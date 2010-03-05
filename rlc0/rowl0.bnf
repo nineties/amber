@@ -1,0 +1,147 @@
+/* BNF of rowl0 */
+
+Symbols of rowl0 : if, else, while, goto, label, return, syscall, export, allocate
+
+nonassoc '=>'
+right ':'
+right '='
+left Operator
+left '|'
+left '^'
+left '&'
+nonassoc '==' '!='
+nonassoc '<' '>' '<=' '>='
+left '+' '-'
+left '*' '/' '%'
+right prec_unary prec_preop
+left '.' prec_postop
+
+Program
+    :
+    | ExternalItem (';' ExternalItem)* ';'?
+    ;
+
+ExternalItemBlock
+    ;
+
+ExternalItem
+    : Item 
+    ;
+
+Item
+    : ToplevelExpr
+    | 'return' OrExpr
+    | 'if' '(' OrExpr ')' Block
+    | 'if' '(' OrExpr ')' Block 'else' Block
+    | 'goto' Identifier
+    | 'label' Identifier
+    | 'export' SimpleItem
+    | 'syscall' SimpleItem
+    | 'allocate' SimpleItem
+    ;
+
+ToplevelExpr
+    : Identifier ':' OrExpr
+    | Identifier '=>' (Integer|Identifier)
+    | Identifier '=' OrExpr
+    | Identifier '(' Arguments')'
+    | SimpleItem '[' OrExpr ']' '=' OrExpr
+    | '*' PrefixExpr '=' OrExpr
+    ;
+
+OrExpr
+    : XorExpr ('|' XorExpr)*
+    ;
+
+XorExpr
+    : AndExpr ('^' AndExpr)*
+    ;
+
+AndExpr
+    : EqualityExpr ('&' EqualityExpr)*
+    ;
+
+EqualityExpr
+    : RelationalExpr ('==' RelationalExpr | '!=' RelationalExpr)*
+    ;
+
+RelationalExpr
+    : AdditiveExpression
+        ('<'  AdditiveExpression |
+         '>'  AdditiveExpression |
+         '<=' AdditiveExpression |
+         '>=' AdditiveExpression)*
+    ;
+
+AdditiveExpression
+    : MultiplicativeExpression
+        ('+' MultiplicativeExpression | 
+         '-' MultiplicativeExpression)*
+    ;
+
+MultiplicativeExpression
+    : PrefixExpr { '*' PrefixExpr | '/' PrefixExpr | '%' PrefixExpr }*
+    ;
+
+PrefixExpr
+    : SimpleItem
+    | '+' SimpleItem
+    | '-' SimpleItem
+    | '*' SimpleItem
+    ;
+
+SimpleItem
+    : Identifier
+    | Constant
+    | Array
+    | Block
+    | Tuple
+    | SimpleItem Array  /* a[b,c,d..] => operator[] */
+    | SimpleItem Tuple  /* a(b,c,d..) => operator() (e.g. function call) */
+    | SimpleItem Block   /* a{...}     => operator{} */
+    ;
+
+Constant
+    : Integer
+    | Character
+    | String
+    ;
+
+Tuple
+    : '(' TupleItemsOpt ')'
+    ;
+
+TupleItemsOpt
+    :
+    | TupleItems
+    ;
+
+TupleItems
+    : Item
+    | TupleItems ',' Item
+    ;
+
+Array
+    : '[' ArrayItemsOpt ']'
+    ;
+
+ArrayItemsOpt
+    :
+    | ArrayItems
+    ;
+
+ArrayItems
+    : Item
+    | ArrayItems ',' Item
+    ;
+
+Block
+    : '{' '}'
+    | '{' BlockItems '}'
+    | '{' BlockItems ';' '}'
+    ;
+
+BlockItems
+    : Item
+    | BlockItems ';' Item
+    ;

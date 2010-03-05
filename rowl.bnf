@@ -1,0 +1,149 @@
+/* BNF of rowl */
+
+right ':'
+right '=>'
+right '=' '+=' '-=' '*=' '/=' '%=' '|=' '^=' '&=' '<<=' '>>='
+left Operator
+left '||'
+left '&&'
+left '|'
+left '^'
+left '&'
+left '==' '!='
+left '<' '>' '<=' '>='
+left '<<' '>>'
+left '+' '-'
+left '*' '/' '%'
+right prec_unary prec_preop
+left '.' '->' prec_postop
+
+Program
+    :
+    | ExternalItemList
+    | ExternalItemList ';'
+    ;
+
+ExternalItemList
+    : ExternalItem
+    | ExternalItemList ';' ExternalItem
+    ;
+
+ExternalItem
+    : Item
+    ;
+
+Item
+    : SecondaryItem
+    | Symbol PatternItemsOpt
+    | Item ':' Item
+    | Item '=>' Item
+    | Item '=' Item
+    | Item '+=' Item
+    | Item '-=' Item
+    | Item '*=' Item
+    | Item '/=' Item
+    | Item '%=' Item
+    | Item '|=' Item
+    | Item '^=' Item
+    | Item '&=' Item
+    | Item '<<=' Item
+    | Item '>>=' Item
+    | Item '+' Item
+    | Item '-' Item
+    | Item '*' Item
+    | Item '/' Item
+    | Item '%' Item
+    | Item '<<' Item
+    | Item '>>' Item
+    | Item '<' Item
+    | Item '>' Item
+    | Item '<=' Item
+    | Item '>=' Item
+    | Item '==' Item
+    | Item '!=' Item
+    | Item '&' Item
+    | Item '^' Item
+    | Item '|' Item
+    | Item '&&' Item
+    | Item '||' Item
+    | Item '.' Item
+    | Item '->' Item
+    | Item Operator Item
+    | '+' Item // prec_unary
+    | '-' Item // prec_unary
+    | '~' Item // prec_unary
+    | '!' Item // prec_unary
+    | '&' Item // prec_unary
+    | '*' Item // prec_unary
+    ;
+
+Tuple
+    : '(' TupleItemsOpt ')'
+    ;
+
+TupleItemsOpt
+    :
+    | TupleItems
+    ;
+
+TupleItems
+    : Item
+    | TupleItems ',' Item
+    ;
+
+Array
+    : '[' ArrayItemsOpt ']'
+    ;
+
+ArrayItemsOpt
+    :
+    | ArrayItems
+    ;
+
+ArrayItems
+    : Item
+    | ArrayItems ',' Item
+    ;
+
+List
+    : '{' '}'
+    | '{' ListItems '}'
+    | '{' ListItems ';' '}'
+    ;
+
+ListItems
+    : Item
+    | ListItems ';' Item
+    ;
+
+PatternItemsOpt
+    :
+    | PatternItems
+    ;
+
+PatternItems
+    : PrimaryItem
+    | PatternItems PrimaryItem
+    ;
+
+SecondaryItem
+    : PrimaryItem
+    | SecondaryItem Tuple  /* a(b,c,d..) => operator() (e.g. function call) */
+    | SecondaryItem Array  /* a[b,c,d..] => operator[] */
+    | SecondaryItem List   /* a{...}     => operator{} */
+    ;
+
+PrimaryItem
+    : Identifier
+    | Constant
+    | Tuple
+    | Array
+    | List
+    ;
+
+Constant
+    : Integer
+    | Character
+    | Real
+    | String
+    ;
