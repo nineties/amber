@@ -8,7 +8,7 @@
 
 include(stddef,code);
 
-export(put_item, put_type, put_tyscheme);
+export(put_prog, put_item, put_type, put_tyscheme);
 
 ppfuncs: [put_prog, put_integer, put_string, put_identifier, put_array,
     put_block, put_tuple, put_rewrite, put_eval, put_decl, put_pattern,
@@ -66,7 +66,7 @@ put_subitem: (p0, p1, p2) {
 put_prog: (p0, p1) {
     allocate(1);
     indent_depth = 0;
-    x0 = p1[2];
+    x0 = p1[1];
     while (x0 != NULL) {
         put_item(p0, ls_value(x0));
         fputs(p0, ";\n");
