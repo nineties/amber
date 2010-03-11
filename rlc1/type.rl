@@ -53,9 +53,6 @@ rename: (p0, p1) {
     if (p1[0] == NODE_ARRAY_T) {
         return mktup2(NODE_ARRAY_T, rename(p0, p1[1]));
     };
-    if (p1[0] == NODE_LIST_T) {
-        return mktup2(NODE_LIST_T, rename(p0, p1[1]));
-    };
     if (p1[0] == NODE_FUNCTION_T) {
         return mktup3(NODE_FUNCTION_T,
             rename_tuple_t(p0, p1[1]), rename(p0, p1[2]));
@@ -100,7 +97,6 @@ freevar_iter: (p0, p1) {
         return p0;
     };
     if (p1[0] == NODE_ARRAY_T) { return freevar_iter(p0, p1[1]); };
-    if (p1[0] == NODE_LIST_T) { return freevar_iter(p0, p1[1]); };
     if (p1[0] == NODE_FUNCTION_T) {
         p0 = freevar_iter(p0, p1[1]);
         return freevar_iter(p0, p1[2]);
