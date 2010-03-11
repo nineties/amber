@@ -32,9 +32,15 @@ compile: (p0) {
     x1 = parse(p0, x0);
     close_in(x0);
     puts("done\n");
+
+    put_prog(stdout, x1);
+
+    (%
+    puts("done\n");
     puts("type checking...");
     typing(x1);
     puts("done\n");
+    %);
 
     (%
     x0 = open_out(gen_fname(p0, ".s"));

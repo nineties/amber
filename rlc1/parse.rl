@@ -12,9 +12,9 @@ export(parse);
 
 (% p0: file name, input channel %);
 parse: (p0, p1) {
-    allocate(1);
     lexer_init(p0, p1);
-    return mktup2(NODE_PROG, parse_semi_list(lex()));
+    return mktup2(NODE_PROG, ls_cons(parse_primary_item(lex()), NULL));
+    (% return mktup2(NODE_PROG, parse_semi_list(lex())); %);
 };
 
 (% p0: name of expected token %);
