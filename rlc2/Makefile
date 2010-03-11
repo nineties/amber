@@ -26,7 +26,7 @@ rlc: $(OBJECTS)
 .SUFFIXES: .rl
 
 .rl.s:
-	$(RLC1) $(basename $<)
+	$(RLC1) $<
 
 .s.o:
 	$(AS) $< -o $@ $(ASFLAGS)
