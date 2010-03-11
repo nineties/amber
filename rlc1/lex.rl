@@ -273,7 +273,7 @@ consume: () {
 (% p0: position %);
 rewind: (p0) {
     cvec_put(tokbuf, p0, '\0');
-    inbuf_beg = inbuf_beg - (cvec_size(tokbuf) - p0) + 1; 
+    inbuf_beg = inbuf_beg - (cvec_size(tokbuf) - p0);
     srcfile = last_file;
     srcline = last_line;
     srcclmn = last_clmn;
