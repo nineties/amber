@@ -79,7 +79,7 @@ parse_declaration_expr: (p0) {
 
 (% p0: first token %);
 parse_command_expr: (p0) {
-    allocate(2);
+    allocate(1);
     if (p0 == TOK_RETURN) {
         x0 = lex();
         if (end_of_item(x0)) {
