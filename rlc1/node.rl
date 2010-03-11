@@ -7,6 +7,7 @@
  %);
 
 include(stddef, code);
+export(make_identifier);
 export(get_rawstring);
 
 escaped: (p0) {
@@ -26,7 +27,7 @@ escaped: (p0) {
     fputc(stderr, '\n');
 };
 
-get_rawstring_impl: (p0) {
+get_rawstring: (p0) {
     allocate(5);
     x0 = memalloc(strlen(p0[2])-1);
     x1 = p0[2];
@@ -45,19 +46,4 @@ get_rawstring_impl: (p0) {
     };
     wch(x0, x3, '\0');
     return x0;
-};
-
-(% p0: string node %);
-get_rawstring: (p0) {
-    allocate(2);
-    if (p0[3] == TRUE) {
-        (% comment-type string %);
-        x0 = strlen(p0[2]);
-        x1 = memalloc(x0 - 3);
-        memcpy(x1, p0[2] + 2, x0-3);
-        wch(x1, x0-4, '\0');
-        return x1;
-    } else {
-        return get_rawstring_impl(p0);
-    }
 };

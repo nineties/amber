@@ -13,8 +13,7 @@ export(parse);
 (% p0: file name, input channel %);
 parse: (p0, p1) {
     lexer_init(p0, p1);
-    return mktup2(NODE_PROG, ls_cons(parse_primary_item(lex()), NULL));
-    (% return mktup2(NODE_PROG, parse_semi_list(lex())); %);
+    return mktup2(NODE_PROG, parse_semi_list(lex()));
 };
 
 (% p0: name of expected token %);
@@ -36,6 +35,16 @@ eatchar: (p0, p1) {
     fputc(stderr, ''');
     fputc(stderr, '\n');
     exit(1);
+};
+
+(% p0: token %);
+end_of_item: (p0) {
+    if (p0 == ',') { return TRUE; };
+    if (p0 == ';') { return TRUE; };
+    if (p0 == ')') { return TRUE; };
+    if (p0 == ']') { return TRUE; };
+    if (p0 == '}') { return TRUE; };
+    return FALSE;
 };
 
 (% p0: first token %);
@@ -62,7 +71,7 @@ parse_declaration_expr: (p0) {
     x0 = parse_command_expr(p0);
     x1 = lex();
     if (x1 == ':') {
-        return mktup5(NODE_PAT, ":", 2, x0, parse_declaration_expr(lex()));
+        return mktup4(NODE_DECL, NULL, x0, parse_declaration_expr(lex()));
     };
     unput();
     return x0;
@@ -71,33 +80,15 @@ parse_declaration_expr: (p0) {
 (% p0: first token %);
 parse_command_expr: (p0) {
     allocate(2);
+    if (p0 == TOK_RETURN) {
+        x0 = lex();
+        if (end_of_item(x0)) {
+            unput();
+            return mktup2(NODE_RET, NULL);
+        };
+        return mktup3(NODE_RETVAL, NULL, parse_assignment_expr(x0));
+    };
     return parse_assignment_expr(p0);
-    if (p0 != TOK_COMMAND) {
-        return parse_assignment_expr(p0);
-    };
-    x0 = token_val();
-    x1 = lex();
-    if (x1 == ',') {
-        unput();
-        return mktup5(NODE_PAT, x0, 0);
-    };
-    if (x1 == ';') {
-        unput();
-        return mktup5(NODE_PAT, x0, 0);
-    };
-    if (x1 == ')') {
-        unput();
-        return mktup5(NODE_PAT, x0, 0);
-    };
-    if (x1 == ']') {
-        unput();
-        return mktup5(NODE_PAT, x0, 0);
-    };
-    if (x1 == '}') {
-        unput();
-        return mktup5(NODE_PAT, x0, 0);
-    };
-    return mktup5(NODE_PAT, x0, 1, parse_assignment_expr(x1));
 };
 
 (% p0: first token %);
@@ -106,37 +97,37 @@ parse_assignment_expr: (p0) {
     x0 = parse_seqor_expr(p0);
     x1 = lex();
     if (x1 == '=') {
-        return mktup5(NODE_PAT, "=", 2, x0, parse_assignment_expr(lex()));
+        return mktup5(NODE_ASSIGN, NULL, BINOP_NONE, x0, parse_assignment_expr(lex()));
     };
     if (x1 == TOK_ADDASGN) {
-        return mktup5(NODE_PAT, "+=", 2, x0, parse_assignment_expr(lex()));
+        return mktup5(NODE_ASSIGN, NULL, BINOP_ADD, x0, parse_assignment_expr(lex()));
     };
     if (x1 == TOK_SUBASGN) {
-        return mktup5(NODE_PAT, "-=", 2, x0, parse_assignment_expr(lex()));
+        return mktup5(NODE_ASSIGN, NULL, BINOP_SUB, x0, parse_assignment_expr(lex()));
     };
     if (x1 == TOK_MULASGN) {
-        return mktup5(NODE_PAT, "*=", 2, x0, parse_assignment_expr(lex()));
+        return mktup5(NODE_ASSIGN, NULL, BINOP_MUL, x0, parse_assignment_expr(lex()));
     };
     if (x1 == TOK_DIVASGN) {
-        return mktup5(NODE_PAT, "/=", 2, x0, parse_assignment_expr(lex()));
+        return mktup5(NODE_ASSIGN, NULL, BINOP_DIV, x0, parse_assignment_expr(lex()));
     };
     if (x1 == TOK_MODASGN) {
-        return mktup5(NODE_PAT, "%=", 2, x0, parse_assignment_expr(lex()));
+        return mktup5(NODE_ASSIGN, NULL, BINOP_MOD, x0, parse_assignment_expr(lex()));
     };
     if (x1 == TOK_ORASGN) {
-        return mktup5(NODE_PAT, "|=", 2, x0, parse_assignment_expr(lex()));
+        return mktup5(NODE_ASSIGN, NULL, BINOP_OR, x0, parse_assignment_expr(lex()));
     };
     if (x1 == TOK_XORASGN) {
-        return mktup5(NODE_PAT, "^=", 2, x0, parse_assignment_expr(lex()));
+        return mktup5(NODE_ASSIGN, NULL, BINOP_XOR, x0, parse_assignment_expr(lex()));
     };
     if (x1 == TOK_ANDASGN) {
-        return mktup5(NODE_PAT, "&=", 2, x0, parse_assignment_expr(lex()));
+        return mktup5(NODE_ASSIGN, NULL, BINOP_AND, x0, parse_assignment_expr(lex()));
     };
     if (x1 == TOK_LSHIFTASGN) {
-        return mktup5(NODE_PAT, "<<=", 2, x0, parse_assignment_expr(lex()));
+        return mktup5(NODE_ASSIGN, NULL, BINOP_LSHIFT, x0, parse_assignment_expr(lex()));
     };
     if (x1 == TOK_RSHIFTASGN) {
-        return mktup5(NODE_PAT, ">>=", 2, x0, parse_assignment_expr(lex()));
+        return mktup5(NODE_ASSIGN, NULL, BINOP_RSHIFT, x0, parse_assignment_expr(lex()));
     };
     unput();
     return x0;
@@ -149,7 +140,7 @@ parse_seqor_expr: (p0) {
 label seqor_loop;
     x1 = lex();
     if (x1 == TOK_SEQOR) {
-        x0 = mktup5(NODE_PAT, "||", 2, x0, parse_seqand_expr(lex()));
+        x0 = mktup5(NODE_BINEXPR, NULL, BINOP_SEQOR, x0, parse_seqand_expr(lex()));
         goto &seqor_loop;
     };
     unput();
@@ -163,7 +154,7 @@ parse_seqand_expr: (p0) {
 label seqand_loop;
     x1 = lex();
     if (x1 == TOK_SEQAND) {
-        x0 = mktup5(NODE_PAT, "&&", 2, x0, parse_or_expr(lex()));
+        x0 = mktup5(NODE_BINEXPR, NULL, BINOP_SEQAND, x0, parse_or_expr(lex()));
         goto &seqand_loop;
     };
     unput();
@@ -177,7 +168,7 @@ parse_or_expr: (p0) {
 label or_loop;
     x1 = lex();
     if (x1 == '|') {
-        x0 = mktup5(NODE_PAT, "|", 2, x0, parse_xor_expr(lex()));
+        x0 = mktup5(NODE_BINEXPR, NULL, BINOP_OR, x0, parse_xor_expr(lex()));
         goto &or_loop;
     };
     unput();
@@ -191,7 +182,7 @@ parse_xor_expr: (p0) {
 label xor_loop;
     x1 = lex();
     if (x1 == '^') {
-        x0 = mktup5(NODE_PAT, "^", 2, x0, parse_and_expr(lex()));
+        x0 = mktup5(NODE_BINEXPR, NULL, BINOP_XOR, x0, parse_and_expr(lex()));
         goto &xor_loop;
     };
     unput();
@@ -205,7 +196,7 @@ parse_and_expr: (p0) {
 label and_loop;
     x1 = lex();
     if (x1 == '&') {
-        x0 = mktup5(NODE_PAT, "&", 2, x0, parse_equality_expr(lex()));
+        x0 = mktup5(NODE_BINEXPR, NULL, BINOP_AND, x0, parse_equality_expr(lex()));
         goto &and_loop;
     };
     unput();
@@ -219,11 +210,11 @@ parse_equality_expr: (p0) {
 label eq_loop;
     x1 = lex();
     if (x1 == TOK_EQ) {
-        x0 = mktup5(NODE_PAT, "==", 2, x0, parse_relational_expr(lex()));
+        x0 = mktup5(NODE_BINEXPR, NULL, BINOP_EQ, x0, parse_relational_expr(lex()));
         goto &eq_loop;
     };
     if (x1 == TOK_NE) {
-        x0 = mktup5(NODE_PAT, "!=", 2, x0, parse_relational_expr(lex()));
+        x0 = mktup5(NODE_BINEXPR, NULL, BINOP_NE, x0, parse_relational_expr(lex()));
         goto &eq_loop;
     };
     unput();
@@ -237,19 +228,19 @@ parse_relational_expr: (p0) {
 label rel_loop;
     x1 = lex();
     if (x1 == '<') {
-        x0 = mktup5(NODE_PAT, "<", 2, x0, parse_shift_expr(lex()));
+        x0 = mktup5(NODE_BINEXPR, NULL, BINOP_LT, x0, parse_shift_expr(lex()));
         goto &rel_loop;
     };
     if (x1 == '>') {
-        x0 = mktup5(NODE_PAT, ">", 2, x0, parse_shift_expr(lex()));
+        x0 = mktup5(NODE_BINEXPR, NULL, BINOP_GT, x0, parse_shift_expr(lex()));
         goto &rel_loop;
     };
     if (x1 == TOK_LE) {
-        x0 = mktup5(NODE_PAT, "<=", 2, x0, parse_shift_expr(lex()));
+        x0 = mktup5(NODE_BINEXPR, NULL, BINOP_LE, x0, parse_shift_expr(lex()));
         goto &rel_loop;
     };
     if (x1 == TOK_GE) {
-        x0 = mktup5(NODE_PAT, ">=", 2, x0, parse_shift_expr(lex()));
+        x0 = mktup5(NODE_BINEXPR, NULL, BINOP_GE, x0, parse_shift_expr(lex()));
         goto &rel_loop;
     };
     unput();
@@ -263,11 +254,11 @@ parse_shift_expr: (p0) {
 label shift_loop;
     x1 = lex();
     if (x1 == TOK_LSHIFT) {
-        x0 = mktup5(NODE_PAT, "<<", 2, x0, parse_additive_expr(lex()));
+        x0 = mktup5(NODE_BINEXPR, NULL, BINOP_LSHIFT, x0, parse_additive_expr(lex()));
         goto &shift_loop;
     };
     if (x1 == TOK_RSHIFT) {
-        x0 = mktup5(NODE_PAT, ">>", 2, x0, parse_additive_expr(lex()));
+        x0 = mktup5(NODE_BINEXPR, NULL, BINOP_RSHIFT, x0, parse_additive_expr(lex()));
         goto &shift_loop;
     };
     unput();
@@ -281,11 +272,11 @@ parse_additive_expr: (p0) {
 label add_loop;
     x1 = lex();
     if (x1 == '+') {
-        x0 = mktup5(NODE_PAT, "+", 2, x0, parse_multiplicative_expr(lex()));
+        x0 = mktup5(NODE_BINEXPR, NULL, BINOP_ADD, x0, parse_multiplicative_expr(lex()));
         goto &add_loop;
     };
     if (x1 == '-') {
-        x0 = mktup5(NODE_PAT, "-", 2, x0, parse_multiplicative_expr(lex()));
+        x0 = mktup5(NODE_BINEXPR, NULL, BINOP_SUB, x0, parse_multiplicative_expr(lex()));
         goto &add_loop;
     };
     unput();
@@ -299,15 +290,15 @@ parse_multiplicative_expr: (p0) {
 label mult_loop;
     x1 = lex();
     if (x1 == '*') {
-        x0 = mktup5(NODE_PAT, "*", 2, x0, parse_prefix_expr(lex()));
+        x0 = mktup5(NODE_BINEXPR, NULL, BINOP_MUL, x0, parse_prefix_expr(lex()));
         goto &mult_loop;
     };
     if (x1 == '/') {
-        x0 = mktup5(NODE_PAT, "/", 2, x0, parse_prefix_expr(lex()));
+        x0 = mktup5(NODE_BINEXPR, NULL, BINOP_DIV, x0, parse_prefix_expr(lex()));
         goto &mult_loop;
     };
     if (x1 == '%') {
-        x0 = mktup5(NODE_PAT, "%", 2, x0, parse_prefix_expr(lex()));
+        x0 = mktup5(NODE_BINEXPR, NULL, BINOP_MOD, x0, parse_prefix_expr(lex()));
         goto &mult_loop;
     };
     unput();
@@ -316,31 +307,31 @@ label mult_loop;
 
 (% p0: first token %);
 parse_prefix_expr: (p0) {
-    if (p0 == '+') { return mktup4(NODE_PAT, "pre+", 1, parse_else_expr(lex())); };
-    if (p0 == '-') { return mktup4(NODE_PAT, "pre-", 1, parse_else_expr(lex())); };
-    if (p0 == '~') { return mktup4(NODE_PAT, "pre~", 1, parse_else_expr(lex())); };
-    if (p0 == '!') { return mktup4(NODE_PAT, "pre!", 1, parse_else_expr(lex())); };
-    if (p0 == '&') { return mktup4(NODE_PAT, "pre&", 1, parse_else_expr(lex())); };
-    if (p0 == '*') { return mktup4(NODE_PAT, "pre*", 1, parse_else_expr(lex())); };
-    if (p0 == '#') { return mktup2(NODE_EVAL, parse_else_expr(lex())); };
+    if (p0 == '+') {
+        return mktup4(NODE_UNEXPR, NULL, UNOP_PLUS, parse_postfix_expr(lex()));
+    };
+    if (p0 == '-') {
+        return mktup4(NODE_UNEXPR, NULL, UNOP_MINUS, parse_postfix_expr(lex()));
+    };
+    if (p0 == '~') {
+        return mktup4(NODE_UNEXPR, NULL, UNOP_INVERSE, parse_postfix_expr(lex()));
+    };
+    if (p0 == '!') {
+        return mktup4(NODE_UNEXPR, NULL, UNOP_NOT, parse_postfix_expr(lex()));
+    };
+    if (p0 == '&') {
+        return mktup4(NODE_UNEXPR, NULL, UNOP_ADDRESSOF, parse_postfix_expr(lex()));
+    };
+    if (p0 == '*') {
+        return mktup4(NODE_UNEXPR, NULL, UNOP_INDIRECT, parse_postfix_expr(lex()));
+    };
     if (p0 == TOK_INCR) {
-        return mktup4(NODE_PAT, "pre++", 1, parse_else_expr(lex()));
+        return mktup4(NODE_UNEXPR, NULL, UNOP_PREINCR, parse_postfix_expr(lex()));
     };
     if (p0 == TOK_DECR) {
-        return mktup4(NODE_PAT, "pre--", 1, parse_else_expr(lex()));
+        return mktup4(NODE_UNEXPR, NULL, UNOP_PREDECR, parse_postfix_expr(lex()));
     };
-    return parse_else_expr(p0);
-};
-
-parse_else_expr: (p0) {
-    allocate(2);
-    x0 = parse_postfix_expr(p0);
-    x1 = lex();
-    if (x1 == TOK_ELSE) {
-        return mktup5(NODE_PAT, "else", 2, x0, parse_else_expr(lex()));
-    };
-    unput();
-    return x0;
+    return parse_postfix_expr(p0);
 };
 
 (% p0: first token %);
@@ -350,23 +341,23 @@ parse_postfix_expr: (p0) {
 label post_loop;
     x1 = lex();
     if (x1 == '(') {
-        x0 = mktup5(NODE_PAT, "()", 2, x0, parse_tuple(x1));
+        x0 = mktup4(NODE_CALLOP, NULL, x0, parse_tuple(x1));
         goto &post_loop;
     };
     if (x1 == '[') {
-        x0 = mktup5(NODE_PAT, "[]", 2, x0, parse_array(x1));
+        x0 = mktup4(NODE_SUBSOP, NULL, x0, parse_array(x1));
         goto &post_loop;
     };
     if (x1 == '{') {
-        x0 = mktup5(NODE_PAT, "{}", 2, x0, parse_list(x1));
+        x0 = mktup4(NODE_CODEOP, NULL, x0, parse_list(x1));
         goto &post_loop;
     };
     if (x1 == TOK_INCR) {
-        x0 = mktup3(NODE_PAT, "post++", 1, x0);
+        x0 = mktup4(NODE_UNEXPR, NULL, UNOP_POSTINCR, x0);
         goto &post_loop;
     };
     if (x1 == TOK_DECR) {
-        x0 = mktup3(NODE_PAT, "post--", 1, x0);
+        x0 = mktup4(NODE_UNEXPR, NULL, UNOP_POSTDECR, x0);
         goto &post_loop;
     };
     unput();
@@ -376,7 +367,7 @@ label post_loop;
 (% p0: first token %);
 parse_primary_item: (p0) {
     if (p0 == TOK_IDENT) {
-        return mktup4(NODE_PAT, strdup(token_text()), 0, NULL);
+        return mktup5(NODE_IDENTIFIER, NULL, strdup(token_text()), 0, NULL);
     };
     if (p0 == '(') { return parse_tuple(p0); };
     if (p0 == '[') { return parse_array(p0); };
@@ -385,10 +376,7 @@ parse_primary_item: (p0) {
         return mktup3(NODE_INTEGER, NULL, token_val());
     };
     if (p0 == TOK_STRING) {
-        return mktup4(NODE_STRING, NULL, strdup(token_text()), FALSE);
-    };
-    if (p0 == TOK_COMMENT) {
-        return mktup4(NODE_STRING, NULL, strdup(token_text()), TRUE);
+        return mktup4(NODE_STRING, NULL, strdup(token_text()));
     };
     expected("item");
 };
@@ -472,11 +460,11 @@ parse_list: (p0) {
     eatchar(p0, '{');
     x0 = lex();
     if (x0 == '}') {
-        return mktup3(NODE_BLOCK, NULL, NULL);
+        return mktup3(NODE_LIST, NULL, NULL);
     };
     x1 = parse_semi_list(x0);
     eatchar(lex(), '}');
-    return mktup3(NODE_BLOCK, NULL, x1);
+    return mktup3(NODE_LIST, NULL, x1);
 };
 
 (% p0: first token %);
@@ -496,6 +484,7 @@ parse_semi_list: (p0) {
         return ls_cons(x0, parse_semi_list(lex()));
     };
     if (x1 == '}') {
+        unput();
         return ls_cons(x0, NULL);
     };
     expected("';' or '}'");

@@ -450,7 +450,7 @@ unify: (p0, p1) {
         if (p0[0] == NODE_DOUBLE_T)   { return; };
         if (p0[0] == NODE_TUPLE_T)    { return unify_tuple_t(p0, p1); };
         if (p0[0] == NODE_ARRAY_T)    { return unify(p0[1], p1[1]); };
-        if (p0[0] == NODE_BLOCK_T)     { return unify(p0[1], p1[1]); };
+        if (p0[0] == NODE_LIST_T)     { return unify(p0[1], p1[1]); };
         if (p0[0] == NODE_POINTER_T)  { return unify(p0[1], p1[1]); };
         if (p0[0] == NODE_FUNCTION_T) { return unify_function_t(p0, p1); };
     };
@@ -501,7 +501,7 @@ occur_check: (p0, p1) {
     allocate(1);
     if (p1[0] == NODE_TUPLE_T)    { return occur_check_tuple_t(p0, p1); };
     if (p1[0] == NODE_ARRAY_T)    { return occur_check(p0, p1[1]); };
-    if (p1[0] == NODE_BLOCK_T)     { return occur_check(p0, p1[1]); };
+    if (p1[0] == NODE_LIST_T)     { return occur_check(p0, p1[1]); };
     if (p1[0] == NODE_POINTER_T)  { return occur_check(p0, p1[1]); };
     if (p1[0] == NODE_FUNCTION_T) { return occur_check_function_t(p0, p1); };
     if (p1[0] == NODE_TYVAR) {
@@ -546,10 +546,10 @@ deref: (p0) {
     if (p0[0] == NODE_IDENTIFIER) { return deref_identifier(p0); };
     if (p0[0] == NODE_INTEGER) { p0[1] = deref_type(p0[1]); return p0; };
     if (p0[0] == NODE_ARRAY) { return deref_array(p0); };
-    if (p0[0] == NODE_BLOCK) { return deref_list(p0); };
+    if (p0[0] == NODE_LIST) { return deref_list(p0); };
     if (p0[0] == NODE_TUPLE) { return deref_tuple(p0); };
     if (p0[0] == NODE_ARRAYOP) { return deref_binary(p0); };
-    if (p0[0] == NODE_BLOCKOP) { return deref_binary(p0); };
+    if (p0[0] == NODE_LISTOP) { return deref_binary(p0); };
     if (p0[0] == NODE_TUPLEOP) { return deref_binary(p0); };
     if (p0[0] == NODE_DECL) { return deref_binary(p0); };
     if (p0[0] == NODE_ASGN) { return deref_binary(p0); };
@@ -667,7 +667,7 @@ deref_type: (p0) {
         return p0;
     };
     if (p0[0] == NODE_ARRAY_T)   { p0[1] = deref_type(p0[1]); return p0; };
-    if (p0[0] == NODE_BLOCK_T)    { p0[1] = deref_type(p0[1]); return p0; };
+    if (p0[0] == NODE_LIST_T)    { p0[1] = deref_type(p0[1]); return p0; };
     if (p0[0] == NODE_POINTER_T) { p0[1] = deref_type(p0[1]); return p0; };
     if (p0[0] == NODE_FUNCTION_T) {
         p0[1] = deref_type(p0[1]);

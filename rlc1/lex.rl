@@ -308,9 +308,10 @@ accept: (p0) {
 
 accept_ident: () {
     allocate(1);
-    x0 = map_find(constr_map, token_text());
-    if (x0 != 0) {
-        accept(x0);
+    x0 = map_find(keyword_map, token_text());
+    if (x0 != NULL) {
+        accept(x0[0]);
+        tokval = x0[1];
         return;
     };
     x0 = map_find(operator_map, token_text());
@@ -502,8 +503,8 @@ label s22;
     goto &s20;
 label s23;
     consume();
-    accept(TOK_COMMENT);
-    goto &fin;
+    (% finished comment block %);
+    goto &s0;
 label s24;
     accept(consume());
     goto &fin;
@@ -527,9 +528,7 @@ label e8;
     lex_error("unterminated comment literal");
 };
 
-export(register_command);
-
-constr_map : NULL;
+keyword_map : NULL;
 
 strhash: (p0) {
     allocate(1);
@@ -542,7 +541,8 @@ strhash: (p0) {
 };
 
 keyword_init: () {
-    constr_map = mkmap(&strhash, &streq, 1);
+    keyword_map = mkmap(&strhash, &streq, 1);
+    map_add(keyword_map, "return", TOK_RETURN);
 };
 
 operator_map : NULL;
@@ -585,5 +585,4 @@ operator_init: () {
     map_add(operator_map, "||", TOK_SEQOR);
     map_add(operator_map, "++", TOK_INCR);
     map_add(operator_map, "--", TOK_DECR);
-    map_add(operator_map, "else", TOK_ELSE);
 };

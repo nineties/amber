@@ -12,13 +12,16 @@ export main;
 
 progname : NULL;
 
-(% p0: file name, p1: suffix %);
-gen_fname: (p0, p1) {
-    allocate(1);
-    x0 = memalloc(strlen(p0) + strlen(p1) + 1);
-    strcpy(x0, p0);
-    strcpy(x0 + strlen(p0), p1);
-    return x0;
+(% rename xxx.rl to xxx.p1 %);
+change_suffix: (p0, p1) {
+    allocate(3);
+    x0 = strlen(p0);
+    x1 = strlen(p1);
+    x2 = memalloc(x0 - 2 + x1 + 1);
+    memcpy(x2, p0, x0 - 2);
+    memcpy(x2 + x0 - 2, p1, x1);
+    wch(x2, x0 - 2 + x1, '\0');
+    return x2;
 };
 
 (% p0: filename %);
@@ -27,7 +30,7 @@ compile: (p0) {
 
     init_rewrite();
 
-    x0 = open_in(gen_fname(p0, ".rl"));
+    x0 = open_in(p0);
     puts("parsing...");
     x1 = parse(p0, x0);
     close_in(x0);
@@ -43,8 +46,7 @@ compile: (p0) {
     %);
 
     (%
-    x0 = open_out(gen_fname(p0, ".s"));
-    codegen(x0, x1);
+    x0 = open_out(change_suffix(p0, "s"));
     close_out(x0);
     %);
 };
