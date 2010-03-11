@@ -6,26 +6,23 @@
  % $Id: code.rl 2010-02-22 18:06:23 nineties $ 
  %);
 
-NODE_PROG       => 0; (% item list %);
-NODE_INTEGER    => 1; (% type, value %);
-NODE_STRING     => 2; (% type, string %);
-NODE_IDENTIFIER => 3; (% type, name, id, tyscheme %);
-NODE_ARRAY      => 4; (% type, length, elements %);
-NODE_LIST       => 5; (% type, elements %);
-NODE_TUPLE      => 6; (% type, length, elements %);
-NODE_REWRITE    => 7; (% left, right %);
-NODE_EVAL       => 8; (% expression %);
-NODE_DECL       => 9; (% type, lhs, rhs %);
-NODE_PAT        => 10; (% symbol, length, pat-elems %);
-NODE_ASM        => 11; (% code %);
-NODE_CALLOP     => 12; (% operator() : type, lhs, tuple of arguments %);
-NODE_SUBSOP     => 13; (% operator[] : type, lhs, array of arguments %);
-NODE_CODEOP     => 14; (% operator{} : type, lhs, list of arguments %);
-NODE_UNEXPR     => 15; (% type, operator, arg %);
-NODE_BINEXPR    => 16; (% type, operator, lhs, rhs %);
-NODE_ASSIGN     => 17; (% type, operator, lhs, rhs %);
-NODE_RET        => 18; (% type %);
-NODE_RETVAL     => 19; (% type, value %);
+NODE_PROG       => 0;  (% item list %);
+NODE_REWRITE    => 1;  (% lhs, rhs %);
+NODE_INTEGER    => 2;  (% type, value %);
+NODE_STRING     => 3;  (% type, string %);
+NODE_IDENTIFIER => 4;  (% type, name, id, tyscheme %);
+NODE_ARRAY      => 5;  (% type, length, elements %);
+NODE_TUPLE      => 6;  (% type, length, elements %);
+NODE_CODE       => 7;  (% type, elements %);
+NODE_DECL       => 8;  (% type, lhs, rhs %);
+NODE_CALLOP     => 9;  (% operator() : type, lhs, tuple of arguments %);
+NODE_SUBSOP     => 10; (% operator[] : type, lhs, array of arguments %);
+NODE_CODEOP     => 11; (% operator{} : type, lhs, code %);
+NODE_UNEXPR     => 12; (% type, operator, arg %);
+NODE_BINEXPR    => 13; (% type, operator, lhs, rhs %);
+NODE_ASSIGN     => 14; (% type, operator, lhs, rhs %);
+NODE_RET        => 15; (% type %);
+NODE_RETVAL     => 16; (% type, value %);
 
 (% types %);
 NODE_VOID_T     => 0;
@@ -36,10 +33,9 @@ NODE_INT64_T    => 4;
 NODE_FLOAT_T    => 5;
 NODE_DOUBLE_T   => 6;
 NODE_ARRAY_T    => 7;  (% element type %);
-NODE_LIST_T     => 8;  (% element type %);
-NODE_TUPLE_T    => 9;  (% length, element types  %);
-NODE_FUNCTION_T => 10; (% param type, ret type %);
-NODE_TYVAR      => 11; (% type-variable id %);
+NODE_TUPLE_T    => 8;  (% length, element types  %);
+NODE_FUNCTION_T => 9;  (% param type, ret type %);
+NODE_TYVAR      => 10; (% type-variable id %);
 
 (% unary operators %);
 UNOP_PLUS      => 0;

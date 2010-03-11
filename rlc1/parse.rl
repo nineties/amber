@@ -460,11 +460,11 @@ parse_list: (p0) {
     eatchar(p0, '{');
     x0 = lex();
     if (x0 == '}') {
-        return mktup3(NODE_LIST, NULL, NULL);
+        return mktup3(NODE_CODE, NULL, NULL);
     };
     x1 = parse_semi_list(x0);
     eatchar(lex(), '}');
-    return mktup3(NODE_LIST, NULL, x1);
+    return mktup3(NODE_CODE, NULL, x1);
 };
 
 (% p0: first token %);
