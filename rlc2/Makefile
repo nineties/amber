@@ -8,7 +8,7 @@
 AS = as
 ASFLAGS =
 LD = ld
-LDFLAGS = --nostdlib --entry=_start
+LDFLAGS = --nostdlib --entry=_main
 
 RLC1 = ../rlc1/rlc
 SOURCES = main.rl

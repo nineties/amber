@@ -372,8 +372,11 @@ parse_primary_item: (p0) {
     if (p0 == '(') { return parse_tuple(p0); };
     if (p0 == '[') { return parse_array(p0); };
     if (p0 == '{') { return parse_list(p0); };
+    if (p0 == TOK_CHAR) {
+        return mktup4(NODE_INTEGER, NULL, 8, token_val());
+    };
     if (p0 == TOK_INT) {
-        return mktup3(NODE_INTEGER, NULL, token_val());
+        return mktup4(NODE_INTEGER, NULL, 32, token_val());
     };
     if (p0 == TOK_STRING) {
         return mktup4(NODE_STRING, NULL, strdup(token_text()));

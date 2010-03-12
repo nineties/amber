@@ -89,10 +89,20 @@ init_tyvarmap: () {
     tyvarmap = mkmap(&tyvarid_hash, &tyvarid_equal, 10);
 };
 
-infer_funcs: [ not_called, infer_integer, infer_string, infer_identifier,
-    not_called, infer_block, infer_tuple, infer_rewrite, infer_eval,
-    infer_decl, infer_pat, infer_asm
-];
+not_reachable: (p0) {
+    fputs(stderr, "ERROR: not reachable here\n");
+    exit(1);
+};
+
+not_implemented: (p0) {
+    fputs(stderr, "ERROR: not implemented\n");
+    exit(1);
+};
+
+infer_funcs: [not_reachable, infer_rewrite, infer_integer, infer_string, infer_identifier,
+    not_implemented, not_implemented, not_implemented, infer_decl, not_implemented,
+    not_implemented, not_implemented, not_implemented, not_implemented, not_implemented,
+    not_implemented, not_implemented ];
 
 void_type   : NULL;
 bool_type   : NULL;
@@ -112,23 +122,16 @@ init_basic_types: () {
     double_type = mktup1(NODE_DOUBLE_T);
 };
 
-not_called: (p0) {
-    fputs(stderr, "ERROR: this function should not be called\n");
-    exit(1);
-};
-
-not_reachable: () {
-    fputs(stderr, "ERROR: not reachable here\n");
-    exit(1);
-};
-
 infer_integer: (p0) {
-    p0[1] = int_type;
-    return p0;
+    if (p0[2] == 1) { p0[1] = bool_type; return p0; };
+    if (p0[2] == 8) { p0[1] = char_type; return p0; };
+    if (p0[2] == 32) { p0[1] = int_type; return p0; };
+    if (p0[2] == 64) { p0[1] = int64_type; return p0; };
+    not_reachable();
 };
 
 infer_string: (p0) {
-    p0[1] = mktup2(NODE_ARRAY_T, char_type);
+    p0[1] = mktup3(NODE_ARRAY_T, char_type, TRUE);
     return p0;
 };
 
@@ -208,23 +211,9 @@ infer_tuple: (p0) {
     return deref(p0);
 };
 
-infer_pat: (p0) {
-    return infer_item(rewrite(p0));
-};
-
-infer_asm: (p0) {
-    p0[1] = infer_item(p0[1]);
-    unify((p0[1])[1], mktup2(NODE_ARRAY_T, char_type));
-    return p0;
-};
-
 infer_rewrite: (p0) {
     register_rewriterule(p0[1], p0[2]);
     return p0;
-};
-
-infer_eval: (p0) {
-    return infer_item(eval(p0[1]));
 };
 
 infer_decl: (p0) {
