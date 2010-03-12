@@ -47,3 +47,4 @@ get_rawstring: (p0) {
     wch(x0, x3, '\0');
     return x0;
 };
+

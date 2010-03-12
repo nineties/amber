@@ -373,7 +373,8 @@ parse_primary_item: (p0) {
     if (p0 == '[') { return parse_array(p0); };
     if (p0 == '{') { return parse_list(p0); };
     if (p0 == TOK_CHAR) {
-        return mktup4(NODE_INTEGER, NULL, 8, token_val());
+        (% character constant is treated as a 32-bit integer %);
+        return mktup4(NODE_INTEGER, NULL, 32, token_val());
     };
     if (p0 == TOK_INT) {
         return mktup4(NODE_INTEGER, NULL, 32, token_val());

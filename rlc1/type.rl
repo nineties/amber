@@ -8,11 +8,8 @@
 
 include(stddef, code);
 
-export(nodetype);
 export(mktyvar, mktyscheme, rename_tyscheme);
 export(freevar, freevar_tyscheme);
-
-nodetype: (p0) { return p0[1]; };
 
 typeid : 0;
 new_tyid: () {

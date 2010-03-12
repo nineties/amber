@@ -48,8 +48,36 @@ ext_string_decl: (p0, p1, p2) {
     fputc(p0, '\n');
 };
 
-ext_array_decl: (p0, p1, p2) {
+emit_static_value: (p0, p1) {
+    if (p1[0] == NODE_INTEGER) {
+        if (p1[2] == 8) {
+            fputs(p0, "\t.byte ");
+            fputi(p0, p1[3]);
+            fputc(p0, '\n');
+            return;
+        };
+        if (p1[2] == 32) {
+            fputs(p0, "\t.long ");
+            fputi(p0, p1[3]);
+            fputc(p0, '\n');
+            return;
+        };
+        not_implemented();
+    };
     not_implemented();
+};
+
+ext_array_decl: (p0, p1, p2) {
+    allocate(3);
+    fputs(p0, p1[2]);
+    fputs(p0, ":\n");
+    x0 = p2[2]; (% length %);
+    x1 = p2[3]; (% ptr %);
+    x2 = 0;
+    while (x2 < x0) {
+        emit_static_value(p0, x1[x2]);
+        x2 = x2 + 1;
+    };
 };
 
 ext_decl: (p0, p1) {
