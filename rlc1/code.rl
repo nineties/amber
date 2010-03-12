@@ -26,16 +26,14 @@ NODE_RETVAL     => 16; (% type, value %);
 
 (% types %);
 NODE_VOID_T     => 0;
-NODE_BOOL_T     => 1;
-NODE_CHAR_T     => 2;
-NODE_INT_T      => 3;
-NODE_INT64_T    => 4;
-NODE_FLOAT_T    => 5;
-NODE_DOUBLE_T   => 6;
-NODE_ARRAY_T    => 7;  (% element type, is_string %);
-NODE_TUPLE_T    => 8;  (% length, element types  %);
-NODE_FUNCTION_T => 9;  (% param type, ret type %);
-NODE_TYVAR      => 10; (% type-variable id %);
+NODE_CHAR_T     => 1;
+NODE_INT_T      => 2;
+NODE_FLOAT_T    => 3;
+NODE_DOUBLE_T   => 4;
+NODE_ARRAY_T    => 5; (% element type, is_string %);
+NODE_TUPLE_T    => 6; (% length, element types  %);
+NODE_FUNCTION_T => 7; (% param type, ret type %);
+NODE_TYVAR      => 8; (% type-variable id %);
 
 (% unary operators %);
 UNOP_PLUS      => 0;
