@@ -7,7 +7,7 @@
  %);
 
 include(stddef, code);
-export(make_identifier);
+export(get_ident_name);
 export(get_rawstring);
 
 escaped: (p0) {

@@ -76,7 +76,7 @@ put_prog: (p0, p1) {
 };
 
 put_integer: (p0, p1) {
-    fputi(p0, p1[2]);
+    fputi(p0, p1[3]);
 };
 
 put_string: (p0, p1) {

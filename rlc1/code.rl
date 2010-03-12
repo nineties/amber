@@ -8,7 +8,7 @@
 
 NODE_PROG       => 0;  (% item list %);
 NODE_REWRITE    => 1;  (% lhs, rhs %);
-NODE_INTEGER    => 2;  (% type, value %);
+NODE_INTEGER    => 2;  (% type, bits, value %);
 NODE_STRING     => 3;  (% type, string %);
 NODE_IDENTIFIER => 4;  (% type, name, id, tyscheme %);
 NODE_ARRAY      => 5;  (% type, length, elements %);
@@ -32,7 +32,7 @@ NODE_INT_T      => 3;
 NODE_INT64_T    => 4;
 NODE_FLOAT_T    => 5;
 NODE_DOUBLE_T   => 6;
-NODE_ARRAY_T    => 7;  (% element type %);
+NODE_ARRAY_T    => 7;  (% element type, is_string %);
 NODE_TUPLE_T    => 8;  (% length, element types  %);
 NODE_FUNCTION_T => 9;  (% param type, ret type %);
 NODE_TYVAR      => 10; (% type-variable id %);

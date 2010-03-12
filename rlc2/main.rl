@@ -1,1 +1,3 @@
-x : 1;
+a : 1;
+b : 'a';
+c : "Hello World";

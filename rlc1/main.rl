@@ -36,19 +36,15 @@ compile: (p0) {
     close_in(x0);
     puts("done\n");
 
-    put_prog(stdout, x1);
-
-    (%
-    puts("done\n");
     puts("type checking...");
     typing(x1);
     puts("done\n");
-    %);
 
-    (%
+    put_prog(stdout, x1);
+
     x0 = open_out(change_suffix(p0, "s"));
+    codegen(x0, x1);
     close_out(x0);
-    %);
 };
 
 (% p0: argc, p1: argv %);
