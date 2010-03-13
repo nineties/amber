@@ -100,7 +100,7 @@ not_implemented: (p0) {
 };
 
 infer_funcs: [not_reachable, not_implemented, infer_integer, infer_string, infer_identifier,
-    infer_array, not_implemented, not_implemented, infer_decl, not_implemented,
+    infer_array, infer_tuple, not_implemented, infer_decl, not_implemented,
     not_implemented, not_implemented, not_implemented, not_implemented, not_implemented,
     not_implemented, not_implemented
 ];
@@ -126,7 +126,7 @@ infer_integer: (p0) {
 };
 
 infer_string: (p0) {
-    p0[1] = mktup3(NODE_ARRAY_T, char_type, TRUE);
+    p0[1] = mktup2(NODE_POINTER_T, char_type);
     return p0;
 };
 
@@ -157,7 +157,7 @@ infer_array: (p0) {
         unify(x0, x3[x2][1]);
         x2 = x2 + 1;
     };
-    p0[1] = mktup3(NODE_ARRAY_T, x0, FALSE);
+    p0[1] = mktup4(NODE_ARRAY_T, x0, x1, FALSE);
     return deref(p0);
 };
 
@@ -290,8 +290,15 @@ unify: (p0, p1) {
         if (p0[0] == NODE_INT_T)      { return; };
         if (p0[0] == NODE_FLOAT_T)    { return; };
         if (p0[0] == NODE_DOUBLE_T)   { return; };
+        if (p0[0] == NODE_POINTER_T)  { return unify(p0[POINTER_T_BASE], p1[POINTER_T_BASE]); };
         if (p0[0] == NODE_TUPLE_T)    { return unify_tuple_t(p0, p1); };
-        if (p0[0] == NODE_ARRAY_T)    { return unify(p0[1], p1[1]); };
+        if (p0[0] == NODE_ARRAY_T)    {
+            unify(p0[ARRAY_T_ELEMENT], p1[ARRAY_T_ELEMENT]);
+            if (p0[ARRAY_T_LENGTH] != p1[ARRAY_T_LENGTH]) {
+                type_mismatch(p0, p1);
+            };
+            return;
+        };
         if (p0[0] == NODE_FUNCTION_T) { return unify_function_t(p0, p1); };
     };
     type_mismatch(p0, p1);
@@ -378,7 +385,7 @@ type_mismatch: (p0, p1) {
 };
 
 deref_funcs: [not_reachable, not_implemented, deref_integer, deref_string, deref_identifier,
-    deref_array, not_implemented, not_implemented, deref_decl, not_implemented,
+    deref_array, deref_tuple, not_implemented, deref_decl, not_implemented,
     not_implemented, not_implemented, not_implemented, not_implemented, not_implemented,
     not_implemented, not_implemented
 ];
@@ -410,6 +417,19 @@ deref_identifier: (p0) {
 };
 
 deref_array: (p0) {
+    allocate(3);
+    x0 = p0[2]; (% length %);
+    x1 = 0;
+    while (x1 < x0) {
+        x2 = p0[3];
+        x2[x1] = deref(x2[x1]);
+        x1 = x1 + 1;
+    };
+    p0[1] = deref_type(p0[1]);
+    return p0;
+};
+
+deref_tuple: (p0) {
     allocate(3);
     x0 = p0[2]; (% length %);
     x1 = 0;
