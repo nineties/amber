@@ -80,7 +80,9 @@ put_integer: (p0, p1) {
 };
 
 put_string: (p0, p1) {
+    fputc(p0, '"');
     fputs(p0, p1[2]);
+    fputc(p0, '"');
 };
 
 put_identifier: (p0, p1) {
@@ -244,7 +246,8 @@ put_retval: (p0, p1) {
     put_subitem(p0, PRI_ASSIGNMENT, p1[2]);
 };
 
-pptype_funcs: [ put_void_t, put_bool_t, put_char_t, put_int_t, put_int64_t, put_float_t, put_double_t, put_array_t, put_code_t, put_tuple_t, put_function_t, put_tyvar];
+pptype_funcs: [ put_void_t, put_char_t, put_int_t, put_float_t, put_double_t, put_pointer_t,
+    put_array_t, put_tuple_t, put_function_t, put_tyvar];
 
 put_type: (p0, p1) {
     allocate(1);
@@ -256,20 +259,12 @@ put_void_t: (p0, p1) {
     fputs(p0, "void");
 };
 
-put_bool_t: (p0, p1) {
-    fputs(p0, "bool");
-};
-
 put_char_t: (p0, p1) {
     fputs(p0, "char");
 };
 
 put_int_t: (p0, p1) {
     fputs(p0, "int");
-};
-
-put_int64_t: (p0, p1) {
-    fputs(p0, "int64");
 };
 
 put_float_t: (p0, p1) {
@@ -280,9 +275,15 @@ put_double_t: (p0, p1) {
     fputs(p0, "double");
 };
 
+put_pointer_t: (p0, p1) {
+    put_type(p0, p1[POINTER_T_BASE]);
+    fputc(p0, '*');
+};
+
 put_array_t: (p0, p1) {
+    put_type(p0, p1[ARRAY_T_ELEMENT]);
     fputc(p0, '[');
-    put_type(p0, p1[1]);
+    fputi(p0, p1[ARRAY_T_LENGTH]);
     fputc(p0, ']');
 };
 

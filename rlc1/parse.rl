@@ -366,6 +366,7 @@ label post_loop;
 
 (% p0: first token %);
 parse_primary_item: (p0) {
+    allocate(2);
     if (p0 == TOK_IDENT) {
         return mktup5(NODE_IDENTIFIER, NULL, strdup(token_text()), 0, NULL);
     };
@@ -380,7 +381,10 @@ parse_primary_item: (p0) {
         return mktup4(NODE_INTEGER, NULL, 32, token_val());
     };
     if (p0 == TOK_STRING) {
-        return mktup4(NODE_STRING, NULL, strdup(token_text()));
+        x0 = strdup(token_text());
+        x1 = strlen(x0);
+        wch(x0, x1-1, '\0');
+        return mktup4(NODE_STRING, NULL, x0+1);
     };
     expected("item");
 };
