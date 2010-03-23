@@ -111,10 +111,16 @@ put_array: (p0, p1) {
 
 put_code: (p0, p1) {
     allocate(1);
-    fputc(p0, '{');
 
-    indent_depth = indent_depth + 4;
     x0 = p1[2];
+
+    if (x0 == NULL) {
+        fputs(p0, "{}");
+        return;
+    };
+
+    fputc(p0, '{');
+    indent_depth = indent_depth + 4;
     while (x0 != NULL) {
         fputc(p0, '\n');
         put_indent(p0);
