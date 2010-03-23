@@ -341,15 +341,15 @@ parse_postfix_expr: (p0) {
 label post_loop;
     x1 = lex();
     if (x1 == '(') {
-        x0 = mktup4(NODE_CALLOP, NULL, x0, parse_tuple(x1));
+        x0 = mktup4(NODE_CALL, NULL, x0, parse_tuple(x1));
         goto &post_loop;
     };
     if (x1 == '[') {
-        x0 = mktup4(NODE_SUBSOP, NULL, x0, parse_array(x1));
+        x0 = mktup4(NODE_SUBSCRIPT, NULL, x0, parse_array(x1));
         goto &post_loop;
     };
     if (x1 == '{') {
-        x0 = mktup4(NODE_CODEOP, NULL, x0, parse_list(x1));
+        x0 = mktup4(NODE_LAMBDA, NULL, x0, parse_list(x1));
         goto &post_loop;
     };
     if (x1 == TOK_INCR) {

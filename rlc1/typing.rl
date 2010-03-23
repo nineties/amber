@@ -101,7 +101,7 @@ not_implemented: (p0) {
 
 infer_funcs: [not_reachable, not_implemented, infer_integer, infer_string, infer_identifier,
     infer_array, infer_tuple, not_implemented, infer_decl, not_implemented,
-    not_implemented, not_implemented, not_implemented, not_implemented, not_implemented,
+    not_implemented, infer_lambda, not_implemented, not_implemented, not_implemented,
     not_implemented, not_implemented
 ];
 
@@ -164,7 +164,10 @@ infer_array: (p0) {
 parse_pat: (p0) {
     if (p0[0] == NODE_IDENTIFIER) { return parse_var_pat(p0); };
     if (p0[0] == NODE_TUPLE) { return parse_tuple_pat(p0); };
-    not_reachable();
+    fputs(stderr, "ERROR: invalid pattern expression '");
+    put_item(stderr, p0);
+    fputs(stderr, "'\n");
+    exit(1);
 };
 
 parse_var_pat: (p0) {
@@ -254,6 +257,14 @@ infer_decl_var: (p0, p1) {
     return mktup2(p0, p1);
 };
 
+infer_lambda: (p0) {
+    varmap_push();
+    p0[LAMBDA_ARG]  = parse_pat(p0[LAMBDA_ARG]);
+    p0[LAMBDA_BODY] = infer_item(p0[LAMBDA_BODY]);
+    varmap_pop();
+    not_implemented();
+};
+
 (% p0: item %);
 infer_item: (p0) {
     allocate(1);
@@ -299,7 +310,7 @@ unify: (p0, p1) {
             };
             return;
         };
-        if (p0[0] == NODE_FUNCTION_T) { return unify_function_t(p0, p1); };
+        if (p0[0] == NODE_LAMBDA_T) { return unify_function_t(p0, p1); };
     };
     type_mismatch(p0, p1);
 };
@@ -346,7 +357,7 @@ occur_check: (p0, p1) {
     allocate(1);
     if (p1[0] == NODE_TUPLE_T)    { return occur_check_tuple_t(p0, p1); };
     if (p1[0] == NODE_ARRAY_T)    { return occur_check(p0, p1[1]); };
-    if (p1[0] == NODE_FUNCTION_T) { return occur_check_function_t(p0, p1); };
+    if (p1[0] == NODE_LAMBDA_T) { return occur_check_function_t(p0, p1); };
     if (p1[0] == NODE_TYVAR) {
         if (p0 == p1[1]) {
             fputs(stderr, "ERROR: infinite type\n");
@@ -463,7 +474,7 @@ deref_type: (p0) {
         return p0;
     };
     if (p0[0] == NODE_ARRAY_T)   { p0[1] = deref_type(p0[1]); return p0; };
-    if (p0[0] == NODE_FUNCTION_T) {
+    if (p0[0] == NODE_LAMBDA_T) {
         p0[1] = deref_type(p0[1]);
         p0[2] = deref_type(p0[2]);
         return p0;

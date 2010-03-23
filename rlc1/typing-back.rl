@@ -200,7 +200,7 @@ infer_blockop: (p0) {
     varmap_push();
     p0[2] = parse_pat(p0[2]);
     p0[3] = infer_item(p0[3]);
-    p0[1] = mktup3(NODE_FUNCTION_T, (p0[2])[1], (p0[3])[1]);
+    p0[1] = mktup3(NODE_LAMBDA_T, (p0[2])[1], (p0[3])[1]);
     varmap_pop();
     return deref(p0);
 };
@@ -211,7 +211,7 @@ infer_tupleop: (p0) {
     x0 = mktyvar(); (% return type %);
     p0[2] = infer_item(p0[2]); (% function %);
     p0[3] = infer_item(p0[3]); (% arguments %);
-    unify((p0[2])[1], mktup3(NODE_FUNCTION_T, (p0[3])[1], x0));
+    unify((p0[2])[1], mktup3(NODE_LAMBDA_T, (p0[3])[1], x0));
     p0[1] = x0;
     return deref(p0);
 };
@@ -452,7 +452,7 @@ unify: (p0, p1) {
         if (p0[0] == NODE_ARRAY_T)    { return unify(p0[1], p1[1]); };
         if (p0[0] == NODE_LIST_T)     { return unify(p0[1], p1[1]); };
         if (p0[0] == NODE_POINTER_T)  { return unify(p0[1], p1[1]); };
-        if (p0[0] == NODE_FUNCTION_T) { return unify_function_t(p0, p1); };
+        if (p0[0] == NODE_LAMBDA_T) { return unify_function_t(p0, p1); };
     };
     type_mismatch(p0, p1);
 };
@@ -503,7 +503,7 @@ occur_check: (p0, p1) {
     if (p1[0] == NODE_ARRAY_T)    { return occur_check(p0, p1[1]); };
     if (p1[0] == NODE_LIST_T)     { return occur_check(p0, p1[1]); };
     if (p1[0] == NODE_POINTER_T)  { return occur_check(p0, p1[1]); };
-    if (p1[0] == NODE_FUNCTION_T) { return occur_check_function_t(p0, p1); };
+    if (p1[0] == NODE_LAMBDA_T) { return occur_check_function_t(p0, p1); };
     if (p1[0] == NODE_TYVAR) {
         if (p0 == p1[1]) {
             fputs(stderr, "ERROR: infinite type\n");
@@ -669,7 +669,7 @@ deref_type: (p0) {
     if (p0[0] == NODE_ARRAY_T)   { p0[1] = deref_type(p0[1]); return p0; };
     if (p0[0] == NODE_LIST_T)    { p0[1] = deref_type(p0[1]); return p0; };
     if (p0[0] == NODE_POINTER_T) { p0[1] = deref_type(p0[1]); return p0; };
-    if (p0[0] == NODE_FUNCTION_T) {
+    if (p0[0] == NODE_LAMBDA_T) {
         p0[1] = deref_type(p0[1]);
         p0[2] = deref_type(p0[2]);
         return p0;
