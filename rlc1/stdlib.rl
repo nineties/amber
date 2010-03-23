@@ -1,9 +1,8 @@
 (%
  % rowl - generation 1
  % Copyright (C) 2010 nineties
- % 
- % 
- % $Id: stdlib.rl 2010-02-27 15:58:44 nineties $ 
+ %
+ % $Id: stdlib.rl 2010-03-24 03:31:57 nineties $
  %);
 
 include(stddef);

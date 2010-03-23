@@ -1,9 +1,8 @@
 (%
  % rowl - generation 1
  % Copyright (C) 2010 nineties
- % 
- % 
- % $Id: pprint.rl 2010-02-22 18:06:31 nineties $ 
+ %
+ % $Id: pprint.rl 2010-03-24 03:31:40 nineties $
  %);
 
 include(stddef,code);
@@ -302,10 +301,10 @@ put_code_t: (p0, p1) {
 put_tuple_t: (p0, p1) {
     allocate(2);
     fputc(p0, '(');
-    x0 = p1[1]; (% length %);
+    x0 = p1[TUPLE_T_LENGTH]; (% length %);
     x1 = 0;
     while (x1 < x0) {
-        put_type(p0, (p1[2])[x2]);
+        put_type(p0, (p1[TUPLE_T_ELEMENTS])[x1]);
         x1 = x1 + 1;
         if (x1 < x0 ) { fputc(p0, ','); };
     };

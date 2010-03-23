@@ -1,9 +1,8 @@
 (%
  % rowl - generation 1
  % Copyright (C) 2010 nineties
- % 
- % 
- % $Id: type.rl 2010-02-22 18:06:45 nineties $ 
+ %
+ % $Id: type.rl 2010-03-24 03:32:10 nineties $
  %);
 
 include(stddef, code);
@@ -31,6 +30,7 @@ mktyscheme: (p0) {
 rename_tyscheme: (p0) {
     allocate(4);
     x0 = p0[0]; (% old type-ids %);
+    if (x0 == NULL) { return p0; };
     x1 = mkiset(); (% new type-ids %);
     x2 = mkmap(&simple_hash, &simple_equal, 10); (% old-id to new-id %);
     while (x0 != NULL) {

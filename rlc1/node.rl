@@ -1,9 +1,8 @@
 (%
  % rowl - generation 1
  % Copyright (C) 2010 nineties
- % 
- % 
- % $Id: node.rl 2010-02-22 18:06:29 nineties $ 
+ %
+ % $Id: node.rl 2010-03-24 03:31:32 nineties $
  %);
 
 include(stddef, code);

@@ -1,9 +1,8 @@
 (%
  % rowl - generation 1
  % Copyright (C) 2010 nineties
- % 
- % 
- % $Id: parse.rl 2010-02-27 16:05:50 nineties $ 
+ %
+ % $Id: parse.rl 2010-03-24 03:31:36 nineties $
  %);
 
 include(stddef, code, token);

@@ -1,9 +1,8 @@
 (%
  % rowl - generation 1
  % Copyright (C) 2010 nineties
- % 
- % 
- % $Id: stddef.rl 2010-02-22 18:06:37 nineties $ 
+ %
+ % $Id: stddef.rl 2010-03-24 03:31:54 nineties $
  %);
 
 TRUE  => 1;

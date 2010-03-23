@@ -2,8 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  % 
- % 
- % $Id: codegen.rl 2010-02-22 18:06:25 nineties $ 
+ % $Id: codegen.rl 2010-03-24 03:31:13 nineties $
  %);
 
 include(stddef, code);
@@ -150,6 +149,13 @@ ext_tuple_decl: (p0, p1, p2) {
     };
 };
 
+ext_lambda_decl: (p0, p1, p2) {
+    allocate(3);
+    fputs(p0, p1[2]);
+    fputs(p0, ":\n");
+    not_implemented();
+};
+
 ext_decl: (p0, p1) {
     allocate(1);
     x0 = p1[1]; (% type %);
@@ -158,6 +164,7 @@ ext_decl: (p0, p1) {
     if (x0[0] == NODE_POINTER_T) { return ext_pointer_decl(p0, p1[2], p1[3]); };
     if (x0[0] == NODE_ARRAY_T) { return ext_array_decl(p0, p1[2], p1[3]); };
     if (x0[0] == NODE_TUPLE_T) { return ext_tuple_decl(p0, p1[2], p1[3]); };
+    if (x0[0] == NODE_LAMBDA_T) { return ext_lambda_decl(p0, p1[2], p1[3]); };
     not_implemented();
 };
 
