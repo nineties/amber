@@ -1,9 +1,8 @@
 (%
  % rowl - generation 1
  % Copyright (C) 2010 nineties
- % 
- % 
- % $Id: code.rl 2010-02-22 18:06:23 nineties $ 
+ %
+ % $Id: code.rl 2010-03-24 03:31:08 nineties $
  %);
 
 NODE_PROG       => 0;  (% item list %);
@@ -24,17 +23,16 @@ NODE_ASSIGN     => 14; (% type, operator, lhs, rhs %);
 NODE_RET        => 15; (% type %);
 NODE_RETVAL     => 16; (% type, value %);
 
-STRING_TYPE    => 1;
-STRING_RAW     => 2;
-LAMBDA_TYPE    => 1;
-LAMBDA_ARG     => 2;
-LAMBDA_BODY    => 3;
-SUBSCRIPT_TYPE => 1;
-SUBSCRIPT_LHS  => 2;
-SUBSCRIPT_RHS  => 3;
-CALL_TYPE      => 1;
-CALL_FUN       => 2;
-CALL_ARG       => 3;
+(% indices %);
+STRING_RAW      => 2;
+CODE_STATEMENTS => 2;
+LAMBDA_ARG      => 2;
+LAMBDA_BODY     => 3;
+SUBSCRIPT_LHS   => 2;
+SUBSCRIPT_RHS   => 3;
+CALL_FUN        => 2;
+CALL_ARG        => 3;
+RETVAL_VALUE    => 2;
 
 (% types %);
 NODE_VOID_T    => 0;
@@ -90,3 +88,4 @@ BINOP_LE     => 15;
 BINOP_GE     => 16;
 BINOP_SEQOR  => 17;
 BINOP_SEQAND => 18;
+

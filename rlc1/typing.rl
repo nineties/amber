@@ -1,9 +1,8 @@
 (%
  % rowl - generation 1
  % Copyright (C) 2010 nineties
- % 
- % 
- % $Id: typing.rl 2010-02-27 15:59:02 nineties $ 
+ %
+ % $Id: typing.rl 2010-03-24 03:32:38 nineties $
  %);
 
 include(stddef, code);
@@ -100,9 +99,9 @@ not_implemented: (p0) {
 };
 
 infer_funcs: [not_reachable, not_implemented, infer_integer, infer_string, infer_identifier,
-    infer_array, infer_tuple, not_implemented, infer_decl, not_implemented,
+    infer_array, infer_tuple, infer_code, infer_decl, not_implemented,
     not_implemented, infer_lambda, not_implemented, not_implemented, not_implemented,
-    not_implemented, not_implemented
+    infer_ret, infer_retval
 ];
 
 void_type   : NULL;
@@ -140,7 +139,7 @@ infer_identifier: (p0) {
         exit(1);
     };
     x1 = rename_tyscheme(x0[0]);
-    p0[1] = x1[2];
+    p0[1] = x1[1];
     p0[3] = x0[1];
     p0[4] = x1;
     return deref(p0);
@@ -197,18 +196,6 @@ parse_tuple_pat: (p0) {
     return p0;
 };
 
-infer_block: (p0) {
-    allocate(2);
-    x0 = p0[2];
-    x1 = mktyvar();
-    while (x0 != NULL) {
-        ls_set(x0, infer_item(ls_value(x0)));
-        unify(x1, (ls_value(x0))[0]);
-        x0 = ls_next(x0);
-    };
-    return deref(p0);
-};
-
 infer_tuple: (p0) {
     allocate(4);
     x1 = p0[2]; (% length %);
@@ -221,6 +208,18 @@ infer_tuple: (p0) {
         x0 = x0 + 1;
     };
     p0[1] = mktup3(NODE_TUPLE_T, x1, x3);
+    return deref(p0);
+};
+
+infer_code: (p0) {
+    allocate(1);
+    x0 = p0[CODE_STATEMENTS];
+    while (x0 != NULL) {
+        ls_set(x0, infer_item(ls_value(x0)));
+        x0 = ls_next(x0);
+    };
+
+    p0[1] = void_type; (% code block has no type %);
     return deref(p0);
 };
 
@@ -257,12 +256,69 @@ infer_decl_var: (p0, p1) {
     return mktup2(p0, p1);
 };
 
+(% insert missing return statement. p0: code block %);
+insert_ret: (p0) {
+    p0[CODE_STATEMENTS] = insert_ret_impl(p0[CODE_STATEMENTS]);
+    return p0;
+};
+insert_ret_impl: (p0) {
+    allocate(1);
+    x0 = ls_value(p0);
+    if (x0 == NULL) { return mktup2(NODE_RET, NULL); };
+    if (x0[0] == NODE_RET) { return p0; };
+    if (x0[0] == NODE_RETVAL) { return p0; };
+    return ls_cons(x0, insert_ret_impl(ls_next(p0)));
+};
+
 infer_lambda: (p0) {
+    allocate(2);
+
+    (% lambda opens new namespace %);
     varmap_push();
     p0[LAMBDA_ARG]  = parse_pat(p0[LAMBDA_ARG]);
+
+    (% pseudo return variable for type checking %);
+    x0 = mktyvar();
+    x1 = new_varid();
+    varmap_add(".pseudo_retvar", mktup2(mktyscheme(x0), x1));
+
     p0[LAMBDA_BODY] = infer_item(p0[LAMBDA_BODY]);
     varmap_pop();
-    not_implemented();
+
+    p0[1] = mktup3(NODE_LAMBDA_T, (p0[LAMBDA_ARG])[1], x0);
+
+    return deref(p0);
+};
+
+(% return; is treated as .pseudo_retvar = (); %);
+infer_ret: (p0) {
+    allocate(2);
+    x0 = varmap_find(".pseudo_retvar"); (% (tyscheme, id) %);
+    if (x0 == NULL) {
+        fputs(stderr, "ERROR: return expression outside function");
+        exit(1);
+    };
+    x1 = x0[0];
+    unify(void_type, x1[1]);
+    p0[1] = void_type;
+    return deref(p0);
+};
+
+(% return e; is treated as .pseudo_retvar = e; %);
+infer_retval: (p0) {
+    allocate(2);
+    p0[RETVAL_VALUE] = infer_item(p0[RETVAL_VALUE]);
+
+    x0 = varmap_find(".pseudo_retvar"); (% (tyscheme, id) %);
+    if (x0 == NULL) {
+        fputs(stderr, "ERROR: return expression outside function");
+        exit(1);
+    };
+
+    x1 = x0[0];
+    unify(x1[1], (p0[RETVAL_VALUE])[1]);
+    p0[1] = void_type;
+    return deref(p0);
 };
 
 (% p0: item %);
@@ -396,9 +452,9 @@ type_mismatch: (p0, p1) {
 };
 
 deref_funcs: [not_reachable, not_implemented, deref_integer, deref_string, deref_identifier,
-    deref_array, deref_tuple, not_implemented, deref_decl, not_implemented,
-    not_implemented, not_implemented, not_implemented, not_implemented, not_implemented,
-    not_implemented, not_implemented
+    deref_array, deref_tuple, deref_code, deref_decl, not_implemented,
+    not_implemented, deref_lambda, not_implemented, not_implemented, not_implemented,
+    deref_ret, deref_retval
 ];
 
 (% p0: item %);
@@ -453,9 +509,38 @@ deref_tuple: (p0) {
     return p0;
 };
 
+deref_code: (p0) {
+    allocate(1);
+    x0 = p0[CODE_STATEMENTS];
+    while (x0 != NULL) {
+        ls_set(x0, deref(ls_value(x0)));
+        x0 = ls_next(x0);
+    };
+    p0[1] = deref_type(p0[1]);
+    return p0;
+};
+
 deref_decl: (p0) {
     p0[2] = deref(p0[2]); (% lhs %);
     p0[3] = deref(p0[3]); (% rhs %);
+    p0[1] = deref_type(p0[1]);
+    return p0;
+};
+
+deref_lambda: (p0) {
+    p0[LAMBDA_ARG] = deref(p0[LAMBDA_ARG]);
+    p0[LAMBDA_BODY] = deref(p0[LAMBDA_BODY]);
+    p0[1] = deref_type(p0[1]);
+    return p0;
+};
+
+deref_ret: (p0) {
+    p0[1] = deref_type(p0[1]);
+    return p0;
+};
+
+deref_retval: (p0) {
+    p0[RETVAL_VALUE] = deref(p0[RETVAL_VALUE]);
     p0[1] = deref_type(p0[1]);
     return p0;
 };

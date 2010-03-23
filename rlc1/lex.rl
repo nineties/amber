@@ -1,9 +1,8 @@
 (%
  % rowl - generation 1
  % Copyright (C) 2010 nineties
- % 
- % 
- % $Id: lex.rl 2010-02-27 16:02:29 nineties $ 
+ %
+ % $Id: lex.rl 2010-03-24 03:31:24 nineties $
  %);
 
 include(stddef, code);
@@ -310,8 +309,7 @@ accept_ident: () {
     allocate(1);
     x0 = map_find(keyword_map, token_text());
     if (x0 != NULL) {
-        accept(x0[0]);
-        tokval = x0[1];
+        accept(x0);
         return;
     };
     x0 = map_find(operator_map, token_text());

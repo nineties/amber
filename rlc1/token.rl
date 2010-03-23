@@ -1,9 +1,8 @@
 (%
  % rowl - generation 1
  % Copyright (C) 2010 nineties
- % 
- % 
- % $Id: token.rl 2010-02-27 15:57:22 nineties $ 
+ %
+ % $Id: token.rl 2010-03-24 03:32:02 nineties $
  %);
 
 (%
