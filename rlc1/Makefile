@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-01-27 21:51:00 nineties $
+# $Id: Makefile 2010-03-24 13:48:13 nineties $
 
 AS = as
 ASFLAGS =
@@ -13,7 +13,7 @@ LDFLAGS = --nostdlib --entry=_start
 RLC0 = ../rlc0/rlc
 SOURCES    = startup.rl main.rl stddef.rl stdlib.rl alloc.rl rowllib.rl \
 			 token.rl lex.rl code.rl node.rl parse.rl type.rl typing.rl \
-			 rewrite.rl eval.rl codegen.rl pprint.rl
+			 mangle.rl tcodegen.rl asmgen.rl pprint.rl
 ASMSOURCES = $(patsubst %.rl,%.s,$(SOURCES))
 OBJECTS    = $(patsubst %.rl,%.o,$(SOURCES))
 
@@ -30,9 +30,9 @@ node.s: stddef.s code.s
 parse.s: stddef.s code.s token.s
 type.s: stddef.s code.s
 typing.s: stddef.s code.s
-rewrite.s: stddef.s code.s
-eval.s: stddef.s code.s
-codegen.s: stddef.s code.s
+mangle.s: code.s
+tcodegen.s: stddef.s code.s
+asmgen.s: stddef.s code.s
 pprint.s: stddef.s code.s
 
 rlc: $(OBJECTS)

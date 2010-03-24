@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: node.rl 2010-03-24 03:31:32 nineties $
+ % $Id: node.rl 2010-03-24 13:42:18 nineties $
  %);
 
 include(stddef, code);
@@ -24,6 +24,10 @@ escaped: (p0) {
     fputs(stderr, "ERROR: invalid escaped sequence ");
     fputc(stderr, p0);
     fputc(stderr, '\n');
+};
+
+get_ident_name: (p0) {
+    return p0[2];
 };
 
 get_rawstring: (p0) {
