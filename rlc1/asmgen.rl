@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: asmgen.rl 2010-03-24 21:23:46 nineties $
+ % $Id: asmgen.rl 2010-03-25 01:04:21 nineties $
  %);
 
 include(stddef, code);
@@ -16,6 +16,18 @@ not_reachable: (p0) {
 not_implemented: (p0) {
     fputs(stderr, "ERROR: not implemented\n");
     exit(1);
+};
+
+SECTION_TEXT => 0;
+SECTION_DATA => 1;
+
+current_section: -1;
+switch_section: (p0, p1) {
+    if (p1 == current_section) { return; };
+    current_section = p1;
+    if (p1 == SECTION_TEXT) { return fputs(p0, ".text\n"); };
+    if (p1 == SECTION_DATA) { return fputs(p0, ".data\n"); };
+    not_reachable();
 };
 
 emit_instfuncs: [
@@ -86,6 +98,7 @@ emit_static_data: (p0, p1) {
 };
 
 emit_data: (p0, p1) {
+    switch_section(p0, SECTION_DATA);
     if (p1[3]) {
         fputs(p0, ".global ");
         fputs(p0, p1[1]);
@@ -98,6 +111,7 @@ emit_data: (p0, p1) {
 
 emit_func: (p0, p1) {
     allocate(1);
+    switch_section(p0, SECTION_TEXT);
     if (p1[4]) {
         fputs(p0, ".global ");
         fputs(p0, p1[1]);
