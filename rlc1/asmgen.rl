@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: asmgen.rl 2010-03-24 13:48:37 nineties $
+ % $Id: asmgen.rl 2010-03-24 20:07:02 nineties $
  %);
 
 include(stddef, code);
@@ -18,21 +18,101 @@ not_implemented: (p0) {
     exit(1);
 };
 
-ext_tcode: (p0, p1) {
-    if (p1[0] == TCODE_LABEL) {
-	fputs(p0, p1[1]);
-	fputs(p0, ":\n");
-	return;
+emit_instfuncs: [
+    emit_ret
+];
+
+emit_ret: (p0, p1, p2, p3) {
+    fputs(p0, "\tret\n");
+};
+
+(% p0: output channel, p1: instruction %);
+emit_inst: (p0, p1) {
+    x0 = emit_instfuncs[p1[1]];
+    x0(p0, p1[2], p1[3], p1[4]);
+};
+
+emit_extfuncs: [
+    not_implemented, emit_data, emit_func, not_implemented
+];
+
+emit_static_data: (p0, p1) {
+    allocate(3);
+    if (p1[0] == DATA_CHAR) {
+        fputs(p0, "\t.byte ");
+        fputi(p0, p1[1]);
+        fputc(p0, '\n');
+        return;
+    };
+    if (p1[0] == DATA_INT) {
+        fputs(p0, "\t.long ");
+        fputi(p0, p1[1]);
+        fputc(p0, '\n');
+        return;
+    };
+    if (p1[0] == DATA_TUPLE) {
+        x0 = p1[1]; (% length %);
+        x1 = p1[2]; (% elements %);
+        x2 = 0;
+        while (x2 < x0) {
+            emit_static_data(p0, x1[x2]);
+            x2 = x2 + 1;
+        };
+        return;
+    };
+    if (p1[0] == DATA_ARRAY) {
+        x0 = p1[1]; (% length %);
+        x1 = p1[2]; (% elements %);
+        x2 = 0;
+        while (x2 < x0) {
+            emit_static_data(p0, x1[x2]);
+            x2 = x2 + 1;
+        };
+        return;
+    };
+    if (p1[0] == DATA_STRING) {
+        fputs(p0, "\t.string \"");
+        fputs(p0, p1[1]);
+        fputs(p0, "\"\n");
+        return;
+    };
+    if (p1[0] == DATA_LABEL) {
+        fputs(p0, "\t.long ");
+        fputs(p0, p1[1]);
+        fputc(p0, '\n');
+        return;
     };
     not_implemented();
 };
 
+emit_data: (p0, p1) {
+    fputs(p0, p1[1]); (% label %);
+    fputs(p0, ":");
+    emit_static_data(p0, p1[2]);
+};
+
+emit_func: (p0, p1) {
+    allocate(1);
+    fputs(p0, p1[1]); (% label %);
+    fputs(p0, ":\n");
+    x0 = p1[3]; (% instructions %);
+    while (x0 != NULL) {
+        emit_inst(p0, ls_value(x0));
+        x0 = ls_next(x0);
+    };
+};
+
+(% p0: output channel, p1: item %);
+emit_extitem: (p0, p1) {
+    allocate(1);
+    x0 = emit_extfuncs[p1[0]];
+    return x0(p0, p1);
+};
+
 (% p0: output channel, p1: instructions %);
 asmgen: (p0, p1) {
-    allocate(1);
-
     while (p1 != NULL) {
-	ext_tcode(p0, ls_value(p1));
+	emit_extitem(p0, ls_value(p1));
 	p1 = ls_next(p1);
     };
 };
