@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-03-24 21:22:43 nineties $
+ % $Id: tcodegen.rl 2010-03-25 00:48:53 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -203,6 +203,8 @@ transl_extitem: (p0) {
 (% p0: program (item list) %);
 tcodegen: (p0) {
     allocate(2);
+
+    init_proc();
 
     topdecl = NULL;
 
