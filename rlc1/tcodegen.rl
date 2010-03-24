@@ -2,13 +2,25 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: totac.rl 2010-03-24 12:09:59 nineties $
+ % $Id: totac.rl 2010-03-24 12:15:30 nineties $
  %);
 
 (% translate typed rowlcore to Three Address Code %);
 
 include(stddef, code);
-export(totac);
+export(transl);
+
+(%
+ %
+ %
+ %
+ %
+ %
+ %
+ %
+ %
+ %
+ %);
 
 not_reachable: (p0) {
     fputs(stderr, "ERROR: not reachable here\n");
@@ -20,25 +32,25 @@ not_implemented: (p0) {
     exit(1);
 };
 
-totac_extfuncs: [not_reachable, not_implemented, not_implemented, not_implemented, not_implemented,
+transl_extfuncs: [not_reachable, not_implemented, not_implemented, not_implemented, not_implemented,
     not_implemented, not_implemented, not_implemented, not_implemented, not_implemented,
     not_implemented, not_implemented, not_implemented, not_implemented, not_implemented,
     not_implemented, not_implemented
 ];
 
 (% p0: item %);
-totac_extitem: (p0) {
+transl_extitem: (p0) {
     allocate(1);
-    x0 = totac_extfuncs[p0[0]];
+    x0 = transl_extfuncs[p0[0]];
     return x0(p0);
 };
 
-totac_prog: (p0) {
+transl_prog: (p0) {
     if (p0 == NULL) { return NULL; };
-    return ls_cons(totac_extitem(ls_value(p0)), ls_next(p0));
+    return ls_cons(transl_extitem(ls_value(p0)), ls_next(p0));
 };
 
 (% p0: program (item list) %);
-totac: (p0) {
-    return totac_prog(p0[1]);
+transl: (p0) {
+    return transl_prog(p0[1]);
 };
