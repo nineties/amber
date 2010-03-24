@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-03-25 01:14:53 nineties $
+# $Id: Makefile 2010-03-25 02:08:04 nineties $
 
 AS = as
 ASFLAGS =
@@ -20,20 +20,20 @@ OBJECTS    = $(patsubst %.rl,%.o,$(SOURCES))
 all: 
 	cd ..; $(MAKE)
 
-alloc.o    : $(RLC0) stddef.s
-main.o     : $(RLC0) stddef.s code.s
-rowllib.o  : $(RLC0) stddef.s
-stdlib.o   : $(RLC0) stddef.s
-lex.o      : $(RLC0) stddef.s code.s token.s
-node.o     : $(RLC0) stddef.s code.s
-parse.o    : $(RLC0) stddef.s code.s token.s
-type.o     : $(RLC0) stddef.s code.s
-typing.o   : $(RLC0) stddef.s code.s
-mangle.o   : $(RLC0) code.s
-tcodegen.o : $(RLC0) stddef.s code.s
-proc.o     : $(RLC0) stddef.s code.s
-asmgen.o   : $(RLC0) stddef.s code.s
-pprint.o   : $(RLC0) stddef.s code.s
+alloc.s    : $(RLC0) stddef.s
+main.s     : $(RLC0) stddef.s code.s
+rowllib.s  : $(RLC0) stddef.s
+stdlib.s   : $(RLC0) stddef.s
+lex.s      : $(RLC0) stddef.s code.s token.s
+node.s     : $(RLC0) stddef.s code.s
+parse.s    : $(RLC0) stddef.s code.s token.s
+type.s     : $(RLC0) stddef.s code.s
+typing.s   : $(RLC0) stddef.s code.s
+mangle.s   : $(RLC0) code.s
+tcodegen.s : $(RLC0) stddef.s code.s
+proc.s     : $(RLC0) stddef.s code.s
+asmgen.s   : $(RLC0) stddef.s code.s
+pprint.s   : $(RLC0) stddef.s code.s
 
 rlc: $(OBJECTS)
 	$(LD) $(OBJECTS) -o $@ $(LDFLAGS)

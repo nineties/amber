@@ -2,12 +2,24 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: node.rl 2010-03-24 13:42:18 nineties $
+ % $Id: node.rl 2010-03-25 02:59:10 nineties $
  %);
 
 include(stddef, code);
+export(new_varid, num_variable);
 export(get_ident_name);
 export(get_rawstring);
+
+varid: 0;
+
+new_varid: () {
+    varid = varid + 1;
+    return varid - 1;
+};
+
+num_variable: () {
+    return varid;
+};
 
 escaped: (p0) {
     if (p0 == ''')  { return '''; };

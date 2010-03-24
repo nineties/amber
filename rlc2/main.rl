@@ -6,5 +6,5 @@ b: ["Hello", "Rowl"];
 
 export
 main: () {
-    return;
+    return b;
 };

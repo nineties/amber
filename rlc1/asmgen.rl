@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: asmgen.rl 2010-03-25 01:04:21 nineties $
+ % $Id: asmgen.rl 2010-03-25 03:16:52 nineties $
  %);
 
 include(stddef, code);
@@ -30,9 +30,48 @@ switch_section: (p0, p1) {
     not_reachable();
 };
 
+emit_opd: (p0, p1, p2) {
+    if (p1[0] == OPD_INTEGER) {
+	fputc(p0, '$');
+	fputi(p0, p1[1]);
+	return;
+    };
+    if (p1[0] == OPD_CHAR) {
+	fputc(p0, '$');
+	fputi(p0, p1[1]);
+	return;
+    };
+    if (p1[0] == OPD_REGISTER) {
+        fputc(p0, '%');
+        if (p2 == 32) { fputc(p0, 'e'); };
+        fputc(p0, 'a' + p1[2]);
+        if (p2 >= 16) { fputc(p0, 'x'); };
+        if (p2 == 8)  { fputc(p0, 'l'); };
+        return;
+    };
+    if (p1[0] == OPD_ADDRESS) {
+        fputc(p0, '$');
+        fputs(p0, p1[1]);
+        return;
+    };
+    if (p1[0] == OPD_CONTENT) {
+        fputs(p0, p1[1]);
+        return;
+    };
+    not_implemented();
+};
+
 emit_instfuncs: [
-    emit_ret
+    emit_movl, emit_ret
 ];
+
+emit_movl: (p0, p1, p2, p3) {
+    fputs(p0, "\tmovl ");
+    emit_opd(p0, p2, 32);
+    fputs(p0, ", ");
+    emit_opd(p0, p1, 32);
+    fputc(p0, '\n');
+};
 
 emit_ret: (p0, p1, p2, p3) {
     fputs(p0, "\tret\n");
@@ -40,6 +79,7 @@ emit_ret: (p0, p1, p2, p3) {
 
 (% p0: output channel, p1: instruction %);
 emit_inst: (p0, p1) {
+    allocate(1);
     x0 = emit_instfuncs[p1[1]];
     x0(p0, p1[2], p1[3], p1[4]);
 };

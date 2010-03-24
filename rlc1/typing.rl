@@ -2,19 +2,12 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-03-24 21:14:59 nineties $
+ % $Id: typing.rl 2010-03-25 03:36:20 nineties $
  %);
 
 include(stddef, code);
 
 export(typing);
-
-varid: 0;
-
-new_varid: () {
-    varid = varid + 1;
-    return varid - 1;
-};
 
 scopeid: 0;
 scopeid_stack: NULL; 
@@ -251,6 +244,7 @@ infer_decl_var: (p0, p1) {
     x2 = closure(p1[1]);
     varmap_add(p0[2], mktup2(x2, x1));
     p0[1] = p1[1];
+    p0[3] = x1;
     p0[4] = x2;
     p0 = deref(p0);
     return mktup2(p0, p1);
