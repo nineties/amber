@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-03-24 20:08:02 nineties $
+ % $Id: tcodegen.rl 2010-03-24 21:22:43 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -66,9 +66,9 @@ new_label: () {
     return strdup(labelbuf);
 };
 
-static_data : NULL;
-add_static_data: (p0) {
-    static_data = ls_cons(p0, static_data);
+topdecl : NULL;
+add_topdecl: (p0) {
+    topdecl = ls_cons(p0, topdecl);
 };
 
 not_reachable: (p0) {
@@ -114,17 +114,17 @@ transl_extfuncs: [
     not_reachable, not_implemented, not_implemented, not_implemented, not_implemented,
     not_implemented, not_implemented, not_implemented, transl_extdecl, not_implemented,
     not_implemented, not_implemented, not_implemented, not_implemented, not_implemented,
-    not_implemented, not_implemented
+    not_implemented, not_implemented, transl_export
 ];
 
 transl_fundecl: (p0) {
     allocate(2);
     x0 = mangle(p0[1], get_ident_name(p0[2]));
     x1 = p0[3]; (% lambda %);
-    return mktup4(TCODE_FUNC, x0, x1[2], ls_reverse(transl_code(NULL, x1[3])));
+    return mktup5(TCODE_FUNC, x0, x1[2], ls_reverse(transl_code(NULL, x1[3])), FALSE);
 };
 
-transl_static_data: (p0) {
+transl_topdecl: (p0) {
     allocate(4);
     if (p0[0] == NODE_INTEGER) {
         if (p0[2] == 8) { return mktup2(DATA_CHAR, p0[3]); };
@@ -137,7 +137,7 @@ transl_static_data: (p0) {
         x2 = memalloc(4*x0); (% new elements %);
         x3 = 0;
         while (x3 < x0) {
-            x2[x3] = transl_static_data(x1[x3]);
+            x2[x3] = transl_topdecl(x1[x3]);
             x3 = x3 + 1;
         };
         return mktup3(DATA_ARRAY, x0, x2);
@@ -148,14 +148,14 @@ transl_static_data: (p0) {
         x2 = memalloc(4*x0); (% new elements %);
         x3 = 0;
         while (x3 < x0) {
-            x2[x3] = transl_static_data(x1[x3]);
+            x2[x3] = transl_topdecl(x1[x3]);
             x3 = x3 + 1;
         };
         return mktup3(DATA_TUPLE, x0, x2);
     };
     if (p0[0] == NODE_STRING) {
         x0 = new_label();
-        add_static_data(mktup3(TCODE_DATA, x0, mktup2(DATA_STRING, p0[2])));
+        add_topdecl(mktup4(TCODE_DATA, x0, mktup2(DATA_STRING, p0[2]), FALSE));
         return mktup2(DATA_LABEL, x0);
     };
     not_implemented();
@@ -173,8 +173,24 @@ transl_extdecl: (p0) {
     x1 = get_ident_name(p0[2]);
 
     (% flatten nested static data and translate to tcode %);
-    x2 = transl_static_data(p0[3]);
-    return mktup3(TCODE_DATA, x1, x2);
+    x2 = transl_topdecl(p0[3]);
+    return mktup4(TCODE_DATA, x1, x2, FALSE);
+};
+
+(% p0: item %);
+transl_export: (p0) {
+    allocate(1);
+    x0 = transl_extitem(p0[1]);
+    if (x0[0] == TCODE_DATA) {
+        x0[3] = TRUE;
+        return x0;
+    };
+    if (x0[0] == TCODE_FUNC) {
+        x0[4] = TRUE;
+        return x0;
+    };
+    fputs(stderr, "ERROR: invalid export directive\n");
+    exit(1);
 };
 
 (% p0: item %);
@@ -188,7 +204,7 @@ transl_extitem: (p0) {
 tcodegen: (p0) {
     allocate(2);
 
-    static_data = NULL;
+    topdecl = NULL;
 
     x0 = p0[1];
     x1 = NULL;
@@ -196,5 +212,5 @@ tcodegen: (p0) {
         x1 = ls_cons(transl_extitem(ls_value(x0)), x1);
         x0 = ls_next(x0);
     };
-    return ls_append(ls_reverse(x1), ls_reverse(static_data));
+    return ls_append(ls_reverse(x1), ls_reverse(topdecl));
 };

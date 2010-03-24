@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-03-24 13:39:28 nineties $
+ % $Id: typing.rl 2010-03-24 21:14:59 nineties $
  %);
 
 include(stddef, code);
@@ -101,7 +101,7 @@ not_implemented: (p0) {
 infer_funcs: [not_reachable, not_implemented, infer_integer, infer_string, infer_identifier,
     infer_array, infer_tuple, infer_code, infer_decl, not_implemented,
     not_implemented, infer_lambda, not_implemented, not_implemented, not_implemented,
-    infer_ret, infer_retval
+    infer_ret, infer_retval, infer_export
 ];
 
 void_type   : NULL;
@@ -321,6 +321,11 @@ infer_retval: (p0) {
     return deref(p0);
 };
 
+infer_export: (p0) {
+    p0[1] = infer_item(p0[1]);
+    return deref(p0);
+};
+
 (% p0: item %);
 infer_item: (p0) {
     allocate(1);
@@ -454,7 +459,7 @@ type_mismatch: (p0, p1) {
 deref_funcs: [not_reachable, not_implemented, deref_integer, deref_string, deref_identifier,
     deref_array, deref_tuple, deref_code, deref_decl, not_implemented,
     not_implemented, deref_lambda, not_implemented, not_implemented, not_implemented,
-    deref_ret, deref_retval
+    deref_ret, deref_retval, deref_export
 ];
 
 (% p0: item %);
@@ -542,6 +547,11 @@ deref_ret: (p0) {
 deref_retval: (p0) {
     p0[RETVAL_VALUE] = deref(p0[RETVAL_VALUE]);
     p0[1] = deref_type(p0[1]);
+    return p0;
+};
+
+deref_export: (p0) {
+    p0[1] = deref(p0[1]);
     return p0;
 };
 

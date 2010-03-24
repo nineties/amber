@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: asmgen.rl 2010-03-24 20:07:02 nineties $
+ % $Id: asmgen.rl 2010-03-24 21:23:46 nineties $
  %);
 
 include(stddef, code);
@@ -86,6 +86,11 @@ emit_static_data: (p0, p1) {
 };
 
 emit_data: (p0, p1) {
+    if (p1[3]) {
+        fputs(p0, ".global ");
+        fputs(p0, p1[1]);
+        fputc(p0, '\n');
+    };
     fputs(p0, p1[1]); (% label %);
     fputs(p0, ":");
     emit_static_data(p0, p1[2]);
@@ -93,6 +98,11 @@ emit_data: (p0, p1) {
 
 emit_func: (p0, p1) {
     allocate(1);
+    if (p1[4]) {
+        fputs(p0, ".global ");
+        fputs(p0, p1[1]);
+        fputc(p0, '\n');
+    };
     fputs(p0, p1[1]); (% label %);
     fputs(p0, ":\n");
     x0 = p1[3]; (% instructions %);
