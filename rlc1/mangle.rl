@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: mangle.rl 2010-03-24 13:46:12 nineties $
+ % $Id: mangle.rl 2010-03-24 19:49:11 nineties $
  %);
 
 (% name mangling %);
@@ -114,6 +114,7 @@ gen_type_suffix: (p0) {
 };
 
 mangle: (p0, p1) {
+    if (streq(p1, "main")) { return p1; };
     reset_namebuf();
     put_namechar('_');
     put_namestr(p1);

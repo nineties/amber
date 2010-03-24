@@ -3,12 +3,12 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-01-27 20:56:25 nineties $
+# $Id: Makefile 2010-03-24 19:49:13 nineties $
 
 AS = as
 ASFLAGS =
 LD = ld
-LDFLAGS = --nostdlib --entry=_main
+LDFLAGS = --nostdlib --entry=main
 
 RLC1 = ../rlc1/rlc
 SOURCES = main.rl

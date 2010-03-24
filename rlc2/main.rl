@@ -1,4 +1,9 @@
 x: 1;
+y: 'a';
+z: [1,2,3,4];
+a: [(1,2), (3,4), (5,6)];
+b: ["Hello", "Rowl"];
+
 main: () {
-    return (0,"Hello World",['a','b','c']);
+    return;
 };

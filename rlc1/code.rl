@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: code.rl 2010-03-24 13:38:45 nineties $
+ % $Id: code.rl 2010-03-24 20:07:06 nineties $
  %);
 
 NODE_PROG       => 0;  (% item list %);
@@ -97,15 +97,23 @@ OPD_VAR      => 0; (% identifier %);
 OPD_REGISTER => 1; (% name, id, address %);
 OPD_STACK    => 2; (% name, id, position %);
 OPD_INTEGER  => 3; (% value %);
-OPD_FLOAT    => 4; (% value %);
-OPD_SYMBOL   => 5; (% name %);
+OPD_CHAR     => 4; (% value %);
+OPD_FLOAT    => 5; (% value %);
+OPD_SYMBOL   => 6; (% name %);
 
-TCODE_LABEL  => 0; (% name %);
-TCODE_CHAR   => 1; (% value %);
-TCODE_INT    => 2; (% value %);
-TCODE_FLOAT  => 3; (% value %);
-TCODE_DOUBLE => 4; (% value %);
-TCODE_SKIP   => 5; (% byte %);
-TCODE_ARRAY  => 6; (% size, length %);
-TCODE_INST   => 7; (% opcode, output reg, input reg1, input reg2 %);
+DATA_CHAR   => 0; (% value %);
+DATA_INT    => 1; (% value %);
+DATA_FLOAT  => 2; (% value %);
+DATA_DOUBLE => 3; (% value %);
+DATA_TUPLE  => 4; (% length, values %);
+DATA_ARRAY  => 5; (% length, values %);
+DATA_STRING => 6; (% string %);
+DATA_LABEL  => 7; (% name %);
+
+TCODE_SKIP   => 0; (% byte %);
+TCODE_DATA   => 1; (% label name, data %);
+TCODE_FUNC   => 2; (% label name, parameters, instructions %);
+TCODE_INST   => 3; (% opcode, output reg, input reg1, input reg2 %);
+
+INST_RET => 0;
 
