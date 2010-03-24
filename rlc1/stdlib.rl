@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: stdlib.rl 2010-03-24 19:25:34 nineties $
+ % $Id: stdlib.rl 2010-03-24 22:00:44 nineties $
  %);
 
 include(stddef);
@@ -15,13 +15,17 @@ export(fgetc, fnextc, fputc, fputs, fputi, fputx);
 export(getc, nextc, putc, puts, puti, putx);
 export(strlen, strcpy, strdup, streq);
 export(memset, memcpy);
+export(fork, waitpid, execve);
 
 (% system calls %);
-SYS_EXIT  => 1;
-SYS_READ  => 3;
-SYS_WRITE => 4;
-SYS_OPEN  => 5;
-SYS_CLOSE => 6;
+SYS_EXIT    => 1;
+SYS_FORK    => 2;
+SYS_READ    => 3;
+SYS_WRITE   => 4;
+SYS_OPEN    => 5;
+SYS_CLOSE   => 6;
+SYS_WAITPID => 7;
+SYS_EXECVE  => 11;
 
 O_RDONLY => 0;
 O_WRONLY => 1;
@@ -333,4 +337,22 @@ memcpy: (p0,p1,p2) {
         wch(p0, x0, rch(p1, x0));
         x0 = x0 + 1;
     }
+};
+
+fork: () {
+    allocate(1);
+    x0 = syscall(SYS_FORK);
+    if (x0 < 0) { panic("fork failed"); };
+    return x0;
+};
+
+waitpid: (p0, p1, p2) {
+    allocate(1);
+    x0 = syscall(SYS_WAITPID, p0, p1, p2);
+    if (x0 < 0) { panic("waitpid failed"); };
+};
+
+execve: (p0, p1, p2) {
+    syscall(SYS_EXECVE, p0, p1, p2);
+    panic("execve failed");
 };

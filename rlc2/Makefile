@@ -3,10 +3,8 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-03-24 19:49:13 nineties $
+# $Id: Makefile 2010-03-24 22:25:01 nineties $
 
-AS = as
-ASFLAGS =
 LD = ld
 LDFLAGS = --nostdlib --entry=main
 
@@ -18,18 +16,13 @@ OBJECTS    = $(patsubst %.rl,%.o,$(SOURCES))
 all: 
 	cd ..; $(MAKE)
 
-$(ASMSOURCES): $(RLC1)
-
 rlc: $(OBJECTS)
 	$(LD) $(OBJECTS) -o $@ $(LDFLAGS)
 
 .SUFFIXES: .rl
 
-.rl.s:
+.rl.o:
 	$(RLC1) $<
-
-.s.o:
-	$(AS) $< -o $@ $(ASFLAGS)
 
 .PHONY: clean
 clean:

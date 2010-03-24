@@ -3,7 +3,7 @@
  * Copyright (C) 2009 nineties
  */
 
-/* $Id: compile.s 2010-01-18 16:45:13 nineties $ */
+/* $Id: compile.s 2010-03-24 22:05:35 nineties $ */
 
 .include "defs.s"
 .include "token.s"
@@ -1238,9 +1238,7 @@ _prefix_expr:
     call    _comma
     call    _eax
     call    _nl
-    call    _addl
-    pushl   $'-
-    call    _putc
+    call    _subl
     movl    token_val, %eax
     imul    $4, %eax
     movl    %eax, (%esp)
