@@ -2,13 +2,33 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-03-25 00:48:53 nineties $
+ % $Id: tcodegen.rl 2010-03-25 07:27:42 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
 
 include(stddef, code);
 export(tcodegen);
+
+vtable: NULL; (% variable table. variable id to corresponding operand %);
+
+(% p0: identifier, p1: operand %);
+set_operand: (p0, p1) {
+    allocate(1);
+    x0 = p0[3]; (% identifier-id %);
+    assert(x0 < vec_size(vtable));
+    vec_put(vtable, x0, p1);
+};
+
+(% p0: identifier %);
+get_operand: (p0) {
+    allocate(2);
+    x0 = p0[3]; (% identifier-id %);
+    assert(x0 < vec_size(vtable));
+    x1 = vec_at(vtable, x0);
+    assert(x1 != NULL);
+    return x1;
+};
 
 LABEL_BUF_SIZE => 128;
 labelbuf : char [LABEL_BUF_SIZE];
@@ -82,32 +102,69 @@ not_implemented: (p0) {
 };
 
 transl_funcs: [
-    not_reachable, not_implemented, not_implemented, not_implemented, not_implemented,
+    not_reachable, not_implemented, transl_integer, transl_string, transl_identifier,
     not_implemented, transl_code, not_implemented, transl_extdecl, not_implemented,
     not_implemented, not_implemented, not_implemented, not_implemented, not_implemented,
-    transl_ret, not_implemented
+    transl_ret, transl_retval
 ];
 
+transl_integer: (p0, p1, p2) {
+    allocate(1);
+    x0 = p1[1]; (% type %);
+    if (x0[0] == NODE_CHAR_T) {
+        *p2 = mktup2(OPD_CHAR, p1[3]);
+        return p0;
+    };
+    if (x0[0] == NODE_INT_T) {
+        *p2 = mktup2(OPD_INTEGER, p1[3]);
+        return p0;
+    };
+    not_reachable();
+};
+
+transl_string: (p0, p1, p2) {
+    allocate(1);
+    x0 = new_label();
+    add_topdecl(mktup4(TCODE_DATA, x0, mktup2(DATA_STRING, p1[2]), FALSE));
+    *p2 = mktup2(OPD_ADDRESS, x0);
+    return p0;
+};
+
+transl_identifier: (p0, p1, p2) {
+    allocate(1);
+    *p2 = get_operand(p1);
+    return p0;
+};
+
 (% p0: output tcode, p1: code block %);
-transl_code: (p0, p1) {
-    allocate(2);
+transl_code: (p0, p1, p2) {
+    allocate(3);
     x0 = p1[2];
     x1 = NULL;
     while (x0 != NULL) {
-        p0 = transl_item(p0, ls_value(x0));
+        p0 = transl_item(p0, ls_value(x0), &x2);
         x0 = ls_next(x0);
     };
     return p0;
 };
 
-transl_ret: (p0, p1) {
+transl_ret: (p0, p1, p2) {
     return ls_cons(mktup5(TCODE_INST, INST_RET, NULL, NULL, NULL), p0);
 };
 
-(% p0: output tcode, p1: item %);
-transl_item: (p0, p1) {
+transl_retval: (p0, p1, p2) {
+    allocate(1);
+    p0 = transl_item(p0, p1[2], &x0);
+    p0 = ls_cons(mktup5(TCODE_INST, INST_MOVL, get_physical_reg(0), x0, NULL), p0);
+    p0 = ls_cons(mktup5(TCODE_INST, INST_RET, NULL, NULL, NULL), p0);
+    return p0;
+};
+
+(% p0: output tcode, p1: item, p2: pointer to store p1's value  %);
+transl_item: (p0, p1, p2) {
+    allocate(2);
     x0 = transl_funcs[p1[0]];
-    return x0(p0, p1);
+    return x0(p0, p1, p2);
 };
 
 transl_extfuncs: [
@@ -124,7 +181,7 @@ transl_fundecl: (p0) {
     return mktup5(TCODE_FUNC, x0, x1[2], ls_reverse(transl_code(NULL, x1[3])), FALSE);
 };
 
-transl_topdecl: (p0) {
+transl_static_data: (p0) {
     allocate(4);
     if (p0[0] == NODE_INTEGER) {
         if (p0[2] == 8) { return mktup2(DATA_CHAR, p0[3]); };
@@ -137,7 +194,7 @@ transl_topdecl: (p0) {
         x2 = memalloc(4*x0); (% new elements %);
         x3 = 0;
         while (x3 < x0) {
-            x2[x3] = transl_topdecl(x1[x3]);
+            x2[x3] = transl_static_data(x1[x3]);
             x3 = x3 + 1;
         };
         return mktup3(DATA_ARRAY, x0, x2);
@@ -148,7 +205,7 @@ transl_topdecl: (p0) {
         x2 = memalloc(4*x0); (% new elements %);
         x3 = 0;
         while (x3 < x0) {
-            x2[x3] = transl_topdecl(x1[x3]);
+            x2[x3] = transl_static_data(x1[x3]);
             x3 = x3 + 1;
         };
         return mktup3(DATA_TUPLE, x0, x2);
@@ -172,8 +229,11 @@ transl_extdecl: (p0) {
 
     x1 = get_ident_name(p0[2]);
 
+    set_operand(p0[2], mktup2(OPD_CONTENT, x1));
+
     (% flatten nested static data and translate to tcode %);
-    x2 = transl_topdecl(p0[3]);
+    x2 = transl_static_data(p0[3]);
+
     return mktup4(TCODE_DATA, x1, x2, FALSE);
 };
 
@@ -206,6 +266,7 @@ tcodegen: (p0) {
 
     init_proc();
 
+    vtable = mkvec(num_variable());
     topdecl = NULL;
 
     x0 = p0[1];

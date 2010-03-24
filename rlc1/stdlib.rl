@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: stdlib.rl 2010-03-24 22:00:44 nineties $
+ % $Id: stdlib.rl 2010-03-25 03:26:03 nineties $
  %);
 
 include(stddef);
@@ -10,12 +10,12 @@ include(stddef);
 export(init_io);
 export(open_in, open_out, close_in, close_out);
 export(stdin, stdout, stderr);
-export(exit, panic, flush);
+export(exit, assert, panic, flush);
 export(fgetc, fnextc, fputc, fputs, fputi, fputx);
 export(getc, nextc, putc, puts, puti, putx);
 export(strlen, strcpy, strdup, streq);
 export(memset, memcpy);
-export(fork, waitpid, execve);
+export(fork, waitpid, unlink, execve);
 
 (% system calls %);
 SYS_EXIT    => 1;
@@ -25,6 +25,7 @@ SYS_WRITE   => 4;
 SYS_OPEN    => 5;
 SYS_CLOSE   => 6;
 SYS_WAITPID => 7;
+SYS_UNLINK  => 10;
 SYS_EXECVE  => 11;
 
 O_RDONLY => 0;
@@ -121,6 +122,12 @@ exit: (p0) {
     };
     finalize_mem();
     syscall(SYS_EXIT, p0);
+};
+
+assert: (p0) {
+    if (p0 == FALSE) {
+        panic("assertion failure");
+    };
 };
 
 (% panic(char *msg) %);
@@ -350,6 +357,15 @@ waitpid: (p0, p1, p2) {
     allocate(1);
     x0 = syscall(SYS_WAITPID, p0, p1, p2);
     if (x0 < 0) { panic("waitpid failed"); };
+};
+
+unlink: (p0) {
+    allocate(1);
+    x0 = syscall(SYS_UNLINK, p0);
+    if (x0 == -2) { (% ENOENT %);
+	return;
+    };
+    if (x0 < 0) { panic("unlink failed"); };
 };
 
 execve: (p0, p1, p2) {

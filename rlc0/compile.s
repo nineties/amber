@@ -3,7 +3,7 @@
  * Copyright (C) 2009 nineties
  */
 
-/* $Id: compile.s 2010-03-24 22:05:35 nineties $ */
+/* $Id: compile.s 2010-03-25 02:17:12 nineties $ */
 
 .include "defs.s"
 .include "token.s"
@@ -619,16 +619,20 @@ _toplevel_expr:
     call    _lex
     movl    $'=, (%esp)
     call    _symbol
+    call    _lex
     call    _or_expr
     call    _popl_ebx
     call    _movl
     call    _eax
+    call    _comma
     movl    $'(, (%esp)
     call    _putc
     call    _ebx
     movl    $'), (%esp)
     call    _putc
     call    _nl
+    addl    $4, %esp
+    ret
 3: /* identifier declaration */
     call    _lex
     call    _declaration
@@ -1240,6 +1244,7 @@ _prefix_expr:
     call    _nl
     call    _subl
     movl    token_val, %eax
+    incl    %eax
     imul    $4, %eax
     movl    %eax, (%esp)
     call    _integer

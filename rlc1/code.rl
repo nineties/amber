@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: code.rl 2010-03-25 00:48:17 nineties $
+ % $Id: code.rl 2010-03-25 03:08:06 nineties $
  %);
 
 NODE_PROG       => 0;  (% item list %);
@@ -93,17 +93,15 @@ BINOP_SEQAND => 18;
 
 (% Three-address Code %);
 
-(% memory location %);
-LOC_UNKNOWN  => 0; (% id %);
-LOC_REGISTER => 1; (% id, address %);
-LOC_STACK    => 2; (% id, position %);
-
 (% operands %);
-OPD_VAR      => 0; (% identifier, location %);
-OPD_INTEGER  => 1; (% value %);
-OPD_CHAR     => 2; (% value %);
-OPD_FLOAT    => 3; (% value %);
-OPD_SYMBOL   => 4; (% name %);
+OPD_PSEUDO   => 0; (% id, null %);
+OPD_REGISTER => 1; (% id, address %);
+OPD_STACK    => 2; (% id, position %);
+OPD_INTEGER  => 3; (% value %);
+OPD_CHAR     => 4; (% value %);
+OPD_FLOAT    => 5; (% value %);
+OPD_ADDRESS  => 6; (% name %);
+OPD_CONTENT  => 7; (% name %);
 
 DATA_CHAR   => 0; (% value %);
 DATA_INT    => 1; (% value %);
@@ -119,5 +117,6 @@ TCODE_DATA   => 1; (% label name, data, export %);
 TCODE_FUNC   => 2; (% label name, parameters, instructions, export %);
 TCODE_INST   => 3; (% opcode, output reg, input reg1, input reg2 %);
 
-INST_RET => 0;
+INST_MOVL => 0;
+INST_RET  => 1;
 
