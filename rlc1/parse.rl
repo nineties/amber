@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: parse.rl 2010-03-24 03:31:36 nineties $
+ % $Id: parse.rl 2010-03-24 21:14:17 nineties $
  %);
 
 include(stddef, code, token);
@@ -12,7 +12,7 @@ export(parse);
 (% p0: file name, input channel %);
 parse: (p0, p1) {
     lexer_init(p0, p1);
-    return mktup2(NODE_PROG, parse_semi_list(lex()));
+    return mktup2(NODE_PROG, parse_toplevel_items(lex()));
 };
 
 (% p0: name of expected token %);
@@ -47,10 +47,40 @@ end_of_item: (p0) {
 };
 
 (% p0: first token %);
-parse_item: (p0) {
+parse_toplevel_items: (p0) {
+    allocate(2);
+    if (p0 == '}') {
+        unput();
+        return NULL;
+    };
+    if (p0 == TOK_END) {
+        unput();
+        return NULL;
+    };
+    x0 = parse_toplevel_item(p0);
+    x1 = lex();
+    if (x1 == ';') {
+        return ls_cons(x0, parse_toplevel_items(lex()));
+    };
+    if (x1 == '}') {
+        unput();
+        return ls_cons(x0, NULL);
+    };
+    expected("';' or '}'");
+};
+
+(% p0: first token %);
+parse_toplevel_item: (p0) {
+    if (p0 == TOK_EXPORT) {
+        return mktup2(NODE_EXPORT, parse_rewrite_expr(lex()));
+    };
     return parse_rewrite_expr(p0);
 };
 
+(% p0: first token %);
+parse_item: (p0) {
+    return parse_rewrite_expr(p0);
+};
 
 (% p0: first token %);
 parse_rewrite_expr: (p0) {
