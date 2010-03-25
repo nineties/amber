@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-03-25 07:27:42 nineties $
+ % $Id: tcodegen.rl 2010-03-25 18:41:57 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -105,7 +105,7 @@ transl_funcs: [
     not_reachable, not_implemented, transl_integer, transl_string, transl_identifier,
     not_implemented, transl_code, not_implemented, transl_extdecl, not_implemented,
     not_implemented, not_implemented, not_implemented, not_implemented, not_implemented,
-    transl_ret, transl_retval
+    not_implemented, transl_ret, transl_retval, transl_syscall
 ];
 
 transl_integer: (p0, p1, p2) {
@@ -160,6 +160,28 @@ transl_retval: (p0, p1, p2) {
     return p0;
 };
 
+transl_syscall: (p0, p1, p2) {
+    allocate(6);
+    x0 = p1[2]; (% argument tuple %);
+    x1 = x0[TUPLE_LENGTH];
+    x2 = x0[TUPLE_ELEMENTS];
+    x3 = memalloc(4*x1); (% translated operands %);
+    x4 = 0;
+
+    while (x4 < x1) {
+        p0 = transl_item(p0, x2[x4], &x5);
+        x3[x4] = x5;
+        x4 = x4 + 1;
+    };
+    x4 = 0;
+    while (x4 < x1) {
+        p0 = ls_cons(mktup5(TCODE_INST, INST_MOVL, get_physical_reg(x4), x3[x4], NULL), p0);
+        x4 = x4 + 1;
+    };
+    p0 = ls_cons(mktup5(TCODE_INST, INST_INT, NULL, mktup2(OPD_INTEGER, 128), NULL), p0);
+    return p0;
+};
+
 (% p0: output tcode, p1: item, p2: pointer to store p1's value  %);
 transl_item: (p0, p1, p2) {
     allocate(2);
@@ -171,7 +193,7 @@ transl_extfuncs: [
     not_reachable, not_implemented, not_implemented, not_implemented, not_implemented,
     not_implemented, not_implemented, not_implemented, transl_extdecl, not_implemented,
     not_implemented, not_implemented, not_implemented, not_implemented, not_implemented,
-    not_implemented, not_implemented, transl_export
+    transl_export, not_implemented, not_implemented
 ];
 
 transl_fundecl: (p0) {

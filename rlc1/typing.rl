@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-03-25 03:36:20 nineties $
+ % $Id: typing.rl 2010-03-25 18:27:39 nineties $
  %);
 
 include(stddef, code);
@@ -94,7 +94,7 @@ not_implemented: (p0) {
 infer_funcs: [not_reachable, not_implemented, infer_integer, infer_string, infer_identifier,
     infer_array, infer_tuple, infer_code, infer_decl, not_implemented,
     not_implemented, infer_lambda, not_implemented, not_implemented, not_implemented,
-    infer_ret, infer_retval, infer_export
+    infer_export, infer_ret, infer_retval, infer_syscall
 ];
 
 void_type   : NULL;
@@ -284,6 +284,11 @@ infer_lambda: (p0) {
     return deref(p0);
 };
 
+infer_export: (p0) {
+    p0[1] = infer_item(p0[1]);
+    return deref(p0);
+};
+
 (% return; is treated as .pseudo_retvar = (); %);
 infer_ret: (p0) {
     allocate(2);
@@ -315,8 +320,9 @@ infer_retval: (p0) {
     return deref(p0);
 };
 
-infer_export: (p0) {
-    p0[1] = infer_item(p0[1]);
+infer_syscall: (p0) {
+    p0[2] = infer_item(p0[2]);
+    p0[1] = int_type;
     return deref(p0);
 };
 
@@ -453,7 +459,7 @@ type_mismatch: (p0, p1) {
 deref_funcs: [not_reachable, not_implemented, deref_integer, deref_string, deref_identifier,
     deref_array, deref_tuple, deref_code, deref_decl, not_implemented,
     not_implemented, deref_lambda, not_implemented, not_implemented, not_implemented,
-    deref_ret, deref_retval, deref_export
+    deref_export, deref_ret, deref_retval, deref_syscall
 ];
 
 (% p0: item %);
@@ -533,6 +539,11 @@ deref_lambda: (p0) {
     return p0;
 };
 
+deref_export: (p0) {
+    p0[1] = deref(p0[1]);
+    return p0;
+};
+
 deref_ret: (p0) {
     p0[1] = deref_type(p0[1]);
     return p0;
@@ -544,8 +555,9 @@ deref_retval: (p0) {
     return p0;
 };
 
-deref_export: (p0) {
-    p0[1] = deref(p0[1]);
+deref_syscall: (p0) {
+    p0[2] = deref(p0[2]);
+    p0[1] = deref_type(p0[1]);
     return p0;
 };
 

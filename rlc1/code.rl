@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: code.rl 2010-03-25 03:08:06 nineties $
+ % $Id: code.rl 2010-03-25 18:40:41 nineties $
  %);
 
 NODE_PROG       => 0;  (% item list %);
@@ -20,12 +20,17 @@ NODE_LAMBDA     => 11; (% operator{} : type, lhs, code %);
 NODE_UNEXPR     => 12; (% type, operator, arg %);
 NODE_BINEXPR    => 13; (% type, operator, lhs, rhs %);
 NODE_ASSIGN     => 14; (% type, operator, lhs, rhs %);
-NODE_RET        => 15; (% type %);
-NODE_RETVAL     => 16; (% type, value %);
-NODE_EXPORT     => 17; (% item %);
+NODE_EXPORT     => 15; (% item %);
+NODE_RET        => 16; (% type %);
+NODE_RETVAL     => 17; (% type, value %);
+NODE_SYSCALL    => 18; (% type, params %);
 
 (% indices %);
 STRING_RAW      => 2;
+ARRAY_LENGTH    => 2;
+ARRAY_ELEMENTS  => 3;
+TUPLE_LENGTH    => 2;
+TUPLE_ELEMENTS  => 3;
 CODE_STATEMENTS => 2;
 LAMBDA_ARG      => 2;
 LAMBDA_BODY     => 3;
@@ -119,4 +124,5 @@ TCODE_INST   => 3; (% opcode, output reg, input reg1, input reg2 %);
 
 INST_MOVL => 0;
 INST_RET  => 1;
+INST_INT  => 2;
 

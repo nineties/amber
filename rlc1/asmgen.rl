@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: asmgen.rl 2010-03-25 03:16:52 nineties $
+ % $Id: asmgen.rl 2010-03-25 18:44:33 nineties $
  %);
 
 include(stddef, code);
@@ -62,7 +62,7 @@ emit_opd: (p0, p1, p2) {
 };
 
 emit_instfuncs: [
-    emit_movl, emit_ret
+    emit_movl, emit_ret, emit_int
 ];
 
 emit_movl: (p0, p1, p2, p3) {
@@ -75,6 +75,12 @@ emit_movl: (p0, p1, p2, p3) {
 
 emit_ret: (p0, p1, p2, p3) {
     fputs(p0, "\tret\n");
+};
+
+emit_int: (p0, p1, p2, p3) {
+    fputs(p0, "\tint ");
+    emit_opd(p0, p2, 32);
+    fputc(p0, '\n');
 };
 
 (% p0: output channel, p1: instruction %);
