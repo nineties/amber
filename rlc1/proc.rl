@@ -2,12 +2,13 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: proc.rl 2010-03-25 19:23:19 nineties $
+ % $Id: proc.rl 2010-03-26 03:51:52 nineties $
  %);
 
 include(stddef, code);
-export(num_physical_regs, num_normal_regs, get_physical_reg, init_proc);
+export(num_physical_regs, num_normal_regs, get_reg, get_physical_reg, init_proc);
 export(get_eax, get_ebx, get_ecx, get_edx, get_esi, get_edi, get_ebp, get_esp);
+export(create_pseudo_reg);
 export(get_register_repr);
 
 NUM_PHYSICAL_REGS => 8; (% eax, ebx, ecx, edx, esi, edi, ebp, esp %);
@@ -31,6 +32,16 @@ new_location_id: () {
 
 num_physical_regs: () { return NUM_PHYSICAL_REGS; };
 num_normal_regs:   () { return NUM_NORMAL_REGS; };
+
+get_reg: (p0) {
+    if (p0 >= vec_size(locations)) {
+	fputs(stderr, "ERROR: register (index=");
+	fputi(stderr, p0);
+	fputs(stderr, ") does not exist\n");
+	exit(1);
+    };
+    return vec_at(locations, p0);
+};
 
 get_physical_reg: (p0) {
     if (p0 >= NUM_PHYSICAL_REGS) {

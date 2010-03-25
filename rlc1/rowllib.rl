@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: rowllib.rl 2010-03-24 19:37:09 nineties $
+ % $Id: rowllib.rl 2010-03-26 03:49:30 nineties $
  %);
 
 include(stddef);
@@ -11,7 +11,7 @@ include(stddef);
                                   tuple object
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%);
 
-export (mktup1, mktup2, mktup3, mktup4, mktup5, mktup6);
+export (mktup1, mktup2, mktup3, mktup4, mktup5, mktup6, mktup7);
 
 alloc_tuple: (p0) {
     return memalloc(4*p0);
@@ -71,6 +71,19 @@ mktup6: (p0, p1, p2, p3, p4, p5) {
     x0[3] = p3;
     x0[4] = p4;
     x0[5] = p5;
+    return x0;
+};
+
+mktup7: (p0, p1, p2, p3, p4, p5, p6) {
+    allocate(1);
+    x0 = alloc_tuple(7);
+    x0[0] = p0;
+    x0[1] = p1;
+    x0[2] = p2;
+    x0[3] = p3;
+    x0[4] = p4;
+    x0[5] = p5;
+    x0[6] = p6;
     return x0;
 };
 

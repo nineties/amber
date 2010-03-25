@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: asmgen.rl 2010-03-26 01:07:16 nineties $
+ % $Id: asmgen.rl 2010-03-26 03:54:36 nineties $
  %);
 
 include(stddef, code);
@@ -54,36 +54,53 @@ emit_opd: (p0, p1, p2) {
         fputs(p0, p1[1]);
         return;
     };
+    if (p1[0] == OPD_PSEUDO) {
+        fputs(p0, "%p");
+        fputi(p0, p1[1]);
+        return;
+    };
     not_implemented();
 };
 
-inst_string: ["movl", "pushl", "popl", "ret", "int", "call", "call"];
-inst_prec:   [32,     32,      32,     32,    32   , "32",   "32"];
+inst_string: ["movl", "pushl", "popl", "ret", "ret", "int", "call", "call"];
+inst_prec:   [32,     32,      32,     32,    32,    32   , "32",   "32"];
 
 (% p0: output channel, p1: instruction %);
 emit_inst: (p0, p1) {
     allocate(1);
     fputc(p0, '\t');
-    fputs(p0, inst_string[p1[1]]);
+    fputs(p0, inst_string[p1[INST_OPCODE]]);
     x0 = FALSE; (% insert comma %);
     if (p1[3] != NULL) {
 	(% first operand %);
 	fputc(p0, ' ');
-	emit_opd(p0, p1[3], inst_prec[p1[1]]);
+	emit_opd(p0, p1[INST_INPUT1], inst_prec[p1[INST_OPCODE]]);
 	x0 = TRUE;
     };
     if (p1[4] != NULL) {
 	(% second operand %);
 	if (x0) { fputc(p0, ','); };
 	fputc(p0, ' ');
-	emit_opd(p0, p1[4], inst_prec[p1[1]]);
+	emit_opd(p0, p1[INST_INPUT2], inst_prec[p1[INST_OPCODE]]);
 	x0 = TRUE;
     };
     if (p1[2] != NULL) {
 	(% output operand %);
 	if (x0) { fputc(p0, ','); };
 	fputc(p0, ' ');
-	emit_opd(p0, p1[2], inst_prec[p1[1]]);
+	emit_opd(p0, p1[INST_OUTPUT], inst_prec[p1[INST_OPCODE]]);
+    };
+
+    (% output liveness information %);
+    x0 = p1[INST_LIVE];
+    if (x0 != NULL) {
+        fputs(p0, "\t/* live:");
+        while (x0 != NULL) {
+            fputc(p0, ' ');
+            emit_opd(p0, get_reg(ls_value(x0)), 32);
+            x0 = ls_next(x0);
+        };
+        fputs(p0, "*/");
     };
     fputc(p0, '\n');
 };
@@ -155,6 +172,9 @@ emit_data: (p0, p1) {
 
 emit_func: (p0, p1) {
     allocate(1);
+
+    liveness(p1);
+
     switch_section(p0, SECTION_TEXT);
     if (p1[4]) {
         fputs(p0, ".global ");

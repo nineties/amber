@@ -1,9 +1,8 @@
 f: () {
-    return;
+    return 100;
 };
 
 export
 main: () {
-    f();
-    syscall(1, 100);
+    syscall(1, f());
 };
