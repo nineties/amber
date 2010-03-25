@@ -6,5 +6,5 @@ b: ["Hello", "Rowl"];
 
 export
 main: () {
-    return b;
+    syscall(1, 0);
 };
