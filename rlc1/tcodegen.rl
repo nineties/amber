@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-03-26 03:34:59 nineties $
+ % $Id: tcodegen.rl 2010-03-26 04:42:42 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -141,13 +141,13 @@ transl_identifier: (p0, p1, p2) {
     return p0;
 };
 
-(% XXX: do not complete implementation %);
 transl_call: (p0, p1, p2) {
     allocate(4);
     x0 = p1[2]; (% function %);
     x1 = p1[3]; (% argument %);
     if (x0[0] == NODE_IDENTIFIER) {
         x2 = mangle(x0[1], get_ident_name(x0));
+
         p0 = ls_cons(mkinst(INST_CALL_IMM, NULL, mktup2(DATA_LABEL, x2), NULL), p0);
 
         x3 = create_pseudo_reg();
@@ -241,10 +241,16 @@ transl_extfuncs: [
 ];
 
 transl_fundecl: (p0) {
-    allocate(2);
+    allocate(3);
     x0 = mangle(p0[1], get_ident_name(p0[2]));
     x1 = p0[3]; (% lambda %);
-    return mktup5(TCODE_FUNC, x0, x1[2], ls_reverse(transl_code(NULL, x1[3])), FALSE);
+    x2 = mktup5(TCODE_FUNC, x0, x1[2], ls_reverse(transl_code(NULL, x1[3])), FALSE);
+
+    (% liveness analysis %);
+    liveness(x2);
+    regalloc(x2);
+
+    return x2;
 };
 
 transl_static_data: (p0) {

@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: asmgen.rl 2010-03-26 03:54:36 nineties $
+ % $Id: asmgen.rl 2010-03-26 04:27:00 nineties $
  %);
 
 include(stddef, code);
@@ -172,8 +172,6 @@ emit_data: (p0, p1) {
 
 emit_func: (p0, p1) {
     allocate(1);
-
-    liveness(p1);
 
     switch_section(p0, SECTION_TEXT);
     if (p1[4]) {
