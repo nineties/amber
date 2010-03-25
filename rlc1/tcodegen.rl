@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-03-26 01:11:47 nineties $
+ % $Id: tcodegen.rl 2010-03-26 03:34:59 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -28,6 +28,11 @@ get_operand: (p0) {
     x1 = vec_at(vtable, x0);
     assert(x1 != NULL);
     return x1;
+};
+
+(% p0: opcode, p1: output reg, p2: intput reg1, p3: input reg2 %);
+mkinst: (p0, p1, p2, p3) {
+    return mktup7(TCODE_INST, p0, p1, p2, p3, mkiset(), 0);
 };
 
 LABEL_BUF_SIZE => 128;
@@ -138,13 +143,16 @@ transl_identifier: (p0, p1, p2) {
 
 (% XXX: do not complete implementation %);
 transl_call: (p0, p1, p2) {
-    allocate(3);
+    allocate(4);
     x0 = p1[2]; (% function %);
     x1 = p1[3]; (% argument %);
     if (x0[0] == NODE_IDENTIFIER) {
         x2 = mangle(x0[1], get_ident_name(x0));
-        p0 = ls_cons(mktup5(TCODE_INST, INST_CALL_IMM, NULL, mktup2(DATA_LABEL, x2), NULL), p0);
-        *p2 = get_eax();
+        p0 = ls_cons(mkinst(INST_CALL_IMM, NULL, mktup2(DATA_LABEL, x2), NULL), p0);
+
+        x3 = create_pseudo_reg();
+        p0 = ls_cons(mkinst(INST_MOVL, x3, get_eax(), NULL), p0);
+        *p2 = x3;
         return p0;
     };
     not_implemented();
@@ -163,19 +171,19 @@ transl_code: (p0, p1, p2) {
 };
 
 transl_ret: (p0, p1, p2) {
-    return ls_cons(mktup5(TCODE_INST, INST_RET, NULL, NULL, NULL), p0);
+    return ls_cons(mkinst(INST_RET, NULL, NULL, NULL), p0);
 };
 
 transl_retval: (p0, p1, p2) {
     allocate(1);
     p0 = transl_item(p0, p1[2], &x0);
-    p0 = ls_cons(mktup5(TCODE_INST, INST_MOVL, get_physical_reg(0), x0, NULL), p0);
-    p0 = ls_cons(mktup5(TCODE_INST, INST_RET, NULL, NULL, NULL), p0);
+    p0 = ls_cons(mkinst(INST_MOVL, get_physical_reg(0), x0, NULL), p0);
+    p0 = ls_cons(mkinst(INST_RETVAL, NULL, NULL, NULL), p0);
     return p0;
 };
 
 transl_syscall: (p0, p1, p2) {
-    allocate(6);
+    allocate(7);
     x0 = p1[2]; (% argument tuple %);
     x1 = x0[TUPLE_LENGTH];
     x2 = x0[TUPLE_ELEMENTS];
@@ -192,23 +200,26 @@ transl_syscall: (p0, p1, p2) {
     if (x1 > num_normal_regs()) {
 	x4 = num_normal_regs();
 	while (x4 < x1) {
-	    p0 = ls_cons(mktup5(TCODE_INST, INST_PUSHL, NULL, get_physical_reg(x4), NULL), p0);
+	    p0 = ls_cons(mkinst(INST_PUSHL, NULL, get_physical_reg(x4), NULL), p0);
 	    x4 = x4 + 1;
 	};
     };
 
     x4 = 0;
     while (x4 < x1) {
-        p0 = ls_cons(mktup5(TCODE_INST, INST_MOVL, get_physical_reg(x4), x3[x4], NULL), p0);
+        p0 = ls_cons(mkinst(INST_MOVL, get_physical_reg(x4), x3[x4], NULL), p0);
         x4 = x4 + 1;
     };
-    p0 = ls_cons(mktup5(TCODE_INST, INST_INT, NULL, mktup2(OPD_INTEGER, 128), NULL), p0);
+    x6 = mkinst(INST_INT, NULL, mktup2(OPD_INTEGER, 128), NULL);
+    x6[INST_ARG] = x1;
+
+    p0 = ls_cons(x6, p0);
 
     (% restore special purpose registers %);
     if (x1 > num_normal_regs()) {
 	x4 = num_normal_regs();
 	while (x4 < x1) {
-	    p0 = ls_cons(mktup5(TCODE_INST, INST_POPL, get_physical_reg(x4), NULL, NULL), p0);
+	    p0 = ls_cons(mkinst(INST_POPL, get_physical_reg(x4), NULL, NULL), p0);
 	    x4 = x4 + 1;
 	};
     };

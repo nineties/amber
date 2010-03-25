@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: code.rl 2010-03-26 00:59:15 nineties $
+ % $Id: code.rl 2010-03-26 03:33:53 nineties $
  %);
 
 NODE_PROG       => 0;  (% item list %);
@@ -99,7 +99,7 @@ BINOP_SEQAND => 18;
 (% Three-address Code %);
 
 (% operands %);
-OPD_PSEUDO   => 0; (% id, null %);
+OPD_PSEUDO   => 0; (% id %);
 OPD_REGISTER => 1; (% id, address %);
 OPD_STACK    => 2; (% id, position %);
 OPD_INTEGER  => 3; (% value %);
@@ -120,13 +120,21 @@ DATA_LABEL  => 7; (% name %);
 TCODE_SKIP   => 0; (% byte %);
 TCODE_DATA   => 1; (% label name, data, export %);
 TCODE_FUNC   => 2; (% label name, parameters, instructions, export %);
-TCODE_INST   => 3; (% opcode, output reg, input reg1, input reg2 %);
+TCODE_INST   => 3; (% opcode, output reg, input reg1, input reg2, live regs, arg %);
+
+INST_OPCODE => 1;
+INST_OUTPUT => 2;
+INST_INPUT1 => 3;
+INST_INPUT2 => 4;
+INST_LIVE   => 5;
+INST_ARG    => 6;
 
 INST_MOVL     => 0;
 INST_PUSHL    => 1;
 INST_POPL     => 2;
 INST_RET      => 3;
-INST_INT      => 4;
-INST_CALL_IMM => 5; (% immediate call %);
-INST_CALL_IND => 6; (% indirect call %);
+INST_RETVAL   => 4;
+INST_INT      => 5; (% ARG is the number of arguments %);
+INST_CALL_IMM => 6; (% immediate call %);
+INST_CALL_IND => 7; (% indirect call %);
 
