@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-03-25 18:41:57 nineties $
+ % $Id: tcodegen.rl 2010-03-25 19:25:09 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -173,12 +173,31 @@ transl_syscall: (p0, p1, p2) {
         x3[x4] = x5;
         x4 = x4 + 1;
     };
+
+    (% save values of special purpose registers %);
+    if (x1 > num_normal_regs()) {
+	x4 = num_normal_regs();
+	while (x4 < x1) {
+	    p0 = ls_cons(mktup5(TCODE_INST, INST_PUSHL, NULL, get_physical_reg(x4), NULL), p0);
+	    x4 = x4 + 1;
+	};
+    };
+
     x4 = 0;
     while (x4 < x1) {
         p0 = ls_cons(mktup5(TCODE_INST, INST_MOVL, get_physical_reg(x4), x3[x4], NULL), p0);
         x4 = x4 + 1;
     };
     p0 = ls_cons(mktup5(TCODE_INST, INST_INT, NULL, mktup2(OPD_INTEGER, 128), NULL), p0);
+
+    (% restore special purpose registers %);
+    if (x1 > num_normal_regs()) {
+	x4 = num_normal_regs();
+	while (x4 < x1) {
+	    p0 = ls_cons(mktup5(TCODE_INST, INST_POPL, get_physical_reg(x4), NULL, NULL), p0);
+	    x4 = x4 + 1;
+	};
+    };
     return p0;
 };
 
