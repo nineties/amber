@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: asmgen.rl 2010-03-25 18:44:33 nineties $
+ % $Id: asmgen.rl 2010-03-25 19:20:14 nineties $
  %);
 
 include(stddef, code);
@@ -42,11 +42,7 @@ emit_opd: (p0, p1, p2) {
 	return;
     };
     if (p1[0] == OPD_REGISTER) {
-        fputc(p0, '%');
-        if (p2 == 32) { fputc(p0, 'e'); };
-        fputc(p0, 'a' + p1[2]);
-        if (p2 >= 16) { fputc(p0, 'x'); };
-        if (p2 == 8)  { fputc(p0, 'l'); };
+	fputs(p0, get_register_repr(p1, p2));
         return;
     };
     if (p1[0] == OPD_ADDRESS) {
@@ -61,33 +57,35 @@ emit_opd: (p0, p1, p2) {
     not_implemented();
 };
 
-emit_instfuncs: [
-    emit_movl, emit_ret, emit_int
-];
-
-emit_movl: (p0, p1, p2, p3) {
-    fputs(p0, "\tmovl ");
-    emit_opd(p0, p2, 32);
-    fputs(p0, ", ");
-    emit_opd(p0, p1, 32);
-    fputc(p0, '\n');
-};
-
-emit_ret: (p0, p1, p2, p3) {
-    fputs(p0, "\tret\n");
-};
-
-emit_int: (p0, p1, p2, p3) {
-    fputs(p0, "\tint ");
-    emit_opd(p0, p2, 32);
-    fputc(p0, '\n');
-};
+inst_string: ["movl", "pushl", "popl", "ret", "int"];
+inst_prec:   [32,     32,      32,     32,    32   ];
 
 (% p0: output channel, p1: instruction %);
 emit_inst: (p0, p1) {
     allocate(1);
-    x0 = emit_instfuncs[p1[1]];
-    x0(p0, p1[2], p1[3], p1[4]);
+    fputc(p0, '\t');
+    fputs(p0, inst_string[p1[1]]);
+    x0 = FALSE; (% insert comma %);
+    if (p1[3] != NULL) {
+	(% first operand %);
+	fputc(p0, ' ');
+	emit_opd(p0, p1[3], inst_prec[p1[1]]);
+	x0 = TRUE;
+    };
+    if (p1[4] != NULL) {
+	(% second operand %);
+	if (x0) { fputc(p0, ','); };
+	fputc(p0, ' ');
+	emit_opd(p0, p1[4], inst_prec[p1[1]]);
+	x0 = TRUE;
+    };
+    if (p1[2] != NULL) {
+	(% output operand %);
+	if (x0) { fputc(p0, ','); };
+	fputc(p0, ' ');
+	emit_opd(p0, p1[2], inst_prec[p1[1]]);
+    };
+    fputc(p0, '\n');
 };
 
 emit_extfuncs: [
