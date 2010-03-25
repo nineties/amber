@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: asmgen.rl 2010-03-26 04:27:00 nineties $
+ % $Id: asmgen.rl 2010-03-26 07:18:33 nineties $
  %);
 
 include(stddef, code);
@@ -31,6 +31,7 @@ switch_section: (p0, p1) {
 };
 
 emit_opd: (p0, p1, p2) {
+    allocate(1);
     if (p1[0] == OPD_INTEGER) {
 	fputc(p0, '$');
 	fputi(p0, p1[1]);
@@ -50,7 +51,7 @@ emit_opd: (p0, p1, p2) {
         fputs(p0, p1[1]);
         return;
     };
-    if (p1[0] == OPD_CONTENT) {
+    if (p1[0] == OPD_LABEL) {
         fputs(p0, p1[1]);
         return;
     };
@@ -59,11 +60,25 @@ emit_opd: (p0, p1, p2) {
         fputi(p0, p1[1]);
         return;
     };
+    if (p1[0] == OPD_STACK) {
+        x0 = p1[2]; (% position %);
+        x0 = 4 * x0;
+        if (x0 != 0) { fputi(p0, x0); };
+        fputs(p0, "(%esp)");
+        return;
+    };
+    if (p1[0] == OPD_ARG) {
+        x0 = p1[2]; (% position %);
+        x0 = 4*(x0 + 2);
+        fputi(p0, x0);
+        fputs(p0, "(%ebp)");
+        return;
+    };
     not_implemented();
 };
 
-inst_string: ["movl", "pushl", "popl", "ret", "ret", "int", "call", "call"];
-inst_prec:   [32,     32,      32,     32,    32,    32   , "32",   "32"];
+inst_string: ["movl", "pushl", "popl", "ret", "leave", "int", "call", "call", "subl"];
+inst_prec:   [32,     32,      32,     32,    32,      32,    32,     32,     32];
 
 (% p0: output channel, p1: instruction %);
 emit_inst: (p0, p1) {

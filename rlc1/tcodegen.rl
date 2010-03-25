@@ -2,13 +2,13 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-03-26 04:42:42 nineties $
+ % $Id: tcodegen.rl 2010-03-26 07:14:14 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
 
 include(stddef, code);
-export(tcodegen);
+export(tcodegen, mkinst);
 
 vtable: NULL; (% variable table. variable id to corresponding operand %);
 
@@ -141,6 +141,21 @@ transl_identifier: (p0, p1, p2) {
     return p0;
 };
 
+(% p1: argument %);
+set_arguments: (p0, p1) {
+    allocate(5);
+    x0 = p1[TUPLE_LENGTH];
+    x1 = p1[TUPLE_ELEMENTS];
+    x2 = 0;
+    x3 = NULL;
+    while (x2 < x0) {
+        p0 = transl_item(p0, x1[x2], &x4);
+        x3 = ls_cons(mkinst(INST_MOVL, get_stack(x2), x4, NULL), x3);
+        x2 = x2 + 1;
+    };
+    return ls_append(x3, p0);
+};
+
 transl_call: (p0, p1, p2) {
     allocate(4);
     x0 = p1[2]; (% function %);
@@ -148,9 +163,10 @@ transl_call: (p0, p1, p2) {
     if (x0[0] == NODE_IDENTIFIER) {
         x2 = mangle(x0[1], get_ident_name(x0));
 
-        p0 = ls_cons(mkinst(INST_CALL_IMM, NULL, mktup2(DATA_LABEL, x2), NULL), p0);
+        p0 = set_arguments(p0, x1);
+        p0 = ls_cons(mkinst(INST_CALL_IMM, NULL, mktup2(OPD_LABEL, x2), NULL), p0);
 
-        x3 = create_pseudo_reg();
+        x3 = create_pseudo();
         p0 = ls_cons(mkinst(INST_MOVL, x3, get_eax(), NULL), p0);
         *p2 = x3;
         return p0;
@@ -175,11 +191,12 @@ transl_ret: (p0, p1, p2) {
 };
 
 transl_retval: (p0, p1, p2) {
-    allocate(1);
+    allocate(2);
     p0 = transl_item(p0, p1[2], &x0);
     p0 = ls_cons(mkinst(INST_MOVL, get_physical_reg(0), x0, NULL), p0);
-    p0 = ls_cons(mkinst(INST_RETVAL, NULL, NULL, NULL), p0);
-    return p0;
+    x1 = mkinst(INST_RET, NULL, NULL, NULL);
+    x1[INST_ARG] = TRUE;
+    return ls_cons(x1, p0);
 };
 
 transl_syscall: (p0, p1, p2) {
@@ -241,16 +258,29 @@ transl_extfuncs: [
 ];
 
 transl_fundecl: (p0) {
-    allocate(3);
+    allocate(7);
+
+    reset_proc();
+
     x0 = mangle(p0[1], get_ident_name(p0[2]));
     x1 = p0[3]; (% lambda %);
-    x2 = mktup5(TCODE_FUNC, x0, x1[2], ls_reverse(transl_code(NULL, x1[3])), FALSE);
+
+    x2 = x1[2]; (% argument %);
+    x3 = x2[TUPLE_LENGTH];
+    x4 = x2[TUPLE_ELEMENTS];
+    x5 = 0;
+    while (x5 < x3) {
+        set_operand(x4[x5], get_arg(x5));
+        x5 = x5 + 1;
+    };
+
+    x6 = mktup5(TCODE_FUNC, x0, x1[2], ls_reverse(transl_code(NULL, x1[3])), FALSE);
 
     (% liveness analysis %);
-    liveness(x2);
-    regalloc(x2);
+    liveness(x6);
+    regalloc(x6);
 
-    return x2;
+    return x6;
 };
 
 transl_static_data: (p0) {
@@ -301,7 +331,7 @@ transl_extdecl: (p0) {
 
     x1 = get_ident_name(p0[2]);
 
-    set_operand(p0[2], mktup2(OPD_CONTENT, x1));
+    set_operand(p0[2], mktup2(OPD_LABEL, x1));
 
     (% flatten nested static data and translate to tcode %);
     x2 = transl_static_data(p0[3]);

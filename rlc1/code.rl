@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: code.rl 2010-03-26 03:33:53 nineties $
+ % $Id: code.rl 2010-03-26 07:17:56 nineties $
  %);
 
 NODE_PROG       => 0;  (% item list %);
@@ -99,14 +99,15 @@ BINOP_SEQAND => 18;
 (% Three-address Code %);
 
 (% operands %);
-OPD_PSEUDO   => 0; (% id %);
+OPD_PSEUDO   => 0; (% id, pseudo-id %);
 OPD_REGISTER => 1; (% id, address %);
 OPD_STACK    => 2; (% id, position %);
-OPD_INTEGER  => 3; (% value %);
-OPD_CHAR     => 4; (% value %);
-OPD_FLOAT    => 5; (% value %);
-OPD_ADDRESS  => 6; (% name %);
-OPD_CONTENT  => 7; (% name %);
+OPD_ARG      => 3; (% id, position %);
+OPD_INTEGER  => 4; (% value %);
+OPD_CHAR     => 5; (% value %);
+OPD_FLOAT    => 6; (% value %);
+OPD_ADDRESS  => 7; (% name %);
+OPD_LABEL    => 8; (% name %);
 
 DATA_CHAR   => 0; (% value %);
 DATA_INT    => 1; (% value %);
@@ -132,9 +133,10 @@ INST_ARG    => 6;
 INST_MOVL     => 0;
 INST_PUSHL    => 1;
 INST_POPL     => 2;
-INST_RET      => 3;
-INST_RETVAL   => 4;
+INST_RET      => 3; (% ARG == TRUE if it is retval instruction %);
+INST_LEAVE    => 4;
 INST_INT      => 5; (% ARG is the number of arguments %);
 INST_CALL_IMM => 6; (% immediate call %);
 INST_CALL_IND => 7; (% indirect call %);
+INST_SUBL     => 8;
 
