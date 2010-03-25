@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-03-25 19:25:09 nineties $
+ % $Id: tcodegen.rl 2010-03-26 01:11:47 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -103,7 +103,7 @@ not_implemented: (p0) {
 
 transl_funcs: [
     not_reachable, not_implemented, transl_integer, transl_string, transl_identifier,
-    not_implemented, transl_code, not_implemented, transl_extdecl, not_implemented,
+    not_implemented, transl_code, not_implemented, not_implemented, transl_call,
     not_implemented, not_implemented, not_implemented, not_implemented, not_implemented,
     not_implemented, transl_ret, transl_retval, transl_syscall
 ];
@@ -134,6 +134,20 @@ transl_identifier: (p0, p1, p2) {
     allocate(1);
     *p2 = get_operand(p1);
     return p0;
+};
+
+(% XXX: do not complete implementation %);
+transl_call: (p0, p1, p2) {
+    allocate(3);
+    x0 = p1[2]; (% function %);
+    x1 = p1[3]; (% argument %);
+    if (x0[0] == NODE_IDENTIFIER) {
+        x2 = mangle(x0[1], get_ident_name(x0));
+        p0 = ls_cons(mktup5(TCODE_INST, INST_CALL_IMM, NULL, mktup2(DATA_LABEL, x2), NULL), p0);
+        *p2 = get_eax();
+        return p0;
+    };
+    not_implemented();
 };
 
 (% p0: output tcode, p1: code block %);

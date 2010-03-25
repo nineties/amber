@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-03-25 18:27:39 nineties $
+ % $Id: typing.rl 2010-03-26 00:55:58 nineties $
  %);
 
 include(stddef, code);
@@ -92,7 +92,7 @@ not_implemented: (p0) {
 };
 
 infer_funcs: [not_reachable, not_implemented, infer_integer, infer_string, infer_identifier,
-    infer_array, infer_tuple, infer_code, infer_decl, not_implemented,
+    infer_array, infer_tuple, infer_code, infer_decl, infer_call,
     not_implemented, infer_lambda, not_implemented, not_implemented, not_implemented,
     infer_export, infer_ret, infer_retval, infer_syscall
 ];
@@ -248,6 +248,19 @@ infer_decl_var: (p0, p1) {
     p0[4] = x2;
     p0 = deref(p0);
     return mktup2(p0, p1);
+};
+
+(% p0: expr %);
+infer_call: (p0) {
+    allocate(3);
+    x0 = infer_item(p0[2]); (% function %);
+    x1 = infer_item(p0[3]); (% argument %);
+    x2 = mktyvar(); (% return type %);
+    unify(x0[1], mktup3(NODE_LAMBDA_T, x1[1], x2));
+    p0[2] = x0;
+    p0[3] = x1;
+    p0[1] = x2;
+    return deref(p0);
 };
 
 (% insert missing return statement. p0: code block %);
@@ -457,7 +470,7 @@ type_mismatch: (p0, p1) {
 };
 
 deref_funcs: [not_reachable, not_implemented, deref_integer, deref_string, deref_identifier,
-    deref_array, deref_tuple, deref_code, deref_decl, not_implemented,
+    deref_array, deref_tuple, deref_code, deref_decl, deref_call,
     not_implemented, deref_lambda, not_implemented, not_implemented, not_implemented,
     deref_export, deref_ret, deref_retval, deref_syscall
 ];
@@ -528,6 +541,13 @@ deref_code: (p0) {
 deref_decl: (p0) {
     p0[2] = deref(p0[2]); (% lhs %);
     p0[3] = deref(p0[3]); (% rhs %);
+    p0[1] = deref_type(p0[1]);
+    return p0;
+};
+
+deref_call: (p0) {
+    p0[2] = deref(p0[2]); (% function %);
+    p0[3] = deref(p0[3]); (% argument %);
     p0[1] = deref_type(p0[1]);
     return p0;
 };

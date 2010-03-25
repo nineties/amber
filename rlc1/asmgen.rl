@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: asmgen.rl 2010-03-25 19:20:14 nineties $
+ % $Id: asmgen.rl 2010-03-26 01:07:16 nineties $
  %);
 
 include(stddef, code);
@@ -57,8 +57,8 @@ emit_opd: (p0, p1, p2) {
     not_implemented();
 };
 
-inst_string: ["movl", "pushl", "popl", "ret", "int"];
-inst_prec:   [32,     32,      32,     32,    32   ];
+inst_string: ["movl", "pushl", "popl", "ret", "int", "call", "call"];
+inst_prec:   [32,     32,      32,     32,    32   , "32",   "32"];
 
 (% p0: output channel, p1: instruction %);
 emit_inst: (p0, p1) {
