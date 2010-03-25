@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-03-26 00:55:58 nineties $
+ % $Id: typing.rl 2010-03-26 05:48:02 nineties $
  %);
 
 include(stddef, code);
@@ -270,8 +270,8 @@ insert_ret: (p0) {
 };
 insert_ret_impl: (p0) {
     allocate(1);
+    if (p0 == NULL) { return ls_cons(mktup2(NODE_RET, NULL), NULL); };
     x0 = ls_value(p0);
-    if (x0 == NULL) { return mktup2(NODE_RET, NULL); };
     if (x0[0] == NODE_RET) { return p0; };
     if (x0[0] == NODE_RETVAL) { return p0; };
     return ls_cons(x0, insert_ret_impl(ls_next(p0)));
@@ -289,6 +289,7 @@ infer_lambda: (p0) {
     x1 = new_varid();
     varmap_add(".pseudo_retvar", mktup2(mktyscheme(x0), x1));
 
+    p0[LAMBDA_BODY] = insert_ret(p0[LAMBDA_BODY]);
     p0[LAMBDA_BODY] = infer_item(p0[LAMBDA_BODY]);
     varmap_pop();
 

@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: liveness.rl 2010-03-26 03:55:05 nineties $
+ % $Id: liveness.rl 2010-03-26 07:11:22 nineties $
  %);
 
 (% liveness analysis %);
@@ -34,7 +34,7 @@ register_del: (p0, p1) {
 
 (% opcode to functor %);
 iterate_funcs: [
-    iterate_normal, iterate_normal, iterate_normal, iterate_ret, iterate_retval,
+    iterate_normal, iterate_normal, iterate_normal, iterate_ret, iterate_normal,
     iterate_int, iterate_call, iterate_call
 ];
 
@@ -52,15 +52,15 @@ iterate_normal: (p0, p1) {
 };
 
 iterate_ret: (p0, p1) {
-    return mkiset();
-};
-
-iterate_retval: (p0, p1) {
     allocate(2);
     x0 = ls_value(p0);
-    x1 = mkiset();
-    x1 = register_add(x1, get_eax());
-    return x1;
+    if (x0[INST_ARG]) {
+        (% retval instruction %);
+        x1 = mkiset();
+        x1 = register_add(x1, get_eax());
+        return x1;
+    };
+    return mkiset();
 };
 
 iterate_int: (p0, p1) {
