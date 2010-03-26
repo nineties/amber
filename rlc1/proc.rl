@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: proc.rl 2010-03-26 06:57:55 nineties $
+ % $Id: proc.rl 2010-03-26 18:27:39 nineties $
  %);
 
 include(stddef, code);
@@ -12,6 +12,7 @@ export(get_reg, get_physical_reg, get_stack, get_arg, get_pseudo);
 export(get_eax, get_ebx, get_ecx, get_edx, get_esi, get_edi, get_ebp, get_esp);
 export(create_pseudo, assign_pseudo);
 export(get_register_repr);
+export(is_constant_operand);
 
 NUM_PHYSICAL_REGS => 8; (% eax, ebx, ecx, edx, esi, edi, ebp, esp %);
 NUM_NORMAL_REGS   => 4; (% eax, ebx, ecx, edx %);
@@ -177,3 +178,13 @@ reset_proc: () {
     location_id = num_physical_regs();
     pseudo_id = 0;
 };
+
+is_constant_operand: (p0) {
+    assert(p0);
+    if (p0[0] == OPD_PSEUDO)   { return FALSE; };
+    if (p0[0] == OPD_REGISTER) { return FALSE; };
+    if (p0[0] == OPD_STACK)    { return FALSE; };
+    if (p0[0] == OPD_ARG)      { return FALSE; };
+    return TRUE;
+};
+
