@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: asmgen.rl 2010-03-26 07:18:33 nineties $
+ % $Id: asmgen.rl 2010-03-26 16:34:39 nineties $
  %);
 
 include(stddef, code);
@@ -77,8 +77,12 @@ emit_opd: (p0, p1, p2) {
     not_implemented();
 };
 
-inst_string: ["movl", "pushl", "popl", "ret", "leave", "int", "call", "call", "subl"];
-inst_prec:   [32,     32,      32,     32,    32,      32,    32,     32,     32];
+inst_string: ["movl", "pushl", "popl", "ret", "leave", "int", "call", "call", "addl",
+    "subl"
+];
+inst_prec:   [32,     32,      32,     32,    32,      32,    32,     32,     32,
+    32
+];
 
 (% p0: output channel, p1: instruction %);
 emit_inst: (p0, p1) {
@@ -89,14 +93,7 @@ emit_inst: (p0, p1) {
     if (p1[3] != NULL) {
 	(% first operand %);
 	fputc(p0, ' ');
-	emit_opd(p0, p1[INST_INPUT1], inst_prec[p1[INST_OPCODE]]);
-	x0 = TRUE;
-    };
-    if (p1[4] != NULL) {
-	(% second operand %);
-	if (x0) { fputc(p0, ','); };
-	fputc(p0, ' ');
-	emit_opd(p0, p1[INST_INPUT2], inst_prec[p1[INST_OPCODE]]);
+	emit_opd(p0, p1[INST_INPUT], inst_prec[p1[INST_OPCODE]]);
 	x0 = TRUE;
     };
     if (p1[2] != NULL) {
@@ -104,18 +101,6 @@ emit_inst: (p0, p1) {
 	if (x0) { fputc(p0, ','); };
 	fputc(p0, ' ');
 	emit_opd(p0, p1[INST_OUTPUT], inst_prec[p1[INST_OPCODE]]);
-    };
-
-    (% output liveness information %);
-    x0 = p1[INST_LIVE];
-    if (x0 != NULL) {
-        fputs(p0, "\t/* live:");
-        while (x0 != NULL) {
-            fputc(p0, ' ');
-            emit_opd(p0, get_reg(ls_value(x0)), 32);
-            x0 = ls_next(x0);
-        };
-        fputs(p0, "*/");
     };
     fputc(p0, '\n');
 };
