@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-03-26 22:36:49 nineties $
+ % $Id: tcodegen.rl 2010-03-26 23:11:27 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -180,7 +180,9 @@ transl_call: (p0, p1, p2) {
     return p0;
 };
 
-bininst: [0, INST_ADDL, INST_SUBL, INST_IMUL, INST_IDIV, INST_IDIV];
+bininst: [0, INST_ADDL, INST_SUBL, INST_IMUL, INST_IDIV, INST_IDIV, INST_ORL, INST_XORL,
+    INST_ANDL, INST_SHLL, INST_SHRL
+];
 
 transl_binexpr: (p0, p1, p2) {
     allocate(3);
