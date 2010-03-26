@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: code.rl 2010-03-26 23:09:19 nineties $
+ % $Id: code.rl 2010-03-26 23:53:38 nineties $
  %);
 
 NODE_PROG       => 0;  (% item list %);
@@ -147,3 +147,7 @@ INST_XORL     => 14;
 INST_ANDL     => 15;
 INST_SHLL     => 16;
 INST_SHRL     => 17;
+INST_NEGL     => 18;
+INST_NOTL     => 19; (% bitwise inverse %);
+INST_INCL     => 20;
+INST_DECL     => 21;

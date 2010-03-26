@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-03-26 23:11:27 nineties $
+ % $Id: tcodegen.rl 2010-03-27 00:09:53 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -109,7 +109,7 @@ not_implemented: (p0) {
 transl_funcs: [
     not_reachable, not_implemented, transl_integer, transl_string, transl_identifier,
     not_implemented, transl_code, not_implemented, not_implemented, transl_call,
-    not_implemented, not_implemented, not_implemented, transl_binexpr, not_implemented,
+    not_implemented, not_implemented, transl_unexpr, transl_binexpr, not_implemented,
     not_implemented, transl_ret, transl_retval, transl_syscall
 ];
 
@@ -178,6 +178,56 @@ transl_call: (p0, p1, p2) {
     p0 = ls_cons(mkinst(INST_MOVL, x3, get_eax()), p0);
     *p2 = x3;
     return p0;
+};
+
+transl_unexpr: (p0, p1, p2) {
+    allocate(2);
+    if (p1[2] == UNOP_PLUS) { return p0; (% do nothing %); };
+    if (p1[2] == UNOP_MINUS) {
+        p0 = transl_item(p0, p1[3], &x0);
+        x1 = create_pseudo();
+        *p2 = x1;
+        p0 = ls_cons(mkinst(INST_MOVL, x1, x0), p0);
+        p0 = ls_cons(mkinst(INST_NEGL, NULL, x1), p0);
+        return p0;
+    };
+    if (p1[2] == UNOP_INVERSE) {
+        p0 = transl_item(p0, p1[3], &x0);
+        x1 = create_pseudo();
+        *p2 = x1;
+        p0 = ls_cons(mkinst(INST_MOVL, x1, x0), p0);
+        p0 = ls_cons(mkinst(INST_NOTL, NULL, x1), p0);
+        return p0;
+    };
+    if (p1[2] == UNOP_PREINCR) {
+        p0 = transl_item(p0, p1[3], &x0);
+        *p2 = x0;
+        p0 = ls_cons(mkinst(INST_INCL, NULL, x0), p0);
+        return p0;
+    };
+    if (p1[2] == UNOP_PREDECR) {
+        p0 = transl_item(p0, p1[3], &x0);
+        *p2 = x0;
+        p0 = ls_cons(mkinst(INST_DECL, NULL, x0), p0);
+        return p0;
+    };
+    if (p1[2] == UNOP_POSTINCR) {
+        p0 = transl_item(p0, p1[3], &x0);
+        x1 = create_pseudo();
+        *p2 = x1;
+        p0 = ls_cons(mkinst(INST_MOVL, x1, x0), p0);
+        p0 = ls_cons(mkinst(INST_INCL, NULL, x0), p0);
+        return p0;
+    };
+    if (p1[2] == UNOP_POSTDECR) {
+        p0 = transl_item(p0, p1[3], &x0);
+        x1 = create_pseudo();
+        *p2 = x1;
+        p0 = ls_cons(mkinst(INST_MOVL, x1, x0), p0);
+        p0 = ls_cons(mkinst(INST_DECL, NULL, x0), p0);
+        return p0;
+    };
+    not_implemented();
 };
 
 bininst: [0, INST_ADDL, INST_SUBL, INST_IMUL, INST_IDIV, INST_IDIV, INST_ORL, INST_XORL,
