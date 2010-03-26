@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: liveness.rl 2010-03-26 19:27:27 nineties $
+ % $Id: liveness.rl 2010-03-26 22:45:05 nineties $
  %);
 
 (% liveness analysis %);
@@ -27,7 +27,8 @@ register_del: (p0, p1) {
 (% opcode to functor %);
 iterate_funcs: [
     iterate_normal, iterate_normal, iterate_normal, iterate_ret, iterate_normal,
-    iterate_int, iterate_call, iterate_call, iterate_normal, iterate_normal
+    iterate_int, iterate_call, iterate_call, iterate_normal, iterate_normal,
+    iterate_normal, iterate_div, iterate_mod
 ];
 
 (% p0: list of instructions, p1: live-out register at final%);
@@ -82,6 +83,35 @@ iterate_call: (p0, p1) {
     return x0; (% live-in registers %);
 };
 
+(% p0: list of instructions, p1: live-out register at final%);
+iterate_div: (p0, p1) {
+    allocate(2);
+    x0 = iterate(ls_next(p0), p1); (% live-out registers %);
+
+    x1 = ls_value(p0);
+    x0 = register_del(x0, get_eax()); (% remove dead register %);
+    x1[INST_LIVE] = iset_copy(x0);
+
+    x0 = register_add(x0, x1[INST_INPUT]);
+    x0 = register_add(x0, get_eax());
+    x0 = register_add(x0, get_edx());
+    return x0; (% live-in registers %);
+};
+
+(% p0: list of instructions, p1: live-out register at final%);
+iterate_mod: (p0, p1) {
+    allocate(2);
+    x0 = iterate(ls_next(p0), p1); (% live-out registers %);
+
+    x1 = ls_value(p0);
+    x0 = register_del(x0, get_edx()); (% remove dead register %);
+    x1[INST_LIVE] = iset_copy(x0);
+
+    x0 = register_add(x0, x1[INST_INPUT]);
+    x0 = register_add(x0, get_eax());
+    x0 = register_add(x0, get_edx());
+    return x0; (% live-in registers %);
+};
 (% p0: list of instructions, p1: live-out registers at final %);
 iterate: (p0, p1) {
     allocate(2);

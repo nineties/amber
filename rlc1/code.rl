@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: code.rl 2010-03-26 16:59:27 nineties $
+ % $Id: code.rl 2010-03-26 21:35:42 nineties $
  %);
 
 NODE_PROG       => 0;  (% item list %);
@@ -99,7 +99,7 @@ BINOP_SEQAND => 18;
 (% Three-address Code %);
 
 (% operands %);
-OPD_PSEUDO   => 0; (% id, pseudo-id %);
+OPD_PSEUDO   => 0; (% id, pseudo-id, flag (TRUE if it must be a register) %);
 OPD_REGISTER => 1; (% id, address %);
 OPD_STACK    => 2; (% id, position %);
 OPD_ARG      => 3; (% id, position %);
@@ -139,4 +139,7 @@ INST_CALL_IMM => 6; (% immediate call %);
 INST_CALL_IND => 7; (% indirect call %);
 INST_ADDL     => 8;
 INST_SUBL     => 9;
+INST_IMUL     => 10;
+INST_IDIV     => 11;
+INST_IMOD     => 12;
 
