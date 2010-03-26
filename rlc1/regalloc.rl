@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: regalloc.rl 2010-03-26 19:41:35 nineties $
+ % $Id: regalloc.rl 2010-03-26 23:00:09 nineties $
  %);
 
 (% Register allocation %);
@@ -25,20 +25,19 @@ compute_score: (p0) {
     return x0;
 };
 
-add_conflicts: (p0) {
-    allocate(4);
-    x0 = p0;
-    while (x0 != NULL) {
-        x1 = p0;
-        while (x1 != NULL) {
-            if (x0 != x1) {
-                x2 = (ls_value(x0));
-                x3 = (ls_value(x1));
-                vec_put(conflicts, x2, iset_add(vec_at(conflicts, x2), x3));
-            };
-            x1 = ls_next(x1);
+(% p0: set of locations, p1: location %);
+add_conflicts: (p0, p1) {
+    allocate(2);
+    if (p1 == NULL) { return; };
+    if (is_constant_operand(p1)) { return; };
+    x0 = p1[1];
+    while (p0 != NULL) {
+        x1 = ls_value(p0);
+        if (x0 != x1) {
+            vec_put(conflicts, x0, iset_add(vec_at(conflicts, x0), x1));
+            vec_put(conflicts, x1, iset_add(vec_at(conflicts, x1), x0));
         };
-        x0 = ls_next(x0);
+        p0 = ls_next(p0);
     };
 };
 
@@ -105,7 +104,7 @@ incr_input_count: (p0) {
 
 (% p0: instructions %);
 compute_conflicts: (p0) {
-    allocate(2);
+    allocate(3);
     conflicts = mkvec(num_locations());
     equivregs = mkvec(num_locations());
     input_count = mkvec(num_locations());
@@ -114,8 +113,14 @@ compute_conflicts: (p0) {
         x0 = ls_value(p0); (% instruction %);
         x1 = x0[INST_LIVE]; (% live locations %);
 
-        (% registers in x1 conflict each other %);
-        add_conflicts(x1);
+        (% live registers in x1 conflict each other %);
+        add_conflicts(x1, x0[INST_INPUT]);
+        add_conflicts(x1, x0[INST_OUTPUT]);
+        x2 = x1;
+        while (x2 != NULL) {
+            add_conflicts(x1, get_reg(ls_value(x2)));
+            x2 = ls_next(x2);
+        };
 
         if (x0[INST_OPCODE] == INST_MOVL) {
             add_equivregs(x0[INST_OUTPUT], x0[INST_INPUT]);
@@ -197,6 +202,7 @@ select_best_equivreg: (p0) {
         x1 = ls_next(x1);
     };
     if (x5) { return x3; };
+    if (p0[3] == TRUE) { return x3; };
     return x2;
 };
 
@@ -221,6 +227,12 @@ select_location: (p0) {
         };
         x1 = x1 + 1;
     };
+
+    if (p0[3] == TRUE) {
+        fputs(stderr, "ERROR: failed to allocate register\n");
+        exit(1);
+    };
+
     (% try to reuse stack memory %);
     x1 = 0;
     while (x1 < num_stack()) {

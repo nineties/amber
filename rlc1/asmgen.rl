@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: asmgen.rl 2010-03-26 16:34:39 nineties $
+ % $Id: asmgen.rl 2010-03-26 22:57:14 nineties $
  %);
 
 include(stddef, code);
@@ -78,10 +78,10 @@ emit_opd: (p0, p1, p2) {
 };
 
 inst_string: ["movl", "pushl", "popl", "ret", "leave", "int", "call", "call", "addl",
-    "subl"
+    "subl", "imul", "idiv", "idiv"
 ];
 inst_prec:   [32,     32,      32,     32,    32,      32,    32,     32,     32,
-    32
+    32,     32,     32,     32
 ];
 
 (% p0: output channel, p1: instruction %);
@@ -90,13 +90,13 @@ emit_inst: (p0, p1) {
     fputc(p0, '\t');
     fputs(p0, inst_string[p1[INST_OPCODE]]);
     x0 = FALSE; (% insert comma %);
-    if (p1[3] != NULL) {
+    if (p1[INST_INPUT] != NULL) {
 	(% first operand %);
 	fputc(p0, ' ');
 	emit_opd(p0, p1[INST_INPUT], inst_prec[p1[INST_OPCODE]]);
 	x0 = TRUE;
     };
-    if (p1[2] != NULL) {
+    if (p1[INST_OUTPUT] != NULL) {
 	(% output operand %);
 	if (x0) { fputc(p0, ','); };
 	fputc(p0, ' ');

@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: proc.rl 2010-03-26 18:27:39 nineties $
+ % $Id: proc.rl 2010-03-26 22:36:23 nineties $
  %);
 
 include(stddef, code);
@@ -136,7 +136,7 @@ get_register_repr: (p0, p1) {
 
 create_pseudo: () {
     allocate(1);
-    x0 = mktup3(OPD_PSEUDO, new_location_id(), new_pseudo_id());
+    x0 = mktup4(OPD_PSEUDO, new_location_id(), new_pseudo_id(), FALSE);
     vec_pushback(locations, x0);
     vec_pushback(pseudoregs, x0);
     return x0;

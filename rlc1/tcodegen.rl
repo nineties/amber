@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-03-26 17:29:05 nineties $
+ % $Id: tcodegen.rl 2010-03-26 22:36:49 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -180,10 +180,16 @@ transl_call: (p0, p1, p2) {
     return p0;
 };
 
-bininst: [0, INST_ADDL, INST_SUBL];
+bininst: [0, INST_ADDL, INST_SUBL, INST_IMUL, INST_IDIV, INST_IDIV];
 
 transl_binexpr: (p0, p1, p2) {
     allocate(3);
+    if (p1[2] == BINOP_DIV) {
+        return transl_divexpr(p0, p1, p2);
+    };
+    if (p1[2] == BINOP_MOD) {
+        return transl_modexpr(p0, p1, p2);
+    };
     (% t = x op y
      %
      % <->
@@ -197,6 +203,56 @@ transl_binexpr: (p0, p1, p2) {
     *p2 = x2;
     p0 = ls_cons(mkinst(INST_MOVL, x2, x0), p0);
     p0 = ls_cons(mkinst(bininst[p1[2]], x2, x1), p0);
+    return p0;
+};
+
+must_not_be_memory: (p0) {
+    if (p0[0] == OPD_PSEUDO) {
+        p0[3] = TRUE;
+    };
+};
+
+transl_divexpr: (p0, p1, p2) {
+    allocate(3);
+    (% t = x / y
+     %
+     % <->
+     %
+     % %eax = x
+     % idiv y
+     % t = %eax
+     %);
+    p0 = transl_item(p0, p1[3], &x0);
+    p0 = transl_item(p0, p1[4], &x1);
+    x2 = create_pseudo();
+    *p2 = x2;
+    p0 = ls_cons(mkinst(INST_MOVL, get_eax(), x0), p0);
+    p0 = ls_cons(mkinst(INST_MOVL, get_edx(), mktup2(OPD_INTEGER, 0)), p0);
+    must_not_be_memory(x1);
+    p0 = ls_cons(mkinst(INST_IDIV, NULL, x1), p0);
+    p0 = ls_cons(mkinst(INST_MOVL, x2, get_eax()), p0);
+    return p0;
+};
+
+transl_modexpr: (p0, p1, p2) {
+    allocate(3);
+    (% t = x % y
+     %
+     % <->
+     %
+     % %eax = x
+     % idiv y
+     % t = %edx
+     %);
+    p0 = transl_item(p0, p1[3], &x0);
+    p0 = transl_item(p0, p1[4], &x1);
+    x2 = create_pseudo();
+    *p2 = x2;
+    p0 = ls_cons(mkinst(INST_MOVL, get_eax(), x0), p0);
+    p0 = ls_cons(mkinst(INST_MOVL, get_edx(), mktup2(OPD_INTEGER, 0)), p0);
+    must_not_be_memory(x1);
+    p0 = ls_cons(mkinst(INST_IMOD, NULL, x1), p0);
+    p0 = ls_cons(mkinst(INST_MOVL, x2, get_edx()), p0);
     return p0;
 };
 
@@ -219,7 +275,7 @@ transl_ret: (p0, p1, p2) {
 transl_retval: (p0, p1, p2) {
     allocate(2);
     p0 = transl_item(p0, p1[2], &x0);
-    p0 = ls_cons(mkinst(INST_MOVL, get_physical_reg(0), x0), p0);
+    p0 = ls_cons(mkinst(INST_MOVL, get_eax(), x0), p0);
     x1 = mkinst(INST_RET, NULL, NULL);
     x1[INST_ARG] = TRUE;
     return ls_cons(x1, p0);
