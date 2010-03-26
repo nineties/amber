@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: regalloc.rl 2010-03-26 07:26:31 nineties $
+ % $Id: regalloc.rl 2010-03-26 16:45:26 nineties $
  %);
 
 (% Register allocation %);
@@ -54,16 +54,21 @@ compute_conflicts: (p0) {
 (% pickup pseudo register which have maximal conflicts %);
 pickup_pseudo_reg: () {
     allocate(4);
-    x0 = get_pseudo(0);
+    x0 = NULL;
     x1 = num_pseudo();
-    x2 = 1;
+    x2 = 0;
     while (x2 < x1) {
         x3 = get_pseudo(x2);
         if (x3 != NULL) {
-            if (num_conflicts(x0) < num_conflicts(x3)) {
+            if (x0 == NULL) {
                 x0 = x3;
+            } else {
+                if (num_conflicts(x0) < num_conflicts(x3)) {
+                    x0 = x3;
+                };
             };
         };
+        x2 = x2 + 1;
     };
     return x0;
 };
@@ -97,31 +102,29 @@ select_location: (p0) {
 };
 
 assign_location: (p0) {
-    allocate(3);
+    allocate(4);
     x0 = select_location(p0);
     (% update register table %);
-    puts("assign: ");
-    puti(p0[1]);
-    puts(" <- ");
-    puti(x0[1]);
-    putc('\n');
     assign_pseudo(p0, x0);
     (% update conflicts %);
     x1 = 0;
     x2 = vec_size(conflicts);
     while (x1 < x2) {
-        x2 = vec_at(conflicts, x1);
-        vec_put(conflicts, x1, iset_del(x2, x0[1]));
+        x3 = vec_at(conflicts, x1);
+        x3 = iset_del(x3, p0[1]);
+        x3 = iset_add(x3, x0[1]);
+        vec_put(conflicts, x1, x3);
         x1 = x1 + 1;
     };
 };
 
 assign_locations: () {
-    allocate(2);
+    allocate(3);
     x0 = 0;
     x1 = num_pseudo();
     while (x0 < x1) {
-        assign_location(pickup_pseudo_reg());
+        x2 = pickup_pseudo_reg();
+        assign_location(x2);
         x0 = x0 + 1;
     };
 };
@@ -140,12 +143,11 @@ update_instructions: (p0) {
     if (p0 == NULL) { return NULL; };
     x0 = ls_value(p0);
     x0[INST_OUTPUT] = replace(x0[INST_OUTPUT]);
-    x0[INST_INPUT1] = replace(x0[INST_INPUT1]);
-    x0[INST_INPUT2] = replace(x0[INST_INPUT2]);
+    x0[INST_INPUT] = replace(x0[INST_INPUT]);
 
     (% eliminate meaningless move %);
     if (x0[INST_OPCODE] == INST_MOVL) {
-        if (x0[INST_OUTPUT] == x0[INST_INPUT1]) {
+        if (x0[INST_OUTPUT] == x0[INST_INPUT]) {
             return update_instructions(ls_next(p0));
         };
     };

@@ -1,8 +1,8 @@
-f: (x,y) {
-    return x;
+plus: (x,y) {
+    return x+y;
 };
 
 export
 main: () {
-    syscall(1, f(100, 200));
+    syscall(1, plus(1, 2));
 };

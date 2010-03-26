@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: main.rl 2010-03-25 18:30:39 nineties $
+ % $Id: main.rl 2010-03-26 16:37:54 nineties $
  %);
 
 include(stddef, code);
@@ -35,7 +35,7 @@ compile: (p0, p1) {
     (% type check %);
     typing(x1);
 
-    (% translate to three address code %);
+    (% translate to two address code %);
     puts("translate to TCODE\n");
     x1 = tcodegen(x1);
 
