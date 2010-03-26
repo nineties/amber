@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: rowllib.rl 2010-03-26 06:48:33 nineties $
+ % $Id: rowllib.rl 2010-03-26 19:17:20 nineties $
  %);
 
 include(stddef);
@@ -509,11 +509,13 @@ map_find: (p0, p1) {
                            sorted-list implementation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%);
 
-export(mkiset, iset_size, iset_singleton, iset_add, iset_del, iset_contains,
+export(mkiset, iset_size, iset_singleton, iset_copy, iset_add, iset_del, iset_contains,
     iset_union, iset_subtract);
 mkiset: () { return NULL; };
 iset_size: (p0) { return ls_length(p0); };
 iset_singleton: (p0) { return ls_cons(p0, NULL); };
+
+iset_copy: (p0) { return ls_copy(p0); };
 
 (% p0: set, p1: value %);
 iset_add: (p0, p1) {

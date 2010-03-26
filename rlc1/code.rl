@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: code.rl 2010-03-26 16:34:02 nineties $
+ % $Id: code.rl 2010-03-26 16:59:27 nineties $
  %);
 
 NODE_PROG       => 0;  (% item list %);
