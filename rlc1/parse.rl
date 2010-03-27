@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: parse.rl 2010-03-27 20:02:20 nineties $
+ % $Id: parse.rl 2010-03-27 21:57:17 nineties $
  %);
 
 include(stddef, code, token);
@@ -411,6 +411,9 @@ parse_primary_item: (p0) {
         x1 = strlen(x0);
         wch(x0, x1-1, '\0');
         return mktup4(NODE_STRING, NULL, x0+1);
+    };
+    if (p0 == '_') {
+        return mktup2(NODE_DONTCARE, NULL);
     };
     expected("item");
 };

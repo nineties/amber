@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-03-27 20:57:23 nineties $
+ % $Id: typing.rl 2010-03-27 22:04:14 nineties $
  %);
 
 include(stddef, code);
@@ -91,10 +91,10 @@ not_implemented: (p0) {
     exit(1);
 };
 
-infer_funcs: [not_reachable, not_implemented, infer_integer, infer_string, infer_identifier,
-    infer_array, infer_tuple, infer_code, infer_decl, infer_call,
-    not_implemented, infer_lambda, infer_unexpr, infer_binexpr, not_implemented,
-    infer_export, infer_ret, infer_retval, infer_syscall
+infer_funcs: [not_reachable, not_implemented, infer_integer, infer_string, not_implemented,
+    infer_identifier, infer_array, infer_tuple, infer_code, infer_decl,
+    infer_call, not_implemented, infer_lambda, infer_unexpr, infer_binexpr,
+    not_implemented, infer_export, infer_ret, infer_retval, infer_syscall
 ];
 
 void_type   : NULL;
@@ -153,42 +153,6 @@ infer_array: (p0) {
     return deref(p0);
 };
 
-parse_pat: (p0) {
-    if (p0[0] == NODE_IDENTIFIER) { return parse_var_pat(p0); };
-    if (p0[0] == NODE_TUPLE) { return parse_tuple_pat(p0); };
-    fputs(stderr, "ERROR: invalid pattern expression '");
-    put_item(stderr, p0);
-    fputs(stderr, "'\n");
-    exit(1);
-};
-
-parse_var_pat: (p0) {
-    allocate(3);
-    x0 = mktyvar();
-    x1 = new_varid();
-    x2 = mktyscheme(x0);
-    varmap_add(p0[2], mktup2(x2, x1));
-    p0[1] = x0;
-    p0[3] = x1;
-    p0[4] = x2;
-    return p0;
-};
-
-parse_tuple_pat: (p0) {
-    allocate(4);
-    x0 = p0[2]; (% length %);
-    x1 = 0;
-    x3 = memalloc(4*x0);
-    while (x1 < x0) {
-        x2 = p0[3];
-        x2[x1] = parse_pat(x2[x1]);
-        x3[x1] = (x2[x1])[1];
-        x1 = x1 + 1;
-    };
-    p0[1] = mktup3(NODE_TUPLE_T, x0, x3);
-    return p0;
-};
-
 infer_tuple: (p0) {
     allocate(4);
     x1 = p0[2]; (% length %);
@@ -216,24 +180,10 @@ infer_code: (p0) {
     return deref(p0);
 };
 
-infer_decl: (p0) {
-    allocate(1);
-    x0 = infer_decl_impl(p0[2], p0[3]);
-    p0[2] = x0[0];
-    p0[3] = x0[1];
-    p0[1] = (x0[1])[1];
-    return deref(p0);
-};
-
-(% p0: lhs, p1: rhs %);
-infer_decl_impl: (p0, p1) {
-    if (p0[0] == NODE_IDENTIFIER) {
-        return infer_decl_var(p0, p1);
-    };
-    if (p0[0] == NODE_TUPLE) {
-        return infer_decl_tuple(p0, p1);
-    };
-    not_implemented();
+infer_decl_dontcare: (p0, p1) {
+    p1 = infer_item(p1);
+    p0[1] = p1[1];
+    return mktup2(p0, p1);
 };
 
 (% p0: var, p1: expr %);
@@ -270,6 +220,11 @@ infer_decl_tuple: (p0, p1) {
 
 infer_pattern: (p0) {
     allocate(4);
+    if (p0[0] == NODE_DONTCARE) {
+        x0 = mktyvar();
+        p0[1] = x0;
+        return p0;
+    };
     if (p0[0] == NODE_IDENTIFIER) {
         (% variable pattern %);
         x0 = mktyvar(); (% type of variable %);
@@ -294,9 +249,33 @@ infer_pattern: (p0) {
         p0[1] = mktup3(NODE_TUPLE_T, x0, x2);
         return p0;
     };
-    fputs(stderr, "ERROR: invalid pattern\n");
+    fputs(stderr, "ERROR: invalid pattern expression\n");
     exit(1);
 };
+
+(% p0: lhs, p1: rhs %);
+infer_decl_impl: (p0, p1) {
+    if (p0[0] == NODE_DONTCARE) {
+        return infer_decl_dontcare(p0, p1);
+    };
+    if (p0[0] == NODE_IDENTIFIER) {
+        return infer_decl_var(p0, p1);
+    };
+    if (p0[0] == NODE_TUPLE) {
+        return infer_decl_tuple(p0, p1);
+    };
+    not_implemented();
+};
+
+infer_decl: (p0) {
+    allocate(1);
+    x0 = infer_decl_impl(p0[2], p0[3]);
+    p0[2] = x0[0];
+    p0[3] = x0[1];
+    p0[1] = (x0[1])[1];
+    return deref(p0);
+};
+
 
 (% p0: expr %);
 infer_call: (p0) {
@@ -330,7 +309,7 @@ infer_lambda: (p0) {
 
     (% lambda opens new namespace %);
     varmap_push();
-    p0[LAMBDA_ARG]  = parse_pat(p0[LAMBDA_ARG]);
+    p0[LAMBDA_ARG]  = infer_pattern(p0[LAMBDA_ARG]);
 
     (% pseudo return variable for type checking %);
     x0 = mktyvar();
@@ -558,10 +537,10 @@ type_mismatch: (p0, p1) {
     exit(1);
 };
 
-deref_funcs: [not_reachable, not_implemented, deref_integer, deref_string, deref_identifier,
-    deref_array, deref_tuple, deref_code, deref_decl, deref_call,
-    not_implemented, deref_lambda, deref_unexpr, deref_binexpr, not_implemented,
-    deref_export, deref_ret, deref_retval, deref_syscall
+deref_funcs: [not_reachable, not_implemented, deref_integer, deref_string, deref_dontcare,
+    deref_identifier, deref_array, deref_tuple, deref_code, deref_decl,
+    deref_call, not_implemented, deref_lambda, deref_unexpr, deref_binexpr,
+    not_implemented, deref_export, deref_ret, deref_retval, deref_syscall
 ];
 
 (% p0: item %);
@@ -574,6 +553,11 @@ deref: (p0) {
 deref_identifier: (p0) {
     p0[1] = deref_type(p0[1]);
     p0[4] = closure(p0[1]);
+    return p0;
+};
+
+deref_dontcare: (p0) {
+    p0[1] = deref_type(p0[1]);
     return p0;
 };
 
@@ -714,6 +698,10 @@ deref_type: (p0) {
 (% p0: pattern %);
 deref_pattern: (p0) {
     allocate(3);
+    if (p0[0] == NODE_DONTCARE) {
+        p0[1] = deref_type(p0[1]);
+        return p0;
+    };
     if (p0[0] == NODE_IDENTIFIER) {
         p0[1] = deref_type(p0[1]);
         p0[4] = closure(p0[1]);

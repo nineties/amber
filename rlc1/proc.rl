@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: proc.rl 2010-03-27 17:28:12 nineties $
+ % $Id: proc.rl 2010-03-27 22:19:30 nineties $
  %);
 
 include(stddef, code);
@@ -81,6 +81,7 @@ get_esp: () { return get_physical_reg(REG_ESP); };
 create_stack: (p0) {
     allocate(1);
     x0 = mktup3(OPD_STACK, new_location_id(), p0);
+    puts("!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     vec_pushback(locations, x0);
     return x0;
 };

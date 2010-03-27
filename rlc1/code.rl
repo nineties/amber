@@ -2,28 +2,29 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: code.rl 2010-03-27 19:49:57 nineties $
+ % $Id: code.rl 2010-03-27 21:11:35 nineties $
  %);
 
 NODE_PROG       => 0;  (% item list %);
 NODE_REWRITE    => 1;  (% lhs, rhs %);
 NODE_INTEGER    => 2;  (% type, bits, value %);
 NODE_STRING     => 3;  (% type, string %);
-NODE_IDENTIFIER => 4;  (% type, name, id, tyscheme %);
-NODE_ARRAY      => 5;  (% type, length, elements %);
-NODE_TUPLE      => 6;  (% type, length, elements %);
-NODE_CODE       => 7;  (% type, elements %);
-NODE_DECL       => 8;  (% type, lhs, rhs %);
-NODE_CALL       => 9;  (% operator() : type, lhs, tuple of arguments %);
-NODE_SUBSCRIPT  => 10; (% operator[] : type, lhs, array of arguments %);
-NODE_LAMBDA     => 11; (% operator{} : type, lhs, code %);
-NODE_UNEXPR     => 12; (% type, operator, arg %);
-NODE_BINEXPR    => 13; (% type, operator, lhs, rhs %);
-NODE_ASSIGN     => 14; (% type, operator, lhs, rhs %);
-NODE_EXPORT     => 15; (% item %);
-NODE_RET        => 16; (% type %);
-NODE_RETVAL     => 17; (% type, value %);
-NODE_SYSCALL    => 18; (% type, params %);
+NODE_DONTCARE   => 4;  (% type %);
+NODE_IDENTIFIER => 5;  (% type, name, id, tyscheme %);
+NODE_ARRAY      => 6;  (% type, length, elements %);
+NODE_TUPLE      => 7;  (% type, length, elements %);
+NODE_CODE       => 8;  (% type, elements %);
+NODE_DECL       => 9;  (% type, lhs, rhs %);
+NODE_CALL       => 10; (% operator() : type, lhs, tuple of arguments %);
+NODE_SUBSCRIPT  => 11; (% operator[] : type, lhs, array of arguments %);
+NODE_LAMBDA     => 12; (% operator{} : type, lhs, code %);
+NODE_UNEXPR     => 13; (% type, operator, arg %);
+NODE_BINEXPR    => 14; (% type, operator, lhs, rhs %);
+NODE_ASSIGN     => 15; (% type, operator, lhs, rhs %);
+NODE_EXPORT     => 16; (% item %);
+NODE_RET        => 17; (% type %);
+NODE_RETVAL     => 18; (% type, value %);
+NODE_SYSCALL    => 19; (% type, params %);
 
 (% indices %);
 STRING_RAW      => 2;

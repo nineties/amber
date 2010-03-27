@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: main.rl 2010-03-26 16:37:54 nineties $
+ % $Id: main.rl 2010-03-27 22:33:50 nineties $
  %);
 
 include(stddef, code);
@@ -27,23 +27,30 @@ change_suffix: (p0, p1) {
 compile: (p0, p1) {
     allocate(2);
 
+    puts("compile ");
+    puts(p1);
+    putc('\n');
+
     (% lex and parse %);
     x0 = open_in(p1);
+    puts("> parsing...\n");
     x1 = parse(p1, x0);
     close_in(x0);
 
     (% type check %);
+    puts("> typing...\n");
     typing(x1);
 
     (% translate to two address code %);
-    puts("translate to TCODE\n");
+    puts("> translating to tcode...\n");
     x1 = tcodegen(x1);
 
     (% generate assembly %);
-    puts("generate assembly\n");
+    puts("> generating assembly...\n");
     x0 = open_out(p0);
     asmgen(x0, x1);
     close_out(x0);
+    puts("finished\n");
 };
 
 ascmd: ["/usr/bin/as", NULL, "-o", NULL, NULL];
