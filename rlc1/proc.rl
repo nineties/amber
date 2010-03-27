@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: proc.rl 2010-03-27 12:39:48 nineties $
+ % $Id: proc.rl 2010-03-27 17:28:12 nineties $
  %);
 
 include(stddef, code);
@@ -86,7 +86,7 @@ create_stack: (p0) {
 };
 
 (% p0: offset %);
-get_stack: (p0) {
+get_stack: (p0, p1) {
     allocate(1);
     if (p0 < vec_size(stackregs)) {
         return vec_at(stackregs, p0);
@@ -134,9 +134,10 @@ get_register_repr: (p0, p1) {
     exit(1);
 };
 
-create_pseudo: () {
+(% p0: length %);
+create_pseudo: (p0) {
     allocate(1);
-    x0 = mktup4(OPD_PSEUDO, new_location_id(), new_pseudo_id(), FALSE);
+    x0 = mktup5(OPD_PSEUDO, new_location_id(), new_pseudo_id(), p0, FALSE);
     vec_pushback(locations, x0);
     vec_pushback(pseudoregs, x0);
     return x0;

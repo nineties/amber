@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: regalloc.rl 2010-03-26 23:00:09 nineties $
+ % $Id: regalloc.rl 2010-03-27 19:33:26 nineties $
  %);
 
 (% Register allocation %);
@@ -151,6 +151,7 @@ pickup_pseudo_reg: () {
         };
         x2 = x2 + 1;
     };
+    assert(x0 != NULL);
     return x0;
 };
 
@@ -202,7 +203,7 @@ select_best_equivreg: (p0) {
         x1 = ls_next(x1);
     };
     if (x5) { return x3; };
-    if (p0[3] == TRUE) { return x3; };
+    if (p0[PSEUDO_MUST_BE_REGISTER] == TRUE) { return x3; };
     return x2;
 };
 
@@ -228,7 +229,7 @@ select_location: (p0) {
         x1 = x1 + 1;
     };
 
-    if (p0[3] == TRUE) {
+    if (p0[PSEUDO_MUST_BE_REGISTER] == TRUE) {
         fputs(stderr, "ERROR: failed to allocate register\n");
         exit(1);
     };
@@ -246,16 +247,16 @@ select_location: (p0) {
     return get_stack(x1);
 };
 
-pseudo_count : 0;
-
 assign_location: (p0) {
     allocate(4);
     x0 = select_location(p0);
     (% update register table %);
+    puts("assign: ");
+    puti(p0[1]);
+    puts(" -> ");
+    puti(x0[1]);
+    putc('\n');
     assign_pseudo(p0, x0);
-    if (x0[0] != OPD_PSEUDO) {
-        pseudo_count = pseudo_count - 1;
-    };
     (% update conflicts/equivregs %);
     x1 = 0;
     x2 = num_locations();
@@ -280,9 +281,12 @@ assign_location: (p0) {
 };
 
 assign_locations: () {
-    pseudo_count = num_pseudo();
-    while (pseudo_count > 0) {
+    allocate(2);
+    x0 = 0;
+    x1 = num_pseudo();
+    while (x0 < x1) {
         assign_location(pickup_pseudo_reg());
+	x0 = x0 + 1;
     };
 };
 
@@ -290,7 +294,7 @@ assign_locations: () {
 replace: (p0) {
     if (p0 == NULL) { return NULL; };
     if (p0[0] == OPD_PSEUDO) {
-        return get_reg(p0[1]);
+        return replace(get_reg(p0[1]));
     };
     return p0;
 };
