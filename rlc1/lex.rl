@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: lex.rl 2010-03-25 18:08:50 nineties $
+ % $Id: lex.rl 2010-03-27 21:10:25 nineties $
  %);
 
 include(stddef, code);
@@ -15,6 +15,7 @@ include(token);
  % decimal    : [1-9][0-9]*
  % octal      : 0[0-7]*
  % hex        : ("0x"|"0X")[0-9a-fA-F]+
+ % dont care  : _
  % identifier : {letter}({letter)|{digit})*
  % escape     : \\['"\\abfnrtv0]
  % character  : \'({escape}|[^\\\'\n])\'
@@ -307,6 +308,14 @@ accept: (p0) {
 
 accept_ident: () {
     allocate(1);
+    x0 = token_text();
+    if (rch(x0, 0) == '_') {
+        if (rch(x0, 1) == '\0') {
+            (% don't care pattern %);
+            accept('_');
+            return;
+        };
+    };
     x0 = map_find(keyword_map, token_text());
     if (x0 != NULL) {
         accept(x0);

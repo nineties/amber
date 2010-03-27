@@ -2,11 +2,11 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: asmgen.rl 2010-03-27 18:44:30 nineties $
+ % $Id: asmgen.rl 2010-03-27 22:28:04 nineties $
  %);
 
 include(stddef, code);
-export(asmgen);
+export(asmgen, emit_opd);
 
 not_reachable: (p0) {
     fputs(stderr, "ERROR: not reachable here\n");

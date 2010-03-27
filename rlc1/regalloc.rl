@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: regalloc.rl 2010-03-27 19:33:26 nineties $
+ % $Id: regalloc.rl 2010-03-27 22:33:22 nineties $
  %);
 
 (% Register allocation %);
@@ -27,15 +27,17 @@ compute_score: (p0) {
 
 (% p0: set of locations, p1: location %);
 add_conflicts: (p0, p1) {
-    allocate(2);
+    allocate(3);
     if (p1 == NULL) { return; };
     if (is_constant_operand(p1)) { return; };
     x0 = p1[1];
     while (p0 != NULL) {
         x1 = ls_value(p0);
         if (x0 != x1) {
-            vec_put(conflicts, x0, iset_add(vec_at(conflicts, x0), x1));
-            vec_put(conflicts, x1, iset_add(vec_at(conflicts, x1), x0));
+            x2 = iset_add(vec_at(conflicts, x0), x1);
+            vec_put(conflicts, x0, x2);
+            x2 = iset_add(vec_at(conflicts, x1), x0);
+            vec_put(conflicts, x1, x2);
         };
         p0 = ls_next(p0);
     };
@@ -243,7 +245,13 @@ select_location: (p0) {
         };
         x1 = x1 + 1;
     };
+
     (% allocate new stack memory %);
+    (% here, we must resize working tables. %);
+    vec_pushback(conflicts, NULL);
+    vec_pushback(equivregs, NULL);
+    vec_pushback(input_count, NULL);
+    vec_pushback(output_count, NULL);
     return get_stack(x1);
 };
 
@@ -251,11 +259,6 @@ assign_location: (p0) {
     allocate(4);
     x0 = select_location(p0);
     (% update register table %);
-    puts("assign: ");
-    puti(p0[1]);
-    puts(" -> ");
-    puti(x0[1]);
-    putc('\n');
     assign_pseudo(p0, x0);
     (% update conflicts/equivregs %);
     x1 = 0;

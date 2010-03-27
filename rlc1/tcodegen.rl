@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-03-27 21:00:23 nineties $
+ % $Id: tcodegen.rl 2010-03-27 22:35:35 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -138,10 +138,10 @@ not_implemented: (p0) {
 };
 
 transl_funcs: [
-    not_reachable, not_implemented, transl_integer, transl_string, transl_identifier,
-    not_implemented, transl_tuple, transl_code, transl_decl, transl_call,
-    not_implemented, not_implemented, transl_unexpr, transl_binexpr, not_implemented,
-    not_implemented, transl_ret, transl_retval, transl_syscall
+    not_reachable, not_implemented, transl_integer, transl_string, not_implemented,
+    transl_identifier, not_implemented, transl_tuple, transl_code, transl_decl,
+    transl_call, not_implemented, not_implemented, transl_unexpr, transl_binexpr,
+    not_implemented, not_implemented, transl_ret, transl_retval, transl_syscall
 ];
 
 transl_integer: (p0, p1, p2) {
@@ -399,6 +399,17 @@ transl_var_decl: (p0, p1, p2) {
 
 transl_tuple_decl_helper: (p0, p1, p2, p3) {
     allocate(5);
+    if (p1[0] == NODE_DONTCARE) {
+        x0 = type_size(p1[1]); (% number of registers required by this pattern %);
+        x1 = NULL;
+        while (x0 > 0) {
+            x1 = ls_cons(ls_value(*p2), x1);
+            *p2 = ls_next(*p2);
+            x0 = x0 - 1;
+        };
+        *p3 = ls_reverse(x1);
+        return p0;
+    };
     if (p1[0] == NODE_IDENTIFIER) {
         x0 = type_size(p1[1]); (% number of registers required by this variable %);
         x1 = 0;
@@ -532,9 +543,9 @@ transl_item_single: (p0, p1, p2) {
 
 transl_extfuncs: [
     not_reachable, not_implemented, not_implemented, not_implemented, not_implemented,
-    not_implemented, not_implemented, not_implemented, transl_extdecl, not_implemented,
+    not_implemented, not_implemented, not_implemented, not_implemented, transl_extdecl,
     not_implemented, not_implemented, not_implemented, not_implemented, not_implemented,
-    transl_export, not_implemented, not_implemented
+    not_implemented, transl_export, not_implemented, not_implemented
 ];
 
 transl_fundecl: (p0) {
@@ -567,6 +578,9 @@ transl_fundecl: (p0) {
     liveness(x6);
 
     (% allocate registers %);
+    puts("> allocating registers (");
+    puts(get_ident_name(p0[2]));
+    puts(") ...\n");
     regalloc(x6);
 
     return x6;
