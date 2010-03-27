@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-03-27 18:48:53 nineties $
+ % $Id: typing.rl 2010-03-27 20:57:23 nineties $
  %);
 
 include(stddef, code);
@@ -132,10 +132,10 @@ infer_identifier: (p0) {
         exit(1);
     };
     x1 = rename_tyscheme(x0[0]);
-    p0[1] = x1[1];
-    p0[3] = x0[1];
+    p0[1] = deref_type(x1[1]);
+    p0[3] = x0[1]; (% set variable id %);
     p0[4] = x1;
-    return deref(p0);
+    return p0;
 };
 
 infer_array: (p0) {
@@ -230,7 +230,10 @@ infer_decl_impl: (p0, p1) {
     if (p0[0] == NODE_IDENTIFIER) {
         return infer_decl_var(p0, p1);
     };
-    not_reachable();
+    if (p0[0] == NODE_TUPLE) {
+        return infer_decl_tuple(p0, p1);
+    };
+    not_implemented();
 };
 
 (% p0: var, p1: expr %);
@@ -254,6 +257,45 @@ infer_decl_var: (p0, p1) {
     p0[4] = x2;
     p0 = deref(p0);
     return mktup2(p0, p1);
+};
+
+(% p0: tuple pattern, p1: expr %);
+infer_decl_tuple: (p0, p1) {
+    p0 = infer_pattern(p0);
+    p1 = infer_item(p1);
+    unify(p0[1], p1[1]);
+    p0 = deref_pattern(p0);
+    return mktup2(p0, p1);
+};
+
+infer_pattern: (p0) {
+    allocate(4);
+    if (p0[0] == NODE_IDENTIFIER) {
+        (% variable pattern %);
+        x0 = mktyvar(); (% type of variable %);
+        x1 = new_varid();
+        x2 = mktup2(mktyscheme(x0), x1);
+        varmap_add(p0[2], x2);
+        p0[1] = x0;
+        p0[3] = x1;
+        p0[4] = x2;
+        return p0;
+    };
+    if (p0[0] == NODE_TUPLE) {
+        x0 = p0[TUPLE_LENGTH];
+        x1 = p0[TUPLE_ELEMENTS];
+        x2 = memalloc(4*x0); (% element types %);
+        x3 = 0;
+        while (x3 < x0) {
+            x1[x3] = infer_pattern(x1[x3]);
+            x2[x3] = (x1[x3])[1];
+            x3 = x3 + 1;
+        };
+        p0[1] = mktup3(NODE_TUPLE_T, x0, x2);
+        return p0;
+    };
+    fputs(stderr, "ERROR: invalid pattern\n");
+    exit(1);
 };
 
 (% p0: expr %);
@@ -529,6 +571,12 @@ deref: (p0) {
     return x0(p0);
 };
 
+deref_identifier: (p0) {
+    p0[1] = deref_type(p0[1]);
+    p0[4] = closure(p0[1]);
+    return p0;
+};
+
 deref_integer: (p0) {
     p0[1] = deref_type(p0[1]);
     return p0;
@@ -536,15 +584,6 @@ deref_integer: (p0) {
 
 deref_string: (p0) {
     p0[1] = deref_type(p0[1]);
-    return p0;
-};
-
-deref_identifier: (p0) {
-    allocate(2);
-    x0 = deref_type(p0[1]);
-    x1 = closure(x0);
-    p0[1] = x0;
-    p0[4] = x1;
     return p0;
 };
 
@@ -670,6 +709,28 @@ deref_type: (p0) {
         return x1
     };
     return p0;
+};
+
+(% p0: pattern %);
+deref_pattern: (p0) {
+    allocate(3);
+    if (p0[0] == NODE_IDENTIFIER) {
+        p0[1] = deref_type(p0[1]);
+        p0[4] = closure(p0[1]);
+        return p0;
+    };
+    if (p0[0] == NODE_TUPLE) {
+        x0 = p0[TUPLE_LENGTH];
+        x1 = p0[TUPLE_ELEMENTS];
+        x2 = 0;
+        while (x2 < x0) {
+            x1[x2] = deref_pattern(x1[x2]);
+            x2 = x2 + 1;
+        };
+        p0[1] = deref_type(p0[1]);
+        return p0;
+    };
+    not_reachable();
 };
 
 (% p0: program (item list) %);
