@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: liveness.rl 2010-03-26 23:53:03 nineties $
+ % $Id: liveness.rl 2010-03-27 23:25:23 nineties $
  %);
 
 (% liveness analysis %);
@@ -48,6 +48,7 @@ iterate_normal: (p0, p1) {
 
 iterate_ret: (p0, p1) {
     allocate(2);
+    iterate(ls_next(p0), p1);
     x0 = ls_value(p0);
     if (x0[INST_ARG]) {
         (% retval instruction %);
