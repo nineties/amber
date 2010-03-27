@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-03-27 00:09:53 nineties $
+ % $Id: tcodegen.rl 2010-03-27 12:49:02 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -74,8 +74,7 @@ put_labelint: (p0, p1) {
     while (p1 != 0) {
         x0 = x0 + 1;
         wch(labelint_digits, x0, p1%10 + '0');
-        p1 = p1/10;
-    };
+        p1 = p1/10; };
 
     while (x0 >= 0) {
 	put_labelchar(rch(labelint_digits, x0));
@@ -108,7 +107,7 @@ not_implemented: (p0) {
 
 transl_funcs: [
     not_reachable, not_implemented, transl_integer, transl_string, transl_identifier,
-    not_implemented, transl_code, not_implemented, not_implemented, transl_call,
+    not_implemented, transl_tuple, transl_code, not_implemented, transl_call,
     not_implemented, not_implemented, transl_unexpr, transl_binexpr, not_implemented,
     not_implemented, transl_ret, transl_retval, transl_syscall
 ];
@@ -308,6 +307,11 @@ transl_modexpr: (p0, p1, p2) {
     return p0;
 };
 
+(% p0: output tcode, p1: tuple %);
+transl_tuple: (p0, p1, p2) {
+    not_implemented();
+};
+
 (% p0: output tcode, p1: code block %);
 transl_code: (p0, p1, p2) {
     allocate(3);
@@ -379,7 +383,7 @@ transl_syscall: (p0, p1, p2) {
 
 (% p0: output tcode, p1: item, p2: pointer to store p1's value  %);
 transl_item: (p0, p1, p2) {
-    allocate(2);
+    allocate(1);
     x0 = transl_funcs[p1[0]];
     return x0(p0, p1, p2);
 };

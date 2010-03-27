@@ -1,9 +1,10 @@
 
 f: (x) {
-    return x++;
+    return;
 };
 
 export
 main: () {
-    syscall(1, f(1));
+    f(1);
+    syscall(1, 0);
 };
