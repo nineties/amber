@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: regalloc.rl 2010-03-27 22:33:22 nineties $
+ % $Id: regalloc.rl 2010-03-27 23:17:10 nineties $
  %);
 
 (% Register allocation %);
@@ -340,6 +340,10 @@ allocate_stack_frame: (p0) {
 (% p0: TCODE_FUNC object %);
 regalloc: (p0) {
     allocate(1);
+
+    (% liveness analysis %);
+    liveness(p0);
+
     x0 = p0[3]; (% instructions %);
     if (num_pseudo() > 0) {
         compute_conflicts(x0);
