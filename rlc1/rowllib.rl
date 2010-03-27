@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: rowllib.rl 2010-03-26 19:17:20 nineties $
+ % $Id: rowllib.rl 2010-03-27 17:59:58 nineties $
  %);
 
 include(stddef);
@@ -252,7 +252,8 @@ cvec_pushback: (p0, p1) {
                                   list object
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%);
 
-export(ls_cons, ls_append, ls_value, ls_set, ls_next, ls_length, ls_reverse, ls_copy);
+export(ls_cons, ls_singleton, ls_append, ls_value, ls_set, ls_next, ls_length, ls_reverse,
+    ls_copy);
 
 (% list = (value, next) %);
 LS_VALUE => 0;
@@ -261,6 +262,10 @@ LS_NEXT  => 1;
 (% p0: value, p1: list %);
 ls_cons: (p0, p1) {
     return mktup2(p0, p1);
+};
+
+ls_singleton: (p0) {
+    return ls_cons(p0, NULL);
 };
 
 (% p0, p1: list %);

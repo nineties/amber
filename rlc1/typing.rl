@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-03-26 23:54:11 nineties $
+ % $Id: typing.rl 2010-03-27 18:48:53 nineties $
  %);
 
 include(stddef, code);
@@ -243,6 +243,12 @@ infer_decl_var: (p0, p1) {
     unify(x0, p1[1]);
     x2 = closure(p1[1]);
     varmap_add(p0[2], mktup2(x2, x1));
+    if (p1[1] == void_type) {
+	fputs(stderr, "ERROR: variable '");
+	fputs(stderr, get_ident_name(p0));
+	fputs(stderr, "' has void type\n");
+	exit(1);
+    };
     p0[1] = p1[1];
     p0[3] = x1;
     p0[4] = x2;
