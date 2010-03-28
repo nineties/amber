@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: deadcode.rl 2010-03-27 23:36:13 nineties $
+ % $Id: deadcode.rl 2010-03-28 20:25:14 nineties $
  %);
 
 include(stddef, code);
@@ -35,7 +35,7 @@ iterate_funcs: [
     iterate_int, iterate_call, iterate_call, iterate_normal, iterate_normal,
     iterate_normal, iterate_div, iterate_mod, iterate_normal, iterate_normal,
     iterate_normal, iterate_normal, iterate_normal, iterate_normal, iterate_normal,
-    iterate_normal, iterate_normal
+    iterate_normal, iterate_normal, iterate_leal, iterate_store, iterate_load
 ];
 
 (% p0: list of instructions, p1: live-out register at final%);
@@ -88,12 +88,18 @@ iterate_int: (p0, p1) {
 };
 
 iterate_call: (p0, p1) {
-    allocate(3);
+    allocate(5);
     x0 = iterate(ls_next(p0), p1);
     x1 = ls_value(p0);
     x2 = *p1;
     x2 = register_del(x2, get_eax());
     x2 = register_add(x2, x1[INST_INPUT]);
+    x3 = x1[INST_ARG];
+    x4 = 0;
+    while (x4 < x3) {
+        x2 = register_add(x2, get_stack(x4));
+        x4 = x4 + 1;
+    };
     *p1 = x2;
     return ls_cons(x1, x0);
 };
@@ -132,6 +138,43 @@ iterate_mod: (p0, p1) {
     x2 = register_add(x2, x1[INST_INPUT]);
     x2 = register_add(x2, get_eax());
     x2 = register_add(x2, get_edx());
+    *p1 = x2;
+    return ls_cons(x1, x0);
+};
+
+iterate_leal: (p0, p1) {
+    allocate(3);
+    x0 = iterate(ls_next(p0), p1);
+    x1 = ls_value(p0);
+    x2 = *p1;
+    if (register_contains(x2, x1[INST_OUTPUT]) == FALSE) {
+        (% this is a dead instruction %);
+        changed = TRUE;
+        return x0;
+    };
+    x2 = register_del(x2, x1[INST_OUTPUT]);
+    *p1 = x2;
+    return ls_cons(x1, x0);
+};
+
+iterate_store: (p0, p1) {
+    allocate(3);
+    x0 = iterate(ls_next(p0), p1);
+    x1 = ls_value(p0);
+    x2 = *p1;
+    x2 = register_add(x2, x1[INST_INPUT]);
+    x2 = register_add(x2, x1[INST_OUTPUT]);
+    *p1 = x2;
+    return ls_cons(x1, x0);
+};
+
+iterate_load: (p0, p1) {
+    allocate(3);
+    x0 = iterate(ls_next(p0), p1);
+    x1 = ls_value(p0);
+    x2 = *p1;
+    x2 = register_add(x2, x1[INST_INPUT]);
+    x2 = register_del(x2, x1[INST_OUTPUT]);
     *p1 = x2;
     return ls_cons(x1, x0);
 };

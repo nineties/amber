@@ -2,15 +2,15 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: proc.rl 2010-03-27 23:17:47 nineties $
+ % $Id: proc.rl 2010-03-28 20:11:22 nineties $
  %);
 
 include(stddef, code);
 export(init_proc, reset_proc);
 export(num_physical_regs, num_normal_regs, num_locations, num_pseudo, num_stack);
-export(get_reg, get_physical_reg, get_stack, get_arg, get_pseudo);
+export(get_reg, get_physical_reg, get_stack, get_stack_array, get_arg);
 export(get_eax, get_ebx, get_ecx, get_edx, get_esi, get_edi, get_ebp, get_esp);
-export(create_pseudo, assign_pseudo);
+export(create_pseudo, get_pseudo, assign_pseudo, get_at);
 export(get_register_repr);
 export(is_constant_operand);
 
@@ -86,7 +86,7 @@ create_stack: (p0) {
 };
 
 (% p0: offset %);
-get_stack: (p0, p1) {
+get_stack: (p0) {
     allocate(1);
     if (p0 < vec_size(stackregs)) {
         return vec_at(stackregs, p0);
@@ -94,6 +94,18 @@ get_stack: (p0, p1) {
     x0 = create_stack(p0);
     vec_pushback(stackregs, x0);
     return x0;
+};
+
+(% p0: offset, p1: length %);
+get_stack_array: (p0, p1) {
+    allocate(2);
+    x0 = NULL;
+    x1 = p0 + p1;
+    while (p0 < x1) {
+        x0 = ls_cons(get_stack(p0), x0);
+        p0 = p0 + 1;
+    };
+    return ls_reverse(x0);
 };
 
 (% p0: offset %);
@@ -134,10 +146,10 @@ get_register_repr: (p0, p1) {
     exit(1);
 };
 
-(% p0: length %);
-create_pseudo: (p0) {
+(% p0: length, p1: location type %);
+create_pseudo: (p0, p1) {
     allocate(1);
-    x0 = mktup5(OPD_PSEUDO, new_location_id(), new_pseudo_id(), p0, FALSE);
+    x0 = mktup6(OPD_PSEUDO, new_location_id(), new_pseudo_id(), p0, p1, NULL);
     vec_pushback(locations, x0);
     vec_pushback(pseudoregs, x0);
     return x0;
@@ -148,13 +160,23 @@ get_pseudo: (p0) {
     return vec_at(pseudoregs, p0);
 };
 
-(% p0: pseudo register, p1: memory location %);
+get_at: (p0, p1) {
+    allocate(1);
+    assert(p0[0] == OPD_PSEUDO);
+    assert(p1 < p0[PSEUDO_LENGTH]);
+    x0 = mktup4(OPD_AT, new_location_id(), p0, p1);
+    vec_pushback(locations, x0);
+    return x0;
+};
+
+(% p0: pseudo register, p1: memory locations %);
 assign_pseudo: (p0, p1) {
     allocate(1);
+    assert(p0[PSEUDO_LENGTH] == ls_length(p1));
     x0 = p0[2]; (% pseudo-id %);
     assert(x0 < vec_size(pseudoregs));
     vec_put(pseudoregs, x0, NULL);
-    vec_put(locations, p0[1], p1);
+    p0[PSEUDO_LOCATION] = p1;
 };
 
 init_proc: () {
@@ -186,6 +208,7 @@ is_constant_operand: (p0) {
     if (p0[0] == OPD_REGISTER) { return FALSE; };
     if (p0[0] == OPD_STACK)    { return FALSE; };
     if (p0[0] == OPD_ARG)      { return FALSE; };
+    if (p0[0] == OPD_AT)       { return FALSE; };
     return TRUE;
 };
 

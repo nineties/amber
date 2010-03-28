@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: asmgen.rl 2010-03-27 22:28:04 nineties $
+ % $Id: asmgen.rl 2010-03-28 20:14:22 nineties $
  %);
 
 include(stddef, code);
@@ -74,21 +74,65 @@ emit_opd: (p0, p1, p2) {
         fputs(p0, "(%ebp)");
         return;
     };
+    if (p1[0] == OPD_AT) {
+        x0 = p1[2]; (% register %);
+        emit_opd(p0, x0, p2);
+        fputc(p0, '@');
+        fputi(p0, p1[3]);
+        return;
+    };
     not_implemented();
 };
 
 inst_string: ["movl", "pushl", "popl", "ret", "leave", "int", "call", "call", "addl",
     "subl", "imul", "idiv", "idiv", "orl", "xorl", "andl", "shll", "shrl", "negl", "notl",
-    "incl", "decl"
+    "incl", "decl", "leal"
 ];
 inst_prec:   [32,     32,      32,     32,    32,      32,    32,     32,     32,
     32,     32,     32,     32,     32,    32,     32,     32,     32,     32,     32,
-    32,     32
+    32,     32,     32
 ];
+
+emit_store: (p0, p1) {
+    fputc(p0, '\t');
+    fputs(p0, "movl");
+    fputc(p0, ' ');
+    emit_opd(p0, p1[INST_INPUT], 32);
+    fputs(p0, ", ");
+    if (p1[INST_ARG] != 0) {
+        fputi(p0, p1[INST_ARG]*4); (% offset %);
+    };
+    fputc(p0, '(');
+    emit_opd(p0, p1[INST_OUTPUT], 32);
+    fputs(p0, ")\n");
+};
+
+emit_load: (p0, p1) {
+    fputc(p0, '\t');
+    fputs(p0, "movl");
+    fputc(p0, ' ');
+    if (p1[INST_ARG] != 0) {
+        fputi(p0, p1[INST_ARG]*4); (% offset %);
+    };
+    fputc(p0, '(');
+    emit_opd(p0, p1[INST_INPUT], 32);
+    fputs(p0, "), ");
+    emit_opd(p0, p1[INST_OUTPUT], 32);
+    fputc(p0, '\n');
+};
 
 (% p0: output channel, p1: instruction %);
 emit_inst: (p0, p1) {
     allocate(1);
+    if (p1[INST_OPCODE] == INST_STORE) {
+        emit_store(p0, p1);
+        return;
+    };
+    if (p1[INST_OPCODE] == INST_LOAD) {
+        emit_load(p0, p1);
+        return;
+    };
+
     fputc(p0, '\t');
     fputs(p0, inst_string[p1[INST_OPCODE]]);
     x0 = FALSE; (% insert comma %);

@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: regalloc.rl 2010-03-27 23:17:10 nineties $
+ % $Id: regalloc.rl 2010-03-28 20:26:43 nineties $
  %);
 
 (% Register allocation %);
@@ -162,6 +162,7 @@ move_cost: (p0) {
     if (p0[0] == OPD_REGISTER) { return 1; };
     if (p0[0] == OPD_STACK) { return 3; };
     if (p0[0] == OPD_ARG) { return 3; };
+    if (p0[0] == OPD_AT) { return 3; };
     fputs(stderr, "ERROR: not reachable here\n");
     exit(1);
 };
@@ -205,82 +206,113 @@ select_best_equivreg: (p0) {
         x1 = ls_next(x1);
     };
     if (x5) { return x3; };
-    if (p0[PSEUDO_MUST_BE_REGISTER] == TRUE) { return x3; };
+    if (p0[PSEUDO_TYPE] == LOCATION_REGISTER) { return x3; };
     return x2;
 };
 
 select_location: (p0) {
     allocate(4);
-    x0 = vec_at(conflicts, p0[1]); (% conflicts %);
-    if (x0 == NULL) {
-        (% no conflicts %);
-        x0 = vec_at(equivregs, p0[1]);
-        if (x0 == NULL) { return get_eax(); };
-        return select_best_equivreg(p0);
+    if (p0[PSEUDO_TYPE] == LOCATION_MEMORY) {
+	goto &alloc_stackmem;
     };
+
+    x0 = vec_at(conflicts, p0[1]);
+
     (% try to allocate register from equivregs %);
     x1 = select_best_equivreg(p0);
-    if (x1 != NULL) { return x1; };
+    if (x1 != NULL) { return ls_singleton(x1); };
 
     (% try to allocation register %);
     x1 = 0;
     while (x1 < num_normal_regs()) {
         if (iset_contains(x0, x1) == FALSE) {
-            return get_reg(x1);
+            return ls_singleton(get_reg(x1));
         };
         x1 = x1 + 1;
     };
 
-    if (p0[PSEUDO_MUST_BE_REGISTER] == TRUE) {
+    if (p0[PSEUDO_TYPE] == LOCATION_REGISTER) {
         fputs(stderr, "ERROR: failed to allocate register\n");
         exit(1);
     };
 
-    (% try to reuse stack memory %);
-    x1 = 0;
-    while (x1 < num_stack()) {
-        x2 = get_stack(x1);
-        if (iset_contains(x0, x2[1]) == FALSE) {
-            return x2;
-        };
-        x1 = x1 + 1;
-    };
+    label alloc_stackmem;
 
-    (% allocate new stack memory %);
-    (% here, we must resize working tables. %);
-    vec_pushback(conflicts, NULL);
-    vec_pushback(equivregs, NULL);
-    vec_pushback(input_count, NULL);
-    vec_pushback(output_count, NULL);
-    return get_stack(x1);
+    if (p0[PSEUDO_LENGTH] == 1) {
+        (% try to reuse stack memory %);
+        x1 = 0;
+        while (x1 < num_stack()) {
+            x2 = get_stack(x1);
+            if (iset_contains(x0, x2[1]) == FALSE) {
+                return ls_singleton(x2);
+            };
+            x1 = x1 + 1;
+        };
+
+        (% allocate new stack memory %);
+        (% here, we must resize working tables. %);
+        vec_pushback(conflicts, NULL);
+        vec_pushback(equivregs, NULL);
+        vec_pushback(input_count, NULL);
+        vec_pushback(output_count, NULL);
+        return ls_singleton(get_stack(x1));
+    } else {
+        (% returns continuous memories %);
+        x0 = p0[PSEUDO_LENGTH];
+        x1 = get_stack_array(num_stack(), x0);
+        vec_resize(conflicts, vec_size(conflicts) + x0);
+        vec_resize(equivregs, vec_size(equivregs) + x0);
+        vec_resize(input_count, vec_size(input_count) + x0);
+        vec_resize(output_count, vec_size(output_count) + x0);
+        return x1;
+    };
 };
 
 assign_location: (p0) {
-    allocate(4);
+    allocate(5);
     x0 = select_location(p0);
     (% update register table %);
+    puts(">> assign: ");
+    emit_opd(stdout, p0, 32);
+    puts(" <-");
+    x1 = x0;
+    while (x1 != NULL) {
+        putc(' ');
+        emit_opd(stdout, ls_value(x1), 32);
+        x1 = ls_next(x1);
+    };
+    putc('\n');
+
     assign_pseudo(p0, x0);
     (% update conflicts/equivregs %);
     x1 = 0;
     x2 = num_locations();
     while (x1 < x2) {
-        x3 = vec_at(conflicts, x1);
-        x3 = iset_del(x3, p0[1]);
-        x3 = iset_add(x3, x0[1]);
-        vec_put(conflicts, x1, x3);
+        x4 = x0;
+        while (x4 != NULL) {
+            x3 = vec_at(conflicts, x1);
+            x3 = iset_del(x3, p0[1]);
+            x3 = iset_add(x3, (ls_value(x4))[1]);
+            vec_put(conflicts, x1, x3);
 
-        x3 = vec_at(equivregs, x1);
-        x3 = iset_del(x3, p0[1]);
-        x3 = iset_add(x3, x0[1]);
-        vec_put(equivregs, x1, x3);
+            x3 = vec_at(equivregs, x1);
+            x3 = iset_del(x3, p0[1]);
+            x3 = iset_add(x3, (ls_value(x4))[1]);
+            vec_put(equivregs, x1, x3);
+            x4 = ls_next(x4);
+        };
 
         x1 = x1 + 1;
     };
+
     (% update output_count/input_count %);
-    vec_put(output_count, x0[1],
-        vec_at(output_count, p0[1]) + vec_at(output_count, x0[1]));
-    vec_put(input_count, x0[1],
-        vec_at(input_count, p0[1]) + vec_at(input_count, x0[1]));
+    while (x0 != NULL) {
+        vec_put(output_count, (ls_value(x0))[1],
+            vec_at(output_count, p0[1]) + vec_at(output_count, (ls_value(x0))[1]));
+        vec_put(input_count, (ls_value(x0))[1],
+            vec_at(input_count, p0[1]) + vec_at(input_count, (ls_value(x0))[1]));
+        x0 = ls_next(x0);
+    };
 };
 
 assign_locations: () {
@@ -295,9 +327,22 @@ assign_locations: () {
 
 (% replace pseudo-reg to physical register or stack memory %);
 replace: (p0) {
+    allocate(2);
     if (p0 == NULL) { return NULL; };
     if (p0[0] == OPD_PSEUDO) {
-        return replace(get_reg(p0[1]));
+        return replace(ls_value(p0[PSEUDO_LOCATION]));
+    };
+    if (p0[0] == OPD_AT) {
+        x0 = p0[2];
+        x1 = p0[3]; (% index %);
+        if (x0[0] == OPD_STACK) {
+            return get_stack(x0[STACK_OFFSET] + x1);
+        };
+        if (x0[0] == OPD_PSEUDO) {
+            return replace(ls_at(x0[PSEUDO_LOCATION], x1));
+        };
+        fputs(stderr, "ERROR: not reachable here\n");
+        exit(1);
     };
     return p0;
 };
