@@ -1,8 +1,7 @@
-f: () { return (1, (2, 3)) };
+return_tuple: () { return (1, 2) };
 
 export
 main: () {
-    x : f();
-    (a, (b, c)) : x;
-    syscall(1, c);
+    (a, b) : return_tuple();
+    syscall(1, a + b);
 }

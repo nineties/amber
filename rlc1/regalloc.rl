@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: regalloc.rl 2010-03-28 20:26:43 nineties $
+ % $Id: regalloc.rl 2010-03-28 22:18:58 nineties $
  %);
 
 (% Register allocation %);
@@ -116,8 +116,8 @@ compute_conflicts: (p0) {
         x1 = x0[INST_LIVE]; (% live locations %);
 
         (% live registers in x1 conflict each other %);
-        add_conflicts(x1, x0[INST_INPUT]);
-        add_conflicts(x1, x0[INST_OUTPUT]);
+        add_conflicts(x1, x0[INST_OPERAND2]);
+        add_conflicts(x1, x0[INST_OPERAND1]);
         x2 = x1;
         while (x2 != NULL) {
             add_conflicts(x1, get_reg(ls_value(x2)));
@@ -125,11 +125,11 @@ compute_conflicts: (p0) {
         };
 
         if (x0[INST_OPCODE] == INST_MOVL) {
-            add_equivregs(x0[INST_OUTPUT], x0[INST_INPUT]);
-            add_equivregs(x0[INST_INPUT], x0[INST_OUTPUT]);
+            add_equivregs(x0[INST_OPERAND1], x0[INST_OPERAND2]);
+            add_equivregs(x0[INST_OPERAND2], x0[INST_OPERAND1]);
         };
-        incr_output_count(x0[INST_OUTPUT]);
-        incr_input_count(x0[INST_INPUT]);
+        incr_output_count(x0[INST_OPERAND1]);
+        incr_input_count(x0[INST_OPERAND2]);
         p0 = ls_next(p0);
     };
 };
@@ -351,12 +351,12 @@ update_instructions: (p0) {
     allocate(2);
     if (p0 == NULL) { return NULL; };
     x0 = ls_value(p0);
-    x0[INST_OUTPUT] = replace(x0[INST_OUTPUT]);
-    x0[INST_INPUT]  = replace(x0[INST_INPUT]);
+    x0[INST_OPERAND1] = replace(x0[INST_OPERAND1]);
+    x0[INST_OPERAND2]  = replace(x0[INST_OPERAND2]);
 
     (% eliminate meaningless move %);
     if (x0[INST_OPCODE] == INST_MOVL) {
-        if (x0[INST_OUTPUT] == x0[INST_INPUT]) {
+        if (x0[INST_OPERAND1] == x0[INST_OPERAND2]) {
             return update_instructions(ls_next(p0));
         };
     };
@@ -365,7 +365,7 @@ update_instructions: (p0) {
 
     (% insert leave instruction %);
     if (x0[INST_OPCODE] == INST_RET) {
-        x1 = ls_cons(mkinst(INST_LEAVE, NULL, NULL, NULL), x1);
+        x1 = ls_cons(mkinst(INST_LEAVE, NULL, NULL), x1);
     };
     return x1;
 };
@@ -374,11 +374,11 @@ allocate_stack_frame: (p0) {
     allocate(1);
     x0 = p0;
     if (num_stack() > 0) {
-        x0 = ls_cons(mkinst(INST_SUBL, get_esp(), mktup2(OPD_INTEGER, 4*num_stack()), NULL), x0);
+        x0 = ls_cons(mkinst(INST_SUBL, mktup2(OPD_INTEGER, 4*num_stack()), get_esp()), x0);
     };
     return
-        ls_cons(mkinst(INST_PUSHL, NULL, get_ebp(), NULL),
-        ls_cons(mkinst(INST_MOVL, get_ebp(), get_esp(), NULL),
+        ls_cons(mkinst(INST_PUSHL, get_ebp(), NULL),
+        ls_cons(mkinst(INST_MOVL, get_esp(), get_ebp()),
             x0));
 };
 
