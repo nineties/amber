@@ -2,27 +2,13 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: liveness.rl 2010-03-28 19:41:05 nineties $
+ % $Id: liveness.rl 2010-03-28 22:26:51 nineties $
  %);
 
 (% liveness analysis %);
 
 include(stddef, code);
 export(liveness);
-
-(% p0: register set (iset), p1: operand %);
-register_add: (p0, p1) {
-    if (p1 == NULL) { return p0; };
-    if (is_constant_operand(p1)) { return p0; };
-    return iset_add(p0, p1[1]);
-};
-
-(% p0: register set (iset), p1: operand %);
-register_del: (p0, p1) {
-    if (p1 == NULL) { return p0; };
-    if (is_constant_operand(p1)) { return p0; };
-    return iset_del(p0, p1[1]);
-};
 
 (% opcode to functor %);
 iterate_funcs: [
@@ -39,10 +25,9 @@ iterate_normal: (p0, p1) {
     x0 = iterate(ls_next(p0), p1); (% live-out registers %);
 
     x1 = ls_value(p0);
-    x0 = register_del(x0, x1[INST_OUTPUT]); (% remove dead register %);
+    x0 = output_del(x0, x1);
     x1[INST_LIVE] = iset_copy(x0);
-
-    x0 = register_add(x0, x1[INST_INPUT]);
+    x0 = input_add(x0, x1);
     return x0; (% live-in registers %);
 };
 
@@ -82,7 +67,7 @@ iterate_call: (p0, p1) {
     x0 = register_del(x0, get_eax());
     x1[INST_LIVE] = iset_copy(x0);
 
-    x0 = register_add(x0, x1[INST_INPUT]);
+    x0 = input_add(x0, x1);
     return x0; (% live-in registers %);
 };
 
@@ -95,7 +80,7 @@ iterate_div: (p0, p1) {
     x0 = register_del(x0, get_eax()); (% remove dead register %);
     x1[INST_LIVE] = iset_copy(x0);
 
-    x0 = register_add(x0, x1[INST_INPUT]);
+    x0 = input_add(x0, x1);
     x0 = register_add(x0, get_eax());
     x0 = register_add(x0, get_edx());
     return x0; (% live-in registers %);
@@ -110,7 +95,7 @@ iterate_mod: (p0, p1) {
     x0 = register_del(x0, get_edx()); (% remove dead register %);
     x1[INST_LIVE] = iset_copy(x0);
 
-    x0 = register_add(x0, x1[INST_INPUT]);
+    x0 = input_add(x0, x1);
     x0 = register_add(x0, get_eax());
     x0 = register_add(x0, get_edx());
     return x0; (% live-in registers %);

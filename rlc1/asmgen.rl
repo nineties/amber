@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: asmgen.rl 2010-03-28 20:14:22 nineties $
+ % $Id: asmgen.rl 2010-03-28 22:17:06 nineties $
  %);
 
 include(stddef, code);
@@ -97,13 +97,13 @@ emit_store: (p0, p1) {
     fputc(p0, '\t');
     fputs(p0, "movl");
     fputc(p0, ' ');
-    emit_opd(p0, p1[INST_INPUT], 32);
+    emit_opd(p0, p1[INST_OPERAND1], 32);
     fputs(p0, ", ");
     if (p1[INST_ARG] != 0) {
         fputi(p0, p1[INST_ARG]*4); (% offset %);
     };
     fputc(p0, '(');
-    emit_opd(p0, p1[INST_OUTPUT], 32);
+    emit_opd(p0, p1[INST_OPERAND2], 32);
     fputs(p0, ")\n");
 };
 
@@ -115,9 +115,9 @@ emit_load: (p0, p1) {
         fputi(p0, p1[INST_ARG]*4); (% offset %);
     };
     fputc(p0, '(');
-    emit_opd(p0, p1[INST_INPUT], 32);
+    emit_opd(p0, p1[INST_OPERAND1], 32);
     fputs(p0, "), ");
-    emit_opd(p0, p1[INST_OUTPUT], 32);
+    emit_opd(p0, p1[INST_OPERAND2], 32);
     fputc(p0, '\n');
 };
 
@@ -136,17 +136,17 @@ emit_inst: (p0, p1) {
     fputc(p0, '\t');
     fputs(p0, inst_string[p1[INST_OPCODE]]);
     x0 = FALSE; (% insert comma %);
-    if (p1[INST_INPUT] != NULL) {
+    if (p1[INST_OPERAND1] != NULL) {
 	(% first operand %);
 	fputc(p0, ' ');
-	emit_opd(p0, p1[INST_INPUT], inst_prec[p1[INST_OPCODE]]);
+	emit_opd(p0, p1[INST_OPERAND1], inst_prec[p1[INST_OPCODE]]);
 	x0 = TRUE;
     };
-    if (p1[INST_OUTPUT] != NULL) {
+    if (p1[INST_OPERAND2] != NULL) {
 	(% output operand %);
 	if (x0) { fputc(p0, ','); };
 	fputc(p0, ' ');
-	emit_opd(p0, p1[INST_OUTPUT], inst_prec[p1[INST_OPCODE]]);
+	emit_opd(p0, p1[INST_OPERAND2], inst_prec[p1[INST_OPCODE]]);
     };
     fputc(p0, '\n');
 };
