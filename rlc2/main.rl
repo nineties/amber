@@ -1,7 +1,8 @@
+f: () { return (1, (2, 3)) };
+
 export
 main: () {
-    x      : (1,(2,3));
-    (_, y) : x;
-    (z, _) : y;
-    syscall(1, z);
+    x : f();
+    (a, (b, c)) : x;
+    syscall(1, c);
 }

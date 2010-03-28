@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: code.rl 2010-03-27 21:11:35 nineties $
+ % $Id: code.rl 2010-03-28 20:24:23 nineties $
  %);
 
 NODE_PROG       => 0;  (% item list %);
@@ -100,24 +100,28 @@ BINOP_SEQAND => 18;
 (% Three-address Code %);
 
 (% operands %);
-OPD_PSEUDO   => 0; (% id, pseudo-id, length, flag (TRUE if it must be a register), %);
+OPD_PSEUDO   => 0; (% id, pseudo-id, length, location type, allocated-locations %);
 OPD_REGISTER => 1; (% id, index %);
 OPD_STACK    => 2; (% id, offset %);
 OPD_ARG      => 3; (% id, offset %);
-OPD_INTEGER  => 4; (% value %);
-OPD_CHAR     => 5; (% value %);
-OPD_FLOAT    => 6; (% value %);
-OPD_ADDRESS  => 7; (% name %);
-OPD_LABEL    => 8; (% name %);
+OPD_AT       => 4; (% id, register, index %);
+OPD_INTEGER  => 5; (% value %);
+OPD_CHAR     => 6; (% value %);
+OPD_FLOAT    => 7; (% value %);
+OPD_ADDRESS  => 8; (% name %);
+OPD_LABEL    => 9; (% name %);
 
-PSUEOD_ID               => 2;
-PSEUDO_LENGTH           => 3;
-PSEUDO_MUST_BE_REGISTER => 4;
-REGISTER_INDEX          => 2;
-STACK_OFFSET            => 2;
-STACK_LENGTH            => 3;
-ARG_OFFSET              => 2;
-ARG_LENGTH              => 3;
+PSUEOD_ID       => 2;
+PSEUDO_LENGTH   => 3;
+PSEUDO_TYPE     => 4;
+PSEUDO_LOCATION => 5;
+REGISTER_INDEX  => 2;
+STACK_OFFSET    => 2;
+ARG_OFFSET      => 2;
+
+LOCATION_ANY      => 0;
+LOCATION_REGISTER => 1;
+LOCATION_MEMORY   => 2; (% must be continuous memory %);
 
 DATA_CHAR   => 0; (% value %);
 DATA_INT    => 1; (% value %);
@@ -142,11 +146,11 @@ INST_ARG    => 5;
 INST_MOVL     => 0;
 INST_PUSHL    => 1;
 INST_POPL     => 2;
-INST_RET      => 3; (% ARG == TRUE if it is retval instruction %);
+INST_RET      => 3; (% INST_ARG == TRUE if it is retval instruction %);
 INST_LEAVE    => 4;
-INST_INT      => 5; (% ARG is the number of arguments %);
-INST_CALL_IMM => 6; (% immediate call %);
-INST_CALL_IND => 7; (% indirect call %);
+INST_INT      => 5; (% INST_ARG is the number of arguments %);
+INST_CALL_IMM => 6; (% immediate call, INST_ARG is the number of arguments %);
+INST_CALL_IND => 7; (% indirect call, INST_ARG is the number of arguments %);
 INST_ADDL     => 8;
 INST_SUBL     => 9;
 INST_IMUL     => 10;
@@ -161,3 +165,6 @@ INST_NEGL     => 18;
 INST_NOTL     => 19; (% bitwise inverse %);
 INST_INCL     => 20;
 INST_DECL     => 21;
+INST_LEAL     => 22; (% load effective address %);
+INST_STORE    => 23;
+INST_LOAD     => 24;

@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: mangle.rl 2010-03-24 19:49:11 nineties $
+ % $Id: mangle.rl 2010-03-28 20:26:01 nineties $
  %);
 
 (% name mangling %);
@@ -17,10 +17,10 @@ export(mangle);
  % int    -> i
  % float  -> f
  % double -> d
- % pointer(T) -> mangle(T) P
- % array(len,T) -> mangle(T) len A
- % tuple(len,types) -> mangle(types) len T
- % lambda(P,R) -> mangle(P) mangle(R) L
+ % pointer(T) -> P mangle(T)
+ % array(len,T) -> A len mangle(T)
+ % tuple(len,types) -> T len mangle(types)
+ % lambda(P,R) -> L mangle(P) mangle(R)
  %);
 
 (% p0: type, p1: name %);
@@ -81,32 +81,32 @@ gen_type_suffix: (p0) {
     if (p0[0] == NODE_FLOAT_T) { return put_namechar('f'); };
     if (p0[0] == NODE_DOUBLE_T) { return put_namechar('d'); };
     if (p0[0] == NODE_POINTER_T) {
-	gen_type_suffix(p0[POINTER_T_BASE]);
 	put_namechar('P');
+	gen_type_suffix(p0[POINTER_T_BASE]);
 	return;
     };
     if (p0[0] == NODE_ARRAY_T) {
-	gen_type_suffix(p0[ARRAY_T_ELEMENT]);
-	put_nameint(p0[ARRAY_T_LENGTH]);
 	put_namechar('A');
+	put_nameint(p0[ARRAY_T_LENGTH]);
+	gen_type_suffix(p0[ARRAY_T_ELEMENT]);
 	return;
     };
     if (p0[0] == NODE_TUPLE_T) {
 	x0 = p0[TUPLE_T_ELEMENTS];
 	x1 = p0[TUPLE_T_LENGTH];
+	put_namechar('T');
+	put_nameint(x1);
 	x2 = 0;
 	while (x2 < x1) {
 	    gen_type_suffix(x0[x2]);
 	    x2 = x2 + 1;
 	};
-	put_nameint(x1);
-	put_namechar('T');
 	return;
     };
     if (p0[0] == NODE_LAMBDA_T) {
+	put_namechar('L');
 	gen_type_suffix(p0[LAMBDA_T_PARAM]);
 	gen_type_suffix(p0[LAMBDA_T_RETURN]);
-	put_namechar('L');
 	return;
     };
     fputs(stderr, "ERROR: not reachable\n");
