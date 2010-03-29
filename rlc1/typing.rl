@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-03-27 22:04:14 nineties $
+ % $Id: typing.rl 2010-03-29 22:44:49 nineties $
  %);
 
 include(stddef, code);
@@ -44,7 +44,9 @@ varmap_pop: () {
 
 (% p0: name, p1: value %);
 varmap_add: (p0, p1) {
-    map_add(varmap, mktup2(scopeid, p0), p1);
+    allocate(1);
+    x0 = vec_at(scopeid_stack, vec_size(scopeid_stack)-1);
+    map_add(varmap, mktup2(x0, p0), p1);
 };
 
 (% p0: name %);
