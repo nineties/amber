@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-03-28 22:14:01 nineties $
+ % $Id: tcodegen.rl 2010-03-28 23:19:38 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -656,7 +656,7 @@ transl_fundecl: (p0) {
     x6 = mktup5(TCODE_FUNC, x0, x1[2], x6, FALSE);
 
     (% deadcode elimination %);
-    puts("> deadcode elimination (");
+    puts("> removing dead-instructions (");
     puts(get_ident_name(p0[2]));
     puts(") ...\n");
     (% eliminate_deadcode(x6); %);

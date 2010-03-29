@@ -1,3 +1,5 @@
+add: (a, b) { return a + b; };
+
 return_tuple: () { return (1, 2) };
 
 export
