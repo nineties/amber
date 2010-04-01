@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-03-28 23:19:38 nineties $
+ % $Id: tcodegen.rl 2010-04-01 23:11:40 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -11,6 +11,8 @@ include(stddef, code);
 export(tcodegen, mkinst);
 
 vtable: NULL; (% variable table. variable id to corresponding operand %);
+
+funtable: NULL; (% function name -> function declaration %);
 
 (% p0: type.  returns number of required register for the type %);
 type_size: (p0) {
@@ -213,7 +215,7 @@ transl_call2: (p0, p1, p2) {
     } else {
         (% indirect call %);
         p0 = transl_item_single(p0, x0, &x5);
-        x6 = create_pseudo(1, LOCATION_ANY); (% address of region for return value %);
+        x6 = create_pseudo(1, LOCATION_REGISTER); (% address of region for return value %);
         p0 = ls_cons(mkinst(INST_LEAL, x4, x6), p0);
         p0 = ls_cons(mkinst(INST_MOVL, x6, get_stack(0)), p0);
         p0 = set_arguments(p0, x3, 1, &x7);
@@ -540,7 +542,7 @@ transl_retval: (p0, p1, p2) {
     allocate(4);
     p0 = transl_item(p0, p1[2], &x0);
     if (ls_length(x0) == 1) {
-        p0 = ls_cons(mkinst(INST_MOVL, x0, get_eax()), p0);
+        p0 = ls_cons(mkinst(INST_MOVL, ls_value(x0), get_eax()), p0);
         x1 = mkinst(INST_RET, NULL, NULL);
         x1[INST_ARG] = TRUE;
         return ls_cons(x1, p0);
@@ -629,10 +631,47 @@ transl_extfuncs: [
     not_implemented, transl_export, not_implemented, not_implemented
 ];
 
+is_polymorphic_type: (p0) {
+    allocate(3);
+    if (p0[0] == NODE_VOID_T)   { return FALSE; };
+    if (p0[0] == NODE_CHAR_T)   { return FALSE; };
+    if (p0[0] == NODE_INT_T)    { return FALSE; };
+    if (p0[0] == NODE_FLOAT_T)  { return FALSE; };
+    if (p0[0] == NODE_DOUBLE_T) { return FALSE; };
+    if (p0[0] == NODE_POINTER_T) {
+        return is_polymorphic_type(p0[POINTER_T_BASE]);
+    };
+    if (p0[0] == NODE_ARRAY_T) {
+        return is_polymorphic_type(p0[ARRAY_LENGTH]);
+    };
+    if (p0[0] == NODE_TUPLE_T) {
+        x0 = p0[TUPLE_T_LENGTH];
+        x1 = p0[TUPLE_T_ELEMENTS];
+        x2 = 0;
+        while (x2 < x0) {
+            if (is_polymorphic_type(x1[x2])) { return TRUE; };
+            x2 = x2 + 1;
+        };
+        return FALSE;
+    };
+    if (p0[0] == NODE_LAMBDA_T) {
+        if (is_polymorphic_type(p0[LAMBDA_T_PARAM]))  { return TRUE; };
+        if (is_polymorphic_type(p0[LAMBDA_T_RETURN])) { return TRUE; };
+        return FALSE;
+    };
+    return TRUE;
+};
+
+(% p0: item %);
 transl_fundecl: (p0) {
     allocate(7);
 
     reset_proc();
+
+    if (is_polymorphic_type(p0[1])) {
+        map_add(funtable, p0[2], p0[3]);
+        return NULL;
+    };
 
     x0 = mangle(p0[1], get_ident_name(p0[2]));
     x1 = p0[3]; (% lambda %);
@@ -659,7 +698,7 @@ transl_fundecl: (p0) {
     puts("> removing dead-instructions (");
     puts(get_ident_name(p0[2]));
     puts(") ...\n");
-    (% eliminate_deadcode(x6); %);
+    eliminate_deadcode(x6);
 
     (% allocate registers %);
     puts("> allocating registers (");
@@ -713,7 +752,7 @@ transl_extdecl: (p0) {
     x0 = p0[1]; (% type %);
     (% generate label %);
     if (x0[0] == NODE_LAMBDA_T) {
-        return transl_fundecl(p0, p0);
+        return transl_fundecl(p0);
     };
 
     x1 = get_ident_name(p0[2]);
@@ -751,17 +790,22 @@ transl_extitem: (p0) {
 
 (% p0: program (item list) %);
 tcodegen: (p0) {
-    allocate(2);
+    allocate(3);
 
     init_proc();
 
     vtable = mkvec(num_variable());
+    funtable = mkmap(strhash, streq, 10);
+
     topdecl = NULL;
 
     x0 = p0[1];
     x1 = NULL;
     while (x0 != NULL) {
-        x1 = ls_cons(transl_extitem(ls_value(x0)), x1);
+        x2 = transl_extitem(ls_value(x0));
+        if (x2 != NULL) {
+            x1 = ls_cons(x2, x1);
+        };
         x0 = ls_next(x0);
     };
     return ls_append(ls_reverse(x1), ls_reverse(topdecl));

@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: stdlib.rl 2010-03-25 19:18:09 nineties $
+ % $Id: stdlib.rl 2010-04-01 12:53:40 nineties $
  %);
 
 include(stddef);
@@ -13,7 +13,7 @@ export(stdin, stdout, stderr);
 export(exit, assert, panic, flush);
 export(fgetc, fnextc, fputc, fputs, fputi, fputx);
 export(getc, nextc, putc, puts, puti, putx);
-export(strlen, strcpy, strdup, streq);
+export(strhash, strlen, strcpy, strdup, streq);
 export(memset, memcpy);
 export(fork, waitpid, unlink, execve);
 
@@ -281,6 +281,17 @@ fputx: (p0, p1) {
 
 putx: (p0) {
     fputx(stdout, p0);
+};
+
+(% strhash(char *str) %);
+strhash: (p0) {
+    allocate(1);
+    x0 = 0;
+    while (rch(p0, 0) != '\0') {
+        x0 = x0 * 7 + rch(p0, 0);
+        p0 = p0 + 1;
+    };
+    return x0;
 };
 
 (% strlen(char *str) %);
