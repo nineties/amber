@@ -2,26 +2,17 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-03-29 22:44:49 nineties $
+ % $Id: typing.rl 2010-04-01 22:41:51 nineties $
  %);
 
 include(stddef, code);
 
-export(typing);
+export(init_typing, typing, void_type, char_type, int_type, float_type, double_type);
+
 
 scopeid: 0;
 scopeid_stack: NULL; 
 varmap: NULL;   (% variable table %);
-
-strhash: (p0) {
-    allocate(1);
-    x0 = 0;
-    while (rch(p0, 0) != '\0') {
-        x0 = x0 * 7 + rch(p0, 0);
-        p0 = p0 + 1;
-    };
-    return x0;
-};
 
 (% p0: (scopeid-id, name) %);
 varmap_hash: (p0) {
@@ -105,7 +96,7 @@ int_type    : NULL;
 float_type  : NULL;
 double_type : NULL;
 
-init_basic_types: () {
+init_typing: () {
     void_type   = mktup1(NODE_VOID_T);
     char_type   = mktup1(NODE_CHAR_T);
     int_type    = mktup1(NODE_INT_T);
@@ -356,7 +347,7 @@ infer_binarith: (p0) {
     p0[3] = infer_item(p0[3]);
     p0[4] = infer_item(p0[4]);
     unify(int_type, (p0[3])[1]);
-    unify(int_type, (p0[3])[1]);
+    unify(int_type, (p0[4])[1]);
     p0[1] = int_type;
     return p0;
 };
@@ -499,8 +490,8 @@ unify_tyvar: (p0, p1) {
 (% p0: id, p1, type %);
 occur_check: (p0, p1) {
     allocate(1);
-    if (p1[0] == NODE_TUPLE_T)    { return occur_check_tuple_t(p0, p1); };
-    if (p1[0] == NODE_ARRAY_T)    { return occur_check(p0, p1[1]); };
+    if (p1[0] == NODE_TUPLE_T)  { return occur_check_tuple_t(p0, p1); };
+    if (p1[0] == NODE_ARRAY_T)  { return occur_check(p0, p1[1]); };
     if (p1[0] == NODE_LAMBDA_T) { return occur_check_function_t(p0, p1); };
     if (p1[0] == NODE_TYVAR) {
         if (p0 == p1[1]) {
@@ -727,7 +718,6 @@ deref_pattern: (p0) {
 typing: (p0) {
     allocate(1);
 
-    init_basic_types();
     init_varmap();
     init_tyvarmap();
 

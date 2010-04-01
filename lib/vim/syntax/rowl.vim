@@ -1,6 +1,6 @@
 " Language:	Rowl
 " Maintainer:	nineties <nineties48@gmail.com>
-" Last Change:	2010 Jan 17
+" $Id: rowl.vim 2010-03-31 12:47:49 nineties $
 
 if exists("b:current_syntax")
     finish
@@ -11,9 +11,10 @@ syn case match
 syn keyword rowlCommand   goto label return 
 syn keyword rowlSymbol    if else syscall while
 syn keyword rowlExternal  include export
-syn keyword rowlType      char int
+syn keyword rowlType      char int float double
 syn match rowlIdentifier /\<\h\w*/
 syn match rowlInteger    /-\?\(0\o*\|[1-9]\d*\|0x\x\+\)\>/
+syn match rowlReal       /-\?\d*\.\d\+\>/
 syn match rowlEscape     /\\['"?\\abfnrtv0]/ contained
 syn match rowlCharacter  /'\(\\["?\\abfnrtv0]\|[^\\\n]\)'/ contains=rowlEscape
 syn match rowlString     /"\(\\['"?\\abfnrtv0]\|[^\\\"\n]\)*"/ contains=rowlEscape
@@ -35,6 +36,7 @@ hi def link rowlEscape      SpecialChar
 hi def link rowlDeclOp      SpecialChar
 hi def link rowlString      String
 hi def link rowlInteger     Number
+hi def link rowlReal        Number
 hi def link rowlDecl        Keyword
 hi def link rowlCommand     Statement
 hi def link rowlSymbol      Statement

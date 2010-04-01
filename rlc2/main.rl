@@ -1,9 +1,7 @@
-add: (a, b) { return a + b; };
-
-return_tuple: () { return (1, 2) };
+plus: (x, y) { return x + y; };
 
 export
 main: () {
-    (a, b) : return_tuple();
-    syscall(1, a + b);
-}
+    y : plus(1, 2);
+    syscall(1, y);
+};

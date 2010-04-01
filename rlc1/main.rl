@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: main.rl 2010-03-27 22:33:50 nineties $
+ % $Id: main.rl 2010-04-01 12:50:30 nineties $
  %);
 
 include(stddef, code);
@@ -26,6 +26,8 @@ change_suffix: (p0, p1) {
 (% p0: asm filename, p1: rowl filename %);
 compile: (p0, p1) {
     allocate(2);
+
+    init_typing();
 
     puts("compile ");
     puts(p1);

@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: token.rl 2010-03-25 18:09:08 nineties $
+ % $Id: token.rl 2010-04-01 12:36:45 nineties $
  %);
 
 (%
@@ -40,3 +40,7 @@ TOK_DECR       => 281;
 TOK_EXPORT     => 282;
 TOK_RETURN     => 283;
 TOK_SYSCALL    => 284;
+TOK_CHAR       => 285;
+TOK_INT        => 286;
+TOK_FLOAT      => 287;
+TOK_DOUBLE     => 288;
