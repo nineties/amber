@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-02 10:38:52 nineties $
+ % $Id: tcodegen.rl 2010-04-03 00:39:16 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -236,7 +236,11 @@ transl_call2: (p0, p1, p2) {
 transl_call: (p0, p1, p2) {
     allocate(6);
     x0 = p1[2]; (% function %);
+
+    x1 = p1[1];
+
     x1 = (x0[1])[LAMBDA_T_RETURN]; (% return type %);
+
     x2 = type_size(x1);
     if (x2 > 1) {
         (% the function returns composite data %);
@@ -247,7 +251,6 @@ transl_call: (p0, p1, p2) {
     if (x0[0] == NODE_IDENTIFIER) {
         (% immediate call %);
         x3 = mangle(x0[1], get_ident_name(x0));
-
         p0 = set_arguments(p0, x2, 0, &x4);
         x5 = mkinst(INST_CALL_IMM, mktup2(OPD_LABEL, x3), NULL);
         x5[INST_ARG] = x4;
@@ -669,7 +672,7 @@ transl_fundecl: (p0) {
     reset_proc();
 
     if (is_polymorphic_type(p0[1])) {
-        map_add(funtable, p0[2], p0[3]);
+        map_add(funtable, get_ident_name(p0[2]), p0[3]);
         return NULL;
     };
 
@@ -795,7 +798,7 @@ tcodegen: (p0) {
     init_proc();
 
     vtable = mkvec(num_variable());
-    funtable = mkmap(strhash, streq, 10);
+    funtable = mkmap(&strhash, &streq, 10);
 
     topdecl = NULL;
 

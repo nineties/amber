@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-01 22:41:51 nineties $
+ % $Id: typing.rl 2010-04-03 01:02:03 nineties $
  %);
 
 include(stddef, code);
@@ -274,6 +274,8 @@ infer_decl: (p0) {
 infer_call: (p0) {
     allocate(3);
     x0 = infer_item(p0[2]); (% function %);
+    put_type(stdout, x0[1]);
+    putc('\n');
     x1 = infer_item(p0[3]); (% argument %);
     x2 = mktyvar(); (% return type %);
     unify(x0[1], mktup3(NODE_LAMBDA_T, x1[1], x2));
@@ -315,7 +317,10 @@ infer_lambda: (p0) {
 
     p0[1] = mktup3(NODE_LAMBDA_T, (p0[LAMBDA_ARG])[1], x0);
 
-    return deref(p0);
+    p0 = deref(p0);
+    put_type(stdout, p0[1]);
+    putc('\n');
+    return p0;
 };
 
 unexpr_funcs: [
