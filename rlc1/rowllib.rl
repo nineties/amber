@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: rowllib.rl 2010-03-28 20:07:05 nineties $
+ % $Id: rowllib.rl 2010-04-02 16:17:04 nineties $
  %);
 
 include(stddef);

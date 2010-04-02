@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: asmgen.rl 2010-04-01 22:55:42 nineties $
+ % $Id: asmgen.rl 2010-04-02 10:21:19 nineties $
  %);
 
 include(stddef, code);
@@ -81,7 +81,7 @@ emit_opd: (p0, p1, p2) {
         fputi(p0, p1[3]);
         return;
     };
-    not_implemented();
+    not_reachable();
 };
 
 inst_string: ["movl", "pushl", "popl", "ret", "leave", "int", "call", "call", "addl",
@@ -148,6 +148,19 @@ emit_inst: (p0, p1) {
 	fputc(p0, ' ');
 	emit_opd(p0, p1[INST_OPERAND2], inst_prec[p1[INST_OPCODE]]);
     };
+
+    (% output liveness information %);
+    x0 = p1[INST_LIVE];
+    if (x0 != NULL) {
+        fputs(p0, "\t/* live:");
+        while (x0 != NULL) {
+            fputc(p0, ' ');
+            emit_opd(p0, get_reg(ls_value(x0)), 32);
+            x0 = ls_next(x0);
+        };
+        fputs(p0, " */");
+    };
+
     fputc(p0, '\n');
 };
 
