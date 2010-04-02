@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: regalloc.rl 2010-04-02 16:40:39 nineties $
+ % $Id: regalloc.rl 2010-04-02 21:57:54 nineties $
  %);
 
 (% Register allocation %);
@@ -305,7 +305,7 @@ select_location: (p0) {
 };
 
 assign_location: (p0) {
-    allocate(5);
+    allocate(2);
     x0 = select_location(p0);
     (% update register table %);
     puts(">> assign: ");
@@ -322,37 +322,6 @@ assign_location: (p0) {
     assign_pseudo(p0, x0);
     (% update conflicts/equivregs %);
     update_tables(p0, x0);
-    (%
-    x1 = 0;
-    x2 = num_locations();
-    while (x1 < x2) {
-        x4 = x0;
-        while (x4 != NULL) {
-            x3 = vec_at(conflicts, x1);
-            if (iset_contains(x3, p0[1])) {
-                x3 = iset_del(x3, p0[1]);
-                x3 = iset_add(x3, (ls_value(x4))[1]);
-                vec_put(conflicts, x1, x3);
-
-                puts("update conflict: ");
-                emit_opd(stdout, ls_value(x4), 32);
-                puts(" <-> ");
-                emit_opd(stdout, get_reg(x1), 32);
-                putc('\n');
-            };
-
-            x3 = vec_at(equivregs, x1);
-            if (iset_contains(x3, p0[1])) {
-                x3 = iset_del(x3, p0[1]);
-                x3 = iset_add(x3, (ls_value(x4))[1]);
-                vec_put(equivregs, x1, x3);
-            };
-            x4 = ls_next(x4);
-        };
-
-        x1 = x1 + 1;
-    };
-    %);
 
     (% update output_count/input_count %);
     while (x0 != NULL) {
