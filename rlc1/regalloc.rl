@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: regalloc.rl 2010-03-28 22:18:58 nineties $
+ % $Id: regalloc.rl 2010-04-02 16:40:39 nineties $
  %);
 
 (% Register allocation %);
@@ -25,7 +25,7 @@ compute_score: (p0) {
     return x0;
 };
 
-(% p0: set of locations, p1: location %);
+(% p0: set of location-ids, p1: location %);
 add_conflicts: (p0, p1) {
     allocate(3);
     if (p1 == NULL) { return; };
@@ -34,6 +34,11 @@ add_conflicts: (p0, p1) {
     while (p0 != NULL) {
         x1 = ls_value(p0);
         if (x0 != x1) {
+            puts("conflict: ");
+            emit_opd(stdout, get_reg(x0), 32);
+            puts(" <-> ");
+            emit_opd(stdout, get_reg(x1), 32);
+            putc('\n');
             x2 = iset_add(vec_at(conflicts, x0), x1);
             vec_put(conflicts, x0, x2);
             x2 = iset_add(vec_at(conflicts, x1), x0);
@@ -47,6 +52,32 @@ num_conflicts: (p0) {
     allocate(1);
     x0 = p0[1]; (% index %);
     return iset_size(vec_at(conflicts, x0));
+};
+
+(% p1: registers assigned to p0 %);
+update_tables: (p0, p1) {
+    allocate(3);
+    x0 = p1;
+    (% registers conflicting with p1 now be conflict with registers in p1 %);
+    while (x0 != NULL) {
+        x1 = vec_at(conflicts, p0[1]);
+        add_conflicts(x1, ls_value(x0));
+        x0 = ls_next(x0);
+    };
+    (% remove entries of p0 %);
+    x0 = 0;
+    x1 = num_locations();
+    while (x0 < x1) {
+        x2 = vec_at(conflicts, x0);
+        x2 = iset_del(x2, p0[1]);
+        vec_put(conflicts, x0, x2);
+
+        x2 = vec_at(equivregs, x0);
+        x2 = iset_del(x2, p0[1]);
+        vec_put(equivregs, x0, x2);
+
+        x0 = x0 + 1;
+    };
 };
 
 equivreg_score: (p0) {
@@ -115,9 +146,10 @@ compute_conflicts: (p0) {
         x0 = ls_value(p0); (% instruction %);
         x1 = x0[INST_LIVE]; (% live locations %);
 
-        (% live registers in x1 conflict each other %);
         add_conflicts(x1, x0[INST_OPERAND2]);
         add_conflicts(x1, x0[INST_OPERAND1]);
+
+        (% live registers in x1 conflict each other %);
         x2 = x1;
         while (x2 != NULL) {
             add_conflicts(x1, get_reg(ls_value(x2)));
@@ -182,23 +214,25 @@ select_best_equivreg: (p0) {
     x5 = FALSE; (% TRUE if it must be a register %);
     while (x1 != NULL) {
         if (iset_contains(x0, ls_value(x1)) == FALSE) {
-            x4 = get_reg(ls_value(x1));
-            if (x3 == NULL) {
-                if (x4[0] == OPD_REGISTER) {
-                    x3 = x4;
-                };
-            };
-            if (x2 == NULL) {
-                x2 = x4;
-            } else {
-                if (is_memory_access(x2)) {
-                    if (is_memory_access(x4)) {
-                        x5 = TRUE;
-                        goto &skip;
+            if (ls_value(x1) != p0[1]) {
+                x4 = get_reg(ls_value(x1));
+                if (x3 == NULL) {
+                    if (x4[0] == OPD_REGISTER) {
+                        x3 = x4;
                     };
                 };
-                if (move_cost(x2) < move_cost(x4)) {
+                if (x2 == NULL) {
                     x2 = x4;
+                } else {
+                    if (is_memory_access(x2)) {
+                        if (is_memory_access(x4)) {
+                            x5 = TRUE;
+                            goto &skip;
+                        };
+                    };
+                    if (move_cost(x2) < move_cost(x4)) {
+                        x2 = x4;
+                    };
                 };
             };
         };
@@ -226,7 +260,9 @@ select_location: (p0) {
     x1 = 0;
     while (x1 < num_normal_regs()) {
         if (iset_contains(x0, x1) == FALSE) {
-            return ls_singleton(get_reg(x1));
+            if (p0[1] != x1) {
+                return ls_singleton(get_reg(x1));
+            };
         };
         x1 = x1 + 1;
     };
@@ -285,25 +321,38 @@ assign_location: (p0) {
 
     assign_pseudo(p0, x0);
     (% update conflicts/equivregs %);
+    update_tables(p0, x0);
+    (%
     x1 = 0;
     x2 = num_locations();
     while (x1 < x2) {
         x4 = x0;
         while (x4 != NULL) {
             x3 = vec_at(conflicts, x1);
-            x3 = iset_del(x3, p0[1]);
-            x3 = iset_add(x3, (ls_value(x4))[1]);
-            vec_put(conflicts, x1, x3);
+            if (iset_contains(x3, p0[1])) {
+                x3 = iset_del(x3, p0[1]);
+                x3 = iset_add(x3, (ls_value(x4))[1]);
+                vec_put(conflicts, x1, x3);
+
+                puts("update conflict: ");
+                emit_opd(stdout, ls_value(x4), 32);
+                puts(" <-> ");
+                emit_opd(stdout, get_reg(x1), 32);
+                putc('\n');
+            };
 
             x3 = vec_at(equivregs, x1);
-            x3 = iset_del(x3, p0[1]);
-            x3 = iset_add(x3, (ls_value(x4))[1]);
-            vec_put(equivregs, x1, x3);
+            if (iset_contains(x3, p0[1])) {
+                x3 = iset_del(x3, p0[1]);
+                x3 = iset_add(x3, (ls_value(x4))[1]);
+                vec_put(equivregs, x1, x3);
+            };
             x4 = ls_next(x4);
         };
 
         x1 = x1 + 1;
     };
+    %);
 
     (% update output_count/input_count %);
     while (x0 != NULL) {
