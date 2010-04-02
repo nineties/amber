@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: mangle.rl 2010-04-01 12:55:51 nineties $
+ % $Id: mangle.rl 2010-04-02 23:28:48 nineties $
  %);
 
 (% name mangling %);

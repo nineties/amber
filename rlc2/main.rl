@@ -1,8 +1,11 @@
-plus: (x, y) { return x + y; };
+identity: (x) { return x; };
+
+
 
 export
 main: () {
-    y : plus(1, 2);
+    x : identity(1);
+    y : identity("Hello World");
 
-    syscall(1, y);
+    syscall(1, 0);
 };
