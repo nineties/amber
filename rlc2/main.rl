@@ -7,6 +7,5 @@ export
 main: () {
     g : f();
     (a, b) : x;
-
     syscall(1, g(a,b));
 };

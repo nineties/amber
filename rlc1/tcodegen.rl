@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-04 01:20:54 nineties $
+ % $Id: tcodegen.rl 2010-04-04 02:29:43 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -13,6 +13,10 @@ export(tcodegen, mkinst);
 vtable: NULL; (% variable table. variable id to corresponding operand %);
 
 funtable: NULL; (% function name -> function declaration %);
+
+binop_table: ["", "+", "-", "*", "/", "%", "|", "^", "&", "<<", ">>", "==", "!=", "<", ">",
+"<=", ">=", "||", "&&"];
+unop_table: ["+", "-", "~", "!", "&", "*", "++", "--", "++", "--"];
 
 is_global_identifier: (p0) {
     if (p0[0] != NODE_IDENTIFIER) { return FALSE; };
@@ -151,7 +155,7 @@ transl_funcs: [
     not_reachable, not_implemented, transl_integer, transl_string, not_implemented,
     transl_identifier, not_implemented, transl_tuple, transl_code, transl_decl,
     transl_call, not_implemented, not_implemented, transl_unexpr, transl_binexpr,
-    not_implemented, not_implemented, transl_ret, transl_retval, transl_syscall
+    transl_assign, not_implemented, transl_ret, transl_retval, transl_syscall
 ];
 
 transl_integer: (p0, p1, p2) {
@@ -381,6 +385,119 @@ transl_binexpr: (p0, p1, p2) {
     return p0;
 };
 
+transl_simple_assign: (p0, p1, p2) {
+    allocate(5);
+    x0 = p1[3]; (% lhs %);
+    x1 = p1[4]; (% rhs %);
+    p0 = transl_item(p0, x1, &x2);
+    x3 = NULL;
+    while (x2 != NULL) {
+	x4 = create_pseudo(1, LOCATION_ANY);
+	x3 = ls_cons(x4, x3);
+	p0 = ls_cons(mkinst(INST_MOVL, ls_value(x2), x4), p0);
+	x2 = ls_next(x2);
+    };
+    x3 = ls_reverse(x3);
+    set_operand(x0, x3);
+    *p2 = x3;
+    return p0;
+};
+
+transl_var_assign: (p0, p1, p2) {
+    allocate(5);
+    x0 = p1[3]; (% lhs %);
+    x1 = p1[4]; (% rhs %);
+    p0 = transl_item(p0, mktup5(NODE_BINEXPR, p1[1], p1[2], p1[3], p1[4]), &x2);
+    x3 = NULL;
+    while (x2 != NULL) {
+	x4 = create_pseudo(1, LOCATION_ANY);
+	x3 = ls_cons(x4, x3);
+	p0 = ls_cons(mkinst(INST_MOVL, ls_value(x2), x4), p0);
+	x2 = ls_next(x2);
+    };
+    x3 = ls_reverse(x3);
+    set_operand(x0, x3);
+    *p2 = x3;
+    return p0;
+};
+
+transl_tuple_assign_helper: (p0, p1, p2, p3) {
+    allocate(5);
+    if (p1[0] == NODE_DONTCARE) {
+        x0 = type_size(p1[1]); (% number of registers required by this pattern %);
+        x1 = NULL;
+        while (x0 > 0) {
+            x1 = ls_cons(ls_value(*p2), x1);
+            *p2 = ls_next(*p2);
+            x0 = x0 - 1;
+        };
+        *p3 = ls_reverse(x1);
+        return p0;
+    };
+    if (p1[0] == NODE_IDENTIFIER) {
+        x0 = type_size(p1[1]); (% number of registers required by this variable %);
+        x1 = 0;
+        x2 = NULL;
+        while (x1 < x0) {
+            x3 = create_pseudo(1, LOCATION_ANY);
+            x2 = ls_cons(x3, x2);
+            p0 = ls_cons(mkinst(INST_MOVL, ls_value(*p2), x3), p0);
+            *p2 = ls_next(*p2);
+            x1 = x1 + 1;
+        };
+        x2 = ls_reverse(x2);
+        assert(x2 != NULL);
+        set_operand(p1, x2);
+        *p3 = x2;
+        return p0;
+    };
+    if (p1[0] == NODE_TUPLE) {
+        x0 = p1[TUPLE_LENGTH];
+        x1 = p1[TUPLE_ELEMENTS];
+        x2 = 0;
+        x3 = NULL;
+        while (x2 < x0) {
+            p0 = transl_tuple_assign_helper(p0, x1[x2], p2, &x4);
+            x3 = ls_append(x3, x4);
+            x2 = x2 + 1;
+        };
+        *p3 = x3;
+        return p0;
+    };
+    not_reachable();
+};
+
+transl_tuple_assign: (p0, p1, p2) {
+    allocate(3);
+    x0 = p1[3]; (% lhs %);
+    x1 = p1[4]; (% rhs %);
+    p0 = transl_item(p0, x1, &x2);
+    p0 = transl_tuple_assign_helper(p0, x0, &x2, p2);
+    assert(ls_length(x2) == 0);
+    return p0;
+};
+
+transl_assign: (p0, p1, p2) {
+    allocate(1);
+    x0 = p1[3]; (% lhs %);
+    if (x0[0] == NODE_IDENTIFIER) {
+        if (p1[2] == BINOP_NONE) {
+            return transl_simple_assign(p0, p1, p2);
+        };
+        return transl_var_assign(p0, p1, p2);
+    };
+    if (x0[0] == NODE_TUPLE) {
+        if (p1[2] != BINOP_NONE) {
+            fputs(stderr, "ERROR: invalid application of ");
+            fputs(stderr, binop_table[p1[2]]);
+            fputs(stderr, " to tuple\n");
+            exit(1);
+        };
+        return transl_tuple_assign(p0, p1, p2);
+    };
+    not_reachable();
+};
+
 must_be_register_or_immediate: (p0, p1) {
     allocate(2);
     x0 = *p1;
@@ -520,7 +637,6 @@ transl_tuple_decl_helper: (p0, p1, p2, p3) {
         return p0;
     };
     if (p1[0] == NODE_IDENTIFIER) {
-        puts("hoge\n");
         x0 = type_size(p1[1]); (% number of registers required by this variable %);
         x1 = 0;
         x2 = NULL;
@@ -703,7 +819,7 @@ transl_fundecl: (p0) {
     puts("> removing dead-instructions (");
     puts(get_ident_name(p0[2]));
     puts(") ...\n");
-    (% eliminate_deadcode(x6); %);
+    eliminate_deadcode(x6);
 
     (% allocate registers %);
     puts("> allocating registers (");
