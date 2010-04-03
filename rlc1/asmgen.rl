@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: asmgen.rl 2010-04-03 14:53:08 nineties $
+ % $Id: asmgen.rl 2010-04-04 00:22:27 nineties $
  %);
 
 include(stddef, code);
@@ -121,6 +121,19 @@ emit_load: (p0, p1) {
     fputc(p0, '\n');
 };
 
+emit_call_ind: (p0, p1) {
+    fputc(p0, '\t');
+    fputs(p0, inst_string[p1[INST_OPCODE]]);
+    if (p1[INST_OPERAND1] != NULL) {
+	(% first operand %);
+	fputc(p0, ' ');
+        fputc(p0, '*');
+	emit_opd(p0, p1[INST_OPERAND1], inst_prec[p1[INST_OPCODE]]);
+	x0 = TRUE;
+    };
+    fputc(p0, '\n');
+};
+
 (% p0: output channel, p1: instruction %);
 emit_inst: (p0, p1) {
     allocate(1);
@@ -130,6 +143,10 @@ emit_inst: (p0, p1) {
     };
     if (p1[INST_OPCODE] == INST_LOAD) {
         emit_load(p0, p1);
+        return;
+    };
+    if (p1[INST_OPCODE] == INST_CALL_IND) {
+        emit_call_ind(p0, p1);
         return;
     };
 
