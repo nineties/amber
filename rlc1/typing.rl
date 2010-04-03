@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-04 00:12:44 nineties $
+ % $Id: typing.rl 2010-04-04 02:06:57 nineties $
  %);
 
 include(stddef, code);
@@ -91,7 +91,7 @@ not_implemented: (p0) {
 infer_funcs: [not_reachable, not_implemented, infer_integer, infer_string, not_implemented,
     infer_identifier, infer_array, infer_tuple, infer_code, infer_decl,
     infer_call, not_implemented, infer_lambda, infer_unexpr, infer_binexpr,
-    not_implemented, infer_export, infer_ret, infer_retval, infer_syscall
+    infer_assign, infer_export, infer_ret, infer_retval, infer_syscall
 ];
 
 void_type   : NULL;
@@ -383,6 +383,15 @@ infer_binexpr: (p0) {
     return x0(p0);
 };
 
+infer_assign: (p0) {
+    allocate(2);
+    x0 = infer_item(p0[3]); (% lhs type %);
+    x1 = infer_item(p0[4]); (% rhs type %);
+    unify(x0, x1);
+    p0[1] = x0;
+    return x0;
+};
+
 infer_export: (p0) {
     infer_item(p0[1]);
     deref(p0);
@@ -564,7 +573,7 @@ type_mismatch: (p0, p1) {
 deref_funcs: [not_reachable, not_implemented, deref_integer, deref_string, deref_dontcare,
     deref_identifier, deref_array, deref_tuple, deref_code, deref_decl,
     deref_call, not_implemented, deref_lambda, deref_unexpr, deref_binexpr,
-    not_implemented, deref_export, deref_ret, deref_retval, deref_syscall
+    deref_assign, deref_export, deref_ret, deref_retval, deref_syscall
 ];
 
 (% p0: item %);
@@ -649,6 +658,12 @@ deref_unexpr: (p0) {
 };
 
 deref_binexpr: (p0) {
+    deref(p0[3]);
+    deref(p0[4]);
+    p0[1] = deref_type(p0[1]);
+};
+
+deref_assign: (p0) {
     deref(p0[3]);
     deref(p0[4]);
     p0[1] = deref_type(p0[1]);
