@@ -1,6 +1,4 @@
-identity: (x) { return x; };
-
-
+identity: (a) { return a; };
 
 export
 main: () {
