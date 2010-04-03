@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: asmgen.rl 2010-04-04 00:22:27 nineties $
+ % $Id: asmgen.rl 2010-04-04 00:56:46 nineties $
  %);
 
 include(stddef, code);
@@ -76,6 +76,12 @@ emit_opd: (p0, p1, p2) {
     };
     if (p1[0] == OPD_AT) {
         x0 = p1[2]; (% register %);
+        if (x0[0] == OPD_LABEL) {
+            emit_opd(p0, x0, p2);
+            fputc(p0, '+');
+            fputi(p0, p1[3]);
+            return;
+        };
         emit_opd(p0, x0, p2);
         fputc(p0, '@');
         fputi(p0, p1[3]);
