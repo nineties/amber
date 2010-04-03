@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: type.rl 2010-04-03 00:50:45 nineties $
+ % $Id: type.rl 2010-04-03 13:42:40 nineties $
  %);
 
 include(stddef, code);
@@ -44,6 +44,7 @@ rename_tyscheme: (p0) {
 
 (% p0: mapping, p1: type %);
 rename: (p0, p1) {
+    allocate(1);
     if (p1[0] == NODE_TUPLE_T) {
         return rename_tuple_t(p0, p1);
     };

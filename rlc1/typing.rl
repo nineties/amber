@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-03 01:02:03 nineties $
+ % $Id: typing.rl 2010-04-03 14:46:41 nineties $
  %);
 
 include(stddef, code);
@@ -105,14 +105,14 @@ init_typing: () {
 };
 
 infer_integer: (p0) {
-    if (p0[2] == 8) { p0[1] = char_type; return p0; };
-    if (p0[2] == 32) { p0[1] = int_type; return p0; };
+    if (p0[2] == 8)  { p0[1] = char_type; return char_type; };
+    if (p0[2] == 32) { p0[1] = int_type;  return int_type; };
     not_reachable();
 };
 
 infer_string: (p0) {
     p0[1] = mktup2(NODE_POINTER_T, char_type);
-    return p0;
+    return p0[1];
 };
 
 infer_identifier: (p0) {
@@ -124,99 +124,107 @@ infer_identifier: (p0) {
         fputs(stderr, "'\n");
         exit(1);
     };
+
     x1 = rename_tyscheme(x0[0]);
-    p0[1] = deref_type(x1[1]);
-    p0[3] = x0[1]; (% set variable id %);
+    p0[1] = x1[1];
+    p0[3] = x0[1];
     p0[4] = x1;
-    return p0;
+    return deref_type(x1[1]);
 };
 
 infer_array: (p0) {
-    allocate(4);
+    allocate(5);
     x0 = mktyvar();
     x1 = p0[2]; (% length %);
     x2 = 0;
     x3 = p0[3]; (% pointer to the array %);
     while (x2 < x1) {
-        x3[x2] = infer_item(x3[x2]);
-        unify(x0, x3[x2][1]);
+        x4 = x3[x2];
+        x4[1] = infer_item(x3[x2]);
+        unify(x0, x4[1]);
         x2 = x2 + 1;
     };
     p0[1] = mktup4(NODE_ARRAY_T, x0, x1, FALSE);
-    return deref(p0);
+    deref(p0);
+    return p0[1];
 };
 
 infer_tuple: (p0) {
-    allocate(4);
+    allocate(5);
     x1 = p0[2]; (% length %);
     x2 = p0[3];
     x3 = memalloc(4*x1);
     x0 = 0;
     while (x0 < x1) {
-        x2[x0] = infer_item((p0[3])[x0]);
-        x3[x0] = (x2[x0])[1];
+        x4 = x2[x0];
+        x4[1] = infer_item((p0[3])[x0]);
+        x3[x0] = x4[1];
         x0 = x0 + 1;
     };
     p0[1] = mktup3(NODE_TUPLE_T, x1, x3);
-    return deref(p0);
+    deref(p0);
+    return p0[1];
 };
 
 infer_code: (p0) {
     allocate(1);
     x0 = p0[CODE_STATEMENTS];
     while (x0 != NULL) {
-        ls_set(x0, infer_item(ls_value(x0)));
+        infer_item(ls_value(x0));
         x0 = ls_next(x0);
     };
 
     p0[1] = void_type; (% code block has no type %);
-    return deref(p0);
+    deref(p0);
+    return void_type;
 };
 
+(% p0: dontcare pattern, p1: expr %);
 infer_decl_dontcare: (p0, p1) {
-    p1 = infer_item(p1);
-    p0[1] = p1[1];
-    return mktup2(p0, p1);
+    p0[1] = infer_item(p1);
+    return p0[1];
 };
 
 (% p0: var, p1: expr %);
 infer_decl_var: (p0, p1) {
-    allocate(3);
+    allocate(4);
     x0 = mktyvar();
     x1 = new_varid();
     varmap_add(p0[2], mktup2(mktyscheme(x0), x1));
-    p1 = infer_item(p1);
-    unify(x0, p1[1]);
-    x2 = closure(p1[1]);
-    varmap_add(p0[2], mktup2(x2, x1));
-    if (p1[1] == void_type) {
+    x2 = infer_item(p1);
+    unify(x0, x2);
+    x3 = closure(x2);
+    varmap_add(p0[2], mktup2(x3, x1));
+    if (x2 == void_type) {
 	fputs(stderr, "ERROR: variable '");
 	fputs(stderr, get_ident_name(p0));
 	fputs(stderr, "' has void type\n");
 	exit(1);
     };
-    p0[1] = p1[1];
-    p0[3] = x1;
-    p0[4] = x2;
-    p0 = deref(p0);
-    return mktup2(p0, p1);
+    p0[1] = x2; (% type %);
+    p0[3] = x1; (% variable id %);
+    p0[4] = x3; (% type scheme %);
+    deref_pattern(p0);
+    deref(p1);
+    return x2;
 };
 
 (% p0: tuple pattern, p1: expr %);
 infer_decl_tuple: (p0, p1) {
-    p0 = infer_pattern(p0);
-    p1 = infer_item(p1);
-    unify(p0[1], p1[1]);
-    p0 = deref_pattern(p0);
-    return mktup2(p0, p1);
+    allocate(1);
+    x0 = infer_pattern(p0);
+    unify(x0, infer_item(p1));
+    deref_pattern(p0);
+    deref(p1);
+    return x0;
 };
 
 infer_pattern: (p0) {
-    allocate(4);
+    allocate(5);
     if (p0[0] == NODE_DONTCARE) {
         x0 = mktyvar();
         p0[1] = x0;
-        return p0;
+        return x0;
     };
     if (p0[0] == NODE_IDENTIFIER) {
         (% variable pattern %);
@@ -227,7 +235,7 @@ infer_pattern: (p0) {
         p0[1] = x0;
         p0[3] = x1;
         p0[4] = x2;
-        return p0;
+        return x0;
     };
     if (p0[0] == NODE_TUPLE) {
         x0 = p0[TUPLE_LENGTH];
@@ -235,12 +243,12 @@ infer_pattern: (p0) {
         x2 = memalloc(4*x0); (% element types %);
         x3 = 0;
         while (x3 < x0) {
-            x1[x3] = infer_pattern(x1[x3]);
-            x2[x3] = (x1[x3])[1];
+            x4 = infer_pattern(x1[x3]);
+            x2[x3] = x4;
             x3 = x3 + 1;
         };
         p0[1] = mktup3(NODE_TUPLE_T, x0, x2);
-        return p0;
+        return p0[1];
     };
     fputs(stderr, "ERROR: invalid pattern expression\n");
     exit(1);
@@ -263,26 +271,23 @@ infer_decl_impl: (p0, p1) {
 infer_decl: (p0) {
     allocate(1);
     x0 = infer_decl_impl(p0[2], p0[3]);
-    p0[2] = x0[0];
-    p0[3] = x0[1];
-    p0[1] = (x0[1])[1];
-    return deref(p0);
+    p0[1] = x0;
+    deref(p0);
+    return x0;
 };
 
 
 (% p0: expr %);
 infer_call: (p0) {
     allocate(3);
-    x0 = infer_item(p0[2]); (% function %);
-    put_type(stdout, x0[1]);
-    putc('\n');
-    x1 = infer_item(p0[3]); (% argument %);
+    x0 = infer_item(p0[2]); (% function type %);
+    x1 = infer_item(p0[3]); (% argument type %);
     x2 = mktyvar(); (% return type %);
-    unify(x0[1], mktup3(NODE_LAMBDA_T, x1[1], x2));
-    p0[2] = x0;
-    p0[3] = x1;
+    unify(x0, mktup3(NODE_LAMBDA_T, x1, x2));
+
     p0[1] = x2;
-    return deref(p0);
+    deref(p0);
+    return x2;
 };
 
 (% insert missing return statement. p0: code block %);
@@ -304,23 +309,21 @@ infer_lambda: (p0) {
 
     (% lambda opens new namespace %);
     varmap_push();
-    p0[LAMBDA_ARG]  = infer_pattern(p0[LAMBDA_ARG]);
+    x0 = infer_pattern(p0[LAMBDA_ARG]);
 
     (% pseudo return variable for type checking %);
-    x0 = mktyvar();
-    x1 = new_varid();
-    varmap_add(".pseudo_retvar", mktup2(mktyscheme(x0), x1));
+    x1 = mktyvar();
+    x2 = new_varid();
+    varmap_add(".pseudo_retvar", mktup2(mktyscheme(x1), x2));
 
     p0[LAMBDA_BODY] = insert_ret(p0[LAMBDA_BODY]);
-    p0[LAMBDA_BODY] = infer_item(p0[LAMBDA_BODY]);
+    x3 = infer_item(p0[LAMBDA_BODY]);
     varmap_pop();
 
-    p0[1] = mktup3(NODE_LAMBDA_T, (p0[LAMBDA_ARG])[1], x0);
+    p0[1] = mktup3(NODE_LAMBDA_T, x0, x1);
 
-    p0 = deref(p0);
-    put_type(stdout, p0[1]);
-    putc('\n');
-    return p0;
+    deref(p0);
+    return p0[1];
 };
 
 unexpr_funcs: [
@@ -329,10 +332,11 @@ unexpr_funcs: [
 ];
 
 infer_unarith: (p0) {
-    p0[3] = infer_item(p0[3]);
-    unify(int_type, (p0[3])[1]);
+    allocate(1);
+    x0 = infer_item(p0[3]);
+    unify(int_type, x0);
     p0[1] = int_type;
-    return p0;
+    return int_type;
 };
 
 infer_unexpr: (p0) {
@@ -349,12 +353,13 @@ binexpr_funcs: [
 ];
 
 infer_binarith: (p0) {
-    p0[3] = infer_item(p0[3]);
-    p0[4] = infer_item(p0[4]);
-    unify(int_type, (p0[3])[1]);
-    unify(int_type, (p0[4])[1]);
+    allocate(2);
+    x0 = infer_item(p0[3]);
+    x1 = infer_item(p0[4]);
+    unify(int_type, x0);
+    unify(int_type, x1);
     p0[1] = int_type;
-    return p0;
+    return int_type;
 };
 
 infer_binexpr: (p0) {
@@ -364,8 +369,9 @@ infer_binexpr: (p0) {
 };
 
 infer_export: (p0) {
-    p0[1] = infer_item(p0[1]);
-    return deref(p0);
+    infer_item(p0[1]);
+    deref(p0);
+    return void_type;
 };
 
 (% return; is treated as .pseudo_retvar = (); %);
@@ -379,30 +385,33 @@ infer_ret: (p0) {
     x1 = x0[0];
     unify(void_type, x1[1]);
     p0[1] = void_type;
-    return deref(p0);
+    deref(p0);
+    return void_type;
 };
 
 (% return e; is treated as .pseudo_retvar = e; %);
 infer_retval: (p0) {
-    allocate(2);
-    p0[RETVAL_VALUE] = infer_item(p0[RETVAL_VALUE]);
+    allocate(3);
+    x0 = infer_item(p0[RETVAL_VALUE]);
 
-    x0 = varmap_find(".pseudo_retvar"); (% (tyscheme, id) %);
-    if (x0 == NULL) {
+    x1 = varmap_find(".pseudo_retvar"); (% (tyscheme, id) %);
+    if (x1 == NULL) {
         fputs(stderr, "ERROR: return expression outside function");
         exit(1);
     };
 
-    x1 = x0[0];
-    unify(x1[1], (p0[RETVAL_VALUE])[1]);
+    x2 = x1[0];
+    unify(x2[1], x0);
     p0[1] = void_type;
-    return deref(p0);
+    deref(p0);
+    return void_type;
 };
 
 infer_syscall: (p0) {
-    p0[2] = infer_item(p0[2]);
+    infer_item(p0[2]);
     p0[1] = int_type;
-    return deref(p0);
+    deref(p0);
+    return int_type;
 };
 
 (% p0: item %);
@@ -480,11 +489,13 @@ unify_tyvar: (p0, p1) {
     x0 = map_find(tyvarmap, p0[1]);
     if (x0 != NULL) {
         unify(x0[1], p1);
+        return;
     };
     if (p1[0] == NODE_TYVAR) {
         x0 = map_find(tyvarmap, p1[1]);
         if (x0 != NULL) {
             unify(p0, x0[1]);
+            return;
         };
     };
     occur_check(p0[1], p1);
@@ -545,28 +556,24 @@ deref_funcs: [not_reachable, not_implemented, deref_integer, deref_string, deref
 deref: (p0) {
     allocate(1);
     x0 = deref_funcs[p0[0]];
-    return x0(p0);
+    x0(p0);
 };
 
 deref_identifier: (p0) {
     p0[1] = deref_type(p0[1]);
     p0[4] = closure(p0[1]);
-    return p0;
 };
 
 deref_dontcare: (p0) {
     p0[1] = deref_type(p0[1]);
-    return p0;
 };
 
 deref_integer: (p0) {
     p0[1] = deref_type(p0[1]);
-    return p0;
 };
 
 deref_string: (p0) {
     p0[1] = deref_type(p0[1]);
-    return p0;
 };
 
 deref_array: (p0) {
@@ -575,11 +582,10 @@ deref_array: (p0) {
     x1 = 0;
     while (x1 < x0) {
         x2 = p0[3];
-        x2[x1] = deref(x2[x1]);
+        deref(x2[x1]);
         x1 = x1 + 1;
     };
     p0[1] = deref_type(p0[1]);
-    return p0;
 };
 
 deref_tuple: (p0) {
@@ -588,78 +594,67 @@ deref_tuple: (p0) {
     x1 = 0;
     while (x1 < x0) {
         x2 = p0[3];
-        x2[x1] = deref(x2[x1]);
+        deref(x2[x1]);
         x1 = x1 + 1;
     };
     p0[1] = deref_type(p0[1]);
-    return p0;
 };
 
 deref_code: (p0) {
     allocate(1);
     x0 = p0[CODE_STATEMENTS];
     while (x0 != NULL) {
-        ls_set(x0, deref(ls_value(x0)));
+        deref(ls_value(x0));
         x0 = ls_next(x0);
     };
     p0[1] = deref_type(p0[1]);
-    return p0;
 };
 
 deref_decl: (p0) {
-    p0[2] = deref(p0[2]); (% lhs %);
-    p0[3] = deref(p0[3]); (% rhs %);
+    deref(p0[2]); (% lhs %);
+    deref(p0[3]); (% rhs %);
     p0[1] = deref_type(p0[1]);
-    return p0;
 };
 
 deref_call: (p0) {
-    p0[2] = deref(p0[2]); (% function %);
-    p0[3] = deref(p0[3]); (% argument %);
+    deref(p0[2]); (% function %);
+    deref(p0[3]); (% argument %);
     p0[1] = deref_type(p0[1]);
-    return p0;
 };
 
 deref_lambda: (p0) {
-    p0[LAMBDA_ARG] = deref(p0[LAMBDA_ARG]);
-    p0[LAMBDA_BODY] = deref(p0[LAMBDA_BODY]);
+    deref(p0[LAMBDA_ARG]);
+    deref(p0[LAMBDA_BODY]);
     p0[1] = deref_type(p0[1]);
-    return p0;
 };
 
 deref_unexpr: (p0) {
-    p0[3] = deref(p0[3]);
+    deref(p0[3]);
     p0[1] = deref_type(p0[1]);
-    return p0;
 };
 
 deref_binexpr: (p0) {
-    p0[3] = deref(p0[3]);
-    p0[4] = deref(p0[4]);
+    deref(p0[3]);
+    deref(p0[4]);
     p0[1] = deref_type(p0[1]);
-    return p0;
 };
 
 deref_export: (p0) {
-    p0[1] = deref(p0[1]);
-    return p0;
+    deref(p0[1]);
 };
 
 deref_ret: (p0) {
     p0[1] = deref_type(p0[1]);
-    return p0;
 };
 
 deref_retval: (p0) {
-    p0[RETVAL_VALUE] = deref(p0[RETVAL_VALUE]);
+    deref(p0[RETVAL_VALUE]);
     p0[1] = deref_type(p0[1]);
-    return p0;
 };
 
 deref_syscall: (p0) {
-    p0[2] = deref(p0[2]);
+    deref(p0[2]);
     p0[1] = deref_type(p0[1]);
-    return p0;
 };
 
 (% p0: type %);
@@ -698,23 +693,23 @@ deref_pattern: (p0) {
     allocate(3);
     if (p0[0] == NODE_DONTCARE) {
         p0[1] = deref_type(p0[1]);
-        return p0;
+        return;
     };
     if (p0[0] == NODE_IDENTIFIER) {
         p0[1] = deref_type(p0[1]);
         p0[4] = closure(p0[1]);
-        return p0;
+        return;
     };
     if (p0[0] == NODE_TUPLE) {
         x0 = p0[TUPLE_LENGTH];
         x1 = p0[TUPLE_ELEMENTS];
         x2 = 0;
         while (x2 < x0) {
-            x1[x2] = deref_pattern(x1[x2]);
+            deref_pattern(x1[x2]);
             x2 = x2 + 1;
         };
         p0[1] = deref_type(p0[1]);
-        return p0;
+        return;
     };
     not_reachable();
 };
@@ -728,7 +723,7 @@ typing: (p0) {
 
     x0 = p0[1];
     while (x0 != NULL) {
-        ls_set(x0, infer_item(ls_value(x0)));
+        infer_item(ls_value(x0));
         x0 = ls_next(x0);
     }
 };

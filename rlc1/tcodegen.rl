@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-03 00:39:16 nineties $
+ % $Id: tcodegen.rl 2010-04-03 14:46:30 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -236,13 +236,8 @@ transl_call2: (p0, p1, p2) {
 transl_call: (p0, p1, p2) {
     allocate(6);
     x0 = p1[2]; (% function %);
-
-    x1 = p1[1];
-
-    x1 = (x0[1])[LAMBDA_T_RETURN]; (% return type %);
-
-    x2 = type_size(x1);
-    if (x2 > 1) {
+    x1 = type_size(p1[1]);
+    if (x1 > 1) {
         (% the function returns composite data %);
         return transl_call2(p0, p1, p2);
     };
