@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-04 01:02:16 nineties $
+ % $Id: tcodegen.rl 2010-04-04 01:20:54 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -386,7 +386,7 @@ must_be_register_or_immediate: (p0, p1) {
     x0 = *p1;
     if (x0[0] == OPD_PSEUDO) {
         if (x0[PSEUDO_TYPE] != LOCATION_ANY) {
-            x1 = get_pseudo(x0[PSEUDO_LENGTH], LOCATION_REGISTER);
+            x1 = create_pseudo(x0[PSEUDO_LENGTH], LOCATION_REGISTER);
             p0 = ls_cons(mkinst(INST_MOVL, x0, x1), p0);
             *p1 = x1;
             return p0;
@@ -395,20 +395,20 @@ must_be_register_or_immediate: (p0, p1) {
         return p0;
     };
     if (x0[0] == OPD_STACK) {
-        x1 = get_pseudo(1, LOCATION_REGISTER);
+        x1 = create_pseudo(1, LOCATION_REGISTER);
         p0 = ls_cons(mkinst(INST_MOVL, x0, x1), p0);
         *p1 = x1;
         return p0;
     };
     if (x0[0] == OPD_ARG) {
-        x1 = get_pseudo(1, LOCATION_REGISTER);
+        x1 = create_pseudo(1, LOCATION_REGISTER);
         p0 = ls_cons(mkinst(INST_MOVL, x0, x1), p0);
         *p1 = x1;
         return p0;
     };
     if (x0[0] == OPD_AT) {
         if (x0[2][0] == OPD_LABEL) {
-            x1 = get_pseudo(1, LOCATION_REGISTER);
+            x1 = create_pseudo(1, LOCATION_REGISTER);
             p0 = ls_cons(mkinst(INST_MOVL, x0, x1), p0);
             *p1 = x1;
             return p0;
