@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: regalloc.rl 2010-04-02 21:57:54 nineties $
+ % $Id: regalloc.rl 2010-04-04 00:54:51 nineties $
  %);
 
 (% Register allocation %);
@@ -358,6 +358,9 @@ replace: (p0) {
         };
         if (x0[0] == OPD_PSEUDO) {
             return replace(ls_at(x0[PSEUDO_LOCATION], x1));
+        };
+        if (x0[0] == OPD_LABEL) {
+            return p0;
         };
         fputs(stderr, "ERROR: not reachable here\n");
         exit(1);

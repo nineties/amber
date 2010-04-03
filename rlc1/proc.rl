@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: proc.rl 2010-04-02 10:21:20 nineties $
+ % $Id: proc.rl 2010-04-04 00:49:46 nineties $
  %);
 
 include(stddef, code);
@@ -162,8 +162,6 @@ get_pseudo: (p0) {
 
 get_at: (p0, p1) {
     allocate(1);
-    assert(p0[0] == OPD_PSEUDO);
-    assert(p1 < p0[PSEUDO_LENGTH]);
     x0 = mktup4(OPD_AT, new_location_id(), p0, p1);
     vec_pushback(locations, x0);
     return x0;

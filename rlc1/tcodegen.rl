@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-04 00:27:27 nineties $
+ % $Id: tcodegen.rl 2010-04-04 01:02:16 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -177,13 +177,28 @@ transl_string: (p0, p1, p2) {
 };
 
 transl_identifier: (p0, p1, p2) {
+    allocate(5);
     if (p1[5]) {
         (% this is a global variable %);
         if (p1[1][0] == NODE_LAMBDA_T) {
             *p2 = ls_singleton(mktup2(OPD_ADDRESS, mangle(p1[1], get_ident_name(p1))));
-        } else {
-            *p2 = ls_singleton(mktup2(OPD_ADDRESS, get_ident_name(p1)));
+            return p0;
         };
+        x0 = type_size(p1[1]);
+        if (x0 == 1) {
+            *p2 = ls_singleton(mktup2(OPD_LABEL, get_ident_name(p1)));
+            return p0;
+        };
+        x1 = mktup2(OPD_LABEL, get_ident_name(p1));
+        x2 = 0;
+        x3 = NULL;
+        while (x2 < x0) {
+            x4 = get_at(x1, x2);
+            p0 = must_be_register_or_immediate(p0, &x4);
+            x3 = ls_cons(x4, x3);
+            x2 = x2 + 1;
+        };
+        *p2 = ls_reverse(x3);
         return p0;
     };
     *p2 = get_operand(p1);
@@ -373,6 +388,7 @@ must_be_register_or_immediate: (p0, p1) {
         if (x0[PSEUDO_TYPE] != LOCATION_ANY) {
             x1 = get_pseudo(x0[PSEUDO_LENGTH], LOCATION_REGISTER);
             p0 = ls_cons(mkinst(INST_MOVL, x0, x1), p0);
+            *p1 = x1;
             return p0;
         };
         x0[PSEUDO_TYPE] = LOCATION_REGISTER;
@@ -381,12 +397,22 @@ must_be_register_or_immediate: (p0, p1) {
     if (x0[0] == OPD_STACK) {
         x1 = get_pseudo(1, LOCATION_REGISTER);
         p0 = ls_cons(mkinst(INST_MOVL, x0, x1), p0);
+        *p1 = x1;
         return p0;
     };
     if (x0[0] == OPD_ARG) {
         x1 = get_pseudo(1, LOCATION_REGISTER);
         p0 = ls_cons(mkinst(INST_MOVL, x0, x1), p0);
+        *p1 = x1;
         return p0;
+    };
+    if (x0[0] == OPD_AT) {
+        if (x0[2][0] == OPD_LABEL) {
+            x1 = get_pseudo(1, LOCATION_REGISTER);
+            p0 = ls_cons(mkinst(INST_MOVL, x0, x1), p0);
+            *p1 = x1;
+            return p0;
+        };
     };
     return p0;
 };
@@ -468,8 +494,6 @@ transl_var_decl: (p0, p1, p2) {
     x1 = p1[3]; (% rhs %);
     p0 = transl_item(p0, x1, &x2);
     x3 = NULL;
-    putx(x2);
-    putc('\n');
     while (x2 != NULL) {
 	x4 = create_pseudo(1, LOCATION_ANY);
 	x3 = ls_cons(x4, x3);
@@ -496,6 +520,7 @@ transl_tuple_decl_helper: (p0, p1, p2, p3) {
         return p0;
     };
     if (p1[0] == NODE_IDENTIFIER) {
+        puts("hoge\n");
         x0 = type_size(p1[1]); (% number of registers required by this variable %);
         x1 = 0;
         x2 = NULL;
