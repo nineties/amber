@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-03 18:46:41 nineties $
+ % $Id: tcodegen.rl 2010-04-04 00:27:27 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -13,6 +13,11 @@ export(tcodegen, mkinst);
 vtable: NULL; (% variable table. variable id to corresponding operand %);
 
 funtable: NULL; (% function name -> function declaration %);
+
+is_global_identifier: (p0) {
+    if (p0[0] != NODE_IDENTIFIER) { return FALSE; };
+    return p0[5];
+};
 
 (% p0: type.  returns number of required register for the type %);
 type_size: (p0) {
@@ -35,6 +40,9 @@ type_size: (p0) {
             x2 = x2 + 1;
         };
         return x3;
+    };
+    if (p0[0] == NODE_LAMBDA_T) {
+        return 1;
     };
     not_reachable();
 };
@@ -169,7 +177,15 @@ transl_string: (p0, p1, p2) {
 };
 
 transl_identifier: (p0, p1, p2) {
-    allocate(1);
+    if (p1[5]) {
+        (% this is a global variable %);
+        if (p1[1][0] == NODE_LAMBDA_T) {
+            *p2 = ls_singleton(mktup2(OPD_ADDRESS, mangle(p1[1], get_ident_name(p1))));
+        } else {
+            *p2 = ls_singleton(mktup2(OPD_ADDRESS, get_ident_name(p1)));
+        };
+        return p0;
+    };
     *p2 = get_operand(p1);
     return p0;
 };
@@ -202,7 +218,7 @@ transl_call2: (p0, p1, p2) {
     x2 = type_size(x1);
     x3 = p1[3]; (% argument %);
     x4 = create_pseudo(x2, LOCATION_MEMORY);
-    if (x0[0] == NODE_IDENTIFIER) {
+    if (is_global_identifier(x0)) {
         (% immediate call %);
         x5 = mangle(x0[1], get_ident_name(x0));
         x6 = create_pseudo(1, LOCATION_REGISTER); (% address of region for return value %);
@@ -243,7 +259,7 @@ transl_call: (p0, p1, p2) {
     };
     x2 = p1[3]; (% argument %);
 
-    if (x0[0] == NODE_IDENTIFIER) {
+    if (is_global_identifier(x0)) {
         (% immediate call %);
         x3 = mangle(x0[1], get_ident_name(x0));
         p0 = set_arguments(p0, x2, 0, &x4);
@@ -452,6 +468,8 @@ transl_var_decl: (p0, p1, p2) {
     x1 = p1[3]; (% rhs %);
     p0 = transl_item(p0, x1, &x2);
     x3 = NULL;
+    putx(x2);
+    putc('\n');
     while (x2 != NULL) {
 	x4 = create_pseudo(1, LOCATION_ANY);
 	x3 = ls_cons(x4, x3);
@@ -711,6 +729,12 @@ transl_static_data: (p0) {
 (% p0: item %);
 transl_extdecl: (p0) {
     allocate(3);
+
+    if (p0[2][0] != NODE_IDENTIFIER) {
+        fputs(stderr, "ERROR: does not support external declaration with pattern\n");
+        exit(1);
+    };
+
     x0 = p0[1]; (% type %);
     (% generate label %);
     if (x0[0] == NODE_LAMBDA_T) {

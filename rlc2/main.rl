@@ -1,9 +1,9 @@
-identity: (a) { return a; };
+plus: (a, b) { return a + b; };
+f: () { return plus; };
 
 export
 main: () {
-    x : identity(1);
-    y : identity("Hello World");
+    g : f();
 
-    syscall(1, 0);
+    syscall(1, g(1,2));
 };

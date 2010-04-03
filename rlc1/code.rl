@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: code.rl 2010-04-03 17:31:23 nineties $
+ % $Id: code.rl 2010-04-04 00:23:29 nineties $
  %);
 
 NODE_PROG       => 0;  (% item list %);
@@ -10,7 +10,7 @@ NODE_REWRITE    => 1;  (% lhs, rhs %);
 NODE_INTEGER    => 2;  (% type, bits, value %);
 NODE_STRING     => 3;  (% type, string %);
 NODE_DONTCARE   => 4;  (% type %);
-NODE_IDENTIFIER => 5;  (% type, name, id, tyscheme %);
+NODE_IDENTIFIER => 5;  (% type, name, id, tyscheme, is_global %);
 NODE_ARRAY      => 6;  (% type, length, elements %);
 NODE_TUPLE      => 7;  (% type, length, elements %);
 NODE_CODE       => 8;  (% type, elements %);

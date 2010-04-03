@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-03 17:40:08 nineties $
+ % $Id: typing.rl 2010-04-04 00:12:44 nineties $
  %);
 
 include(stddef, code);
@@ -60,6 +60,9 @@ init_varmap: () {
     varmap_push(); (% global scopeid %);
 };
 
+in_global_namespace: () {
+    return vec_size(scopeid_stack) == 1;
+};
 
 tyvarmap: NULL;
 
@@ -118,7 +121,7 @@ infer_string: (p0) {
 
 infer_identifier: (p0) {
     allocate(3);
-    x0 = varmap_find(p0[2]); (% (tyscheme, id) %);
+    x0 = varmap_find(p0[2]); (% (tyscheme, id, is_global) %);
     if (x0 == NULL) {
         fputs(stderr, "ERROR: undefined variable '");
         fputs(stderr, p0[2]);
@@ -130,6 +133,7 @@ infer_identifier: (p0) {
     p0[1] = x1[1];
     p0[3] = x0[1];
     p0[4] = x1;
+    p0[5] = x0[2];
 
     x2 = map_find(funtable, p0[3]);
     x2 = ls_cons(p0, x2);
@@ -193,30 +197,31 @@ infer_decl_dontcare: (p0, p1) {
 
 (% p0: var, p1: expr %);
 infer_decl_var: (p0, p1) {
-    allocate(4);
+    allocate(5);
     x0 = mktyvar();
     x1 = new_varid();
-    varmap_add(p0[2], mktup2(mktyscheme(x0), x1));
-    x2 = infer_item(p1);
-    unify(x0, x2);
-    x3 = closure(x2);
-    varmap_add(p0[2], mktup2(x3, x1));
-    if (x2 == void_type) {
+    x2 = in_global_namespace();
+    varmap_add(p0[2], mktup3(mktyscheme(x0), x1, x2));
+    x3 = infer_item(p1);
+    unify(x0, x3);
+    x4 = closure(x3);
+    varmap_add(p0[2], mktup3(x4, x1, x2));
+    if (x3 == void_type) {
 	fputs(stderr, "ERROR: variable '");
 	fputs(stderr, get_ident_name(p0));
 	fputs(stderr, "' has void type\n");
 	exit(1);
     };
-    p0[1] = x2; (% type %);
+    p0[1] = x3; (% type %);
     p0[3] = x1; (% variable id %);
-    p0[4] = x3; (% type scheme %);
+    p0[4] = x4; (% type scheme %);
     deref_pattern(p0);
     deref(p1);
 
-    if (is_polymorphic_type(x2)) {
+    if (is_polymorphic_type(x3)) {
         map_add(funtable, p0[3], NULL);
     };
-    return x2;
+    return x3;
 };
 
 (% p0: tuple pattern, p1: expr %);
@@ -240,7 +245,7 @@ infer_pattern: (p0) {
         (% variable pattern %);
         x0 = mktyvar(); (% type of variable %);
         x1 = new_varid();
-        x2 = mktup2(mktyscheme(x0), x1);
+        x2 = mktup3(mktyscheme(x0), x1, in_global_namespace());
         varmap_add(p0[2], x2);
         p0[1] = x0;
         p0[3] = x1;
@@ -324,7 +329,7 @@ infer_lambda: (p0) {
     (% pseudo return variable for type checking %);
     x1 = mktyvar();
     x2 = new_varid();
-    varmap_add(".pseudo_retvar", mktup2(mktyscheme(x1), x2));
+    varmap_add(".pseudo_retvar", mktup3(mktyscheme(x1), x2, FALSE));
 
     p0[LAMBDA_BODY] = insert_ret(p0[LAMBDA_BODY]);
     x3 = infer_item(p0[LAMBDA_BODY]);
