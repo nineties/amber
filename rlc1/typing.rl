@@ -2,17 +2,18 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-03 14:46:41 nineties $
+ % $Id: typing.rl 2010-04-03 17:40:08 nineties $
  %);
 
 include(stddef, code);
 
 export(init_typing, typing, void_type, char_type, int_type, float_type, double_type);
 
-
 scopeid: 0;
 scopeid_stack: NULL; 
-varmap: NULL;   (% variable table %);
+
+varmap: NULL;   (% variable table. name -> (tyscheme, id) %);
+funtable: NULL; (% polymorphic function table. name -> types %);
 
 (% p0: (scopeid-id, name) %);
 varmap_hash: (p0) {
@@ -116,7 +117,7 @@ infer_string: (p0) {
 };
 
 infer_identifier: (p0) {
-    allocate(2);
+    allocate(3);
     x0 = varmap_find(p0[2]); (% (tyscheme, id) %);
     if (x0 == NULL) {
         fputs(stderr, "ERROR: undefined variable '");
@@ -129,6 +130,11 @@ infer_identifier: (p0) {
     p0[1] = x1[1];
     p0[3] = x0[1];
     p0[4] = x1;
+
+    x2 = map_find(funtable, p0[3]);
+    x2 = ls_cons(p0, x2);
+    map_add(funtable, p0[3], x2);
+
     return deref_type(x1[1]);
 };
 
@@ -206,6 +212,10 @@ infer_decl_var: (p0, p1) {
     p0[4] = x3; (% type scheme %);
     deref_pattern(p0);
     deref(p1);
+
+    if (is_polymorphic_type(x2)) {
+        map_add(funtable, p0[3], NULL);
+    };
     return x2;
 };
 
@@ -720,11 +730,12 @@ typing: (p0) {
 
     init_varmap();
     init_tyvarmap();
+    funtable = mkmap(&simple_hash, &simple_equal, 10);
 
     x0 = p0[1];
     while (x0 != NULL) {
         infer_item(ls_value(x0));
         x0 = ls_next(x0);
-    }
+    };
+    return mktup2(p0, funtable);
 };
-

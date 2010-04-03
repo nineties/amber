@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: main.rl 2010-04-03 00:39:02 nineties $
+ % $Id: main.rl 2010-04-03 17:40:26 nineties $
  %);
 
 include(stddef, code);
@@ -25,7 +25,7 @@ change_suffix: (p0, p1) {
 
 (% p0: asm filename, p1: rowl filename %);
 compile: (p0, p1) {
-    allocate(2);
+    allocate(4);
 
     init_typing();
 
@@ -41,16 +41,16 @@ compile: (p0, p1) {
 
     (% type check %);
     puts("> typing...\n");
-    typing(x1);
+    x2 = typing(x1);
 
     (% translate to two address code %);
     puts("> translating to tcode...\n");
-    x1 = tcodegen(x1);
+    x3 = tcodegen(x2);
 
     (% generate assembly %);
     puts("> generating assembly...\n");
     x0 = open_out(p0);
-    asmgen(x0, x1);
+    asmgen(x0, x3);
     close_out(x0);
     puts("finished\n");
 };

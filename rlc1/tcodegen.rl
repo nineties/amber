@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-03 14:46:30 nineties $
+ % $Id: tcodegen.rl 2010-04-03 18:46:41 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -629,47 +629,11 @@ transl_extfuncs: [
     not_implemented, transl_export, not_implemented, not_implemented
 ];
 
-is_polymorphic_type: (p0) {
-    allocate(3);
-    if (p0[0] == NODE_VOID_T)   { return FALSE; };
-    if (p0[0] == NODE_CHAR_T)   { return FALSE; };
-    if (p0[0] == NODE_INT_T)    { return FALSE; };
-    if (p0[0] == NODE_FLOAT_T)  { return FALSE; };
-    if (p0[0] == NODE_DOUBLE_T) { return FALSE; };
-    if (p0[0] == NODE_POINTER_T) {
-        return is_polymorphic_type(p0[POINTER_T_BASE]);
-    };
-    if (p0[0] == NODE_ARRAY_T) {
-        return is_polymorphic_type(p0[ARRAY_LENGTH]);
-    };
-    if (p0[0] == NODE_TUPLE_T) {
-        x0 = p0[TUPLE_T_LENGTH];
-        x1 = p0[TUPLE_T_ELEMENTS];
-        x2 = 0;
-        while (x2 < x0) {
-            if (is_polymorphic_type(x1[x2])) { return TRUE; };
-            x2 = x2 + 1;
-        };
-        return FALSE;
-    };
-    if (p0[0] == NODE_LAMBDA_T) {
-        if (is_polymorphic_type(p0[LAMBDA_T_PARAM]))  { return TRUE; };
-        if (is_polymorphic_type(p0[LAMBDA_T_RETURN])) { return TRUE; };
-        return FALSE;
-    };
-    return TRUE;
-};
-
 (% p0: item %);
 transl_fundecl: (p0) {
     allocate(7);
 
     reset_proc();
-
-    if (is_polymorphic_type(p0[1])) {
-        map_add(funtable, get_ident_name(p0[2]), p0[3]);
-        return NULL;
-    };
 
     x0 = mangle(p0[1], get_ident_name(p0[2]));
     x1 = p0[3]; (% lambda %);
@@ -786,18 +750,18 @@ transl_extitem: (p0) {
     return x0(p0);
 };
 
-(% p0: program (item list) %);
+(% p0: (program, funtable) %);
 tcodegen: (p0) {
     allocate(3);
 
     init_proc();
 
     vtable = mkvec(num_variable());
-    funtable = mkmap(&strhash, &streq, 10);
+    funtable = p0[1];
 
     topdecl = NULL;
 
-    x0 = p0[1];
+    x0 = p0[0][1];
     x1 = NULL;
     while (x0 != NULL) {
         x2 = transl_extitem(ls_value(x0));
