@@ -2,13 +2,14 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: type.rl 2010-04-03 13:42:40 nineties $
+ % $Id: type.rl 2010-04-03 17:38:29 nineties $
  %);
 
 include(stddef, code);
 
 export(mktyvar, mktyscheme, rename_tyscheme);
 export(freevar, freevar_tyscheme);
+export(is_polymorphic_type);
 
 typeid : 0;
 new_tyid: () {
@@ -109,3 +110,35 @@ freevar_iter: (p0, p1) {
 freevar_tyscheme: (p0) {
     return iset_subtract(freevar(p0[2]), p0[1]);
 };
+
+is_polymorphic_type: (p0) {
+    allocate(3);
+    if (p0[0] == NODE_VOID_T)   { return FALSE; };
+    if (p0[0] == NODE_CHAR_T)   { return FALSE; };
+    if (p0[0] == NODE_INT_T)    { return FALSE; };
+    if (p0[0] == NODE_FLOAT_T)  { return FALSE; };
+    if (p0[0] == NODE_DOUBLE_T) { return FALSE; };
+    if (p0[0] == NODE_POINTER_T) {
+        return is_polymorphic_type(p0[POINTER_T_BASE]);
+    };
+    if (p0[0] == NODE_ARRAY_T) {
+        return is_polymorphic_type(p0[ARRAY_LENGTH]);
+    };
+    if (p0[0] == NODE_TUPLE_T) {
+        x0 = p0[TUPLE_T_LENGTH];
+        x1 = p0[TUPLE_T_ELEMENTS];
+        x2 = 0;
+        while (x2 < x0) {
+            if (is_polymorphic_type(x1[x2])) { return TRUE; };
+            x2 = x2 + 1;
+        };
+        return FALSE;
+    };
+    if (p0[0] == NODE_LAMBDA_T) {
+        if (is_polymorphic_type(p0[LAMBDA_T_PARAM]))  { return TRUE; };
+        if (is_polymorphic_type(p0[LAMBDA_T_RETURN])) { return TRUE; };
+        return FALSE;
+    };
+    return TRUE;
+};
+
