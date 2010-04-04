@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-04 02:29:43 nineties $
+ % $Id: tcodegen.rl 2010-04-04 13:29:59 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -47,6 +47,9 @@ type_size: (p0) {
     };
     if (p0[0] == NODE_LAMBDA_T) {
         return 1;
+    };
+    if (p0[0] == NODE_NAMED_T) {
+        return type_size(p0[2]);
     };
     not_reachable();
 };
@@ -155,7 +158,8 @@ transl_funcs: [
     not_reachable, not_implemented, transl_integer, transl_string, not_implemented,
     transl_identifier, not_implemented, transl_tuple, transl_code, transl_decl,
     transl_call, not_implemented, not_implemented, transl_unexpr, transl_binexpr,
-    transl_assign, not_implemented, transl_ret, transl_retval, transl_syscall
+    transl_assign, not_implemented, transl_ret, transl_retval, transl_syscall, transl_field,
+    transl_fieldref
 ];
 
 transl_integer: (p0, p1, p2) {
@@ -763,6 +767,49 @@ transl_syscall: (p0, p1, p2) {
 	    x4 = x4 + 1;
 	};
     };
+    return p0;
+};
+
+transl_field: (p0, p1, p2) {
+    transl_item(p0, p1[3], p2);
+};
+
+(% p0: type, p1: field name %);
+get_field: (p0, p1) {
+    allocate(5);
+    x0 = 0; (% offset %);
+    x1 = p0[TUPLE_T_LENGTH];
+    x2 = p0[TUPLE_T_ELEMENTS];
+    x3 = 0;
+    while (x3 < x1) {
+        x4 = x2[x3];
+        if (has_name(x4, p1)) {
+            return mktup2(x0, type_size(x4));
+        };
+        x0 = x0 + type_size(x4);
+        x3 = x3 + 1;
+    };
+};
+
+transl_fieldref: (p0, p1, p2) {
+    allocate(7);
+    x0 = p1[2]; (% lhs %);
+    x1 = p1[3]; (% fiel name %);
+    x2 = get_field(x0[1], x1); (% offset, length %);
+    p0 = transl_item(p0, x0, &x3);
+    x4 = x2[0]; (% offset %);
+    x5 = x2[1]; (% length %);
+    while (x4 > 0) {
+        x3 = ls_next(x3);
+        x4 = x4 - 1;
+    };
+    x6 = NULL;
+    while (x5 > 0) {
+        x6 = ls_cons(ls_value(x3), x6);
+        x3 = ls_next(x3);
+        x5 = x5 - 1;
+    };
+    *p2 = ls_reverse(x6);
     return p0;
 };
 

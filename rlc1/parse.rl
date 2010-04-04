@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: parse.rl 2010-04-03 23:56:41 nineties $
+ % $Id: parse.rl 2010-04-04 12:52:18 nineties $
  %);
 
 include(stddef, code, token);
@@ -112,6 +112,18 @@ parse_command_expr: (p0) {
         return mktup3(NODE_RETVAL, NULL, parse_assignment_expr(x0));
     };
     return parse_assignment_expr(p0);
+};
+
+(% p0: first token %);
+parse_field_expr: (p0) {
+    allocate(2);
+    x0 = parse_assignment_expr(p0);
+    x1 = lex();
+    if (x1 == ':') {
+        return mktup4(NODE_FIELD, NULL, x0, parse_assignment_expr(lex()));
+    };
+    unput();
+    return x0;
 };
 
 (% p0: first token %);
@@ -386,6 +398,14 @@ label post_loop;
         x0 = mktup4(NODE_UNEXPR, NULL, UNOP_POSTDECR, x0);
         goto &post_loop;
     };
+    if (x1 == '.') {
+        x1 = lex();
+        if (x1 != TOK_IDENT) {
+            expected("identifier");
+        };
+        x0 = mktup4(NODE_FIELDREF, NULL, x0, strdup(token_text()));
+        goto &post_loop;
+    };
     unput();
     return x0;
 };
@@ -468,7 +488,7 @@ parse_tuple: (p0) {
 (% p0: first token %);
 parse_comma_list: (p0) {
     allocate(2);
-    x0 = parse_item(p0);
+    x0 = parse_field_expr(p0);
     x1 = lex();
     if (x1 == ',') {
         return ls_cons(x0, parse_comma_list(lex()));

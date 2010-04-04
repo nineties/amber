@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: code.rl 2010-04-04 02:21:16 nineties $
+ % $Id: code.rl 2010-04-04 12:26:20 nineties $
  %);
 
 NODE_PROG       => 0;  (% item list %);
@@ -25,7 +25,8 @@ NODE_EXPORT     => 16; (% item %);
 NODE_RET        => 17; (% type %);
 NODE_RETVAL     => 18; (% type, value %);
 NODE_SYSCALL    => 19; (% type, params %);
-NODE_TYPE       => 20; (% type %);
+NODE_FIELD      => 20; (% type, lhs, rhs %);
+NODE_FIELDREF   => 21; (% type, lhs, name %);
 
 (% indices %);
 STRING_RAW      => 2;
@@ -48,11 +49,12 @@ NODE_CHAR_T    => 1;
 NODE_INT_T     => 2;
 NODE_FLOAT_T   => 3;
 NODE_DOUBLE_T  => 4;
-NODE_POINTER_T => 5; (% element type %);
-NODE_ARRAY_T   => 6; (% element type, length, is_string %);
-NODE_TUPLE_T   => 7; (% length, element types  %);
-NODE_LAMBDA_T  => 8; (% param type, ret type %);
-NODE_TYVAR     => 9; (% type-variable id %);
+NODE_POINTER_T => 5;  (% element type %);
+NODE_ARRAY_T   => 6;  (% element type, length, is_string %);
+NODE_TUPLE_T   => 7;  (% length, element types  %);
+NODE_LAMBDA_T  => 8;  (% param type, ret type %);
+NODE_TYVAR     => 9;  (% type-variable id %);
+NODE_NAMED_T   => 10; (% fieldname, type %);
 
 POINTER_T_BASE    => 1;
 ARRAY_T_ELEMENT   => 1;
