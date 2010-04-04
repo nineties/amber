@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-04 13:29:59 nineties $
+ % $Id: tcodegen.rl 2010-04-04 21:26:46 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -202,7 +202,6 @@ transl_identifier: (p0, p1, p2) {
         x3 = NULL;
         while (x2 < x0) {
             x4 = get_at(x1, x2);
-            p0 = must_be_register_or_immediate(p0, &x4);
             x3 = ls_cons(x4, x3);
             x2 = x2 + 1;
         };
@@ -393,7 +392,18 @@ transl_simple_assign: (p0, p1, p2) {
     allocate(5);
     x0 = p1[3]; (% lhs %);
     x1 = p1[4]; (% rhs %);
-    p0 = transl_item(p0, x1, &x2);
+    p0 = transl_item(p0, x0, &x2);
+    p0 = transl_item(p0, x1, &x3);
+    assert(ls_length(x2) == ls_length(x3));
+    x4 = x2;
+    while (x3 != NULL) {
+        p0 = ls_cons(mkinst(INST_MOVL, ls_value(x3), ls_value(x4)), p0);
+        x4 = ls_next(x4);
+        x3 = ls_next(x3);
+    };
+    *p2 = x4;
+    return p0;
+    (%
     x3 = NULL;
     while (x2 != NULL) {
 	x4 = create_pseudo(1, LOCATION_ANY);
@@ -402,12 +412,15 @@ transl_simple_assign: (p0, p1, p2) {
 	x2 = ls_next(x2);
     };
     x3 = ls_reverse(x3);
-    set_operand(x0, x3);
+    if (x0[0] == NODE_IDENTIFIER) {
+        set_operand(x0, x3);
+    };
     *p2 = x3;
     return p0;
+    %);
 };
 
-transl_var_assign: (p0, p1, p2) {
+transl_arith_assign: (p0, p1, p2) {
     allocate(5);
     x0 = p1[3]; (% lhs %);
     x1 = p1[4]; (% rhs %);
@@ -488,16 +501,17 @@ transl_assign: (p0, p1, p2) {
         if (p1[2] == BINOP_NONE) {
             return transl_simple_assign(p0, p1, p2);
         };
-        return transl_var_assign(p0, p1, p2);
+        return transl_arith_assign(p0, p1, p2);
     };
     if (x0[0] == NODE_TUPLE) {
-        if (p1[2] != BINOP_NONE) {
-            fputs(stderr, "ERROR: invalid application of ");
-            fputs(stderr, binop_table[p1[2]]);
-            fputs(stderr, " to tuple\n");
-            exit(1);
-        };
+        assert(p1[2] == BINOP_NONE);
         return transl_tuple_assign(p0, p1, p2);
+    };
+    if (x0[0] == NODE_FIELDREF) {
+        if (p1[2] == BINOP_NONE) {
+            return transl_simple_assign(p0, p1, p2);
+        };
+        return transl_arith_assign(p0, p1, p2);
     };
     not_reachable();
 };
@@ -840,6 +854,9 @@ transl_fundecl: (p0) {
     allocate(7);
 
     reset_proc();
+    puts("> compiling '");
+    puts(get_ident_name(p0[2]));
+    puts("' ...\n");
 
     x0 = mangle(p0[1], get_ident_name(p0[2]));
     x1 = p0[3]; (% lambda %);
@@ -863,15 +880,11 @@ transl_fundecl: (p0) {
     x6 = mktup5(TCODE_FUNC, x0, x1[2], x6, FALSE);
 
     (% deadcode elimination %);
-    puts("> removing dead-instructions (");
-    puts(get_ident_name(p0[2]));
-    puts(") ...\n");
+    puts("> removing dead-instructions ...\n");
     eliminate_deadcode(x6);
 
     (% allocate registers %);
-    puts("> allocating registers (");
-    puts(get_ident_name(p0[2]));
-    puts(") ...\n");
+    puts("> allocating registers ...\n");
     regalloc(x6);
 
     return x6;
