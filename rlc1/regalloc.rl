@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: regalloc.rl 2010-04-04 00:54:51 nineties $
+ % $Id: regalloc.rl 2010-04-04 08:59:42 nineties $
  %);
 
 (% Register allocation %);
@@ -34,11 +34,13 @@ add_conflicts: (p0, p1) {
     while (p0 != NULL) {
         x1 = ls_value(p0);
         if (x0 != x1) {
+            (%
             puts("conflict: ");
             emit_opd(stdout, get_reg(x0), 32);
             puts(" <-> ");
             emit_opd(stdout, get_reg(x1), 32);
             putc('\n');
+            %);
             x2 = iset_add(vec_at(conflicts, x0), x1);
             vec_put(conflicts, x0, x2);
             x2 = iset_add(vec_at(conflicts, x1), x0);

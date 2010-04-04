@@ -2,13 +2,13 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: type.rl 2010-04-03 17:38:29 nineties $
+ % $Id: type.rl 2010-04-04 13:23:24 nineties $
  %);
 
 include(stddef, code);
 
 export(mktyvar, mktyscheme, rename_tyscheme);
-export(freevar, freevar_tyscheme);
+export(has_name, freevar, freevar_tyscheme);
 export(is_polymorphic_type);
 
 typeid : 0;
@@ -109,6 +109,11 @@ freevar_iter: (p0, p1) {
 (% p0: type scheme %);
 freevar_tyscheme: (p0) {
     return iset_subtract(freevar(p0[2]), p0[1]);
+};
+
+has_name: (p0, p1) {
+    if (p0[0] != NODE_NAMED_T) { return FALSE; };
+    return streq(p0[1], p1);
 };
 
 is_polymorphic_type: (p0) {

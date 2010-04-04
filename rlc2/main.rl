@@ -1,11 +1,9 @@
-x: (1, 2);
-
-plus: (a, b) { return a + b; };
-f: () { return plus; };
+f: () {
+    return (x:1, y:2);
+};
 
 export
 main: () {
-    g : f();
-    (a, b) : x;
-    syscall(1, g(a,b));
+    p : f();
+    syscall(1, p.x + p.y);
 };

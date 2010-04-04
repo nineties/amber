@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-04 02:06:57 nineties $
+ % $Id: typing.rl 2010-04-04 13:23:48 nineties $
  %);
 
 include(stddef, code);
@@ -91,7 +91,8 @@ not_implemented: (p0) {
 infer_funcs: [not_reachable, not_implemented, infer_integer, infer_string, not_implemented,
     infer_identifier, infer_array, infer_tuple, infer_code, infer_decl,
     infer_call, not_implemented, infer_lambda, infer_unexpr, infer_binexpr,
-    infer_assign, infer_export, infer_ret, infer_retval, infer_syscall
+    infer_assign, infer_export, infer_ret, infer_retval, infer_syscall, infer_field,
+    infer_fieldref
 ];
 
 void_type   : NULL;
@@ -438,6 +439,56 @@ infer_syscall: (p0) {
     return int_type;
 };
 
+(% fieldname : expression %);
+infer_field: (p0) {
+    allocate(3);
+    x0 = p0[2]; (% lhs %);
+    if (x0[0] != NODE_IDENTIFIER) {
+        fputs(stderr, "ERROR: invalid field name\n");
+        exit(1);
+    };
+    x1 = infer_item(p0[3]);
+    x2 = mktup3(NODE_NAMED_T, get_ident_name(x0), x1);
+    p0[1] = x2;
+    deref(p0);
+    return x2;
+};
+
+(% p0: type, p1: field name %);
+get_fieldtype: (p0, p1) {
+    allocate(4);
+    if (p0[0] != NODE_TUPLE_T) {
+        return NULL;
+    };
+    x0 = p0[TUPLE_T_LENGTH];
+    x1 = p0[TUPLE_T_ELEMENTS];
+    x2 = 0;
+    while (x2 < x0) {
+        x3 = x1[x2];
+        if (has_name(x3, p1)) {
+            return x3[2];
+        };
+        x2 = x2 + 1;
+    };
+    return NULL;
+};
+
+infer_fieldref: (p0) {
+    allocate(3);
+    x0 = infer_item(p0[2]); (% lhs %);
+    x1 = p0[3]; (% field name %);
+    x2 = get_fieldtype(x0, x1);
+    if (x2 == NULL) {
+        fputs(stderr, "ERROR: field '");
+        fputs(stderr, x1);
+        fputs(stderr, "' not found\n");
+        exit(1);
+    };
+    p0[1] = x2;
+    deref(p0);
+    return x2;
+};
+
 (% p0: item %);
 infer_item: (p0) {
     allocate(1);
@@ -573,7 +624,8 @@ type_mismatch: (p0, p1) {
 deref_funcs: [not_reachable, not_implemented, deref_integer, deref_string, deref_dontcare,
     deref_identifier, deref_array, deref_tuple, deref_code, deref_decl,
     deref_call, not_implemented, deref_lambda, deref_unexpr, deref_binexpr,
-    deref_assign, deref_export, deref_ret, deref_retval, deref_syscall
+    deref_assign, deref_export, deref_ret, deref_retval, deref_syscall, deref_field,
+    deref_fieldref
 ];
 
 (% p0: item %);
@@ -687,6 +739,16 @@ deref_syscall: (p0) {
     p0[1] = deref_type(p0[1]);
 };
 
+deref_field: (p0) {
+    deref(p0[3]);
+    p0[1] = deref_type(p0[1]);
+};
+
+deref_fieldref: (p0) {
+    deref(p0[2]); (% lhs %);
+    p0[1] = deref_type(p0[1]);
+};
+
 (% p0: type %);
 deref_type: (p0) {
     allocate(3);
@@ -714,6 +776,10 @@ deref_type: (p0) {
         x2 = closure(x1);
         map_add(tyvarmap, p0[1], x2);
         return x1
+    };
+    if (p0[0] == NODE_NAMED_T) {
+        p0[2] = deref_type(p0[2]);
+        return p0;
     };
     return p0;
 };
