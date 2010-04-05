@@ -10,5 +10,5 @@ main: () {
     p:f();
     p.x = 2;
     t.z = 1;
-    syscall(1, p.x + p.y.a + p.y.b + t.z);
+    syscall(1, p.x + p.y.a + p.y.b + t.z); (% 2 + 2 + 3 + 1 %)
 };
