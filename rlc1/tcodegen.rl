@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-05 14:13:37 nineties $
+ % $Id: tcodegen.rl 2010-04-05 14:25:21 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -11,8 +11,6 @@ include(stddef, code);
 export(tcodegen, mkinst);
 
 vtable: NULL; (% variable table. variable id to corresponding operand %);
-
-funtable: NULL; (% function name -> function declaration %);
 
 binop_table: ["", "+", "-", "*", "/", "%", "|", "^", "&", "<<", ">>", "==", "!=", "<", ">",
 "<=", ">=", "||", "&&"];
@@ -383,7 +381,7 @@ transl_binexpr: (p0, p1, p2) {
      %);
     p0 = transl_item_single(p0, p1[3], &x0);
     p0 = transl_item_single(p0, p1[4], &x1);
-    x2 = create_pseudo(1, LOCATION_ANY);
+    x2 = create_pseudo(1, LOCATION_REGISTER);
     *p2 = ls_singleton(x2);
     p0 = ls_cons(mkinst(INST_MOVL, x0, x2), p0);
     p0 = ls_cons(mkinst(bininst[p1[2]], x1, x2), p0);
@@ -405,21 +403,6 @@ transl_simple_assign: (p0, p1, p2) {
     };
     *p2 = x4;
     return p0;
-    (%
-    x3 = NULL;
-    while (x2 != NULL) {
-	x4 = create_pseudo(1, LOCATION_ANY);
-	x3 = ls_cons(x4, x3);
-	p0 = ls_cons(mkinst(INST_MOVL, ls_value(x2), x4), p0);
-	x2 = ls_next(x2);
-    };
-    x3 = ls_reverse(x3);
-    if (x0[0] == NODE_IDENTIFIER) {
-        set_operand(x0, x3);
-    };
-    *p2 = x3;
-    return p0;
-    %);
 };
 
 transl_arith_assign: (p0, p1, p2) {
@@ -981,18 +964,17 @@ transl_extitem: (p0) {
     return x0(p0);
 };
 
-(% p0: (program, funtable) %);
+(% p0: program %);
 tcodegen: (p0) {
     allocate(3);
 
     init_proc();
 
     vtable = mkvec(num_variable());
-    funtable = p0[1];
 
     topdecl = NULL;
 
-    x0 = p0[0][1];
+    x0 = p0[1];
     x1 = NULL;
     while (x0 != NULL) {
         x2 = transl_extitem(ls_value(x0));

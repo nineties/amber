@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-04 13:23:48 nineties $
+ % $Id: typing.rl 2010-04-05 14:21:50 nineties $
  %);
 
 include(stddef, code);
@@ -13,7 +13,6 @@ scopeid: 0;
 scopeid_stack: NULL; 
 
 varmap: NULL;   (% variable table. name -> (tyscheme, id) %);
-funtable: NULL; (% polymorphic function table. name -> types %);
 
 (% p0: (scopeid-id, name) %);
 varmap_hash: (p0) {
@@ -136,11 +135,9 @@ infer_identifier: (p0) {
     p0[4] = x1;
     p0[5] = x0[2];
 
-    x2 = map_find(funtable, p0[3]);
-    x2 = ls_cons(p0, x2);
-    map_add(funtable, p0[3], x2);
+    deref(p0);
 
-    return deref_type(x1[1]);
+    return p0[1];
 };
 
 infer_array: (p0) {
@@ -219,10 +216,7 @@ infer_decl_var: (p0, p1) {
     deref_pattern(p0);
     deref(p1);
 
-    if (is_polymorphic_type(x3)) {
-        map_add(funtable, p0[3], NULL);
-    };
-    return x3;
+    return p0[1];
 };
 
 (% p0: tuple pattern, p1: expr %);
@@ -232,7 +226,7 @@ infer_decl_tuple: (p0, p1) {
     unify(x0, infer_item(p1));
     deref_pattern(p0);
     deref(p1);
-    return x0;
+    return p0[1];
 };
 
 infer_pattern: (p0) {
@@ -251,7 +245,8 @@ infer_pattern: (p0) {
         p0[1] = x0;
         p0[3] = x1;
         p0[4] = x2;
-        return x0;
+        deref(p0);
+        return p0[1];
     };
     if (p0[0] == NODE_TUPLE) {
         x0 = p0[TUPLE_LENGTH];
@@ -289,7 +284,7 @@ infer_decl: (p0) {
     x0 = infer_decl_impl(p0[2], p0[3]);
     p0[1] = x0;
     deref(p0);
-    return x0;
+    return p0[1];
 };
 
 
@@ -303,7 +298,7 @@ infer_call: (p0) {
 
     p0[1] = x2;
     deref(p0);
-    return x2;
+    return p0[1];
 };
 
 (% insert missing return statement. p0: code block %);
@@ -451,7 +446,7 @@ infer_field: (p0) {
     x2 = mktup3(NODE_NAMED_T, get_ident_name(x0), x1);
     p0[1] = x2;
     deref(p0);
-    return x2;
+    return p0[1];
 };
 
 (% p0: type, p1: field name %);
@@ -486,7 +481,7 @@ infer_fieldref: (p0) {
     };
     p0[1] = x2;
     deref(p0);
-    return x2;
+    return p0[1];
 };
 
 (% p0: item %);
@@ -816,12 +811,11 @@ typing: (p0) {
 
     init_varmap();
     init_tyvarmap();
-    funtable = mkmap(&simple_hash, &simple_equal, 10);
 
     x0 = p0[1];
     while (x0 != NULL) {
         infer_item(ls_value(x0));
         x0 = ls_next(x0);
     };
-    return mktup2(p0, funtable);
+    return p0;
 };
