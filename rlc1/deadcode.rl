@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: deadcode.rl 2010-03-28 22:34:11 nineties $
+ % $Id: deadcode.rl 2010-04-05 13:02:06 nineties $
  %);
 
 include(stddef, code);
