@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: main.rl 2010-04-04 12:24:15 nineties $
+ % $Id: main.rl 2010-04-05 13:03:19 nineties $
  %);
 
 include(stddef, code);
@@ -88,5 +88,5 @@ main: (p0, p1) {
 	assemble(x2, x1);
         x0 = x0 + 1;
     };
-    exit(0);
+    return 0;
 };
