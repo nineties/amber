@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-05 12:05:19 nineties $
+ % $Id: tcodegen.rl 2010-04-05 14:13:37 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -83,6 +83,8 @@ get_operand_single: (p0) {
 mkinst: (p0, p1, p2) {
     return mktup6(TCODE_INST, p0, p1, p2, mkiset(), 0);
 };
+
+
 
 LABEL_BUF_SIZE => 128;
 labelbuf : char [LABEL_BUF_SIZE];
@@ -885,7 +887,7 @@ transl_fundecl: (p0) {
 
     (% allocate registers %);
     puts("> allocating registers ...\n");
-    (% regalloc(x6); %);
+    regalloc(x6);
 
     return x6;
 };
