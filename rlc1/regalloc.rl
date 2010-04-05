@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: regalloc.rl 2010-04-04 08:59:42 nineties $
+ % $Id: regalloc.rl 2010-04-05 15:54:46 nineties $
  %);
 
 (% Register allocation %);
@@ -204,6 +204,13 @@ move_cost: (p0) {
 is_memory_access: (p0) {
     if (p0[0] == OPD_STACK) { return TRUE; };
     if (p0[0] == OPD_ARG)   { return TRUE; };
+    if (p0[0] == OPD_AT) {
+        return is_memory_access(p0[2]);
+    };
+    if (p0[0] == OPD_LABEL) { return TRUE; };
+    if (p0[0] == OPD_PSEUDO) {
+        return p0[PSEUDO_TYPE] == LOCATION_MEMORY;
+    };
     return FALSE;
 };
 
@@ -248,11 +255,12 @@ select_best_equivreg: (p0) {
 
 select_location: (p0) {
     allocate(4);
+
+    x0 = vec_at(conflicts, p0[1]);
+
     if (p0[PSEUDO_TYPE] == LOCATION_MEMORY) {
 	goto &alloc_stackmem;
     };
-
-    x0 = vec_at(conflicts, p0[1]);
 
     (% try to allocate register from equivregs %);
     x1 = select_best_equivreg(p0);
@@ -405,11 +413,56 @@ allocate_stack_frame: (p0) {
             x0));
 };
 
+(% p0: instructions
+ % if two operands are both memory references, insert temporal register
+ % op a b => movl a t; op t b
+ %);
+
+(% p0: instruction %);
+need_temporal_register: (p0) {
+    if (p0[INST_OPERAND1] == NULL) { return FALSE; };
+    if (p0[INST_OPERAND2] == NULL) { return FALSE; };
+    if (is_memory_access(p0[INST_OPERAND1]) == FALSE) {
+        return FALSE;
+    };
+    if (is_memory_access(p0[INST_OPERAND2]) == FALSE) {
+        return FALSE;
+    };
+    return TRUE;
+};
+
+(% p0: program list, p1: instruction %);
+insert: (p0, p1) {
+    allocate(2);
+    if (need_temporal_register(p1)) {
+        x0 = create_pseudo(1, LOCATION_REGISTER);
+        p0 = ls_cons(mkinst(INST_MOVL, p1[INST_OPERAND1], x0), p0);
+        x2 = mkinst(p1[INST_OPCODE], x0, p1[INST_OPERAND2]);
+        x2[INST_ARG] = p1[INST_ARG];
+        p0 = ls_cons(x2, p0);
+        return p0;
+    };
+    return ls_cons(p1, p0);
+};
+
+insert_temporal_register: (p0) {
+    allocate(2);
+    x0 = p0;
+    x1 = NULL;
+    while (x0 != NULL) {
+        x1 = insert(x1, ls_value(x0));
+        x0 = ls_next(x0);
+    };
+    return ls_reverse(x1);
+};
+
 (% p0: TCODE_FUNC object %);
 regalloc: (p0) {
     allocate(1);
 
     (% liveness analysis %);
+    liveness(p0);
+    p0[3] = insert_temporal_register(p0[3]);
     liveness(p0);
 
     x0 = p0[3]; (% instructions %);

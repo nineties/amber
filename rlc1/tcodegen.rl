@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-05 14:25:21 nineties $
+ % $Id: tcodegen.rl 2010-04-05 15:51:20 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -381,7 +381,7 @@ transl_binexpr: (p0, p1, p2) {
      %);
     p0 = transl_item_single(p0, p1[3], &x0);
     p0 = transl_item_single(p0, p1[4], &x1);
-    x2 = create_pseudo(1, LOCATION_REGISTER);
+    x2 = create_pseudo(1, LOCATION_ANY);
     *p2 = ls_singleton(x2);
     p0 = ls_cons(mkinst(INST_MOVL, x0, x2), p0);
     p0 = ls_cons(mkinst(bininst[p1[2]], x1, x2), p0);

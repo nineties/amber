@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: asmgen.rl 2010-04-04 02:17:33 nineties $
+ % $Id: asmgen.rl 2010-04-05 15:42:43 nineties $
  %);
 
 include(stddef, code);
