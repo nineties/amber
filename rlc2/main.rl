@@ -1,12 +1,12 @@
 type test
     : A
-    | B
     ;
 
 export
 main: () {
     syscall(1, 0);
 };
+
 
 (%
 t: (x:1,y:2,z:3);

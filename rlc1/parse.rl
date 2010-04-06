@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: parse.rl 2010-04-04 12:52:18 nineties $
+ % $Id: parse.rl 2010-04-06 12:15:38 nineties $
  %);
 
 include(stddef, code, token);
@@ -25,7 +25,7 @@ expected: (p0) {
 };
 
 (% p0: character, p1: expected character %);
-eatchar: (p0, p1) {
+eat: (p0, p1) {
     if (p0 == p1) { return; };
     fputloc(stderr);
     fputs(stderr, ": ERROR: expected ");
@@ -68,7 +68,10 @@ parse_toplevel_item: (p0) {
     if (p0 == TOK_EXPORT) {
         return mktup2(NODE_EXPORT, parse_rewrite_expr(lex()));
     };
-    return parse_rewrite_expr(p0);
+    if (p0 == TOK_TYPE) {
+        return parse_typedecl_rhsdecl(p0);
+    };
+    parse_rewrite_expr(p0);
 };
 
 (% p0: first token %);
@@ -399,11 +402,8 @@ label post_loop;
         goto &post_loop;
     };
     if (x1 == '.') {
-        x1 = lex();
-        if (x1 != TOK_IDENT) {
-            expected("identifier");
-        };
-        x0 = mktup4(NODE_FIELDREF, NULL, x0, strdup(token_text()));
+        x1 = parse_identifier(lex());
+        x0 = mktup4(NODE_FIELDREF, NULL, x0, get_ident_name(x1));
         goto &post_loop;
     };
     unput();
@@ -414,7 +414,7 @@ label post_loop;
 parse_primary_item: (p0) {
     allocate(2);
     if (p0 == TOK_IDENT) {
-        return mktup6(NODE_IDENTIFIER, NULL, strdup(token_text()), 0, NULL, FALSE);
+        return parse_identifier(p0);
     };
     if (p0 == '(') { return parse_tuple(p0); };
     if (p0 == '[') { return parse_array(p0); };
@@ -436,6 +436,13 @@ parse_primary_item: (p0) {
         return mktup2(NODE_DONTCARE, NULL);
     };
     expected("item");
+};
+
+parse_identifier: (p0) {
+    if (p0 == TOK_IDENT) {
+        return mktup6(NODE_IDENTIFIER, NULL, strdup(token_text()), 0, NULL, FALSE);
+    };
+    expected("identifier");
 };
 
 (% p0: list of items %);
@@ -475,13 +482,13 @@ make_array_from_list: (p0) {
 (% p0: first token %);
 parse_tuple: (p0) {
     allocate(2);
-    eatchar(p0, '(');
+    eat(p0, '(');
     x0 = lex();
     if (x0 == ')') {
         return make_tuple_from_list(NULL);
     };
     x1 = parse_comma_list(x0);
-    eatchar(lex(), ')');
+    eat(lex(), ')');
     return make_tuple_from_list(x1);
 };
 
@@ -494,33 +501,33 @@ parse_comma_list: (p0) {
         return ls_cons(x0, parse_comma_list(lex()));
     } else {
         unput();
-        return ls_cons(x0, NULL);
+        return ls_singleton(x0);
     };
 };
 
 (% p0: first token %);
 parse_array: (p0) {
     allocate(2);
-    eatchar(p0, '[');
+    eat(p0, '[');
     x0 = lex();
     if (x0 == ']') {
         return make_array_from_list(NULL);
     };
     x1 = parse_comma_list(x0);
-    eatchar(lex(), ']');
+    eat(lex(), ']');
     return make_array_from_list(x1);
 };
 
 (% p0: first token %);
 parse_list: (p0) {
     allocate(2);
-    eatchar(p0, '{');
+    eat(p0, '{');
     x0 = lex();
     if (x0 == '}') {
         return mktup3(NODE_CODE, NULL, NULL);
     };
     x1 = parse_semi_list(x0);
-    eatchar(lex(), '}');
+    eat(lex(), '}');
     return mktup3(NODE_CODE, NULL, x1);
 };
 
@@ -542,7 +549,52 @@ parse_semi_list: (p0) {
     };
     if (x1 == '}') {
         unput();
-        return ls_cons(x0, NULL);
+        return ls_singleton(x0);
     };
     expected("';' or '}'");
+};
+
+(% p0: first token %);
+parse_typedecl_rhsdecl: (p0) {
+    allocate(1);
+    eat(p0, TOK_TYPE);
+    x0 = parse_identifier(lex());
+    eat(lex(), ':');
+    x1 = parse_typedecl_rhs(lex());
+    return mktup3(NODE_TYPEDECL, x0, x1);
+};
+
+(% p0: first token %);
+parse_typedecl_rhs: (p0) {
+    if (p0 == TOK_CHAR_T) { return char_type; };
+    if (p0 == TOK_INT_T)  { return int_type; };
+    if (p0 == TOK_IDENT) {
+        return parse_variant(p0);
+    };
+    assert(0);
+};
+
+parse_variant: (p0) {
+    allocate(1);
+    x0 = parse_variant_items(p0);
+    return mktup3(NODE_VARIANT_T, NULL, x0);
+};
+
+parse_variant_items: (p0) {
+    allocate(2);
+    x0 = parse_variant_item(p0);
+    x1 = lex();
+    if (x1 == '|') {
+        return ls_cons(x0, parse_variant_items(lex()));
+    } else {
+        unput();
+        return ls_singleton(x0);
+    };
+};
+
+parse_variant_item: (p0) {
+    allocate(1);
+    x0 = parse_identifier(p0);
+    (% temporal implementation %);
+    return mktup2(x0, void_type);
 };

@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-05 15:51:20 nineties $
+ % $Id: tcodegen.rl 2010-04-06 07:55:13 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -159,7 +159,7 @@ transl_funcs: [
     transl_identifier, not_implemented, transl_tuple, transl_code, transl_decl,
     transl_call, not_implemented, not_implemented, transl_unexpr, transl_binexpr,
     transl_assign, not_implemented, transl_ret, transl_retval, transl_syscall, transl_field,
-    transl_fieldref
+    transl_fieldref, not_reachable
 ];
 
 transl_integer: (p0, p1, p2) {
@@ -828,10 +828,11 @@ transl_item_single: (p0, p1, p2) {
 };
 
 transl_extfuncs: [
-    not_reachable, not_implemented, not_implemented, not_implemented, not_implemented,
-    not_implemented, not_implemented, not_implemented, not_implemented, transl_extdecl,
-    not_implemented, not_implemented, not_implemented, not_implemented, not_implemented,
-    not_implemented, transl_export, not_implemented, not_implemented
+    not_reachable, not_reachable, not_reachable, not_reachable, not_reachable,
+    not_reachable, not_reachable, not_reachable, not_reachable, transl_extdecl,
+    not_reachable, not_reachable, not_reachable, not_reachable, not_reachable,
+    not_reachable, transl_export, not_reachable, not_reachable, not_reachable,
+    not_reachable, not_reachable, transl_typedecl
 ];
 
 (% p0: item %);
@@ -956,6 +957,11 @@ transl_export: (p0) {
     fputs(stderr, "ERROR: invalid export directive\n");
     exit(1);
 };
+
+transl_typedecl: (p0) {
+    return NULL;
+};
+
 
 (% p0: item %);
 transl_extitem: (p0) {

@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: code.rl 2010-04-05 14:08:50 nineties $
+ % $Id: code.rl 2010-04-06 12:14:31 nineties $
  %);
 
 NODE_PROG       => 0;  (% item list %);
@@ -27,6 +27,7 @@ NODE_RETVAL     => 18; (% type, value %);
 NODE_SYSCALL    => 19; (% type, params %);
 NODE_FIELD      => 20; (% type, lhs, rhs %);
 NODE_FIELDREF   => 21; (% type, lhs, name %);
+NODE_TYPEDECL   => 22; (% identifier, tyscheme %);
 
 (% indices %);
 STRING_RAW      => 2;
@@ -55,6 +56,11 @@ NODE_TUPLE_T   => 7;  (% length, element types  %);
 NODE_LAMBDA_T  => 8;  (% param type, ret type %);
 NODE_TYVAR     => 9;  (% type-variable id %);
 NODE_NAMED_T   => 10; (% fieldname, type %);
+NODE_VARIANT_T => 11; (% name, rows %);
+
+(% structure of rows of variant
+ % (constructor, type)
+ %);
 
 POINTER_T_BASE    => 1;
 ARRAY_T_ELEMENT   => 1;
