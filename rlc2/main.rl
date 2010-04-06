@@ -1,11 +1,13 @@
 type test
     : A
-    | B
+    | B (int)
+    | C (char, int)
     ;
 
 export
 main: () {
-    syscall(1, B);
+    x : B(2);
+    syscall(1, A);
 };
 
 
