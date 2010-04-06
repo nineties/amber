@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-05 14:21:50 nineties $
+ % $Id: typing.rl 2010-04-06 13:50:24 nineties $
  %);
 
 include(stddef, code);
@@ -77,6 +77,9 @@ init_tyvarmap: () {
     tyvarmap = mkmap(&tyvarid_hash, &tyvarid_equal, 10);
 };
 
+(% constructor name -> (variant type, corresponding row) %);
+variant_map: NULL;
+
 not_reachable: (p0) {
     fputs(stderr, "ERROR: not reachable here\n");
     exit(1);
@@ -91,7 +94,7 @@ infer_funcs: [not_reachable, not_implemented, infer_integer, infer_string, not_i
     infer_identifier, infer_array, infer_tuple, infer_code, infer_decl,
     infer_call, not_implemented, infer_lambda, infer_unexpr, infer_binexpr,
     infer_assign, infer_export, infer_ret, infer_retval, infer_syscall, infer_field,
-    infer_fieldref
+    infer_fieldref, infer_typedecl, infer_variant, infer_void
 ];
 
 void_type   : NULL;
@@ -484,6 +487,47 @@ infer_fieldref: (p0) {
     return p0[1];
 };
 
+infer_typedecl: (p0) {
+    allocate(5);
+    x0 = p0[1]; (% identifier %);
+    x1 = p0[2]; (% type %);
+    if (x1[0] == NODE_VARIANT_T) {
+        x1[1] = x0;
+        x2 = x1[2]; (% rows %);
+        x3 = 0; (% constructor id %);
+
+        (% set constructor-id and register to variant_map %);
+        while (x2 != NULL) {
+            x4 = ls_value(x2); (% constructor name, id, arg %);
+            x4[1] = x3;
+            map_add(variant_map, x4[0], mktup2(x1, x4));
+            x2 = ls_next(x2);
+            x3 = x3 + 1;
+        };
+        return void_type;
+    };
+    not_implemented();
+    return void_type;
+};
+
+infer_variant: (p0) {
+    allocate(3);
+    x0 = p0[2]; (% constructor name %);
+    x1 = map_find(variant_map, x0); (% (type, (constructor name, id, arg type)) %);
+    assert(x1 != NULL);
+    p0[1] = x1[0];
+    p0[3] = x1[1][1]; (% id %);
+    x2 = infer_item(p0[4]); (% infer argument %);
+    unify(x2, x1[1][2]);
+    deref(p0);
+    return p0[1];
+};
+
+infer_void: (p0) {
+    p0[1] = void_type;
+    return void_type;
+};
+
 (% p0: item %);
 infer_item: (p0) {
     allocate(1);
@@ -620,7 +664,7 @@ deref_funcs: [not_reachable, not_implemented, deref_integer, deref_string, deref
     deref_identifier, deref_array, deref_tuple, deref_code, deref_decl,
     deref_call, not_implemented, deref_lambda, deref_unexpr, deref_binexpr,
     deref_assign, deref_export, deref_ret, deref_retval, deref_syscall, deref_field,
-    deref_fieldref
+    deref_fieldref, deref_typedecl, deref_variant, deref_void
 ];
 
 (% p0: item %);
@@ -744,6 +788,19 @@ deref_fieldref: (p0) {
     p0[1] = deref_type(p0[1]);
 };
 
+deref_typedecl: (p0) {
+    (% do nothing %);
+};
+
+deref_variant: (p0) {
+    deref(p0[4]);
+    p0[1] = deref_type(p0[1]);
+};
+
+deref_void: (p0) {
+    (% do nothing %);
+};
+
 (% p0: type %);
 deref_type: (p0) {
     allocate(3);
@@ -811,6 +868,7 @@ typing: (p0) {
 
     init_varmap();
     init_tyvarmap();
+    variant_map = mkmap(&strhash, &streq, 10);
 
     x0 = p0[1];
     while (x0 != NULL) {

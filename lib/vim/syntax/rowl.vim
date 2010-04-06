@@ -1,6 +1,6 @@
 " Language:	Rowl
 " Maintainer:	nineties <nineties48@gmail.com>
-" $Id: rowl.vim 2010-03-31 12:47:49 nineties $
+" $Id: rowl.vim 2010-04-06 01:42:13 nineties $
 
 if exists("b:current_syntax")
     finish
@@ -8,41 +8,38 @@ endif
 
 syn case match
 
-syn keyword rowlCommand   goto label return 
+syn keyword rowlCommand   goto label return type
 syn keyword rowlSymbol    if else syscall while
 syn keyword rowlExternal  include export
 syn keyword rowlType      char int float double
-syn match rowlIdentifier /\<\h\w*/
-syn match rowlInteger    /-\?\(0\o*\|[1-9]\d*\|0x\x\+\)\>/
-syn match rowlReal       /-\?\d*\.\d\+\>/
-syn match rowlEscape     /\\['"?\\abfnrtv0]/ contained
-syn match rowlCharacter  /'\(\\["?\\abfnrtv0]\|[^\\\n]\)'/ contains=rowlEscape
-syn match rowlString     /"\(\\['"?\\abfnrtv0]\|[^\\\"\n]\)*"/ contains=rowlEscape
+syn match rowlIdentifier  /\<\h\w*/
+syn match rowlInteger     /-\?\(0\o*\|[1-9]\d*\|0x\x\+\)\>/
+syn match rowlReal        /-\?\d*\.\d\+\>/
+syn match rowlEscape      /\\['"?\\abfnrtv0]/ contained
+syn match rowlCharacter   /'\(\\["?\\abfnrtv0]\|[^\\\n]\)'/ contains=rowlEscape
+syn match rowlString      /"\(\\['"?\\abfnrtv0]\|[^\\\"\n]\)*"/ contains=rowlEscape
 syn keyword rowlTodo TODO FIXME NOTE XXX contained
 syn region  rowlString start=/"/ skip=/\\"/ end=/"/
 syn region  rowlComment start=/(%/ end=/%)/ contains=rowlComment,rowlTodo
-syn region  rowlTuple start=/(/ end=/)/ contains=ALL
-syn region  rowlList  start=/{/ end=/}/ contains=ALL
-syn region  rowlArray start=/\[/ end=/\]/ contains=ALL
 
-syn match rowlDecl "\(\<\h\w*\s*\):" contains=rowlDeclOp
-syn match rowlDecl "\(\<\h\w*\s*\)=>" contains=rowlDeclOp
-syn match rowlDeclOp ":"
-syn match rowlDeclOp "=>"
+syn match rowlKeyOperator ":"
+syn match rowlKeyOperator "|"
+syn match rowlKeyOperator "=>"
+syn match rowlConstructor "\u\w*\>"
 
 hi def link rowlComment     Comment
 hi def link rowlCharacter   Character
 hi def link rowlEscape      SpecialChar
-hi def link rowlDeclOp      SpecialChar
+hi def link rowlKeyOperator Operator
 hi def link rowlString      String
 hi def link rowlInteger     Number
 hi def link rowlReal        Number
-hi def link rowlDecl        Keyword
 hi def link rowlCommand     Statement
 hi def link rowlSymbol      Statement
 hi def link rowlExternal    PreProc
 hi def link rowlType        Type
 hi def link rowlTodo        Keyword
+hi def link rowlConstructor Constant
 
 let b:current_syntax = "rowl"
 
