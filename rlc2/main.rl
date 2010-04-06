@@ -1,4 +1,11 @@
-exit: (status ! int) {
+export type test: int;
+export type hoge
+    : A
+    | B (int)
+    | C (int, int)
+    ;
+
+exit: (status! int) {
     syscall(1, status);
 };
 

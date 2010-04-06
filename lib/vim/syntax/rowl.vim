@@ -1,6 +1,6 @@
 " Language:	Rowl
 " Maintainer:	nineties <nineties48@gmail.com>
-" $Id: rowl.vim 2010-04-06 01:42:13 nineties $
+" $Id: rowl.vim 2010-04-07 01:16:47 nineties $
 
 if exists("b:current_syntax")
     finish
@@ -10,7 +10,7 @@ syn case match
 
 syn keyword rowlCommand   goto label return type
 syn keyword rowlSymbol    if else syscall while
-syn keyword rowlExternal  include export
+syn keyword rowlExternal  include export external
 syn keyword rowlType      char int float double
 syn match rowlIdentifier  /\<\h\w*/
 syn match rowlInteger     /-\?\(0\o*\|[1-9]\d*\|0x\x\+\)\>/
@@ -24,7 +24,10 @@ syn region  rowlComment start=/(%/ end=/%)/ contains=rowlComment,rowlTodo
 
 syn match rowlKeyOperator ":"
 syn match rowlKeyOperator "|"
+syn match rowlKeyOperator "->"
 syn match rowlKeyOperator "=>"
+syn match rowlKeyOperator "!"
+syn match rowlConstructor "(\s*)"
 syn match rowlConstructor "\u\w*\>"
 
 hi def link rowlComment     Comment

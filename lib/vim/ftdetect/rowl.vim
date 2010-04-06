@@ -1,1 +1,1 @@
-au BufRead,BufNewFile *.rl  set filetype=rowl
+au BufRead,BufNewFile *.rl,*.rli set filetype=rowl

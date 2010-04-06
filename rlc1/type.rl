@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: type.rl 2010-04-04 13:23:24 nineties $
+ % $Id: type.rl 2010-04-07 00:02:07 nineties $
  %);
 
 include(stddef, code);
@@ -118,7 +118,7 @@ has_name: (p0, p1) {
 
 is_polymorphic_type: (p0) {
     allocate(3);
-    if (p0[0] == NODE_VOID_T)   { return FALSE; };
+    if (p0[0] == NODE_UNIT_T)   { return FALSE; };
     if (p0[0] == NODE_CHAR_T)   { return FALSE; };
     if (p0[0] == NODE_INT_T)    { return FALSE; };
     if (p0[0] == NODE_FLOAT_T)  { return FALSE; };

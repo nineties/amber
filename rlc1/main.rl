@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: main.rl 2010-04-06 17:57:14 nineties $
+ % $Id: main.rl 2010-04-07 07:56:54 nineties $
  %);
 
 include(stddef, code);
@@ -23,25 +23,29 @@ change_suffix: (p0, p1) {
     return x2;
 };
 
-(% p0: asm filename, p1: rowl filename %);
-compile: (p0, p1) {
+(% p0: asm filename, p1: header filename, p2:rowl filename %);
+compile: (p0, p1, p2) {
     allocate(4);
 
     init_typing();
 
     puts("compile ");
-    puts(p1);
+    puts(p2);
     putc('\n');
 
     (% lex and parse %);
-    x0 = open_in(p1);
+    x0 = open_in(p2);
     puts("> parsing...\n");
-    x1 = parse(p1, x0);
+    x1 = parse(p2, x0);
     close_in(x0);
 
     (% type check %);
     puts("> typing...\n");
     x2 = typing(x1);
+
+    (% generate header file %);
+    puts("> generating header...\n");
+    headergen(p1, x2);
 
     (% translate to two address code %);
     puts("> translating to tcode...\n");
@@ -72,7 +76,7 @@ assemble: (p0, p1) {
 
 (% p0: argc, p1: argv %);
 main: (p0, p1) {
-    allocate(3);
+    allocate(4);
 
     progname = strdup(p1[0]);
 
@@ -80,11 +84,13 @@ main: (p0, p1) {
     while (x0 < p0) {
 	x1 = change_suffix(p1[x0], "s"); (% name of assembly source file %);
 	x2 = change_suffix(p1[x0], "o"); (% name of object file %);
+        x3 = change_suffix(p1[x0], "rli"); (% name of header file %);
 
 	unlink(x1);
 	unlink(x2);
+        unlink(x3);
 
-        compile(x1, p1[x0]);
+        compile(x1, x3, p1[x0]);
 	assemble(x2, x1);
         x0 = x0 + 1;
     };

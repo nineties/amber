@@ -2,12 +2,12 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-06 17:50:50 nineties $
+ % $Id: typing.rl 2010-04-07 07:31:35 nineties $
  %);
 
 include(stddef, code);
 
-export(init_typing, typing, void_type, char_type, int_type, float_type, double_type);
+export(init_typing, typing, unit_type, char_type, int_type, float_type, double_type);
 
 scopeid: 0;
 scopeid_stack: NULL; 
@@ -94,17 +94,17 @@ infer_funcs: [not_reachable, not_implemented, infer_integer, infer_string, not_i
     infer_identifier, infer_array, infer_tuple, infer_code, infer_decl,
     infer_call, not_implemented, infer_lambda, infer_unexpr, infer_binexpr,
     infer_assign, infer_export, infer_ret, infer_retval, infer_syscall, infer_field,
-    infer_fieldref, infer_typedecl, infer_variant, infer_void, infer_typedexpr
+    infer_fieldref, infer_typedecl, infer_variant, infer_unit, infer_typedexpr
 ];
 
-void_type   : NULL;
+unit_type   : NULL;
 char_type   : NULL;
 int_type    : NULL;
 float_type  : NULL;
 double_type : NULL;
 
 init_typing: () {
-    void_type   = mktup1(NODE_VOID_T);
+    unit_type   = mktup1(NODE_UNIT_T);
     char_type   = mktup1(NODE_CHAR_T);
     int_type    = mktup1(NODE_INT_T);
     float_type  = mktup1(NODE_FLOAT_T);
@@ -185,9 +185,9 @@ infer_code: (p0) {
         x0 = ls_next(x0);
     };
 
-    p0[1] = void_type; (% code block has no type %);
+    p0[1] = unit_type; (% code block has no type %);
     deref(p0);
-    return void_type;
+    return unit_type;
 };
 
 (% p0: dontcare pattern, p1: expr %);
@@ -207,12 +207,6 @@ infer_decl_var: (p0, p1) {
     unify(x0, x3);
     x4 = closure(x3);
     varmap_add(p0[2], mktup3(x4, x1, x2));
-    if (x3 == void_type) {
-	fputs(stderr, "ERROR: variable '");
-	fputs(stderr, get_ident_name(p0));
-	fputs(stderr, "' has void type\n");
-	exit(1);
-    };
     p0[1] = x3; (% type %);
     p0[3] = x1; (% variable id %);
     p0[4] = x4; (% type scheme %);
@@ -234,6 +228,10 @@ infer_decl_tuple: (p0, p1) {
 
 infer_pattern: (p0) {
     allocate(5);
+    if (p0[0] == NODE_UNIT) {
+        p0[1] = unit_type;
+        return unit_type;
+    };
     if (p0[0] == NODE_DONTCARE) {
         x0 = mktyvar();
         p0[1] = x0;
@@ -402,7 +400,7 @@ infer_assign: (p0) {
 infer_export: (p0) {
     infer_item(p0[1]);
     deref(p0);
-    return void_type;
+    return unit_type;
 };
 
 (% return; is treated as .pseudo_retvar = (); %);
@@ -414,10 +412,10 @@ infer_ret: (p0) {
         exit(1);
     };
     x1 = x0[0];
-    unify(void_type, x1[1]);
-    p0[1] = void_type;
+    unify(unit_type, x1[1]);
+    p0[1] = unit_type;
     deref(p0);
-    return void_type;
+    return unit_type;
 };
 
 (% return e; is treated as .pseudo_retvar = e; %);
@@ -433,13 +431,14 @@ infer_retval: (p0) {
 
     x2 = x1[0];
     unify(x2[1], x0);
-    p0[1] = void_type;
+    p0[1] = unit_type;
     deref(p0);
-    return void_type;
+    return unit_type;
 };
 
 infer_syscall: (p0) {
-    infer_item(p0[2]);
+    x0 = infer_item(p0[2]);
+
     p0[1] = int_type;
     deref(p0);
     return int_type;
@@ -512,10 +511,9 @@ infer_typedecl: (p0) {
             x2 = ls_next(x2);
             x3 = x3 + 1;
         };
-        return void_type;
+        return unit_type;
     };
-    not_implemented();
-    return void_type;
+    return unit_type;
 };
 
 infer_variant: (p0) {
@@ -531,9 +529,9 @@ infer_variant: (p0) {
     return p0[1];
 };
 
-infer_void: (p0) {
-    p0[1] = void_type;
-    return void_type;
+infer_unit: (p0) {
+    p0[1] = unit_type;
+    return unit_type;
 };
 
 infer_typedexpr: (p0) {
@@ -575,7 +573,7 @@ unify: (p0, p1) {
     if (p0[0] == NODE_TYVAR) { return unify_tyvar(p0, p1); };
     if (p1[0] == NODE_TYVAR) { return unify_tyvar(p1, p0); };
     if (p0[0] == p1[0]) {
-        if (p0[0] == NODE_VOID_T)     { return; };
+        if (p0[0] == NODE_UNIT_T)     { return; };
         if (p0[0] == NODE_CHAR_T)     { return; };
         if (p0[0] == NODE_INT_T)      { return; };
         if (p0[0] == NODE_FLOAT_T)    { return; };
@@ -589,7 +587,7 @@ unify: (p0, p1) {
             };
             return;
         };
-        if (p0[0] == NODE_LAMBDA_T) { return unify_function_t(p0, p1); };
+        if (p0[0] == NODE_LAMBDA_T) { return unify_lambda_t(p0, p1); };
     };
     type_mismatch(p0, p1);
 };
@@ -605,8 +603,8 @@ unify_tuple_t: (p0, p1) {
     };
 };
 
-unify_function_t: (p0, p1) {
-    unify_tuple_t(p0[1], p1[1]);
+unify_lambda_t: (p0, p1) {
+    unify(p0[1], p1[1]);
     unify(p0[2], p1[2]);
 };
 
@@ -638,7 +636,7 @@ occur_check: (p0, p1) {
     allocate(1);
     if (p1[0] == NODE_TUPLE_T)  { return occur_check_tuple_t(p0, p1); };
     if (p1[0] == NODE_ARRAY_T)  { return occur_check(p0, p1[1]); };
-    if (p1[0] == NODE_LAMBDA_T) { return occur_check_function_t(p0, p1); };
+    if (p1[0] == NODE_LAMBDA_T) { return occur_check_lambda_t(p0, p1); };
     if (p1[0] == NODE_TYVAR) {
         if (p0 == p1[1]) {
             fputs(stderr, "ERROR: infinite type\n");
@@ -648,6 +646,7 @@ occur_check: (p0, p1) {
         if (x0 == NULL) { return; };
         x0 = rename_tyscheme(x0);
         occur_check(p0, x0[1]);
+        return;
     };
 };
 
@@ -661,8 +660,8 @@ occur_check_tuple_t: (p0, p1) {
     };
 };
 
-occur_check_function_t: (p0, p1) {
-    occur_check_tuple_t(p0, p1[1]);
+occur_check_lambda_t: (p0, p1) {
+    occur_check(p0, p1[1]);
     occur_check(p0, p1[2]);
 };
 
@@ -680,7 +679,7 @@ deref_funcs: [not_reachable, not_implemented, deref_integer, deref_string, deref
     deref_identifier, deref_array, deref_tuple, deref_code, deref_decl,
     deref_call, not_implemented, deref_lambda, deref_unexpr, deref_binexpr,
     deref_assign, deref_export, deref_ret, deref_retval, deref_syscall, deref_field,
-    deref_fieldref, deref_typedecl, deref_variant, deref_void, deref_typedexpr
+    deref_fieldref, deref_typedecl, deref_variant, deref_unit, deref_typedexpr
 ];
 
 (% p0: item %);
@@ -813,7 +812,7 @@ deref_variant: (p0) {
     p0[1] = deref_type(p0[1]);
 };
 
-deref_void: (p0) {
+deref_unit: (p0) {
     (% do nothing %);
 };
 

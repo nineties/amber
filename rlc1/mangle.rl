@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: mangle.rl 2010-04-04 12:21:23 nineties $
+ % $Id: mangle.rl 2010-04-07 01:39:06 nineties $
  %);
 
 (% name mangling %);
@@ -75,7 +75,7 @@ put_nameint: (p0, p1) {
 (% p0: type %);
 gen_type_suffix: (p0) {
     allocate(3);
-    if (p0[0] == NODE_VOID_T) { return put_namechar('v'); };
+    if (p0[0] == NODE_UNIT_T) { return put_namechar('u'); };
     if (p0[0] == NODE_CHAR_T) { return put_namechar('c'); };
     if (p0[0] == NODE_INT_T)  { return put_namechar('i'); };
     if (p0[0] == NODE_FLOAT_T) { return put_namechar('f'); };
