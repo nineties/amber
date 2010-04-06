@@ -1,26 +1,9 @@
-type test
-    : A
-    | B (int)
-    | C (char, int)
-    ;
-
-export
-main: () {
-    x : B(2);
-    syscall(1, A + B(2));
-};
-
-
-(%
-t: (x:1,y:2,z:3);
-
-f: () {
-    return (x:1, y:(a:2, b:3));
+exit: (status ! int) {
+    syscall(1, status);
 };
 
 export
 main: () {
-    t.z = 1;
-    syscall(1, f().x + f().y.a + f().y.b + t.z); (% 1 + 2 + 3 + 1 %)
+    exit(0);
+    (% exit("Hello"); type error %);
 };
-%)

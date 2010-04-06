@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-03-25 01:14:02 nineties $
+# $Id: Makefile 2010-04-06 18:01:36 nineties $
 
 LD = ld
 LDFLAGS = --nostdlib --entry=main
