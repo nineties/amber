@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-06 14:19:09 nineties $
+ % $Id: tcodegen.rl 2010-04-06 18:00:17 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -24,6 +24,7 @@ is_global_identifier: (p0) {
 (% p0: type.  returns number of required register for the type %);
 type_size: (p0) {
     allocate(4);
+    if (p0[0] == NODE_VOID_T) { return 0; };
     if (p0[0] == NODE_CHAR_T) { return 1; };
     if (p0[0] == NODE_INT_T)  { return 1; };
     if (p0[0] == NODE_FLOAT_T) { return 1; };
@@ -55,6 +56,8 @@ type_size: (p0) {
 (% p0: identifier, p1: operand list %);
 set_operand: (p0, p1) {
     allocate(1);
+    assert(p0[0] == NODE_IDENTIFIER);
+
     x0 = p0[3]; (% identifier-id %);
     assert(x0 < vec_size(vtable));
     vec_put(vtable, x0, p1);
@@ -159,7 +162,7 @@ transl_funcs: [
     transl_identifier, not_implemented, transl_tuple, transl_code, transl_decl,
     transl_call, not_implemented, not_implemented, transl_unexpr, transl_binexpr,
     transl_assign, not_implemented, transl_ret, transl_retval, transl_syscall, transl_field,
-    transl_fieldref, not_reachable, transl_variant, transl_void
+    transl_fieldref, not_reachable, transl_variant, transl_void, transl_typedexpr
 ];
 
 transl_integer: (p0, p1, p2) {
@@ -826,6 +829,10 @@ transl_void: (p0, p1, p2) {
     return p0;
 };
 
+transl_typedexpr: (p0, p1, p2) {
+    return transl_item(p0, p1[1], p2);
+};
+
 (% p0: output tcode, p1: item, p2: pointer to store p1's value  %);
 transl_item: (p0, p1, p2) {
     allocate(1);
@@ -866,6 +873,11 @@ transl_fundecl: (p0) {
     x4 = x2[TUPLE_ELEMENTS];
     x5 = 0;
     while (x5 < x3) {
+        (% ad-hoc implementation for typed pattern :( %);
+        if (x4[x5][0] == NODE_TYPEDEXPR) {
+            x4[x5] = x4[x5][1];
+        };
+
         set_operand(x4[x5], ls_singleton(create_pseudo(1, LOCATION_ANY)));
         x5 = x5 + 1;
     };
