@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: parse.rl 2010-04-06 13:48:17 nineties $
+ % $Id: parse.rl 2010-04-06 14:17:12 nineties $
  %);
 
 include(stddef, code, token);
@@ -457,9 +457,6 @@ parse_identifier: (p0) {
 (% p0: list of items %);
 make_tuple_from_list: (p0) {
     allocate(3);
-    if (p0 == NULL) {
-        return mktup5(NODE_TUPLE, NULL, 0, NULL);
-    };
     x1 = ls_length(p0);
     x0 = memalloc(x1 * 4);
     x2 = 0;
@@ -468,15 +465,12 @@ make_tuple_from_list: (p0) {
         x2 = x2 + 1;
         p0 = ls_next(p0);
     };
-    return mktup5(NODE_TUPLE, NULL, x1, x0);
+    return mktup4(NODE_TUPLE, NULL, x1, x0);
 };
 
 (% p0: list of items %);
 make_array_from_list: (p0) {
     allocate(3);
-    if (p0 == NULL) {
-        return mktup5(NODE_ARRAY, NULL, 0, NULL);
-    };
     x1 = ls_length(p0);
     x0 = memalloc(x1 * 4);
     x2 = 0;
@@ -485,7 +479,7 @@ make_array_from_list: (p0) {
         x2 = x2 + 1;
         p0 = ls_next(p0);
     };
-    return mktup5(NODE_ARRAY, NULL, x1, x0);
+    return mktup4(NODE_ARRAY, NULL, x1, x0);
 };
 
 (% p0: first token %);
@@ -575,12 +569,10 @@ parse_typedecl_rhsdecl: (p0) {
 
 (% p0: first token %);
 parse_typedecl_rhs: (p0) {
-    if (p0 == TOK_CHAR_T) { return char_type; };
-    if (p0 == TOK_INT_T)  { return int_type; };
     if (p0 == TOK_IDENT) {
         return parse_variant(p0);
     };
-    assert(0);
+    return parse_type(p0);
 };
 
 parse_variant: (p0) {
@@ -602,9 +594,55 @@ parse_variant_items: (p0) {
 };
 
 parse_variant_item: (p0) {
-    allocate(1);
+    allocate(2);
     x0 = get_ident_name(parse_identifier(p0));
     add_constr(x0);
-
+    x1 = lex();
+    if (x1 == '(') {
+        return mktup3(x0, 0, parse_tuple_type(x1));
+    };
+    unput();
     return mktup3(x0, 0, void_type);
+};
+
+parse_type: (p0) {
+    if (p0 == TOK_CHAR_T) { return char_type; };
+    if (p0 == TOK_INT_T) { return int_type; };
+    if (p0 == '(') {
+        return parse_tuple_type(p0);
+    };
+    assert(0);
+};
+
+parse_tuple_type: (p0) {
+    allocate(1);
+    eat(p0, '(');
+    x0 = parse_type_list(lex());
+    eat(lex(), ')');
+    return make_tuple_t_from_list(x0);
+};
+
+parse_type_list: (p0) {
+    allocate(2);
+    x0 = parse_type(p0);
+    x1 = lex();
+    if (x1 == ',') {
+        return ls_cons(x0, parse_type_list(lex()));
+    } else {
+        unput();
+        return ls_singleton(x0);
+    };
+};
+
+make_tuple_t_from_list: (p0) {
+    allocate(3);
+    x0 = ls_length(p0);
+    x1 = memalloc(x0 * 4);
+    x2 = 0;
+    while (p0 != NULL) {
+        x1[x2] = ls_value(p0);
+        x2 = x2 + 1;
+        p0 = ls_next(p0);
+    };
+    return mktup3(NODE_TUPLE_T, x0, x1);
 };
