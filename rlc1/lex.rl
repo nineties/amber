@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: lex.rl 2010-04-06 16:25:58 nineties $
+ % $Id: lex.rl 2010-04-07 01:49:16 nineties $
  %);
 
 include(stddef, code);
@@ -618,4 +618,5 @@ operator_init: () {
     map_add(operator_map, "||", TOK_SEQOR);
     map_add(operator_map, "++", TOK_INCR);
     map_add(operator_map, "--", TOK_DECR);
+    map_add(operator_map, "->", TOK_ARROW);
 };

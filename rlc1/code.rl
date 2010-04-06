@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: code.rl 2010-04-06 17:51:43 nineties $
+ % $Id: code.rl 2010-04-07 07:37:57 nineties $
  %);
 
 NODE_PROG       => 0;  (% item list %);
@@ -29,7 +29,7 @@ NODE_FIELD      => 20; (% type, lhs, rhs %);
 NODE_FIELDREF   => 21; (% type, lhs, name %);
 NODE_TYPEDECL   => 22; (% name, type %);
 NODE_VARIANT    => 23; (% type, constructor name, id, arg %);
-NODE_VOID       => 24; (% type %);
+NODE_UNIT       => 24; (% type, 0, NULL %);
 NODE_TYPEDEXPR  => 25; (% expr, type %);
 
 (% indices %);
@@ -48,7 +48,7 @@ CALL_ARG        => 3;
 RETVAL_VALUE    => 2;
 
 (% types %);
-NODE_VOID_T    => 0;
+NODE_UNIT_T    => 0;
 NODE_CHAR_T    => 1;
 NODE_INT_T     => 2;
 NODE_FLOAT_T   => 3;

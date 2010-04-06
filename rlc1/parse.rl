@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: parse.rl 2010-04-06 18:05:37 nineties $
+ % $Id: parse.rl 2010-04-07 07:34:12 nineties $
  %);
 
 include(stddef, code, token);
@@ -78,16 +78,20 @@ parse_toplevel_items: (p0) {
 (% p0: first token %);
 parse_toplevel_item: (p0) {
     if (p0 == TOK_EXPORT) {
-        return mktup2(NODE_EXPORT, parse_rewrite_expr(lex()));
+        return mktup2(NODE_EXPORT, parse_typedecl_expr(lex()));
     };
-    if (p0 == TOK_TYPE) {
-        return parse_typedecl_rhsdecl(p0);
-    };
-    parse_rewrite_expr(p0);
+    parse_typedecl_expr(p0);
 };
 
 (% p0: first token %);
 parse_item: (p0) {
+    return parse_rewrite_expr(p0);
+};
+
+parse_typedecl_expr: (p0) {
+    if (p0 == TOK_TYPE) {
+        return parse_typedecl_body(p0);
+    };
     return parse_rewrite_expr(p0);
 };
 
@@ -464,7 +468,7 @@ parse_primary_item: (p0) {
             return mktup5(NODE_VARIANT, NULL, x0, 0, parse_tuple(x1));
         };
         unput();
-        return mktup5(NODE_VARIANT, NULL, x0, 0, mktup2(NODE_VOID, void_type));
+        return mktup5(NODE_VARIANT, NULL, x0, 0, mktup4(NODE_UNIT, unit_type, 0, NULL));
     };
     expected("item");
 };
@@ -480,6 +484,9 @@ parse_identifier: (p0) {
 make_tuple_from_list: (p0) {
     allocate(3);
     x1 = ls_length(p0);
+    if (x1 == 0) {
+        return mktup4(NODE_UNIT, unit_type, 0, NULL);
+    };
     x0 = memalloc(x1 * 4);
     x2 = 0;
     while (p0 != NULL) {
@@ -569,7 +576,7 @@ parse_semi_list: (p0) {
     };
     if (x0 == ';') {
         (% empty expression %);
-        return ls_cons(mktup2(NODE_VOID, void_type), parse_semi_list(lex()));
+        return ls_cons(mktup2(NODE_UNIT, unit_type, 0, NULL), parse_semi_list(lex()));
     };
     x0 = parse_item(p0);
     x1 = lex();
@@ -584,7 +591,7 @@ parse_semi_list: (p0) {
 };
 
 (% p0: first token %);
-parse_typedecl_rhsdecl: (p0) {
+parse_typedecl_body: (p0) {
     allocate(2);
     eattoken(p0, TOK_TYPE, "type");
     x0 = parse_identifier(lex());
@@ -628,10 +635,21 @@ parse_variant_item: (p0) {
         return mktup3(x0, 0, parse_tuple_type(x1));
     };
     unput();
-    return mktup3(x0, 0, void_type);
+    return mktup3(x0, 0, unit_type);
 };
 
 parse_type: (p0) {
+    allocate(2);
+    x0 = parse_primary_type(p0);
+    x1 = lex();
+    if (x1 == TOK_ARROW) {
+        return mktup3(NODE_LAMBDA_T, x0, parse_type(lex()));
+    };
+    unput();
+    return x0;
+};
+
+parse_primary_type: (p0) {
     if (p0 == TOK_CHAR_T) { return char_type; };
     if (p0 == TOK_INT_T) { return int_type; };
     if (p0 == '(') {
@@ -663,6 +681,9 @@ parse_type_list: (p0) {
 make_tuple_t_from_list: (p0) {
     allocate(3);
     x0 = ls_length(p0);
+    if (x0 == 0) {
+        return unit_type;
+    };
     x1 = memalloc(x0 * 4);
     x2 = 0;
     while (p0 != NULL) {
