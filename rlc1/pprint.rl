@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: pprint.rl 2010-04-04 12:15:29 nineties $
+ % $Id: pprint.rl 2010-04-06 14:22:43 nineties $
  %);
 
 include(stddef,code);
@@ -252,7 +252,7 @@ put_retval: (p0, p1) {
 };
 
 pptype_funcs: [ put_void_t, put_char_t, put_int_t, put_float_t, put_double_t, put_pointer_t,
-    put_array_t, put_tuple_t, put_function_t, put_tyvar, put_namedty];
+    put_array_t, put_tuple_t, put_function_t, put_tyvar, put_namedty, put_variant_t];
 
 put_type: (p0, p1) {
     allocate(1);
@@ -327,6 +327,10 @@ put_namedty: (p0, p1) {
     fputs(p0, p1[1]);
     fputs(p0, ">");
     put_type(p0, p1[2]);
+};
+
+put_variant_t: (p0, p1) {
+    fputs(p0, p1[1]);
 };
 
 put_tyscheme: (p0, p1) {
