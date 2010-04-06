@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: parse.rl 2010-04-06 12:15:38 nineties $
+ % $Id: parse.rl 2010-04-06 13:48:17 nineties $
  %);
 
 include(stddef, code, token);
@@ -435,6 +435,15 @@ parse_primary_item: (p0) {
     if (p0 == '_') {
         return mktup2(NODE_DONTCARE, NULL);
     };
+    if (p0 == TOK_CONSTR) {
+        x0 = strdup(token_text());
+        x1 = lex();
+        if (x1 == '(') {
+            return mktup5(NODE_VARIANT, NULL, x0, 0, parse_tuple(x1));
+        };
+        unput();
+        return mktup5(NODE_VARIANT, NULL, x0, 0, mktup2(NODE_VOID, void_type));
+    };
     expected("item");
 };
 
@@ -556,12 +565,12 @@ parse_semi_list: (p0) {
 
 (% p0: first token %);
 parse_typedecl_rhsdecl: (p0) {
-    allocate(1);
+    allocate(2);
     eat(p0, TOK_TYPE);
     x0 = parse_identifier(lex());
     eat(lex(), ':');
     x1 = parse_typedecl_rhs(lex());
-    return mktup3(NODE_TYPEDECL, x0, x1);
+    return mktup3(NODE_TYPEDECL, get_ident_name(x0), x1);
 };
 
 (% p0: first token %);
@@ -594,7 +603,8 @@ parse_variant_items: (p0) {
 
 parse_variant_item: (p0) {
     allocate(1);
-    x0 = parse_identifier(p0);
-    (% temporal implementation %);
-    return mktup2(x0, void_type);
+    x0 = get_ident_name(parse_identifier(p0));
+    add_constr(x0);
+
+    return mktup3(x0, 0, void_type);
 };

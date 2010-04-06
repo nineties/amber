@@ -2,11 +2,18 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: lex.rl 2010-04-06 01:59:14 nineties $
+ % $Id: lex.rl 2010-04-06 12:36:34 nineties $
  %);
 
 include(stddef, code);
 include(token);
+
+export(lexer_init);
+export(fputloc);
+export(token_text, token_len, token_val);
+export(lex, unput);
+export(add_constr);
+
 
 (%
  % regular expressions:
@@ -187,11 +194,6 @@ s16next: [
  e5, e1, e5, e5,s15, e5, e5,s15,s15, e5, e5, e5,s15,s15,s15, e5,s15, e5, e5, e5, e5
 ];
 
-export(lexer_init);
-export(fputloc);
-export(token_text, token_len, token_val);
-export(lex, unput);
-
 srcfile  : NULL;
 srcline  : 1;
 srcclmn  : 1;
@@ -228,6 +230,7 @@ lexer_init: (p0, p1) {
 
     keyword_init();
     operator_init();
+    constr_set = mkset(&strhash, &streq, 10);
 };
 
 token_text: () {
@@ -324,6 +327,10 @@ accept_ident: () {
     x0 = map_find(operator_map, token_text());
     if (x0 != 0) {
         accept(x0);
+        return;
+    };
+    if (set_contains(constr_set, token_text())) {
+        accept(TOK_CONSTR);
         return;
     };
     accept(TOK_IDENT);
@@ -536,6 +543,7 @@ label e8;
 };
 
 keyword_map : NULL;
+constr_set  : NULL;
 
 strhash: (p0) {
     allocate(1);
@@ -545,6 +553,17 @@ strhash: (p0) {
         p0 = p0 + 1;
     };
     return x0;
+};
+
+(% p0: name %);
+add_constr: (p0) {
+    if (set_contains(constr_set, p0)) {
+        fputs(stderr, "ERROR: duplicated declaration of constructor '");
+        fputs(stderr, p0);
+        fputs(stderr, "'\n");
+        exit(1);
+    };
+    set_add(constr_set, p0);
 };
 
 keyword_init: () {

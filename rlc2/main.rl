@@ -1,10 +1,11 @@
 type test
     : A
+    | B
     ;
 
 export
 main: () {
-    syscall(1, 0);
+    syscall(1, B);
 };
 
 
