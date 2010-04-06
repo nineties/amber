@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: lex.rl 2010-04-06 01:42:27 nineties $
+ % $Id: lex.rl 2010-04-06 01:59:14 nineties $
  %);
 
 include(stddef, code);
@@ -552,10 +552,11 @@ keyword_init: () {
     map_add(keyword_map, "export", TOK_EXPORT);
     map_add(keyword_map, "return", TOK_RETURN);
     map_add(keyword_map, "syscall", TOK_SYSCALL);
-    map_add(keyword_map, "char", TOK_CHAR);
-    map_add(keyword_map, "int", TOK_INT);
-    map_add(keyword_map, "float", TOK_FLOAT);
-    map_add(keyword_map, "double", TOK_DOUBLE);
+    map_add(keyword_map, "char", TOK_CHAR_T);
+    map_add(keyword_map, "int", TOK_INT_T);
+    map_add(keyword_map, "float", TOK_FLOAT_T);
+    map_add(keyword_map, "double", TOK_DOUBLE_T);
+    map_add(keyword_map, "type", TOK_TYPE);
 };
 
 operator_map : NULL;
