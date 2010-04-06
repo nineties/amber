@@ -7,7 +7,7 @@ type test
 export
 main: () {
     x : B(2);
-    syscall(1, A);
+    syscall(1, A + B(2));
 };
 
 
