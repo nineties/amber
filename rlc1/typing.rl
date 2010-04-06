@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-06 13:50:24 nineties $
+ % $Id: typing.rl 2010-04-06 17:50:50 nineties $
  %);
 
 include(stddef, code);
@@ -94,7 +94,7 @@ infer_funcs: [not_reachable, not_implemented, infer_integer, infer_string, not_i
     infer_identifier, infer_array, infer_tuple, infer_code, infer_decl,
     infer_call, not_implemented, infer_lambda, infer_unexpr, infer_binexpr,
     infer_assign, infer_export, infer_ret, infer_retval, infer_syscall, infer_field,
-    infer_fieldref, infer_typedecl, infer_variant, infer_void
+    infer_fieldref, infer_typedecl, infer_variant, infer_void, infer_typedexpr
 ];
 
 void_type   : NULL;
@@ -252,6 +252,7 @@ infer_pattern: (p0) {
         return p0[1];
     };
     if (p0[0] == NODE_TUPLE) {
+        (% tuple pattern %);
         x0 = p0[TUPLE_LENGTH];
         x1 = p0[TUPLE_ELEMENTS];
         x2 = memalloc(4*x0); (% element types %);
@@ -263,6 +264,13 @@ infer_pattern: (p0) {
         };
         p0[1] = mktup3(NODE_TUPLE_T, x0, x2);
         return p0[1];
+    };
+    if (p0[0] == NODE_TYPEDEXPR) {
+        (% typed pattern %);
+        x0 = infer_pattern(p0[1]);
+        unify(x0, p0[2]);
+        deref(p0);
+        return p0[2];
     };
     fputs(stderr, "ERROR: invalid pattern expression\n");
     exit(1);
@@ -528,6 +536,14 @@ infer_void: (p0) {
     return void_type;
 };
 
+infer_typedexpr: (p0) {
+    allocate(1);
+    x0 = infer_item(p0[1]); (% expression %);
+    unify(x0, p0[2]);
+    deref(p0);
+    return p0[2];
+};
+
 (% p0: item %);
 infer_item: (p0) {
     allocate(1);
@@ -664,7 +680,7 @@ deref_funcs: [not_reachable, not_implemented, deref_integer, deref_string, deref
     deref_identifier, deref_array, deref_tuple, deref_code, deref_decl,
     deref_call, not_implemented, deref_lambda, deref_unexpr, deref_binexpr,
     deref_assign, deref_export, deref_ret, deref_retval, deref_syscall, deref_field,
-    deref_fieldref, deref_typedecl, deref_variant, deref_void
+    deref_fieldref, deref_typedecl, deref_variant, deref_void, deref_typedexpr
 ];
 
 (% p0: item %);
@@ -799,6 +815,11 @@ deref_variant: (p0) {
 
 deref_void: (p0) {
     (% do nothing %);
+};
+
+deref_typedexpr: (p0) {
+    deref(p0[1]);
+    p0[2] = deref_type(p0[2]);
 };
 
 (% p0: type %);

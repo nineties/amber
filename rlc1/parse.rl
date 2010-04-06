@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: parse.rl 2010-04-06 14:17:12 nineties $
+ % $Id: parse.rl 2010-04-06 18:05:37 nineties $
  %);
 
 include(stddef, code, token);
@@ -25,12 +25,24 @@ expected: (p0) {
 };
 
 (% p0: character, p1: expected character %);
-eat: (p0, p1) {
+eatchar: (p0, p1) {
     if (p0 == p1) { return; };
     fputloc(stderr);
     fputs(stderr, ": ERROR: expected ");
     fputc(stderr, ''');
     fputc(stderr, p1);
+    fputc(stderr, ''');
+    fputc(stderr, '\n');
+    exit(1);
+};
+
+(% p0: token type, p1: expected token type, p2: token name %);
+eattoken: (p0, p1, p2) {
+    if (p0 == p1) { return; };
+    fputloc(stderr);
+    fputs(stderr, ": ERROR: expected ");
+    fputc(stderr, ''');
+    fputs(stderr, p2);
     fputc(stderr, ''');
     fputc(stderr, '\n');
     exit(1);
@@ -112,18 +124,29 @@ parse_command_expr: (p0) {
             unput();
             return mktup2(NODE_RET, NULL);
         };
-        return mktup3(NODE_RETVAL, NULL, parse_assignment_expr(x0));
+        return mktup3(NODE_RETVAL, NULL, parse_typed_expr(x0));
     };
-    return parse_assignment_expr(p0);
+    return parse_typed_expr(p0);
 };
 
 (% p0: first token %);
 parse_field_expr: (p0) {
     allocate(2);
-    x0 = parse_assignment_expr(p0);
+    x0 = parse_typed_expr(p0);
     x1 = lex();
     if (x1 == ':') {
-        return mktup4(NODE_FIELD, NULL, x0, parse_assignment_expr(lex()));
+        return mktup4(NODE_FIELD, NULL, x0, parse_typed_expr(lex()));
+    };
+    unput();
+    return x0;
+};
+
+parse_typed_expr: (p0) {
+    allocate(2);
+    x0 = parse_assignment_expr(p0);
+    x1 = lex();
+    if (x1 == '!') {
+        return mktup3(NODE_TYPEDEXPR, x0, parse_type(lex()));
     };
     unput();
     return x0;
@@ -420,8 +443,7 @@ parse_primary_item: (p0) {
     if (p0 == '[') { return parse_array(p0); };
     if (p0 == '{') { return parse_list(p0); };
     if (p0 == TOK_CHAR) {
-        (% character constant is treated as a 32-bit integer %);
-        return mktup4(NODE_INTEGER, NULL, 32, token_val());
+        return mktup4(NODE_INTEGER, NULL, 8, token_val());
     };
     if (p0 == TOK_INT) {
         return mktup4(NODE_INTEGER, NULL, 32, token_val());
@@ -485,13 +507,13 @@ make_array_from_list: (p0) {
 (% p0: first token %);
 parse_tuple: (p0) {
     allocate(2);
-    eat(p0, '(');
+    eatchar(p0, '(');
     x0 = lex();
     if (x0 == ')') {
         return make_tuple_from_list(NULL);
     };
     x1 = parse_comma_list(x0);
-    eat(lex(), ')');
+    eatchar(lex(), ')');
     return make_tuple_from_list(x1);
 };
 
@@ -511,26 +533,26 @@ parse_comma_list: (p0) {
 (% p0: first token %);
 parse_array: (p0) {
     allocate(2);
-    eat(p0, '[');
+    eatchar(p0, '[');
     x0 = lex();
     if (x0 == ']') {
         return make_array_from_list(NULL);
     };
     x1 = parse_comma_list(x0);
-    eat(lex(), ']');
+    eatchar(lex(), ']');
     return make_array_from_list(x1);
 };
 
 (% p0: first token %);
 parse_list: (p0) {
     allocate(2);
-    eat(p0, '{');
+    eatchar(p0, '{');
     x0 = lex();
     if (x0 == '}') {
         return mktup3(NODE_CODE, NULL, NULL);
     };
     x1 = parse_semi_list(x0);
-    eat(lex(), '}');
+    eatchar(lex(), '}');
     return mktup3(NODE_CODE, NULL, x1);
 };
 
@@ -544,6 +566,10 @@ parse_semi_list: (p0) {
     if (p0 == TOK_END) {
         unput();
         return NULL;
+    };
+    if (x0 == ';') {
+        (% empty expression %);
+        return ls_cons(mktup2(NODE_VOID, void_type), parse_semi_list(lex()));
     };
     x0 = parse_item(p0);
     x1 = lex();
@@ -560,9 +586,9 @@ parse_semi_list: (p0) {
 (% p0: first token %);
 parse_typedecl_rhsdecl: (p0) {
     allocate(2);
-    eat(p0, TOK_TYPE);
+    eattoken(p0, TOK_TYPE, "type");
     x0 = parse_identifier(lex());
-    eat(lex(), ':');
+    eatchar(lex(), ':');
     x1 = parse_typedecl_rhs(lex());
     return mktup3(NODE_TYPEDECL, get_ident_name(x0), x1);
 };
@@ -616,9 +642,9 @@ parse_type: (p0) {
 
 parse_tuple_type: (p0) {
     allocate(1);
-    eat(p0, '(');
+    eatchar(p0, '(');
     x0 = parse_type_list(lex());
-    eat(lex(), ')');
+    eatchar(lex(), ')');
     return make_tuple_t_from_list(x0);
 };
 
