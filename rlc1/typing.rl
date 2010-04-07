@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-07 17:21:38 nineties $
+ % $Id: typing.rl 2010-04-07 19:35:51 nineties $
  %);
 
 include(stddef, code);
@@ -95,7 +95,7 @@ infer_funcs: [not_reachable, not_implemented, infer_integer, infer_string, not_i
     infer_call, not_implemented, infer_lambda, infer_unexpr, infer_binexpr,
     infer_assign, infer_export, infer_import, infer_external, infer_ret, infer_retval,
     infer_syscall, infer_field, infer_fieldref, infer_typedecl, infer_variant, infer_unit,
-    infer_typedexpr, infer_if, infer_else
+    infer_typedexpr, infer_if, infer_ifelse
 ];
 
 unit_type   : NULL;
@@ -337,8 +337,20 @@ infer_call: (p0) {
     return p0[1];
 };
 
+insert_missing_ret: (p0) {
+    allocate(1);
+    if (p0 == NULL) {
+        return ls_singleton(mktup2(NODE_RET, unit_type));
+    };
+    x0 = ls_value(p0);
+    if (x0[0] == NODE_RET)    { return p0; };
+    if (x0[0] == NODE_RETVAL) { return p0; };
+    if (x0[1] == void_type)   { return p0; };
+    return ls_cons(x0, insert_missing_ret(ls_next(p0)));
+};
+
 infer_lambda: (p0) {
-    allocate(2);
+    allocate(3);
 
     (% lambda opens new namespace %);
     varmap_push();
@@ -348,6 +360,11 @@ infer_lambda: (p0) {
     varmap_pop();
 
     p0[1] = mktup3(NODE_LAMBDA_T, x0, x1);
+
+    if (p0[1] != void_type) {
+        x2 = p0[LAMBDA_BODY];
+        x2[2] = insert_missing_ret(x2[2]);
+    };
 
     deref(p0);
     return p0[1];
@@ -375,8 +392,8 @@ infer_unexpr: (p0) {
 binexpr_funcs: [
     not_reachable, infer_binarith, infer_binarith, infer_binarith, infer_binarith,
     infer_binarith, infer_binarith, infer_binarith, infer_binarith, infer_binarith,
-    infer_binarith, infer_binarith, infer_binarith, infer_binarith, infer_binarith,
-    not_implemented, not_implemented, not_implemented, not_implemented
+    infer_binarith, infer_equality, infer_equality, infer_binarith, infer_binarith,
+    infer_binarith, infer_binarith, not_implemented, not_implemented
 ];
 
 infer_binarith: (p0) {
@@ -386,6 +403,16 @@ infer_binarith: (p0) {
     unify(int_type, x0);
     unify(int_type, x1);
     p0[1] = int_type;
+    deref(p0);
+    return int_type;
+};
+
+infer_equality: (p0) {
+    x0 = infer_item(p0[3]);
+    x1 = infer_item(p0[4]);
+    unify(x0, x1);
+    p0[1] = int_type;
+    deref(p0);
     return int_type;
 };
 
@@ -563,18 +590,20 @@ infer_if: (p0) {
     allocate(1);
     x0 = infer_item(p0[2]); (% condition %);
     unify(x0, int_type);
-    x1 = infer_item(p0[3]);
-    p0[1] = x1;
+    infer_item(p0[3]);
+    p0[1] = unit_type;
     deref(p0);
     return p0[1];
 };
 
-infer_else: (p0) {
-    allocate(3);
-    x0 = infer_item(p0[2]); (% ifthen block %);
-    x1 = infer_item(p0[3]); (% ifelse block %);
-    x2 = unify_join(x0, x1);
-    p0[1] = x2;
+infer_ifelse: (p0) {
+    allocate(4);
+    x0 = infer_item(p0[2]); (% condition %);
+    unify(int_type, x0);
+    x1 = infer_item(p0[3]); (% ifthen block %);
+    x2 = infer_item(p0[4]); (% ifelse block %);
+    x3 = unify_join(x1, x2);
+    p0[1] = x3;
     deref(p0);
     return p0[1];
 };
@@ -725,7 +754,7 @@ deref_funcs: [not_reachable, not_implemented, deref_integer, deref_string, deref
     deref_call, not_implemented, deref_lambda, deref_unexpr, deref_binexpr,
     deref_assign, deref_export, deref_import, deref_external, deref_ret, deref_retval,
     deref_syscall, deref_field, deref_fieldref, deref_typedecl, deref_variant, deref_unit,
-    deref_typedexpr, deref_if, deref_else
+    deref_typedexpr, deref_if, deref_ifelse
 ];
 
 (% p0: item %);
@@ -881,9 +910,10 @@ deref_if: (p0) {
     p0[1] = deref_type(p0[1]);
 };
 
-deref_else: (p0) {
+deref_ifelse: (p0) {
     deref(p0[2]);
     deref(p0[3]);
+    deref(p0[4]);
     p0[1] = deref_type(p0[1]);
 };
 
