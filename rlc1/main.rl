@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: main.rl 2010-04-07 07:56:54 nineties $
+ % $Id: main.rl 2010-04-07 09:15:38 nineties $
  %);
 
 include(stddef, code);
@@ -34,10 +34,8 @@ compile: (p0, p1, p2) {
     putc('\n');
 
     (% lex and parse %);
-    x0 = open_in(p2);
     puts("> parsing...\n");
-    x1 = parse(p2, x0);
-    close_in(x0);
+    x1 = parse(p2);
 
     (% type check %);
     puts("> typing...\n");

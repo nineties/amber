@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-07 07:31:35 nineties $
+ % $Id: typing.rl 2010-04-07 09:07:52 nineties $
  %);
 
 include(stddef, code);
@@ -93,8 +93,9 @@ not_implemented: (p0) {
 infer_funcs: [not_reachable, not_implemented, infer_integer, infer_string, not_implemented,
     infer_identifier, infer_array, infer_tuple, infer_code, infer_decl,
     infer_call, not_implemented, infer_lambda, infer_unexpr, infer_binexpr,
-    infer_assign, infer_export, infer_ret, infer_retval, infer_syscall, infer_field,
-    infer_fieldref, infer_typedecl, infer_variant, infer_unit, infer_typedexpr
+    infer_assign, infer_export, infer_import, infer_external, infer_ret, infer_retval,
+    infer_syscall, infer_field, infer_fieldref, infer_typedecl, infer_variant, infer_unit,
+    infer_typedexpr
 ];
 
 unit_type   : NULL;
@@ -403,12 +404,40 @@ infer_export: (p0) {
     return unit_type;
 };
 
+infer_import: (p0) {
+    (% do nothing %);
+};
+
+infer_external: (p0) {
+    allocate(5);
+    x0 = p0[1]; (% item %);
+    if (x0[0] != NODE_TYPEDEXPR) {
+        goto &external_error;
+    };
+    x1 = x0[1]; (% expr %);
+    x2 = x0[2]; (% type %);
+    if (x1[0] != NODE_IDENTIFIER) {
+        goto &external_error;
+    };
+    x3 = closure(x2);
+    x4 = new_varid();
+    varmap_add(get_ident_name(x1), mktup3(x3, x4, TRUE));
+    x1[1] = x2;
+    x1[3] = x4;
+    x1[4] = x3;
+    return unit_type;
+
+label external_error;
+    fputs(stderr, "ERROR: invalid external declaration\n");
+    exit(1);
+};
+
 (% return; is treated as .pseudo_retvar = (); %);
 infer_ret: (p0) {
     allocate(2);
     x0 = varmap_find(".pseudo_retvar"); (% (tyscheme, id) %);
     if (x0 == NULL) {
-        fputs(stderr, "ERROR: return expression outside function");
+        fputs(stderr, "ERROR: return expression outside function\n");
         exit(1);
     };
     x1 = x0[0];
@@ -678,8 +707,9 @@ type_mismatch: (p0, p1) {
 deref_funcs: [not_reachable, not_implemented, deref_integer, deref_string, deref_dontcare,
     deref_identifier, deref_array, deref_tuple, deref_code, deref_decl,
     deref_call, not_implemented, deref_lambda, deref_unexpr, deref_binexpr,
-    deref_assign, deref_export, deref_ret, deref_retval, deref_syscall, deref_field,
-    deref_fieldref, deref_typedecl, deref_variant, deref_unit, deref_typedexpr
+    deref_assign, deref_export, deref_import, deref_external, deref_ret, deref_retval,
+    deref_syscall, deref_field, deref_fieldref, deref_typedecl, deref_variant, deref_unit,
+    deref_typedexpr
 ];
 
 (% p0: item %);
@@ -777,6 +807,14 @@ deref_assign: (p0) {
 
 deref_export: (p0) {
     deref(p0[1]);
+};
+
+deref_import: (p0) {
+    (% do nothing %);
+};
+
+deref_external: (p0) {
+    (% do nothing %);
 };
 
 deref_ret: (p0) {

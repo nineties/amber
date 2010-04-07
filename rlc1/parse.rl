@@ -2,17 +2,50 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: parse.rl 2010-04-07 07:34:12 nineties $
+ % $Id: parse.rl 2010-04-07 09:25:43 nineties $
  %);
 
 include(stddef, code, token);
 
 export(parse);
 
-(% p0: file name, input channel %);
-parse: (p0, p1) {
-    lexer_init(p0, p1);
-    return mktup2(NODE_PROG, parse_toplevel_items(lex()));
+import_queue: NULL;
+imported: NULL;
+
+add_suffix: (p0, p1) {
+    allocate(3);
+    x0 = strlen(p0);
+    x1 = strlen(p1);
+    x2 = memalloc(x0 + x1 + 1);
+    memcpy(x2, p0, x0);
+    memcpy(x2 + x0, p1, x1);
+    wch(x2, x0 + x1, '\0');
+    return x2;
+};
+
+(% p0: expression list, p1: filename %);
+import_module: (p0, p1) {
+    allocate(3);
+    if (set_contains(imported, p1)) { return p0; };
+    set_add(imported, p1);
+
+    x0 = add_suffix(p1, ".rli");
+    x1 = open_in(x0);
+    lexer_init(x0, x1);
+    x2 = parse_toplevel_items(lex());
+    close_in(x1);
+    return ls_append(x2, p0);
+};
+
+(% p0: expression list %);
+import_modules: (p0) {
+    allocate(1);
+    x0 = 0;
+    while (x0 < vec_size(import_queue)) {
+        p0 = import_module(p0, vec_at(import_queue, x0));
+        x0 = x0 + 1;
+    };
+    return p0;
 };
 
 (% p0: name of expected token %);
@@ -77,8 +110,18 @@ parse_toplevel_items: (p0) {
 
 (% p0: first token %);
 parse_toplevel_item: (p0) {
+    allocate(1);
     if (p0 == TOK_EXPORT) {
         return mktup2(NODE_EXPORT, parse_typedecl_expr(lex()));
+    };
+    if (p0 == TOK_IMPORT) {
+        x0 = parse_identifier(lex());
+        vec_pushback(import_queue, get_ident_name(x0));
+        return mktup2(NODE_IMPORT, get_ident_name(x0));
+    };
+    if (p0 == TOK_EXTERNAL) {
+        x0 = parse_typed_expr(lex());
+        return mktup2(NODE_EXTERNAL, x0);
     };
     parse_typedecl_expr(p0);
 };
@@ -659,11 +702,15 @@ parse_primary_type: (p0) {
 };
 
 parse_tuple_type: (p0) {
-    allocate(1);
+    allocate(2);
     eatchar(p0, '(');
-    x0 = parse_type_list(lex());
+    x0 = lex();
+    if (x0 == ')') {
+        return unit_type;
+    };
+    x1 = parse_type_list(x0);
     eatchar(lex(), ')');
-    return make_tuple_t_from_list(x0);
+    return make_tuple_t_from_list(x1);
 };
 
 parse_type_list: (p0) {
@@ -692,4 +739,20 @@ make_tuple_t_from_list: (p0) {
         p0 = ls_next(p0);
     };
     return mktup3(NODE_TUPLE_T, x0, x1);
+};
+
+(% p0: file name %);
+parse: (p0) {
+    allocate(2);
+    import_queue = mkvec(0);
+    imported = mkset(&strhash, &streq, 0);
+
+    x0 = open_in(p0);
+    lexer_init(p0, x0);
+    x1 = parse_toplevel_items(lex());
+    close_in(x0);
+
+    x1 = import_modules(x1);
+
+    return mktup2(NODE_PROG, x1);
 };

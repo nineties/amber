@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: code.rl 2010-04-07 07:37:57 nineties $
+ % $Id: code.rl 2010-04-07 08:38:44 nineties $
  %);
 
 NODE_PROG       => 0;  (% item list %);
@@ -22,15 +22,17 @@ NODE_UNEXPR     => 13; (% type, operator, arg %);
 NODE_BINEXPR    => 14; (% type, operator, lhs, rhs %);
 NODE_ASSIGN     => 15; (% type, operator, lhs, rhs %);
 NODE_EXPORT     => 16; (% item %);
-NODE_RET        => 17; (% type %);
-NODE_RETVAL     => 18; (% type, value %);
-NODE_SYSCALL    => 19; (% type, params %);
-NODE_FIELD      => 20; (% type, lhs, rhs %);
-NODE_FIELDREF   => 21; (% type, lhs, name %);
-NODE_TYPEDECL   => 22; (% name, type %);
-NODE_VARIANT    => 23; (% type, constructor name, id, arg %);
-NODE_UNIT       => 24; (% type, 0, NULL %);
-NODE_TYPEDEXPR  => 25; (% expr, type %);
+NODE_IMPORT     => 17; (% module name %);
+NODE_EXTERNAL   => 18; (% typed expr %);
+NODE_RET        => 19; (% type %);
+NODE_RETVAL     => 20; (% type, value %);
+NODE_SYSCALL    => 21; (% type, params %);
+NODE_FIELD      => 22; (% type, lhs, rhs %);
+NODE_FIELDREF   => 23; (% type, lhs, name %);
+NODE_TYPEDECL   => 24; (% name, type %);
+NODE_VARIANT    => 25; (% type, constructor name, id, arg %);
+NODE_UNIT       => 26; (% type, 0, NULL %);
+NODE_TYPEDEXPR  => 27; (% expr, type %);
 
 (% indices %);
 STRING_RAW      => 2;
