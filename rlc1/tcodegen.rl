@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-07 07:49:43 nineties $
+ % $Id: tcodegen.rl 2010-04-07 09:03:59 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -161,8 +161,9 @@ transl_funcs: [
     not_reachable, not_implemented, transl_integer, transl_string, not_implemented,
     transl_identifier, not_implemented, transl_tuple, transl_code, transl_decl,
     transl_call, not_implemented, not_implemented, transl_unexpr, transl_binexpr,
-    transl_assign, not_implemented, transl_ret, transl_retval, transl_syscall, transl_field,
-    transl_fieldref, not_reachable, transl_variant, transl_void, transl_typedexpr
+    transl_assign, not_reachable, not_reachable, not_reachable, transl_ret, transl_retval,
+    transl_syscall, transl_field, transl_fieldref, not_reachable, transl_variant, transl_unit,
+    transl_typedexpr
 ];
 
 transl_integer: (p0, p1, p2) {
@@ -824,7 +825,7 @@ transl_variant: (p0, p1, p2) {
     return p0;
 };
 
-transl_void: (p0, p1, p2) {
+transl_unit: (p0, p1, p2) {
     *p2 = NULL;
     return p0;
 };
@@ -852,8 +853,9 @@ transl_extfuncs: [
     not_reachable, not_reachable, not_reachable, not_reachable, not_reachable,
     not_reachable, not_reachable, not_reachable, not_reachable, transl_extdecl,
     not_reachable, not_reachable, not_reachable, not_reachable, not_reachable,
-    not_reachable, transl_export, not_reachable, not_reachable, not_reachable,
-    not_reachable, not_reachable, transl_typedecl, not_reachable, not_reachable
+    not_reachable, transl_export, transl_import, transl_external, not_reachable,
+    not_reachable, not_reachable, not_reachable, not_reachable, transl_typedecl,
+    not_reachable, not_reachable
 ];
 
 (% p0: item %);
@@ -983,6 +985,16 @@ transl_export: (p0) {
     };
     fputs(stderr, "ERROR: invalid export directive\n");
     exit(1);
+};
+
+transl_import: (p0) {
+    (% do nothing %);
+    return NULL;
+};
+
+transl_external: (p0) {
+    (% do nothing %);
+    return NULL;
 };
 
 transl_typedecl: (p0) {
