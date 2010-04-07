@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-07 19:35:51 nineties $
+ % $Id: typing.rl 2010-04-08 00:56:35 nineties $
  %);
 
 include(stddef, code);
@@ -90,7 +90,7 @@ not_implemented: (p0) {
     exit(1);
 };
 
-infer_funcs: [not_reachable, not_implemented, infer_integer, infer_string, not_implemented,
+infer_funcs: [not_reachable, infer_integer, infer_string, not_implemented,
     infer_identifier, infer_array, infer_tuple, infer_block, infer_decl,
     infer_call, not_implemented, infer_lambda, infer_unexpr, infer_binexpr,
     infer_assign, infer_export, infer_import, infer_external, infer_ret, infer_retval,
@@ -129,7 +129,7 @@ infer_identifier: (p0) {
     allocate(3);
     x0 = varmap_find(p0[2]); (% (tyscheme, id, is_global) %);
     if (x0 == NULL) {
-        fputs(stderr, "ERROR: undefined variable '");
+        fputs(stderr, "ERROR: undefined symbol '");
         fputs(stderr, p0[2]);
         fputs(stderr, "'\n");
         exit(1);
@@ -749,7 +749,7 @@ type_mismatch: (p0, p1) {
     exit(1);
 };
 
-deref_funcs: [not_reachable, not_implemented, deref_integer, deref_string, deref_dontcare,
+deref_funcs: [not_reachable, deref_integer, deref_string, deref_dontcare,
     deref_identifier, deref_array, deref_tuple, deref_block, deref_decl,
     deref_call, not_implemented, deref_lambda, deref_unexpr, deref_binexpr,
     deref_assign, deref_export, deref_import, deref_external, deref_ret, deref_retval,

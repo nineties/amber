@@ -9,5 +9,5 @@ fib: (n) {
 
 export
 main: () {
-    exit(fib(3));
+    exit(fib(30));
 };

@@ -1,6 +1,6 @@
 " Language:	Rowl
 " Maintainer:	nineties <nineties48@gmail.com>
-" $Id: rowl.vim 2010-04-07 13:23:01 nineties $
+" $Id: rowl.vim 2010-04-08 01:04:58 nineties $
 
 if exists("b:current_syntax")
     finish
@@ -26,7 +26,7 @@ syn match rowlKeyOperator ":"
 syn match rowlKeyOperator "|"
 syn match rowlKeyOperator "->"
 syn match rowlKeyOperator "=>"
-syn match rowlKeyOperator "![^=]"me=e-1
+syn match rowlKeyOperator "@"
 syn match rowlConstructor "\u\w*\>"
 
 hi def link rowlComment     Comment

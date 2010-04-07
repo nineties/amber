@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-07 19:54:33 nineties $
+ % $Id: tcodegen.rl 2010-04-08 00:55:56 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -159,7 +159,7 @@ not_implemented: (p0) {
 };
 
 transl_funcs: [
-    not_reachable, not_implemented, transl_integer, transl_string, not_implemented,
+    not_reachable, transl_integer, transl_string, not_implemented,
     transl_identifier, not_implemented, transl_tuple, transl_code, transl_decl,
     transl_call, not_implemented, not_implemented, transl_unexpr, transl_binexpr,
     transl_assign, not_reachable, not_reachable, not_reachable, transl_ret, transl_retval,
@@ -907,13 +907,17 @@ transl_item_single: (p0, p1, p2) {
 };
 
 transl_extfuncs: [
-    not_reachable, not_reachable, not_reachable, not_reachable, not_reachable,
-    not_reachable, not_reachable, not_reachable, not_reachable, transl_extdecl,
-    not_reachable, not_reachable, not_reachable, not_reachable, not_reachable,
-    not_reachable, transl_export, transl_import, transl_external, not_reachable,
-    not_reachable, not_reachable, not_reachable, not_reachable, transl_typedecl,
-    not_reachable, not_reachable
+    do_nothing, do_nothing, do_nothing, do_nothing,
+    do_nothing, do_nothing, do_nothing, do_nothing, transl_extdecl,
+    do_nothing, do_nothing, do_nothing, do_nothing, do_nothing,
+    do_nothing, transl_export, transl_import, transl_external, do_nothing,
+    do_nothing, do_nothing, do_nothing, do_nothing, transl_typedecl,
+    do_nothing, do_nothing
 ];
+
+do_nothing: (p0) {
+    return NULL;
+};
 
 (% p0: item %);
 transl_fundecl: (p0) {

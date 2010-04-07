@@ -2,39 +2,38 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: code.rl 2010-04-07 20:00:01 nineties $
+ % $Id: code.rl 2010-04-08 00:52:54 nineties $
  %);
 
 NODE_PROG       => 0;  (% item list %);
-NODE_REWRITE    => 1;  (% lhs, rhs %);
-NODE_INTEGER    => 2;  (% type, bits, value %);
-NODE_STRING     => 3;  (% type, string %);
-NODE_DONTCARE   => 4;  (% type %);
-NODE_IDENTIFIER => 5;  (% type, name, id, tyscheme, is_global %);
-NODE_ARRAY      => 6;  (% type, length, elements %);
-NODE_TUPLE      => 7;  (% type, length, elements %);
-NODE_BLOCK      => 8;  (% type, elements %);
-NODE_DECL       => 9;  (% type, lhs, rhs %);
-NODE_CALL       => 10; (% operator() : type, lhs, tuple of arguments %);
-NODE_SUBSCRIPT  => 11; (% operator[] : type, lhs, array of arguments %);
-NODE_LAMBDA     => 12; (% operator{} : type, lhs, code %);
-NODE_UNEXPR     => 13; (% type, operator, arg %);
-NODE_BINEXPR    => 14; (% type, operator, lhs, rhs %);
-NODE_ASSIGN     => 15; (% type, operator, lhs, rhs %);
-NODE_EXPORT     => 16; (% item %);
-NODE_IMPORT     => 17; (% module name %);
-NODE_EXTERNAL   => 18; (% typed expr %);
-NODE_RET        => 19; (% type %);
-NODE_RETVAL     => 20; (% type, value %);
-NODE_SYSCALL    => 21; (% type, params %);
-NODE_FIELD      => 22; (% type, lhs, rhs %);
-NODE_FIELDREF   => 23; (% type, lhs, name %);
-NODE_TYPEDECL   => 24; (% name, type %);
-NODE_VARIANT    => 25; (% type, constructor name, id, arg %);
-NODE_UNIT       => 26; (% type, 0, NULL %);
-NODE_TYPEDEXPR  => 27; (% type, expr %);
-NODE_IF         => 28; (% type, cond, body %);
-NODE_IFELSE     => 29; (% type, cond, ifthen, ifelse %);
+NODE_INTEGER    => 1;  (% type, bits, value %);
+NODE_STRING     => 2;  (% type, string %);
+NODE_DONTCARE   => 3;  (% type %);
+NODE_IDENTIFIER => 4;  (% type, name, id, tyscheme, is_global %);
+NODE_ARRAY      => 5;  (% type, length, elements %);
+NODE_TUPLE      => 6;  (% type, length, elements %);
+NODE_BLOCK      => 7;  (% type, elements %);
+NODE_DECL       => 8;  (% type, lhs, rhs %);
+NODE_CALL       => 9;  (% operator() : type, lhs, tuple of arguments %);
+NODE_SUBSCRIPT  => 10; (% operator[] : type, lhs, array of arguments %);
+NODE_LAMBDA     => 11; (% operator{} : type, lhs, code %);
+NODE_UNEXPR     => 12; (% type, operator, arg %);
+NODE_BINEXPR    => 13; (% type, operator, lhs, rhs %);
+NODE_ASSIGN     => 14; (% type, operator, lhs, rhs %);
+NODE_EXPORT     => 15; (% item %);
+NODE_IMPORT     => 16; (% module name %);
+NODE_EXTERNAL   => 17; (% typed expr %);
+NODE_RET        => 18; (% type %);
+NODE_RETVAL     => 19; (% type, value %);
+NODE_SYSCALL    => 20; (% type, params %);
+NODE_FIELD      => 21; (% type, lhs, rhs %);
+NODE_FIELDREF   => 22; (% type, lhs, name %);
+NODE_TYPEDECL   => 23; (% name, type %);
+NODE_VARIANT    => 24; (% type, constructor name, id, arg %);
+NODE_UNIT       => 25; (% type, 0, NULL %);
+NODE_TYPEDEXPR  => 26; (% type, expr %);
+NODE_IF         => 27; (% type, cond, body %);
+NODE_IFELSE     => 28; (% type, cond, ifthen, ifelse %);
 
 (% indices %);
 STRING_RAW      => 2;
