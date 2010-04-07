@@ -1,4 +1,4 @@
 export
-exit: (status! int) {
-    syscall(1, status);
+exit: (status!int) {
+    syscall(1, status) ! void;
 };

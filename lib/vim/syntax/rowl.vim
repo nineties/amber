@@ -1,6 +1,6 @@
 " Language:	Rowl
 " Maintainer:	nineties <nineties48@gmail.com>
-" $Id: rowl.vim 2010-04-07 08:21:34 nineties $
+" $Id: rowl.vim 2010-04-07 13:23:01 nineties $
 
 if exists("b:current_syntax")
     finish
@@ -11,7 +11,7 @@ syn case match
 syn keyword rowlCommand   goto label return type
 syn keyword rowlSymbol    if else syscall while
 syn keyword rowlExternal  include export import external
-syn keyword rowlType      char int float double
+syn keyword rowlType      char int float double void
 syn match rowlIdentifier  /\<\h\w*/
 syn match rowlInteger     /-\?\(0\o*\|[1-9]\d*\|0x\x\+\)\>/
 syn match rowlReal        /-\?\d*\.\d\+\>/

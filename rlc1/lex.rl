@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: lex.rl 2010-04-07 08:36:46 nineties $
+ % $Id: lex.rl 2010-04-07 13:47:49 nineties $
  %);
 
 include(stddef, code);
@@ -577,6 +577,7 @@ keyword_init: () {
     map_add(keyword_map, "int", TOK_INT_T);
     map_add(keyword_map, "float", TOK_FLOAT_T);
     map_add(keyword_map, "double", TOK_DOUBLE_T);
+    map_add(keyword_map, "void", TOK_VOID_T);
     map_add(keyword_map, "type", TOK_TYPE);
 };
 

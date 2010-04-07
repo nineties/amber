@@ -2,12 +2,12 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-07 09:07:52 nineties $
+ % $Id: typing.rl 2010-04-07 16:34:30 nineties $
  %);
 
 include(stddef, code);
 
-export(init_typing, typing, unit_type, char_type, int_type, float_type, double_type);
+export(init_typing, typing, unit_type, char_type, int_type, float_type, double_type, void_type);
 
 scopeid: 0;
 scopeid_stack: NULL; 
@@ -91,7 +91,7 @@ not_implemented: (p0) {
 };
 
 infer_funcs: [not_reachable, not_implemented, infer_integer, infer_string, not_implemented,
-    infer_identifier, infer_array, infer_tuple, infer_code, infer_decl,
+    infer_identifier, infer_array, infer_tuple, infer_block, infer_decl,
     infer_call, not_implemented, infer_lambda, infer_unexpr, infer_binexpr,
     infer_assign, infer_export, infer_import, infer_external, infer_ret, infer_retval,
     infer_syscall, infer_field, infer_fieldref, infer_typedecl, infer_variant, infer_unit,
@@ -103,6 +103,7 @@ char_type   : NULL;
 int_type    : NULL;
 float_type  : NULL;
 double_type : NULL;
+void_type   : NULL;
 
 init_typing: () {
     unit_type   = mktup1(NODE_UNIT_T);
@@ -110,6 +111,7 @@ init_typing: () {
     int_type    = mktup1(NODE_INT_T);
     float_type  = mktup1(NODE_FLOAT_T);
     double_type = mktup1(NODE_DOUBLE_T);
+    void_type   = mktup1(NODE_VOID_T);
 };
 
 infer_integer: (p0) {
@@ -178,17 +180,41 @@ infer_tuple: (p0) {
     return p0[1];
 };
 
-infer_code: (p0) {
-    allocate(1);
-    x0 = p0[CODE_STATEMENTS];
+do_exit: (p0) {
+    if (p0[0] == NODE_RETVAL) { return TRUE; };
+    if (p0[0] == NODE_RET)    { return TRUE; };
+    if (p0[1][0] == NODE_VOID_T) { return TRUE; };
+    return FALSE;
+};
+
+(% p0: instruction %);
+return_type: (p0) {
+    if (p0[0] == NODE_RETVAL) { return p0[1]; };
+    if (p0[1][0] == NODE_VOID_T) { return void_type; };
+    return unit_type;
+};
+
+infer_block: (p0) {
+    allocate(3);
+    x0 = p0[BLOCK_STATEMENTS];
+
     while (x0 != NULL) {
-        infer_item(ls_value(x0));
+        x1 = ls_value(x0);
+        x2 = infer_item(x1);
+        if (ls_next(x0) != NULL) {
+            if (do_exit(ls_value(x0))) {
+                fputs(stderr, "ERROR: unreachable code '");
+                put_item(stderr, ls_value(ls_next(x0)));
+                fputs(stderr, "'\n");
+                exit(1);
+            };
+        } else {
+            p0[1] = return_type(x1);
+        };
         x0 = ls_next(x0);
     };
-
-    p0[1] = unit_type; (% code block has no type %);
     deref(p0);
-    return unit_type;
+    return p0[1];
 };
 
 (% p0: dontcare pattern, p1: expr %);
@@ -266,10 +292,10 @@ infer_pattern: (p0) {
     };
     if (p0[0] == NODE_TYPEDEXPR) {
         (% typed pattern %);
-        x0 = infer_pattern(p0[1]);
-        unify(x0, p0[2]);
+        x0 = infer_pattern(p0[2]);
+        unify(x0, p0[1]);
         deref(p0);
-        return p0[2];
+        return p0[1];
     };
     fputs(stderr, "ERROR: invalid pattern expression\n");
     exit(1);
@@ -311,20 +337,6 @@ infer_call: (p0) {
     return p0[1];
 };
 
-(% insert missing return statement. p0: code block %);
-insert_ret: (p0) {
-    p0[CODE_STATEMENTS] = insert_ret_impl(p0[CODE_STATEMENTS]);
-    return p0;
-};
-insert_ret_impl: (p0) {
-    allocate(1);
-    if (p0 == NULL) { return ls_cons(mktup2(NODE_RET, NULL), NULL); };
-    x0 = ls_value(p0);
-    if (x0[0] == NODE_RET) { return p0; };
-    if (x0[0] == NODE_RETVAL) { return p0; };
-    return ls_cons(x0, insert_ret_impl(ls_next(p0)));
-};
-
 infer_lambda: (p0) {
     allocate(2);
 
@@ -332,13 +344,7 @@ infer_lambda: (p0) {
     varmap_push();
     x0 = infer_pattern(p0[LAMBDA_ARG]);
 
-    (% pseudo return variable for type checking %);
-    x1 = mktyvar();
-    x2 = new_varid();
-    varmap_add(".pseudo_retvar", mktup3(mktyscheme(x1), x2, FALSE));
-
-    p0[LAMBDA_BODY] = insert_ret(p0[LAMBDA_BODY]);
-    x3 = infer_item(p0[LAMBDA_BODY]);
+    x1 = infer_item(p0[LAMBDA_BODY]);
     varmap_pop();
 
     p0[1] = mktup3(NODE_LAMBDA_T, x0, x1);
@@ -414,8 +420,8 @@ infer_external: (p0) {
     if (x0[0] != NODE_TYPEDEXPR) {
         goto &external_error;
     };
-    x1 = x0[1]; (% expr %);
-    x2 = x0[2]; (% type %);
+    x1 = x0[2]; (% expr %);
+    x2 = x0[1]; (% type %);
     if (x1[0] != NODE_IDENTIFIER) {
         goto &external_error;
     };
@@ -432,16 +438,10 @@ label external_error;
     exit(1);
 };
 
-(% return; is treated as .pseudo_retvar = (); %);
 infer_ret: (p0) {
-    allocate(2);
-    x0 = varmap_find(".pseudo_retvar"); (% (tyscheme, id) %);
-    if (x0 == NULL) {
-        fputs(stderr, "ERROR: return expression outside function\n");
-        exit(1);
-    };
-    x1 = x0[0];
-    unify(unit_type, x1[1]);
+    allocate(1);
+    x0 = x0[0];
+    unify(unit_type, x0[1]);
     p0[1] = unit_type;
     deref(p0);
     return unit_type;
@@ -449,28 +449,16 @@ infer_ret: (p0) {
 
 (% return e; is treated as .pseudo_retvar = e; %);
 infer_retval: (p0) {
-    allocate(3);
-    x0 = infer_item(p0[RETVAL_VALUE]);
-
-    x1 = varmap_find(".pseudo_retvar"); (% (tyscheme, id) %);
-    if (x1 == NULL) {
-        fputs(stderr, "ERROR: return expression outside function");
-        exit(1);
-    };
-
-    x2 = x1[0];
-    unify(x2[1], x0);
-    p0[1] = unit_type;
+    p0[1] = infer_item(p0[RETVAL_VALUE]);
     deref(p0);
-    return unit_type;
+    return p0[1];
 };
 
 infer_syscall: (p0) {
-    x0 = infer_item(p0[2]);
-
-    p0[1] = int_type;
+    infer_item(p0[2]);
+    p0[1] = mktyvar();
     deref(p0);
-    return int_type;
+    return p0[1];
 };
 
 (% fieldname : expression %);
@@ -565,10 +553,10 @@ infer_unit: (p0) {
 
 infer_typedexpr: (p0) {
     allocate(1);
-    x0 = infer_item(p0[1]); (% expression %);
-    unify(x0, p0[2]);
+    x0 = infer_item(p0[2]); (% expression %);
+    unify(x0, p0[1]);
     deref(p0);
-    return p0[2];
+    return p0[1];
 };
 
 (% p0: item %);
@@ -705,7 +693,7 @@ type_mismatch: (p0, p1) {
 };
 
 deref_funcs: [not_reachable, not_implemented, deref_integer, deref_string, deref_dontcare,
-    deref_identifier, deref_array, deref_tuple, deref_code, deref_decl,
+    deref_identifier, deref_array, deref_tuple, deref_block, deref_decl,
     deref_call, not_implemented, deref_lambda, deref_unexpr, deref_binexpr,
     deref_assign, deref_export, deref_import, deref_external, deref_ret, deref_retval,
     deref_syscall, deref_field, deref_fieldref, deref_typedecl, deref_variant, deref_unit,
@@ -760,9 +748,9 @@ deref_tuple: (p0) {
     p0[1] = deref_type(p0[1]);
 };
 
-deref_code: (p0) {
+deref_block: (p0) {
     allocate(1);
-    x0 = p0[CODE_STATEMENTS];
+    x0 = p0[BLOCK_STATEMENTS];
     while (x0 != NULL) {
         deref(ls_value(x0));
         x0 = ls_next(x0);
@@ -855,8 +843,8 @@ deref_unit: (p0) {
 };
 
 deref_typedexpr: (p0) {
-    deref(p0[1]);
-    p0[2] = deref_type(p0[2]);
+    deref(p0[2]);
+    p0[1] = deref_type(p0[1]);
 };
 
 (% p0: type %);
