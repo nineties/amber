@@ -2,5 +2,7 @@ import stdlib;
 
 export
 main: () {
-    exit(0);
+    if (0) {
+        exit(1);
+    };
 };

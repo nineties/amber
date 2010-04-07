@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: asmgen.rl 2010-04-05 15:42:43 nineties $
+ % $Id: asmgen.rl 2010-04-07 17:51:15 nineties $
  %);
 
 include(stddef, code);
@@ -92,11 +92,13 @@ emit_opd: (p0, p1, p2) {
 
 inst_string: ["movl", "pushl", "popl", "ret", "leave", "int", "call", "call", "addl",
     "subl", "imul", "idiv", "idiv", "orl", "xorl", "andl", "shll", "shrl", "negl", "notl",
-    "incl", "decl", "leal"
+    "incl", "decl", "leal", "DUMMY", "DUMMY", "cmpl", "jmp", "je", "jne", "ja", "jae", "jb",
+    "jbe", "DUMMY"
 ];
 inst_prec:   [32,     32,      32,     32,    32,      32,    32,     32,     32,
     32,     32,     32,     32,     32,    32,     32,     32,     32,     32,     32,
-    32,     32,     32
+    32,     32,     32,     32,      32,      32,     32,    32,    32,  32,    32,   32,
+    32
 ];
 
 emit_store: (p0, p1) {
@@ -140,21 +142,18 @@ emit_call_ind: (p0, p1) {
     fputc(p0, '\n');
 };
 
+emit_label: (p0, p1) {
+    fputs(p0, p1[INST_OPERAND1][1]);
+    fputs(p0, ":\n");
+};
+
 (% p0: output channel, p1: instruction %);
 emit_inst: (p0, p1) {
     allocate(1);
-    if (p1[INST_OPCODE] == INST_STORE) {
-        emit_store(p0, p1);
-        return;
-    };
-    if (p1[INST_OPCODE] == INST_LOAD) {
-        emit_load(p0, p1);
-        return;
-    };
-    if (p1[INST_OPCODE] == INST_CALL_IND) {
-        emit_call_ind(p0, p1);
-        return;
-    };
+    if (p1[INST_OPCODE] == INST_STORE)    { return emit_store(p0, p1); };
+    if (p1[INST_OPCODE] == INST_LOAD)     { return emit_load(p0, p1); };
+    if (p1[INST_OPCODE] == INST_CALL_IND) { return emit_call_ind(p0, p1); };
+    if (p1[INST_OPCODE] == INST_LABEL) { return emit_label(p0, p1); };
 
     fputc(p0, '\t');
     fputs(p0, inst_string[p1[INST_OPCODE]]);
