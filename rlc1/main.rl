@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: main.rl 2010-04-07 19:49:03 nineties $
+ % $Id: main.rl 2010-04-07 20:15:03 nineties $
  %);
 
 include(stddef, code);
@@ -95,10 +95,3 @@ main: (p0, p1) {
     return 0;
 };
 
-
-fib: (p0) {
-    if (p0) {
-        return p0 * fib(p0-1);
-    };
-    return 1;
-};
