@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: code.rl 2010-04-07 19:27:46 nineties $
+ % $Id: code.rl 2010-04-07 20:00:01 nineties $
  %);
 
 NODE_PROG       => 0;  (% item list %);
@@ -136,9 +136,9 @@ REGISTER_INDEX  => 2;
 STACK_OFFSET    => 2;
 ARG_OFFSET      => 2;
 
-LOCATION_ANY      => 0;
-LOCATION_REGISTER => 1;
-LOCATION_MEMORY   => 2; (% must be continuous memory %);
+LOCATION_ANY                     => 0;
+LOCATION_REGISTER                => 1;
+LOCATION_MEMORY                  => 2; (% must be continuous memory %);
 
 DATA_CHAR   => 0; (% value %);
 DATA_INT    => 1; (% value %);

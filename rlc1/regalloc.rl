@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: regalloc.rl 2010-04-07 19:46:50 nineties $
+ % $Id: regalloc.rl 2010-04-07 20:06:56 nineties $
  %);
 
 (% Register allocation %);
@@ -187,7 +187,6 @@ pickup_pseudo_reg: () {
         };
         x2 = x2 + 1;
     };
-    assert(x0 != NULL);
     return x0;
 };
 
@@ -344,11 +343,13 @@ assign_location: (p0) {
 };
 
 assign_locations: () {
-    allocate(2);
+    allocate(3);
     x0 = 0;
     x1 = num_pseudo();
     while (x0 < x1) {
-        assign_location(pickup_pseudo_reg());
+        x2 = pickup_pseudo_reg();
+        if (x2 == NULL) { return; };
+        assign_location(x2);
 	x0 = x0 + 1;
     };
 };
@@ -420,6 +421,7 @@ allocate_stack_frame: (p0) {
 
 (% p0: instruction %);
 need_temporal_register: (p0) {
+    allocate(3);
     if (p0[INST_OPERAND1] == NULL) { return FALSE; };
     if (p0[INST_OPERAND2] == NULL) { return FALSE; };
     if (is_memory_access(p0[INST_OPERAND1]) == FALSE) {
@@ -434,6 +436,18 @@ need_temporal_register: (p0) {
 	if (is_memory_access(p0[INST_OPERAND1])) {
 	    set_pseudo_type(p0[INST_OPERAND2], LOCATION_REGISTER);
 	};
+        return FALSE;
+    };
+    x0 = p0[INST_OPERAND1];
+    x1 = p0[INST_OPERAND2];
+    x2 = vec_at(conflicts, x0[1]);
+    if (iset_contains(x2, x1[1])) {
+        return TRUE;
+    };
+    if (x1[0] == OPD_PSEUDO) {
+        x0 = ls_singleton(x0);
+        assign_pseudo(x1, x0);
+        update_tables(x1, x0);
         return FALSE;
     };
     return TRUE;
@@ -470,6 +484,7 @@ regalloc: (p0) {
 
     (% liveness analysis %);
     liveness(p0);
+    compute_conflicts(p0[3]);
     p0[3] = insert_temporal_register(p0[3]);
     liveness(p0);
 
