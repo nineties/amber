@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: parse.rl 2010-04-07 17:14:07 nineties $
+ % $Id: parse.rl 2010-04-07 19:29:21 nineties $
  %);
 
 include(stddef, code, token);
@@ -157,8 +157,12 @@ parse_else_expr: (p0) {
 label cond_loop;
     x1 = lex();
     if (x1 == TOK_ELSE) {
+	if (x0[0] != NODE_IF) {
+	    fputs(stderr, "ERROR: invalid conditional expression\n");
+	    exit(1);
+	};
         x1 = parse_conditional_expr(lex());
-        x0 = mktup4(NODE_ELSE, NULL, x0, x1);
+        x0 = mktup5(NODE_IFELSE, NULL, x0[2], x0[3], x1);
         goto &cond_loop;
     };
     unput();

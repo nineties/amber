@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: regalloc.rl 2010-04-05 15:54:46 nineties $
+ % $Id: regalloc.rl 2010-04-07 19:46:50 nineties $
  %);
 
 (% Register allocation %);
@@ -423,9 +423,17 @@ need_temporal_register: (p0) {
     if (p0[INST_OPERAND1] == NULL) { return FALSE; };
     if (p0[INST_OPERAND2] == NULL) { return FALSE; };
     if (is_memory_access(p0[INST_OPERAND1]) == FALSE) {
+	(% XXX: ad-hoc register management :( %);
+	if (is_memory_access(p0[INST_OPERAND2])) {
+	    set_pseudo_type(p0[INST_OPERAND1], LOCATION_REGISTER);
+	};
         return FALSE;
     };
     if (is_memory_access(p0[INST_OPERAND2]) == FALSE) {
+	(% XXX: ad-hoc register management :( %);
+	if (is_memory_access(p0[INST_OPERAND1])) {
+	    set_pseudo_type(p0[INST_OPERAND2], LOCATION_REGISTER);
+	};
         return FALSE;
     };
     return TRUE;
