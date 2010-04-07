@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-07 16:34:30 nineties $
+ % $Id: typing.rl 2010-04-07 17:21:38 nineties $
  %);
 
 include(stddef, code);
@@ -95,7 +95,7 @@ infer_funcs: [not_reachable, not_implemented, infer_integer, infer_string, not_i
     infer_call, not_implemented, infer_lambda, infer_unexpr, infer_binexpr,
     infer_assign, infer_export, infer_import, infer_external, infer_ret, infer_retval,
     infer_syscall, infer_field, infer_fieldref, infer_typedecl, infer_variant, infer_unit,
-    infer_typedexpr
+    infer_typedexpr, infer_if, infer_else
 ];
 
 unit_type   : NULL;
@@ -559,6 +559,26 @@ infer_typedexpr: (p0) {
     return p0[1];
 };
 
+infer_if: (p0) {
+    allocate(1);
+    x0 = infer_item(p0[2]); (% condition %);
+    unify(x0, int_type);
+    x1 = infer_item(p0[3]);
+    p0[1] = x1;
+    deref(p0);
+    return p0[1];
+};
+
+infer_else: (p0) {
+    allocate(3);
+    x0 = infer_item(p0[2]); (% ifthen block %);
+    x1 = infer_item(p0[3]); (% ifelse block %);
+    x2 = unify_join(x0, x1);
+    p0[1] = x2;
+    deref(p0);
+    return p0[1];
+};
+
 (% p0: item %);
 infer_item: (p0) {
     allocate(1);
@@ -648,6 +668,14 @@ unify_tyvar: (p0, p1) {
     map_add(tyvarmap, p0[1], x0);
 };
 
+(% p0: type of ifthen block, p1: type of ifelse block %);
+unify_join: (p0, p1) {
+    if (p0 == void_type) { return p1; };
+    if (p1 == void_type) { return p0; };
+    unify(p0, p1);
+    return p0;
+};
+
 (% p0: id, p1, type %);
 occur_check: (p0, p1) {
     allocate(1);
@@ -697,7 +725,7 @@ deref_funcs: [not_reachable, not_implemented, deref_integer, deref_string, deref
     deref_call, not_implemented, deref_lambda, deref_unexpr, deref_binexpr,
     deref_assign, deref_export, deref_import, deref_external, deref_ret, deref_retval,
     deref_syscall, deref_field, deref_fieldref, deref_typedecl, deref_variant, deref_unit,
-    deref_typedexpr
+    deref_typedexpr, deref_if, deref_else
 ];
 
 (% p0: item %);
@@ -844,6 +872,18 @@ deref_unit: (p0) {
 
 deref_typedexpr: (p0) {
     deref(p0[2]);
+    p0[1] = deref_type(p0[1]);
+};
+
+deref_if: (p0) {
+    deref(p0[2]);
+    deref(p0[3]);
+    p0[1] = deref_type(p0[1]);
+};
+
+deref_else: (p0) {
+    deref(p0[2]);
+    deref(p0[3]);
     p0[1] = deref_type(p0[1]);
 };
 

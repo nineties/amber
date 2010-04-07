@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: parse.rl 2010-04-07 16:03:34 nineties $
+ % $Id: parse.rl 2010-04-07 17:14:07 nineties $
  %);
 
 include(stddef, code, token);
@@ -141,13 +141,41 @@ parse_typedecl_expr: (p0) {
 (% p0: first token %);
 parse_rewrite_expr: (p0) {
     allocate(2);
-    x0 = parse_declaration_expr(p0);
+    x0 = parse_else_expr(p0);
     x1 = lex();
     if (x1 == TOK_REWRITE) {
         return mktup3(NODE_REWRITE, x0, parse_rewrite_expr(lex()));
     };
     unput();
     return x0;
+};
+
+(% p0: fist token %);
+parse_else_expr: (p0) {
+    allocate(2);
+    x0 = parse_conditional_expr(p0);
+label cond_loop;
+    x1 = lex();
+    if (x1 == TOK_ELSE) {
+        x1 = parse_conditional_expr(lex());
+        x0 = mktup4(NODE_ELSE, NULL, x0, x1);
+        goto &cond_loop;
+    };
+    unput();
+    return x0;
+};
+
+(% p0: first token %);
+parse_conditional_expr: (p0) {
+    allocate(2);
+    if (p0 == TOK_IF) {
+        eatchar(lex(), '(');
+        x0 = parse_assignment_expr(lex());
+        eatchar(lex(), ')');
+        x1 = parse_block(lex());
+        return mktup4(NODE_IF, NULL, x0, x1);
+    };
+    return parse_declaration_expr(p0);
 };
 
 (% p0: first token %);
@@ -460,7 +488,7 @@ label post_loop;
         goto &post_loop;
     };
     if (x1 == '{') {
-        x0 = mktup4(NODE_LAMBDA, NULL, x0, parse_list(x1));
+        x0 = mktup4(NODE_LAMBDA, NULL, x0, parse_block(x1));
         goto &post_loop;
     };
     if (x1 == TOK_INCR) {
@@ -488,7 +516,7 @@ parse_primary_item: (p0) {
     };
     if (p0 == '(') { return parse_tuple(p0); };
     if (p0 == '[') { return parse_array(p0); };
-    if (p0 == '{') { return parse_list(p0); };
+    if (p0 == '{') { return parse_block(p0); };
     if (p0 == TOK_CHAR) {
         return mktup4(NODE_INTEGER, NULL, 8, token_val());
     };
@@ -594,7 +622,7 @@ parse_array: (p0) {
 };
 
 (% p0: first token %);
-parse_list: (p0) {
+parse_block: (p0) {
     allocate(2);
     eatchar(p0, '{');
     x0 = lex();

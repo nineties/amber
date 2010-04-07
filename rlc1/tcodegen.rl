@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-07 16:10:58 nineties $
+ % $Id: tcodegen.rl 2010-04-07 18:01:23 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -164,7 +164,7 @@ transl_funcs: [
     transl_call, not_implemented, not_implemented, transl_unexpr, transl_binexpr,
     transl_assign, not_reachable, not_reachable, not_reachable, transl_ret, transl_retval,
     transl_syscall, transl_field, transl_fieldref, not_reachable, transl_variant, transl_unit,
-    transl_typedexpr
+    transl_typedexpr, transl_if, transl_else
 ];
 
 transl_integer: (p0, p1, p2) {
@@ -542,6 +542,45 @@ must_be_register_or_immediate: (p0, p1) {
     return p0;
 };
 
+must_be_register: (p0, p1) {
+    allocate(2);
+    x0 = *p1;
+    if (x0[0] == OPD_PSEUDO) {
+        if (x0[PSEUDO_TYPE] != LOCATION_ANY) {
+            x1 = create_pseudo(x0[PSEUDO_LENGTH], LOCATION_REGISTER);
+            p0 = ls_cons(mkinst(INST_MOVL, x0, x1), p0);
+            *p1 = x1;
+            return p0;
+        };
+        x0[PSEUDO_TYPE] = LOCATION_REGISTER;
+        return p0;
+    };
+    if (x0[0] == OPD_STACK) {
+        x1 = create_pseudo(1, LOCATION_REGISTER);
+        p0 = ls_cons(mkinst(INST_MOVL, x0, x1), p0);
+        *p1 = x1;
+        return p0;
+    };
+    if (x0[0] == OPD_ARG) {
+        x1 = create_pseudo(1, LOCATION_REGISTER);
+        p0 = ls_cons(mkinst(INST_MOVL, x0, x1), p0);
+        *p1 = x1;
+        return p0;
+    };
+    if (x0[0] == OPD_AT) {
+        if (x0[2][0] == OPD_LABEL) {
+            x1 = create_pseudo(1, LOCATION_REGISTER);
+            p0 = ls_cons(mkinst(INST_MOVL, x0, x1), p0);
+            *p1 = x1;
+            return p0;
+        };
+    };
+    x1 = create_pseudo(1, LOCATION_REGISTER);
+    p0 = ls_cons(mkinst(INST_MOVL, x0, x1), p0);
+    *p1 = x1;
+    return p0;
+};
+
 transl_divexpr: (p0, p1, p2) {
     allocate(3);
     (% t = x / y
@@ -833,6 +872,23 @@ transl_unit: (p0, p1, p2) {
 
 transl_typedexpr: (p0, p1, p2) {
     return transl_item(p0, p1[2], p2);
+};
+
+transl_if: (p0, p1, p2) {
+    allocate(3);
+    x0 = p1[2]; (% condition %);
+    p0 = transl_item_single(p0, x0, &x1);
+    p0 = must_be_register(p0, &x1);
+    p0 = ls_cons(mkinst(INST_CMPL, mktup2(OPD_INTEGER, 0), x1), p0);
+    x2 = mktup2(OPD_LABEL, new_label());
+    p0 = ls_cons(mkinst(INST_JE, x2, NULL), p0);
+    p0 = transl_item(p0, p1[3], p2);
+    p0 = ls_cons(mkinst(INST_LABEL, x2, NULL), p0);
+    return p0;
+};
+
+transl_else: (p0, p1, p2) {
+    return p0;
 };
 
 (% p0: output tcode, p1: item, p2: pointer to store p1's value  %);

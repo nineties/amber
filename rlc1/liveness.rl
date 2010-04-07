@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: liveness.rl 2010-04-05 15:04:56 nineties $
+ % $Id: liveness.rl 2010-04-07 17:37:47 nineties $
  %);
 
 (% liveness analysis %);
@@ -16,7 +16,9 @@ iterate_funcs: [
     iterate_int, iterate_call, iterate_call, iterate_normal, iterate_normal,
     iterate_normal, iterate_div, iterate_mod, iterate_normal, iterate_normal,
     iterate_normal, iterate_normal, iterate_normal, iterate_normal, iterate_normal,
-    iterate_normal, iterate_normal, iterate_normal, iterate_normal, iterate_normal
+    iterate_normal, iterate_normal, iterate_normal, iterate_normal, iterate_normal,
+    iterate_normal, iterate_normal, iterate_normal, iterate_normal, iterate_normal,
+    iterate_normal, iterate_normal, iterate_normal, iterate_normal
 ];
 
 (% p0: list of instructions, p1: live-out register at final%);

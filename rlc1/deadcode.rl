@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: deadcode.rl 2010-04-05 14:13:04 nineties $
+ % $Id: deadcode.rl 2010-04-07 17:55:36 nineties $
  %);
 
 include(stddef, code);
@@ -21,7 +21,9 @@ iterate_funcs: [
     iterate_int, iterate_call, iterate_call, iterate_normal, iterate_normal,
     iterate_normal, iterate_div, iterate_mod, iterate_normal, iterate_normal,
     iterate_normal, iterate_normal, iterate_normal, iterate_normal, iterate_normal,
-    iterate_normal, iterate_normal, iterate_leal, iterate_store, iterate_load
+    iterate_normal, iterate_normal, iterate_leal, iterate_store, iterate_load,
+    iterate_nothing, iterate_nothing, iterate_nothing, iterate_nothing, iterate_nothing,
+    iterate_nothing, iterate_nothing, iterate_nothing, iterate_nothing
 ];
 
 register_is_used: (p0, p1) {
@@ -60,6 +62,18 @@ iterate_normal: (p0, p1) {
 	changed = TRUE;
 	return x0;
     };
+
+    x2 = output_del(x2, x1);
+    x2 = input_add(x2, x1);
+    *p1 = x2;
+    return ls_cons(x1, x0);
+};
+
+iterate_nothing: (p0, p1) {
+    allocate(3);
+    x0 = iterate(ls_next(p0), p1);
+    x1 = ls_value(p0);
+    x2 = *p1;
 
     x2 = output_del(x2, x1);
     x2 = input_add(x2, x1);
