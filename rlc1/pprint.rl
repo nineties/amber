@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: pprint.rl 2010-04-07 07:47:58 nineties $
+ % $Id: pprint.rl 2010-04-07 09:33:35 nineties $
  %);
 
 include(stddef,code);
@@ -11,8 +11,8 @@ export(put_prog, put_item, put_type, put_tyscheme);
 
 ppfuncs: [put_prog, put_rewrite, put_integer, put_string, put_dontcare, put_identifier,
     put_array, put_tuple, put_code, put_decl, put_callop, put_subsop, put_codeop, put_unexpr,
-    put_binexpr, put_assign, put_export, put_ret, put_retval, put_syscall, put_field,
-    put_fieldref, put_typedecl, put_variant, put_unit, put_typedexpr
+    put_binexpr, put_assign, put_export, put_import, put_external, put_ret, put_retval,
+    put_syscall, put_field, put_fieldref, put_typedecl, put_variant, put_unit, put_typedexpr
 ];
 
 (% priority of expressions %);
@@ -261,6 +261,16 @@ put_assign: (p0, p1) {
 put_export: (p0, p1) {
     fputs(p0, "export ");
     put_subitem(p0, PRI_TYPEDECL, p1[1]);
+};
+
+put_import: (p0, p1) {
+    fputs(p0, "import ");
+    put_subitem(p0, PRI_TYPEDECL, p1[1]);
+};
+
+put_external: (p0, p1) {
+    fputs(p0, "external ");
+    put_subitem(p0, PRI_TYPEDEXPR, p1[1]);
 };
 
 put_ret: (p0, p1) {
