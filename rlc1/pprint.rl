@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: pprint.rl 2010-04-07 09:33:35 nineties $
+ % $Id: pprint.rl 2010-04-07 15:51:44 nineties $
  %);
 
 include(stddef,code);
@@ -67,7 +67,7 @@ put_item: (p0, p1) {
 (% p0: output channel, p1: item, p2: priority %);
 put_subitem: (p0, p1, p2) {
     allocate(2);
-    x0 = get_priority(p1[0]);
+    x0 = get_priority(p1);
     if (x0 > p2) { fputc(p0, '('); };
     put_item(p0, p1);
     if (x0 > p2) { fputc(p0, ')'); };
@@ -225,52 +225,52 @@ put_unexpr: (p0, p1) {
     allocate(1);
     x0 = p1[2]; (% operator %);
     if (x0 == UNOP_POSTINCR) {
-        put_subitem(p0, unop_arg_priority[x0], p1[3]);
+        put_subitem(p0, p1[3], unop_arg_priority[x0]);
         fputs(p0, unop_string[x0]);
         return;
     };
     if (x0 == UNOP_POSTDECR) {
-        put_subitem(p0, unop_arg_priority[x0], p1[3]);
+        put_subitem(p0, p1[3], unop_arg_priority[x0]);
         fputs(p0, unop_string[x0]);
         return;
     };
     fputs(p0, unop_string[x0]);
-    put_subitem(p0, unop_arg_priority[x0], p1[3]);
+    put_subitem(p0, p1[3], unop_arg_priority[x0]);
 };
 
 put_binexpr: (p0, p1) {
     allocate(1);
     x0 = p1[2]; (% operator %);
-    put_subitem(p0, binop_lhs_priority[x0], p1[3]);
+    put_subitem(p0, p1[3], binop_lhs_priority[x0]);
     fputc(p0, ' ');
     fputs(p0, binop_string[x0]);
     fputc(p0, ' ');
-    put_subitem(p0, binop_rhs_priority[x0], p1[4]);
+    put_subitem(p0, p1[4], binop_rhs_priority[x0]);
 };
 
 put_assign: (p0, p1) {
     allocate(1);
     x0 = p1[2]; (% operator %);
-    put_subitem(p0, PRI_SEQOR, p1[3]);
+    put_subitem(p0, p1[3], PRI_SEQOR);
     fputc(p0, ' ');
     fputs(p0, binop_string[x0]);
     fputs(p0, "= ");
-    put_subitem(p0, PRI_ASSIGNMENT, p1[4]);
+    put_subitem(p0, p1[4], PRI_ASSIGNMENT);
 };
 
 put_export: (p0, p1) {
     fputs(p0, "export ");
-    put_subitem(p0, PRI_TYPEDECL, p1[1]);
+    put_subitem(p0, p1[1], PRI_TYPEDECL);
 };
 
 put_import: (p0, p1) {
     fputs(p0, "import ");
-    put_subitem(p0, PRI_TYPEDECL, p1[1]);
+    put_subitem(p0, p1[1], PRI_TYPEDECL);
 };
 
 put_external: (p0, p1) {
     fputs(p0, "external ");
-    put_subitem(p0, PRI_TYPEDEXPR, p1[1]);
+    put_subitem(p0, p1[1], PRI_TYPEDEXPR);
 };
 
 put_ret: (p0, p1) {
@@ -279,12 +279,12 @@ put_ret: (p0, p1) {
 
 put_retval: (p0, p1) {
     fputs(p0, "return ");
-    put_subitem(p0, PRI_ASSIGNMENT, p1[2]);
+    put_subitem(p0, p1[2], PRI_ASSIGNMENT);
 };
 
 put_syscall: (p0, p1) {
     fputs(p0, "syscall");
-    put_item(p0, p1[2]);
+    put_subitem(p0, p1[2], PRI_PRIMARY);
 };
 
 put_field: (p0, p1) {
@@ -294,7 +294,7 @@ put_field: (p0, p1) {
 };
 
 put_fieldref: (p0, p1) {
-    put_subitem(p0, PRI_PRIMARY, p1[2]);
+    put_subitem(p0, p1[2], PRI_PRIMARY);
     fputc(p0, '.');
     fputs(p0, p1[3]);
 };
@@ -345,7 +345,7 @@ put_variant: (p0, p1) {
     fputs(p0, p1[2]);
     if (p1[4] != NULL) {
         fputc(p0, ' ');
-        put_subitem(p0, PRI_PRIMARY, p1[4]);
+        put_subitem(p0, p1[4], PRI_PRIMARY);
     };
 };
 
@@ -354,13 +354,15 @@ put_unit: (p0, p1) {
 };
 
 put_typedexpr: (p0, p1) {
-    put_subitem(p0, PRI_ASSIGNMENT, p1[1]);
+    put_subitem(p0, p1[2], PRI_ASSIGNMENT);
     fputc(p0, ':');
-    put_type(p0, p1[2]);
+    put_type(p0, p1[1]);
 };
 
-pptype_funcs: [ put_unit_t, put_char_t, put_int_t, put_float_t, put_double_t, put_pointer_t,
-    put_array_t, put_tuple_t, put_lambda_t, put_tyvar, put_namedty, put_variant_t];
+pptype_funcs: [ put_unit_t, put_char_t, put_int_t, put_float_t, put_double_t,
+    put_pointer_t, put_array_t, put_tuple_t, put_lambda_t, put_tyvar, put_namedty,
+    put_variant_t, put_void_t
+];
 
 put_type: (p0, p1) {
     allocate(1);
@@ -386,6 +388,10 @@ put_float_t: (p0, p1) {
 
 put_double_t: (p0, p1) {
     fputs(p0, "double");
+};
+
+put_void_t: (p0, p1) {
+    fputs(p0, "void");
 };
 
 put_pointer_t: (p0, p1) {

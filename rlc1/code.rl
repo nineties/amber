@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: code.rl 2010-04-07 08:38:44 nineties $
+ % $Id: code.rl 2010-04-07 15:51:18 nineties $
  %);
 
 NODE_PROG       => 0;  (% item list %);
@@ -13,7 +13,7 @@ NODE_DONTCARE   => 4;  (% type %);
 NODE_IDENTIFIER => 5;  (% type, name, id, tyscheme, is_global %);
 NODE_ARRAY      => 6;  (% type, length, elements %);
 NODE_TUPLE      => 7;  (% type, length, elements %);
-NODE_CODE       => 8;  (% type, elements %);
+NODE_BLOCK      => 8;  (% type, elements %);
 NODE_DECL       => 9;  (% type, lhs, rhs %);
 NODE_CALL       => 10; (% operator() : type, lhs, tuple of arguments %);
 NODE_SUBSCRIPT  => 11; (% operator[] : type, lhs, array of arguments %);
@@ -32,7 +32,7 @@ NODE_FIELDREF   => 23; (% type, lhs, name %);
 NODE_TYPEDECL   => 24; (% name, type %);
 NODE_VARIANT    => 25; (% type, constructor name, id, arg %);
 NODE_UNIT       => 26; (% type, 0, NULL %);
-NODE_TYPEDEXPR  => 27; (% expr, type %);
+NODE_TYPEDEXPR  => 27; (% type, expr %);
 
 (% indices %);
 STRING_RAW      => 2;
@@ -40,7 +40,7 @@ ARRAY_LENGTH    => 2;
 ARRAY_ELEMENTS  => 3;
 TUPLE_LENGTH    => 2;
 TUPLE_ELEMENTS  => 3;
-CODE_STATEMENTS => 2;
+BLOCK_STATEMENTS => 2;
 LAMBDA_ARG      => 2;
 LAMBDA_BODY     => 3;
 SUBSCRIPT_LHS   => 2;
@@ -62,6 +62,7 @@ NODE_LAMBDA_T  => 8;  (% param type, ret type %);
 NODE_TYVAR     => 9;  (% type-variable id %);
 NODE_NAMED_T   => 10; (% fieldname, type %);
 NODE_VARIANT_T => 11; (% name, rows %);
+NODE_VOID_T    => 12;
 
 (% structure of rows of variant
  % (constructor name, id, arg)

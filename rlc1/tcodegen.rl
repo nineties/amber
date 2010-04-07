@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-07 09:03:59 nineties $
+ % $Id: tcodegen.rl 2010-04-07 16:10:58 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -24,6 +24,7 @@ is_global_identifier: (p0) {
 (% p0: type.  returns number of required register for the type %);
 type_size: (p0) {
     allocate(4);
+    if (p0[0] == NODE_VOID_T) { return 0; };
     if (p0[0] == NODE_UNIT_T) { return 1; };
     if (p0[0] == NODE_CHAR_T) { return 1; };
     if (p0[0] == NODE_INT_T)  { return 1; };
@@ -831,7 +832,7 @@ transl_unit: (p0, p1, p2) {
 };
 
 transl_typedexpr: (p0, p1, p2) {
-    return transl_item(p0, p1[1], p2);
+    return transl_item(p0, p1[2], p2);
 };
 
 (% p0: output tcode, p1: item, p2: pointer to store p1's value  %);
@@ -877,7 +878,7 @@ transl_fundecl: (p0) {
     while (x5 < x3) {
         (% ad-hoc implementation for typed pattern :( %);
         if (x4[x5][0] == NODE_TYPEDEXPR) {
-            x4[x5] = x4[x5][1];
+            x4[x5] = x4[x5][2];
         };
 
         set_operand(x4[x5], ls_singleton(create_pseudo(1, LOCATION_ANY)));

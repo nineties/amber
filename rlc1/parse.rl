@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: parse.rl 2010-04-07 09:41:49 nineties $
+ % $Id: parse.rl 2010-04-07 16:03:34 nineties $
  %);
 
 include(stddef, code, token);
@@ -193,7 +193,7 @@ parse_typed_expr: (p0) {
     x0 = parse_assignment_expr(p0);
     x1 = lex();
     if (x1 == '!') {
-        return mktup3(NODE_TYPEDEXPR, x0, parse_type(lex()));
+        return mktup3(NODE_TYPEDEXPR, parse_type(lex()), x0);
     };
     unput();
     return x0;
@@ -599,11 +599,11 @@ parse_list: (p0) {
     eatchar(p0, '{');
     x0 = lex();
     if (x0 == '}') {
-        return mktup3(NODE_CODE, NULL, NULL);
+        return mktup3(NODE_BLOCK, NULL, NULL);
     };
     x1 = parse_semi_list(x0);
     eatchar(lex(), '}');
-    return mktup3(NODE_CODE, NULL, x1);
+    return mktup3(NODE_BLOCK, NULL, x1);
 };
 
 (% p0: first token %);
@@ -693,12 +693,13 @@ parse_type: (p0) {
 };
 
 parse_primary_type: (p0) {
+    if (p0 == TOK_VOID_T) { return void_type; };
     if (p0 == TOK_CHAR_T) { return char_type; };
-    if (p0 == TOK_INT_T) { return int_type; };
+    if (p0 == TOK_INT_T)  { return int_type; };
     if (p0 == '(') {
         return parse_tuple_type(p0);
     };
-    assert(0);
+    expected("type");
 };
 
 parse_tuple_type: (p0) {
