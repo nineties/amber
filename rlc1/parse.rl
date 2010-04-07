@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: parse.rl 2010-04-07 19:29:21 nineties $
+ % $Id: parse.rl 2010-04-08 01:03:18 nineties $
  %);
 
 include(stddef, code, token);
@@ -97,6 +97,9 @@ parse_toplevel_items: (p0) {
     if (p0 == TOK_END) {
         return NULL;
     };
+    if (p0 == ';') {
+        return parse_toplevel_items(lex());
+    };
     x0 = parse_toplevel_item(p0);
     x1 = lex();
     if (x1 == ';') {
@@ -138,13 +141,34 @@ parse_typedecl_expr: (p0) {
     return parse_rewrite_expr(p0);
 };
 
+rewrite_map : NULL;
 (% p0: first token %);
 parse_rewrite_expr: (p0) {
-    allocate(2);
+    allocate(4);
     x0 = parse_else_expr(p0);
     x1 = lex();
     if (x1 == TOK_REWRITE) {
-        return mktup3(NODE_REWRITE, x0, parse_rewrite_expr(lex()));
+        (%
+         % currently we only support macro integer constant
+         %);
+        if (x0[0] != NODE_IDENTIFIER) {
+            fputs(stderr, "ERROR: invalid rewrite expression\n");
+            exit(1);
+        };
+        x2 = lex();
+        if (x2 != TOK_INT) {
+            fputs(stderr, "ERROR: not implemented yet\n");
+            exit(1);
+        };
+        x3 = get_ident_name(x0);
+        if (map_find(rewrite_map, x3) != NULL) {
+            fputs(stderr, "ERROR: macto '");
+            fputs(stderr, x3);
+            fputs(stderr, "' already defined\n");
+            exit(1);
+        };
+        map_add(rewrite_map, x3, token_val());
+        return mktup2(NODE_UNIT, NULL);
     };
     unput();
     return x0;
@@ -224,7 +248,7 @@ parse_typed_expr: (p0) {
     allocate(2);
     x0 = parse_assignment_expr(p0);
     x1 = lex();
-    if (x1 == '!') {
+    if (x1 == '@') {
         return mktup3(NODE_TYPEDEXPR, parse_type(lex()), x0);
     };
     unput();
@@ -516,6 +540,11 @@ label post_loop;
 parse_primary_item: (p0) {
     allocate(2);
     if (p0 == TOK_IDENT) {
+        x0 = token_text();
+        x1 = map_find(rewrite_map, x0);
+        if (x1 != NULL) {
+            return mktup4(NODE_INTEGER, NULL, 32, x1);
+        };
         return parse_identifier(p0);
     };
     if (p0 == '(') { return parse_tuple(p0); };
@@ -779,6 +808,7 @@ parse: (p0) {
     allocate(2);
     import_queue = mkvec(0);
     imported = mkset(&strhash, &streq, 0);
+    rewrite_map = mkmap(&strhash, &streq, 0);
 
     x0 = open_in(p0);
     lexer_init(p0, x0);
