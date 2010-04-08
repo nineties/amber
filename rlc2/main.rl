@@ -10,7 +10,7 @@ make_counter: (n) {
 
 export
 main: () {
-    x : new 0;
-    *x = 1;
-    exit(ExitSuccess);
+    x : new (1, hoge:2);
+    (% exit(ExitSuccess); %);
+    sys_exit(x->hoge);
 };
