@@ -1,7 +1,7 @@
 import stdlib;
 
 fib: (n) {
-    if (n) {
+    if (n > 0) {
 	return n * fib(n-1);
     };
     return 1;
@@ -9,5 +9,5 @@ fib: (n) {
 
 export
 main: () {
-    exit(fib(30));
+    exit(fib(3));
 };
