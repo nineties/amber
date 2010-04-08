@@ -9,9 +9,5 @@ make_counter: (n) {
 
 export
 main: () {
-    counter : make_counter(1);
-    counter();
-    counter();
-    counter();
-    sys_exit(counter());
+    exit(ExitSuccess);
 };

@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-08 20:12:52 nineties $
+ % $Id: tcodegen.rl 2010-04-08 20:52:57 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -901,7 +901,10 @@ transl_fieldref: (p0, p1, p2) {
 transl_variant: (p0, p1, p2) {
     allocate(2);
     x0 = p1[3]; (% variant id %);
-    p0 = transl_item(p0, p1[4], &x1); (% translate arg %);
+    x1 = NULL;
+    if (p1[4] != NULL) {
+        p0 = transl_item(p0, p1[4], &x1); (% translate arg %);
+    };
     x1 = ls_cons(mktup2(OPD_INTEGER, x0), x1);
     *p2 = x1;
     return p0;

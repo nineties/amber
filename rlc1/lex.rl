@@ -2,13 +2,13 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: lex.rl 2010-04-08 20:08:40 nineties $
+ % $Id: lex.rl 2010-04-08 21:57:40 nineties $
  %);
 
 include(stddef, code);
 include(token);
 
-export(lexer_init);
+export(lexer_init, lexer_push, lexer_pop);
 export(fputloc);
 export(token_text, token_len, token_val);
 export(lex, unput);
@@ -179,7 +179,7 @@ s7next: [
 fin, e1,fin,fin, s7, s7, s7, e2, e2, e2, e2, e2, e2,fin,fin,fin,fin,fin,fin,fin,fin
 ];
 s8next: [
-fin, e1,fin,fin, s8, s8, s8, s8, s8, s8, s8, s8, s8,fin,fin,fin,fin,fin,fin,fin,fin
+s25, e1,s25,s25, s8, s8, s8, s8, s8, s8, s8, s8, s8,s25,s25,s25,s25,s25,s25,s25,s25
 ];
 s9next: [
  e6, e1,s10, e6,s10,s10,s10,s10,s10,s10,s10,s10,s10,s10,s10,s10,s12,s10,s10,s10,s10
@@ -210,6 +210,8 @@ last_file: NULL;
 last_line: 0;
 last_clmn: 0;
 
+lexer_stack: NULL;
+
 (% p0: file name, p1: input channel %);
 lexer_init: (p0, p1) {
     srcfile = p0;
@@ -231,6 +233,32 @@ lexer_init: (p0, p1) {
     keyword_init();
     operator_init();
     constr_set = mkset(&strhash, &streq, 10);
+};
+
+(% p0: new filename, p1: new input channel %);
+lexer_push: (p0, p1) {
+    allocate(1);
+    x0 = mktup6(srcfile, srcline, srcclmn, lexichan, inbuf, inbuf_beg);
+    lexer_stack = ls_cons(x0, lexer_stack);
+    srcfile = p0;
+    srcline = 1;
+    srcclmn = 1;
+    lexichan = p1;
+    inbuf = mkvec(0);
+    inbuf_beg = 0;
+};
+
+lexer_pop: () {
+    allocate(1);
+    assert(lexer_stack != NULL);
+    x0 = ls_value(lexer_stack);
+    lexer_stack = ls_next(lexer_stack);
+    srcfile   = x0[0];
+    srcline   = x0[1];
+    srcclmn   = x0[2];
+    lexichan  = x0[3];
+    inbuf     = x0[4];
+    inbuf_beg = x0[5];
 };
 
 token_text: () {
@@ -417,7 +445,6 @@ label s7;
     goto s7next[lookahead()];
 label s8;
     consume();
-    accept_ident();
     goto s8next[lookahead()];
 label s9;
     consume();
@@ -521,6 +548,9 @@ label s23;
     goto &s0;
 label s24;
     accept(consume());
+    goto &fin;
+label s25;
+    accept_ident();
     goto &fin;
 label fin;
     return toktag;

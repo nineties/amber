@@ -2,14 +2,13 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: parse.rl 2010-04-08 20:10:23 nineties $
+ % $Id: parse.rl 2010-04-08 21:58:40 nineties $
  %);
 
 include(stddef, code, token);
 
 export(parse);
 
-import_queue: NULL;
 imported: NULL;
 
 add_suffix: (p0, p1) {
@@ -23,29 +22,19 @@ add_suffix: (p0, p1) {
     return x2;
 };
 
-(% p0: expression list, p1: filename %);
-import_module: (p0, p1) {
+(% p0: filename %);
+import_module: (p0) {
     allocate(3);
-    if (set_contains(imported, p1)) { return p0; };
-    set_add(imported, p1);
+    if (set_contains(imported, p0)) { return NULL; };
+    set_add(imported, p0);
 
-    x0 = add_suffix(p1, ".rli");
+    x0 = add_suffix(p0, ".rli");
     x1 = open_in(x0);
-    lexer_init(x0, x1);
+    lexer_push(x0, x1);
     x2 = parse_toplevel_items(lex());
+    lexer_pop();
     close_in(x1);
-    return ls_append(x2, p0);
-};
-
-(% p0: expression list %);
-import_modules: (p0) {
-    allocate(1);
-    x0 = 0;
-    while (x0 < vec_size(import_queue)) {
-        p0 = import_module(p0, vec_at(import_queue, x0));
-        x0 = x0 + 1;
-    };
-    return p0;
+    return x2;
 };
 
 (% p0: name of expected token %);
@@ -93,12 +82,23 @@ end_of_item: (p0) {
 
 (% p0: first token %);
 parse_toplevel_items: (p0) {
-    allocate(2);
+    allocate(3);
     if (p0 == TOK_END) {
         return NULL;
     };
     if (p0 == ';') {
         return parse_toplevel_items(lex());
+    };
+    if (p0 == TOK_IMPORT) {
+        x0 = parse_identifier(lex());
+        x2 = import_module(get_ident_name(x0));
+        x1 = lex();
+        if (x1 == TOK_END) {
+            puts("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+            return x2;
+        };
+        eatchar(x1, ';');
+        return ls_append(x2, parse_toplevel_items(lex()));
     };
     x0 = parse_toplevel_item(p0);
     x1 = lex();
@@ -116,11 +116,6 @@ parse_toplevel_item: (p0) {
     allocate(1);
     if (p0 == TOK_EXPORT) {
         return mktup2(NODE_EXPORT, parse_typedecl_expr(lex()));
-    };
-    if (p0 == TOK_IMPORT) {
-        x0 = parse_identifier(lex());
-        vec_pushback(import_queue, get_ident_name(x0));
-        return mktup2(NODE_IMPORT, get_ident_name(x0));
     };
     if (p0 == TOK_EXTERNAL) {
         x0 = parse_typed_expr(lex());
@@ -711,6 +706,8 @@ parse_semi_list: (p0) {
     expected("';' or '}'");
 };
 
+type_map: NULL;
+
 (% p0: first token %);
 parse_typedecl_body: (p0) {
     allocate(2);
@@ -718,6 +715,7 @@ parse_typedecl_body: (p0) {
     x0 = parse_identifier(lex());
     eatchar(lex(), ':');
     x1 = parse_typedecl_rhs(lex());
+    map_add(type_map, get_ident_name(x0), x1);
     return mktup3(NODE_TYPEDECL, get_ident_name(x0), x1);
 };
 
@@ -771,11 +769,22 @@ parse_type: (p0) {
 };
 
 parse_primary_type: (p0) {
+    allocate(1);
     if (p0 == TOK_VOID_T) { return void_type; };
     if (p0 == TOK_CHAR_T) { return char_type; };
     if (p0 == TOK_INT_T)  { return int_type; };
     if (p0 == '(') {
         return parse_tuple_type(p0);
+    };
+    if (p0 == TOK_IDENT) {
+        x0 = map_find(type_map, token_text());
+        if (x0 == NULL) {
+            fputs(stderr, "ERROR: undefined type'");
+            fputs(stderr, token_text());
+            fputs(stderr, "'\n");
+            exit(1);
+        };
+        return x0;
     };
     expected("type");
 };
@@ -823,16 +832,14 @@ make_tuple_t_from_list: (p0) {
 (% p0: file name %);
 parse: (p0) {
     allocate(2);
-    import_queue = mkvec(0);
     imported = mkset(&strhash, &streq, 0);
     rewrite_map = mkmap(&strhash, &streq, 0);
+    type_map = mkmap(&strhash, &streq, 0);
 
     x0 = open_in(p0);
     lexer_init(p0, x0);
     x1 = parse_toplevel_items(lex());
     close_in(x0);
-
-    x1 = import_modules(x1);
 
     return mktup2(NODE_PROG, x1);
 };
