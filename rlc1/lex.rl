@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: lex.rl 2010-04-08 22:06:18 nineties $
+ % $Id: lex.rl 2010-04-09 02:02:04 nineties $
  %);
 
 include(stddef, code);
@@ -614,6 +614,7 @@ keyword_init: () {
     map_add(keyword_map, "static_array", TOK_SARRAY);
     map_add(keyword_map, "cast", TOK_CAST);
     map_add(keyword_map, "new", TOK_NEW);
+    map_add(keyword_map, "while", TOK_WHILE);
 };
 
 operator_map : NULL;
