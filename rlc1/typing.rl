@@ -2,12 +2,13 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-08 21:14:44 nineties $
+ % $Id: typing.rl 2010-04-09 00:28:56 nineties $
  %);
 
 include(stddef, code);
 
 export(init_typing, typing, unit_type, char_type, int_type, float_type, double_type, void_type);
+export(get_variable);
 
 scopeid: 0;
 scopeid_stack: NULL; 
@@ -59,6 +60,19 @@ init_varmap: () {
     varmap_push(); (% global scopeid %);
 };
 
+get_variable: (p0) {
+    allocate(1);
+    x0 = varmap_find(p0);
+    if (x0 == NULL) {
+        fputs(stderr, "ERROR: variable '");
+        fputs(stderr, p0);
+        fputs(stderr, "' is not declared\n");
+        exit(1);
+    };
+    return mktup6(NODE_IDENTIFIER, x0[0][1], p0, x0[1], x0[0], x0[1]);
+};
+
+
 in_global_namespace: () {
     return vec_size(scopeid_stack) == 1;
 };
@@ -95,7 +109,7 @@ infer_funcs: [not_reachable, infer_integer, infer_string, not_implemented,
     infer_call, infer_subscript, infer_lambda, infer_unexpr, infer_binexpr,
     infer_assign, infer_export, infer_import, infer_external, infer_ret, infer_retval,
     infer_syscall, infer_field, infer_fieldref, infer_typedecl, infer_variant, infer_unit,
-    infer_typedexpr, infer_if, infer_ifelse, infer_static_array, infer_cast
+    infer_typedexpr, infer_if, infer_ifelse, infer_static_array, infer_cast, infer_new
 ];
 
 unit_type   : NULL;
@@ -399,7 +413,7 @@ infer_lambda: (p0) {
 
 unexpr_funcs: [
     infer_unarith, infer_unarith, infer_unarith, infer_unarith, not_implemented,
-    not_implemented, infer_unarith, infer_unarith, infer_unarith, infer_unarith
+    infer_indirect, infer_unarith, infer_unarith, infer_unarith, infer_unarith
 ];
 
 infer_unarith: (p0) {
@@ -408,6 +422,16 @@ infer_unarith: (p0) {
     unify(int_type, x0);
     p0[1] = int_type;
     return int_type;
+};
+
+infer_indirect: (p0) {
+    allocate(2);
+    x0 = infer_item(p0[3]);
+    x1 = mktyvar();
+    unify(mktup2(NODE_POINTER_T, x1), x0);
+    p0[1] = x1;
+    deref(p0);
+    return p0[1];
 };
 
 infer_unexpr: (p0) {
@@ -662,6 +686,14 @@ infer_cast: (p0) {
     return p0[1];
 };
 
+infer_new: (p0) {
+    allocate(1);
+    x0 = infer_item(p0[2]);
+    p0[1] = mktup2(NODE_POINTER_T, x0);
+    deref(p0);
+    return p0[1];
+};
+
 (% p0: item %);
 infer_item: (p0) {
     allocate(1);
@@ -812,7 +844,7 @@ deref_funcs: [not_reachable, deref_integer, deref_string, deref_dontcare,
     deref_call, deref_subscript, deref_lambda, deref_unexpr, deref_binexpr,
     deref_assign, deref_export, deref_import, deref_external, deref_ret, deref_retval,
     deref_syscall, deref_field, deref_fieldref, deref_typedecl, deref_variant, deref_unit,
-    deref_typedexpr, deref_if, deref_ifelse, deref_static_array, deref_cast
+    deref_typedexpr, deref_if, deref_ifelse, deref_static_array, deref_cast, deref_new
 ];
 
 (% p0: item %);
@@ -990,6 +1022,11 @@ deref_static_array: (p0) {
 };
 
 deref_cast: (p0) {
+    deref(p0[2]);
+    p0[1] = deref_type(p0[1]);
+};
+
+deref_new: (p0) {
     deref(p0[2]);
     p0[1] = deref_type(p0[1]);
 };

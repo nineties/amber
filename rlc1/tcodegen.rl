@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-08 20:52:57 nineties $
+ % $Id: tcodegen.rl 2010-04-09 01:24:54 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -171,7 +171,7 @@ transl_funcs: [
     transl_call, not_implemented, transl_lambda, transl_unexpr, transl_binexpr,
     transl_assign, not_reachable, not_reachable, not_reachable, transl_ret, transl_retval,
     transl_syscall, transl_field, transl_fieldref, not_reachable, transl_variant, transl_unit,
-    transl_typedexpr, transl_if, transl_ifelse, not_reachable, transl_cast
+    transl_typedexpr, transl_if, transl_ifelse, not_reachable, transl_cast, transl_new
 ];
 
 transl_integer: (p0, p1, p2) {
@@ -521,6 +521,26 @@ transl_array_assign: (p0, p1, p2) {
     not_implemented();
 };
 
+transl_indirect_assign: (p0, p1, p2) {
+    allocate(7);
+    x0 = p1[3][3]; (% pointer %);
+    x1 = p1[4]; (% rhs %);
+    p0 = transl_item_single(p0, x0, &x2);
+    x3 = create_pseudo(1, LOCATION_REGISTER);
+    p0 = ls_cons(mkinst(INST_MOVL, x2, x3), p0);
+    p0 = transl_item(p0, x1, &x4);
+    x5 = 0;
+    x6 = x4;
+    while (x6 != NULL) {
+        p0 = ls_cons(
+            mkinst(INST_STORE, ls_value(x6), create_offset(x3, NULL, x5)), p0);
+        x5 = x5 + 1;
+        x6 = ls_next(x6);
+    };
+    *p2 = x4;
+    return p0;
+};
+
 transl_assign: (p0, p1, p2) {
     allocate(1);
     x0 = p1[3]; (% lhs %);
@@ -543,6 +563,14 @@ transl_assign: (p0, p1, p2) {
     if (x0[0] == NODE_SUBSCRIPT) {
 	assert(p1[2] == BINOP_NONE);
 	return transl_array_assign(p0, p1, p2);
+    };
+    if (x0[0] == NODE_UNEXPR) {
+        if (x0[2] != UNOP_INDIRECT) {
+            fputs(stderr, "ERROR: invalid assignment expression\n");
+            exit(1);
+        };
+        assert(p1[2] == BINOP_NONE);
+        return transl_indirect_assign(p0, p1, p2);
     };
     not_reachable();
 };
@@ -579,6 +607,9 @@ must_be_register_or_immediate: (p0, p1) {
             *p1 = x1;
             return p0;
         };
+    };
+    if (x0[0] == OPD_OFFSET) {
+        not_reachable();
     };
     return p0;
 };
@@ -847,8 +878,8 @@ transl_syscall: (p0, p1, p2) {
     if (x1 > num_normal_regs()) {
 	x4 = num_normal_regs();
 	while (x4 < x1) {
-	    p0 = ls_cons(mkinst(INST_POPL, get_physical_reg(x4), NULL), p0);
-	    x4 = x4 + 1;
+	    p0 = ls_cons(mkinst(INST_POPL, get_physical_reg(x1-1), NULL), p0);
+            x1 = x1-1;
 	};
     };
     *p2 = ls_singleton(get_eax());
@@ -1007,6 +1038,28 @@ transl_cast: (p0, p1, p2) {
     return transl_item(p0, p1[2], p2);
 };
 
+transl_new: (p0, p1, p2) {
+    allocate(7);
+    x0 = p1[2]; (% expr %);
+    x1 = type_size(x0);
+    x2 = get_variable("alloc");
+    p0 = ls_cons(mkinst(INST_MOVL, mktup2(OPD_INTEGER, x1*4), get_stack(0)), p0);
+    x3 = mkinst(INST_CALL_IMM, mktup2(OPD_LABEL, mangle(x2[1], get_ident_name(x2))), NULL);
+    x3[INST_ARG] = 1;
+    p0 = ls_cons(x3, p0);
+
+    p0 = transl_item(p0, x0, &x4);
+    x5 = 0;
+    while (x5 < x1) {
+        x6 = mkinst(INST_STORE, ls_value(x4), create_offset(get_eax(), NULL, x5*4));
+        p0 = ls_cons(x6, p0);
+        x4 = ls_next(x4);
+        x5 = x5 + 1;
+    };
+    *p2 = ls_singleton(get_eax());
+    return p0;
+};
+
 (% p0: output tcode, p1: item, p2: pointer to store p1's value  %);
 transl_item: (p0, p1, p2) {
     allocate(1);
@@ -1078,7 +1131,7 @@ transl_fundecl_impl: (p0, p1) {
         x5 = x5 + 1;
     };
 
-    x6 = mktup5(TCODE_FUNC, x0, x1[2], x6, FALSE);
+    x6 = mktup6(TCODE_FUNC, x0, x1[2], x6, FALSE, 0);
 
     (% deadcode elimination %);
     puts("> removing dead-instructions ...\n");
@@ -1087,6 +1140,7 @@ transl_fundecl_impl: (p0, p1) {
     (% allocate registers %);
     puts("> allocating registers ...\n");
     regalloc(x6);
+    x6[5] = num_stack();
 
     return x6;
 };

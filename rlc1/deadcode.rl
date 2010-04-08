@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: deadcode.rl 2010-04-08 19:10:31 nineties $
+ % $Id: deadcode.rl 2010-04-08 23:03:10 nineties $
  %);
 
 include(stddef, code);
@@ -17,7 +17,7 @@ register_contains: (p0, p1) {
 
 (% opcode to functor %);
 iterate_funcs: [
-    iterate_normal, iterate_normal, iterate_normal, iterate_ret, iterate_normal,
+    iterate_normal, iterate_nothing, iterate_nothing, iterate_ret, iterate_normal,
     iterate_int, iterate_call, iterate_call, iterate_normal, iterate_normal,
     iterate_normal, iterate_div, iterate_mod, iterate_normal, iterate_normal,
     iterate_normal, iterate_normal, iterate_normal, iterate_normal, iterate_normal,

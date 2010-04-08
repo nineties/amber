@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: parse.rl 2010-04-08 21:58:40 nineties $
+ % $Id: parse.rl 2010-04-09 01:02:53 nineties $
  %);
 
 include(stddef, code, token);
@@ -94,11 +94,11 @@ parse_toplevel_items: (p0) {
         x2 = import_module(get_ident_name(x0));
         x1 = lex();
         if (x1 == TOK_END) {
-            puts("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
             return x2;
         };
         eatchar(x1, ';');
-        return ls_append(x2, parse_toplevel_items(lex()));
+        return ls_cons(mktup2(NODE_IMPORT, get_ident_name(x0)),
+            ls_append(x2, parse_toplevel_items(lex())));
     };
     x0 = parse_toplevel_item(p0);
     x1 = lex();
@@ -193,7 +193,7 @@ parse_conditional_expr: (p0) {
     allocate(2);
     if (p0 == TOK_IF) {
         eatchar(lex(), '(');
-        x0 = parse_assignment_expr(lex());
+        x0 = parse_typed_expr(lex());
         eatchar(lex(), ')');
         x1 = parse_block(lex());
         return mktup4(NODE_IF, NULL, x0, x1);
@@ -507,7 +507,7 @@ label post_loop;
         goto &post_loop;
     };
     if (x1 == '[') {
-        x0 = mktup4(NODE_SUBSCRIPT, NULL, x0, parse_assignment_expr(lex()));
+        x0 = mktup4(NODE_SUBSCRIPT, NULL, x0, parse_typed_expr(lex()));
 	eatchar(lex(), ']');
         goto &post_loop;
     };
@@ -581,10 +581,13 @@ parse_primary_item: (p0) {
     if (p0 == TOK_CAST) {
         eatchar(lex(), '(');
         x0 = parse_type(lex());
-        eatchar(lex(), ',');
-        x1 = parse_assignment_expr(lex());
         eatchar(lex(), ')');
+        x1 = parse_primary_item(lex());
         return mktup3(NODE_CAST, x0, x1);
+    };
+    if (p0 == TOK_NEW) {
+        x0 = parse_typed_expr(lex());
+        return mktup3(NODE_NEW, NULL, x0);
     };
     expected("item");
 };
@@ -763,6 +766,9 @@ parse_type: (p0) {
     x1 = lex();
     if (x1 == TOK_ARROW) {
         return mktup3(NODE_LAMBDA_T, x0, parse_type(lex()));
+    };
+    if (x1 == '*') {
+        return mktup2(NODE_POINTER_T, x0);
     };
     unput();
     return x0;

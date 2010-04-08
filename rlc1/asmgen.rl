@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: asmgen.rl 2010-04-08 19:19:57 nineties $
+ % $Id: asmgen.rl 2010-04-09 01:06:00 nineties $
  %);
 
 include(stddef, code);
@@ -67,9 +67,10 @@ emit_opd: (p0, p1, p2) {
     };
     if (p1[0] == OPD_STACK) {
         x0 = p1[2]; (% position %);
-        x0 = 4 * x0;
-        if (x0 != 0) { fputi(p0, x0); };
-        fputs(p0, "(%esp)");
+        x0 = 4 * (stack_depth - x0);
+        fputc(p0, '-');
+        fputi(p0, x0);
+        fputs(p0, "(%ebp)");
         return;
     };
     if (p1[0] == OPD_ARG) {
@@ -93,13 +94,22 @@ emit_opd: (p0, p1, p2) {
         return;
     };
     if (p1[0] == OPD_OFFSET) {
-	emit_opd(p0, p1[3], 32); (% label %);
-	fputs(p0, "(,");
-	emit_opd(p0, p1[2], 32); (% register %);
-	fputc(p0, ',');
-	fputi(p0, p1[4]);
-	fputc(p0, ')');
-	return;
+        if (p1[3] != NULL) {
+            emit_opd(p0, p1[3], 32); (% label %);
+            fputs(p0, "(,");
+            emit_opd(p0, p1[2], 32); (% register %);
+            fputc(p0, ',');
+            fputi(p0, p1[4]);
+            fputc(p0, ')');
+            return;
+        };
+        if (p1[4] != 0) {
+            fputi(p0, p1[4]);
+        };
+        fputc(p0, '(');
+        emit_opd(p0, p1[2], 32);
+        fputc(p0, ')');
+        return;
     };
     not_reachable();
 };
@@ -233,6 +243,8 @@ emit_data: (p0, p1) {
     emit_static_data(p0, p1[2]);
 };
 
+stack_depth:0;
+
 emit_func: (p0, p1) {
     allocate(1);
 
@@ -242,6 +254,8 @@ emit_func: (p0, p1) {
         fputs(p0, p1[1]);
         fputc(p0, '\n');
     };
+    stack_depth = p1[5];
+
     fputs(p0, p1[1]); (% label %);
     fputs(p0, ":\n");
     x0 = p1[3]; (% instructions %);
