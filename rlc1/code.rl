@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: code.rl 2010-04-08 13:12:00 nineties $
+ % $Id: code.rl 2010-04-08 19:03:53 nineties $
  %);
 
 NODE_PROG       => 0;  (% item list %);
@@ -15,7 +15,7 @@ NODE_TUPLE      => 6;  (% type, length, elements %);
 NODE_BLOCK      => 7;  (% type, elements %);
 NODE_DECL       => 8;  (% type, lhs, rhs %);
 NODE_CALL       => 9;  (% operator() : type, lhs, tuple of arguments %);
-NODE_SUBSCRIPT  => 10; (% operator[] : type, lhs, array of arguments %);
+NODE_SUBSCRIPT  => 10; (% operator[] : type, lhs, index %);
 NODE_LAMBDA     => 11; (% operator{} : type, lhs, code %);
 NODE_UNEXPR     => 12; (% type, operator, arg %);
 NODE_BINEXPR    => 13; (% type, operator, lhs, rhs %);
@@ -34,6 +34,7 @@ NODE_UNIT       => 25; (% type, 0, NULL %);
 NODE_TYPEDEXPR  => 26; (% type, expr %);
 NODE_IF         => 27; (% type, cond, body %);
 NODE_IFELSE     => 28; (% type, cond, ifthen, ifelse %);
+NODE_SARRAY     => 29; (% type, elem, length %);
 
 (% indices %);
 STRING_RAW       => 2;
@@ -64,6 +65,7 @@ NODE_TYVAR     => 9;  (% type-variable id %);
 NODE_NAMED_T   => 10; (% fieldname, type %);
 NODE_VARIANT_T => 11; (% name, rows %);
 NODE_VOID_T    => 12;
+NODE_SARRAY_T  => 13; (% element type %);
 
 (% structure of rows of variant
  % (constructor name, id, arg)
@@ -126,6 +128,7 @@ OPD_CHAR     => 6; (% value %);
 OPD_FLOAT    => 7; (% value %);
 OPD_ADDRESS  => 8; (% name %);
 OPD_LABEL    => 9; (% name %);
+OPD_OFFSET   => 10; (% id, register, label, size %);
 
 PSUEOD_ID       => 2;
 PSEUDO_LENGTH   => 3;
@@ -147,6 +150,7 @@ DATA_TUPLE  => 4; (% length, values %);
 DATA_ARRAY  => 5; (% length, values %);
 DATA_STRING => 6; (% string %);
 DATA_LABEL  => 7; (% name %);
+DATA_SARRAY => 8; (% size, bits %);
 
 TCODE_SKIP   => 0; (% byte %);
 TCODE_DATA   => 1; (% label name, data, export %);

@@ -2,7 +2,7 @@
  % rowl - generation 2
  % Copyright (C) 2010 nineties
  %
- % $Id: sys.rl 2010-04-08 10:33:02 nineties $
+ % $Id: sys.rl 2010-04-08 18:01:49 nineties $
  %)
 
 (% system calls %)
@@ -31,4 +31,31 @@ fork: () {
         return pid;
     };
     exit(-pid);
+};
+
+ProtRead  => 1;
+ProtWrite => 2;
+ProtExec  => 4;
+ProtSem   => 8;
+ProtNone  => 0;
+
+MapShared    => 1;
+MapPrivate   => 2;
+MapType      => 15;
+MapFixed     => 16;
+MapAnonymous => 32;
+
+export
+mmap2: (addr @ int, size @ int) {
+    ret : syscall(SysMmap2, addr, size, ProtRead|ProtWrite|ProtExec,
+        MapAnonymous|MapPrivate, -1, 0) @ int;
+    if (ret >= 0) {
+        return ret;
+    };
+    exit(-ret);
+};
+
+export
+munmap: (addr @ int, size @ int) {
+    syscall(SysMunmap, addr, size);
 };

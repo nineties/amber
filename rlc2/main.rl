@@ -1,9 +1,10 @@
 import stdlib;
 
 make_counter: (n) {
-    return () {
+    f : () {
         return n++;
     };
+    return f;
 };
 
 export

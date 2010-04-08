@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-08 14:27:20 nineties $
+ % $Id: typing.rl 2010-04-08 19:23:06 nineties $
  %);
 
 include(stddef, code);
@@ -92,10 +92,10 @@ not_implemented: (p0) {
 
 infer_funcs: [not_reachable, infer_integer, infer_string, not_implemented,
     infer_identifier, infer_array, infer_tuple, infer_block, infer_decl,
-    infer_call, not_implemented, infer_lambda, infer_unexpr, infer_binexpr,
+    infer_call, infer_subscript, infer_lambda, infer_unexpr, infer_binexpr,
     infer_assign, infer_export, infer_import, infer_external, infer_ret, infer_retval,
     infer_syscall, infer_field, infer_fieldref, infer_typedecl, infer_variant, infer_unit,
-    infer_typedexpr, infer_if, infer_ifelse
+    infer_typedexpr, infer_if, infer_ifelse, infer_static_array
 ];
 
 unit_type   : NULL;
@@ -343,6 +343,19 @@ infer_call: (p0) {
     return p0[1];
 };
 
+infer_subscript: (p0) {
+    allocate(2);
+    x0 = infer_item(p0[2]);
+    x1 = infer_item(p0[3]);
+    unify(int_type, x1);
+    if (x0[0] == NODE_SARRAY_T) {
+	p0[1] = x0[1];
+	deref(p0);
+	return p0[1];
+    };
+    not_implemented();
+};
+
 insert_missing_ret: (p0) {
     allocate(1);
     if (p0 == NULL) {
@@ -416,6 +429,7 @@ infer_binarith: (p0) {
 };
 
 infer_equality: (p0) {
+    allocate(2);
     x0 = infer_item(p0[3]);
     x1 = infer_item(p0[4]);
     unify(x0, x1);
@@ -614,13 +628,22 @@ infer_if: (p0) {
 };
 
 infer_ifelse: (p0) {
-    allocate(4);
+    allocate(3);
     x0 = infer_item(p0[2]); (% condition %);
     unify(int_type, x0);
     x1 = infer_item(p0[3]); (% ifthen block %);
     x2 = infer_item(p0[4]); (% ifelse block %);
-    x3 = unify_join(x1, x2);
-    p0[1] = x3;
+    p0[1] = unify_join(x1, x2);
+    deref(p0);
+    return p0[1];
+};
+
+infer_static_array: (p0) {
+    allocate(4);
+    x0 = infer_item(p0[2]); (% initializer %);
+    x1 = infer_item(p0[3]); (% length %);
+    unify(x1, int_type);
+    p0[1] = mktup2(NODE_SARRAY_T, x0);
     deref(p0);
     return p0[1];
 };
@@ -718,8 +741,7 @@ unify_tyvar: (p0, p1) {
 unify_join: (p0, p1) {
     if (p0 == void_type) { return p1; };
     if (p1 == void_type) { return p0; };
-    unify(p0, p1);
-    return p0;
+    return unit_type;
 };
 
 (% p0: id, p1, type %);
@@ -768,10 +790,10 @@ type_mismatch: (p0, p1) {
 
 deref_funcs: [not_reachable, deref_integer, deref_string, deref_dontcare,
     deref_identifier, deref_array, deref_tuple, deref_block, deref_decl,
-    deref_call, not_implemented, deref_lambda, deref_unexpr, deref_binexpr,
+    deref_call, deref_subscript, deref_lambda, deref_unexpr, deref_binexpr,
     deref_assign, deref_export, deref_import, deref_external, deref_ret, deref_retval,
     deref_syscall, deref_field, deref_fieldref, deref_typedecl, deref_variant, deref_unit,
-    deref_typedexpr, deref_if, deref_ifelse
+    deref_typedexpr, deref_if, deref_ifelse, deref_static_array
 ];
 
 (% p0: item %);
@@ -841,6 +863,12 @@ deref_decl: (p0) {
 deref_call: (p0) {
     deref(p0[2]); (% function %);
     deref(p0[3]); (% argument %);
+    p0[1] = deref_type(p0[1]);
+};
+
+deref_subscript: (p0) {
+    deref(p0[2]);
+    deref(p0[3]);
     p0[1] = deref_type(p0[1]);
 };
 
@@ -931,6 +959,12 @@ deref_ifelse: (p0) {
     deref(p0[2]);
     deref(p0[3]);
     deref(p0[4]);
+    p0[1] = deref_type(p0[1]);
+};
+
+deref_static_array: (p0) {
+    deref(p0[2]);
+    deref(p0[3]);
     p0[1] = deref_type(p0[1]);
 };
 

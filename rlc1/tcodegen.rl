@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-08 11:19:55 nineties $
+ % $Id: tcodegen.rl 2010-04-08 19:22:12 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -171,7 +171,7 @@ transl_funcs: [
     transl_call, not_implemented, transl_lambda, transl_unexpr, transl_binexpr,
     transl_assign, not_reachable, not_reachable, not_reachable, transl_ret, transl_retval,
     transl_syscall, transl_field, transl_fieldref, not_reachable, transl_variant, transl_unit,
-    transl_typedexpr, transl_if, transl_else
+    transl_typedexpr, transl_if, transl_ifelse
 ];
 
 transl_integer: (p0, p1, p2) {
@@ -204,6 +204,10 @@ transl_identifier: (p0, p1, p2) {
             *p2 = ls_singleton(mktup2(OPD_ADDRESS, mangle(p1[1], get_ident_name(p1))));
             return p0;
         };
+	if (p1[1][0] == NODE_SARRAY_T) {
+	    *p2 = ls_singleton(mktup2(OPD_LABEL, get_ident_name(p1)));
+	    return p0;
+	};
         x0 = type_size(p1[1]);
         if (x0 == 1) {
             *p2 = ls_singleton(mktup2(OPD_LABEL, get_ident_name(p1)));
@@ -499,6 +503,24 @@ transl_tuple_assign: (p0, p1, p2) {
     return p0;
 };
 
+transl_array_assign: (p0, p1, p2) {
+    allocate(7);
+    x0 = p1[3]; (% lhs %);
+    x1 = p1[4]; (% rhs %);
+    p0 = transl_item_single(p0, x0[2], &x2);
+    p0 = transl_item_single(p0, x0[3], &x3);
+    x4 = type_size(p1[1]) * 4;
+    if (x2[0] == OPD_LABEL) {
+	p0 = must_be_register(p0, &x3);
+	x5 = create_offset(x3, x2, x4);
+	p0 = transl_item_single(p0, x1, &x6);
+	p0 = ls_cons(mkinst(INST_STORE, x6, x5), p0);
+	*p2 = x5;
+	return p0;
+    };
+    not_implemented();
+};
+
 transl_assign: (p0, p1, p2) {
     allocate(1);
     x0 = p1[3]; (% lhs %);
@@ -517,6 +539,10 @@ transl_assign: (p0, p1, p2) {
             return transl_simple_assign(p0, p1, p2);
         };
         return transl_arith_assign(p0, p1, p2);
+    };
+    if (x0[0] == NODE_SUBSCRIPT) {
+	assert(p1[2] == BINOP_NONE);
+	return transl_array_assign(p0, p1, p2);
     };
     not_reachable();
 };
@@ -612,7 +638,7 @@ transl_divexpr: (p0, p1, p2) {
     *p2 = ls_singleton(x2);
     p0 = ls_cons(mkinst(INST_MOVL, x0, get_eax()), p0);
     p0 = ls_cons(mkinst(INST_MOVL, mktup2(OPD_INTEGER, 0), get_edx()), p0);
-    p0 = must_be_register_or_immediate(p0, &x1);
+    p0 = must_be_register(p0, &x1);
     p0 = ls_cons(mkinst(INST_IDIV, x1, NULL), p0);
     p0 = ls_cons(mkinst(INST_MOVL, get_eax(), x2), p0);
     return p0;
@@ -634,7 +660,7 @@ transl_modexpr: (p0, p1, p2) {
     *p2 = ls_singleton(x2);
     p0 = ls_cons(mkinst(INST_MOVL, x0, get_eax()), p0);
     p0 = ls_cons(mkinst(INST_MOVL, mktup2(OPD_INTEGER, 0), get_edx()), p0);
-    p0 = must_be_register_or_immediate(p0, &x1);
+    p0 = must_be_register(p0, &x1);
     p0 = ls_cons(mkinst(INST_IMOD, x1, NULL), p0);
     p0 = ls_cons(mkinst(INST_MOVL, get_edx(), x2), p0);
     return p0;
@@ -912,6 +938,28 @@ transl_binary_if: (p0, p1, p2) {
     return p0;
 };
 
+transl_binary_ifelse: (p0, p1, p2) {
+    allocate(6);
+    x0 = p1[2]; (% condition %);
+    if (x0[2] >= BINOP_SEQOR) {
+        not_implemented();
+    };
+    x1 = binary_if_inversed_inst[x0[2]];
+    p0 = transl_item_single(p0, x0[3], &x2);
+    p0 = transl_item_single(p0, x0[4], &x3);
+    p0 = must_be_register(p0, &x3);
+    p0 = ls_cons(mkinst(INST_CMPL, x2, x3), p0);
+    x4 = mktup2(OPD_LABEL, new_label("L"));
+    x5 = mktup2(OPD_LABEL, new_label("L"));
+    p0 = ls_cons(mkinst(x1, x4, NULL), p0);
+    p0 = transl_item(p0, p1[3], p2); (% ifthen block %);
+    p0 = ls_cons(mkinst(INST_JMP, x5, NULL), p0);
+    p0 = ls_cons(mkinst(INST_LABEL, x4, NULL), p0);
+    p0 = transl_item(p0, p1[4], p2); (% ifelse block %);
+    p0 = ls_cons(mkinst(INST_LABEL, x5, NULL), p0);
+    return p0;
+};
+
 transl_if: (p0, p1, p2) {
     allocate(3);
     x0 = p1[2]; (% condition %);
@@ -925,12 +973,30 @@ transl_if: (p0, p1, p2) {
     p0 = ls_cons(mkinst(INST_CMPL, mktup2(OPD_INTEGER, 0), x1), p0);
     x2 = mktup2(OPD_LABEL, new_label("L"));
     p0 = ls_cons(mkinst(INST_JE, x2, NULL), p0);
-    p0 = transl_item(p0, p1[3], p2);
+    p0 = transl_item(p0, p1[3], p2); (% ifthen block %);
     p0 = ls_cons(mkinst(INST_LABEL, x2, NULL), p0);
     return p0;
 };
 
-transl_else: (p0, p1, p2) {
+transl_ifelse: (p0, p1, p2) {
+    allocate(4);
+    x0 = p1[2]; (% condition %);
+    if (x0[0] == NODE_BINEXPR) {
+        if (x0[2] >= BINOP_EQ) {
+            return transl_binary_ifelse(p0, p1, p2);
+        };
+    };
+    x2 = mktup2(OPD_LABEL, new_label("L"));
+    x3 = mktup2(OPD_LABEL, new_label("L"));
+    p0 = transl_item_single(p0, x0, &x1);
+    p0 = must_be_register(p0, &x1);
+    p0 = ls_cons(mkinst(INST_CMPL, mktup2(OPD_INTEGER, 0), x1), p0);
+    p0 = ls_cons(mkinst(INST_JE, x2, NULL), p0);
+    p0 = transl_item(p0, p1[3], p2); (% ifthen block %);
+    p0 = ls_cons(mkinst(INST_JMP, x3, NULL), p0);
+    p0 = ls_cons(mkinst(INST_LABEL, x2, NULL), p0);
+    p0 = transl_item(p0, p1[4], p2); (% ifelse block %);
+    p0 = ls_cons(mkinst(INST_LABEL, x3, NULL), p0);
     return p0;
 };
 
@@ -1055,6 +1121,23 @@ transl_static_data: (p0) {
     if (p0[0] == NODE_FIELD) {
         transl_static_data(p0[3]);
         return;
+    };
+    if (p0[0] == NODE_SARRAY) {
+	x0 = p0[2]; (% initializer %);
+	if (x0[0] != NODE_INTEGER) {
+	    fputs(stderr, "ERROR: static array of non-integer is not implemented\n");
+	    exit(1);
+	};
+	if (x0[3] != 0) {
+	    fputs(stderr, "ERROR: static array of non-zero integer is not implemented\n");
+	    exit(1);
+	};
+	x1 = p0[3]; (% length %);
+	if (x1[0] != NODE_INTEGER) {
+	    fputs(stderr, "ERROR: length of array is not static\n");
+	    exit(1);
+	};
+	return mktup3(DATA_SARRAY, x0[2]*x1[3]/8, x0[2]);
     };
     not_implemented();
 };

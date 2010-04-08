@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: proc.rl 2010-04-07 19:46:24 nineties $
+ % $Id: proc.rl 2010-04-08 19:21:15 nineties $
  %);
 
 include(stddef, code);
@@ -13,6 +13,7 @@ export(get_eax, get_ebx, get_ecx, get_edx, get_esi, get_edi, get_ebp, get_esp);
 export(create_pseudo, get_pseudo, assign_pseudo, get_at);
 export(get_register_repr);
 export(is_constant_operand, is_local_operand, set_pseudo_type);
+export(create_offset);
 
 NUM_PHYSICAL_REGS => 8; (% eax, ebx, ecx, edx, esi, edi, ebp, esp %);
 NUM_NORMAL_REGS   => 4; (% eax, ebx, ecx, edx %);
@@ -177,6 +178,13 @@ assign_pseudo: (p0, p1) {
     p0[PSEUDO_LOCATION] = p1;
 };
 
+create_offset: (p0, p1, p2) {
+    allocate(1);
+    x0 = mktup5(OPD_OFFSET, new_location_id(), p0, p1, p2);
+    vec_pushback(locations, x0);
+    return x0;
+};
+
 init_proc: () {
     allocate(1);
     locations  = mkvec(NUM_PHYSICAL_REGS);
@@ -207,6 +215,7 @@ is_constant_operand: (p0) {
     if (p0[0] == OPD_STACK)    { return FALSE; };
     if (p0[0] == OPD_ARG)      { return FALSE; };
     if (p0[0] == OPD_AT)       { return FALSE; };
+    if (p0[0] == OPD_OFFSET)   { return FALSE; };
     return TRUE;
 };
 
@@ -216,6 +225,7 @@ is_local_operand: (p0) {
     if (p0[0] == OPD_AT) {
 	return is_local_operand(p0[2]);
     };
+    if (p0[0] == OPD_OFFSET) { return FALSE; };
     return TRUE;
 };
 

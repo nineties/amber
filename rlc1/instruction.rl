@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: instruction.rl 2010-04-07 17:39:30 nineties $
+ % $Id: instruction.rl 2010-04-08 19:15:35 nineties $
  %);
 
 include(code, stddef);
@@ -70,6 +70,9 @@ opd2_is_output: (p0) {
 register_add: (p0, p1) {
     if (p1 == NULL) { return p0; };
     if (is_constant_operand(p1)) { return p0; };
+    if (p1[0] == OPD_OFFSET) {
+	return register_add(p0, p1[2]);
+    };
     return iset_add(p0, p1[1]);
 };
 

@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: parse.rl 2010-04-08 01:03:18 nineties $
+ % $Id: parse.rl 2010-04-08 18:37:59 nineties $
  %);
 
 include(stddef, code, token);
@@ -512,7 +512,8 @@ label post_loop;
         goto &post_loop;
     };
     if (x1 == '[') {
-        x0 = mktup4(NODE_SUBSCRIPT, NULL, x0, parse_array(x1));
+        x0 = mktup4(NODE_SUBSCRIPT, NULL, x0, parse_assignment_expr(lex()));
+	eatchar(lex(), ']');
         goto &post_loop;
     };
     if (x1 == '{') {
@@ -573,6 +574,14 @@ parse_primary_item: (p0) {
         };
         unput();
         return mktup5(NODE_VARIANT, NULL, x0, 0, NULL);
+    };
+    if (p0 == TOK_SARRAY) {
+	eatchar(lex(), '(');
+	x0 = parse_item(lex()); (% init %);
+	eatchar(lex(), ',');
+	x1 = parse_item(lex()); (% length %);
+	eatchar(lex(), ')');
+	return mktup4(NODE_SARRAY, NULL, x0, x1);
     };
     expected("item");
 };

@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: regalloc.rl 2010-04-07 20:06:56 nineties $
+ % $Id: regalloc.rl 2010-04-08 19:22:19 nineties $
  %);
 
 (% Register allocation %);
@@ -317,6 +317,7 @@ assign_location: (p0) {
     allocate(2);
     x0 = select_location(p0);
     (% update register table %);
+    (%
     puts(">> assign: ");
     emit_opd(stdout, p0, 32);
     puts(" <-");
@@ -327,6 +328,7 @@ assign_location: (p0) {
         x1 = ls_next(x1);
     };
     putc('\n');
+    %);
 
     assign_pseudo(p0, x0);
     (% update conflicts/equivregs %);
@@ -440,6 +442,12 @@ need_temporal_register: (p0) {
     };
     x0 = p0[INST_OPERAND1];
     x1 = p0[INST_OPERAND2];
+    if (x0[0] == OPD_LABEL) {
+	return TRUE;
+    };
+    if (x1[0] == OPD_LABEL) {
+	return TRUE;
+    };
     x2 = vec_at(conflicts, x0[1]);
     if (iset_contains(x2, x1[1])) {
         return TRUE;
@@ -455,7 +463,7 @@ need_temporal_register: (p0) {
 
 (% p0: program list, p1: instruction %);
 insert: (p0, p1) {
-    allocate(2);
+    allocate(3);
     if (need_temporal_register(p1)) {
         x0 = create_pseudo(1, LOCATION_REGISTER);
         p0 = ls_cons(mkinst(INST_MOVL, p1[INST_OPERAND1], x0), p0);
