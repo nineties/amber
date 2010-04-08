@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-08 10:11:19 nineties $
+ % $Id: tcodegen.rl 2010-04-08 11:19:55 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -135,9 +135,11 @@ put_labelint: (p0, p1) {
     };
 };
 
-new_label: () {
+(% p0: prefix %);
+new_label: (p0) {
     reset_labelbuf();
-    put_labelstr("L.");
+    put_labelstr(p0);
+    put_labelchar('.');
     put_labelint(label_id);
     label_id = label_id + 1;
     return strdup(labelbuf);
@@ -146,6 +148,11 @@ new_label: () {
 topdecl : NULL;
 add_topdecl: (p0) {
     topdecl = ls_cons(p0, topdecl);
+};
+
+const_closures : NULL;
+add_closure: (p0) {
+    const_closures = ls_cons(p0, const_closures);
 };
 
 not_reachable: (p0) {
@@ -161,7 +168,7 @@ not_implemented: (p0) {
 transl_funcs: [
     not_reachable, transl_integer, transl_string, not_implemented,
     transl_identifier, not_implemented, transl_tuple, transl_code, transl_decl,
-    transl_call, not_implemented, not_implemented, transl_unexpr, transl_binexpr,
+    transl_call, not_implemented, transl_lambda, transl_unexpr, transl_binexpr,
     transl_assign, not_reachable, not_reachable, not_reachable, transl_ret, transl_retval,
     transl_syscall, transl_field, transl_fieldref, not_reachable, transl_variant, transl_unit,
     transl_typedexpr, transl_if, transl_else
@@ -183,7 +190,7 @@ transl_integer: (p0, p1, p2) {
 
 transl_string: (p0, p1, p2) {
     allocate(1);
-    x0 = new_label();
+    x0 = new_label("str");
     add_topdecl(mktup4(TCODE_DATA, x0, mktup2(DATA_STRING, p1[2]), FALSE));
     *p2 = ls_singleton(mktup2(OPD_ADDRESS, x0));
     return p0;
@@ -304,6 +311,14 @@ transl_call: (p0, p1, p2) {
     x4 = create_pseudo(1, LOCATION_ANY);
     p0 = ls_cons(mkinst(INST_MOVL, get_eax(), x4), p0);
     *p2 = ls_singleton(x4);
+    return p0;
+};
+
+transl_lambda: (p0, p1, p2) {
+    allocate(1);
+    x0 = new_label("cls");
+    add_closure(mktup2(x0, p1));
+    *p2 = ls_singleton(mktup2(OPD_ADDRESS, x0));
     return p0;
 };
 
@@ -890,7 +905,7 @@ transl_binary_if: (p0, p1, p2) {
     p0 = transl_item_single(p0, x0[4], &x3);
     p0 = must_be_register(p0, &x3);
     p0 = ls_cons(mkinst(INST_CMPL, x2, x3), p0);
-    x4 = mktup2(OPD_LABEL, new_label());
+    x4 = mktup2(OPD_LABEL, new_label("L"));
     p0 = ls_cons(mkinst(x1, x4, NULL), p0);
     p0 = transl_item(p0, p1[3], p2);
     p0 = ls_cons(mkinst(INST_LABEL, x4, NULL), p0);
@@ -908,7 +923,7 @@ transl_if: (p0, p1, p2) {
     p0 = transl_item_single(p0, x0, &x1);
     p0 = must_be_register(p0, &x1);
     p0 = ls_cons(mkinst(INST_CMPL, mktup2(OPD_INTEGER, 0), x1), p0);
-    x2 = mktup2(OPD_LABEL, new_label());
+    x2 = mktup2(OPD_LABEL, new_label("L"));
     p0 = ls_cons(mkinst(INST_JE, x2, NULL), p0);
     p0 = transl_item(p0, p1[3], p2);
     p0 = ls_cons(mkinst(INST_LABEL, x2, NULL), p0);
@@ -949,15 +964,25 @@ do_nothing: (p0) {
 
 (% p0: item %);
 transl_fundecl: (p0) {
-    allocate(7);
-
-    reset_proc();
     puts("> compiling '");
     puts(get_ident_name(p0[2]));
     puts("' ...\n");
+    return transl_fundecl_impl(mangle(p0[1], get_ident_name(p0[2])), p0[3]);
+};
 
-    x0 = mangle(p0[1], get_ident_name(p0[2]));
-    x1 = p0[3]; (% lambda %);
+(% p0: program list, p1 (label name, lambda) %);
+transl_const_closure: (p0, p1) {
+    return ls_cons(transl_fundecl_impl(p1[0], p1[1]), p0);
+};
+
+(% p0: name, p1: lambda %);
+transl_fundecl_impl: (p0, p1) {
+    allocate(7);
+
+    reset_proc();
+
+    x0 = p0;
+    x1 = p1;
 
     x2 = x1[2]; (% argument %);
     x3 = x2[TUPLE_LENGTH];
@@ -1023,7 +1048,7 @@ transl_static_data: (p0) {
         return mktup3(DATA_TUPLE, x0, x2);
     };
     if (p0[0] == NODE_STRING) {
-        x0 = new_label();
+        x0 = new_label("str");
         add_topdecl(mktup4(TCODE_DATA, x0, mktup2(DATA_STRING, p0[2]), FALSE));
         return mktup2(DATA_LABEL, x0);
     };
@@ -1107,6 +1132,7 @@ tcodegen: (p0) {
     vtable = mkvec(num_variable());
 
     topdecl = NULL;
+    const_closures = NULL;
 
     x0 = p0[1];
     x1 = NULL;
@@ -1116,6 +1142,11 @@ tcodegen: (p0) {
             x1 = ls_cons(x2, x1);
         };
         x0 = ls_next(x0);
+    };
+
+    while (const_closures != NULL) {
+	x1 = transl_const_closure(x1, ls_value(const_closures));
+	const_closures = ls_next(const_closures);
     };
     return ls_append(ls_reverse(x1), ls_reverse(topdecl));
 };

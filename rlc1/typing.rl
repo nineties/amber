@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-08 09:31:28 nineties $
+ % $Id: typing.rl 2010-04-08 10:51:18 nineties $
  %);
 
 include(stddef, code);
@@ -191,15 +191,15 @@ do_exit: (p0) {
 return_type: (p0) {
     if (p0[0] == NODE_RETVAL) { return p0[1]; };
     if (p0[1][0] == NODE_VOID_T) {
-        if (have_return != NULL) {
-            return deref_type(have_return);
+        if (vec_back(return_stack) != NULL) {
+            return deref_type(vec_back(return_stack));
         };
         return void_type;
     };
     return unit_type;
 };
 
-have_return: NULL;
+return_stack: NULL;
 
 infer_block: (p0) {
     allocate(3);
@@ -362,8 +362,9 @@ infer_lambda: (p0) {
     varmap_push();
     x0 = infer_pattern(p0[LAMBDA_ARG]);
 
-    have_return = NULL;
+    vec_pushback(return_stack, NULL);
     x1 = infer_item(p0[LAMBDA_BODY]);
+    vec_popback(return_stack);
     varmap_pop();
 
     p0[1] = mktup3(NODE_LAMBDA_T, x0, x1);
@@ -474,10 +475,11 @@ label external_error;
 
 infer_ret: (p0) {
     allocate(1);
-    if (have_return != NULL) {
-        unify(have_return, unit_type);
+    x0 = vec_back(return_stack);
+    if (x0 != NULL) {
+        unify(x0, unit_type);
     };
-    have_return = unit_type;
+    vec_put(return_stack, vec_size(return_stack)-1, unit_type);
     p0[1] = unit_type;
     deref(p0);
     return unit_type;
@@ -485,12 +487,14 @@ infer_ret: (p0) {
 
 (% return e; is treated as .pseudo_retvar = e; %);
 infer_retval: (p0) {
+    allocate(1);
     p0[1] = infer_item(p0[RETVAL_VALUE]);
-    if (have_return != NULL) {
-        unify(p0[1], have_return);
+    x0 = vec_back(return_stack);
+    if (x0 != NULL) {
+        unify(p0[1], x0);
     };
     deref(p0);
-    have_return = p0[1];
+    vec_put(return_stack, vec_size(return_stack)-1, p0[1]);
     return p0[1];
 };
 
@@ -997,7 +1001,8 @@ typing: (p0) {
 
     init_varmap();
     init_tyvarmap();
-    variant_map = mkmap(&strhash, &streq, 10);
+    variant_map  = mkmap(&strhash, &streq, 10);
+    return_stack = mkvec(0);
 
     x0 = p0[1];
     while (x0 != NULL) {
