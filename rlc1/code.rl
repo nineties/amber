@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: code.rl 2010-04-08 00:52:54 nineties $
+ % $Id: code.rl 2010-04-08 01:54:54 nineties $
  %);
 
 NODE_PROG       => 0;  (% item list %);
@@ -36,19 +36,19 @@ NODE_IF         => 27; (% type, cond, body %);
 NODE_IFELSE     => 28; (% type, cond, ifthen, ifelse %);
 
 (% indices %);
-STRING_RAW      => 2;
-ARRAY_LENGTH    => 2;
-ARRAY_ELEMENTS  => 3;
-TUPLE_LENGTH    => 2;
-TUPLE_ELEMENTS  => 3;
+STRING_RAW       => 2;
+ARRAY_LENGTH     => 2;
+ARRAY_ELEMENTS   => 3;
+TUPLE_LENGTH     => 2;
+TUPLE_ELEMENTS   => 3;
 BLOCK_STATEMENTS => 2;
-LAMBDA_ARG      => 2;
-LAMBDA_BODY     => 3;
-SUBSCRIPT_LHS   => 2;
-SUBSCRIPT_RHS   => 3;
-CALL_FUN        => 2;
-CALL_ARG        => 3;
-RETVAL_VALUE    => 2;
+LAMBDA_ARG       => 2;
+LAMBDA_BODY      => 3;
+SUBSCRIPT_LHS    => 2;
+SUBSCRIPT_RHS    => 3;
+CALL_FUN         => 2;
+CALL_ARG         => 3;
+RETVAL_VALUE     => 2;
 
 (% types %);
 NODE_UNIT_T    => 0;

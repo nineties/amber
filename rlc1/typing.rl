@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-08 00:56:35 nineties $
+ % $Id: typing.rl 2010-04-08 09:21:11 nineties $
  %);
 
 include(stddef, code);
@@ -190,9 +190,16 @@ do_exit: (p0) {
 (% p0: instruction %);
 return_type: (p0) {
     if (p0[0] == NODE_RETVAL) { return p0[1]; };
-    if (p0[1][0] == NODE_VOID_T) { return void_type; };
+    if (p0[1][0] == NODE_VOID_T) {
+        if (have_return != NULL) {
+            return deref_type(have_return);
+        };
+        return void_type;
+    };
     return unit_type;
 };
+
+have_return: NULL;
 
 infer_block: (p0) {
     allocate(3);
@@ -239,7 +246,6 @@ infer_decl_var: (p0, p1) {
     p0[4] = x4; (% type scheme %);
     deref_pattern(p0);
     deref(p1);
-
     return p0[1];
 };
 
@@ -356,6 +362,7 @@ infer_lambda: (p0) {
     varmap_push();
     x0 = infer_pattern(p0[LAMBDA_ARG]);
 
+    have_return = NULL;
     x1 = infer_item(p0[LAMBDA_BODY]);
     varmap_pop();
 
@@ -404,7 +411,7 @@ infer_binarith: (p0) {
     unify(int_type, x1);
     p0[1] = int_type;
     deref(p0);
-    return int_type;
+    return p0[1];
 };
 
 infer_equality: (p0) {
@@ -467,8 +474,10 @@ label external_error;
 
 infer_ret: (p0) {
     allocate(1);
-    x0 = x0[0];
-    unify(unit_type, x0[1]);
+    if (have_return != NULL) {
+        unify(have_return, unit_type);
+    };
+    have_return = unit_type;
     p0[1] = unit_type;
     deref(p0);
     return unit_type;
@@ -477,7 +486,11 @@ infer_ret: (p0) {
 (% return e; is treated as .pseudo_retvar = e; %);
 infer_retval: (p0) {
     p0[1] = infer_item(p0[RETVAL_VALUE]);
+    if (have_return != NULL) {
+        unify(p0[1], have_return);
+    };
     deref(p0);
+    have_return = p0[1];
     return p0[1];
 };
 
@@ -631,7 +644,7 @@ closure: (p0) {
     allocate(1);
     x0 = freevar(p0);
     x0 = remove_unfreevar(x0);
-    return mktup3(x0, p0);
+    return mktup2(x0, p0);
 };
 
 (% p0, p1: type %);
@@ -939,7 +952,7 @@ deref_type: (p0) {
     if (p0[0] == NODE_TYVAR) {
         x0 = map_find(tyvarmap, p0[1]); (% x0: type scheme %);
         if (x0 == NULL) { return p0; };
-        x1 = x0[2];
+        x1 = x0[1];
         x1 = deref_type(x1);
         x2 = closure(x1);
         map_add(tyvarmap, p0[1], x2);

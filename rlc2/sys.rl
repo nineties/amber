@@ -2,7 +2,7 @@
  % rowl - generation 2
  % Copyright (C) 2010 nineties
  %
- % $Id: sys.rl 2010-04-08 01:06:21 nineties $
+ % $Id: sys.rl 2010-04-08 08:36:39 nineties $
  %)
 
 (% system calls %)
@@ -19,3 +19,16 @@ SysExecve  => 11;
 SysMmap2   => 192;
 SysMunmap  => 91;
 
+export
+exit: (status @ int) {
+    syscall(SysExit, status) @ void;
+};
+
+export
+fork: () {
+    pid : syscall(SysFork);
+    if (pid >= 0) {
+        return pid;
+    };
+    exit(1);
+};

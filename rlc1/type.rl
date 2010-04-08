@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: type.rl 2010-04-07 00:02:07 nineties $
+ % $Id: type.rl 2010-04-08 09:14:13 nineties $
  %);
 
 include(stddef, code);
@@ -108,7 +108,7 @@ freevar_iter: (p0, p1) {
 
 (% p0: type scheme %);
 freevar_tyscheme: (p0) {
-    return iset_subtract(freevar(p0[2]), p0[1]);
+    return iset_subtract(freevar(p0[1]), p0[0]);
 };
 
 has_name: (p0, p1) {

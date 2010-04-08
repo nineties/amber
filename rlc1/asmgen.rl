@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: asmgen.rl 2010-04-07 17:51:15 nineties $
+ % $Id: asmgen.rl 2010-04-08 08:54:56 nineties $
  %);
 
 include(stddef, code);
@@ -91,7 +91,7 @@ emit_opd: (p0, p1, p2) {
 };
 
 inst_string: ["movl", "pushl", "popl", "ret", "leave", "int", "call", "call", "addl",
-    "subl", "imul", "idiv", "idiv", "orl", "xorl", "andl", "shll", "shrl", "negl", "notl",
+    "subl", "imull", "idiv", "idiv", "orl", "xorl", "andl", "shll", "shrl", "negl", "notl",
     "incl", "decl", "leal", "DUMMY", "DUMMY", "cmpl", "jmp", "je", "jne", "ja", "jae", "jb",
     "jbe", "DUMMY"
 ];
