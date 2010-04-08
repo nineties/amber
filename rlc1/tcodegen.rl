@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-09 01:48:53 nineties $
+ % $Id: tcodegen.rl 2010-04-09 02:17:15 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -171,7 +171,8 @@ transl_funcs: [
     transl_call, not_implemented, transl_lambda, transl_unexpr, transl_binexpr,
     transl_assign, not_reachable, not_reachable, not_reachable, transl_ret, transl_retval,
     transl_syscall, transl_field, transl_fieldref, not_reachable, transl_variant, transl_unit,
-    transl_typedexpr, transl_if, transl_ifelse, not_reachable, transl_cast, transl_new
+    transl_typedexpr, transl_if, transl_ifelse, not_reachable, transl_cast, transl_new,
+    transl_while
 ];
 
 transl_integer: (p0, p1, p2) {
@@ -1027,6 +1028,35 @@ transl_if: (p0, p1, p2) {
     return p0;
 };
 
+(% p1: expr, p2: label %);
+transl_binary_cond: (p0, p1, p2) {
+    allocate(3);
+    if (p1[2] >= BINOP_SEQOR) {
+        not_implemented();
+    };
+    x0 = binary_if_inversed_inst[p1[2]];
+    p0 = transl_item_single(p0, p1[3], &x1);
+    p0 = transl_item_single(p0, p1[4], &x2);
+    p0 = must_be_register(p0, &x2);
+    p0 = ls_cons(mkinst(INST_CMPL, x1, x2), p0);
+    p0 = ls_cons(mkinst(x0, p2, NULL), p0);
+    return p0;
+};
+
+transl_cond: (p0, p1, p2) {
+    allocate(1);
+    if (p1[0] == NODE_BINEXPR) {
+        if (p1[2] >= BINOP_EQ) {
+            return transl_binary_cond(p0, p1, p2);
+        };
+    };
+    p0 = transl_item_single(p0, p1, &x0);
+    p0 = must_be_register(p0, &x0);
+    p0 = ls_cons(mkinst(INST_CMPL, mktup2(OPD_INTEGER, 0), x0), p0);
+    p0 = ls_cons(mkinst(INST_JE, p2, NULL), p0);
+    return p0;
+};
+
 transl_ifelse: (p0, p1, p2) {
     allocate(4);
     x0 = p1[2]; (% condition %);
@@ -1072,6 +1102,19 @@ transl_new: (p0, p1, p2) {
         x5 = x5 + 1;
     };
     *p2 = ls_singleton(get_eax());
+    return p0;
+};
+
+transl_while: (p0, p1, p2) {
+    allocate(3);
+    x0 = p1[2]; (% condition %);
+    x1 = mktup2(OPD_LABEL, new_label("L"));
+    x2 = mktup2(OPD_LABEL, new_label("L"));
+    p0 = ls_cons(mkinst(INST_LABEL, x1, NULL), p0);
+    p0 = transl_cond(p0, x0, x2);
+    p0 = transl_item(p0, p1[3], p2); (% body %);
+    p0 = ls_cons(mkinst(INST_JMP, x1, NULL), p0);
+    p0 = ls_cons(mkinst(INST_LABEL, x2, NULL), p0);
     return p0;
 };
 

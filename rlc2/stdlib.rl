@@ -1,4 +1,5 @@
 import sys;
+import alloc;
 
 MaxExitCallback => 256;
 exit_callbacks: static_array(0, MaxExitCallback);
@@ -15,10 +16,10 @@ exit: (status @ exit_status) {
 };
 
 export
-atexit: (fn @ ()->()) {
+atexit: (callback @ ()->()) {
     if (num_exit_callback >= MaxExitCallback) {
         exit(ExitFailure);
     };
-    exit_callbacks[num_exit_callback] = cast(int) fn;
+    exit_callbacks[num_exit_callback] = cast(int) callback;
     num_exit_callback++;
 };

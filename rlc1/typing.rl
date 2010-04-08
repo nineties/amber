@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-09 00:28:56 nineties $
+ % $Id: typing.rl 2010-04-09 02:05:14 nineties $
  %);
 
 include(stddef, code);
@@ -109,7 +109,8 @@ infer_funcs: [not_reachable, infer_integer, infer_string, not_implemented,
     infer_call, infer_subscript, infer_lambda, infer_unexpr, infer_binexpr,
     infer_assign, infer_export, infer_import, infer_external, infer_ret, infer_retval,
     infer_syscall, infer_field, infer_fieldref, infer_typedecl, infer_variant, infer_unit,
-    infer_typedexpr, infer_if, infer_ifelse, infer_static_array, infer_cast, infer_new
+    infer_typedexpr, infer_if, infer_ifelse, infer_static_array, infer_cast, infer_new,
+    infer_while
 ];
 
 unit_type   : NULL;
@@ -694,6 +695,16 @@ infer_new: (p0) {
     return p0[1];
 };
 
+infer_while: (p0) {
+    allocate(1);
+    x0 = infer_item(p0[2]); (% condition %);
+    unify(int_type, x0);
+    infer_item(p0[3]);
+    p0[1] = unit_type;
+    deref(p0);
+    return p0[1];
+};
+
 (% p0: item %);
 infer_item: (p0) {
     allocate(1);
@@ -844,7 +855,8 @@ deref_funcs: [not_reachable, deref_integer, deref_string, deref_dontcare,
     deref_call, deref_subscript, deref_lambda, deref_unexpr, deref_binexpr,
     deref_assign, deref_export, deref_import, deref_external, deref_ret, deref_retval,
     deref_syscall, deref_field, deref_fieldref, deref_typedecl, deref_variant, deref_unit,
-    deref_typedexpr, deref_if, deref_ifelse, deref_static_array, deref_cast, deref_new
+    deref_typedexpr, deref_if, deref_ifelse, deref_static_array, deref_cast, deref_new,
+    deref_while
 ];
 
 (% p0: item %);
@@ -1029,6 +1041,11 @@ deref_cast: (p0) {
 deref_new: (p0) {
     deref(p0[2]);
     p0[1] = deref_type(p0[1]);
+};
+
+deref_while: (p0) {
+    deref(p0[2]);
+    deref(p0[3]);
 };
 
 (% p0: type %);
