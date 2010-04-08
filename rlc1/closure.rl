@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: closure.rl 2010-04-08 14:43:34 nineties $
+ % $Id: closure.rl 2010-04-08 17:10:06 nineties $
  %);
 
 (% closure conversion %);
@@ -30,6 +30,10 @@ nest_depth: 0;
 incl_nestlevel: () {
     nest_depth = nest_depth + 1;
     return nest_depth;
+};
+
+decl_nestlevel: () {
+    nest_depth = nest_depth - 1;
 };
 
 remove_vars: (p0, p1) {
@@ -141,9 +145,25 @@ free_variable: (p0) {
     return iterate(mkiset(), p0);
 };
 
-(% p0: function name, p1: lambda %);
+(% p0: pointer to env, p1: free variables %);
+build_closure_env: (p0, p1) {
+    if (p1 != NULL) { not_implemented(); };
+    return p1;
+};
+
+(% p0: function ident, p1: lambda, p2: free variables %);
+close_function_impl: (p0, p1, p2) {
+    allocate(2);
+    x0 = mktup6(NODE_IDENTIFIER, strdup("clsenv"), 0, mktyscheme(unit_type), FALSE);
+    set_varid(x0);
+    x1 = build_closure_env(x0, p2);
+};
+
+(% p0: function ident, p1: lambda %);
 close_function: (p0, p1) {
-    allocate(3);
+    allocate(4);
+    puts(get_ident_name(p0));
+    putc('\n');
     x0 = incl_nestlevel();
     (% determine the free variables of the lambda %);
     x1 = free_variable(p1);
@@ -155,6 +175,8 @@ close_function: (p0, p1) {
         x1 = ls_next(x1);
     };
     putc('\n');
+    x3 = close_function_impl(p0, p1, x1);
+
     return mktup2(p1, p0);
 };
 
@@ -162,7 +184,7 @@ close_funcs: [ not_reachable, do_nothing, do_nothing, do_nothing, close_identifi
 not_implemented, close_tuple, close_block, close_decl, do_nothing, do_nothing,
 do_nothing, close_unexpr, close_binexpr, close_assign, close_export, do_nothing,
 do_nothing, do_nothing, close_retval, close_syscall, close_field, close_fieldref,
-do_nothing, close_variant, do_nothing, close_typedexpr, close_if, close_ifelse
+do_nothing, close_variant, do_nothing, close_typedexpr, close_if, close_ifelse, do_nothing
 ];
 
 do_nothing: (p0) {

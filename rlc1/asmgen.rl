@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: asmgen.rl 2010-04-08 10:08:46 nineties $
+ % $Id: asmgen.rl 2010-04-08 19:19:57 nineties $
  %);
 
 include(stddef, code);
@@ -56,6 +56,11 @@ emit_opd: (p0, p1, p2) {
         return;
     };
     if (p1[0] == OPD_PSEUDO) {
+	if (p1[PSEUDO_LOCATION] != NULL) {
+	    assert(ls_length(p1[PSEUDO_LOCATION]) == 1);
+	    emit_opd(p0, ls_value(p1[PSEUDO_LOCATION]), 32);
+	    return;
+	};
         fputs(p0, "%p");
         fputi(p0, p1[2]);
         return;
@@ -87,12 +92,21 @@ emit_opd: (p0, p1, p2) {
         fputi(p0, p1[3]);
         return;
     };
+    if (p1[0] == OPD_OFFSET) {
+	emit_opd(p0, p1[3], 32); (% label %);
+	fputs(p0, "(,");
+	emit_opd(p0, p1[2], 32); (% register %);
+	fputc(p0, ',');
+	fputi(p0, p1[4]);
+	fputc(p0, ')');
+	return;
+    };
     not_reachable();
 };
 
 inst_string: ["movl", "pushl", "popl", "ret", "leave", "int", "call", "call", "addl",
     "subl", "imul", "idiv", "idiv", "orl", "xorl", "andl", "shll", "shrl", "negl", "notl",
-    "incl", "decl", "leal", "DUMMY", "DUMMY", "cmpl", "jmp", "je", "jne", "ja", "jae", "jb",
+    "incl", "decl", "leal", "movl", "movl", "cmpl", "jmp", "je", "jne", "ja", "jae", "jb",
     "jbe", "DUMMY"
 ];
 inst_prec:   [32,     32,      32,     32,    32,      32,    32,     32,     32,
@@ -100,34 +114,6 @@ inst_prec:   [32,     32,      32,     32,    32,      32,    32,     32,     32
     32,     32,     32,     32,      32,      32,     32,    32,    32,  32,    32,   32,
     32
 ];
-
-emit_store: (p0, p1) {
-    fputc(p0, '\t');
-    fputs(p0, "movl");
-    fputc(p0, ' ');
-    emit_opd(p0, p1[INST_OPERAND1], 32);
-    fputs(p0, ", ");
-    if (p1[INST_ARG] != 0) {
-        fputi(p0, p1[INST_ARG]*4); (% offset %);
-    };
-    fputc(p0, '(');
-    emit_opd(p0, p1[INST_OPERAND2], 32);
-    fputs(p0, ")\n");
-};
-
-emit_load: (p0, p1) {
-    fputc(p0, '\t');
-    fputs(p0, "movl");
-    fputc(p0, ' ');
-    if (p1[INST_ARG] != 0) {
-        fputi(p0, p1[INST_ARG]*4); (% offset %);
-    };
-    fputc(p0, '(');
-    emit_opd(p0, p1[INST_OPERAND1], 32);
-    fputs(p0, "), ");
-    emit_opd(p0, p1[INST_OPERAND2], 32);
-    fputc(p0, '\n');
-};
 
 emit_call_ind: (p0, p1) {
     fputc(p0, '\t');
@@ -150,8 +136,6 @@ emit_label: (p0, p1) {
 (% p0: output channel, p1: instruction %);
 emit_inst: (p0, p1) {
     allocate(1);
-    if (p1[INST_OPCODE] == INST_STORE)    { return emit_store(p0, p1); };
-    if (p1[INST_OPCODE] == INST_LOAD)     { return emit_load(p0, p1); };
     if (p1[INST_OPCODE] == INST_CALL_IND) { return emit_call_ind(p0, p1); };
     if (p1[INST_OPCODE] == INST_LABEL) { return emit_label(p0, p1); };
 
@@ -233,6 +217,16 @@ emit_data: (p0, p1) {
         fputs(p0, ".global ");
         fputs(p0, p1[1]);
         fputc(p0, '\n');
+    };
+    if (p1[2][0] == DATA_SARRAY) {
+	fputs(p0, "\t.comm ");
+	fputs(p0, p1[1]); (% label %);
+	fputc(p0, ',');
+	fputi(p0, p1[2][1]);
+	fputc(p0, ',');
+	fputi(p0, p1[2][2]);
+	fputc(p0, '\n');
+	return;
     };
     fputs(p0, p1[1]); (% label %);
     fputs(p0, ":");

@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: headergen.rl 2010-04-08 10:03:38 nineties $
+ % $Id: headergen.rl 2010-04-08 16:48:37 nineties $
  %);
 
 (% automatic header file generation %);
@@ -53,12 +53,10 @@ headergen: (p0, p1) {
     while (x0 != NULL) {
         x2 = ls_value(x0);
         if (x2[0] == NODE_IMPORT) {
-            fputc(x1, '\n');
             put_item(x1, x2);
             fputs(x1, ";\n");
         };
         if (x2[0] == NODE_EXPORT) {
-            fputc(x1, '\n');
             export_item(x1, x2);
             fputs(x1, ";\n");
         };
