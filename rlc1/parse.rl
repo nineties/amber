@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: parse.rl 2010-04-09 02:02:45 nineties $
+ % $Id: parse.rl 2010-04-09 08:31:17 nineties $
  %);
 
 include(stddef, code, token);
@@ -203,13 +203,24 @@ parse_conditional_expr: (p0) {
 
 (% p0: first token %);
 parse_iteration_expr: (p0) {
-    allocate(2);
+    allocate(4);
     if (p0 == TOK_WHILE) {
         eatchar(lex(), '(');
         x0 = parse_typed_expr(lex());
         eatchar(lex(), ')');
         x1 = parse_block(lex());
         return mktup4(NODE_WHILE, NULL, x0, x1);
+    };
+    if (p0 == TOK_FOR) {
+        eatchar(lex(), '(');
+        x0 = parse_declaration_expr(lex());
+        eatchar(lex(), ',');
+        x1 = parse_declaration_expr(lex());
+        eatchar(lex(), ',');
+        x2 = parse_declaration_expr(lex());
+        eatchar(lex(), ')');
+        x3 = parse_block(lex());
+        return mktup6(NODE_FOR, NULL, x0, x1, x2, x3);
     };
     return parse_declaration_expr(p0);
 };

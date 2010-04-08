@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-09 02:05:14 nineties $
+ % $Id: typing.rl 2010-04-09 08:26:11 nineties $
  %);
 
 include(stddef, code);
@@ -110,7 +110,7 @@ infer_funcs: [not_reachable, infer_integer, infer_string, not_implemented,
     infer_assign, infer_export, infer_import, infer_external, infer_ret, infer_retval,
     infer_syscall, infer_field, infer_fieldref, infer_typedecl, infer_variant, infer_unit,
     infer_typedexpr, infer_if, infer_ifelse, infer_static_array, infer_cast, infer_new,
-    infer_while
+    infer_while, infer_for
 ];
 
 unit_type   : NULL;
@@ -705,6 +705,18 @@ infer_while: (p0) {
     return p0[1];
 };
 
+infer_for: (p0) {
+    allocate(1);
+    infer_item(p0[2]);
+    x0 = infer_item(p0[3]); (% condition %);
+    unify(int_type, x0);
+    infer_item(p0[4]);
+    infer_item(p0[5]);
+    p0[1] = unit_type;
+    deref(p0);
+    return p0[1];
+};
+
 (% p0: item %);
 infer_item: (p0) {
     allocate(1);
@@ -856,7 +868,7 @@ deref_funcs: [not_reachable, deref_integer, deref_string, deref_dontcare,
     deref_assign, deref_export, deref_import, deref_external, deref_ret, deref_retval,
     deref_syscall, deref_field, deref_fieldref, deref_typedecl, deref_variant, deref_unit,
     deref_typedexpr, deref_if, deref_ifelse, deref_static_array, deref_cast, deref_new,
-    deref_while
+    deref_while, deref_for
 ];
 
 (% p0: item %);
@@ -1046,6 +1058,13 @@ deref_new: (p0) {
 deref_while: (p0) {
     deref(p0[2]);
     deref(p0[3]);
+};
+
+deref_for: (p0) {
+    deref(p0[2]);
+    deref(p0[3]);
+    deref(p0[4]);
+    deref(p0[5]);
 };
 
 (% p0: type %);

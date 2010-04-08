@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-09 04:33:25 nineties $
+ % $Id: tcodegen.rl 2010-04-09 08:29:00 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -172,7 +172,7 @@ transl_funcs: [
     transl_assign, not_reachable, not_reachable, not_reachable, transl_ret, transl_retval,
     transl_syscall, transl_field, transl_fieldref, not_reachable, transl_variant, transl_unit,
     transl_typedexpr, transl_if, transl_ifelse, not_reachable, transl_cast, transl_new,
-    transl_while
+    transl_while, transl_for
 ];
 
 transl_integer: (p0, p1, p2) {
@@ -1113,6 +1113,20 @@ transl_while: (p0, p1, p2) {
     p0 = ls_cons(mkinst(INST_LABEL, x1, NULL), p0);
     p0 = transl_cond(p0, x0, x2);
     p0 = transl_item(p0, p1[3], p2); (% body %);
+    p0 = ls_cons(mkinst(INST_JMP, x1, NULL), p0);
+    p0 = ls_cons(mkinst(INST_LABEL, x2, NULL), p0);
+    return p0;
+};
+
+transl_for: (p0, p1, p2) {
+    allocate(3);
+    x1 = mktup2(OPD_LABEL, new_label("L"));
+    x2 = mktup2(OPD_LABEL, new_label("L"));
+    p0 = transl_item(p0, p1[2], &x0); (% init %);
+    p0 = ls_cons(mkinst(INST_LABEL, x1, NULL), p0);
+    p0 = transl_cond(p0, p1[3], x2);
+    p0 = transl_item(p0, p1[5], &x0); (% body %);
+    p0 = transl_item(p0, p1[4], &x0); (% step %);
     p0 = ls_cons(mkinst(INST_JMP, x1, NULL), p0);
     p0 = ls_cons(mkinst(INST_LABEL, x2, NULL), p0);
     return p0;
