@@ -2,23 +2,30 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: node.rl 2010-03-25 02:59:10 nineties $
+ % $Id: node.rl 2010-04-08 14:32:19 nineties $
  %);
 
 include(stddef, code);
-export(new_varid, num_variable);
+export(init_vartable, set_varid, num_variable, vartable);
 export(get_ident_name);
 export(get_rawstring);
 
 varid: 0;
+vartable: NULL;
 
-new_varid: () {
+set_varid: (p0) {
+    p0[3] = varid;
+    vec_pushback(vartable, p0);
     varid = varid + 1;
-    return varid - 1;
+    return varid-1;
 };
 
 num_variable: () {
     return varid;
+};
+
+init_vartable: () {
+    vartable = mkvec(0);
 };
 
 escaped: (p0) {
