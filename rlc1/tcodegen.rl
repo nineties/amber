@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-08 01:42:37 nineties $
+ % $Id: tcodegen.rl 2010-04-08 10:11:19 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -810,6 +810,7 @@ transl_syscall: (p0, p1, p2) {
 	    x4 = x4 + 1;
 	};
     };
+    *p2 = ls_singleton(get_eax());
     return p0;
 };
 
@@ -874,9 +875,36 @@ transl_typedexpr: (p0, p1, p2) {
     return transl_item(p0, p1[2], p2);
 };
 
+binary_if_inversed_inst: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, INST_JNE, INST_JE, INST_JBE, INST_JAE,
+INST_JB, INST_JA, 0, 0
+];
+
+transl_binary_if: (p0, p1, p2) {
+    allocate(5);
+    x0 = p1[2]; (% condition %);
+    if (x0[2] >= BINOP_SEQOR) {
+        not_implemented();
+    };
+    x1 = binary_if_inversed_inst[x0[2]];
+    p0 = transl_item_single(p0, x0[3], &x2);
+    p0 = transl_item_single(p0, x0[4], &x3);
+    p0 = must_be_register(p0, &x3);
+    p0 = ls_cons(mkinst(INST_CMPL, x2, x3), p0);
+    x4 = mktup2(OPD_LABEL, new_label());
+    p0 = ls_cons(mkinst(x1, x4, NULL), p0);
+    p0 = transl_item(p0, p1[3], p2);
+    p0 = ls_cons(mkinst(INST_LABEL, x4, NULL), p0);
+    return p0;
+};
+
 transl_if: (p0, p1, p2) {
     allocate(3);
     x0 = p1[2]; (% condition %);
+    if (x0[0] == NODE_BINEXPR) {
+        if (x0[2] >= BINOP_EQ) {
+            return transl_binary_if(p0, p1, p2);
+        };
+    };
     p0 = transl_item_single(p0, x0, &x1);
     p0 = must_be_register(p0, &x1);
     p0 = ls_cons(mkinst(INST_CMPL, mktup2(OPD_INTEGER, 0), x1), p0);
