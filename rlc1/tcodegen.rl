@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-09 01:24:54 nineties $
+ % $Id: tcodegen.rl 2010-04-09 01:48:53 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -327,7 +327,7 @@ transl_lambda: (p0, p1, p2) {
 };
 
 transl_unexpr: (p0, p1, p2) {
-    allocate(2);
+    allocate(7);
     if (p1[2] == UNOP_PLUS) {
 	p0 = transl_item_single(p0, p1[3], &x0);
 	x1 = create_pseudo(1, LOCATION_ANY);
@@ -379,6 +379,21 @@ transl_unexpr: (p0, p1, p2) {
         *p2 = ls_singleton(x1);
         p0 = ls_cons(mkinst(INST_MOVL, x0, x1), p0);
         p0 = ls_cons(mkinst(INST_DECL, x0, NULL), p0);
+        return p0;
+    };
+    if (p1[2] == UNOP_INDIRECT) {
+        p0 = transl_item_single(p0, p1[3], &x0);
+        x1 = create_pseudo(1, LOCATION_REGISTER); (% address %);
+        x2 = type_size(p1[1]);
+        p0 = ls_cons(mkinst(INST_MOVL, x0, x1), p0);
+        x3 = 0;
+        x4 = NULL;
+        while (x3 < x2) {
+            x5 = create_offset(x1, NULL, x3*4);
+            x4 = ls_cons(x5, x4);
+            x3 = x3 + 1;
+        };
+        *p2 = ls_reverse(x4);
         return p0;
     };
     not_implemented();
@@ -1041,7 +1056,7 @@ transl_cast: (p0, p1, p2) {
 transl_new: (p0, p1, p2) {
     allocate(7);
     x0 = p1[2]; (% expr %);
-    x1 = type_size(x0);
+    x1 = type_size(x0[1]);
     x2 = get_variable("alloc");
     p0 = ls_cons(mkinst(INST_MOVL, mktup2(OPD_INTEGER, x1*4), get_stack(0)), p0);
     x3 = mkinst(INST_CALL_IMM, mktup2(OPD_LABEL, mangle(x2[1], get_ident_name(x2))), NULL);

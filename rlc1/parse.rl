@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: parse.rl 2010-04-09 01:02:53 nineties $
+ % $Id: parse.rl 2010-04-09 01:50:55 nineties $
  %);
 
 include(stddef, code, token);
@@ -526,6 +526,14 @@ label post_loop;
     if (x1 == '.') {
         x1 = parse_identifier(lex());
         x0 = mktup4(NODE_FIELDREF, NULL, x0, get_ident_name(x1));
+        goto &post_loop;
+    };
+    if (x1 == TOK_ARROW) {
+        (% p->m is equivarent to (*p).m %);
+        x1 = parse_identifier(lex());
+        x0 = mktup4(NODE_FIELDREF, NULL,
+            mktup4(NODE_UNEXPR, NULL, UNOP_INDIRECT, x0),
+            get_ident_name(x1));
         goto &post_loop;
     };
     unput();
