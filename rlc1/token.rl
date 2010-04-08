@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: token.rl 2010-04-09 02:01:45 nineties $
+ % $Id: token.rl 2010-04-09 08:23:19 nineties $
  %);
 
 (%
@@ -56,3 +56,4 @@ TOK_SARRAY     => 297;
 TOK_CAST       => 298;
 TOK_NEW        => 299;
 TOK_WHILE      => 300;
+TOK_FOR        => 301;
