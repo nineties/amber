@@ -13,5 +13,5 @@ main: () {
     counter();
     counter();
     counter();
-    exit(counter());
+    sys_exit(counter());
 };

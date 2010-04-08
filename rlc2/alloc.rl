@@ -2,7 +2,7 @@
  % rowl - generation 2
  % Copyright (C) 2010 nineties
  %
- % $Id: alloc.rl 2010-04-08 18:17:16 nineties $
+ % $Id: alloc.rl 2010-04-08 20:00:00 nineties $
  %)
 
 (% memory allocation %);
@@ -21,12 +21,12 @@ free_last: 0;
 
 (% allocate memory block with size of BlockSize %)
 alloc_block: () {
-    addr: mmap2(0, 2*BlockSize);
+    addr: sys_mmap2(0, 2*BlockSize);
     slop: addr & BlockMask;
 
-    munmap(addr, slop);
+    sys_munmap(addr, slop);
     if (slop > 0) {
-        munmap(addr + slop + BlockSize, BlockSize - slop);
+        sys_munmap(addr + slop + BlockSize, BlockSize - slop);
     };
     addr += slop;
     return addr;
@@ -35,15 +35,15 @@ alloc_block: () {
 (% allocate memory block with size of BlockSize and set free_first and free_last %)
 alloc_block_fast: () {
     if (num_block >= MaxBlocks) {
-        exit(1);
+        sys_exit(1);
     };
     addr: 0;
     if (next_addr == 0) {
         addr = alloc_block();
     } else {
-        addr = mmap2(next_addr, BlockSize);
+        addr = sys_mmap2(next_addr, BlockSize);
         if (addr & BlockMask != 0) {
-            munmap(addr, BlockSize);
+            sys_munmap(addr, BlockSize);
             addr = alloc_block();
         }
     };

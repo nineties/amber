@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-08 19:23:06 nineties $
+ % $Id: typing.rl 2010-04-08 20:11:24 nineties $
  %);
 
 include(stddef, code);
@@ -95,7 +95,7 @@ infer_funcs: [not_reachable, infer_integer, infer_string, not_implemented,
     infer_call, infer_subscript, infer_lambda, infer_unexpr, infer_binexpr,
     infer_assign, infer_export, infer_import, infer_external, infer_ret, infer_retval,
     infer_syscall, infer_field, infer_fieldref, infer_typedecl, infer_variant, infer_unit,
-    infer_typedexpr, infer_if, infer_ifelse, infer_static_array
+    infer_typedexpr, infer_if, infer_ifelse, infer_static_array, infer_cast
 ];
 
 unit_type   : NULL;
@@ -205,21 +205,27 @@ infer_block: (p0) {
     allocate(3);
     x0 = p0[BLOCK_STATEMENTS];
 
-    while (x0 != NULL) {
-        x1 = ls_value(x0);
-        x2 = infer_item(x1);
-        if (ls_next(x0) != NULL) {
-            if (do_exit(ls_value(x0))) {
-                fputs(stderr, "ERROR: unreachable code '");
-                put_item(stderr, ls_value(ls_next(x0)));
-                fputs(stderr, "'\n");
-                exit(1);
+    if (x0 != NULL) {
+        while (x0 != NULL) {
+            x1 = ls_value(x0);
+            x2 = infer_item(x1);
+            if (ls_next(x0) != NULL) {
+                if (do_exit(ls_value(x0))) {
+                    fputs(stderr, "ERROR: unreachable code '");
+                    put_item(stderr, ls_value(ls_next(x0)));
+                    fputs(stderr, "'\n");
+                    exit(1);
+                };
+            } else {
+                p0[1] = return_type(x1);
             };
-        } else {
-            p0[1] = return_type(x1);
+            x0 = ls_next(x0);
         };
-        x0 = ls_next(x0);
+    } else {
+        (% empty function body %);
+        p0[1] = unit_type;
     };
+
     deref(p0);
     return p0[1];
 };
@@ -648,6 +654,12 @@ infer_static_array: (p0) {
     return p0[1];
 };
 
+infer_cast: (p0) {
+    infer_item(p0[2]);
+    deref(p0);
+    return p0[1];
+};
+
 (% p0: item %);
 infer_item: (p0) {
     allocate(1);
@@ -793,7 +805,7 @@ deref_funcs: [not_reachable, deref_integer, deref_string, deref_dontcare,
     deref_call, deref_subscript, deref_lambda, deref_unexpr, deref_binexpr,
     deref_assign, deref_export, deref_import, deref_external, deref_ret, deref_retval,
     deref_syscall, deref_field, deref_fieldref, deref_typedecl, deref_variant, deref_unit,
-    deref_typedexpr, deref_if, deref_ifelse, deref_static_array
+    deref_typedexpr, deref_if, deref_ifelse, deref_static_array, deref_cast
 ];
 
 (% p0: item %);
@@ -965,6 +977,11 @@ deref_ifelse: (p0) {
 deref_static_array: (p0) {
     deref(p0[2]);
     deref(p0[3]);
+    p0[1] = deref_type(p0[1]);
+};
+
+deref_cast: (p0) {
+    deref(p0[2]);
     p0[1] = deref_type(p0[1]);
 };
 

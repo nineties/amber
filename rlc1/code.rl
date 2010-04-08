@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: code.rl 2010-04-08 19:03:53 nineties $
+ % $Id: code.rl 2010-04-08 20:09:40 nineties $
  %);
 
 NODE_PROG       => 0;  (% item list %);
@@ -35,6 +35,7 @@ NODE_TYPEDEXPR  => 26; (% type, expr %);
 NODE_IF         => 27; (% type, cond, body %);
 NODE_IFELSE     => 28; (% type, cond, ifthen, ifelse %);
 NODE_SARRAY     => 29; (% type, elem, length %);
+NODE_CAST       => 30; (% type, expr %);
 
 (% indices %);
 STRING_RAW       => 2;
