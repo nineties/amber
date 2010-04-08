@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: rowllib.rl 2010-04-02 16:17:04 nineties $
+ % $Id: rowllib.rl 2010-04-08 10:45:13 nineties $
  %);
 
 include(stddef);
@@ -92,7 +92,7 @@ mktup7: (p0, p1, p2, p3, p4, p5, p6) {
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%);
 
 export(mkvec);
-export(vec_ptr, vec_size, vec_at, vec_put);
+export(vec_ptr, vec_size, vec_at, vec_back, vec_put);
 export(vec_resize, vec_pushback, vec_popback);
 
 VEC_SIZE => 0;
@@ -127,6 +127,10 @@ vec_at: (p0, p1) {
     allocate(1);
     x0 = p0[VEC_BUF];
     return x0[p1];
+};
+
+vec_back: (p0) {
+    return vec_at(p0, vec_size(p0)-1);
 };
 
 (% p0: vector, p1:index, p2:value %);
