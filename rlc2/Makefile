@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-04-08 16:52:36 nineties $
+# $Id: Makefile 2010-04-08 19:58:35 nineties $
 
 LD = ld
 LDFLAGS = --nostdlib --entry=main
@@ -19,10 +19,10 @@ all:
 rlc: $(OBJECTS)
 	$(LD) $(OBJECTS) -o $@ $(LDFLAGS)
 
-main.o   : $(RLC1) main.rl stdlib.rli
+main.o   : $(RLC1) main.rl stdlib.o
 sys.o    : $(RLC1) sys.rl
-alloc.o  : $(RLC1) sys.rl alloc.rl
-stdlib.o : $(RLC1) sys.rl stdlib.rl
+alloc.o  : $(RLC1) sys.o alloc.rl
+stdlib.o : $(RLC1) sys.o stdlib.rl
 
 .SUFFIXES:
 .SUFFIXES: .o .rl .rli
@@ -35,4 +35,4 @@ stdlib.o : $(RLC1) sys.rl stdlib.rl
 
 .PHONY: clean
 clean:
-	rm -f *.o *.s rlc core
+	rm -f *.rli *.o *.s rlc core

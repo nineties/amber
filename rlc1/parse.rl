@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: parse.rl 2010-04-08 18:37:59 nineties $
+ % $Id: parse.rl 2010-04-08 20:10:23 nineties $
  %);
 
 include(stddef, code, token);
@@ -582,6 +582,14 @@ parse_primary_item: (p0) {
 	x1 = parse_item(lex()); (% length %);
 	eatchar(lex(), ')');
 	return mktup4(NODE_SARRAY, NULL, x0, x1);
+    };
+    if (p0 == TOK_CAST) {
+        eatchar(lex(), '(');
+        x0 = parse_type(lex());
+        eatchar(lex(), ',');
+        x1 = parse_assignment_expr(lex());
+        eatchar(lex(), ')');
+        return mktup3(NODE_CAST, x0, x1);
     };
     expected("item");
 };

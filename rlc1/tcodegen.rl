@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-08 19:22:12 nineties $
+ % $Id: tcodegen.rl 2010-04-08 20:12:52 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -171,7 +171,7 @@ transl_funcs: [
     transl_call, not_implemented, transl_lambda, transl_unexpr, transl_binexpr,
     transl_assign, not_reachable, not_reachable, not_reachable, transl_ret, transl_retval,
     transl_syscall, transl_field, transl_fieldref, not_reachable, transl_variant, transl_unit,
-    transl_typedexpr, transl_if, transl_ifelse
+    transl_typedexpr, transl_if, transl_ifelse, not_reachable, transl_cast
 ];
 
 transl_integer: (p0, p1, p2) {
@@ -998,6 +998,10 @@ transl_ifelse: (p0, p1, p2) {
     p0 = transl_item(p0, p1[4], p2); (% ifelse block %);
     p0 = ls_cons(mkinst(INST_LABEL, x3, NULL), p0);
     return p0;
+};
+
+transl_cast: (p0, p1, p2) {
+    return transl_item(p0, p1[2], p2);
 };
 
 (% p0: output tcode, p1: item, p2: pointer to store p1's value  %);
