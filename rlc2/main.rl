@@ -1,12 +1,16 @@
 import stdlib;
 
-mkcls: () {
-    return (a, b) {
-        return a + b;
+make_counter: (n) {
+    return () {
+        return n++;
     };
 };
 
 export
 main: () {
-    exit(mkcls()(1,2));
+    counter : make_counter(1);
+    counter();
+    counter();
+    counter();
+    exit(counter());
 };

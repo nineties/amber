@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: main.rl 2010-04-07 20:15:03 nineties $
+ % $Id: main.rl 2010-04-08 14:26:08 nineties $
  %);
 
 include(stddef, code);
@@ -27,6 +27,7 @@ change_suffix: (p0, p1) {
 compile: (p0, p1, p2) {
     allocate(4);
 
+    init_vartable();
     init_typing();
 
     puts("compile ");
@@ -44,6 +45,10 @@ compile: (p0, p1, p2) {
     (% generate header file %);
     puts("> generating header...\n");
     headergen(p1, x2);
+
+    (% closure conversion %);
+    puts("> closing local functions...\n");
+    x2 = closure_conversion(x2);
 
     (% translate to two address code %);
     puts("> translating to tcode...\n");

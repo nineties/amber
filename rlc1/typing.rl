@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-08 10:51:18 nineties $
+ % $Id: typing.rl 2010-04-08 14:27:20 nineties $
  %);
 
 include(stddef, code);
@@ -234,7 +234,7 @@ infer_decl_dontcare: (p0, p1) {
 infer_decl_var: (p0, p1) {
     allocate(5);
     x0 = mktyvar();
-    x1 = new_varid();
+    x1 = set_varid(p0);
     x2 = in_global_namespace();
     varmap_add(p0[2], mktup3(mktyscheme(x0), x1, x2));
     x3 = infer_item(p1);
@@ -273,7 +273,7 @@ infer_pattern: (p0) {
     if (p0[0] == NODE_IDENTIFIER) {
         (% variable pattern %);
         x0 = mktyvar(); (% type of variable %);
-        x1 = new_varid();
+        x1 = set_varid(p0);
         x2 = mktup3(mktyscheme(x0), x1, in_global_namespace());
         varmap_add(p0[2], x2);
         p0[1] = x0;
@@ -461,7 +461,7 @@ infer_external: (p0) {
         goto &external_error;
     };
     x3 = closure(x2);
-    x4 = new_varid();
+    x4 = set_varid(x1);
     varmap_add(get_ident_name(x1), mktup3(x3, x4, TRUE));
     x1[1] = x2;
     x1[3] = x4;
