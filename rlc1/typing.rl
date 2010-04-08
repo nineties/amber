@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-08 09:21:11 nineties $
+ % $Id: typing.rl 2010-04-08 09:31:28 nineties $
  %);
 
 include(stddef, code);
@@ -628,22 +628,22 @@ infer_item: (p0) {
     return x0(p0);
 };
 
-remove_unfreevar: (p0) {
+remove_freevar: (p0) {
     allocate(1);
     if (p0 == NULL) { return NULL; };
     x0 = map_find(tyvarmap, ls_value(p0));
-    if (x0 == NULL) {
-        p0[1] = remove_unfreevar(ls_next(p0));
+    if (x0 != NULL) {
+        p0[1] = remove_freevar(ls_next(p0));
         return p0;
     };
-    return remove_unfreevar(ls_next(p0));
+    return remove_freevar(ls_next(p0));
 };
 
 (% p0: type %);
 closure: (p0) {
     allocate(1);
     x0 = freevar(p0);
-    x0 = remove_unfreevar(x0);
+    x0 = remove_freevar(x0);
     return mktup2(x0, p0);
 };
 
