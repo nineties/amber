@@ -2,7 +2,7 @@
  % rowl - generation 2
  % Copyright (C) 2010 nineties
  %
- % $Id: sys.rl 2010-04-08 08:36:39 nineties $
+ % $Id: sys.rl 2010-04-08 10:33:02 nineties $
  %)
 
 (% system calls %)
@@ -26,9 +26,9 @@ exit: (status @ int) {
 
 export
 fork: () {
-    pid : syscall(SysFork);
+    pid : syscall(SysFork) @ int;
     if (pid >= 0) {
         return pid;
     };
-    exit(1);
+    exit(-pid);
 };
