@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-09 02:46:42 nineties $
+ % $Id: tcodegen.rl 2010-04-09 04:33:25 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -83,7 +83,7 @@ get_operand_single: (p0) {
 
 (% p0: opcode, p1: operand1, p2, operand2 %);
 mkinst: (p0, p1, p2) {
-    return mktup6(TCODE_INST, p0, p1, p2, mkiset(), 0);
+    return mktup7(TCODE_INST, p0, p1, p2, mkiset(), 0, mkiset());
 };
 
 

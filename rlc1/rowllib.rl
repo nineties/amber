@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: rowllib.rl 2010-04-09 02:43:12 nineties $
+ % $Id: rowllib.rl 2010-04-09 08:10:54 nineties $
  %);
 
 include(stddef);
@@ -388,6 +388,7 @@ resize_bucket: (p0, p1) {
                     p1);
                 vec_put(x1, x4,
                     ls_cons(ls_value(x3), vec_at(x1, x4)));
+                x3 = ls_next(x3);
             };
             x2 = x2 + 1;
         };
@@ -420,7 +421,7 @@ ht_del: (p0, p1) {
             p0[HT_SIZE] = p0[HT_SIZE] - 1;
             if (x1 != NULL) {
                 x1[LS_NEXT] = ls_next(ls_next(x1));
-                x1 = x1;
+                x1 = x2;
                 x2 = ls_next(x1);
             } else {
                 vec_put(p0[HT_BUCKET], x0, ls_next(x2));
@@ -526,7 +527,7 @@ map_find: (p0, p1) {
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%);
 
 export(mkiset, iset_size, iset_singleton, iset_copy, iset_add, iset_del, iset_contains,
-    iset_union, iset_subtract, iset_eq);
+    iset_union, iset_intersection, iset_subtract, iset_eq);
 mkiset: () { return NULL; };
 iset_size: (p0) { return ls_length(p0); };
 iset_singleton: (p0) { return ls_cons(p0, NULL); };
@@ -561,6 +562,7 @@ iset_contains: (p0, p1) {
     return FALSE;
 };
 
+x:0;
 (% p0,p1: set %);
 iset_union: (p0, p1) {
     if (p0 == NULL) { return ls_copy(p1); };
@@ -576,6 +578,20 @@ iset_union: (p0, p1) {
 };
 
 (% p0,p1: set %);
+iset_intersection: (p0, p1) {
+    if (p0 == NULL) { return NULL; };
+    if (p1 == NULL) { return NULL; };
+    if (ls_value(p0) == ls_value(p1)) {
+        return ls_cons(ls_value(p0), iset_intersection(ls_next(p0), ls_next(p1)));
+    };
+    if (ls_value(p0) < ls_value(p1)) {
+        return iset_intersection(ls_next(p0), p1);
+    } else {
+        return iset_intersection(p0, ls_next(p1));
+    };
+};
+
+(% p0,p1: set (p0-p1)  %);
 iset_subtract: (p0, p1) {
     if (p0 == NULL) { return NULL; };
     if (p1 == NULL) { return ls_copy(p0); };
