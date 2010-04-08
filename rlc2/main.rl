@@ -15,5 +15,5 @@ main: () {
         i++;
     };
     (% exit(ExitSuccess); %);
-    sys_exit(x->hoge);
+    sys_exit(i);
 };
