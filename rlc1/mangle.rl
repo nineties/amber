@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: mangle.rl 2010-04-07 14:45:18 nineties $
+ % $Id: mangle.rl 2010-04-08 20:53:57 nineties $
  %);
 
 (% name mangling %);
@@ -114,6 +114,11 @@ gen_type_suffix: (p0) {
         put_namechar('N');
         put_namestr(p0[1]);
         gen_type_suffix(p0[2]);
+        return;
+    };
+    if (p0[0] == NODE_VARIANT_T) {
+        put_namechar('V');
+        put_namestr(p0[1]);
         return;
     };
     fputs(stderr, "ERROR: not reachable\n");

@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-08 20:11:24 nineties $
+ % $Id: typing.rl 2010-04-08 21:14:44 nineties $
  %);
 
 include(stddef, code);
@@ -604,8 +604,10 @@ infer_variant: (p0) {
     assert(x1 != NULL);
     p0[1] = x1[0];
     p0[3] = x1[1][1]; (% id %);
-    x2 = infer_item(p0[4]); (% infer argument %);
-    unify(x2, x1[1][2]);
+    if (p0[4] != NULL) {
+        x2 = infer_item(p0[4]); (% infer argument %);
+        unify(x2, x1[1][2]);
+    };
     deref(p0);
     return p0[1];
 };
@@ -706,6 +708,11 @@ unify: (p0, p1) {
             return;
         };
         if (p0[0] == NODE_LAMBDA_T) { return unify_lambda_t(p0, p1); };
+        if (p0[0] == NODE_VARIANT_T) {
+            if (streq(p0[1], p1[1])) {
+                return;
+            };
+        };
     };
     type_mismatch(p0, p1);
 };
@@ -948,7 +955,9 @@ deref_typedecl: (p0) {
 };
 
 deref_variant: (p0) {
-    deref(p0[4]);
+    if (p0[4] != NULL) {
+        deref(p0[4]);
+    };
     p0[1] = deref_type(p0[1]);
 };
 

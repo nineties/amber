@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: regalloc.rl 2010-04-08 19:22:19 nineties $
+ % $Id: regalloc.rl 2010-04-08 20:21:48 nineties $
  %);
 
 (% Register allocation %);
@@ -210,6 +210,7 @@ is_memory_access: (p0) {
     if (p0[0] == OPD_PSEUDO) {
         return p0[PSEUDO_TYPE] == LOCATION_MEMORY;
     };
+    if (p0[0] == OPD_OFFSET) { return TRUE; };
     return FALSE;
 };
 
