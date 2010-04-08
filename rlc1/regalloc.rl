@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: regalloc.rl 2010-04-09 01:25:38 nineties $
+ % $Id: regalloc.rl 2010-04-09 04:18:39 nineties $
  %);
 
 (% Register allocation %);
@@ -15,7 +15,7 @@ equivregs: NULL;
 input_count: NULL;
 output_count: NULL;
 
-(% p0: register, p1: is output %);
+(% p0: register %);
 compute_score: (p0) {
     allocate(1);
     x0 = num_conflicts(p0) * 5;
@@ -30,6 +30,10 @@ add_conflicts: (p0, p1) {
     allocate(3);
     if (p1 == NULL) { return; };
     if (is_constant_operand(p1)) { return; };
+    if (p1[0] == OPD_OFFSET) {
+        add_conflicts(p0, p1[2]);
+        return;
+    };
     x0 = p1[1];
     while (p0 != NULL) {
         x1 = ls_value(p0);
@@ -114,6 +118,8 @@ add_equivregs: (p0, p1) {
     allocate(1);
     if (is_constant_operand(p0)) { return; };
     if (is_constant_operand(p1)) { return; };
+    if (p0[0] == OPD_OFFSET) { return; };
+    if (p1[0] == OPD_OFFSET) { return; };
     x0 = vec_at(equivregs, p0[1]);
     x0 = iset_add(x0, p1[1]);
     vec_put(equivregs, p0[1], x0);
@@ -123,6 +129,7 @@ incr_output_count: (p0) {
     allocate(1);
     if (p0 == NULL) { return; };
     if (is_constant_operand(p0)) { return; };
+    if (p0[0] == OPD_OFFSET) { return; };
     x0 = vec_at(output_count, p0[1]);
     vec_size(output_count, p0[1], x0 + 1);
     return;
@@ -132,6 +139,10 @@ incr_input_count: (p0) {
     allocate(1);
     if (p0 == NULL) { return; };
     if (is_constant_operand(p0)) { return; };
+    if (p0[0] == OPD_OFFSET) {
+        incr_input_count(p0[2]);
+        return;
+    };
     x0 = vec_at(input_count, p0[1]);
     vec_size(input_count, p0[1], x0 + 1);
     return;
@@ -146,7 +157,7 @@ compute_conflicts: (p0) {
     output_count = mkvec(num_locations());
     while (p0 != NULL) {
         x0 = ls_value(p0); (% instruction %);
-        x1 = x0[INST_LIVE]; (% live locations %);
+        x1 = iset_intersection(x0[INST_LIVEOUT], x0[INST_LIVEIN]); (% live locations %);
 
         add_conflicts(x1, x0[INST_OPERAND2]);
         add_conflicts(x1, x0[INST_OPERAND1]);

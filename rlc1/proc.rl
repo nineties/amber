@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: proc.rl 2010-04-08 19:21:15 nineties $
+ % $Id: proc.rl 2010-04-09 08:11:54 nineties $
  %);
 
 include(stddef, code);
@@ -209,7 +209,7 @@ reset_proc: () {
 };
 
 is_constant_operand: (p0) {
-    assert(p0);
+    assert(p0 != NULL);
     if (p0[0] == OPD_PSEUDO)   { return FALSE; };
     if (p0[0] == OPD_REGISTER) { return FALSE; };
     if (p0[0] == OPD_STACK)    { return FALSE; };

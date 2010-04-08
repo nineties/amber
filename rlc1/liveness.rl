@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: liveness.rl 2010-04-09 02:46:38 nineties $
+ % $Id: liveness.rl 2010-04-09 08:11:42 nineties $
  %);
 
 (% liveness analysis %);
@@ -13,12 +13,20 @@ export(liveness);
 live_map: NULL; (% label -> liveout %);
 changed: FALSE;
 
-update_live: (p0, p1) {
+update_livein: (p0, p1) {
     allocate(1);
-    x0 = p0[INST_LIVE];
-    if (iset_eq(x0, p1) == FALSE) {
+    x0 = p0[INST_LIVEIN];
+    if (iset_subtract(p1, x0) != NULL) {
         changed = TRUE;
-        p0[INST_LIVE] = iset_copy(p1);
+        p0[INST_LIVEIN] = iset_union(p0[INST_LIVEIN], p1);
+    };
+};
+update_liveout: (p0, p1) {
+    allocate(1);
+    x0 = p0[INST_LIVEOUT];
+    if (iset_subtract(p1, x0) != NULL) {
+        changed = TRUE;
+        p0[INST_LIVEOUT] = iset_union(p0[INST_LIVEOUT], p1);
     };
 };
 
@@ -39,9 +47,11 @@ iterate_normal: (p0, p1) {
     x0 = iterate(ls_next(p0), p1); (% live-out registers %);
 
     x1 = ls_value(p0);
+    update_liveout(x1, x0);
+
     x0 = output_del(x0, x1);
-    update_live(x1, x0);
     x0 = input_add(x0, x1);
+    update_livein(x1, x0);
     return x0; (% live-in registers %);
 };
 
@@ -53,6 +63,7 @@ iterate_ret: (p0, p1) {
         (% retval instruction %);
         x1 = mkiset();
         x1 = register_add(x1, get_eax());
+        update_livein(x0, x1);
         return x1;
     };
     return mkiset();
@@ -62,8 +73,8 @@ iterate_int: (p0, p1) {
     allocate(4);
     x0 = iterate(ls_next(p0), p1); (% live-out registers %);
     x1 = ls_value(p0);
+    update_liveout(x1, x0);
     x0 = register_del(x0, get_eax()); (% remove dead register %);
-    update_live(x1, x0);
 
     x2 = x1[INST_ARG];
     x3 = 0;
@@ -71,6 +82,7 @@ iterate_int: (p0, p1) {
         x0 = register_add(x0, get_physical_reg(x3));
         x3 = x3 + 1;
     };
+    update_livein(x1, x0);
     return x0; (% live-in registers %);
 };
 
@@ -79,7 +91,8 @@ iterate_jump: (p0, p1) {
     iterate(ls_next(p0), p1);
     x0 = ls_value(p0);
     x1 = map_find(live_map, x0[INST_OPERAND1][1]);
-    update_live(x0, x1);
+    update_liveout(x0, x1);
+    update_livein(x0, x1);
     return x1;
 };
 
@@ -89,7 +102,8 @@ iterate_branch: (p0, p1) {
     x1 = ls_value(p0);
     x2 = map_find(live_map, x1[INST_OPERAND1][1]);
     x3 = iset_union(x0, x2);
-    update_live(x1, x3);
+    update_liveout(x1, x3);
+    update_livein(x1, x3);
     return x3;
 };
 
@@ -97,15 +111,16 @@ iterate_label: (p0, p1) {
     allocate(2);
     x0 = iterate(ls_next(p0), p1); (% live-out registers %);
     x1 = ls_value(p0);
-    map_add(live_map, x1[INST_OPERAND1][1], x0);
-    update_live(x1, x0);
+    update_liveout(x1, x0);
+    update_livein(x1, x0);
+    map_add(live_map, x1[INST_OPERAND1][1], x1[INST_LIVEIN]);
     return x0;
 };
 
 (% p0: a location %);
 must_be_memory: (p0) {
     if (p0[0] == OPD_PSEUDO) {
-        assert(p0[PSEUDO_TYPE] != LOCATION_REGISTER);
+        (% assert(p0[PSEUDO_TYPE] != LOCATION_REGISTER); %);
         p0[PSEUDO_TYPE] = LOCATION_MEMORY;
         return;
     };
@@ -121,12 +136,12 @@ must_be_memory: (p0) {
 };
 
 iterate_call: (p0, p1) {
-    allocate(3);
+    allocate(4);
 
     x0 = iterate(ls_next(p0), p1); (% live-out registers %);
     x1 = ls_value(p0);
+    update_liveout(x1, x0);
     x0 = register_del(x0, get_eax());
-    update_live(x1, x0);
 
     (% registers live across function call must be assigned to stack memory %);
     x2 = x0;
@@ -136,6 +151,13 @@ iterate_call: (p0, p1) {
     };
 
     x0 = input_add(x0, x1);
+    x2 = x1[INST_ARG]; (% number of arguments %);
+    x3 = 0;
+    while (x3 < x2) {
+        x0 = register_add(x0, get_stack(x3));
+        x3 = x3 + 1;
+    };
+    update_livein(x1, x0);
     return x0; (% live-in registers %);
 };
 
@@ -145,12 +167,13 @@ iterate_div: (p0, p1) {
     x0 = iterate(ls_next(p0), p1); (% live-out registers %);
 
     x1 = ls_value(p0);
+    update_liveout(x1, x0);
     x0 = register_del(x0, get_eax()); (% remove dead register %);
-    update_live(x1, x0);
 
     x0 = input_add(x0, x1);
     x0 = register_add(x0, get_eax());
     x0 = register_add(x0, get_edx());
+    update_livein(x1, x0);
     return x0; (% live-in registers %);
 };
 
@@ -160,12 +183,13 @@ iterate_mod: (p0, p1) {
     x0 = iterate(ls_next(p0), p1); (% live-out registers %);
 
     x1 = ls_value(p0);
+    update_liveout(x1, x0);
     x0 = register_del(x0, get_edx()); (% remove dead register %);
-    update_live(x1, x0);
 
     x0 = input_add(x0, x1);
     x0 = register_add(x0, get_eax());
     x0 = register_add(x0, get_edx());
+    update_livein(x1, x0);
     return x0; (% live-in registers %);
 };
 (% p0: list of instructions, p1: live-out registers at final %);
