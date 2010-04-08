@@ -11,14 +11,14 @@ export type exit_status
 
 export
 exit: (status @ exit_status) {
-    sys_exit(cast(int, status));
+    sys_exit(cast(int) status);
 };
 
 export
-at_exit: (fn @ ()->()) {
+atexit: (fn @ ()->()) {
     if (num_exit_callback >= MaxExitCallback) {
         exit(ExitFailure);
     };
-    exit_callbacks[num_exit_callback] = cast(int, fn);
+    exit_callbacks[num_exit_callback] = cast(int) fn;
     num_exit_callback++;
 };
