@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: rowllib.rl 2010-04-08 10:45:13 nineties $
+ % $Id: rowllib.rl 2010-04-09 02:43:12 nineties $
  %);
 
 include(stddef);
@@ -526,7 +526,7 @@ map_find: (p0, p1) {
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%);
 
 export(mkiset, iset_size, iset_singleton, iset_copy, iset_add, iset_del, iset_contains,
-    iset_union, iset_subtract);
+    iset_union, iset_subtract, iset_eq);
 mkiset: () { return NULL; };
 iset_size: (p0) { return ls_length(p0); };
 iset_singleton: (p0) { return ls_cons(p0, NULL); };
@@ -587,4 +587,13 @@ iset_subtract: (p0, p1) {
     } else {
         return ls_cons(ls_value(p0), iset_subtract(ls_next(p0), p1));
     }
+};
+
+iset_eq: (p0, p1) {
+    if (p0 == NULL) { return p1 == NULL; };
+    if (p1 == NULL) { return FALSE; };
+    if (ls_value(p0) == ls_value(p1)) {
+        return iset_eq(ls_next(p0), ls_next(p1));
+    };
+    return FALSE;
 };
