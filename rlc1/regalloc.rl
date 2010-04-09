@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: regalloc.rl 2010-04-10 01:08:56 nineties $
+ % $Id: regalloc.rl 2010-04-10 02:01:00 nineties $
  %);
 
 (% Register allocation %);
@@ -483,12 +483,23 @@ need_temporal_register: (p0) {
 (% p0: program list, p1: instruction %);
 insert: (p0, p1) {
     allocate(3);
+    (%
     if (need_temporal_register(p1)) {
         x0 = create_pseudo(1, LOCATION_REGISTER);
         p0 = ls_cons(mkinst(INST_MOVL, p1[INST_OPERAND1], x0), p0);
         x2 = mkinst(p1[INST_OPCODE], x0, p1[INST_OPERAND2]);
         x2[INST_ARG] = p1[INST_ARG];
         p0 = ls_cons(x2, p0);
+        return p0;
+    };
+    return ls_cons(p1, p0);
+    %);
+    if (get_opd1_type(p1) == OPD_INPUT) {
+        x0 = create_pseudo(1, LOCATION_ANY);
+        p0 = ls_cons(mkinst(INST_MOVL, p1[INST_OPERAND1], x0), p0);
+        x1 = mkinst(p1[INST_OPCODE], x0, p1[INST_OPERAND2]);
+        x1[INST_ARG] = p1[INST_ARG];
+        p0 = ls_cons(x1, p0);
         return p0;
     };
     return ls_cons(p1, p0);
@@ -505,14 +516,70 @@ insert_temporal_register: (p0) {
     return ls_reverse(x1);
 };
 
+move: (p0, p1, p2) {
+    allocate(1);
+    if (is_memory_access(p1)) {
+        if (is_memory_access(p2)) {
+            puts("Moge\n");
+            x0 = create_pseudo(1, LOCATION_REGISTER);
+            p0 = ls_cons(mkinst(INST_MOVL, p1, x0), p0);
+            p0 = ls_cons(mkinst(INST_MOVL, x0, p2), p0);
+        } else {
+            set_pseudo_type(p2, LOCATION_REGISTER);
+        };
+        return p0;
+    };
+    if (is_memory_access(p2)) {
+        set_pseudo_type(p1, LOCATION_REGISTER);
+    };
+    return p0;
+};
+
+evacuate: (p0, p1) {
+    allocate(5);
+    if (p1[INST_OPCODE] == INST_CALL_IMM) {
+        x0 = iset_intersection(p1[INST_LIVEOUT], p1[INST_LIVEIN]);
+        x1 = x0;
+        x2 = NULL;
+        while (x1 != NULL) {
+            x3 = get_reg(ls_value(x1));
+            x4 = create_pseudo(x3[PSEUDO_LENGTH], LOCATION_MEMORY);
+            x2 = ls_cons(x4, x2);
+            p0 = move(p0, x3, x4);
+            x1 = ls_next(x1);
+        };
+        p0 = ls_cons(p1, p0);
+        x1 = x0;
+        x2 = ls_reverse(x2);
+        while (x1 != NULL) {
+            x3 = get_reg(ls_value(x1));
+            p0 = move(p0, ls_value(x2), x3);
+            x1 = ls_next(x1);
+            x2 = ls_next(x2);
+        };
+        return p0;
+    };
+    return ls_cons(p1, p0);
+};
+
+insert_evacuation: (p0) {
+    allocate(2);
+    x0 = p0;
+    x1 = NULL;
+    while (x0 != NULL) {
+        x1 = evacuate(x1, ls_value(x0));
+        x0 = ls_next(x0);
+    };
+    return ls_reverse(x1);
+};
+
 (% p0: TCODE_FUNC object %);
 regalloc: (p0) {
     allocate(1);
 
     (% liveness analysis %);
     liveness(p0);
-    compute_conflicts(p0[3]);
-    p0[3] = insert_temporal_register(p0[3]);
+    p0[3] = insert_evacuation(p0[3]);
     liveness(p0);
 
     x0 = p0[3]; (% instructions %);

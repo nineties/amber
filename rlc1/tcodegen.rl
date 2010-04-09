@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-10 01:08:21 nineties $
+ % $Id: tcodegen.rl 2010-04-10 02:00:21 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -340,7 +340,7 @@ transl_call: (p0, p1, p2) {
         x5[INST_ARG] = x4;
         p0 = ls_cons(x5, p0);
     };
-    x4 = create_pseudo(1, LOCATION_ANY);
+    x4 = create_pseudo(1, LOCATION_MEMORY);
     p0 = ls_cons(mkinst(INST_MOVL, get_eax(), x4), p0);
     *p2 = ls_singleton(x4);
     return p0;
@@ -407,7 +407,7 @@ transl_unexpr: (p0, p1, p2) {
     allocate(7);
     if (p1[2] == UNOP_PLUS) {
 	p0 = transl_item_single(p0, p1[3], &x0);
-	x1 = create_pseudo(1, LOCATION_ANY);
+	x1 = create_pseudo(1, LOCATION_MEMORY);
 	*p2 = ls_singleton(x1);
 	p0 = ls_cons(mkinst(INST_MOVL, x0, x1), p0);
 	return p0;
@@ -415,7 +415,7 @@ transl_unexpr: (p0, p1, p2) {
     if (p1[2] == UNOP_MINUS) {
         p0 = transl_item_single(p0, p1[3], &x0);
 
-        x1 = create_pseudo(1, LOCATION_ANY);
+        x1 = create_pseudo(1, LOCATION_MEMORY);
         *p2 = ls_singleton(x1);
 
         p0 = ls_cons(mkinst(INST_MOVL, x0, x1), p0);
@@ -424,7 +424,7 @@ transl_unexpr: (p0, p1, p2) {
     };
     if (p1[2] == UNOP_INVERSE) {
         p0 = transl_item_single(p0, p1[3], &x0);
-        x1 = create_pseudo(1, LOCATION_ANY);
+        x1 = create_pseudo(1, LOCATION_MEMORY);
         *p2 = ls_singleton(x1);
         p0 = ls_cons(mkinst(INST_MOVL, x0, x1), p0);
         p0 = ls_cons(mkinst(INST_NOTL, x1, NULL), p0);
@@ -444,7 +444,7 @@ transl_unexpr: (p0, p1, p2) {
     };
     if (p1[2] == UNOP_POSTINCR) {
         p0 = transl_item_single(p0, p1[3], &x0);
-        x1 = create_pseudo(1, LOCATION_ANY);
+        x1 = create_pseudo(1, LOCATION_MEMORY);
         *p2 = ls_singleton(x1);
         p0 = ls_cons(mkinst(INST_MOVL, x0, x1), p0);
         p0 = ls_cons(mkinst(INST_INCL, x0, NULL), p0);
@@ -452,7 +452,7 @@ transl_unexpr: (p0, p1, p2) {
     };
     if (p1[2] == UNOP_POSTDECR) {
         p0 = transl_item_single(p0, p1[3], &x0);
-        x1 = create_pseudo(1, LOCATION_ANY);
+        x1 = create_pseudo(1, LOCATION_MEMORY);
         *p2 = ls_singleton(x1);
         p0 = ls_cons(mkinst(INST_MOVL, x0, x1), p0);
         p0 = ls_cons(mkinst(INST_DECL, x0, NULL), p0);
@@ -497,7 +497,7 @@ transl_binexpr: (p0, p1, p2) {
      %);
     p0 = transl_item_single(p0, p1[3], &x0);
     p0 = transl_item_single(p0, p1[4], &x1);
-    x2 = create_pseudo(1, LOCATION_ANY);
+    x2 = create_pseudo(1, LOCATION_REGISTER);
     *p2 = ls_singleton(x2);
     p0 = ls_cons(mkinst(INST_MOVL, x0, x2), p0);
     p0 = ls_cons(mkinst(bininst[p1[2]], x1, x2), p0);
@@ -528,7 +528,7 @@ transl_arith_assign: (p0, p1, p2) {
     p0 = transl_item(p0, mktup5(NODE_BINEXPR, p1[1], p1[2], p1[3], p1[4]), &x2);
     x3 = NULL;
     while (x2 != NULL) {
-	x4 = create_pseudo(1, LOCATION_ANY);
+	x4 = create_pseudo(1, LOCATION_MEMORY);
 	x3 = ls_cons(x4, x3);
 	p0 = ls_cons(mkinst(INST_MOVL, ls_value(x2), x4), p0);
 	x2 = ls_next(x2);
@@ -557,7 +557,7 @@ transl_tuple_assign_helper: (p0, p1, p2, p3) {
         x1 = 0;
         x2 = NULL;
         while (x1 < x0) {
-            x3 = create_pseudo(1, LOCATION_ANY);
+            x3 = create_pseudo(1, LOCATION_MEMORY);
             x2 = ls_cons(x3, x2);
             p0 = ls_cons(mkinst(INST_MOVL, ls_value(*p2), x3), p0);
             *p2 = ls_next(*p2);
@@ -780,7 +780,7 @@ transl_divexpr: (p0, p1, p2) {
      %);
     p0 = transl_item_single(p0, p1[3], &x0);
     p0 = transl_item_single(p0, p1[4], &x1);
-    x2 = create_pseudo(1, LOCATION_ANY);
+    x2 = create_pseudo(1, LOCATION_MEMORY);
     *p2 = ls_singleton(x2);
     p0 = ls_cons(mkinst(INST_MOVL, x0, get_eax()), p0);
     p0 = ls_cons(mkinst(INST_MOVL, mktup2(OPD_INTEGER, 0), get_edx()), p0);
@@ -802,7 +802,7 @@ transl_modexpr: (p0, p1, p2) {
      %);
     p0 = transl_item_single(p0, p1[3], &x0);
     p0 = transl_item_single(p0, p1[4], &x1);
-    x2 = create_pseudo(1, LOCATION_ANY);
+    x2 = create_pseudo(1, LOCATION_MEMORY);
     *p2 = ls_singleton(x2);
     p0 = ls_cons(mkinst(INST_MOVL, x0, get_eax()), p0);
     p0 = ls_cons(mkinst(INST_MOVL, mktup2(OPD_INTEGER, 0), get_edx()), p0);
@@ -846,7 +846,7 @@ transl_var_decl: (p0, p1, p2) {
     p0 = transl_item(p0, x1, &x2);
     x3 = NULL;
     while (x2 != NULL) {
-	x4 = create_pseudo(1, LOCATION_ANY);
+	x4 = create_pseudo(1, LOCATION_MEMORY);
 	x3 = ls_cons(x4, x3);
 	p0 = ls_cons(mkinst(INST_MOVL, ls_value(x2), x4), p0);
 	x2 = ls_next(x2);
@@ -875,7 +875,7 @@ transl_tuple_decl_helper: (p0, p1, p2, p3) {
         x1 = 0;
         x2 = NULL;
         while (x1 < x0) {
-            x3 = create_pseudo(1, LOCATION_ANY);
+            x3 = create_pseudo(1, LOCATION_MEMORY);
             x2 = ls_cons(x3, x2);
             p0 = ls_cons(mkinst(INST_MOVL, ls_value(*p2), x3), p0);
             *p2 = ls_next(*p2);
@@ -1320,7 +1320,7 @@ transl_fundecl_impl: (p0, p1) {
             x4[x5] = x4[x5][2];
         };
 
-        set_operand(x4[x5], ls_singleton(create_pseudo(1, LOCATION_ANY)));
+        set_operand(x4[x5], ls_singleton(create_pseudo(1, LOCATION_MEMORY)));
         x5 = x5 + 1;
     };
     x3 = type_size(x2[1]);
