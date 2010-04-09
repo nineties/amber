@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-09 09:57:11 nineties $
+ % $Id: typing.rl 2010-04-09 10:09:36 nineties $
  %);
 
 include(stddef, code);
@@ -375,6 +375,11 @@ infer_subscript: (p0) {
 	deref(p0);
 	return p0[1];
     };
+    if (x0[0] == NODE_ARRAY_T) {
+        p0[1] = x0[1];
+        deref(p0);
+        return p0[1];
+    };
     not_implemented();
 };
 
@@ -723,7 +728,6 @@ infer_newarray: (p0) {
     x0 = infer_item(p0[2]); (% length %);
     unify(int_type, x0);
     x1 = infer_item(p0[3]);
-    puts("hoge\n");
     p0[1] = mktup2(NODE_ARRAY_T, x1);
     deref(p0);
     return p0[1];
