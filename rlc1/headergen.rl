@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: headergen.rl 2010-04-08 16:48:37 nineties $
+ % $Id: headergen.rl 2010-04-09 09:09:08 nineties $
  %);
 
 (% automatic header file generation %);
@@ -44,17 +44,23 @@ export_item: (p0, p1) {
     exit(1);
 };
 
+imported: NULL;
+
 (% p0: header filename, p1: program %);
 headergen: (p0, p1) {
     allocate(3);
     x0 = p1[1]; (% item list %);
     x1 = open_out(p0); (% output channel %);
+    imported = mkset(&strhash, &streq, 0);
     print_header(x1, p0);
     while (x0 != NULL) {
         x2 = ls_value(x0);
         if (x2[0] == NODE_IMPORT) {
-            put_item(x1, x2);
-            fputs(x1, ";\n");
+	    if (set_contains(imported, x2[1]) == FALSE) {
+		set_add(imported, x2[1]);
+		put_item(x1, x2);
+		fputs(x1, ";\n");
+	    };
         };
         if (x2[0] == NODE_EXPORT) {
             export_item(x1, x2);

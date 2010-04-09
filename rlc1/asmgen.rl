@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: asmgen.rl 2010-04-09 04:21:58 nineties $
+ % $Id: asmgen.rl 2010-04-09 10:05:30 nineties $
  %);
 
 include(stddef, code);
@@ -142,17 +142,6 @@ emit_label: (p0, p1) {
     allocate(1);
     fputs(p0, p1[INST_OPERAND1][1]);
     fputs(p0, ":");
-    x0 = p1[INST_LIVEOUT];
-    if (x0 != NULL) {
-        fputs(p0, "\t/* live:");
-        while (x0 != NULL) {
-            (% emit_opd(p0, get_reg(ls_value(x0)), 32); %);
-            fputc(p0, ' ');
-            fputi(p0, ls_value(x0));
-            x0 = ls_next(x0);
-        };
-        fputs(p0, " */");
-    };
     fputc(p0, '\n');
 };
 
@@ -176,18 +165,6 @@ emit_inst: (p0, p1) {
 	if (x0) { fputc(p0, ','); };
 	fputc(p0, ' ');
 	emit_opd(p0, p1[INST_OPERAND2], inst_prec[p1[INST_OPCODE]]);
-    };
-
-    x0 = p1[INST_LIVEOUT];
-    if (x0 != NULL) {
-        fputs(p0, "\t/* live:");
-        while (x0 != NULL) {
-            (% emit_opd(p0, get_reg(ls_value(x0)), 32); %);
-            fputc(p0, ' ');
-            fputi(p0, ls_value(x0));
-            x0 = ls_next(x0);
-        };
-        fputs(p0, " */");
     };
     fputc(p0, '\n');
 };

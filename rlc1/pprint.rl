@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: pprint.rl 2010-04-08 10:04:40 nineties $
+ % $Id: pprint.rl 2010-04-09 09:01:36 nineties $
  %);
 
 include(stddef,code);
@@ -306,6 +306,9 @@ put_typedecl: (p0, p1) {
     allocate(1);
     fputs(p0, "type ");
     fputs(p0, p1[1]);
+    if (p1[2][0] == NODE_ABSTRACT_T) {
+	return;
+    };
     if (p1[2][0] != NODE_VARIANT_T) {
         fputs(p0, ": ");
         put_type(p0, p1[2]);
@@ -355,7 +358,7 @@ put_typedexpr: (p0, p1) {
 
 pptype_funcs: [ put_unit_t, put_char_t, put_int_t, put_float_t, put_double_t,
     put_pointer_t, put_array_t, put_tuple_t, put_lambda_t, put_tyvar, put_namedty,
-    put_variant_t, put_void_t
+    put_variant_t, put_void_t, put_sarray_t, put_abstract_t
 ];
 
 put_type: (p0, p1) {
@@ -396,7 +399,6 @@ put_pointer_t: (p0, p1) {
 put_array_t: (p0, p1) {
     put_type(p0, p1[ARRAY_T_ELEMENT]);
     fputc(p0, '[');
-    fputi(p0, p1[ARRAY_T_LENGTH]);
     fputc(p0, ']');
 };
 
@@ -439,6 +441,15 @@ put_namedty: (p0, p1) {
 
 put_variant_t: (p0, p1) {
     fputs(p0, p1[1]);
+};
+
+put_sarray_t: (p0, p1) {
+    fputs(stderr, "ERROR: not implemented\n");
+    exit(1);
+};
+
+put_abstract_t: (p0, p1) {
+    fputc(p0, '*');
 };
 
 put_tyscheme: (p0, p1) {

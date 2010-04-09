@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-09 08:29:00 nineties $
+ % $Id: tcodegen.rl 2010-04-09 10:04:29 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -32,7 +32,7 @@ type_size: (p0) {
     if (p0[0] == NODE_DOUBLE_T) { return 2; };
     if (p0[0] == NODE_POINTER_T) { return 1; };
     if (p0[0] == NODE_ARRAY_T) {
-        return type_size(p0[ARRAY_T_ELEMENT]) * p0[ARRAY_T_LENGTH];
+	return 1;
     };
     if (p0[0] == NODE_TUPLE_T) {
         x0 = p0[TUPLE_T_LENGTH];
@@ -172,7 +172,7 @@ transl_funcs: [
     transl_assign, not_reachable, not_reachable, not_reachable, transl_ret, transl_retval,
     transl_syscall, transl_field, transl_fieldref, not_reachable, transl_variant, transl_unit,
     transl_typedexpr, transl_if, transl_ifelse, not_reachable, transl_cast, transl_new,
-    transl_while, transl_for
+    transl_while, transl_for, transl_newarray
 ];
 
 transl_integer: (p0, p1, p2) {
@@ -1129,6 +1129,24 @@ transl_for: (p0, p1, p2) {
     p0 = transl_item(p0, p1[4], &x0); (% step %);
     p0 = ls_cons(mkinst(INST_JMP, x1, NULL), p0);
     p0 = ls_cons(mkinst(INST_LABEL, x2, NULL), p0);
+    return p0;
+};
+
+transl_newarray: (p0, p1, p2) {
+    allocate(7);
+    x0 = p1[2]; (% length expr %);
+    x1 = p1[3]; (% init %);
+    x2 = type_size(x1[1]);
+    x3 = get_variable("alloc");
+    p0 = transl_item_single(p0, x0, &x4);
+    x5 = create_pseudo(1, LOCATION_REGISTER);
+    p0 = ls_cons(mkinst(INST_MOVL, mktup2(OPD_INTEGER, x2*4), x5), p0);
+    p0 = ls_cons(mkinst(INST_IMUL, x4, x5), p0);
+    p0 = ls_cons(mkinst(INST_MOVL, x5, get_stack(0)), p0);
+    x6 = mkinst(INST_CALL_IMM, mktup2(OPD_LABEL, mangle(x3[1], get_ident_name(x3))), NULL);
+    x6[INST_ARG] = 1;
+    p0 = ls_cons(x6, p0);
+    *p2 = ls_singleton(get_eax());
     return p0;
 };
 

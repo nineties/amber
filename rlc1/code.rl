@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: code.rl 2010-04-09 08:24:47 nineties $
+ % $Id: code.rl 2010-04-09 09:54:24 nineties $
  %);
 
 NODE_PROG       => 0;  (% item list %);
@@ -39,6 +39,7 @@ NODE_CAST       => 30; (% type, expr %);
 NODE_NEW        => 31; (% type, expr %);
 NODE_WHILE      => 32; (% type, cond, body %);
 NODE_FOR        => 33; (% type, init, cond, step, body %);
+NODE_NEWARRAY   => 34; (% type, length, init %);
 
 (% indices %);
 STRING_RAW       => 2;
@@ -56,20 +57,21 @@ CALL_ARG         => 3;
 RETVAL_VALUE     => 2;
 
 (% types %);
-NODE_UNIT_T    => 0;
-NODE_CHAR_T    => 1;
-NODE_INT_T     => 2;
-NODE_FLOAT_T   => 3;
-NODE_DOUBLE_T  => 4;
-NODE_POINTER_T => 5;  (% element type %);
-NODE_ARRAY_T   => 6;  (% element type, length, is_string %);
-NODE_TUPLE_T   => 7;  (% length, element types  %);
-NODE_LAMBDA_T  => 8;  (% param type, ret type %);
-NODE_TYVAR     => 9;  (% type-variable id %);
-NODE_NAMED_T   => 10; (% fieldname, type %);
-NODE_VARIANT_T => 11; (% name, rows %);
-NODE_VOID_T    => 12;
-NODE_SARRAY_T  => 13; (% element type %);
+NODE_UNIT_T     => 0;
+NODE_CHAR_T     => 1;
+NODE_INT_T      => 2;
+NODE_FLOAT_T    => 3;
+NODE_DOUBLE_T   => 4;
+NODE_POINTER_T  => 5;  (% element type %);
+NODE_ARRAY_T    => 6;  (% element type %);
+NODE_TUPLE_T    => 7;  (% length, element types  %);
+NODE_LAMBDA_T   => 8;  (% param type, ret type %);
+NODE_TYVAR      => 9;  (% type-variable id %);
+NODE_NAMED_T    => 10; (% fieldname, type %);
+NODE_VARIANT_T  => 11; (% name, rows %);
+NODE_VOID_T     => 12;
+NODE_SARRAY_T   => 13; (% element type %);
+NODE_ABSTRACT_T => 14;
 
 (% structure of rows of variant
  % (constructor name, id, arg)
@@ -77,8 +79,6 @@ NODE_SARRAY_T  => 13; (% element type %);
 
 POINTER_T_BASE    => 1;
 ARRAY_T_ELEMENT   => 1;
-ARRAY_T_LENGTH    => 2;
-ARRAY_T_IS_STRING => 3;
 TUPLE_T_LENGTH    => 1;
 TUPLE_T_ELEMENTS  => 2;
 LAMBDA_T_PARAM    => 1;
