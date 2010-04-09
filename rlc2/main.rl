@@ -2,10 +2,9 @@ import stdlib;
 
 export
 main: () {
-    x : new (1, hoge:2);
-    y : new_array 100 (1,2);
-
-    y[10] = (1, 3);
-    (a, b) : y[10];
+    y : new_array 100 'a';
+    y[0] = 'h';
+    a: y[0];
+    y[1] = a;
     exit(ExitSuccess);
 };
