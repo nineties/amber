@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: asmgen.rl 2010-04-09 11:08:09 nineties $
+ % $Id: asmgen.rl 2010-04-09 21:16:45 nineties $
  %);
 
 include(stddef, code);
@@ -67,7 +67,7 @@ emit_opd: (p0, p1, p2) {
     };
     if (p1[0] == OPD_STACK) {
         x0 = p1[2]; (% position %);
-        x0 = stack_depth - x0;
+        x0 = 4*(stack_depth - x0);
         fputc(p0, '-');
         fputi(p0, x0);
         fputs(p0, "(%ebp)");
@@ -75,7 +75,7 @@ emit_opd: (p0, p1, p2) {
     };
     if (p1[0] == OPD_ARG) {
         x0 = p1[2]; (% position %);
-        x0 = x0 + 2;
+        x0 = 4*(x0 + 2);
         fputi(p0, x0);
         fputs(p0, "(%ebp)");
         return;
@@ -104,7 +104,7 @@ emit_opd: (p0, p1, p2) {
             return;
         };
         if (p1[4] != 0) {
-            fputi(p0, p1[4]);
+            fputi(p0, 4*p1[4]);
         };
         fputc(p0, '(');
         emit_opd(p0, p1[2], 32);
@@ -126,6 +126,7 @@ inst_prec:   [32,     32,      32,     32,    32,      32,    32,     32,     32
 ];
 
 emit_call_ind: (p0, p1) {
+    allocate(1);
     fputc(p0, '\t');
     fputs(p0, inst_string[p1[INST_OPCODE]]);
     if (p1[INST_OPERAND1] != NULL) {
@@ -133,7 +134,17 @@ emit_call_ind: (p0, p1) {
 	fputc(p0, ' ');
         fputc(p0, '*');
 	emit_opd(p0, p1[INST_OPERAND1], inst_prec[p1[INST_OPCODE]]);
-	x0 = TRUE;
+    };
+
+    x0 = p1[INST_LIVEIN];
+    if (x0 != NULL) {
+        fputs(p0, "\t/* live-in:");
+        while (x0 != NULL) {
+            fputc(p0, ' ');
+            fputi(p0, ls_value(x0));
+            x0 = ls_next(x0);
+        };
+        fputs(p0, " */");
     };
     fputc(p0, '\n');
 };

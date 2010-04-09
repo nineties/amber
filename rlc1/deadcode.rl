@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: deadcode.rl 2010-04-09 11:07:49 nineties $
+ % $Id: deadcode.rl 2010-04-09 21:18:18 nineties $
  %);
 
 include(stddef, code);
@@ -102,11 +102,12 @@ iterate_load: (p0) {
     allocate(2);
     x0 = iterate(ls_next(p0));
     x1 = ls_value(p0);
+    (%
     if (output_is_used(x1, x0) == FALSE) {
-        (% this is a dead instruction %);
         changed = TRUE;
         return x0;
     };
+    %);
     return ls_cons(x1, x0);
 };
 

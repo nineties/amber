@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: pprint.rl 2010-04-09 09:01:36 nineties $
+ % $Id: pprint.rl 2010-04-10 00:24:01 nineties $
  %);
 
 include(stddef,code);
@@ -10,7 +10,7 @@ include(stddef,code);
 export(put_prog, put_item, put_type, put_tyscheme);
 
 ppfuncs: [put_prog, put_integer, put_string, put_dontcare, put_identifier,
-    put_array, put_tuple, put_code, put_decl, put_callop, put_subsop, put_codeop, put_unexpr,
+    put_array, put_tuple, put_code, put_decl, put_lambda, put_subsop, put_codeop, put_unexpr,
     put_binexpr, put_assign, put_export, put_import, put_external, put_ret, put_retval,
     put_syscall, put_field, put_fieldref, put_typedecl, put_variant, put_unit, put_typedexpr
 ];
@@ -39,7 +39,10 @@ PRI_REWRITE        => 20;
 PRI_TYPEDECL       => 21;
 PRI_EXTERNAL       => 22;
 
-priority: [0, 20, 0, 0, 0, 0, 0, 0, 0, 19, 1, 1, 1, 3, 0, 16, 22, 18, 18, 18, 16, 1, 21, 0, 0, 17];
+
+priority: [0, 0, 0, 0, 0, 0, 0, 0, 19, 1, 1, 1, 3, 0, 16, 22, 18, 18, 18, 16, 1, 21, 0, 0, 17
+, 0, 17, 18, 18, 0, 0, 0, 18, 18, 0
+];
 binexpr_priority: [0, 5, 5, 4, 4, 4, 13, 10, 9, 6, 6, 8, 8, 7, 7, 7, 7, 15, 14];
 
 get_priority: (p0) {
@@ -186,8 +189,8 @@ put_decl: (p0, p1) {
     put_subitem(p0, p1[3], PRI_DECLARATION);
 };
 
-put_callop: (p0, p1) {
-    put_subitem(p0, p1[2], PRI_POSTFIX);
+put_lambda: (p0, p1) {
+    put_subitem(p0, p1[2], PRI_PRIMARY);
     put_subitem(p0, p1[3], PRI_PRIMARY);
 };
 
