@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: pprint.rl 2010-04-10 00:24:01 nineties $
+ % $Id: pprint.rl 2010-04-10 01:00:54 nineties $
  %);
 
 include(stddef,code);
@@ -12,7 +12,8 @@ export(put_prog, put_item, put_type, put_tyscheme);
 ppfuncs: [put_prog, put_integer, put_string, put_dontcare, put_identifier,
     put_array, put_tuple, put_code, put_decl, put_lambda, put_subsop, put_codeop, put_unexpr,
     put_binexpr, put_assign, put_export, put_import, put_external, put_ret, put_retval,
-    put_syscall, put_field, put_fieldref, put_typedecl, put_variant, put_unit, put_typedexpr
+    put_syscall, put_field, put_fieldref, put_typedecl, put_variant, put_unit, put_typedexpr,
+    put_if, put_ifelse
 ];
 
 (% priority of expressions %);
@@ -196,7 +197,9 @@ put_lambda: (p0, p1) {
 
 put_subsop: (p0, p1) {
     put_subitem(p0, p1[2], PRI_POSTFIX);
+    fputc(p0, '[');
     put_subitem(p0, p1[3], PRI_PRIMARY);
+    fputc(p0, ']');
 };
 
 put_codeop: (p0, p1) {
@@ -357,6 +360,22 @@ put_typedexpr: (p0, p1) {
     put_subitem(p0, p1[2], PRI_ASSIGNMENT);
     fputc(p0, '@');
     put_type(p0, p1[1]);
+};
+
+put_if: (p0, p1) {
+    fputs(p0, "if (");
+    put_item(p0, p1[2]);
+    fputs(p0, ") ");
+    put_item(p0, p1[3]);
+};
+
+put_ifelse: (p0, p1) {
+    fputs(p0, "if (");
+    put_item(p0, p1[2]);
+    fputs(p0, ") ");
+    put_item(p0, p1[3]);
+    fputs(p0, " else ");
+    put_item(p0, p1[4]);
 };
 
 pptype_funcs: [ put_unit_t, put_char_t, put_int_t, put_float_t, put_double_t,
