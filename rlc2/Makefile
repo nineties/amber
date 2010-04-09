@@ -3,13 +3,13 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-04-09 08:59:30 nineties $
+# $Id: Makefile 2010-04-09 16:35:14 nineties $
 
 LD = ld
 LDFLAGS = --nostdlib --entry=main
 
 RLC1 = ../rlc1/rlc
-SOURCES = main.rl sys.rl alloc.rl stdlib.rl string.rl io.rl
+SOURCES = main.rl sys.rl alloc.rl
 ASMSOURCES = $(patsubst %.rl,%.s,$(SOURCES))
 OBJECTS    = $(patsubst %.rl,%.o,$(SOURCES))
 
@@ -19,7 +19,7 @@ all:
 rlc: $(OBJECTS)
 	$(LD) $(OBJECTS) -o $@ $(LDFLAGS)
 
-main.o   : $(RLC1) main.rl alloc.o stdlib.o
+main.o   : $(RLC1) main.rl alloc.o
 sys.o    : $(RLC1) sys.rl
 alloc.o  : $(RLC1) sys.o
 stdlib.o : $(RLC1) sys.o alloc.o stdlib.rl

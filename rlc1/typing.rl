@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-09 10:09:36 nineties $
+ % $Id: typing.rl 2010-04-10 00:21:43 nineties $
  %);
 
 include(stddef, code);
@@ -60,16 +60,17 @@ init_varmap: () {
     varmap_push(); (% global scopeid %);
 };
 
+(% p0: name %);
 get_variable: (p0) {
     allocate(1);
-    x0 = varmap_find(p0);
+    x0 = varmap_find(p0); (% tyscheme, id, is_global %);
     if (x0 == NULL) {
         fputs(stderr, "ERROR: variable '");
         fputs(stderr, p0);
         fputs(stderr, "' is not declared\n");
         exit(1);
     };
-    return mktup6(NODE_IDENTIFIER, x0[0][1], p0, x0[1], x0[0], x0[1]);
+    return mktup6(NODE_IDENTIFIER, x0[0][1], p0, x0[1], x0[0], x0[2]);
 };
 
 
@@ -502,26 +503,16 @@ infer_import: (p0) {
 
 infer_external: (p0) {
     allocate(5);
-    x0 = p0[1]; (% item %);
-    if (x0[0] != NODE_TYPEDEXPR) {
-        goto &external_error;
-    };
-    x1 = x0[2]; (% expr %);
-    x2 = x0[1]; (% type %);
-    if (x1[0] != NODE_IDENTIFIER) {
-        goto &external_error;
-    };
-    x3 = closure(x2);
-    x4 = set_varid(x1);
-    varmap_add(get_ident_name(x1), mktup3(x3, x4, TRUE));
-    x1[1] = x2;
-    x1[3] = x4;
-    x1[4] = x3;
+    x0 = p0[1]; (% ident %);
+    x1 = p0[2]; (% type %);
+    x2 = closure(x1);
+    x3 = set_varid(x0);
+    varmap_add(get_ident_name(x0), mktup3(x2, x3, TRUE));
+    x0[1] = x1;
+    x0[3] = x3;
+    x0[4] = x2;
+    x0[5] = TRUE;
     return unit_type;
-
-label external_error;
-    fputs(stderr, "ERROR: invalid external declaration\n");
-    exit(1);
 };
 
 infer_ret: (p0) {

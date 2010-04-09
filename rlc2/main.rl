@@ -1,10 +1,14 @@
-import stdlib;
+import alloc;
+
+make_counter: (n) {
+    return () {
+        return n++;
+    };
+};
 
 export
 main: () {
-    y : new_array 100 'a';
-    y[0] = 'h';
-    a: y[0];
-    y[1] = a;
-    exit(ExitSuccess);
+    counter : make_counter(1);
+    x : counter();
+    syscall(1, x) @ void;
 };

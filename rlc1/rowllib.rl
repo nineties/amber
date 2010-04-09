@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: rowllib.rl 2010-04-09 08:10:54 nineties $
+ % $Id: rowllib.rl 2010-04-09 22:08:42 nineties $
  %);
 
 include(stddef);
@@ -125,6 +125,12 @@ vec_size: (p0) { return p0[VEC_SIZE]; };
 (% p0: vector, p1:index %);
 vec_at: (p0, p1) {
     allocate(1);
+    if (p1 < 0) {
+        *0 = 1;
+    };
+    if (p1 >= p0[VEC_SIZE]) {
+        *0 = 1;
+    };
     x0 = p0[VEC_BUF];
     return x0[p1];
 };
@@ -165,8 +171,8 @@ vec_pushback: (p0, p1) {
     if (p0[VEC_SIZE] == p0[VEC_CAPA]) {
         vec_reserve(p0, p0[VEC_CAPA] * 2);
     };
-    vec_put(p0, p0[VEC_SIZE], p1);
     p0[VEC_SIZE] = p0[VEC_SIZE] + 1;
+    vec_put(p0, p0[VEC_SIZE]-1, p1);
 };
 
 (% p0: vector %);

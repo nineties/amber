@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: regalloc.rl 2010-04-09 04:18:39 nineties $
+ % $Id: regalloc.rl 2010-04-09 22:13:38 nineties $
  %);
 
 (% Register allocation %);
@@ -72,7 +72,7 @@ update_tables: (p0, p1) {
     };
     (% remove entries of p0 %);
     x0 = 0;
-    x1 = num_locations();
+    x1 = vec_size(conflicts);
     while (x0 < x1) {
         x2 = vec_at(conflicts, x0);
         x2 = iset_del(x2, p0[1]);
@@ -404,6 +404,13 @@ update_instructions: (p0) {
     if (x0[INST_OPCODE] == INST_MOVL) {
         if (x0[INST_OPERAND1] == x0[INST_OPERAND2]) {
             return update_instructions(ls_next(p0));
+        };
+        if (x0[INST_OPERAND1][0] == OPD_OFFSET) {
+            if (x0[INST_OPERAND2][0] == OPD_OFFSET) {
+                if (x0[INST_OPERAND1][1] == x0[INST_OPERAND2][x1]) {
+                    return update_instructions(ls_next(p0));
+                };
+            };
         };
     };
 

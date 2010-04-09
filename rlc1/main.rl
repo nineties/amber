@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: main.rl 2010-04-08 21:34:52 nineties $
+ % $Id: main.rl 2010-04-09 21:42:55 nineties $
  %);
 
 include(stddef, code);
@@ -47,10 +47,8 @@ compile: (p0, p1, p2) {
     headergen(p1, x2);
 
     (% closure conversion %);
-    (%
     puts("> closing local functions...\n");
     x2 = closure_conversion(x2);
-    %);
 
     (% translate to two address code %);
     puts("> translating to tcode...\n");

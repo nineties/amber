@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: parse.rl 2010-04-09 09:57:35 nineties $
+ % $Id: parse.rl 2010-04-10 00:20:51 nineties $
  %);
 
 include(stddef, code, token);
@@ -113,13 +113,15 @@ parse_toplevel_items: (p0) {
 
 (% p0: first token %);
 parse_toplevel_item: (p0) {
-    allocate(1);
+    allocate(2);
     if (p0 == TOK_EXPORT) {
         return mktup2(NODE_EXPORT, parse_typedecl_expr(lex()));
     };
     if (p0 == TOK_EXTERNAL) {
-        x0 = parse_typed_expr(lex());
-        return mktup2(NODE_EXTERNAL, x0);
+        x0 = parse_identifier(lex());
+        eatchar(lex(), '@');
+        x1 = parse_type(lex());
+        return mktup3(NODE_EXTERNAL, x0, x1);
     };
     parse_typedecl_expr(p0);
 };
@@ -527,7 +529,7 @@ parse_postfix_expr: (p0) {
 label post_loop;
     x1 = lex();
     if (x1 == '(') {
-        x0 = mktup4(NODE_CALL, NULL, x0, parse_tuple(x1));
+        x0 = mktup5(NODE_CALL, NULL, x0, parse_tuple(x1), FALSE);
         goto &post_loop;
     };
     if (x1 == '[') {
@@ -536,7 +538,7 @@ label post_loop;
         goto &post_loop;
     };
     if (x1 == '{') {
-        x0 = mktup4(NODE_LAMBDA, NULL, x0, parse_block(x1));
+        x0 = mktup6(NODE_LAMBDA, NULL, x0, parse_block(x1), NULL, NULL);
         goto &post_loop;
     };
     if (x1 == TOK_INCR) {
