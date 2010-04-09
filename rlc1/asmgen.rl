@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: asmgen.rl 2010-04-09 21:16:45 nineties $
+ % $Id: asmgen.rl 2010-04-10 01:47:34 nineties $
  %);
 
 include(stddef, code);
@@ -111,6 +111,9 @@ emit_opd: (p0, p1, p2) {
         fputc(p0, ')');
         return;
     };
+    puti(p1[0]);
+    putc('\n');
+    puts("hoge\n");
     not_reachable();
 };
 

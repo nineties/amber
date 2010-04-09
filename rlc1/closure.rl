@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: closure.rl 2010-04-10 01:05:19 nineties $
+ % $Id: closure.rl 2010-04-10 01:54:45 nineties $
  %);
 
 (% closure conversion %);
@@ -306,14 +306,17 @@ close_call: (p0) {
     x0 = p0[2]; (% fun %);
     x1 = p0[3]; (% arguments %);
     x2 = close(x0);
+    puts("ppppp\n");
     if (x2[1] == NULL) {
         (% closure call %);
         p0[4] = TRUE;
         return mktup2(p0, NULL);
     };
+    puts("poge\n");
     if (iset_contains(closed, x2[1][3])) {
         return mktup2(p0, NULL);
     };
+    puts("mmmm\n");
     x3 = (close(x1))[0];
     x1 = tuple_pushback(x1, x2[0]);
     p0[3] = x1;
@@ -357,6 +360,7 @@ close_external: (p0) {
     allocate(1);
     x0 = p0[1]; (% ident %);
     map_add(fmap, x0[3], x0);
+    closed = iset_add(closed, x0[3]);
     return mktup2(p0, NULL);
 };
 
