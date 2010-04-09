@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: liveness.rl 2010-04-09 21:09:29 nineties $
+ % $Id: liveness.rl 2010-04-10 01:11:29 nineties $
  %);
 
 (% liveness analysis %);
@@ -121,7 +121,7 @@ iterate_label: (p0, p1) {
 (% p0: a location %);
 must_be_memory: (p0) {
     if (p0[0] == OPD_PSEUDO) {
-        (% assert(p0[PSEUDO_TYPE] != LOCATION_REGISTER); %);
+        assert(p0[PSEUDO_TYPE] != LOCATION_REGISTER);
         p0[PSEUDO_TYPE] = LOCATION_MEMORY;
         return;
     };

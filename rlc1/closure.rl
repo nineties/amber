@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: closure.rl 2010-04-10 00:23:53 nineties $
+ % $Id: closure.rl 2010-04-10 01:05:19 nineties $
  %);
 
 (% closure conversion %);
@@ -23,17 +23,6 @@ not_implemented: (p0) {
 cmap: NULL; (% identifier-id to item %);
 fmap: NULL; (% identifier-id to label or NULL %);
 closed: NULL; (% closed closure labels %);
-
-nest_depth: 0;
-
-incl_nestlevel: () {
-    nest_depth = nest_depth + 1;
-    return nest_depth;
-};
-
-decl_nestlevel: () {
-    nest_depth = nest_depth - 1;
-};
 
 remove_vars: (p0, p1) {
     allocate(3);
@@ -147,21 +136,6 @@ free_variable: (p0) {
     return iterate(mkiset(), p0);
 };
 
-(% p0: pointer to env, p1: free variables %);
-build_closure_env: (p0, p1) {
-    allocate(3);
-    if (p1 != NULL) { return; };
-    x2 = 0;
-    while (p1 != NULL) {
-        x1 = get_variable(ls_value(p1));
-        assert(x1 != NULL);
-        map_add(cmap, x1[3], mktup4(NODE_SUBSCRIPT, int_type, x0,
-            mktup4(NODE_INTEGER, int_type, 32, x2)));
-        x2 = x2 + 1;
-        p1 = ls_next(p1);
-    };
-};
-
 tuple_t_pushback: (p0, p1) {
     allocate(3);
     x0 = p0[TUPLE_T_LENGTH];
@@ -192,19 +166,40 @@ tuple_pushback: (p0, p1) {
     return p0;
 };
 
+(% p0: pointer to env, p1: free variables %);
+build_closure_env: (p0, p1) {
+    allocate(3);
+    if (p1 == NULL) { return; };
+    x2 = 1;
+    while (p1 != NULL) {
+        x1 = vec_at(vartable, ls_value(p1));
+        assert(x1 != NULL);
+        map_add(cmap, x1[3], mktup4(NODE_SUBSCRIPT, int_type, x0,
+            mktup4(NODE_INTEGER, int_type, 32, x2)));
+        x2 = x2 + 1;
+        p1 = ls_next(p1);
+    };
+};
+
 (% p0: function ident, p1: lambda, p2: free variables %);
 close_function_impl: (p0, p1, p2) {
     allocate(3);
     x0 = mktup2(NODE_ARRAY_T, int_type);
-    x1 = mktup6(NODE_IDENTIFIER, x0, strdup("clsenv"), 0, mktyscheme(x0), FALSE);
+    x1 = mktup6(NODE_IDENTIFIER, x0, strdup("cls0"), 0, mktyscheme(x0), FALSE);
     set_varid(x1);
     build_closure_env(x1, p2);
     map_add(cmap, x1[3], mktup4(NODE_SUBSCRIPT, int_type, x1,
             mktup4(NODE_INTEGER, int_type, 32, 0)));
     map_add(fmap, x1[3], x1);
     p1[3] = (close(p1[3]))[0];
+    map_del(fmap, x1[3]);
+    map_del(cmap, x1[3]);
+    while (p2 != NULL) {
+        map_del(cmap, ls_value(p2));
+        p2 = ls_next(p2);
+    };
+
     if (occur(x1, p1[3])) {
-        puts("HHHHHHH\n");
         (% build new parameter %);
         p1[2] = tuple_pushback(p1[2], x1);
         return;
@@ -216,10 +211,9 @@ close_function_impl: (p0, p1, p2) {
 (% p0: function ident, p1: lambda %);
 close_function: (p0, p1) {
     allocate(5);
-    x0 = incl_nestlevel();
     (% determine the free variables of the lambda %);
     x1 = free_variable(p1);
-
+    x1 = iset_del(x1, p0[3]);
     close_function_impl(p0, p1, x1);
     x2 = NULL;
     while (x1 != NULL) {
@@ -229,7 +223,6 @@ close_function: (p0, p1) {
     x2 = ls_reverse(x2);
     p1[5] = x2; (% free variables %);
     p1[4] = p0;
-    decl_nestlevel();
     return mktup2(p1, p0);
 };
 
@@ -283,7 +276,7 @@ close_fundecl: (p0) {
     x1[3] = (close(x1[3]))[0];
     x3 = mkmap(&simple_hash, &simple_equal, 0);
     x4 = mktup2(NODE_ARRAY_T, int_type);
-    x5 = mktup6(NODE_IDENTIFIER, x4, strdup("clsenv"), 0, mktyscheme(x4), FALSE);
+    x5 = mktup6(NODE_IDENTIFIER, x4, strdup("cls1"), 0, mktyscheme(x4), FALSE);
     set_varid(x5);
     map_add(x3, x2[1][3], mktup4(NODE_SUBSCRIPT, int_type, x5,
         mktup4(NODE_INTEGER, int_type, 32, 0)));
@@ -328,10 +321,15 @@ close_call: (p0) {
 };
 
 close_lambda: (p0) {
-    allocate(2);
+    allocate(3);
+    if (p0[4] != NULL) {
+        return mktup2(p0, p0[4]);
+    };
     x0 = mktup2(NODE_ARRAY_T, int_type);
-    x1 = mktup6(NODE_IDENTIFIER, x0, strdup("clsenv"), 0, mktyscheme(x0), FALSE);
-    return close_function(x1, p0);
+    x1 = mktup6(NODE_IDENTIFIER, x0, strdup("cls2"), 0, mktyscheme(x0), FALSE);
+    set_varid(x1);
+    x2 = close_function(x1, p0);
+    return x2;
 };
 
 close_unexpr: (p0) {

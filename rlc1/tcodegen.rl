@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-10 00:22:29 nineties $
+ % $Id: tcodegen.rl 2010-04-10 01:08:21 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -302,6 +302,7 @@ transl_closure_call: (p0, p1, p2) {
     p0 = transl_item_single(p0, x0, &x3);
     p0 = set_arguments(p0, x2, 0, &x4);
     p0 = ls_cons(mkinst(INST_MOVL, x3, get_stack(x4)), p0);
+    p0 = must_be_register(p0, &x3);
     x6 = mkinst(INST_CALL_IND, create_offset(x3, NULL, 0), NULL);
     x6[INST_ARG] = x4 + 1;
     p0 = ls_cons(x6, p0);
