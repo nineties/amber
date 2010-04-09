@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-09 08:26:11 nineties $
+ % $Id: typing.rl 2010-04-09 09:57:11 nineties $
  %);
 
 include(stddef, code);
@@ -110,7 +110,7 @@ infer_funcs: [not_reachable, infer_integer, infer_string, not_implemented,
     infer_assign, infer_export, infer_import, infer_external, infer_ret, infer_retval,
     infer_syscall, infer_field, infer_fieldref, infer_typedecl, infer_variant, infer_unit,
     infer_typedexpr, infer_if, infer_ifelse, infer_static_array, infer_cast, infer_new,
-    infer_while, infer_for
+    infer_while, infer_for, infer_newarray
 ];
 
 unit_type   : NULL;
@@ -173,6 +173,7 @@ infer_array: (p0) {
         unify(x0, x4[1]);
         x2 = x2 + 1;
     };
+    not_implemented();
     p0[1] = mktup4(NODE_ARRAY_T, x0, x1, FALSE);
     deref(p0);
     return p0[1];
@@ -717,6 +718,17 @@ infer_for: (p0) {
     return p0[1];
 };
 
+infer_newarray: (p0) {
+    allocate(2);
+    x0 = infer_item(p0[2]); (% length %);
+    unify(int_type, x0);
+    x1 = infer_item(p0[3]);
+    puts("hoge\n");
+    p0[1] = mktup2(NODE_ARRAY_T, x1);
+    deref(p0);
+    return p0[1];
+};
+
 (% p0: item %);
 infer_item: (p0) {
     allocate(1);
@@ -757,9 +769,6 @@ unify: (p0, p1) {
         if (p0[0] == NODE_TUPLE_T)    { return unify_tuple_t(p0, p1); };
         if (p0[0] == NODE_ARRAY_T)    {
             unify(p0[ARRAY_T_ELEMENT], p1[ARRAY_T_ELEMENT]);
-            if (p0[ARRAY_T_LENGTH] != p1[ARRAY_T_LENGTH]) {
-                type_mismatch(p0, p1);
-            };
             return;
         };
         if (p0[0] == NODE_LAMBDA_T) { return unify_lambda_t(p0, p1); };
@@ -868,7 +877,7 @@ deref_funcs: [not_reachable, deref_integer, deref_string, deref_dontcare,
     deref_assign, deref_export, deref_import, deref_external, deref_ret, deref_retval,
     deref_syscall, deref_field, deref_fieldref, deref_typedecl, deref_variant, deref_unit,
     deref_typedexpr, deref_if, deref_ifelse, deref_static_array, deref_cast, deref_new,
-    deref_while, deref_for
+    deref_while, deref_for, deref_newarray
 ];
 
 (% p0: item %);
@@ -1065,6 +1074,12 @@ deref_for: (p0) {
     deref(p0[3]);
     deref(p0[4]);
     deref(p0[5]);
+};
+
+deref_newarray: (p0) {
+    deref(p0[2]);
+    deref(p0[3]);
+    p0[1] = deref_type(p0[1]);
 };
 
 (% p0: type %);

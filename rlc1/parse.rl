@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: parse.rl 2010-04-09 08:31:17 nineties $
+ % $Id: parse.rl 2010-04-09 09:57:35 nineties $
  %);
 
 include(stddef, code, token);
@@ -621,6 +621,11 @@ parse_primary_item: (p0) {
         x0 = parse_typed_expr(lex());
         return mktup3(NODE_NEW, NULL, x0);
     };
+    if (p0 == TOK_NEWARRAY) {
+        x0 = parse_primary_item(lex());
+        x1 = parse_typed_expr(lex());
+        return mktup4(NODE_NEWARRAY, NULL, x0, x1);
+    };
     expected("item");
 };
 
@@ -745,13 +750,17 @@ type_map: NULL;
 
 (% p0: first token %);
 parse_typedecl_body: (p0) {
-    allocate(2);
+    allocate(3);
     eattoken(p0, TOK_TYPE, "type");
     x0 = parse_identifier(lex());
-    eatchar(lex(), ':');
-    x1 = parse_typedecl_rhs(lex());
-    map_add(type_map, get_ident_name(x0), x1);
-    return mktup3(NODE_TYPEDECL, get_ident_name(x0), x1);
+    x1 = lex();
+    if (x1 == ':') {
+        x2 = parse_typedecl_rhs(lex());
+        map_add(type_map, get_ident_name(x0), x2);
+        return mktup3(NODE_TYPEDECL, get_ident_name(x0), x2);
+    };
+    unput();
+    return mktup3(NODE_TYPEDECL, get_ident_name(x0), mktup1(NODE_ABSTRACT_T));
 };
 
 (% p0: first token %);
@@ -801,6 +810,10 @@ parse_type: (p0) {
     };
     if (x1 == '*') {
         return mktup2(NODE_POINTER_T, x0);
+    };
+    if (x1 == '[') {
+        eatchar(lex(), ']');
+        return mktup2(NODE_ARRAY_T, x0);
     };
     unput();
     return x0;
