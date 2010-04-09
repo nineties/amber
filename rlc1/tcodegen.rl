@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-09 10:21:25 nineties $
+ % $Id: tcodegen.rl 2010-04-09 11:07:16 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -27,12 +27,12 @@ type_size: (p0) {
     if (p0[0] == NODE_VOID_T) { return 0; };
     if (p0[0] == NODE_UNIT_T) { return 1; };
     if (p0[0] == NODE_CHAR_T) { return 1; };
-    if (p0[0] == NODE_INT_T)  { return 1; };
-    if (p0[0] == NODE_FLOAT_T) { return 1; };
-    if (p0[0] == NODE_DOUBLE_T) { return 2; };
-    if (p0[0] == NODE_POINTER_T) { return 1; };
+    if (p0[0] == NODE_INT_T)  { return 4; };
+    if (p0[0] == NODE_FLOAT_T) { return 4; };
+    if (p0[0] == NODE_DOUBLE_T) { return 8; };
+    if (p0[0] == NODE_POINTER_T) { return 4; };
     if (p0[0] == NODE_ARRAY_T) {
-	return 1;
+	return 4;
     };
     if (p0[0] == NODE_TUPLE_T) {
         x0 = p0[TUPLE_T_LENGTH];
@@ -40,13 +40,17 @@ type_size: (p0) {
         x2 = 0;
         x3 = 0;
         while (x2 < x0) {
-            x3 = x3 + type_size(x1[x2]);
+            x4 = type_size(x1[x2]);
+            if (x4 == 1) {
+                x4 = 4;
+            };
+            x3 = x3 + x4;
             x2 = x2 + 1;
         };
         return x3;
     };
     if (p0[0] == NODE_LAMBDA_T) {
-        return 1;
+        return 4;
     };
     if (p0[0] == NODE_NAMED_T) {
         return type_size(p0[2]);
@@ -210,7 +214,7 @@ transl_identifier: (p0, p1, p2) {
 	    return p0;
 	};
         x0 = type_size(p1[1]);
-        if (x0 == 1) {
+        if (x0 <= 4) {
             *p2 = ls_singleton(mktup2(OPD_LABEL, get_ident_name(p1)));
             return p0;
         };
@@ -220,7 +224,7 @@ transl_identifier: (p0, p1, p2) {
         while (x2 < x0) {
             x4 = get_at(x1, x2);
             x3 = ls_cons(x4, x3);
-            x2 = x2 + 1;
+            x2 = x2 + 4;
         };
         *p2 = ls_reverse(x3);
         return p0;
@@ -241,7 +245,7 @@ set_arguments: (p0, p1, p2, p3) {
         p0 = transl_item(p0, x1[x2], &x5);
 	while (x5 != NULL) {
 	    x4 = ls_cons(mkinst(INST_MOVL, ls_value(x5), get_stack(x3)), x4);
-	    x3 = x3 + 1;
+	    x3 = x3 + 4;
 	    x5 = ls_next(x5);
 	};
         x2 = x2 + 1;
@@ -263,7 +267,7 @@ transl_call2: (p0, p1, p2) {
         x6 = create_pseudo(1, LOCATION_REGISTER); (% address of region for return value %);
         p0 = ls_cons(mkinst(INST_LEAL, x4, x6), p0);
         p0 = ls_cons(mkinst(INST_MOVL, x6, get_stack(0)), p0);
-        p0 = set_arguments(p0, x3, 1, &x7);
+        p0 = set_arguments(p0, x3, 4, &x7);
         x8 = mkinst(INST_CALL_IMM, mktup2(OPD_LABEL, x5), NULL);
         x8[INST_ARG] = x7;
         p0 = ls_cons(x8, p0);
@@ -273,7 +277,7 @@ transl_call2: (p0, p1, p2) {
         x6 = create_pseudo(1, LOCATION_REGISTER); (% address of region for return value %);
         p0 = ls_cons(mkinst(INST_LEAL, x4, x6), p0);
         p0 = ls_cons(mkinst(INST_MOVL, x6, get_stack(0)), p0);
-        p0 = set_arguments(p0, x3, 1, &x7);
+        p0 = set_arguments(p0, x3, 4, &x7);
         x8 = mkinst(INST_CALL_IND, x5, NULL);
         x8[INST_ARG] = x7;
         p0 = ls_cons(x8, p0);
@@ -282,7 +286,7 @@ transl_call2: (p0, p1, p2) {
     x3 = NULL;
     while (x0 < x2) {
         x3 = ls_cons(get_at(x4, x0), x3);
-        x0 = x0 + 1;
+        x0 = x0 + 4;
     };
     *p2 = ls_reverse(x3);
     return p0;
@@ -292,7 +296,7 @@ transl_call: (p0, p1, p2) {
     allocate(6);
     x0 = p1[2]; (% function %);
     x1 = type_size(p1[1]);
-    if (x1 > 1) {
+    if (x1 > 4) {
         (% the function returns composite data %);
         return transl_call2(p0, p1, p2);
     };
@@ -329,13 +333,20 @@ transl_subscript: (p0, p1, p2) {
         x4 = type_size(x0[1][1]);
         x5 = create_pseudo(1, LOCATION_REGISTER);
         p0 = ls_cons(mkinst(INST_MOVL, x3, x5), p0);
-        p0 = ls_cons(mkinst(INST_IMUL, mktup2(OPD_INTEGER, x4*4), x5), p0);
+        if (x4 == 1) {
+            x6 = create_pseudo(1, LOCATION_REGISTER);
+            p0 = ls_cons(mkinst(INST_ADDL, x2, x5), p0);
+            p0 = ls_cons(mkinst(INST_LOADB, create_offset(x5, NULL, 0), x6), p0);
+            *p2 = ls_singleton(x6);
+            return p0;
+        };
+        p0 = ls_cons(mkinst(INST_IMUL, mktup2(OPD_INTEGER, x4), x5), p0);
         p0 = ls_cons(mkinst(INST_ADDL, x2, x5), p0);
         x6 = NULL;
         x7 = 0;
         while (x7 < x4) {
-            x6 = ls_cons(create_offset(x5, NULL, x7*4), x6);
-            x7 = x7 + 1;
+            x6 = ls_cons(create_offset(x5, NULL, x7), x6);
+            x7 = x7 + 4;
         };
         *p2 = ls_reverse(x6);
         return p0;
@@ -414,9 +425,9 @@ transl_unexpr: (p0, p1, p2) {
         x3 = 0;
         x4 = NULL;
         while (x3 < x2) {
-            x5 = create_offset(x1, NULL, x3*4);
+            x5 = create_offset(x1, NULL, x3);
             x4 = ls_cons(x5, x4);
-            x3 = x3 + 1;
+            x3 = x3 + 4;
         };
         *p2 = ls_reverse(x4);
         return p0;
@@ -495,7 +506,7 @@ transl_tuple_assign_helper: (p0, p1, p2, p3) {
         while (x0 > 0) {
             x1 = ls_cons(ls_value(*p2), x1);
             *p2 = ls_next(*p2);
-            x0 = x0 - 1;
+            x0 = x0 - 4;
         };
         *p3 = ls_reverse(x1);
         return p0;
@@ -509,7 +520,7 @@ transl_tuple_assign_helper: (p0, p1, p2, p3) {
             x2 = ls_cons(x3, x2);
             p0 = ls_cons(mkinst(INST_MOVL, ls_value(*p2), x3), p0);
             *p2 = ls_next(*p2);
-            x1 = x1 + 1;
+            x1 = x1 + 4;
         };
         x2 = ls_reverse(x2);
         assert(x2 != NULL);
@@ -552,7 +563,7 @@ transl_array_assign: (p0, p1, p2) {
     x4 = type_size(p1[1]);
     if (x2[0] == OPD_LABEL) {
         p0 = must_be_register(p0, &x3);
-        x5 = create_offset(x3, x2, x4*4);
+        x5 = create_offset(x3, x2, x4);
         p0 = transl_item_single(p0, x1, &x6);
         p0 = ls_cons(mkinst(INST_STORE, x6, x5), p0);
         *p2 = x5;
@@ -560,14 +571,22 @@ transl_array_assign: (p0, p1, p2) {
     };
     x5 = create_pseudo(1, LOCATION_REGISTER);
     p0 = ls_cons(mkinst(INST_MOVL, x3, x5), p0);
-    p0 = ls_cons(mkinst(INST_IMUL, mktup2(OPD_INTEGER, x4*4), x5), p0);
+    if (x4 == 1) {
+        x7 = create_pseudo(1, LOCATION_REGISTER);
+        p0 = ls_cons(mkinst(INST_ADDL, x2, x5), p0);
+        p0 = transl_item_single(p0, x1, &x6);
+        p0 = ls_cons(mkinst(INST_STOREB, x7, create_offset(x5, NULL, 0)), p0);
+        *p2 = x6;
+        return p0;
+    };
+    p0 = ls_cons(mkinst(INST_IMUL, mktup2(OPD_INTEGER, x4), x5), p0);
     p0 = ls_cons(mkinst(INST_ADDL, x2, x5), p0);
     p0 = transl_item(p0, x1, &x6);
     x7 = x6;
     x8 = 0;
     while (x7 != NULL) {
-        p0 = ls_cons(mkinst(INST_STORE, ls_value(x7), create_offset(x5, NULL, x8*4)), p0);
-        x8 = x8 + 1;
+        p0 = ls_cons(mkinst(INST_STORE, ls_value(x7), create_offset(x5, NULL, x8)), p0);
+        x8 = x8 + 4;
         x7 = ls_next(x7);
     };
     *p2 = x6;
@@ -1125,7 +1144,7 @@ transl_new: (p0, p1, p2) {
     x0 = p1[2]; (% expr %);
     x1 = type_size(x0[1]);
     x2 = get_variable("alloc");
-    p0 = ls_cons(mkinst(INST_MOVL, mktup2(OPD_INTEGER, x1*4), get_stack(0)), p0);
+    p0 = ls_cons(mkinst(INST_MOVL, mktup2(OPD_INTEGER, x1), get_stack(0)), p0);
     x3 = mkinst(INST_CALL_IMM, mktup2(OPD_LABEL, mangle(x2[1], get_ident_name(x2))), NULL);
     x3[INST_ARG] = 1;
     p0 = ls_cons(x3, p0);
@@ -1133,10 +1152,10 @@ transl_new: (p0, p1, p2) {
     p0 = transl_item(p0, x0, &x4);
     x5 = 0;
     while (x5 < x1) {
-        x6 = mkinst(INST_STORE, ls_value(x4), create_offset(get_eax(), NULL, x5*4));
+        x6 = mkinst(INST_STORE, ls_value(x4), create_offset(get_eax(), NULL, x5));
         p0 = ls_cons(x6, p0);
         x4 = ls_next(x4);
-        x5 = x5 + 1;
+        x5 = x5 + 4;
     };
     *p2 = ls_singleton(get_eax());
     return p0;
@@ -1177,7 +1196,7 @@ transl_newarray: (p0, p1, p2) {
     x3 = get_variable("alloc");
     p0 = transl_item_single(p0, x0, &x4);
     x5 = create_pseudo(1, LOCATION_REGISTER);
-    p0 = ls_cons(mkinst(INST_MOVL, mktup2(OPD_INTEGER, x2*4), x5), p0);
+    p0 = ls_cons(mkinst(INST_MOVL, mktup2(OPD_INTEGER, x2), x5), p0);
     p0 = ls_cons(mkinst(INST_IMUL, x4, x5), p0);
     p0 = ls_cons(mkinst(INST_MOVL, x5, get_stack(0)), p0);
     x6 = mkinst(INST_CALL_IMM, mktup2(OPD_LABEL, mangle(x3[1], get_ident_name(x3))), NULL);

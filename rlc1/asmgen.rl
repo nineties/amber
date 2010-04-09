@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: asmgen.rl 2010-04-09 10:05:30 nineties $
+ % $Id: asmgen.rl 2010-04-09 11:08:09 nineties $
  %);
 
 include(stddef, code);
@@ -67,7 +67,7 @@ emit_opd: (p0, p1, p2) {
     };
     if (p1[0] == OPD_STACK) {
         x0 = p1[2]; (% position %);
-        x0 = 4 * (stack_depth - x0);
+        x0 = stack_depth - x0;
         fputc(p0, '-');
         fputi(p0, x0);
         fputs(p0, "(%ebp)");
@@ -75,7 +75,7 @@ emit_opd: (p0, p1, p2) {
     };
     if (p1[0] == OPD_ARG) {
         x0 = p1[2]; (% position %);
-        x0 = 4*(x0 + 2);
+        x0 = x0 + 2;
         fputi(p0, x0);
         fputs(p0, "(%ebp)");
         return;
@@ -85,7 +85,7 @@ emit_opd: (p0, p1, p2) {
         if (x0[0] == OPD_LABEL) {
             emit_opd(p0, x0, p2);
             fputc(p0, '+');
-            fputi(p0, 4*p1[3]);
+            fputi(p0, p1[3]);
             return;
         };
         emit_opd(p0, x0, p2);
@@ -117,12 +117,12 @@ emit_opd: (p0, p1, p2) {
 inst_string: ["movl", "pushl", "popl", "ret", "leave", "int", "call", "call", "addl",
     "subl", "imul", "idiv", "idiv", "orl", "xorl", "andl", "shll", "shrl", "negl", "notl",
     "incl", "decl", "leal", "movl", "movl", "cmpl", "jmp", "je", "jne", "ja", "jae", "jb",
-    "jbe", "DUMMY"
+    "jbe", "DUMMY", "movb", "movb"
 ];
 inst_prec:   [32,     32,      32,     32,    32,      32,    32,     32,     32,
     32,     32,     32,     32,     32,    32,     32,     32,     32,     32,     32,
     32,     32,     32,     32,      32,      32,     32,    32,    32,  32,    32,   32,
-    32
+    32,    0,       8,        8
 ];
 
 emit_call_ind: (p0, p1) {
