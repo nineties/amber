@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-11 01:29:24 nineties $
+ % $Id: tcodegen.rl 2010-04-11 02:44:23 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -1216,8 +1216,6 @@ transl_fundecl: (p0) {
     puts("> compiling '");
     puts(get_ident_name(p0[2]));
     puts("' ...\n");
-    put_item(stdout, p0);
-    putc('\n');
     return transl_fundecl_impl(mangle(p0[1], get_ident_name(p0[2])), p0[3]);
 };
 
