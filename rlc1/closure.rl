@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: closure.rl 2010-04-10 13:12:36 nineties $
+ % $Id: closure.rl 2010-04-11 02:44:00 nineties $
  %);
 
 (% closure conversion %);
@@ -188,7 +188,7 @@ build_closure_env: (p0, p1) {
 close_function_impl: (p0, p1, p2) {
     allocate(3);
     x0 = mktup2(NODE_ARRAY_T, int_type);
-    x1 = mktup6(NODE_IDENTIFIER, x0, strdup("cls0"), 0, mktyscheme(x0), FALSE);
+    x1 = mktup6(NODE_IDENTIFIER, x0, strdup("closure0"), 0, mktyscheme(x0), FALSE);
     set_varid(x1);
     build_closure_env(x1, p2);
     map_add(cmap, x1[3], mktup4(NODE_SUBSCRIPT, int_type, x1,
@@ -217,6 +217,7 @@ close_function: (p0, p1) {
     (% determine the free variables of the lambda %);
     x1 = free_variable(p1);
     x1 = iset_del(x1, p0[3]);
+
     close_function_impl(p0, p1, x1);
     x2 = NULL;
     while (x1 != NULL) {
@@ -279,12 +280,15 @@ close_fundecl: (p0) {
     map_add(fmap, x0[3], x2[1]);
     x1[3] = (close(x1[3]))[0];
     x3 = mkmap(&simple_hash, &simple_equal, 0);
+    (%
     x4 = mktup2(NODE_ARRAY_T, int_type);
-    x5 = mktup6(NODE_IDENTIFIER, x4, strdup("cls1"), 0, mktyscheme(x4), FALSE);
+    x5 = mktup6(NODE_IDENTIFIER, x4, strdup("closure1"), 0, mktyscheme(x4), FALSE);
     set_varid(x5);
     map_add(x3, x2[1][3], mktup4(NODE_SUBSCRIPT, int_type, x5,
         mktup4(NODE_INTEGER, int_type, 32, 0)));
     x1[3] = substitute(x3, x1[3]);
+    p0[2] = x5;
+    %);
     return mktup2(p0, x2[1]);
 };
 
@@ -315,6 +319,7 @@ close_call: (p0) {
         p0[4] = TRUE;
         return mktup2(p0, NULL);
     };
+    p0[4] = FALSE;
     if (iset_contains(closed, x2[1][3])) {
         return mktup2(p0, NULL);
     };
@@ -330,7 +335,7 @@ close_lambda: (p0) {
         return mktup2(p0, p0[4]);
     };
     x0 = mktup2(NODE_ARRAY_T, int_type);
-    x1 = mktup6(NODE_IDENTIFIER, x0, strdup("cls2"), 0, mktyscheme(x0), FALSE);
+    x1 = mktup6(NODE_IDENTIFIER, x0, strdup("closure2"), 0, mktyscheme(x0), FALSE);
     set_varid(x1);
     x2 = close_function(x1, p0);
     return x2;
