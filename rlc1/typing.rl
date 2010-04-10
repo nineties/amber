@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-10 15:54:02 nineties $
+ % $Id: typing.rl 2010-04-11 01:50:47 nineties $
  %);
 
 include(stddef, code);
@@ -205,12 +205,10 @@ do_exit: (p0) {
 };
 
 (% p0: instruction %);
-return_type: (p0) {
-    if (p0[0] == NODE_RETVAL) { return p0[1]; };
+block_type: (p0) {
+    if (p0[0] == NODE_RET) { return void_type; };
+    if (p0[0] == NODE_RETVAL) { return void_type; };
     if (p0[1][0] == NODE_VOID_T) {
-        if (vec_back(return_stack) != NULL) {
-            return deref_type(vec_back(return_stack));
-        };
         return void_type;
     };
     return unit_type;
@@ -234,7 +232,7 @@ infer_block: (p0) {
                     exit(1);
                 };
             } else {
-                p0[1] = return_type(x1);
+                p0[1] = block_type(x1);
             };
             x0 = ls_next(x0);
         };
@@ -405,6 +403,10 @@ infer_lambda: (p0) {
 
     vec_pushback(return_stack, NULL);
     x1 = infer_item(p0[LAMBDA_BODY]);
+    x2 = vec_at(return_stack, vec_size(return_stack)-1);
+    if (x2 != NULL) {
+        x1 = x2;
+    };
     vec_popback(return_stack);
     varmap_pop();
 

@@ -7,6 +7,15 @@ make_counter: (n) {
 };
 
 export
+fact: (n) {
+    if (n <= 0) {
+        return 1;
+    } else {
+        return n*(n-1);
+    }
+};
+
+export
 main: () {
     counter: make_counter(1);
     x: counter() + counter() + counter();
