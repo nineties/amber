@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: asmgen.rl 2010-04-10 01:47:34 nineties $
+ % $Id: asmgen.rl 2010-04-10 13:43:04 nineties $
  %);
 
 include(stddef, code);
@@ -111,21 +111,18 @@ emit_opd: (p0, p1, p2) {
         fputc(p0, ')');
         return;
     };
-    puti(p1[0]);
-    putc('\n');
-    puts("hoge\n");
     not_reachable();
 };
 
 inst_string: ["movl", "pushl", "popl", "ret", "leave", "int", "call", "call", "addl",
     "subl", "imul", "idiv", "idiv", "orl", "xorl", "andl", "shll", "shrl", "negl", "notl",
     "incl", "decl", "leal", "movl", "movl", "cmpl", "jmp", "je", "jne", "ja", "jae", "jb",
-    "jbe", "DUMMY", "movb", "movb"
+    "jbe", "DUMMY", "movb", "movb", "movb"
 ];
 inst_prec:   [32,     32,      32,     32,    32,      32,    32,     32,     32,
     32,     32,     32,     32,     32,    32,     32,     32,     32,     32,     32,
     32,     32,     32,     32,      32,      32,     32,    32,    32,  32,    32,   32,
-    32,    0,       8,        8
+    32,    0,       8,        8,    8
 ];
 
 emit_call_ind: (p0, p1) {
