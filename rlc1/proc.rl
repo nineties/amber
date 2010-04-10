@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: proc.rl 2010-04-10 13:31:12 nineties $
+ % $Id: proc.rl 2010-04-10 22:20:29 nineties $
  %);
 
 include(stddef, code);
@@ -107,13 +107,12 @@ get_newstack: (p0) {
 (% p0: offset, p1: length %);
 get_stack_array: (p0, p1) {
     allocate(2);
-    x0 = NULL;
-    x1 = p0 + p1;
-    while (p0 < x1) {
-        x0 = ls_cons(get_stack(p0), x0);
-        p0 = p0 + 1;
+    x0 = 0;
+    while (x0 < p1) {
+        get_stack(p0+x0);
+        x0 = x0 + 1;
     };
-    return ls_reverse(x0);
+    return get_stack(p0);
 };
 
 (% p0: offset %);
@@ -169,10 +168,8 @@ get_pseudo: (p0) {
 };
 
 get_at: (p0, p1) {
-    allocate(1);
-    x0 = mktup4(OPD_AT, new_location_id(), p0, p1);
-    vec_pushback(locations, x0);
-    return x0;
+    assert(p0[0] == OPD_STACK);
+    return get_stack(p0[2] + p1);
 };
 
 (% p0: pseudo register, p1: memory locations %);
