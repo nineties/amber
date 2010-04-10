@@ -2,7 +2,7 @@
  % rowl - generation 2
  % Copyright (C) 2010 nineties
  %
- % $Id: alloc.rl 2010-04-11 01:29:30 nineties $
+ % $Id: alloc.rl 2010-04-11 01:35:14 nineties $
  %)
 
 (% memory allocation %);
@@ -22,8 +22,8 @@ free_last: 0;
 (% allocate memory block with size of BlockSize %)
 alloc_block: () {
     addr: sys_mmap2(0, 2*BlockSize);
-
     slop: addr & BlockMask;
+
     sys_munmap(addr, BlockSize - slop);
     if (slop > 0) {
         sys_munmap(addr + 2*BlockSize - slop, slop);
