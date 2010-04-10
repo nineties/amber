@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: parse.rl 2010-04-10 00:20:51 nineties $
+ % $Id: parse.rl 2010-04-10 15:53:31 nineties $
  %);
 
 include(stddef, code, token);
@@ -577,7 +577,9 @@ parse_primary_item: (p0) {
         };
         return parse_identifier(p0);
     };
-    if (p0 == '(') { return parse_tuple(p0); };
+    if (p0 == '(') {
+        return parse_tuple(p0);
+    };
     if (p0 == '[') { return parse_array(p0); };
     if (p0 == '{') { return parse_block(p0); };
     if (p0 == TOK_CHAR) {
@@ -643,7 +645,10 @@ make_tuple_from_list: (p0) {
     allocate(3);
     x1 = ls_length(p0);
     if (x1 == 0) {
-        return mktup4(NODE_UNIT, unit_type, 0, NULL);
+        return mktup4(NODE_TUPLE, NULL, 0, NULL);
+    };
+    if (x1 == 1) {
+        return ls_value(p0);
     };
     x0 = memalloc(x1 * 4);
     x2 = 0;

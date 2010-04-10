@@ -8,7 +8,7 @@ make_counter: (n) {
 
 export
 main: () {
-    counter : make_counter(1);
-    x : counter() + counter() + counter();
+    counter: make_counter(1);
+    x: counter() + counter() + counter();
     sys_exit(x); (% -> 6 %)
 };

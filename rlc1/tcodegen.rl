@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-10 13:42:36 nineties $
+ % $Id: tcodegen.rl 2010-04-11 01:29:24 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -65,14 +65,14 @@ type_size: (p0) {
     not_reachable();
 };
 
-(% p0: identifier, p1: operand list %);
-set_operand: (p0, p1) {
+(% p0: identifier, p1: first operand, p2: length %);
+set_operand: (p0, p1, p2) {
     allocate(1);
     assert(p0[0] == NODE_IDENTIFIER);
 
     x0 = p0[3]; (% identifier-id %);
     assert(x0 < vec_size(vtable));
-    vec_put(vtable, x0, p1);
+    vec_put(vtable, x0, mktup2(p1, p2));
 };
 
 (% p0: identifier %);
@@ -207,7 +207,7 @@ get_storage: (p0, p1, p2) {
             return p0;
         };
         x0 = get_operand(p1);
-        *p2 = get_stack(x0[0]);
+        *p2 = x0[0];
         return p0;
     };
     if (p1[0] == NODE_SUBSCRIPT) {
@@ -291,16 +291,15 @@ transl_identifier: (p0, p1) {
     };
     x0 = get_operand(p1);
     x1 = x0[1]; (% size %);
-    x2 = x0[0]; (% offset %);
+    x2 = x0[0]; (% first %);
     x3 = 0;
     if (x1 > 1) {
         while (x3 < x1) {
-            p0 = pushl(p0, get_stack(x2));
-            x2 = x2 + 1;
+            (% p0 = pushl(p0, get_at(x2, x3)); %);
             x3 = x3 + 1;
         };
     } else {
-        p0 = movl(p0, get_stack(x2), get_eax());
+        p0 = movl(p0, x2, get_eax());
     };
     return p0;
 };
@@ -308,17 +307,10 @@ transl_identifier: (p0, p1) {
 (% p1: argument tuple %);
 set_arguments: (p0, p1) {
     allocate(5);
-    x0 = p1[TUPLE_LENGTH];
-    x1 = p1[TUPLE_ELEMENTS];
-    while (x0 > 0) {
-        x0 = x0 - 1;
-        x4 = type_size(x1[x0][1]);
-        if (x4 == 1) {
-            p0 = transl_item(p0, x1[x0]);
-            p0 = pushl(p0, get_eax());
-        } else {
-            p0 = transl_item(p0, x1[x0]);
-        };
+    p0 = transl_item(p0, p1);
+    x0 = type_size(p1[1]);
+    if (x0 == 1) {
+        p0 = pushl(p0, get_eax());
     };
     return p0;
 };
@@ -461,10 +453,7 @@ transl_lambda: (p0, p1) {
     };
     x2 = ls_reverse(p1[5]);
     while (x2 != NULL) {
-        p0 = transl_item(p0, ls_value(x2));
-        if (type_size((ls_value(x2))[1]) == 1) {
-            p0 = pushl(p0, get_eax());
-        };
+        p0 = transl_item_push(p0, ls_value(x2));
         x2 = ls_next(x2);
     };
     p0 = gen_alloc(p0, x1+1);
@@ -816,16 +805,15 @@ transl_var_decl: (p0, p1) {
     x1 = p1[3]; (% rhs %);
     p0 = transl_item(p0, x1);
     x2 = type_size(x0[1]);
-    set_operand(x0, mktup2(num_stack(), x2));
+    x3 = num_stack(); (% offset %);
+    set_operand(x0, get_stack_array(num_stack(), x2), x2);
     if (x2 > 1) {
-        x3 = x2;
-        while (x3 > 0) {
-            x4 = get_newstack();
-            p0 = popl(p0, x4);
+        while (x2 > 0) {
             x2 = x2 - 1;
+            p0 = popl(p0, get_stack(x3 + x2));
         };
     } else {
-        p0 = movl(p0, get_eax(), get_newstack());
+        p0 = movl(p0, get_eax(), get_stack(x3));
     };
     return p0;
 };
@@ -926,10 +914,8 @@ transl_retval: (p0, p1) {
 
 transl_syscall: (p0, p1) {
     allocate(7);
-    x0 = p1[2]; (% argument tuple %);
-    x1 = x0[TUPLE_LENGTH];
-    x2 = x0[TUPLE_ELEMENTS];
-    x3 = memalloc(4*x1); (% translated operands %);
+    x0 = p1[2]; (% arguments %);
+    x1 = type_size(x0[1]);
     x4 = 0;
 
     (% save values registers %);
@@ -939,18 +925,13 @@ transl_syscall: (p0, p1) {
         x4 = x4 + 1;
     };
 
-    x4 = 0;
-    while (x4 < x1) {
-        p0 = transl_item(p0, x2[x4]);
-        p0 = pushl(p0, get_eax());
-        x4 = x4 + 1;
-    };
+    p0 = transl_item_push(p0, x0);
 
     (% set arguments %);
-    x4 = x1;
-    while (x4 > 0) {
-        x4 = x4 - 1;
+    x4 = 0;
+    while (x4 < x1) {
         p0 = popl(p0, get_physical_reg(x4));
+        x4 = x4 + 1;
     };
 
     p0 = ls_cons(mkinst(INST_INT, mktup2(OPD_INTEGER, 128), NULL), p0);
@@ -1165,10 +1146,18 @@ transl_newarray: (p0, p1) {
 };
 
 (% p0: output tcode, p1: item, p2: location for temporal value %);
-transl_item: (p0, p1, p2) {
+transl_item: (p0, p1) {
     allocate(1);
     x0 = transl_funcs[p1[0]];
-    return x0(p0, p1, p2);
+    return x0(p0, p1)
+};
+
+transl_item_push: (p0, p1) {
+    p0 = transl_item(p0, p1);
+    if (type_size(p1[1]) == 1) {
+        p0 = pushl(p0, get_eax());
+    };
+    return p0;
 };
 
 transl_item_single: (p0, p1) {
@@ -1193,11 +1182,42 @@ do_nothing: (p0) {
     return NULL;
 };
 
+set_parameters: (p0, p1) {
+    allocate(3);
+    if (p0[0] == NODE_DONTCARE) {
+        return p1 - type_size(p0[1]);
+    };
+    if (p0[0] == NODE_IDENTIFIER) {
+        x0 = type_size(p0[1]);
+        set_operand(p0, get_stack_array(p1-x0, x0), x0);
+        return p1 - type_size(p0[1]);
+    };
+    if (p0[0] == NODE_UNIT) {
+        return p1;
+    };
+    if (p0[0] == NODE_TUPLE) {
+        x0 = p0[TUPLE_LENGTH];
+        x1 = p0[TUPLE_ELEMENTS];
+        x2 = 0;
+        while (x2 < x0) {
+            p1 = set_parameters(x1[x2], p1);
+            x2 = x2 + 1;
+        };
+        return p1;
+    };
+    if (p0[0] == NODE_TYPEDEXPR) {
+        return set_parameters(p0[2], p1);
+    };
+    not_reachable();
+};
+
 (% p0: item %);
 transl_fundecl: (p0) {
     puts("> compiling '");
     puts(get_ident_name(p0[2]));
     puts("' ...\n");
+    put_item(stdout, p0);
+    putc('\n');
     return transl_fundecl_impl(mangle(p0[1], get_ident_name(p0[2])), p0[3]);
 };
 
@@ -1216,18 +1236,7 @@ transl_fundecl_impl: (p0, p1) {
     x1 = p1;
 
     x2 = x1[2]; (% argument %);
-    x3 = x2[TUPLE_LENGTH];
-    x4 = x2[TUPLE_ELEMENTS];
-    x5 = 0;
-    while (x5 < x3) {
-        (% ad-hoc implementation for typed pattern :( %);
-        if (x4[x5][0] == NODE_TYPEDEXPR) {
-            x4[x5] = x4[x5][2];
-        };
-        set_operand(x4[x5], mktup2(-x5-1, 1));
-        x5 = x5 + 1;
-    };
-    x3 = type_size(x2[1]);
+    set_parameters(x2, 0);
 
     x6 = ls_reverse(transl_block(NULL, x1[3]));
     if (num_stack() > 0) {
