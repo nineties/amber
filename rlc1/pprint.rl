@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: pprint.rl 2010-04-10 01:00:54 nineties $
+ % $Id: pprint.rl 2010-04-10 12:36:28 nineties $
  %);
 
 include(stddef,code);
@@ -13,7 +13,7 @@ ppfuncs: [put_prog, put_integer, put_string, put_dontcare, put_identifier,
     put_array, put_tuple, put_code, put_decl, put_lambda, put_subsop, put_codeop, put_unexpr,
     put_binexpr, put_assign, put_export, put_import, put_external, put_ret, put_retval,
     put_syscall, put_field, put_fieldref, put_typedecl, put_variant, put_unit, put_typedexpr,
-    put_if, put_ifelse
+    put_if, put_ifelse, put_sarray, put_cast, put_new, put_while, put_for, put_newarray
 ];
 
 (% priority of expressions %);
@@ -376,6 +376,51 @@ put_ifelse: (p0, p1) {
     put_item(p0, p1[3]);
     fputs(p0, " else ");
     put_item(p0, p1[4]);
+};
+
+put_sarray: (p0, p1) {
+    fputs(p0, "static_array(");
+    put_item(p0, p1[2]);
+    fputc(p0, ',');
+    put_item(p0, p1[3]);
+    fputc(p0, ')');
+};
+
+put_cast: (p0, p1) {
+    fputs(p0, "cast(");
+    put_type(p0, p1[1]);
+    fputs(p0, ") ");
+    put_subitem(p0, p1[2], PRI_PRIMARY);
+};
+
+put_new: (p0, p1) {
+    fputs(p0, "new ");
+    put_subitem(p0, p1[2], PRI_PRIMARY);
+};
+
+put_while: (p0, p1) {
+    fputs(p0, "while(");
+    put_item(p0, p1[2]);
+    fputs(p0, ") ");
+    put_item(p0, p1[3]);
+};
+
+put_for: (p0, p1) {
+    fputs(p0, "for(");
+    put_item(p0, p1[2]);
+    fputc(p0, ',');
+    put_item(p0, p1[3]);
+    fputc(p0, ',');
+    put_item(p0, p1[4]);
+    fputs(p0, ") ");
+    put_item(p0, p1[5]);
+};
+
+put_newarray: (p0, p1) {
+    fputs(p0, "new_array(");
+    put_item(p0, p1[2]);
+    fputs(p0, ") ");
+    put_subitem(p0, p1[3], PRI_PRIMARY);
 };
 
 pptype_funcs: [ put_unit_t, put_char_t, put_int_t, put_float_t, put_double_t,

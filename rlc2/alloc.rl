@@ -2,7 +2,7 @@
  % rowl - generation 2
  % Copyright (C) 2010 nineties
  %
- % $Id: alloc.rl 2010-04-09 01:59:38 nineties $
+ % $Id: alloc.rl 2010-04-10 12:34:02 nineties $
  %)
 
 (% memory allocation %);

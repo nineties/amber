@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: closure.rl 2010-04-10 01:54:45 nineties $
+ % $Id: closure.rl 2010-04-10 13:12:36 nineties $
  %);
 
 (% closure conversion %);
@@ -115,7 +115,10 @@ iterate: (p0, p1) {
     if (p1[0] == NODE_SYSCALL)   { return iterate(p0, p1[2]); };
     if (p1[0] == NODE_FIELD)     { return iterate(p0, p1[2]); };
     if (p1[0] == NODE_FIELDREF)  { return iterate(p0, p1[2]); };
-    if (p1[0] == NODE_VARIANT)   { return iterate(p0, p1[4]); };
+    if (p1[0] == NODE_VARIANT)   {
+        if (p1[4] != NULL) { return iterate(p0, p1[4]); };
+        return p0;
+    };
     if (p1[0] == NODE_TYPEDEXPR) { return iterate(p0, p1[2]); };
     if (p1[0] == NODE_IF) {
         p0 = iterate(p0, p1[2]);
@@ -230,7 +233,8 @@ close_funcs: [ not_reachable, do_nothing, do_nothing, do_nothing, close_identifi
 not_implemented, close_tuple, close_block, close_decl, close_call, do_nothing,
 close_lambda, close_unexpr, close_binexpr, close_assign, close_export, do_nothing,
 close_external, do_nothing, close_retval, close_syscall, close_field, close_fieldref,
-do_nothing, close_variant, do_nothing, close_typedexpr, close_if, close_ifelse, do_nothing
+do_nothing, close_variant, do_nothing, close_typedexpr, close_if, close_ifelse, do_nothing,
+do_nothing, close_new, close_while, close_for, close_newarray
 ];
 
 do_nothing: (p0) {
@@ -306,17 +310,14 @@ close_call: (p0) {
     x0 = p0[2]; (% fun %);
     x1 = p0[3]; (% arguments %);
     x2 = close(x0);
-    puts("ppppp\n");
     if (x2[1] == NULL) {
         (% closure call %);
         p0[4] = TRUE;
         return mktup2(p0, NULL);
     };
-    puts("poge\n");
     if (iset_contains(closed, x2[1][3])) {
         return mktup2(p0, NULL);
     };
-    puts("mmmm\n");
     x3 = (close(x1))[0];
     x1 = tuple_pushback(x1, x2[0]);
     p0[3] = x1;
@@ -385,7 +386,9 @@ close_fieldref: (p0) {
 };
 
 close_variant: (p0) {
-    p0[4] = (close(p0[4]))[0];
+    if (p0[4] != NULL) {
+        p0[4] = (close(p0[4]))[0];
+    };
     return mktup2(p0, NULL);
 };
 
@@ -407,6 +410,30 @@ close_ifelse: (p0) {
     return mktup2(p0, NULL);
 };
 
+close_new: (p0) {
+    p0[2] = (close(p0[2]))[0];
+    return mktup2(p0, NULL);
+};
+
+close_while: (p0) {
+    p0[2] = (close(p0[2]))[0];
+    p0[3] = (close(p0[3]))[0];
+    return mktup2(p0, NULL);
+};
+
+close_for: (p0) {
+    p0[2] = (close(p0[2]))[0];
+    p0[3] = (close(p0[3]))[0];
+    p0[4] = (close(p0[4]))[0];
+    p0[5] = (close(p0[5]))[0];
+    return mktup2(p0, NULL);
+};
+
+close_newarray: (p0) {
+    p0[2] = (close(p0[2]))[0];
+    p0[3] = (close(p0[3]))[0];
+    return mktup2(p0, NULL);
+};
 close: (p0) {
     return (close_funcs[p0[0]])(p0);
 };
@@ -505,7 +532,9 @@ substitute: (p0, p1) {
         return p1;
     };
     if (p1[0] == NODE_VARIANT) {
-        p1[4] = substitute(p0, p1[4]);
+        if (p1[4] != NULL) {
+            p1[4] = substitute(p0, p1[4]);
+        };
         return p1;
     };
     if (p1[0] == NODE_TYPEDEXPR) {
@@ -633,7 +662,10 @@ occur: (p0, p1) {
         return occur(p0, p1[2]);
     };
     if (p1[0] == NODE_VARIANT) {
-        return occur(p0, p1[4]);
+        if (p1[4] != NULL) {
+            return occur(p0, p1[4]);
+        };
+        return FALSE;
     };
     if (p1[0] == NODE_TYPEDEXPR) {
         return occur(p0, p1[2]);

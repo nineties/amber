@@ -1,15 +1,14 @@
-import alloc;
+import stdlib;
 
 make_counter: (n) {
     return () {
-        return ++n;
-    };
+        return n++;
+    }
 };
 
 export
 main: () {
-    counter : make_counter(2);
-    x : counter();
-    x = counter();
-    syscall(1, x) @ void;
+    counter : make_counter(1);
+    x : counter() + counter() + counter();
+    sys_exit(x); (% -> 6 %)
 };

@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: code.rl 2010-04-10 01:13:57 nineties $
+ % $Id: code.rl 2010-04-10 12:31:20 nineties $
  %);
 
 NODE_PROG       => 0;  (% item list %);
@@ -209,3 +209,4 @@ INST_JBE      => 32;
 INST_LABEL    => 33;
 INST_STOREB   => 34;
 INST_LOADB    => 35;
+INST_MOVB     => 36;

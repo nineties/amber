@@ -2,13 +2,13 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: proc.rl 2010-04-10 01:57:03 nineties $
+ % $Id: proc.rl 2010-04-10 13:31:12 nineties $
  %);
 
 include(stddef, code);
 export(init_proc, reset_proc);
 export(num_physical_regs, num_normal_regs, num_locations, num_pseudo, num_stack);
-export(get_reg, get_physical_reg, get_stack, get_stack_array, get_arg);
+export(get_reg, get_physical_reg, get_stack, get_newstack, get_stack_array, get_arg);
 export(get_eax, get_ebx, get_ecx, get_edx, get_esi, get_edi, get_ebp, get_esp);
 export(create_pseudo, get_pseudo, assign_pseudo, get_at);
 export(get_register_repr);
@@ -89,12 +89,19 @@ create_stack: (p0) {
 (% p0: offset %);
 get_stack: (p0) {
     allocate(1);
+    if (p0 < 0) {
+        return get_arg(-p0-1);
+    };
     if (p0 < vec_size(stackregs)) {
         return vec_at(stackregs, p0);
     };
     x0 = create_stack(p0);
     vec_pushback(stackregs, x0);
     return x0;
+};
+
+get_newstack: (p0) {
+    return get_stack(num_stack());
 };
 
 (% p0: offset, p1: length %);
