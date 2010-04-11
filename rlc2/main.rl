@@ -2,6 +2,6 @@ import stdlib;
 
 export
 main: () {
-    x: new_array(100) 1;
-    sys_exit(x[0]); (% -> 6 %)
+    (_, _, _, (a, _)): (1, (2,3), 0, (4, 5));
+    sys_exit(a); (% -> 4 %)
 };

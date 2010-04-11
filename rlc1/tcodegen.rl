@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-11 13:37:08 nineties $
+ % $Id: tcodegen.rl 2010-04-11 15:00:22 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -807,47 +807,34 @@ transl_var_decl: (p0, p1) {
     return p0;
 };
 
+(% p1: offset %);
 transl_tuple_decl_helper: (p0, p1, p2) {
     allocate(5);
     if (p1[0] == NODE_DONTCARE) {
-        x0 = type_size(p1[1]); (% number of registers required by this pattern %);
-        x1 = NULL;
-        while (x0 > 0) {
-            x1 = ls_cons(ls_value(*p2), x1);
-            *p2 = ls_next(*p2);
-            x0 = x0 - 1;
-        };
-        *p3 = ls_reverse(x1);
+        x0 = type_size(p1[1]);
+        p0 = ls_cons(mkinst(INST_ADDL, mktup2(OPD_INTEGER, x0*4), get_esp()), p0);
+        *p2 = *p2 + x0;
         return p0;
     };
     if (p1[0] == NODE_IDENTIFIER) {
-        x0 = type_size(p1[1]); (% number of registers required by this variable %);
+        x0 = type_size(p1[1]);
+        set_operand(p1, get_stack_array(*p2, x0), x0);
         x1 = 0;
-        x2 = NULL;
         while (x1 < x0) {
-            x3 = create_pseudo(1, LOCATION_MEMORY);
-            x2 = ls_cons(x3, x2);
-            p0 = ls_cons(mkinst(INST_MOVL, ls_value(*p2), x3), p0);
-            *p2 = ls_next(*p2);
+            p0 = popl(p0, get_stack(*p2 + x1));
             x1 = x1 + 1;
         };
-        x2 = ls_reverse(x2);
-        assert(x2 != NULL);
-        set_operand(p1, x2);
-        *p3 = x2;
+        *p2 = *p2 + x0;
         return p0;
     };
     if (p1[0] == NODE_TUPLE) {
         x0 = p1[TUPLE_LENGTH];
         x1 = p1[TUPLE_ELEMENTS];
         x2 = 0;
-        x3 = NULL;
         while (x2 < x0) {
-            p0 = transl_tuple_decl_helper(p0, x1[x2], p2, &x4);
-            x3 = ls_append(x3, x4);
+            p0 = transl_tuple_decl_helper(p0, x1[x2], p2);
             x2 = x2 + 1;
         };
-        *p3 = x3;
         return p0;
     };
     not_reachable();
@@ -857,9 +844,9 @@ transl_tuple_decl: (p0, p1) {
     allocate(3);
     x0 = p1[2]; (% lhs %);
     x1 = p1[3]; (% rhs %);
-    p0 = transl_item(p0, x1, &x2);
-    p0 = transl_tuple_decl_helper(p0, x0, &x2, p2);
-    assert(ls_length(x2) == 0);
+    p0 = transl_item_push(p0, x1);
+    x2 = num_stack(); (% offset %);
+    p0 = transl_tuple_decl_helper(p0, x0, &x2);
     return p0;
 };
 
