@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: closure.rl 2010-04-11 02:44:00 nineties $
+ % $Id: closure.rl 2010-04-11 10:23:57 nineties $
  %);
 
 (% closure conversion %);
@@ -244,6 +244,10 @@ do_nothing: (p0) {
 
 close_identifier: (p0) {
     allocate(2);
+    if (p0[5]) {
+        (% global identifier %);
+        return mktup2(p0, p00);
+    };
     x0 = map_find(cmap, p0[3]);
     if (x0 == NULL) { x0 = p0; };
     x1 = map_find(fmap, p0[3]);
@@ -276,19 +280,23 @@ close_fundecl: (p0) {
     allocate(6);
     x0 = p0[2]; (% identifier %);
     x1 = p0[3]; (% lambda %);
+    if (x0[5] == TRUE) {
+        (% global functions are already closed %);
+        iset_add(closed, x0[3]);
+        return mktup2(p0, x0);
+    };
     x2 = close_function(x0, x1); (% new lambda, id %);
     map_add(fmap, x0[3], x2[1]);
     x1[3] = (close(x1[3]))[0];
     x3 = mkmap(&simple_hash, &simple_equal, 0);
-    (%
     x4 = mktup2(NODE_ARRAY_T, int_type);
-    x5 = mktup6(NODE_IDENTIFIER, x4, strdup("closure1"), 0, mktyscheme(x4), FALSE);
+    x5 = mktup6(NODE_IDENTIFIER, x4, get_ident_name(x0), 0, mktyscheme(x4), TRUE);
     set_varid(x5);
     map_add(x3, x2[1][3], mktup4(NODE_SUBSCRIPT, int_type, x5,
         mktup4(NODE_INTEGER, int_type, 32, 0)));
     x1[3] = substitute(x3, x1[3]);
     p0[2] = x5;
-    %);
+    map_del(x3, x2[1][3]);
     return mktup2(p0, x2[1]);
 };
 

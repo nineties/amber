@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-11 01:50:47 nineties $
+ % $Id: typing.rl 2010-04-11 09:52:38 nineties $
  %);
 
 include(stddef, code);
@@ -265,6 +265,7 @@ infer_decl_var: (p0, p1) {
     p0[1] = x3; (% type %);
     p0[3] = x1; (% variable id %);
     p0[4] = x4; (% type scheme %);
+    p0[5] = x2;
     deref_pattern(p0);
     deref(p1);
     return p0[1];

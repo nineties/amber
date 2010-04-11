@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-11 02:44:23 nineties $
+ % $Id: tcodegen.rl 2010-04-11 10:03:58 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -215,7 +215,7 @@ get_storage: (p0, p1, p2) {
             x0 = get_ident_name(p1[2]);
             p0 = transl_item(p0, p1[3]); (% index %);
             p0 = movl(p0, get_eax(), get_ebx());
-            *p2 = create_offset(get_ebx(), mktup2(OPD_LABEL, x0), 4*type_size(p1[1]));
+            *p2 = offset(get_ebx(), mktup2(OPD_LABEL, x0), 4*type_size(p1[1]));
             return p0;
         };
         p0 = transl_item(p0, p1[2]); (% addr %);
@@ -225,14 +225,14 @@ get_storage: (p0, p1, p2) {
         p0 = popl(p0, get_ecx());
         p0 = ls_cons(mkinst(INST_ADDL, get_ecx(), get_eax()), p0);
         p0 = movl(p0, get_eax(), get_ebx());
-        *p2 = create_offset(get_ebx(), NULL, 0);
+        *p2 = offset(get_ebx(), NULL, 0);
         return p0;
     };
     if (p1[0] == NODE_UNEXPR) {
         if (p1[2] == UNOP_INDIRECT) {
             p0 = transl_item(p0, p1[3]); (% addr %);
             p0 = movl(p0, get_eax(), get_ebx());
-            *p2 = create_offset(get_ebx(), NULL, 0);
+            *p2 = offset(get_ebx(), NULL, 0);
             return p0;
         }
     };
@@ -295,7 +295,7 @@ transl_identifier: (p0, p1) {
     x3 = 0;
     if (x1 > 1) {
         while (x3 < x1) {
-            (% p0 = pushl(p0, get_at(x2, x3)); %);
+            p0 = pushl(p0, get_at(x2, x3));
             x3 = x3 + 1;
         };
     } else {
@@ -368,9 +368,9 @@ transl_closure_call: (p0, p1) {
     p0 = pushl(p0, get_eax());
     p0 = set_arguments(p0, x2);
     x3 = type_size(x2[1]);
-    p0 = pushl(p0, create_offset(get_esp(), NULL, x3));
-    p0 = movl(p0, create_offset(get_esp(), NULL, x3), get_eax());
-    p0 = ls_cons(mkinst(INST_CALL_IND, create_offset(get_eax(), NULL, 0), NULL), p0);
+    p0 = pushl(p0, offset(get_esp(), NULL, x3));
+    p0 = movl(p0, offset(get_esp(), NULL, x3), get_eax());
+    p0 = ls_cons(mkinst(INST_CALL_IND, offset(get_eax(), NULL, 0), NULL), p0);
     p0 = ls_cons(mkinst(INST_ADDL, mktup2(OPD_INTEGER, (x3+2)*4), get_esp()), p0);
     return p0;
 };
@@ -399,11 +399,11 @@ transl_call: (p0, p1) {
         };
     } else {
         (% indirect call %);
-        p0 = transl_item_single(p0, x0, &x3);
-        p0 = set_arguments(p0, x2, 0, &x4);
-        x5 = mkinst(INST_CALL_IND, x3, NULL);
-        x5[INST_ARG] = x4;
-        p0 = ls_cons(x5, p0);
+        p0 = transl_item_push(p0, x0);
+        p0 = set_arguments(p0, x2);
+        x4 = type_size(x2[1]);
+        p0 = ls_cons(mkinst(INST_CALL_IND, get_stack(x4), NULL), p0);
+        p0 = ls_cons(mkinst(INST_ADDL, mktup2(OPD_INTEGER, 4*(x4+1)), get_esp()), p0);
     };
     return p0;
 };
@@ -413,29 +413,18 @@ transl_subscript: (p0, p1) {
     x0 = p1[2]; (% lhs %);
     x1 = p1[3]; (% index %);
     if (x0[1][0] == NODE_ARRAY_T) {
-        p0 = transl_item_single(p0, x0, &x2); (% address %);
-        p0 = transl_item_single(p0, x1, &x3); (% index %);
-        x4 = type_size(x0[1][1]);
-        x5 = create_pseudo(1, LOCATION_REGISTER);
-        p0 = ls_cons(mkinst(INST_MOVL, x3, x5), p0);
-        (%
-        if (x4 == 1) {
-            x6 = create_pseudo(1, LOCATION_REGISTER);
-            p0 = ls_cons(mkinst(INST_ADDL, x2, x5), p0);
-            p0 = ls_cons(mkinst(INST_LOADB, create_offset(x5, NULL, 0), x6), p0);
-            *p2 = ls_singleton(x6);
+        p0 = transl_item_push(p0, x0); (% address %);
+        p0 = transl_item(p0, x1); (% index %);
+        x2 = type_size(p1[1]);
+        if (x2 == 1) {
+            p0 = ls_cons(mkinst(INST_IMUL, mktup2(OPD_INTEGER, 4*x2), get_eax()), p0);
+            p0 = popl(p0, get_ebx());
+            p0 = ls_cons(mkinst(INST_ADDL, get_eax(), get_ebx()), p0);
+            p0 = ls_cons(mkinst(INST_MOVL, offset(get_ebx(), NULL, 0), get_eax()), p0);
             return p0;
         };
-        %);
-        p0 = ls_cons(mkinst(INST_IMUL, mktup2(OPD_INTEGER, x4*4), x5), p0);
-        p0 = ls_cons(mkinst(INST_ADDL, x2, x5), p0);
-        x6 = NULL;
-        x7 = 0;
-        while (x7 < x4) {
-            x6 = ls_cons(create_offset(x5, NULL, x7*4), x6);
-            x7 = x7 + 1;
-        };
-        *p2 = ls_reverse(x6);
+        fputs(stderr, "transl_subscript\n");
+        not_implemented();
         return p0;
     };
     not_implemented();
@@ -457,10 +446,10 @@ transl_lambda: (p0, p1) {
         x2 = ls_next(x2);
     };
     p0 = gen_alloc(p0, x1+1);
-    p0 = ls_cons(mkinst(INST_MOVL, mktup2(OPD_ADDRESS, x0), create_offset(get_eax(), NULL, 0)), p0);
+    p0 = ls_cons(mkinst(INST_MOVL, mktup2(OPD_ADDRESS, x0), offset(get_eax(), NULL, 0)), p0);
     x3 = 0;
     while (x3 < x1) {
-        p0 = popl(p0, create_offset(get_eax(), NULL, x3+1));
+        p0 = popl(p0, offset(get_eax(), NULL, x3+1));
         x3 = x3 + 1;
     };
     return p0;
@@ -509,11 +498,11 @@ transl_unexpr: (p0, p1) {
         p0 = transl_item(p0, p1[3]); (% eax = address %);
         x0 = type_size(p1[1]);
         if (x0 == 1) {
-            p0 = movl(p0, create_offset(get_eax(), NULL, 0), get_eax());
+            p0 = movl(p0, offset(get_eax(), NULL, 0), get_eax());
         } else {
             while (x0 > 0) {
                 x0 = x0 - 1;
-                p0 = pushl(p0, create_offset(get_eax(), NULL, x0));
+                p0 = pushl(p0, offset(get_eax(), NULL, x0));
             };
         };
         return p0;
@@ -905,7 +894,7 @@ transl_retval: (p0, p1) {
         x1 = x0; (% offset %);
         while (x1 > 0) {
             x1 = x1 - 1;
-            p0 = popl(p0, create_offset(get_eax(), NULL, x1));
+            p0 = popl(p0, offset(get_eax(), NULL, x1));
         };
         p0 = ls_cons(mkinst(INST_LEAVE, NULL, NULL), p0);
         return ls_cons(mkinst(INST_RET, NULL, NULL), p0);
@@ -1088,11 +1077,11 @@ transl_new: (p0, p1) {
     p0 = transl_item(p0, x0);
     p0 = popl(p0, get_ebx());
     if (x1 == 1) {
-        p0 = movl(p0, get_eax(), create_offset(get_ebx(), NULL, 0));
+        p0 = movl(p0, get_eax(), offset(get_ebx(), NULL, 0));
     } else {
         x4 = 0;
         while (x4 < x1) {
-            p0 = popl(p0, create_offset(get_ebx(), NULL, x4*4));
+            p0 = popl(p0, offset(get_ebx(), NULL, x4*4));
             x4 = x4 + 1;
         };
     };
@@ -1216,6 +1205,8 @@ transl_fundecl: (p0) {
     puts("> compiling '");
     puts(get_ident_name(p0[2]));
     puts("' ...\n");
+    put_item(stdout, p0);
+    putc('\n');
     return transl_fundecl_impl(mangle(p0[1], get_ident_name(p0[2])), p0[3]);
 };
 
