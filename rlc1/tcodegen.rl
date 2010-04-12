@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-11 15:00:22 nineties $
+ % $Id: tcodegen.rl 2010-04-12 11:40:11 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -409,22 +409,24 @@ transl_call: (p0, p1) {
 };
 
 transl_subscript: (p0, p1) {
-    allocate(8);
+    allocate(4);
     x0 = p1[2]; (% lhs %);
     x1 = p1[3]; (% index %);
     if (x0[1][0] == NODE_ARRAY_T) {
         p0 = transl_item_push(p0, x0); (% address %);
         p0 = transl_item(p0, x1); (% index %);
         x2 = type_size(p1[1]);
+        p0 = ls_cons(mkinst(INST_IMUL, mktup2(OPD_INTEGER, 4*x2), get_eax()), p0);
+        p0 = popl(p0, get_ebx());
+        p0 = ls_cons(mkinst(INST_ADDL, get_eax(), get_ebx()), p0);
         if (x2 == 1) {
-            p0 = ls_cons(mkinst(INST_IMUL, mktup2(OPD_INTEGER, 4*x2), get_eax()), p0);
-            p0 = popl(p0, get_ebx());
-            p0 = ls_cons(mkinst(INST_ADDL, get_eax(), get_ebx()), p0);
-            p0 = ls_cons(mkinst(INST_MOVL, offset(get_ebx(), NULL, 0), get_eax()), p0);
+            p0 = movl(p0, offset(get_ebx(), NULL, 0), get_eax());
             return p0;
         };
-        fputs(stderr, "transl_subscript\n");
-        not_implemented();
+        while (x2 > 0) {
+            p0 = pushl(p0, offset(get_ebx(), NULL, x2 - 1));
+            x2 = x2 - 1;
+        };
         return p0;
     };
     not_implemented();
@@ -768,10 +770,7 @@ transl_tuple: (p0, p1) {
     x0 = p1[TUPLE_LENGTH];
     x1 = p1[TUPLE_ELEMENTS];
     while (x0 > 0) {
-        p0 = transl_item(p0, x1[x0-1]);
-        if (type_size(x1[x0-1][1]) == 1) {
-            p0 = pushl(p0, get_eax());
-        };
+        p0 = transl_item_push(p0, x1[x0-1]);
         x0 = x0 -1;
     };
     return p0;
@@ -797,9 +796,10 @@ transl_var_decl: (p0, p1) {
     x3 = num_stack(); (% offset %);
     set_operand(x0, get_stack_array(num_stack(), x2), x2);
     if (x2 > 1) {
-        while (x2 > 0) {
-            x2 = x2 - 1;
-            p0 = popl(p0, get_stack(x3 + x2));
+        x4 = 0;
+        while (x4 < x2) {
+            p0 = popl(p0, get_stack(x3 + x4));
+            x4 = x4 + 1;
         };
     } else {
         p0 = movl(p0, get_eax(), get_stack(x3));
@@ -942,24 +942,22 @@ get_field: (p0, p1) {
 };
 
 transl_fieldref: (p0, p1) {
-    allocate(7);
+    allocate(9);
     x0 = p1[2]; (% lhs %);
     x1 = p1[3]; (% fiel name %);
     x2 = get_field(x0[1], x1); (% offset, length %);
-    p0 = transl_item(p0, x0, &x3);
     x4 = x2[0]; (% offset %);
     x5 = x2[1]; (% length %);
-    while (x4 > 0) {
-        x3 = ls_next(x3);
-        x4 = x4 - 1;
+    p0 = get_storage(p0, x0, &x6);
+    if (x5 == 1) {
+        p0 = movl(p0, get_at(x6, x4), get_eax());
+    } else {
+        x7 = 0;
+        while (x7 < x5) {
+            p0 = pushl(p0, get_at(x6, x4 + x7));
+            x7 = x7 + 1;
+        };
     };
-    x6 = NULL;
-    while (x5 > 0) {
-        x6 = ls_cons(ls_value(x3), x6);
-        x3 = ls_next(x3);
-        x5 = x5 - 1;
-    };
-    *p2 = ls_reverse(x6);
     return p0;
 };
 
