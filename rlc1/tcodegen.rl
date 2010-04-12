@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-12 11:40:11 nineties $
+ % $Id: tcodegen.rl 2010-04-12 13:05:15 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -100,6 +100,13 @@ mkinst: (p0, p1, p2) {
 movl: (p0, p1, p2) {
     if (p1 != p2) {
         return ls_cons(mkinst(INST_MOVL, p1, p2), p0);
+    };
+    return p0;
+};
+
+movb: (p0, p1, p2) {
+    if (p1 != p2) {
+        return ls_cons(mkinst(INST_MOVB, p1, p2), p0);
     };
     return p0;
 };
@@ -368,8 +375,8 @@ transl_closure_call: (p0, p1) {
     p0 = pushl(p0, get_eax());
     p0 = set_arguments(p0, x2);
     x3 = type_size(x2[1]);
-    p0 = pushl(p0, offset(get_esp(), NULL, x3));
-    p0 = movl(p0, offset(get_esp(), NULL, x3), get_eax());
+    p0 = pushl(p0, offset(get_esp(), NULL, 4*x3));
+    p0 = movl(p0, offset(get_esp(), NULL, 4*x3), get_eax());
     p0 = ls_cons(mkinst(INST_CALL_IND, offset(get_eax(), NULL, 0), NULL), p0);
     p0 = ls_cons(mkinst(INST_ADDL, mktup2(OPD_INTEGER, (x3+2)*4), get_esp()), p0);
     return p0;
@@ -424,7 +431,7 @@ transl_subscript: (p0, p1) {
             return p0;
         };
         while (x2 > 0) {
-            p0 = pushl(p0, offset(get_ebx(), NULL, x2 - 1));
+            p0 = pushl(p0, offset(get_ebx(), NULL, 4*(x2 - 1)));
             x2 = x2 - 1;
         };
         return p0;
@@ -451,7 +458,7 @@ transl_lambda: (p0, p1) {
     p0 = ls_cons(mkinst(INST_MOVL, mktup2(OPD_ADDRESS, x0), offset(get_eax(), NULL, 0)), p0);
     x3 = 0;
     while (x3 < x1) {
-        p0 = popl(p0, offset(get_eax(), NULL, x3+1));
+        p0 = popl(p0, offset(get_eax(), NULL, 4*(x3+1)));
         x3 = x3 + 1;
     };
     return p0;
@@ -504,7 +511,7 @@ transl_unexpr: (p0, p1) {
         } else {
             while (x0 > 0) {
                 x0 = x0 - 1;
-                p0 = pushl(p0, offset(get_eax(), NULL, x0));
+                p0 = pushl(p0, offset(get_eax(), NULL, 4*x0));
             };
         };
         return p0;
@@ -881,7 +888,7 @@ transl_retval: (p0, p1) {
         x1 = x0; (% offset %);
         while (x1 > 0) {
             x1 = x1 - 1;
-            p0 = popl(p0, offset(get_eax(), NULL, x1));
+            p0 = popl(p0, offset(get_eax(), NULL, 4*x1));
         };
         p0 = ls_cons(mkinst(INST_LEAVE, NULL, NULL), p0);
         return ls_cons(mkinst(INST_RET, NULL, NULL), p0);
@@ -1101,11 +1108,59 @@ transl_for: (p0, p1) {
     return p0;
 };
 
+transl_new_chararray: (p0, p1) {
+    allocate(9);
+    x0 = p1[2]; (% length expr %);
+    x1 = p1[3]; (% init %);
+    x2 = type_size(x1[1]);
+    x3 = get_variable("alloc");
+    p0 = transl_item_push(p0, x0);
+    p0 = ls_cons(mkinst(INST_IMUL, mktup2(OPD_INTEGER, x2), get_eax()), p0);
+    p0 = pushl(p0, get_eax());
+    p0 = ls_cons(mkinst(INST_CALL_IMM, mktup2(OPD_LABEL, mangle(x3[1], get_ident_name(x3))), NULL),
+        p0);
+    p0  = ls_cons(mkinst(INST_ADDL, mktup2(OPD_INTEGER, 4), get_esp()), p0);
+
+    (% initialization loop %);
+    x4 = get_stack(num_stack());
+    x5 = get_stack(num_stack());
+    p0 = movl(p0, get_eax(), x4);  (% address %);
+    p0 = popl(p0, x5);             (% pop length %);
+    p0 = transl_item_push(p0, x1); (% init value %);
+    x6 = mktup2(OPD_LABEL, new_label("L"));
+    x7 = mktup2(OPD_LABEL, new_label("L"));
+    p0 = ls_cons(mkinst(INST_LABEL, x6, NULL), p0);
+    p0 = movl(p0, x5, get_eax());
+    p0 = movl(p0, mktup2(OPD_INTEGER, 0), get_ebx());
+    p0 = ls_cons(mkinst(INST_CMPL, get_eax(), get_ebx()), p0);
+    p0 = ls_cons(mkinst(INST_JAE, x7, NULL), p0);
+    p0 = movl(p0, x4, get_eax());
+    p0 = movl(p0, x5, get_ebx());
+    p0 = ls_cons(mkinst(INST_SUBL, mktup2(OPD_INTEGER, 1), get_ebx()), p0);
+    p0 = ls_cons(mkinst(INST_ADDL, get_ebx(), get_eax()), p0);
+    x8 = 0;
+    while (x8 < x2) {
+        p0 = movl(p0, offset(get_esp(), NULL, x8), get_ebx());
+        p0 = movb(p0, get_ebx(), offset(get_eax(), NULL, x8));
+        x8 = x8 + 1;
+    };
+    p0 = ls_cons(mkinst(INST_SUBL, mktup2(OPD_INTEGER, 1), x5), p0);
+    p0 = ls_cons(mkinst(INST_JMP, x6, NULL), p0);
+    p0 = ls_cons(mkinst(INST_LABEL, x7, NULL), p0);
+    p0 = ls_cons(mkinst(INST_ADDL, mktup2(OPD_INTEGER, x2*4), get_esp()), p0);
+    p0 = movl(p0, x4, get_eax());
+
+    return p0;
+};
+
 transl_newarray: (p0, p1) {
     allocate(9);
     x0 = p1[2]; (% length expr %);
     x1 = p1[3]; (% init %);
     x2 = type_size(x1[1]);
+    if (x1[1][0] == NODE_CHAR_T) {
+        return transl_new_chararray(p0, p1);
+    };
     x3 = get_variable("alloc");
     p0 = transl_item_push(p0, x0);
     p0 = ls_cons(mkinst(INST_IMUL, mktup2(OPD_INTEGER, x2*4), get_eax()), p0);
@@ -1134,8 +1189,8 @@ transl_newarray: (p0, p1) {
     p0 = ls_cons(mkinst(INST_ADDL, get_ebx(), get_eax()), p0);
     x8 = 0;
     while (x8 < x2) {
-        p0 = movl(p0, offset(get_esp(), NULL, x8), get_ebx());
-        p0 = movl(p0, get_ebx(), offset(get_eax(), NULL, x8));
+        p0 = movl(p0, offset(get_esp(), NULL, 4*x8), get_ebx());
+        p0 = movl(p0, get_ebx(), offset(get_eax(), NULL, 4*x8));
         x8 = x8 + 1;
     };
     p0 = ls_cons(mkinst(INST_SUBL, mktup2(OPD_INTEGER, 1), x5), p0);
