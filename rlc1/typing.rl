@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-11 09:52:38 nineties $
+ % $Id: typing.rl 2010-04-13 21:01:26 nineties $
  %);
 
 include(stddef, code);
@@ -559,7 +559,7 @@ infer_field: (p0) {
         exit(1);
     };
     x1 = infer_item(p0[3]);
-    x2 = mktup3(NODE_NAMED_T, get_ident_name(x0), x1);
+    x2 = mktup3(NODE_FIELD_T, get_ident_name(x0), x1);
     p0[1] = x2;
     deref(p0);
     return p0[1];
@@ -603,7 +603,11 @@ infer_fieldref: (p0) {
 infer_typedecl: (p0) {
     allocate(5);
     x0 = p0[1]; (% identifier %);
-    x1 = p0[2]; (% type %);
+    x1 = p0[2][2]; (% type %);
+    puts("hoge\n");
+    if (x1 == NULL) {
+	return unit_type;
+    };
     if (x1[0] == NODE_VARIANT_T) {
         x1[1] = x0;
         x2 = x1[2]; (% rows %);
@@ -771,10 +775,21 @@ unify: (p0, p1) {
         };
         if (p0[0] == NODE_LAMBDA_T) { return unify_lambda_t(p0, p1); };
         if (p0[0] == NODE_VARIANT_T) {
-            if (streq(p0[1], p1[1])) {
-                return;
-            };
+            if (streq(p0[1], p1[1])) { return; };
         };
+	if (p0[0] == NODE_NAMED_T) {
+	    if (streq(p0[1], p1[1])) { return; };
+	};
+    };
+    if (p0[0] == NODE_NAMED_T) {
+	if (p0[2] != NULL) {
+	    return unify(p0[2], p1);
+	};
+    };
+    if (p1[0] == NODE_NAMED_T) {
+	if (p1[2] != NULL) {
+	    return unify(p0, p1[2]);
+	};
     };
     type_mismatch(p0, p1);
 };
@@ -1108,9 +1123,15 @@ deref_type: (p0) {
         map_add(tyvarmap, p0[1], x2);
         return x1
     };
-    if (p0[0] == NODE_NAMED_T) {
+    if (p0[0] == NODE_FIELD_T) {
         p0[2] = deref_type(p0[2]);
         return p0;
+    };
+    if (p0[0] == NODE_NAMED_T) {
+	if (p0[2] != NULL) {
+	    p0[2] = deref_type(p0[2]);
+	};
+	return p0;
     };
     return p0;
 };

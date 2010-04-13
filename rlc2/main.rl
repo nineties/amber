@@ -1,6 +1,7 @@
 import stdlib;
+import string;
 
 export
 main: () {
-    sys_exit(0);
+    exit(ExitSuccess);
 };

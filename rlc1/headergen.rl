@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: headergen.rl 2010-04-09 09:09:08 nineties $
+ % $Id: headergen.rl 2010-04-13 20:28:19 nineties $
  %);
 
 (% automatic header file generation %);

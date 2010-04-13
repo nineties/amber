@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: proc.rl 2010-04-12 12:59:56 nineties $
+ % $Id: proc.rl 2010-04-13 20:52:32 nineties $
  %);
 
 include(stddef, code);
@@ -168,8 +168,15 @@ get_pseudo: (p0) {
 };
 
 get_at: (p0, p1) {
-    assert(p0[0] == OPD_STACK);
-    return get_stack(p0[2] + p1);
+    if (p0[0] == OPD_STACK) {
+        return get_stack(p0[2] + p1);
+    };
+    if (p0[0] == OPD_OFFSET) {
+        p0[4] = p0[4] + p1*4;
+        return p0;
+    };
+    fputs(stderr, "ERROR: not implemented (get_at)\n");
+    putc('\n');
 };
 
 (% p0: pseudo register, p1: memory locations %);

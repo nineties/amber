@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: parse.rl 2010-04-11 01:33:54 nineties $
+ % $Id: parse.rl 2010-04-13 19:44:13 nineties $
  %);
 
 include(stddef, code, token);
@@ -762,17 +762,19 @@ type_map: NULL;
 
 (% p0: first token %);
 parse_typedecl_body: (p0) {
-    allocate(3);
+    allocate(4);
     eattoken(p0, TOK_TYPE, "type");
     x0 = parse_identifier(lex());
     x1 = lex();
     if (x1 == ':') {
         x2 = parse_typedecl_rhs(lex());
-        map_add(type_map, get_ident_name(x0), x2);
-        return mktup3(NODE_TYPEDECL, get_ident_name(x0), x2);
+        x3 = mktup3(NODE_NAMED_T, get_ident_name(x0), x2);
+        map_add(type_map, get_ident_name(x0), x3);
+        return mktup3(NODE_TYPEDECL, get_ident_name(x0), x3);
     };
     unput();
-    return mktup3(NODE_TYPEDECL, get_ident_name(x0), mktup1(NODE_ABSTRACT_T));
+    return mktup3(NODE_TYPEDECL, get_ident_name(x0),
+        mktup3(NODE_NAMED_T, get_ident_name(x0), NULL));
 };
 
 (% p0: first token %);
@@ -816,23 +818,27 @@ parse_variant_item: (p0) {
 parse_type: (p0) {
     allocate(2);
     x0 = parse_primary_type(p0);
+label type_loop;
     x1 = lex();
     if (x1 == TOK_ARROW) {
-        return mktup3(NODE_LAMBDA_T, x0, parse_type(lex()));
+        x0 = mktup3(NODE_LAMBDA_T, x0, parse_type(lex()));
+        goto &type_loop;
     };
     if (x1 == '*') {
-        return mktup2(NODE_POINTER_T, x0);
+        x0 = mktup2(NODE_POINTER_T, x0);
+        goto &type_loop;
     };
     if (x1 == '[') {
         eatchar(lex(), ']');
-        return mktup2(NODE_ARRAY_T, x0);
+        x0 = mktup2(NODE_ARRAY_T, x0);
+        goto &type_loop;
     };
     unput();
     return x0;
 };
 
 parse_primary_type: (p0) {
-    allocate(1);
+    allocate(4);
     if (p0 == TOK_VOID_T) { return void_type; };
     if (p0 == TOK_CHAR_T) { return char_type; };
     if (p0 == TOK_INT_T)  { return int_type; };
@@ -840,14 +846,21 @@ parse_primary_type: (p0) {
         return parse_tuple_type(p0);
     };
     if (p0 == TOK_IDENT) {
-        x0 = map_find(type_map, token_text());
-        if (x0 == NULL) {
+        x0 = strdup(token_text());
+        x1 = map_find(type_map, x0);
+        if (x1 == NULL) {
+            x2 = lex();
+            if (x2 == ':') {
+                x3 = parse_type(lex());
+                return mktup3(NODE_FIELD_T, x0, x3);
+            };
             fputs(stderr, "ERROR: undefined type'");
-            fputs(stderr, token_text());
+            fputs(stderr, x0);
             fputs(stderr, "'\n");
             exit(1);
         };
-        return x0;
+        assert(x1[0] == NODE_NAMED_T);
+        return x1;
     };
     expected("type");
 };

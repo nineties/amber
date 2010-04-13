@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: pprint.rl 2010-04-10 12:36:28 nineties $
+ % $Id: pprint.rl 2010-04-13 20:32:14 nineties $
  %);
 
 include(stddef,code);
@@ -312,15 +312,20 @@ put_typedecl: (p0, p1) {
     allocate(1);
     fputs(p0, "type ");
     fputs(p0, p1[1]);
-    if (p1[2][0] == NODE_ABSTRACT_T) {
+    x0 = p1[2][2];
+    if (x0 == NULL) {
+        return;
+    };
+    if (x0[0] == NODE_NAMED_T) {
+        fputs(p0, x0[1]);
 	return;
     };
-    if (p1[2][0] != NODE_VARIANT_T) {
+    if (x0[0] != NODE_VARIANT_T) {
         fputs(p0, ": ");
         put_type(p0, p1[2]);
         return;
     };
-    x0 = p1[2][2]; (% rows %);
+    x0 = x0[2]; (% rows %);
     if (ls_next(x0) == NULL) {
         fputs(": ");
         put_variant_row(p0, ls_value(x0));
@@ -424,8 +429,8 @@ put_newarray: (p0, p1) {
 };
 
 pptype_funcs: [ put_unit_t, put_char_t, put_int_t, put_float_t, put_double_t,
-    put_pointer_t, put_array_t, put_tuple_t, put_lambda_t, put_tyvar, put_namedty,
-    put_variant_t, put_void_t, put_sarray_t, put_abstract_t
+    put_pointer_t, put_array_t, put_tuple_t, put_lambda_t, put_tyvar, put_field_t,
+    put_variant_t, put_void_t, put_sarray_t, put_named_t
 ];
 
 put_type: (p0, p1) {
@@ -499,10 +504,9 @@ put_tyvar: (p0, p1) {
     fputi(p0, p1[1]);
 };
 
-put_namedty: (p0, p1) {
-    fputs(p0, "<");
+put_field_t: (p0, p1) {
     fputs(p0, p1[1]);
-    fputs(p0, ">");
+    fputc(p0, ':');
     put_type(p0, p1[2]);
 };
 
@@ -511,12 +515,13 @@ put_variant_t: (p0, p1) {
 };
 
 put_sarray_t: (p0, p1) {
-    fputs(stderr, "ERROR: not implemented\n");
-    exit(1);
+    fputs(p0, "[|");
+    put_type(p0, p1[1]);
+    fputs(p0, "|]");
 };
 
-put_abstract_t: (p0, p1) {
-    fputc(p0, '*');
+put_named_t: (p0, p1) {
+    fputs(p0, p1[1]);
 };
 
 put_tyscheme: (p0, p1) {
