@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-12 13:05:15 nineties $
+ % $Id: tcodegen.rl 2010-04-13 20:52:33 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -44,7 +44,7 @@ type_size: (p0) {
     if (p0[0] == NODE_LAMBDA_T) {
         return 1;
     };
-    if (p0[0] == NODE_NAMED_T) {
+    if (p0[0] == NODE_FIELD_T) {
         return type_size(p0[2]);
     };
     if (p0[0] == NODE_VARIANT_T) {
@@ -61,6 +61,11 @@ type_size: (p0) {
             x0 = ls_next(x0);
         };
         return x1;
+    };
+    if (p0[0] == NODE_NAMED_T) {
+	if (p0[2]) {
+	    return type_size(p0[2]);
+	};
     };
     not_reachable();
 };
@@ -953,6 +958,7 @@ transl_fieldref: (p0, p1) {
     x0 = p1[2]; (% lhs %);
     x1 = p1[3]; (% fiel name %);
     x2 = get_field(x0[1], x1); (% offset, length %);
+    assert(x2 != NULL);
     x4 = x2[0]; (% offset %);
     x5 = x2[1]; (% length %);
     p0 = get_storage(p0, x0, &x6);
@@ -1270,9 +1276,6 @@ set_parameters: (p0, p1) {
 
 (% p0: item %);
 transl_fundecl: (p0) {
-    puts("> compiling '");
-    puts(get_ident_name(p0[2]));
-    puts("' ...\n");
     return transl_fundecl_impl(mangle(p0[1], get_ident_name(p0[2])), p0[3]);
 };
 

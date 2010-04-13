@@ -1,3 +1,6 @@
 export type string;
+type string: (ptr:char[], len:int)*;
 
-type string : char[];
+length: (str@string) {
+    return str->len;
+};

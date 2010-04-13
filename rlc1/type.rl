@@ -112,7 +112,7 @@ freevar_tyscheme: (p0) {
 };
 
 has_name: (p0, p1) {
-    if (p0[0] != NODE_NAMED_T) { return FALSE; };
+    if (p0[0] != NODE_FIELD_T) { return FALSE; };
     return streq(p0[1], p1);
 };
 
