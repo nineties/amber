@@ -1,7 +1,7 @@
-import stdlib;
+import sys;
 import string;
 
 export
 main: () {
-    exit(ExitSuccess);
+    sys_exit(length("Hello World"));
 };

@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: closure.rl 2010-04-11 10:23:57 nineties $
+ % $Id: closure.rl 2010-04-14 11:08:40 nineties $
  %);
 
 (% closure conversion %);
@@ -235,7 +235,7 @@ not_implemented, close_tuple, close_block, close_decl, close_call, do_nothing,
 close_lambda, close_unexpr, close_binexpr, close_assign, close_export, do_nothing,
 close_external, do_nothing, close_retval, close_syscall, close_field, close_fieldref,
 do_nothing, close_variant, do_nothing, close_typedexpr, close_if, close_ifelse, do_nothing,
-do_nothing, close_new, close_while, close_for, close_newarray
+do_nothing, close_new, close_while, close_for, close_newarray, close_rewrite
 ];
 
 do_nothing: (p0) {
@@ -447,6 +447,12 @@ close_newarray: (p0) {
     p0[3] = (close(p0[3]))[0];
     return mktup2(p0, NULL);
 };
+
+close_rewrite: (p0) {
+    (% do nothing %);
+    return mktup2(p0, NULL);
+};
+
 close: (p0) {
     return (close_funcs[p0[0]])(p0);
 };

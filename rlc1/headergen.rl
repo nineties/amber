@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: headergen.rl 2010-04-13 20:28:19 nineties $
+ % $Id: headergen.rl 2010-04-14 11:05:22 nineties $
  %);
 
 (% automatic header file generation %);
@@ -39,6 +39,12 @@ export_item: (p0, p1) {
     if (x0[0] == NODE_TYPEDECL) {
         put_item(p0, x0);
         return;
+    };
+    if (x0[0] == NODE_REWRITE) {
+	fputs(p0, x0[1]);
+	fputs(p0, " => ");
+	fputi(p0, x0[2]);
+	return;
     };
     fputs(stderr, "ERROR: not reachable\n");
     exit(1);

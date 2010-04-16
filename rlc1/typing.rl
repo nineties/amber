@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-13 21:01:26 nineties $
+ % $Id: typing.rl 2010-04-16 16:47:54 nineties $
  %);
 
 include(stddef, code);
@@ -111,7 +111,7 @@ infer_funcs: [not_reachable, infer_integer, infer_string, not_implemented,
     infer_assign, infer_export, infer_import, infer_external, infer_ret, infer_retval,
     infer_syscall, infer_field, infer_fieldref, infer_typedecl, infer_variant, infer_unit,
     infer_typedexpr, infer_if, infer_ifelse, infer_static_array, infer_cast, infer_new,
-    infer_while, infer_for, infer_newarray
+    infer_while, infer_for, infer_newarray, infer_rewrite
 ];
 
 unit_type   : NULL;
@@ -137,7 +137,7 @@ infer_integer: (p0) {
 };
 
 infer_string: (p0) {
-    p0[1] = mktup2(NODE_POINTER_T, char_type);
+    p0[1] = mktup3(NODE_NAMED_T, "string", NULL);
     return p0[1];
 };
 
@@ -604,7 +604,6 @@ infer_typedecl: (p0) {
     allocate(5);
     x0 = p0[1]; (% identifier %);
     x1 = p0[2][2]; (% type %);
-    puts("hoge\n");
     if (x1 == NULL) {
 	return unit_type;
     };
@@ -729,6 +728,10 @@ infer_newarray: (p0) {
     p0[1] = mktup2(NODE_ARRAY_T, x1);
     deref(p0);
     return p0[1];
+};
+
+infer_rewrite: (p0) {
+    return unit_type;
 };
 
 (% p0: item %);
@@ -890,7 +893,7 @@ deref_funcs: [not_reachable, deref_integer, deref_string, deref_dontcare,
     deref_assign, deref_export, deref_import, deref_external, deref_ret, deref_retval,
     deref_syscall, deref_field, deref_fieldref, deref_typedecl, deref_variant, deref_unit,
     deref_typedexpr, deref_if, deref_ifelse, deref_static_array, deref_cast, deref_new,
-    deref_while, deref_for, deref_newarray
+    deref_while, deref_for, deref_newarray, deref_rewrite
 ];
 
 (% p0: item %);
@@ -1093,6 +1096,11 @@ deref_newarray: (p0) {
     deref(p0[2]);
     deref(p0[3]);
     p0[1] = deref_type(p0[1]);
+};
+
+deref_rewrite: (p0) {
+    (% do nothing %);
+    return;
 };
 
 (% p0: type %);

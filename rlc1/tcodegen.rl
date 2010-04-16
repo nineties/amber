@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-13 20:52:33 nineties $
+ % $Id: tcodegen.rl 2010-04-14 11:13:29 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -66,6 +66,7 @@ type_size: (p0) {
 	if (p0[2]) {
 	    return type_size(p0[2]);
 	};
+        return 1;
     };
     not_reachable();
 };
@@ -191,6 +192,16 @@ add_closure: (p0) {
     const_closures = ls_cons(p0, const_closures);
 };
 
+static_string: (p0) {
+    allocate(1);
+    x0 = new_label("cstr");
+    add_topdecl(mktup4(TCODE_DATA, x0, mktup2(DATA_STRING, p0), FALSE));
+    return mktup3(DATA_TUPLE, 2,
+        mktup2(
+            mktup2(DATA_LABEL, x0),
+            mktup2(DATA_INT, strlen(p0))));
+};
+
 not_reachable: (p0) {
     fputs(stderr, "ERROR: not reachable here\n");
     exit(1);
@@ -208,7 +219,7 @@ transl_funcs: [
     transl_assign, not_reachable, not_reachable, not_reachable, transl_ret, transl_retval,
     transl_syscall, transl_field, transl_fieldref, not_reachable, transl_variant, transl_unit,
     transl_typedexpr, transl_if, transl_ifelse, not_reachable, transl_cast, transl_new,
-    transl_while, transl_for, transl_newarray
+    transl_while, transl_for, transl_newarray, transl_rewrite
 ];
 
 get_storage: (p0, p1, p2) {
@@ -269,7 +280,7 @@ transl_integer: (p0, p1) {
 transl_string: (p0, p1) {
     allocate(1);
     x0 = new_label("str");
-    add_topdecl(mktup4(TCODE_DATA, x0, mktup2(DATA_STRING, p1[2]), FALSE));
+    add_topdecl(mktup4(TCODE_DATA, x0, static_string(p1[2]), FALSE));
     p0 = ls_cons(mkinst(INST_MOVL, mktup2(OPD_ADDRESS, x0), get_eax()), p0);
     return p0;
 };
@@ -1208,6 +1219,11 @@ transl_newarray: (p0, p1) {
     return p0;
 };
 
+transl_rewrite: (p0, p1) {
+    (% do nothing %);
+    return p0;
+};
+
 (% p0: output tcode, p1: item, p2: location for temporal value %);
 transl_item: (p0, p1) {
     allocate(1);
@@ -1238,7 +1254,8 @@ transl_extfuncs: [
     do_nothing, do_nothing, do_nothing, do_nothing, do_nothing,
     do_nothing, transl_export, transl_import, transl_external, do_nothing,
     do_nothing, do_nothing, do_nothing, do_nothing, transl_typedecl,
-    do_nothing, do_nothing
+    do_nothing, do_nothing, do_nothing, do_nothing, do_nothing, do_nothing,
+    do_nothing, do_nothing, do_nothing, do_nothing, do_nothing, do_nothing
 ];
 
 do_nothing: (p0) {
@@ -1341,7 +1358,7 @@ transl_static_data: (p0) {
     };
     if (p0[0] == NODE_STRING) {
         x0 = new_label("str");
-        add_topdecl(mktup4(TCODE_DATA, x0, mktup2(DATA_STRING, p0[2]), FALSE));
+        add_topdecl(mktup4(TCODE_DATA, x0, static_string(p0[2]), FALSE));
         return mktup2(DATA_LABEL, x0);
     };
     if (p0[0] == NODE_FIELD) {

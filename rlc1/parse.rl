@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: parse.rl 2010-04-13 19:44:13 nineties $
+ % $Id: parse.rl 2010-04-16 15:54:02 nineties $
  %);
 
 include(stddef, code, token);
@@ -29,6 +29,9 @@ import_module: (p0) {
     set_add(imported, p0);
 
     x0 = add_suffix(p0, ".rli");
+    puts("import ");
+    puts(x0);
+    putc('\n');
     x1 = open_in(x0);
     lexer_push(x0, x1);
     x2 = parse_toplevel_items(lex());
@@ -164,8 +167,8 @@ parse_rewrite_expr: (p0) {
             fputs(stderr, "' already defined\n");
             exit(1);
         };
-        map_add(rewrite_map, x3, token_val());
-        return mktup2(NODE_UNIT, NULL);
+        map_add(rewrite_map, x3, mktup4(NODE_INTEGER, int_type, 32, token_val()));
+        return mktup3(NODE_REWRITE, x3, token_val());
     };
     unput();
     return x0;
@@ -580,12 +583,16 @@ label post_loop;
 
 (% p0: first token %);
 parse_primary_item: (p0) {
-    allocate(2);
+    allocate(3);
     if (p0 == TOK_IDENT) {
         x0 = token_text();
         x1 = map_find(rewrite_map, x0);
         if (x1 != NULL) {
-            return mktup4(NODE_INTEGER, NULL, 32, x1);
+            return x1;
+        };
+        x1 = map_find(type_map, x0);
+        if (x1 != NULL) {
+            x2 = parse_tuple(lex());
         };
         return parse_identifier(p0);
     };
@@ -766,23 +773,25 @@ parse_typedecl_body: (p0) {
     eattoken(p0, TOK_TYPE, "type");
     x0 = parse_identifier(lex());
     x1 = lex();
+    x2 = NULL;
     if (x1 == ':') {
         x2 = parse_typedecl_rhs(lex());
-        x3 = mktup3(NODE_NAMED_T, get_ident_name(x0), x2);
-        map_add(type_map, get_ident_name(x0), x3);
-        return mktup3(NODE_TYPEDECL, get_ident_name(x0), x3);
+    } else {
+        unput();
     };
-    unput();
-    return mktup3(NODE_TYPEDECL, get_ident_name(x0),
-        mktup3(NODE_NAMED_T, get_ident_name(x0), NULL));
+    x3 = mktup3(NODE_NAMED_T, get_ident_name(x0), x2);
+    map_add(type_map, get_ident_name(x0), x3);
+    return mktup3(NODE_TYPEDECL, get_ident_name(x0), x3);
 };
 
 (% p0: first token %);
 parse_typedecl_rhs: (p0) {
+    allocate(2);
     if (p0 == TOK_IDENT) {
         return parse_variant(p0);
     };
-    return parse_type(p0);
+    x0 = parse_type(p0);
+    return x0;
 };
 
 parse_variant: (p0) {
