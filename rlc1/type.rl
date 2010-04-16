@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: type.rl 2010-04-08 09:14:13 nineties $
+ % $Id: type.rl 2010-04-16 16:47:44 nineties $
  %);
 
 include(stddef, code);
@@ -146,4 +146,3 @@ is_polymorphic_type: (p0) {
     };
     return TRUE;
 };
-

@@ -2,7 +2,7 @@
  % rowl - generation 2
  % Copyright (C) 2010 nineties
  %
- % $Id: sys.rl 2010-04-11 01:02:07 nineties $
+ % $Id: sys.rl 2010-04-14 11:28:18 nineties $
  %)
 
 (% system calls %)
@@ -31,6 +31,27 @@ sys_fork: () {
         return pid;
     };
     sys_exit(-pid);
+};
+
+export OpenRDONLY => 0;
+export OpenWRONLY => 1;
+export OpenRDWR   => 2;
+export OpenCREAT  => 64;
+export OpenTRUNC  => 512;
+export OpenAPPEND => 1024;
+
+export
+sys_open: (file @ char[], flag @ int) {
+    fd : syscall(SysOpen, file, flag) @ int;
+    if (fd >= 0) {
+	return fd;
+    };
+    sys_exit(-fd);
+};
+
+export
+sys_close: (fd @ int) {
+    syscall(SysClose, fd);
 };
 
 ProtRead  => 1;
