@@ -19,12 +19,21 @@ make_ochan: (fd@int) {
     return new Ochan(fd, new_array(WriteBufSize) '\0', 0);
 };
 
-export
-open_in: (file) {
+export open_in: (file) {
     return make_ichan(sys_open(to_cstr(file), OpenRDONLY));
 };
 
-export
-close_in: (c @ ichan*) {
-    syscall(c->fd);
+export close_in: (c @ ichan*) {
+    sys_close(c->fd);
+};
+
+export close_out: (c @ ochan*) {
+    sys_close(c->fd);
+};
+
+export flush: (c @ ochan*) {
+    if (c->index) {
+        sys_write(c->fd, c->buf, c->index);
+        c->index = 0;
+    }
 };
