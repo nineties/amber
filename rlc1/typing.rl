@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-16 16:47:54 nineties $
+ % $Id: typing.rl 2010-04-16 22:01:42 nineties $
  %);
 
 include(stddef, code);
@@ -568,18 +568,32 @@ infer_field: (p0) {
 (% p0: type, p1: field name %);
 get_fieldtype: (p0, p1) {
     allocate(4);
-    if (p0[0] != NODE_TUPLE_T) {
+    if (p0[0] == NODE_TUPLE_T) {
+        x0 = p0[TUPLE_T_LENGTH];
+        x1 = p0[TUPLE_T_ELEMENTS];
+        x2 = 0;
+        while (x2 < x0) {
+            x3 = x1[x2];
+            if (has_name(x3, p1)) {
+                return x3[2];
+            };
+            x2 = x2 + 1;
+        };
         return NULL;
     };
-    x0 = p0[TUPLE_T_LENGTH];
-    x1 = p0[TUPLE_T_ELEMENTS];
-    x2 = 0;
-    while (x2 < x0) {
-        x3 = x1[x2];
-        if (has_name(x3, p1)) {
-            return x3[2];
+    if (p0[0] == NODE_VARIANT_T) {
+        x0 = p0[2]; (% rows %);
+        if (ls_length(x0) != 1) {
+            return NULL;
         };
-        x2 = x2 + 1;
+        x1 = (ls_value(x0))[2]; (% argument type %);
+        return get_fieldtype(x1, p1);
+    };
+    if (p0[0] == NODE_NAMED_T) {
+        if (p0[2] != NULL) {
+            return get_fieldtype(p0[2], p1);
+        };
+        return NULL;
     };
     return NULL;
 };
@@ -793,6 +807,12 @@ unify: (p0, p1) {
 	if (p1[2] != NULL) {
 	    return unify(p0, p1[2]);
 	};
+    };
+    if (p0[0] == NODE_FIELD_T) {
+        return unify(p0[2], p1);
+    };
+    if (p1[0] == NODE_FIELD_T) {
+        return unify(p0, p1[2]);
     };
     type_mismatch(p0, p1);
 };
