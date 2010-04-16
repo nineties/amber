@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: code.rl 2010-04-14 11:03:33 nineties $
+ % $Id: code.rl 2010-04-16 22:10:52 nineties $
  %);
 
 NODE_PROG       => 0;  (% item list %);
@@ -76,7 +76,7 @@ NODE_SARRAY_T  => 13; (% element type %);
 NODE_NAMED_T   => 14; (% name, type%);
 
 (% structure of rows of variant
- % (constructor name, id, arg)
+ % (constructor name, id, arg type)
  %);
 
 POINTER_T_BASE    => 1;

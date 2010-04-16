@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-14 11:13:29 nineties $
+ % $Id: tcodegen.rl 2010-04-16 22:25:54 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -950,18 +950,34 @@ transl_field: (p0, p1) {
 (% p0: type, p1: field name %);
 get_field: (p0, p1) {
     allocate(5);
-    x0 = 0; (% offset %);
-    x1 = p0[TUPLE_T_LENGTH];
-    x2 = p0[TUPLE_T_ELEMENTS];
-    x3 = 0;
-    while (x3 < x1) {
-        x4 = x2[x3];
-        if (has_name(x4, p1)) {
-            return mktup2(x0, type_size(x4));
+    if (p0[0] == NODE_TUPLE_T) {
+        x0 = 0; (% offset %);
+        x1 = p0[TUPLE_T_LENGTH];
+        x2 = p0[TUPLE_T_ELEMENTS];
+        x3 = 0;
+        while (x3 < x1) {
+            x4 = x2[x3];
+            if (has_name(x4, p1)) {
+                return mktup2(x0, type_size(x4));
+            };
+            x0 = x0 + type_size(x4);
+            x3 = x3 + 1;
         };
-        x0 = x0 + type_size(x4);
-        x3 = x3 + 1;
     };
+    if (p0[0] == NODE_VARIANT_T) {
+        x0 = p0[2]; (% rows %);
+        if (ls_length(x0) != 1) {
+            return NULL;
+        };
+        x1 = (ls_value(x0))[2]; (% argument type %);
+        return get_field(x1, p1);
+    };
+    if (p0[0] == NODE_NAMED_T) {
+        if (p0[2] != NULL) {
+            return get_field(p0[2], p1);
+        };
+    };
+    not_reachable();
 };
 
 transl_fieldref: (p0, p1) {
@@ -986,14 +1002,19 @@ transl_fieldref: (p0, p1) {
 };
 
 transl_variant: (p0, p1) {
-    allocate(2);
-    x0 = p1[3]; (% variant id %);
-    x1 = NULL;
-    if (p1[4] != NULL) {
-        p0 = transl_item(p0, p1[4], &x1); (% translate arg %);
+    allocate(1);
+    x0 = type_size(p1[1]);
+    if (x0 == 1) {
+        assert(p1[4] == NULL);
+        return movl(p0, mktup2(OPD_INTEGER, p1[3]), get_eax()); (% set variant id %);
     };
-    x1 = ls_cons(mktup2(OPD_INTEGER, x0), x1);
-    *p2 = x1;
+    p0 = pushl(p0, mktup2(OPD_INTEGER, p1[3]));
+    p0 = transl_item(p0, p1[4]); (% translate argument %);
+    x0 = x0 - type_size(p1[4][1]) - 1;
+    while (x0 > 0) {
+        p0 = pushl(p0, mktup2(OPD_INTEGER, 0)); (% insert padding %);
+        x0 = x0 - 1;
+    };
     return p0;
 };
 
@@ -1077,14 +1098,16 @@ gen_alloc: (p0, p1) {
 };
 
 transl_new: (p0, p1) {
-    allocate(7);
+    allocate(5);
     x0 = p1[2]; (% expr %);
     x1 = type_size(x0[1]);
     p0 = gen_alloc(p0, x1);
-    p0 = pushl(p0, get_eax());
+    x2 = num_stack();
+    x3 = get_stack(x2); (% for address %);
+    p0 = movl(p0, get_eax(), x3);
     (% initialize the memory %);
     p0 = transl_item(p0, x0);
-    p0 = popl(p0, get_ebx());
+    p0 = movl(p0, x3, get_ebx());
     if (x1 == 1) {
         p0 = movl(p0, get_eax(), offset(get_ebx(), NULL, 0));
     } else {
