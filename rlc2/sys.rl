@@ -2,7 +2,7 @@
  % rowl - generation 2
  % Copyright (C) 2010 nineties
  %
- % $Id: sys.rl 2010-04-14 11:28:18 nineties $
+ % $Id: sys.rl 2010-04-17 01:25:03 nineties $
  %)
 
 (% system calls %)
@@ -19,18 +19,32 @@ SysExecve  => 11;
 SysMmap2   => 192;
 SysMunmap  => 91;
 
-export
-sys_exit: (status @ int) {
+export sys_exit: (status @ int) {
     syscall(SysExit, status) @ void;
 };
 
-export
-sys_fork: () {
+export sys_fork: () {
     pid : syscall(SysFork) @ int;
     if (pid >= 0) {
         return pid;
     };
     sys_exit(-pid);
+};
+
+export sys_read: (fd @ int, buf @ char[], size @ int) {
+    s : syscall(SysRead, fd, buf, size) @ int;
+    if (s >= 0) {
+        return s;
+    };
+    sys_exit(-s);
+};
+
+export sys_write: (fd @ int, buf @ char[], size @ int) {
+    s : syscall(SysWrite, fd, buf, size) @ int;
+    if (s >= 0) {
+        return s;
+    };
+    sys_exit(-s);
 };
 
 export OpenRDONLY => 0;

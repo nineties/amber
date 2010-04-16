@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-16 22:25:54 nineties $
+ % $Id: tcodegen.rl 2010-04-17 01:29:08 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -223,7 +223,7 @@ transl_funcs: [
 ];
 
 get_storage: (p0, p1, p2) {
-    allocate(1);
+    allocate(6);
     if (p1[0] == NODE_IDENTIFIER) {
         if (is_global_identifier(p1)) {
             *p2 = mktup2(OPD_LABEL, get_ident_name(p1));
@@ -258,6 +258,16 @@ get_storage: (p0, p1, p2) {
             *p2 = offset(get_ebx(), NULL, 0);
             return p0;
         }
+    };
+    if (p1[0] == NODE_FIELDREF) {
+        x0 = p1[2]; (% lhs %);
+        x1 = p1[3]; (% field name %);
+        x2 = get_field(x0[1], x1); (% offset, length %);
+        assert(x2 != NULL);
+        x4 = x2[0]; (% offset %);
+        p0 = get_storage(p0, x0, &x5);
+        *p2 = get_at(x5, x4);
+        return p0;
     };
     not_implemented();
 };
@@ -983,7 +993,7 @@ get_field: (p0, p1) {
 transl_fieldref: (p0, p1) {
     allocate(9);
     x0 = p1[2]; (% lhs %);
-    x1 = p1[3]; (% fiel name %);
+    x1 = p1[3]; (% field name %);
     x2 = get_field(x0[1], x1); (% offset, length %);
     assert(x2 != NULL);
     x4 = x2[0]; (% offset %);
