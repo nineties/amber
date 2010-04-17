@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-17 01:29:08 nineties $
+ % $Id: tcodegen.rl 2010-04-17 14:11:04 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -238,13 +238,21 @@ get_storage: (p0, p1, p2) {
             x0 = get_ident_name(p1[2]);
             p0 = transl_item(p0, p1[3]); (% index %);
             p0 = movl(p0, get_eax(), get_ebx());
-            *p2 = offset(get_ebx(), mktup2(OPD_LABEL, x0), 4*type_size(p1[1]));
+	    (% XXX: ad-hoc impl %);
+	    if (p1[1][0] == NODE_CHAR_T) {
+		*p2 = offset(get_ebx(), mktup2(OPD_LABEL, x0), type_size(p1[1]));
+	    } else {
+		*p2 = offset(get_ebx(), mktup2(OPD_LABEL, x0), 4*type_size(p1[1]));
+	    };
             return p0;
         };
         p0 = transl_item(p0, p1[2]); (% addr %);
         p0 = pushl(p0, get_eax());
         p0 = transl_item(p0, p1[3]); (% index %);
-        p0 = ls_cons(mkinst(INST_IMUL, mktup2(OPD_INTEGER, 4*type_size(p1[1])), get_eax()), p0);
+	(% XXX: ad-hoc impl %);
+	if (p1[1][0] != NODE_CHAR_T) {
+	    p0 = ls_cons(mkinst(INST_IMUL, mktup2(OPD_INTEGER, 4*type_size(p1[1])), get_eax()), p0);
+	};
         p0 = popl(p0, get_ecx());
         p0 = ls_cons(mkinst(INST_ADDL, get_ecx(), get_eax()), p0);
         p0 = movl(p0, get_eax(), get_ebx());
@@ -449,7 +457,10 @@ transl_subscript: (p0, p1) {
         p0 = transl_item_push(p0, x0); (% address %);
         p0 = transl_item(p0, x1); (% index %);
         x2 = type_size(p1[1]);
-        p0 = ls_cons(mkinst(INST_IMUL, mktup2(OPD_INTEGER, 4*x2), get_eax()), p0);
+	(% XXX: ad-hoc impl %);
+	if (p1[1][0] != NODE_CHAR_T) {
+	    p0 = ls_cons(mkinst(INST_IMUL, mktup2(OPD_INTEGER, 4*x2), get_eax()), p0);
+	};
         p0 = popl(p0, get_ebx());
         p0 = ls_cons(mkinst(INST_ADDL, get_eax(), get_ebx()), p0);
         if (x2 == 1) {

@@ -23,17 +23,18 @@ export open_in: (file) {
     return make_ichan(sys_open(to_cstr(file), OpenRDONLY));
 };
 
-export close_in: (c @ ichan*) {
-    sys_close(c->fd);
+export close_in: (chan @ ichan*) {
+    sys_close(chan->fd);
 };
 
-export close_out: (c @ ochan*) {
-    sys_close(c->fd);
+export close_out: (chan @ ochan*) {
+    sys_close(chan->fd);
 };
 
-export flush: (c @ ochan*) {
-    if (c->index) {
-        sys_write(c->fd, c->buf, c->index);
-        c->index = 0;
+export flush: (chan @ ochan*) {
+    if (chan->index) {
+        sys_write(chan->fd, chan->buf, chan->index);
+        chan->index = 0;
     }
 };
+
