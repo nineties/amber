@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-17 14:11:04 nineties $
+ % $Id: tcodegen.rl 2010-04-19 11:26:53 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -460,15 +460,27 @@ transl_subscript: (p0, p1) {
 	(% XXX: ad-hoc impl %);
 	if (p1[1][0] != NODE_CHAR_T) {
 	    p0 = ls_cons(mkinst(INST_IMUL, mktup2(OPD_INTEGER, 4*x2), get_eax()), p0);
-	};
+            p0 = popl(p0, get_ebx());
+            p0 = ls_cons(mkinst(INST_ADDL, get_eax(), get_ebx()), p0);
+            if (x2 == 1) {
+                p0 = movl(p0, offset(get_ebx(), NULL, 0), get_eax());
+                return p0;
+            };
+            while (x2 > 0) {
+                p0 = pushl(p0, offset(get_ebx(), NULL, 4*(x2 - 1)));
+                x2 = x2 - 1;
+            };
+            return p0;
+        };
         p0 = popl(p0, get_ebx());
         p0 = ls_cons(mkinst(INST_ADDL, get_eax(), get_ebx()), p0);
+        p0 = ls_cons(mkinst(INST_XORL, get_eax(), get_eax()), p0);
+        p0 = movb(p0, offset(get_ebx(), NULL, 0), get_eax());
         if (x2 == 1) {
-            p0 = movl(p0, offset(get_ebx(), NULL, 0), get_eax());
             return p0;
         };
         while (x2 > 0) {
-            p0 = pushl(p0, offset(get_ebx(), NULL, 4*(x2 - 1)));
+            p0 = pushl(p0, get_eax());
             x2 = x2 - 1;
         };
         return p0;
