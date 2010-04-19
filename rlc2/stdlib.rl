@@ -11,12 +11,12 @@ export type exit_status
     ;
 
 export
-exit: (status @ exit_status) {
+exit: (status ! exit_status) {
     sys_exit(cast(int) status);
 };
 
 export
-atexit: (callback @ ()->()) {
+atexit: (callback ! ()->()) {
     if (num_exit_callback >= MaxExitCallback) {
         exit(ExitFailure);
     };

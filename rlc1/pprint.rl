@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: pprint.rl 2010-04-13 20:32:14 nineties $
+ % $Id: pprint.rl 2010-04-17 17:02:25 nineties $
  %);
 
 include(stddef,code);
@@ -363,7 +363,7 @@ put_unit: (p0, p1) {
 
 put_typedexpr: (p0, p1) {
     put_subitem(p0, p1[2], PRI_ASSIGNMENT);
-    fputc(p0, '@');
+    fputc(p0, '!');
     put_type(p0, p1[1]);
 };
 
