@@ -2,7 +2,7 @@
  % rowl - generation 2
  % Copyright (C) 2010 nineties
  %
- % $Id: sys.rl 2010-04-17 01:25:03 nineties $
+ % $Id: sys.rl 2010-04-18 14:46:59 nineties $
  %)
 
 (% system calls %)
@@ -19,28 +19,28 @@ SysExecve  => 11;
 SysMmap2   => 192;
 SysMunmap  => 91;
 
-export sys_exit: (status @ int) {
-    syscall(SysExit, status) @ void;
+export sys_exit: (status!int) {
+    syscall(SysExit, status)!void;
 };
 
 export sys_fork: () {
-    pid : syscall(SysFork) @ int;
+    pid : syscall(SysFork)!int;
     if (pid >= 0) {
         return pid;
     };
     sys_exit(-pid);
 };
 
-export sys_read: (fd @ int, buf @ char[], size @ int) {
-    s : syscall(SysRead, fd, buf, size) @ int;
+export sys_read: (fd!int, buf!char[], size!int) {
+    s : syscall(SysRead, fd, buf, size)!int;
     if (s >= 0) {
         return s;
     };
     sys_exit(-s);
 };
 
-export sys_write: (fd @ int, buf @ char[], size @ int) {
-    s : syscall(SysWrite, fd, buf, size) @ int;
+export sys_write: (fd!int, buf!char[], size!int) {
+    s : syscall(SysWrite, fd, buf, size)!int;
     if (s >= 0) {
         return s;
     };
@@ -55,8 +55,8 @@ export OpenTRUNC  => 512;
 export OpenAPPEND => 1024;
 
 export
-sys_open: (file @ char[], flag @ int) {
-    fd : syscall(SysOpen, file, flag) @ int;
+sys_open: (file!char[], flag!int) {
+    fd : syscall(SysOpen, file, flag, 420)!int; (% 420 = 0644 %)
     if (fd >= 0) {
 	return fd;
     };
@@ -64,7 +64,7 @@ sys_open: (file @ char[], flag @ int) {
 };
 
 export
-sys_close: (fd @ int) {
+sys_close: (fd!int) {
     syscall(SysClose, fd);
 };
 
@@ -81,9 +81,9 @@ MapFixed     => 16;
 MapAnonymous => 32;
 
 export
-sys_mmap2: (addr @ int, size @ int) {
+sys_mmap2: (addr!int, size!int) {
     ret : syscall(SysMmap2, addr, size, ProtRead|ProtWrite|ProtExec,
-        MapAnonymous|MapPrivate, -1, 0) @ int;
+        MapAnonymous|MapPrivate, -1, 0)!int;
     if (ret >= 0) {
         return ret;
     };
@@ -91,6 +91,6 @@ sys_mmap2: (addr @ int, size @ int) {
 };
 
 export
-sys_munmap: (addr @ int, size @ int) {
+sys_munmap: (addr!int, size!int) {
     syscall(SysMunmap, addr, size);
 };
