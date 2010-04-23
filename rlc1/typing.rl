@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-16 22:01:42 nineties $
+ % $Id: typing.rl 2010-04-23 16:56:50 nineties $
  %);
 
 include(stddef, code);
@@ -13,7 +13,7 @@ export(get_variable);
 scopeid: 0;
 scopeid_stack: NULL; 
 
-varmap: NULL;   (% variable table. name -> (tyscheme, id) %);
+varmap: NULL; (% variable table. name -> list of (tyscheme, id) %);
 
 (% p0: (scopeid-id, name) %);
 varmap_hash: (p0) {
@@ -171,7 +171,7 @@ infer_array: (p0) {
     while (x2 < x1) {
         x4 = x3[x2];
         x4[1] = infer_item(x3[x2]);
-        unify(x0, x4[1]);
+        unify(x0, x4[1], TRUE);
         x2 = x2 + 1;
     };
     not_implemented();
@@ -259,7 +259,7 @@ infer_decl_var: (p0, p1) {
     x2 = in_global_namespace();
     varmap_add(p0[2], mktup3(mktyscheme(x0), x1, x2));
     x3 = infer_item(p1);
-    unify(x0, x3);
+    unify(x0, x3, TRUE);
     x4 = closure(x3);
     varmap_add(p0[2], mktup3(x4, x1, x2));
     p0[1] = x3; (% type %);
@@ -275,7 +275,7 @@ infer_decl_var: (p0, p1) {
 infer_decl_tuple: (p0, p1) {
     allocate(1);
     x0 = infer_pattern(p0);
-    unify(x0, infer_item(p1));
+    unify(x0, infer_item(p1), TRUE);
     deref_pattern(p0);
     deref(p1);
     return p0[1];
@@ -321,7 +321,7 @@ infer_pattern: (p0) {
     if (p0[0] == NODE_TYPEDEXPR) {
         (% typed pattern %);
         x0 = infer_pattern(p0[2]);
-        unify(x0, p0[1]);
+        unify(x0, p0[1], TRUE);
         deref(p0);
         return p0[1];
     };
@@ -358,7 +358,7 @@ infer_call: (p0) {
     x0 = infer_item(p0[2]); (% function type %);
     x1 = infer_item(p0[3]); (% argument type %);
     x2 = mktyvar(); (% return type %);
-    unify(x0, mktup3(NODE_LAMBDA_T, x1, x2));
+    unify(x0, mktup3(NODE_LAMBDA_T, x1, x2), TRUE);
 
     p0[1] = x2;
     deref(p0);
@@ -369,7 +369,7 @@ infer_subscript: (p0) {
     allocate(2);
     x0 = infer_item(p0[2]);
     x1 = infer_item(p0[3]);
-    unify(int_type, x1);
+    unify(int_type, x1, TRUE);
     if (x0[0] == NODE_SARRAY_T) {
 	p0[1] = x0[1];
 	deref(p0);
@@ -430,7 +430,7 @@ unexpr_funcs: [
 infer_unarith: (p0) {
     allocate(1);
     x0 = infer_item(p0[3]);
-    unify(int_type, x0);
+    unify(int_type, x0, TRUE);
     p0[1] = int_type;
     return int_type;
 };
@@ -439,7 +439,7 @@ infer_indirect: (p0) {
     allocate(2);
     x0 = infer_item(p0[3]);
     x1 = mktyvar();
-    unify(mktup2(NODE_POINTER_T, x1), x0);
+    unify(mktup2(NODE_POINTER_T, x1), x0, TRUE);
     p0[1] = x1;
     deref(p0);
     return p0[1];
@@ -462,8 +462,8 @@ infer_binarith: (p0) {
     allocate(2);
     x0 = infer_item(p0[3]);
     x1 = infer_item(p0[4]);
-    unify(int_type, x0);
-    unify(int_type, x1);
+    unify(int_type, x0, TRUE);
+    unify(int_type, x1, TRUE);
     p0[1] = int_type;
     deref(p0);
     return p0[1];
@@ -473,7 +473,7 @@ infer_equality: (p0) {
     allocate(2);
     x0 = infer_item(p0[3]);
     x1 = infer_item(p0[4]);
-    unify(x0, x1);
+    unify(x0, x1, TRUE);
     p0[1] = int_type;
     deref(p0);
     return int_type;
@@ -489,7 +489,7 @@ infer_assign: (p0) {
     allocate(2);
     x0 = infer_item(p0[3]); (% lhs type %);
     x1 = infer_item(p0[4]); (% rhs type %);
-    unify(x0, x1);
+    unify(x0, x1, TRUE);
     p0[1] = x0;
     return x0;
 };
@@ -522,7 +522,7 @@ infer_ret: (p0) {
     allocate(1);
     x0 = vec_back(return_stack);
     if (x0 != NULL) {
-        unify(x0, unit_type);
+        unify(x0, unit_type, TRUE);
     };
     vec_put(return_stack, vec_size(return_stack)-1, unit_type);
     p0[1] = unit_type;
@@ -536,7 +536,7 @@ infer_retval: (p0) {
     p0[1] = infer_item(p0[RETVAL_VALUE]);
     x0 = vec_back(return_stack);
     if (x0 != NULL) {
-        unify(p0[1], x0);
+        unify(p0[1], x0, TRUE);
     };
     deref(p0);
     vec_put(return_stack, vec_size(return_stack)-1, p0[1]);
@@ -648,7 +648,7 @@ infer_variant: (p0) {
     p0[3] = x1[1][1]; (% id %);
     if (p0[4] != NULL) {
         x2 = infer_item(p0[4]); (% infer argument %);
-        unify(x2, x1[1][2]);
+        unify(x2, x1[1][2], TRUE);
     };
     deref(p0);
     return p0[1];
@@ -662,7 +662,7 @@ infer_unit: (p0) {
 infer_typedexpr: (p0) {
     allocate(1);
     x0 = infer_item(p0[2]); (% expression %);
-    unify(x0, p0[1]);
+    unify(x0, p0[1], TRUE);
     deref(p0);
     return p0[1];
 };
@@ -670,7 +670,7 @@ infer_typedexpr: (p0) {
 infer_if: (p0) {
     allocate(1);
     x0 = infer_item(p0[2]); (% condition %);
-    unify(x0, int_type);
+    unify(x0, int_type, TRUE);
     infer_item(p0[3]);
     p0[1] = unit_type;
     deref(p0);
@@ -680,10 +680,10 @@ infer_if: (p0) {
 infer_ifelse: (p0) {
     allocate(3);
     x0 = infer_item(p0[2]); (% condition %);
-    unify(int_type, x0);
+    unify(int_type, x0, TRUE);
     x1 = infer_item(p0[3]); (% ifthen block %);
     x2 = infer_item(p0[4]); (% ifelse block %);
-    p0[1] = unify_join(x1, x2);
+    p0[1] = unify_join(x1, x2, TRUE);
     deref(p0);
     return p0[1];
 };
@@ -692,7 +692,7 @@ infer_static_array: (p0) {
     allocate(4);
     x0 = infer_item(p0[2]); (% initializer %);
     x1 = infer_item(p0[3]); (% length %);
-    unify(x1, int_type);
+    unify(x1, int_type, TRUE);
     p0[1] = mktup2(NODE_SARRAY_T, x0);
     deref(p0);
     return p0[1];
@@ -715,7 +715,7 @@ infer_new: (p0) {
 infer_while: (p0) {
     allocate(1);
     x0 = infer_item(p0[2]); (% condition %);
-    unify(int_type, x0);
+    unify(int_type, x0, TRUE);
     infer_item(p0[3]);
     p0[1] = unit_type;
     deref(p0);
@@ -726,7 +726,7 @@ infer_for: (p0) {
     allocate(1);
     infer_item(p0[2]);
     x0 = infer_item(p0[3]); (% condition %);
-    unify(int_type, x0);
+    unify(int_type, x0, TRUE);
     infer_item(p0[4]);
     infer_item(p0[5]);
     p0[1] = unit_type;
@@ -737,7 +737,7 @@ infer_for: (p0) {
 infer_newarray: (p0) {
     allocate(2);
     x0 = infer_item(p0[2]); (% length %);
-    unify(int_type, x0);
+    unify(int_type, x0, TRUE);
     x1 = infer_item(p0[3]);
     p0[1] = mktup2(NODE_ARRAY_T, x1);
     deref(p0);
@@ -774,86 +774,100 @@ closure: (p0) {
     return mktup2(x0, p0);
 };
 
-(% p0, p1: type %);
-unify: (p0, p1) {
-    if (p0[0] == NODE_TYVAR) { return unify_tyvar(p0, p1); };
-    if (p1[0] == NODE_TYVAR) { return unify_tyvar(p1, p0); };
+
+(% p0, p1: type, p2: do update tyvarmap %);
+unify: (p0, p1, p2) {
+    if (p0[0] == NODE_TYVAR) { return unify_tyvar(p0, p1, p2); };
+    if (p1[0] == NODE_TYVAR) { return unify_tyvar(p1, p0, p2); };
     if (p0[0] == p1[0]) {
-        if (p0[0] == NODE_UNIT_T)     { return; };
-        if (p0[0] == NODE_CHAR_T)     { return; };
-        if (p0[0] == NODE_INT_T)      { return; };
-        if (p0[0] == NODE_FLOAT_T)    { return; };
-        if (p0[0] == NODE_DOUBLE_T)   { return; };
-        if (p0[0] == NODE_POINTER_T)  { return unify(p0[POINTER_T_BASE], p1[POINTER_T_BASE]); };
-        if (p0[0] == NODE_TUPLE_T)    { return unify_tuple_t(p0, p1); };
+        if (p0[0] == NODE_UNIT_T)     { return TRUE; };
+        if (p0[0] == NODE_CHAR_T)     { return TRUE; };
+        if (p0[0] == NODE_INT_T)      { return TRUE; };
+        if (p0[0] == NODE_FLOAT_T)    { return TRUE; };
+        if (p0[0] == NODE_DOUBLE_T)   { return TRUE; };
+        if (p0[0] == NODE_POINTER_T)  { return unify(p0[POINTER_T_BASE], p1[POINTER_T_BASE], p2); };
+        if (p0[0] == NODE_TUPLE_T)    { return unify_tuple_t(p0, p1, p2); };
         if (p0[0] == NODE_ARRAY_T)    {
-            unify(p0[ARRAY_T_ELEMENT], p1[ARRAY_T_ELEMENT]);
-            return;
+            unify(p0[ARRAY_T_ELEMENT], p1[ARRAY_T_ELEMENT], p2);
+            return TRUE;
         };
-        if (p0[0] == NODE_LAMBDA_T) { return unify_lambda_t(p0, p1); };
+        if (p0[0] == NODE_LAMBDA_T) { return unify_lambda_t(p0, p1, p2); };
         if (p0[0] == NODE_VARIANT_T) {
-            if (streq(p0[1], p1[1])) { return; };
+            if (streq(p0[1], p1[1])) { return TRUE; };
         };
 	if (p0[0] == NODE_NAMED_T) {
-	    if (streq(p0[1], p1[1])) { return; };
+	    if (streq(p0[1], p1[1])) { return TRUE; };
 	};
     };
     if (p0[0] == NODE_NAMED_T) {
 	if (p0[2] != NULL) {
-	    return unify(p0[2], p1);
+	    return unify(p0[2], p1, p2);
 	};
     };
     if (p1[0] == NODE_NAMED_T) {
 	if (p1[2] != NULL) {
-	    return unify(p0, p1[2]);
+	    return unify(p0, p1[2], p2);
 	};
     };
     if (p0[0] == NODE_FIELD_T) {
-        return unify(p0[2], p1);
+        return unify(p0[2], p1, p2);
     };
     if (p1[0] == NODE_FIELD_T) {
-        return unify(p0, p1[2]);
+        return unify(p0, p1[2], p2);
     };
-    type_mismatch(p0, p1);
+    if (p2) {
+        type_mismatch(p0, p1);
+    };
+    return FALSE;
 };
 
-unify_tuple_t: (p0, p1) {
+unify_tuple_t: (p0, p1, p2) {
     allocate(2);
-    if (p0[1] != p1[1]) { type_mismatch(p0, p1); };
+    if (p0[1] != p1[1]) {
+        if (p2) {
+            type_mismatch(p0, p1);
+        };
+        return FALSE;
+    };
     x1 = p0[1]; (% length %);
     x0 = 0;
     while (x0 < x1) {
-        unify((p0[2])[x0], (p1[2])[x0]);
+        if (unify((p0[2])[x0], (p1[2])[x0], p2) == FALSE) {
+            return FALSE;
+        };
         x0 = x0 + 1;
     };
+    return TRUE;
 };
 
-unify_lambda_t: (p0, p1) {
-    unify(p0[1], p1[1]);
-    unify(p0[2], p1[2]);
+unify_lambda_t: (p0, p1, p2) {
+    if(unify(p0[1], p1[1], p2) == FALSE) {
+        return FALSE;
+    };
+    return unify(p0[2], p1[2], p2);
 };
 
 (% p0: tyvar, p1, type %);
-unify_tyvar: (p0, p1) {
+unify_tyvar: (p0, p1, p2) {
     allocate(1);
     if (p1[0] == NODE_TYVAR) {
-        if (p0[1] == p1[1]) { return; };
+        if (p0[1] == p1[1]) { return TRUE; };
     };
     x0 = map_find(tyvarmap, p0[1]);
     if (x0 != NULL) {
-        unify(x0[1], p1);
-        return;
+        return unify(x0[1], p1, p2);
     };
     if (p1[0] == NODE_TYVAR) {
         x0 = map_find(tyvarmap, p1[1]);
         if (x0 != NULL) {
-            unify(p0, x0[1]);
-            return;
+            return unify(p0, x0[1], p2);
         };
     };
     occur_check(p0[1], p1);
-    x0 = closure(p1);
-    map_add(tyvarmap, p0[1], x0);
+    if (p2) {
+        x0 = closure(p1);
+        map_add(tyvarmap, p0[1], x0);
+    };
 };
 
 (% p0: type of ifthen block, p1: type of ifelse block %);
