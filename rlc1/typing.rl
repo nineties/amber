@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-23 16:56:50 nineties $
+ % $Id: typing.rl 2010-04-29 22:46:33 nineties $
  %);
 
 include(stddef, code);
@@ -13,24 +13,24 @@ export(get_variable);
 scopeid: 0;
 scopeid_stack: NULL; 
 
-varmap: NULL; (% variable table. name -> list of (tyscheme, id) %);
+varmap: NULL; (% variable table. name -> (tyscheme, id, is_global) %);
 
 (% p0: (scopeid-id, name) %);
-varmap_hash: (p0) {
+ident_hash: (p0) {
     return strhash(p0[1]) * 3+ p0[0];
 };
 
-varmap_keyequal: (p0, p1) {
+ident_equal: (p0, p1) {
     if (p0[0] != p1[0]) { return FALSE; };
     return streq(p0[1], p1[1]);
 };
 
-varmap_push: () {
+scope_push: () {
     scopeid = scopeid + 1;
     vec_pushback(scopeid_stack, scopeid);
 };
 
-varmap_pop: () {
+scope_pop: () {
     vec_popback(scopeid_stack);
 };
 
@@ -54,10 +54,26 @@ varmap_find: (p0) {
     return NULL;
 };
 
-init_varmap: () {
-    varmap = mkmap(&varmap_hash, &varmap_keyequal, 10);
-    scopeid_stack = mkvec(0);
-    varmap_push(); (% global scopeid %);
+funtable: NULL; (% function table. name -> list of tyscheme %);
+
+(% p0: name, p1: value %);
+function_add: (p0, p1) {
+    allocate(1);
+    x0 = vec_at(scopeid_stack, vec_size(scopeid_stack)-1);
+    map_add(funtable, mktup2(x0, p0), p1);
+};
+
+(% p0: name %);
+function_find: (p0) {
+    allocate(3);
+    x0 = vec_size(scopeid_stack)-1;
+    while (x0 >= 0) {
+        x1 = vec_at(scopeid_stack, x0); (% scopeid-id %);
+        x2 = map_find(funtable, mktup2(x1, p0));
+        if (x2 != NULL) { return x2; };
+        x0 = x0 - 1;
+    };
+    return NULL;
 };
 
 (% p0: name %);
@@ -399,7 +415,7 @@ infer_lambda: (p0) {
     allocate(3);
 
     (% lambda opens new namespace %);
-    varmap_push();
+    scope_push();
     x0 = infer_pattern(p0[LAMBDA_ARG]);
 
     vec_pushback(return_stack, NULL);
@@ -409,7 +425,7 @@ infer_lambda: (p0) {
         x1 = x2;
     };
     vec_popback(return_stack);
-    varmap_pop();
+    scope_pop();
 
     p0[1] = mktup3(NODE_LAMBDA_T, x0, x1);
 
@@ -1208,8 +1224,12 @@ deref_pattern: (p0) {
 typing: (p0) {
     allocate(1);
 
-    init_varmap();
+    varmap = mkmap(&ident_hash, &ident_equal, 10);
+    funtable = mkmap(&ident_hash, &ident_equal, 10);
+    scopeid_stack = mkvec(0);
+    scope_push(); (% global scopeid %);
     init_tyvarmap();
+
     variant_map  = mkmap(&strhash, &streq, 10);
     return_stack = mkvec(0);
 
