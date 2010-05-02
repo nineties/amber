@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-04-29 22:46:33 nineties $
+ % $Id: typing.rl 2010-05-02 13:56:34 nineties $
  %);
 
 include(stddef, code);
@@ -58,22 +58,28 @@ funtable: NULL; (% function table. name -> list of tyscheme %);
 
 (% p0: name, p1: value %);
 function_add: (p0, p1) {
-    allocate(1);
+    allocate(3);
     x0 = vec_at(scopeid_stack, vec_size(scopeid_stack)-1);
-    map_add(funtable, mktup2(x0, p0), p1);
+    x1 = mktup2(x0, p0);
+    x2 = map_find(funtable, x1);
+    x2 = ls_cons(p1, x2);
+    map_add(funtable, x1, x2);
 };
 
 (% p0: name %);
 function_find: (p0) {
-    allocate(3);
+    allocate(4);
     x0 = vec_size(scopeid_stack)-1;
+    x3 = NULL;
     while (x0 >= 0) {
         x1 = vec_at(scopeid_stack, x0); (% scopeid-id %);
         x2 = map_find(funtable, mktup2(x1, p0));
-        if (x2 != NULL) { return x2; };
+        if (x2 != NULL) {
+            x3 = ls_append(x3, x2);
+        };
         x0 = x0 - 1;
     };
-    return NULL;
+    return x3;
 };
 
 (% p0: name %);
@@ -278,6 +284,11 @@ infer_decl_var: (p0, p1) {
     unify(x0, x3, TRUE);
     x4 = closure(x3);
     varmap_add(p0[2], mktup3(x4, x1, x2));
+
+    if (x3[0] == NODE_LAMBDA_T) {
+        function_add(p0[2], mktup3(x4, x1, x2));
+    };
+
     p0[1] = x3; (% type %);
     p0[3] = x1; (% variable id %);
     p0[4] = x4; (% type scheme %);
@@ -370,7 +381,35 @@ infer_decl: (p0) {
 
 (% p0: expr %);
 infer_call: (p0) {
-    allocate(3);
+    allocate(7);
+    if (p0[2][0] == NODE_IDENTIFIER) {
+        x0 = function_find(get_ident_name(p0[2])); (% function type list %);
+        x1 = infer_item(p0[3]); (% argument type %);
+        x2 = mktyvar(); (% return type %);
+        x3 = mktup3(NODE_LAMBDA_T, x1, x2);
+
+        while (x0 != NULL) {
+            x4 = ls_value(x0); (% tyscheme, identifier-id, is_global %);
+            x5 = rename_tyscheme(x4[0]);
+            if (unify(x5[1], x3, FALSE)) {
+                unify(x5[1], x3, TRUE);
+                x6 = p0[2];
+                x6[1] = x5[1];
+                x6[3] = x4[1];
+                x6[4] = x5;
+                x6[5] = x4[2];
+
+                p0[1] = x2;
+                deref(p0);
+                return p0[1];
+            };
+            x0 = ls_next(x0);
+        };
+
+        fputs(stderr, "ERROR: infer_call\n");
+        exit(1);
+    };
+
     x0 = infer_item(p0[2]); (% function type %);
     x1 = infer_item(p0[3]); (% argument type %);
     x2 = mktyvar(); (% return type %);
@@ -527,6 +566,9 @@ infer_external: (p0) {
     x2 = closure(x1);
     x3 = set_varid(x0);
     varmap_add(get_ident_name(x0), mktup3(x2, x3, TRUE));
+    if (x1[0] == NODE_LAMBDA_T) {
+        function_add(get_ident_name(x0), mktup3(x2, x3, TRUE));
+    };
     x0[1] = x1;
     x0[3] = x3;
     x0[4] = x2;
@@ -884,6 +926,7 @@ unify_tyvar: (p0, p1, p2) {
         x0 = closure(p1);
         map_add(tyvarmap, p0[1], x0);
     };
+    return TRUE;
 };
 
 (% p0: type of ifthen block, p1: type of ifelse block %);
