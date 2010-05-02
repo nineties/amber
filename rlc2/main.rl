@@ -1,10 +1,12 @@
 import io;
 import stdlib;
 
-f: () { return 0; };
+f: () { return 1; };
 f: (x!int) { return x; };
 
 export
 main: () {
-    sys_exit(f());
+    x : f ();
+    y : f (1);
+    exit(ExitSuccess);
 };
