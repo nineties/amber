@@ -1,3 +1,10 @@
+(%
+ % rowl - generation 2
+ % Copyright (C) 2010 nineties
+ %
+ % $Id: string.rl 2010-05-03 00:10:50 nineties $
+ %)
+
 export type string;
 type string: (ptr:char[], len:int)*;
 

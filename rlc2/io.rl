@@ -1,3 +1,10 @@
+(%
+ % rowl - generation 2
+ % Copyright (C) 2010 nineties
+ %
+ % $Id: io.rl 2010-05-03 00:10:13 nineties $
+ %);
+
 import sys;
 import alloc;
 import string;
