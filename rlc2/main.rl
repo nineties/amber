@@ -1,4 +1,10 @@
-import io;
+(%
+ % rowl - generation 2
+ % Copyright (C) 2010 nineties
+ %
+ % $Id: main.rl 2010-05-03 00:10:42 nineties $
+ %)
+
 import stdlib;
 
 f: () { return 1; };
