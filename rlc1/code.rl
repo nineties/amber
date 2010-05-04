@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: code.rl 2010-04-16 22:10:52 nineties $
+ % $Id: code.rl 2010-05-04 13:57:31 nineties $
  %);
 
 NODE_PROG       => 0;  (% item list %);
@@ -160,7 +160,7 @@ DATA_SARRAY => 8; (% size, bits %);
 
 TCODE_SKIP   => 0; (% byte %);
 TCODE_DATA   => 1; (% label name, data, export %);
-TCODE_FUNC   => 2; (% label name, parameters, instructions, export %);
+TCODE_FUNC   => 2; (% label name, parameters, instructions, export, stack size %);
 TCODE_INST   => 3; (% opcode, output reg, input reg, live regs, arg, alive %);
 
 INST_OPCODE   => 1;
