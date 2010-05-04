@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: mangle.rl 2010-04-16 22:07:15 nineties $
+ % $Id: mangle.rl 2010-05-03 00:50:55 nineties $
  %);
 
 (% name mangling %);
@@ -112,20 +112,20 @@ gen_type_suffix: (p0) {
     if (p0[0] == NODE_FIELD_T) {
         put_namechar('F');
         put_namestr(p0[1]);
-	put_namechar('$');
+	put_namechar('.');
         gen_type_suffix(p0[2]);
         return;
     };
     if (p0[0] == NODE_VARIANT_T) {
         put_namechar('N');
         put_namestr(p0[1]);
-	put_namechar('$');
+	put_namechar('.');
         return;
     };
     if (p0[0] == NODE_NAMED_T) {
 	put_namechar('N');
 	put_namestr(p0[1]);
-	put_namechar('$');
+	put_namechar('.');
 	return;
     };
     fputs(stderr, "ERROR: not reachable\n");
@@ -137,7 +137,7 @@ mangle: (p0, p1) {
     reset_namebuf();
     put_namechar('_');
     put_namestr(p1);
-    put_namechar('.');
+    put_namechar('$');
     gen_type_suffix(p0);
     return strdup(namebuf);
 };

@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: tcodegen.rl 2010-04-20 00:16:17 nineties $
+ % $Id: tcodegen.rl 2010-05-04 15:28:00 nineties $
  %);
 
 (% translate typed rowlcore to Three-address Code %);
@@ -210,6 +210,54 @@ not_reachable: (p0) {
 not_implemented: (p0) {
     fputs(stderr, "ERROR: not implemented\n");
     exit(1);
+};
+
+(% __init__MODULENAME %);
+init_func_name: (p0) {
+    allocate(2);
+    x0 = strlen(p0);
+    x1 = memalloc(x0 + 8 + 1);
+    strcpy(x1, "__init__");
+    strcpy(x1 + 8, p0);
+    wch(x1, x0 + 8 + 1, '\0');
+    return x1;
+};
+
+init_insts: NULL;
+
+(% p0: module name %);
+gen_init_func: (p0) {
+    allocate(3);
+    (%
+     % __init__XXXX:
+     %     movl __init__done, %eax
+     %     cmpl $1, %eax
+     %     je __init__ret
+     %     movl $1, __init_done
+     %     .. initializations ..
+     % __init__ret:
+     %     ret
+     %);
+    x0 = mktup2(OPD_LABEL, "__init__done");
+    x1 = mktup2(OPD_LABEL, "__init_ret");
+
+    init_insts = ls_cons(mkinst(INST_LABEL, x1, NULL), init_insts);
+    init_insts = ls_cons(mkinst(INST_RET, NULL, NULL), init_insts);
+    init_insts = ls_reverse(init_insts);
+    init_insts = movl(init_insts, mktup2(OPD_INTEGER, 1), x0);
+    init_insts = ls_cons(mkinst(INST_JE, x1, NULL), init_insts);
+    init_insts = ls_cons(mkinst(INST_CMPL, mktup2(OPD_INTEGER, 1), get_eax()), init_insts);
+    init_insts = movl(init_insts, x0, get_eax());
+
+    x2 = mktup6(TCODE_FUNC,
+        init_func_name(p0),
+        mktup4(NODE_UNIT, unit_type, 0, NULL),
+        init_insts,
+        TRUE,
+        0);
+
+
+    return ls_cons(mktup4(TCODE_DATA, "__init__done", mktup2(DATA_INT, 0), FALSE), ls_singleton(x2));
 };
 
 transl_funcs: [
@@ -1397,6 +1445,10 @@ transl_static_data: (p0) {
         x3 = 0;
         while (x3 < x0) {
             x2[x3] = transl_static_data(x1[x3]);
+            if (x2[x3] == NULL) {
+                fputs(stderr, "ERROR: non-static initialization of array element is not supported\n");
+                exit(1);
+            };
             x3 = x3 + 1;
         };
         return mktup3(DATA_ARRAY, x0, x2);
@@ -1408,6 +1460,10 @@ transl_static_data: (p0) {
         x3 = 0;
         while (x3 < x0) {
             x2[x3] = transl_static_data(x1[x3]);
+            if (x2[x3] == NULL) {
+                fputs(stderr, "ERROR: non-static initialization of dynamic tuple element is not supported\n");
+                exit(1);
+            };
             x3 = x3 + 1;
         };
         return mktup3(DATA_TUPLE, x0, x2);
@@ -1438,7 +1494,7 @@ transl_static_data: (p0) {
 	};
 	return mktup3(DATA_SARRAY, x0[2]*x1[3]/8, x0[2]);
     };
-    not_implemented();
+    return NULL;
 };
 
 (% p0: item %);
@@ -1462,8 +1518,19 @@ transl_extdecl: (p0) {
 
     (% flatten nested static data and translate to tcode %);
     x2 = transl_static_data(p0[3]);
+    if (x2 != NULL) {
+        return mktup4(TCODE_DATA, x1, x2, FALSE);
+    };
+    x2 = type_size(p0[3][1]);
+    if (x2 != 1) {
+        fputs(stderr, "ERROR: non-static initialization of composite data is not supported\n");
+        exit(1);
+    };
 
-    return mktup4(TCODE_DATA, x1, x2, FALSE);
+    init_insts = transl_item(init_insts, p0[3]);
+    init_insts = movl(init_insts, get_eax(), mktup2(OPD_LABEL, x1));
+
+    return mktup4(TCODE_DATA, x1, mktup2(DATA_INT, 0), FALSE);
 };
 
 (% p0: item %);
@@ -1484,7 +1551,11 @@ transl_export: (p0) {
 };
 
 transl_import: (p0) {
-    (% do nothing %);
+    allocate(1);
+    x0 = p0[1]; (% module name %);
+    init_insts = ls_cons(
+        mkinst(INST_CALL_IMM, mktup2(OPD_LABEL, init_func_name(x0)), NULL),
+        init_insts);
     return NULL;
 };
 
@@ -1505,8 +1576,8 @@ transl_extitem: (p0) {
     return x0(p0);
 };
 
-(% p0: program %);
-tcodegen: (p0) {
+(% p0: program, p1: module name %);
+tcodegen: (p0, p1) {
     allocate(3);
 
     init_proc();
@@ -1515,6 +1586,7 @@ tcodegen: (p0) {
 
     topdecl = NULL;
     const_closures = NULL;
+    init_insts = NULL;
 
     x0 = p0[1];
     x1 = NULL;
@@ -1530,5 +1602,7 @@ tcodegen: (p0) {
 	x1 = transl_closure(x1, ls_value(const_closures));
 	const_closures = ls_next(const_closures);
     };
-    return ls_append(ls_reverse(x1), ls_reverse(topdecl));
+    x1 = ls_append(ls_reverse(x1), ls_reverse(topdecl));
+    x1 = ls_append(gen_init_func(p1), x1);
+    return x1;
 };

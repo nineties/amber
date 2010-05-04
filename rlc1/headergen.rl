@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: headergen.rl 2010-04-17 17:02:48 nineties $
+ % $Id: headergen.rl 2010-05-03 00:20:46 nineties $
  %);
 
 (% automatic header file generation %);
@@ -25,7 +25,7 @@ gen_ident_decl: (p0, p1) {
 
     fputs(p0, "external ");
     fputs(p0, get_ident_name(p1));
-    fputs(p0, " ! ");
+    fputs(p0, "! ");
     put_type(p0, p1[1]);
 };
 

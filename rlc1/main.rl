@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: main.rl 2010-04-11 10:22:58 nineties $
+ % $Id: main.rl 2010-05-04 13:28:18 nineties $
  %);
 
 include(stddef, code);
@@ -21,6 +21,15 @@ change_suffix: (p0, p1) {
     memcpy(x2 + x0 - 2, p1, x1);
     wch(x2, x0 - 2 + x1, '\0');
     return x2;
+};
+
+(% xxx.rl to xxx %);
+basename: (p0) {
+    allocate(2);
+    x0 = strdup(p0);
+    x1 = strlen(x0);
+    wch(x0, x1-3, '\0');
+    return x0;
 };
 
 (% p0: asm filename, p1: header filename, p2:rowl filename %);
@@ -52,7 +61,7 @@ compile: (p0, p1, p2) {
 
     (% translate to two address code %);
     puts("> translating to tcode...\n");
-    x3 = tcodegen(x2);
+    x3 = tcodegen(x2, basename(p2));
 
     (% generate assembly %);
     puts("> generating assembly...\n");
