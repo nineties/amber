@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: pprint.rl 2010-05-06 13:44:03 nineties $
+ % $Id: pprint.rl 2010-05-06 13:58:40 nineties $
  %);
 
 include(stddef,code);
@@ -10,7 +10,7 @@ include(stddef,code);
 export(put_prog, put_item, put_type, put_tyscheme);
 
 ppfuncs: [put_prog, put_integer, put_string, put_dontcare, put_identifier,
-    put_array, put_tuple, put_code, put_decl, put_lambda, put_subsop, put_codeop, put_unexpr,
+    put_array, put_tuple, put_code, put_decl, put_call, put_subsop, put_codeop, put_unexpr,
     put_binexpr, put_assign, put_export, put_import, put_external, put_ret, put_retval,
     put_syscall, put_field, put_fieldref, put_typedecl, put_variant, put_unit, put_typedexpr,
     put_if, put_ifelse, put_sarray, put_cast, put_new, put_while, put_for, put_newarray
@@ -190,9 +190,15 @@ put_decl: (p0, p1) {
     put_subitem(p0, p1[3], PRI_DECLARATION);
 };
 
-put_lambda: (p0, p1) {
+put_call: (p0, p1) {
     put_subitem(p0, p1[2], PRI_PRIMARY);
-    put_subitem(p0, p1[3], PRI_PRIMARY);
+    if (p1[3][0] == NODE_TUPLE) {
+        put_subitem(p0, p1[3], PRI_PRIMARY);
+        return;
+    };
+    fputc(p0, '(');
+    put_item(p0, p1[3]);
+    fputc(p0, ')');
 };
 
 put_subsop: (p0, p1) {
