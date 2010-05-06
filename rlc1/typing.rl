@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: typing.rl 2010-05-02 13:56:34 nineties $
+ % $Id: typing.rl 2010-05-06 13:52:59 nineties $
  %);
 
 include(stddef, code);
@@ -406,7 +406,9 @@ infer_call: (p0) {
             x0 = ls_next(x0);
         };
 
-        fputs(stderr, "ERROR: infer_call\n");
+        fputs(stderr, "ERROR: can not infer type of '");
+        put_item(stderr, p0);
+        fputs(stderr, "'\n");
         exit(1);
     };
 
