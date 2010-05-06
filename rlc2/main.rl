@@ -2,7 +2,7 @@
  % rowl - generation 2
  % Copyright (C) 2010 nineties
  %
- % $Id: main.rl 2010-05-03 00:10:42 nineties $
+ % $Id: main.rl 2010-05-06 03:27:11 nineties $
  %)
 
 import stdlib;

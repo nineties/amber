@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: parse.rl 2010-04-17 17:01:52 nineties $
+ % $Id: parse.rl 2010-05-06 13:11:58 nineties $
  %);
 
 include(stddef, code, token);
@@ -100,8 +100,9 @@ parse_toplevel_items: (p0) {
             return x2;
         };
         eatchar(x1, ';');
-        return ls_cons(mktup2(NODE_IMPORT, get_ident_name(x0)),
-            ls_append(x2, parse_toplevel_items(lex())));
+        return ls_append(x2,
+            ls_cons(mktup2(NODE_IMPORT, get_ident_name(x0)),
+            parse_toplevel_items(lex())));
     };
     x0 = parse_toplevel_item(p0);
     x1 = lex();
