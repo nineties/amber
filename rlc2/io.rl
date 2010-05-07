@@ -2,7 +2,7 @@
  % rowl - generation 2
  % Copyright (C) 2010 nineties
  %
- % $Id: io.rl 2010-05-06 15:23:30 nineties $
+ % $Id: io.rl 2010-05-06 17:26:15 nineties $
  %)
 
 import sys;
@@ -78,6 +78,8 @@ put_to: (chan!ochan*, s!string) {
         put_to(chan, at(s, i));
     }
 };
+
+putnum_digits: static_array('\0', 10); (% 32bit decimal integer are less than 11 digits %);
 
 export
 put: (c!char) {
