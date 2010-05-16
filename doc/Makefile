@@ -6,7 +6,7 @@ target: all
 
 all: rowl_spec.pdf
 
-rowl-spec.pdf:\
+rowl_spec.pdf:\
     rowl_spec.tex
 
 %.eps : %.fig
