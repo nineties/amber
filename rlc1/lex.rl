@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: lex.rl 2010-05-18 01:54:27 nineties $
+ % $Id: lex.rl 2010-05-18 03:04:14 nineties $
  %);
 
 include(stddef, code);
@@ -13,7 +13,6 @@ export(lexer_init, lexer_push, lexer_pop);
 export(fputloc);
 export(token_text, token_len, token_val);
 export(lex, unput);
-export(add_constr);
 
 
 (%
@@ -166,25 +165,25 @@ s2next: [
  s1, e1, s2, s0, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2
 ];
 s4next: [
-fin, e1,fin,fin, s7, s7, e3, e3, e3, e3, e3, s5, e3, e3, e3, e3, e3, e3, e3,fin, e3
+fin, e1,fin,fin, s7, s7, e3, e3, e3, e3, e3, s5, e3, e3, e3, e3, e3, e3,fin,fin, e3
 ];
 s5next: [
 fin, e1,fin,fin, s6, s6, s6, e4, e4, s6, e4, e4, e4, e4, e4, e4, e4, e4, e4,fin, e4
 ];
 s6next: [
-fin, e1,fin,fin, s6, s6, s6, e4, e4, s6, e4, e4, e4, e4, e4, e4, e4, e4, e4,fin, e4
+fin, e1,fin,fin, s6, s6, s6, e4, e4, s6, e4, e4, e4, e4, e4, e4, e4, e4,fin,fin, e4
 ];
 s7next: [
-fin, e1,fin,fin, s7, s7, e3, e3, e3, e3, e3, e3, e3, e3, e3, e3, e3, e3, e3,fin, e3
+fin, e1,fin,fin, s7, s7, e3, e3, e3, e3, e3, e3, e3, e3, e3, e3, e3, e3,fin,fin, e3
 ];
 s8next: [
-fin, e1,fin,fin, s8, s8, s8, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2,fin, e2
+fin, e1,fin,fin, s8, s8, s8, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2,fin,fin, e2
 ];
 s9next: [
-fin, e1,fin,fin, e1,s10,s10, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2,fin, e2
+fin, e1,fin,fin, e1,s10,s10, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2,fin,fin, e2
 ];
 s10next: [
-fin, e1,fin,fin,s10,s10,s10, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2,fin, e2
+fin, e1,fin,fin,s10,s10,s10, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2,fin,fin, e2
 ];
 s11next: [
  e6, e1,s12, e6,s12,s12,s12,s12,s12,s12,s12,s12,s12,s12,s12,s12,s14,s12,s12,s12,s12
@@ -199,7 +198,7 @@ s18next: [
  e5, e1, e5, e5,s17, e5, e5,s17,s17, e5, e5, e5,s17,s17,s17, e5,s17, e5, e5, e5, e5
 ];
 s20next: [
-fin, e1,fin,fin,s20,s20,s20,s20,s20,s20,s20,s20,s20, e8, e8,s20, e8, e8, e8,fin,s20
+fin, e1,fin,fin,s20,s20,s20,s20,s20,s20,s20,s20,s20, e8, e8,s20, e8, e8,fin,fin,s20
 ];
 
 srcfile  : NULL;
@@ -213,10 +212,6 @@ unputted : FALSE;
 
 inbuf : NULL;
 inbuf_beg : 0;
-last_pos : 0;
-last_file: NULL;
-last_line: 0;
-last_clmn: 0;
 
 lexer_stack: NULL;
 
@@ -233,14 +228,6 @@ lexer_init: (p0, p1) {
     unputted = FALSE;
     inbuf  = mkcvec(0);
     inbuf_beg = 0;
-    last_pos = 0;
-    last_file = p0;
-    last_line = 1;
-    last_clmn = 1;
-
-    keyword_init();
-    operator_init();
-    constr_set = mkset(&strhash, &streq, 10);
 };
 
 (% p0: new filename, p1: new input channel %);
@@ -309,15 +296,6 @@ consume: () {
     return x0;
 };
 
-(% p0: position %);
-rewind: (p0) {
-    cvec_put(tokbuf, p0, '\0');
-    inbuf_beg = inbuf_beg - (cvec_size(tokbuf) - p0);
-    srcfile = last_file;
-    srcline = last_line;
-    srcclmn = last_clmn;
-};
-
 unput: () {
     if (unputted) {
         fputs(stderr, "ERROR: try to unput two or more tokens\n");
@@ -339,37 +317,6 @@ fputloc: (p0) {
 (% p0: token tag %);
 accept: (p0) {
     toktag = p0;
-    last_pos = cvec_size(tokbuf);
-    last_file = srcfile;
-    last_line = srcline;
-    last_clmn = srcclmn;
-};
-
-accept_ident: () {
-    allocate(1);
-    x0 = token_text();
-    if (rch(x0, 0) == '_') {
-        if (rch(x0, 1) == '\0') {
-            (% don't care pattern %);
-            accept('_');
-            return;
-        };
-    };
-    x0 = map_find(keyword_map, token_text());
-    if (x0 != NULL) {
-        accept(x0);
-        return;
-    };
-    x0 = map_find(operator_map, token_text());
-    if (x0 != 0) {
-        accept(x0);
-        return;
-    };
-    if (set_contains(constr_set, token_text())) {
-        accept(TOK_CONSTR);
-        return;
-    };
-    accept(TOK_IDENT);
 };
 
 init_tokbuf: () {
@@ -377,7 +324,6 @@ init_tokbuf: () {
     tokval = 0;
     cvec_resize(tokbuf, 0);
     cvec_pushback(tokbuf, '\0');
-    last_pos = 0;
 };
 
 (% p0: message %);
@@ -409,6 +355,14 @@ lex: () {
         return toktag;
     };
 label s0;
+    if (lookahead() == CH_SPACES) {
+        consume();
+        goto &s0;
+    };
+    if (lookahead() == CH_NL) {
+        consume();
+        goto &s0;
+    };
     init_tokbuf();
     goto s0next[lookahead()];
 label s1;
@@ -416,18 +370,19 @@ label s1;
     return TOK_END;
 label s2;
     consume();
-    x0 = lookahead();
-    if (x0 == CH_SPACES) { goto &s2; };
-    if (x0 == CH_NL)     { goto &s2; };
-    goto &s0;
+    goto s2next[lookahead()];
 label s3;
-    consume();
-    accept(TOK_INT);
-    goto s3next[lookahead()];
+    accept(consume()); (% ( or ) %);
+    goto &fin;
 label s4;
     consume();
+    tokval = 0;
+    accept(TOK_INT);
     goto s4next[lookahead()];
 label s5;
+    consume();
+    goto s5next[lookahead()];
+label s6;
     x0 = consume();
     if ('a' <= x0) {
         x0 = x0 - 'a' + 10;
@@ -440,126 +395,70 @@ label s5;
     };
     tokval = tokval * 16 + x0;
     accept(TOK_INT);
-    goto s5next[lookahead()];
-label s6;
-    x0 = consume();
-    tokval = tokval * 8 + (x0 - '0');
-    accept(TOK_INT);
     goto s6next[lookahead()];
 label s7;
     x0 = consume();
-    tokval = tokval * 10 + (x0 - '0');
+    tokval = tokval * 8 + (x0 - '0');
     accept(TOK_INT);
     goto s7next[lookahead()];
 label s8;
-    consume();
+    x0 = consume();
+    tokval = tokval * 10 + (x0 - '0');
+    accept(TOK_INT);
     goto s8next[lookahead()];
 label s9;
     consume();
+    accept(TOK_SYMBOL); (% operator - %);
     goto s9next[lookahead()];
 label s10;
+    x0 = consume();
+    tokval = - tokval * 10 - (x0 - '0');
+    accept(TOK_INT);
+    goto s10next[lookahead()];
+label s11;
+    consume();
+    goto s11next[lookahead()];
+label s12;
     consume();
     if (lookahead() == CH_SQUOTE) {
-        goto &s11;
+        goto &s13;
     } else {
         goto &e6;
     };
-label s11;
+label s13;
     consume();
     accept(TOK_CHAR);
     tokval = cvec_at(tokbuf, 1);
     goto &fin;
-label s12;
+label s14;
     consume();
-    goto s12next[lookahead()];
-label s13;
+    goto s14next[lookahead()];
+label s15;
     consume();
     if (lookahead() == CH_SQUOTE) {
-        goto &s14;
+        goto &s16;
     } else {
         goto &e6;
     };
-label s14;
+label s16;
     consume();
     tokval = esc2val(cvec_at(tokbuf, 2));
     accept(TOK_CHAR);
     goto &fin;
-label s15;
-    consume();
-    goto s15next[lookahead()];
-label s16;
-    consume();
-    goto s16next[lookahead()];
 label s17;
+    consume();
+    goto s17next[lookahead()];
+label s18;
+    consume();
+    goto s18next[lookahead()];
+label s19;
     consume();
     accept(TOK_STRING);
     goto &fin;
-label s18;
-    consume();
-    x0 = map_find(operator_map, token_text());
-    if (x0 != 0) {
-        accept(x0);
-    };
-    x0 = lookahead();
-    if (x0 == CH_OPCHAR)  { goto &s18; };
-    if (x0 == CH_PERCENT) { goto &s18; };
-    if (last_pos == 0) {
-        goto &e1;
-    };
-    rewind(last_pos);
-    goto &fin;
-label s19;
-    consume();
-    if (lookahead() == CH_PERCENT) {
-        x1 = 0;  (% init depth %);
-        goto &s20;
-    } else {
-        accept('(');
-        goto &fin;
-    };
 label s20;
     consume();
-    x0 = lookahead();
-    if (x0 == CH_LPAREN)  { goto &s22; };
-    if (x0 == CH_PERCENT) { goto &s21; };
-    if (x0 == CH_INVALID) { goto &e1; };
-    if (x0 == CH_EOF)     { goto &e8; };
-    goto &s20;
-label s21;
-    consume();
-    x0 = lookahead();
-    if (x0 == CH_LPAREN)  { goto &s22; };
-    if (x0 == CH_PERCENT) { goto &s21; };
-    if (x0 == CH_RPAREN) {
-        if (x1 == 0) {
-            goto &s23;
-        };
-        x1 = x1 - 1; (% decrement depth %);
-        goto &s20;
-    };
-    if (x0 == CH_INVALID) { goto &e1; };
-    if (x0 == CH_EOF)     { goto &e8; };
-    goto &s20;
-label s22;
-    consume();
-    x0 = lookahead();
-    if (x0 == CH_PERCENT) {
-        x1 = x1 + 1;
-        goto &s20;
-    };
-    if (x0 == CH_INVALID) { goto &e1; };
-    if (x0 == CH_EOF)     { goto &e8; };
-    goto &s20;
-label s23;
-    consume();
-    (% finished comment block %);
-    goto &s0;
-label s24;
-    accept(consume());
-    goto &fin;
-label s25;
-    accept_ident();
-    goto &fin;
+    accept(TOK_SYMBOL);
+    goto s20next[lookahead()];
 label fin;
     return toktag;
 label e1;
@@ -580,9 +479,6 @@ label e8;
     lex_error("unterminated comment literal");
 };
 
-keyword_map : NULL;
-constr_set  : NULL;
-
 strhash: (p0) {
     allocate(1);
     x0 = 0;
@@ -593,92 +489,42 @@ strhash: (p0) {
     return x0;
 };
 
-(% p0: name %);
-add_constr: (p0) {
-    if (set_contains(constr_set, p0)) {
-        fputs(stderr, "ERROR: duplicated declaration of constructor '");
-        fputs(stderr, p0);
-        fputs(stderr, "'\n");
-        exit(1);
+print_token: (p0) {
+    if (p0 == TOK_END) {
+        puts("<eof>");
+        return;
     };
-    set_add(constr_set, p0);
+    if (p0 == TOK_CHAR) {
+        puts("CHAR:");
+        puti(token_val());
+        return;
+    };
+    if (p0 == TOK_INT) {
+        puts("INT:");
+        puti(token_val());
+        return;
+    };
+    if (p0 == TOK_STRING) {
+        puts("STRING:");
+        puts(token_text());
+        return;
+    };
+    if (p0 == TOK_SYMBOL) {
+        puts("SYMBOL:");
+        puts(token_text());
+        return;
+    };
+    putc(p0);
 };
 
-keyword_init: () {
-    keyword_map = mkmap(&strhash, &streq, 10);
-    map_add(keyword_map, "export", TOK_EXPORT);
-    map_add(keyword_map, "import", TOK_IMPORT);
-    map_add(keyword_map, "external", TOK_EXTERNAL);
-    map_add(keyword_map, "return", TOK_RETURN);
-    map_add(keyword_map, "syscall", TOK_SYSCALL);
-    map_add(keyword_map, "char", TOK_CHAR_T);
-    map_add(keyword_map, "int", TOK_INT_T);
-    map_add(keyword_map, "float", TOK_FLOAT_T);
-    map_add(keyword_map, "double", TOK_DOUBLE_T);
-    map_add(keyword_map, "void", TOK_VOID_T);
-    map_add(keyword_map, "type", TOK_TYPE);
-    map_add(keyword_map, "if", TOK_IF);
-    map_add(keyword_map, "else", TOK_ELSE);
-    map_add(keyword_map, "static_array", TOK_SARRAY);
-    map_add(keyword_map, "cast", TOK_CAST);
-    map_add(keyword_map, "new", TOK_NEW);
-    map_add(keyword_map, "while", TOK_WHILE);
-    map_add(keyword_map, "for", TOK_FOR);
-    map_add(keyword_map, "new_array", TOK_NEWARRAY);
-};
-
-operator_map : NULL;
-operator_init: () {
-    operator_map = mkmap(&strhash, &streq, 20);
-    map_add(operator_map, "#", '#');
-    map_add(operator_map, "!", '!');
-    map_add(operator_map, "%", '%');
-    map_add(operator_map, "&", '&');
-    map_add(operator_map, "=", '=');
-    map_add(operator_map, "-", '-');
-    map_add(operator_map, "~", '~');
-    map_add(operator_map, "^", '^');
-    map_add(operator_map, "|", '|');
-    map_add(operator_map, "*", '*');
-    map_add(operator_map, ":", ':');
-    map_add(operator_map, "+", '+');
-    map_add(operator_map, "<", '<');
-    map_add(operator_map, ">", '>');
-    map_add(operator_map, ".", '.');
-    map_add(operator_map, "/", '/');
-    map_add(operator_map, "@", '@');
-    map_add(operator_map, "=>", TOK_REWRITE);
-    map_add(operator_map, "+=", TOK_ADDASGN);
-    map_add(operator_map, "-=", TOK_SUBASGN);
-    map_add(operator_map, "*=", TOK_MULASGN);
-    map_add(operator_map, "/=", TOK_DIVASGN);
-    map_add(operator_map, "%=", TOK_MODASGN);
-    map_add(operator_map, "|=", TOK_ORASGN);
-    map_add(operator_map, "^=", TOK_XORASGN);
-    map_add(operator_map, "&=", TOK_ANDASGN);
-    map_add(operator_map, "<<=", TOK_LSHIFTASGN);
-    map_add(operator_map, ">>=", TOK_RSHIFTASGN);
-    map_add(operator_map, "<<", TOK_LSHIFT);
-    map_add(operator_map, ">>", TOK_RSHIFT);
-    map_add(operator_map, "==", TOK_EQ);
-    map_add(operator_map, "!=", TOK_NE);
-    map_add(operator_map, "<=", TOK_LE);
-    map_add(operator_map, ">=", TOK_GE);
-    map_add(operator_map, "&&", TOK_SEQAND);
-    map_add(operator_map, "||", TOK_SEQOR);
-    map_add(operator_map, "++", TOK_INCR);
-    map_add(operator_map, "--", TOK_DECR);
-    map_add(operator_map, "->", TOK_ARROW);
-};
-
-
-
-(% p0: input stream %);
-lexer_test: (p0) {
+(% p0: file name, p1: input channel %);
+lexer_test: (p0, p1) {
+    allocate(1);
+    lexer_init(p0, p1);
     while (1) {
-        x0 = lex(p0);
-        if (x0 == TOK_END) { return; };
+        x0 = lex();
         print_token(x0);
         puts("\n");
+        if (x0 == TOK_END) { return; };
     }
 }
