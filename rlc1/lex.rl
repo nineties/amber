@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: lex.rl 2010-05-16 21:51:37 nineties $
+ % $Id: lex.rl 2010-05-18 01:54:27 nineties $
  %);
 
 include(stddef, code);
@@ -73,7 +73,12 @@ chgroup : [
 
 (% === state transition diagram ===
  %
- % +---+  null   +---+
+ %
+ %
+ %    spaces
+ %   +---+
+ %   v   |
+ % +---+ |   EOF +---+
  % | 0 +-+------>|@1 | (end)
  % +---+ |       +---+
  %       | ;     +---+       +---+
@@ -99,30 +104,30 @@ chgroup : [
  %       |       +---+  |[0-9]
  %       |         ^    |
  %       |         +----+
- %       | -     +---+ (negative decimal integer)
- %       +------>|@9 +--+
- %       |       +---+  |[0-9]
- %       |         ^    |
- %       |         +----+
+ %       | -     +---+ [1-9]  +---+ (negative decimal integer)
+ %       +------>|@9 +------->|@10+-+
+ %       |       +---+        +---+ |[0-9]
+ %       |  (operator -)        ^   |
+ %       |                      +---+
  %       |'        +---+ [^\\\n]    +---+ '     +---+
- %       +-------->| 10+----------->| 11+------>|@12|
+ %       +-------->| 11+----------->| 12+------>|@13|
  %       |         +-+-+            +---+       +---+
  %       |           |\   +---+['"\\abfnrtv0] +---+'   +---+
- %       |           +--->| 13+-------------->| 14+--->|@15|
+ %       |           +--->| 14+-------------->| 15+--->|@16|
  %       |                +---+               +---+    +---+
  %       |"        +---+   "          +---+
- %       +-------->| 16+--+---------->|@18|
+ %       +-------->| 17+--+---------->|@19|
  %       |         +---+  |           +---+
  %       |           ^    |[^\\\"\n]
  %       |           +----+
  %       |           |    |\
  %       |           |    v
  %       |           |  +---+
- %       |           +--+ 17|
+ %       |           +--+ 18|
  %       |['"\\abfnrtv0]+---+
  %       |
  %       |        +---+
- %       +------->|@19+-+
+ %       +------->|@20+-+
  %                +---+ |^({spaces}|[;)
  %                  ^   |
  %                  +---+
@@ -135,7 +140,7 @@ chgroup : [
  %   e5: invalid escape sequence
  %   e6: unterminated character literal
  %   e7: unterminated string literal
- %   e8: unterminated comment literal
+ %   e8: invalid symbol character
  %);
 
 (% === jump table ==== %);
@@ -155,37 +160,46 @@ chgroup : [
  :   :   :   :   :   :   :   :   :   :   :   :   :   :   :   :   :   :   :   :   :
 %);
 s0next: [
- s1, e1, s2, s2, s3, s7, s7, s8, s8, s8, s8, s8, s8, s9,s15,s18, e1,s19,s24,s18,s24
+ s1, e1, s0, s0, s4, s8, s8,s20,s20,s20,s20,s20,s20,s11,s17,s20, e1, s3, s3, s2,s20
 ];
-s3next: [
-fin, e1,fin,fin, s6, s6, e3, e2, e2, e2, e2, s4, e2,fin,fin,fin,fin,fin,fin,fin,fin
+s2next: [
+ s1, e1, s2, s0, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2
 ];
 s4next: [
- e4, e1, e4, e4, s5, s5, s5, s5, e4, s5, e4, e4, e4, e4, e4, e4, e4, e4, e4, e4, e4
+fin, e1,fin,fin, s7, s7, e3, e3, e3, e3, e3, s5, e3, e3, e3, e3, e3, e3, e3,fin, e3
 ];
 s5next: [
-fin, e1,fin,fin, s5, s5, s5, s5, e4, s5, e4, e4, e4,fin,fin,fin,fin,fin,fin,fin,fin
+fin, e1,fin,fin, s6, s6, s6, e4, e4, s6, e4, e4, e4, e4, e4, e4, e4, e4, e4,fin, e4
 ];
 s6next: [
-fin, e1,fin,fin, s6, s6, e3, e3, e3, e3, e3, e3, e3,fin,fin,fin,fin,fin,fin,fin,fin
+fin, e1,fin,fin, s6, s6, s6, e4, e4, s6, e4, e4, e4, e4, e4, e4, e4, e4, e4,fin, e4
 ];
 s7next: [
-fin, e1,fin,fin, s7, s7, s7, e2, e2, e2, e2, e2, e2,fin,fin,fin,fin,fin,fin,fin,fin
+fin, e1,fin,fin, s7, s7, e3, e3, e3, e3, e3, e3, e3, e3, e3, e3, e3, e3, e3,fin, e3
 ];
 s8next: [
-s25, e1,s25,s25, s8, s8, s8, s8, s8, s8, s8, s8, s8,s25,s25,s25,s25,s25,s25,s25,s25
+fin, e1,fin,fin, s8, s8, s8, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2,fin, e2
 ];
 s9next: [
- e6, e1,s10, e6,s10,s10,s10,s10,s10,s10,s10,s10,s10,s10,s10,s10,s12,s10,s10,s10,s10
+fin, e1,fin,fin, e1,s10,s10, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2,fin, e2
 ];
-s12next: [
- e5, e1, e5, e5,s13, e5, e5,s13,s13, e5, e5, e5,s13,s13,s13, e5,s13, e5, e5, e5, e5
+s10next: [
+fin, e1,fin,fin,s10,s10,s10, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2,fin, e2
 ];
-s15next: [
- e7, e1,s15, e7,s15,s15,s15,s15,s15,s15,s15,s15,s15,s15,s17,s15,s16,s15,s15,s15,s15
+s11next: [
+ e6, e1,s12, e6,s12,s12,s12,s12,s12,s12,s12,s12,s12,s12,s12,s12,s14,s12,s12,s12,s12
 ];
-s16next: [
+s14next: [
  e5, e1, e5, e5,s15, e5, e5,s15,s15, e5, e5, e5,s15,s15,s15, e5,s15, e5, e5, e5, e5
+];
+s17next: [
+ e7, e1,s17, e7,s17,s17,s17,s17,s17,s17,s17,s17,s17,s17,s19,s17,s18,s17,s17,s17,s17
+];
+s18next: [
+ e5, e1, e5, e5,s17, e5, e5,s17,s17, e5, e5, e5,s17,s17,s17, e5,s17, e5, e5, e5, e5
+];
+s20next: [
+fin, e1,fin,fin,s20,s20,s20,s20,s20,s20,s20,s20,s20, e8, e8,s20, e8, e8, e8,fin,s20
 ];
 
 srcfile  : NULL;
