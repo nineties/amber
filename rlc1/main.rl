@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: main.rl 2010-05-20 02:52:17 nineties $
+ % $Id: main.rl 2010-05-20 03:01:21 nineties $
  %);
 
 (% rowl-core interpreter %);
@@ -15,6 +15,9 @@ export main;
 interpret: (p0) {
     allocate(2);
     x0 = parse(p0);
+
+    init_evaluator();
+
     while (x0 != NULL) {
         x1 = eval_sexp(rl_car(x0));
         pp_sexp(stdout, x1);
