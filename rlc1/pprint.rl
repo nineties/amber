@@ -7,7 +7,7 @@
 
 include(stddef,code);
 
-export(pp_sexpr);
+export(pp_sexp);
 
 pp_symbol: (p0, p1) {
     if (p1[0] != NODE_SYMBOL) {
@@ -52,7 +52,7 @@ pp_cons: (p0, p1) {
     fputc(p0, '(');
     x0 = p1;
     while (x0 != NULL) {
-        pp_sexpr(p0, x0[1]);
+        pp_sexp(p0, x0[1]);
         x0 = x0[2];
         if (x0 != NULL) {
             fputc(p0, ' ');
@@ -62,12 +62,12 @@ pp_cons: (p0, p1) {
 };
 
 (% p0: output channel, p1: S-expression %);
-pp_sexpr: (p0, p1) {
+pp_sexp: (p0, p1) {
     if (p1 == NULL)           { return pp_cons(p0, p1); };
     if (p1[0] == NODE_CONS)   { return pp_cons(p0, p1) };
     if (p1[0] == NODE_SYMBOL) { return pp_symbol(p0, p1) };
     if (p1[0] == NODE_INT)    { return pp_int(p0, p1) };
     if (p1[0] == NODE_CHAR)   { return pp_char(p0, p1) };
     if (p1[0] == NODE_STRING) { return pp_string(p0, p1) };
-    panic("'pp_sexpr': not reachable here");
+    panic("'pp_sexp': not reachable here");
 };
