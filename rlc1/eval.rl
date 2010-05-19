@@ -2,15 +2,47 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: eval.rl 2010-05-20 02:51:35 nineties $
+ % $Id: eval.rl 2010-05-20 03:06:44 nineties $
  %);
 
 include(stddef,code);
-export(eval_sexp);
+export(init_evaluator, eval_sexp);
 
-symbol_map: NULL;
+symbol_map: NULL; (% (symbol name, scope id) -> symbol object %);
 
-init_evaluator: () {
+scopeid: 0;
+scopeid_stack: NULL;
+
+(% p0: (symbol name, scope id) %);
+symbol_hash: (p0) {
+    return strhash(p0[0])*3 + p0[1];
+};
+
+symbol_equal: (p0, p1) {
+    if (p0[1] != p1[1]) { return FALSE; };
+    return streq(p0[0], p1[0]);
+};
+
+scope_push: () {
+    scopeid = scopeid + 1;
+    vec_pushback(scopeid_stack, scopeid);
+};
+
+scope_pop: () {
+    vec_popback(scopeid_stack);
+};
+
+(% p0: symbol name %);
+find_symbol: (p0) {
+    allocate(3);
+    x0 = vec_size(scopeid_stack)-1;
+    while (x0 >= 0) {
+        x1 = vec_at(scopeid_stack, x0); (% scopeid-id %);
+        x2 = map_find(symbol_map, mktup2(p0, x1));
+        if (x2 != NULL) { return x2; };
+        x0 = x0 - 1;
+    };
+    return NULL;
 };
 
 eval_sexp: (p0) {
@@ -36,3 +68,10 @@ eval_sexp: (p0) {
     };
     panic("'eval_sexp': not reachable here");
 };
+
+init_evaluator: () {
+    symbol_map = mkmap(&symbol_hash, &symbol_equal, 100);
+    scopeid_stack = mkvec(0);
+    scope_push(); (% global scope %);
+};
+

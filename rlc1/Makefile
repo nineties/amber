@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-05-20 02:50:47 nineties $
+# $Id: Makefile 2010-05-20 03:20:22 nineties $
 
 AS = as
 ASFLAGS =
@@ -17,7 +17,7 @@ SOURCES = startup.rl\
 	  stdlib.rl\
 	  alloc.rl\
 	  rowllib.rl\
-	  node.rl\
+	  object.rl\
 	  builtin.rl\
 	  pprint.rl\
 	  lex.rl\
@@ -34,7 +34,7 @@ alloc.s  : $(RLC0) stddef.s
 main.s   : $(RLC0) stddef.s code.s
 rowllib.s: $(RLC0) stddef.s
 stdlib.s : $(RLC0) stddef.s
-node.s   : $(RLC0) stddef.s code.s
+object.s : $(RLC0) stddef.s code.s
 builtin.s: $(RLC0) stddef.s code.s
 pprint.s : $(RLC0) stddef.s code.s
 lex.s    : $(RLC0) stddef.s token.s

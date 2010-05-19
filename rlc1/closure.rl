@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: closure.rl 2010-04-14 11:08:40 nineties $
+ % $Id: closure.rl 2010-05-20 02:58:04 nineties $
  %);
 
 (% closure conversion %);
