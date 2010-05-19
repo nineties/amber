@@ -21,19 +21,19 @@ eatchar: (p0, p1) {
     exit(1);
 };
 
-parse_sexpr: (p0) {
+parse_sexp: (p0) {
     allocate(3);
     if (p0 == '(') {
         x0 = NULL;
         while(1) {
             x1 = lex();
             if (x1 == TOK_END) {
-                goto &parse_sexpr;
+                goto &parse_sexp;
             };
             if (x1 == ')') {
                 return rl_reverse(x0);
             };
-            x0 = rl_cons(parse_sexpr(x1), x0);
+            x0 = rl_cons(parse_sexp(x1), x0);
         }
     };
     if (p0 == TOK_CHAR) {
@@ -54,13 +54,13 @@ label parse_err;
     exit(1);
 };
 
-parse_sexpr_list: (p0) {
+parse_sexp_list: (p0) {
     allocate(2);
     if (p0 == TOK_END) {
         return NULL;
     };
-    x0 = parse_sexpr(p0);
-    x1 = parse_sexpr_list(lex());
+    x0 = parse_sexp(p0);
+    x1 = parse_sexp_list(lex());
     return rl_cons(x0, x1);
 };
 
@@ -69,7 +69,7 @@ parse: (p0) {
     allocate(2);
     x0 = open_in(p0);
     lexer_init(p0, x0);
-    x1 = parse_sexpr_list(lex());
+    x1 = parse_sexp_list(lex());
     close_in(x0);
     return x1;
 };

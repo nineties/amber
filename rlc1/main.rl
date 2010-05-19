@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: main.rl 2010-05-19 04:43:19 nineties $
+ % $Id: main.rl 2010-05-20 02:52:17 nineties $
  %);
 
 (% rowl-core interpreter %);
@@ -13,10 +13,11 @@ export main;
 
 (% source file name %);
 interpret: (p0) {
-    allocate(1);
+    allocate(2);
     x0 = parse(p0);
     while (x0 != NULL) {
-        pp_sexpr(stdout, rl_car(x0));
+        x1 = eval_sexp(rl_car(x0));
+        pp_sexp(stdout, x1);
         fputc(stdout, '\n');
         x0 = rl_cdr(x0);
     }

@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-05-19 04:15:51 nineties $
+# $Id: Makefile 2010-05-20 02:50:47 nineties $
 
 AS = as
 ASFLAGS =
@@ -21,7 +21,8 @@ SOURCES = startup.rl\
 	  builtin.rl\
 	  pprint.rl\
 	  lex.rl\
-	  parse.rl
+	  parse.rl\
+	  eval.rl
 
 ASMSOURCES = $(patsubst %.rl,%.s,$(SOURCES))
 OBJECTS    = $(patsubst %.rl,%.o,$(SOURCES))
@@ -38,6 +39,7 @@ builtin.s: $(RLC0) stddef.s code.s
 pprint.s : $(RLC0) stddef.s code.s
 lex.s    : $(RLC0) stddef.s token.s
 parse.s  : $(RLC0) stddef.s token.s code.s
+eval.s   : $(RLC0) stddef.s code.s
 
 rlc: $(OBJECTS)
 	$(LD) $(OBJECTS) -o $@ $(LDFLAGS)
