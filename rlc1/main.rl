@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: main.rl 2010-05-20 03:01:21 nineties $
+ % $Id: main.rl 2010-05-20 03:30:40 nineties $
  %);
 
 (% rowl-core interpreter %);
@@ -16,6 +16,7 @@ interpret: (p0) {
     allocate(2);
     x0 = parse(p0);
 
+    init_builtin_objects();
     init_evaluator();
 
     while (x0 != NULL) {
