@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: eval.rl 2010-05-20 03:06:44 nineties $
+ % $Id: eval.rl 2010-05-20 03:45:30 nineties $
  %);
 
 include(stddef,code);
@@ -32,17 +32,18 @@ scope_pop: () {
     vec_popback(scopeid_stack);
 };
 
-(% p0: symbol name %);
+(% p0: symbol object %);
 find_symbol: (p0) {
-    allocate(3);
+    allocate(4);
     x0 = vec_size(scopeid_stack)-1;
+    x3 = sym_name(p0);
     while (x0 >= 0) {
         x1 = vec_at(scopeid_stack, x0); (% scopeid-id %);
-        x2 = map_find(symbol_map, mktup2(p0, x1));
+        x2 = map_find(symbol_map, mktup2(x3, x1));
         if (x2 != NULL) { return x2; };
         x0 = x0 - 1;
     };
-    return NULL;
+    return p0;
 };
 
 eval_sexp: (p0) {
@@ -54,8 +55,7 @@ eval_sexp: (p0) {
         exit(1);
     };
     if (x0 == NODE_SYMBOL) {
-        fputs(stderr, "ERROR 'eval_sexp': not implemented yet\n");
-        exit(1);
+	return find_symbol(p0);
     };
     if (x0 == NODE_INT) {
         return p0;
