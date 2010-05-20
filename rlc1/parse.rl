@@ -31,22 +31,22 @@ parse_sexp: (p0) {
                 goto &parse_sexp;
             };
             if (x1 == ')') {
-                return rl_reverse(x0);
+                return reverse(x0);
             };
-            x0 = rl_cons(parse_sexp(x1), x0);
+            x0 = cons(parse_sexp(x1), x0);
         }
     };
     if (p0 == TOK_CHAR) {
-        return make_char(token_val());
+        return mkchar(token_val());
     };
     if (p0 == TOK_INT) {
-        return make_int(token_val());
+        return mkint(token_val());
     };
     if (p0 == TOK_STRING) {
-        return make_string(token_text());
+        return mkstring(token_text());
     };
     if (p0 == TOK_SYMBOL) {
-        return make_symbol(token_text());
+        return mksym(token_text());
     };
 label parse_err;
     fputloc(stderr);
@@ -61,7 +61,7 @@ parse_sexp_list: (p0) {
     };
     x0 = parse_sexp(p0);
     x1 = parse_sexp_list(lex());
-    return rl_cons(x0, x1);
+    return cons(x0, x1);
 };
 
 (% p0: file name %);
