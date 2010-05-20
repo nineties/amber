@@ -2,17 +2,17 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-05-20 17:15:45 nineties $
+ % $Id: builtin.rl 2010-05-20 17:31:46 nineties $
  %);
 
 include(stddef,code);
 export(init_builtin_objects);
-export(nil_sym,true_sym,false_sym,if_sym);
 export(mksym, mkint, mkchar, mkstring);
 export(sym_set, sym_name, sym_value);
 export(cons_p,sym_p,int_p,char_p,string_p,prim_p);
 export(prim_funptr);
 export(rl_empty,rl_cons,rl_car,rl_cdr,rl_length,rl_reverse);
+export(nil_sym,true_sym,false_sym,if_sym,while_sym);
 
 (%
  % symbol object:
@@ -229,6 +229,7 @@ mul_sym   : NULL;
 print_sym : NULL;
 getc_sym  : NULL;
 if_sym    : NULL;
+while_sym : NULL;
 
 init_builtin_objects: () {
     nil_sym     = mksym("$nil");
@@ -239,6 +240,7 @@ init_builtin_objects: () {
     print_sym   = mksym2("$print", mkprim(&rl_print));
     getc_sym    = mksym2("$getc", mkprim(&rl_getc));
     if_sym      = mksym("$if");
+    while_sym   = mksym("$while");
 
     assign("$nil", nil_sym);
     assign("$true", true_sym);
@@ -248,4 +250,5 @@ init_builtin_objects: () {
     assign("$print", print_sym);
     assign("$getc", getc_sym);
     assign("$if", if_sym);
+    assign("$while", while_sym);
 };
