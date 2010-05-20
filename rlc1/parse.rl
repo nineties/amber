@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: parse.rl 2010-05-19 04:53:08 nineties $
+ % $Id: parse.rl 2010-05-20 15:46:02 nineties $
  %);
 
 include(stddef, code, token);
@@ -19,6 +19,38 @@ eatchar: (p0, p1) {
     fputc(stderr, ''');
     fputc(stderr, '\n');
     exit(1);
+};
+
+escaped_char: (p0) {
+    if (p0 == '0') { return 0; };
+    if (p0 == 'a') { return 7; };
+    if (p0 == 'b') { return 8; };
+    if (p0 == 't') { return 9; };
+    if (p0 == 'n') { return 10; };
+    if (p0 == 'v') { return 11; };
+    if (p0 == 'f') { return 12; };
+    if (p0 == 'r') { return 13; };
+    return p0;
+};
+
+unescape: (p0) {
+    allocate(4);
+    x0 = strlen(p0)-2;
+    p0 = p0 + 1; (% skip first " %);
+    x1 = memalloc(x0+1);
+    x2 = 0;
+    while (rch(p0,0) != '"') {
+        x3 = rch(p0, 0);
+        if (x3 == '\\') {
+            p0 = p0 + 1;
+            x3 = escaped_char(rch(p0, 0));
+        };
+        wch(x1, x2, x3);
+        x2 = x2 + 1;
+        p0 = p0 + 1;
+    };
+    wch(x1,x2,'\0');
+    return x1;
 };
 
 parse_sexp: (p0) {
@@ -43,7 +75,8 @@ parse_sexp: (p0) {
         return mkint(token_val());
     };
     if (p0 == TOK_STRING) {
-        return mkstring(token_text());
+        x0 = unescape(token_text());
+        return mkstring(x0);
     };
     if (p0 == TOK_SYMBOL) {
         return mksym(token_text());

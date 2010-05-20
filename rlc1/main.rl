@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: main.rl 2010-05-20 13:42:36 nineties $
+ % $Id: main.rl 2010-05-20 15:04:59 nineties $
  %);
 
 (% rowl-core interpreter %);

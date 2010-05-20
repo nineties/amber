@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-05-20 13:57:04 nineties $
+ % $Id: builtin.rl 2010-05-20 15:30:16 nineties $
  %);
 
 include(stddef,code);
@@ -20,11 +20,6 @@ export(empty,cons,car,cdr,reverse);
  % 1: symbol name
  % 2: associated object (default: nil symbol)
  %);
-
-nil_sym: NULL;
-true_sym: NULL;
-false_sym: NULL;
-add_sym: NULL;
 
 mksym: (p0) {
     return mktup3(NODE_SYMBOL, strdup(p0), nil_sym);
@@ -71,6 +66,10 @@ mkstring: (p0) {
     return mktup2(NODE_STRING, strdup(p0));
 };
 
+string_value: (p0) {
+    expect(p0, NODE_STRING, "string_value", "string object");
+    return p0[1];
+};
 
 (% p0: code, p1: object %);
 check_code: (p0, p1) {
@@ -167,26 +166,39 @@ add: (p0) {
     x0 = 0;
     while (p0 != NULL ) {
         x1 = car(p0);
-        if (int_p(x1) == false_sym) {
-            fputs(stderr, "ERROR '$add': not an integer '\n");
-            pp_sexp(stderr, x1);
-            fputs(stderr, "'\n");
-            exit(1);
-        };
+        expect(x1, NODE_INT, "add", "integer");
         x0 = x0 + int_value(x1);
         p0 = cdr(p0);
     };
     return mkint(x0);
 };
 
+print: (p0) {
+    while (p0 != NULL) {
+        x0 = car(p0);
+        expect(x0, NODE_STRING, "print", "string");
+        puts(string_value(x0));
+        p0 = cdr(p0);
+    };
+    return nil_sym;
+};
+
+nil_sym     : NULL;
+true_sym    : NULL;
+false_sym   : NULL;
+add_sym     : NULL;
+print_sym   : NULL;
+
 init_builtin_objects: () {
-    nil_sym   = mksym("$nil");
-    true_sym  = mksym("$true");
-    false_sym = mksym("$false");
-    add_sym   = mksym2("$add", mkprim(&add));
+    nil_sym     = mksym("$nil");
+    true_sym    = mksym("$true");
+    false_sym   = mksym("$false");
+    add_sym     = mksym2("$add", mkprim(&add));
+    print_sym   = mksym2("$print", mkprim(&print));
 
     assign("$nil", nil_sym);
     assign("$true", true_sym);
     assign("$false", false_sym);
     assign("$add", add_sym);
+    assign("$print", print_sym);
 };
