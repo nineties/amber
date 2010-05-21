@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: parse.rl 2010-05-21 00:54:48 nineties $
+ % $Id: parse.rl 2010-05-22 02:53:37 nineties $
  %);
 
 include(stddef, code, token);
@@ -63,7 +63,7 @@ parse_sexp: (p0) {
                 goto &parse_sexp;
             };
             if (x1 == ')') {
-                return rl_reverse(x0);
+                return reverse(x0);
             };
             x0 = mkcons(parse_sexp(x1), x0);
         }

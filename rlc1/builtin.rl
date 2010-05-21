@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-05-21 23:47:29 nineties $
+ % $Id: builtin.rl 2010-05-22 02:54:41 nineties $
  %);
 
 include(stddef,code);
@@ -11,7 +11,7 @@ export(mksym, mkint, mkchar, mkstring);
 export(sym_set, sym_name, sym_value);
 export(cons_p,sym_p,int_p,char_p,string_p,prim_p);
 export(prim_funptr);
-export(mkcons,rl_car,rl_cdr,rl_length,rl_reverse);
+export(mkcons,car,cdr,length,reverse);
 export(nil_sym,true_sym,false_sym,if_sym,while_sym);
 
 (%
@@ -23,6 +23,40 @@ export(nil_sym,true_sym,false_sym,if_sym,while_sym);
 
 mkcons: (p0, p1) {
     return mktup3(NODE_CONS, p0, p1);
+};
+
+car: (p0) {
+    expect(p0, NODE_CONS, "car", "cons object");
+    return p0[1];
+};
+
+cdr: (p0) {
+    expect(p0, NODE_CONS, "car", "cons object");
+    return p0[2];
+};
+
+length: (p0) {
+    allocate(2);
+    x0 = 0;
+    while (p0 != nil_sym) {
+        p0 = cdr(p0);
+        x0 = x0 + 1;
+    };
+    return x0;
+};
+
+reverse: (p0) {
+    allocate(1);
+    if (p0 == nil_sym) { return nil_sym; };
+    if (p0[0] != NODE_CONS) {
+        fputs(stderr, "ERROR 'reverse': not a list\n");
+    };
+    x0 = nil_sym;
+    while (p0 != nil_sym) {
+        x0 = mkcons(car(p0), x0);
+        p0 = cdr(p0);
+    };
+    return x0;
 };
 
 mksym: (p0) {
@@ -117,64 +151,38 @@ mkprim: (p0) {
 };
 
 rl_cons: (p0) {
-    check_arity(p0, 2, "$cons");
-    return mkcons(rl_car(p0), rl_car(rl_cdr(p0)));
+    check_arity(p0, 2, "cons");
+    return mkcons(car(p0), car(cdr(p0)));
 };
 
 rl_car: (p0) {
-    if (p0 == nil_sym) {
-        fputs(stderr, "ERROR '$car': empty list\n");
-        exit(1);
-    };
-    if (p0[0] != NODE_CONS) {
-        fputs(stderr, "ERROR '$car': not a list\n");
-    };
-    return p0[1];
+    check_arity(p0, 1, "car");
+    return car(car(p0));
 };
 
 rl_cdr: (p0) {
-    if (p0 == nil_sym) {
-        fputs(stderr, "ERROR '$cdr': empty list\n");
-        exit(1);
-    };
-    if (p0[0] != NODE_CONS) {
-        fputs(stderr, "ERROR '$cdr': not a list\n");
-    };
-    return p0[2];
+    check_arity(p0, 1, "cdr");
+    return cdr(car(p0));
 };
 
 rl_length: (p0) {
-    allocate(2);
-    x0 = 0;
-    while (p0 != nil_sym) {
-        p0 = rl_cdr(p0);
-        x0 = x0 + 1;
-    };
-    return x0;
+    check_arity(p0, 1, "length");
+    return length(car(p0));
 };
 
 rl_reverse: (p0) {
-    allocate(1);
-    if (p0 == nil_sym) { return nil_sym; };
-    if (p0[0] != NODE_CONS) {
-        fputs(stderr, "ERROR '$car': not a list\n");
-    };
-    x0 = nil_sym;
-    while (p0 != nil_sym) {
-        x0 = mkcons(rl_car(p0), x0);
-        p0 = rl_cdr(p0);
-    };
-    return x0;
+    check_arity(p0, 1, "reverse");
+    return reverse(car(p0));
 };
 
 rl_add: (p0) {
     allocate(2);
     x0 = 0;
     while (p0 != nil_sym) {
-        x1 = rl_car(p0);
-        expect(x1, NODE_INT, "$add", "integer");
+        x1 = car(p0);
+        expect(x1, NODE_INT, "add", "integer");
         x0 = x0 + int_value(x1);
-        p0 = rl_cdr(p0);
+        p0 = cdr(p0);
     };
     return mkint(x0);
 };
@@ -183,10 +191,10 @@ rl_mul: (p0) {
     allocate(2);
     x0 = 1;
     while (p0 != nil_sym) {
-        x1 = rl_car(p0);
-        expect(x1, NODE_INT, "$mul", "integer");
+        x1 = car(p0);
+        expect(x1, NODE_INT, "mul", "integer");
         x0 = x0 * int_value(x1);
-        p0 = rl_cdr(p0);
+        p0 = cdr(p0);
     };
     return mkint(x0);
 };
@@ -194,9 +202,9 @@ rl_mul: (p0) {
 rl_print: (p0) {
     allocate(1);
     while (p0 != nil_sym) {
-        x0 = rl_car(p0);
+        x0 = car(p0);
         pp_sexp(stdout, x0);
-        p0 = rl_cdr(p0);
+        p0 = cdr(p0);
     };
     return nil_sym;
 };
@@ -223,29 +231,29 @@ if_sym    : NULL;
 while_sym : NULL;
 
 init_builtin_objects: () {
-    nil_sym   = mksym("$nil");
-    true_sym  = mksym("$true");
-    false_sym = mksym("$false");
-    cons_sym  = mksym2("$cons", mkprim(&rl_cons));
-    car_sym   = mksym2("$car", mkprim(&rl_car));
-    cdr_sym   = mksym2("$cdr", mkprim(&rl_cdr));
-    add_sym   = mksym2("$add", mkprim(&rl_add));
-    mul_sym   = mksym2("$mul", mkprim(&rl_mul));
-    print_sym = mksym2("$print", mkprim(&rl_print));
-    getc_sym  = mksym2("$getc", mkprim(&rl_getc));
-    if_sym    = mksym("$if");
-    while_sym = mksym("$while");
+    nil_sym   = mksym("nil");
+    true_sym  = mksym("true");
+    false_sym = mksym("false");
+    cons_sym  = mksym2("cons", mkprim(&rl_cons));
+    car_sym   = mksym2("car", mkprim(&rl_car));
+    cdr_sym   = mksym2("cdr", mkprim(&rl_cdr));
+    add_sym   = mksym2("add", mkprim(&rl_add));
+    mul_sym   = mksym2("mul", mkprim(&rl_mul));
+    print_sym = mksym2("print", mkprim(&rl_print));
+    getc_sym  = mksym2("getc", mkprim(&rl_getc));
+    if_sym    = mksym("if");
+    while_sym = mksym("while");
 
-    assign("$nil", nil_sym);
-    assign("$true", true_sym);
-    assign("$false", false_sym);
-    assign("$cons", cons_sym);
-    assign("$car", car_sym);
-    assign("$cdr", cdr_sym);
-    assign("$add", add_sym);
-    assign("$mul", mul_sym);
-    assign("$print", print_sym);
-    assign("$getc", getc_sym);
-    assign("$if", if_sym);
-    assign("$while", while_sym);
+    assign("nil", nil_sym);
+    assign("true", true_sym);
+    assign("false", false_sym);
+    assign("cons", cons_sym);
+    assign("car", car_sym);
+    assign("cdr", cdr_sym);
+    assign("add", add_sym);
+    assign("mul", mul_sym);
+    assign("print", print_sym);
+    assign("getc", getc_sym);
+    assign("if", if_sym);
+    assign("while", while_sym);
 };
