@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: main.rl 2010-05-20 17:22:34 nineties $
+ % $Id: main.rl 2010-05-21 23:47:08 nineties $
  %);
 
 (% rowl-core interpreter %);
@@ -20,7 +20,7 @@ interpret: (p0) {
 
     x0 = parse(p0);
 
-    while (x0 != NULL) {
+    while (x0 != nil_sym) {
         eval_sexp(rl_car(x0));
         x0 = rl_cdr(x0);
     }

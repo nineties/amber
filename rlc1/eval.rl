@@ -2,11 +2,11 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: eval.rl 2010-05-20 17:38:21 nineties $
+ % $Id: eval.rl 2010-05-21 23:45:51 nineties $
  %);
 
 include(stddef,code);
-export(init_evaluator, assign, deref, eval_sexp);
+export(init_evaluator, assign, deref, check_arity, eval_sexp);
 
 symbol_map: NULL; (% (symbol name, scope id) -> symbol object %);
 
@@ -66,8 +66,8 @@ check_arity: (p0, p1, p2) {
 };
 
 eval_args: (p0) {
-    if (p0 == NULL) { return NULL; };
-    return rl_cons(eval_sexp(rl_car(p0)), eval_args(rl_cdr(p0)));
+    if (p0 == nil_sym) { return nil_sym; };
+    return mkcons(eval_sexp(rl_car(p0)), eval_args(rl_cdr(p0)));
 };
 
 eval_cons: (p0) {
@@ -80,7 +80,7 @@ eval_cons: (p0) {
     if (x1 == nil_sym) { goto &eval_cons_error; };
     x1 = sym_value(x1);
     if (prim_p(x1)) { return (prim_funptr(x1))(eval_args(rl_cdr(p0))); };
-    return NULL;
+    return nil_sym;
 label eval_cons_error;
     fputs(stderr, "ERROR: invalid application of '");
     pp_sexp(stderr, rl_car(p0));
@@ -94,8 +94,18 @@ eval_if: (p0) {
     check_arity(p0, 3, "$if");
     x0 = eval_sexp(rl_car(p0));
     p0 = rl_cdr(p0);
-    if (x0 == true_sym)  { return eval_sexp(rl_car(p0)); };
-    if (x0 == false_sym) { return eval_sexp(rl_car(rl_cdr(p0))); };
+    if (x0 == true_sym)  {
+        scope_push();
+        x1 = eval_sexp(rl_car(p0));
+        scope_pop();
+        return x1;
+    };
+    if (x0 == false_sym) {
+        scope_push();
+        x1 = eval_sexp(rl_car(rl_cdr(p0)));
+        scope_pop();
+        return x1;
+    };
     fputs(stderr, "ERROR '$if': conditional expression could not evaluated to $true/$false\n");
     exit(1);
 };
@@ -107,10 +117,12 @@ eval_while: (p0) {
     x0 = rl_car(p0); (% condition %);
     x1 = rl_car(rl_cdr(p0)); (% body %);
     x2 = eval_sexp(x0);
+    scope_push();
     while (x2 == true_sym) {
         eval_sexp(x1);
         x2 = eval_sexp(x0);
     };
+    scope_pop();
     if (x2 != false_sym) {
         fputs(stderr, "ERROR '$while': conditional expression could not evaluated to $true/$false\n");
         exit(1);
@@ -120,7 +132,6 @@ eval_while: (p0) {
 
 eval_sexp: (p0) {
     allocate(1);
-    if (p0 == NULL) { return p0; };
     x0 = p0[0]; (% node code %);
     if (x0 == NODE_CONS)   { return eval_cons(p0); };
     if (x0 == NODE_SYMBOL) { return deref(p0); };
