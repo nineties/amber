@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: pprint.rl 2010-05-19 04:53:35 nineties $
+ % $Id: pprint.rl 2010-05-22 02:50:58 nineties $
  %);
 
 include(stddef,code);
@@ -43,18 +43,16 @@ pp_string: (p0, p1) {
 
 pp_cons: (p0, p1) {
     allocate(1);
-    if (p1 != NULL) {
-        if (p1[0] != NODE_CONS) {
-            fputs(stderr, "ERROR 'pp_cons': not a cons cell\n");
-            exit(1);
-        };
+    if (p1[0] != NODE_CONS) {
+        fputs(stderr, "ERROR 'pp_cons': not a cons cell\n");
+        exit(1);
     };
     fputc(p0, '(');
     x0 = p1;
-    while (x0 != NULL) {
-        pp_sexp(p0, x0[1]);
-        x0 = x0[2];
-        if (x0 != NULL) {
+    while (x0 != nil_sym) {
+        pp_sexp(p0, car(x0));
+        x0 = cdr(x0);
+        if (x0 != nil_sym) {
             fputc(p0, ' ');
         }
     };
@@ -63,7 +61,6 @@ pp_cons: (p0, p1) {
 
 (% p0: output channel, p1: S-expression %);
 pp_sexp: (p0, p1) {
-    if (p1 == NULL)           { return pp_cons(p0, p1); };
     if (p1[0] == NODE_CONS)   { return pp_cons(p0, p1) };
     if (p1[0] == NODE_SYMBOL) { return pp_symbol(p0, p1) };
     if (p1[0] == NODE_INT)    { return pp_int(p0, p1) };

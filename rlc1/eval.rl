@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: eval.rl 2010-05-21 23:45:51 nineties $
+ % $Id: eval.rl 2010-05-22 02:53:29 nineties $
  %);
 
 include(stddef,code);
@@ -55,7 +55,7 @@ deref: (p0) {
 };
 
 check_arity: (p0, p1, p2) {
-    if (rl_length(p0) != p1) {
+    if (length(p0) != p1) {
         fputs(stderr, "ERROR '");
         fputs(stderr, p2);
         fputs(stderr, "': required ");
@@ -67,23 +67,23 @@ check_arity: (p0, p1, p2) {
 
 eval_args: (p0) {
     if (p0 == nil_sym) { return nil_sym; };
-    return mkcons(eval_sexp(rl_car(p0)), eval_args(rl_cdr(p0)));
+    return mkcons(eval_sexp(car(p0)), eval_args(cdr(p0)));
 };
 
 eval_cons: (p0) {
     allocate(2);
-    x0 = rl_car(p0);
+    x0 = car(p0);
     if (sym_p(x0) != true_sym) { goto &eval_cons_error; };
     x1 = eval_sexp(x0);
-    if (x1 == if_sym) { return eval_if(rl_cdr(p0)); };
-    if (x1 == while_sym) { return eval_while(rl_cdr(p0)); };
+    if (x1 == if_sym) { return eval_if(cdr(p0)); };
+    if (x1 == while_sym) { return eval_while(cdr(p0)); };
     if (x1 == nil_sym) { goto &eval_cons_error; };
     x1 = sym_value(x1);
-    if (prim_p(x1)) { return (prim_funptr(x1))(eval_args(rl_cdr(p0))); };
+    if (prim_p(x1)) { return (prim_funptr(x1))(eval_args(cdr(p0))); };
     return nil_sym;
 label eval_cons_error;
     fputs(stderr, "ERROR: invalid application of '");
-    pp_sexp(stderr, rl_car(p0));
+    pp_sexp(stderr, car(p0));
     fputs(stderr, "'\n");
     exit(1);
 };
@@ -92,17 +92,17 @@ label eval_cons_error;
 eval_if: (p0) {
     allocate(1);
     check_arity(p0, 3, "$if");
-    x0 = eval_sexp(rl_car(p0));
-    p0 = rl_cdr(p0);
+    x0 = eval_sexp(car(p0));
+    p0 = cdr(p0);
     if (x0 == true_sym)  {
         scope_push();
-        x1 = eval_sexp(rl_car(p0));
+        x1 = eval_sexp(car(p0));
         scope_pop();
         return x1;
     };
     if (x0 == false_sym) {
         scope_push();
-        x1 = eval_sexp(rl_car(rl_cdr(p0)));
+        x1 = eval_sexp(car(cdr(p0)));
         scope_pop();
         return x1;
     };
@@ -114,8 +114,8 @@ eval_if: (p0) {
 eval_while: (p0) {
     allocate(3);
     check_arity(p0, 2, "$while");
-    x0 = rl_car(p0); (% condition %);
-    x1 = rl_car(rl_cdr(p0)); (% body %);
+    x0 = car(p0); (% condition %);
+    x1 = car(cdr(p0)); (% body %);
     x2 = eval_sexp(x0);
     scope_push();
     while (x2 == true_sym) {
