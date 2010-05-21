@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: parse.rl 2010-05-20 17:06:35 nineties $
+ % $Id: parse.rl 2010-05-21 00:54:48 nineties $
  %);
 
 include(stddef, code, token);
@@ -56,7 +56,7 @@ unescape: (p0) {
 parse_sexp: (p0) {
     allocate(3);
     if (p0 == '(') {
-        x0 = NULL;
+        x0 = nil_sym;
         while(1) {
             x1 = lex();
             if (x1 == TOK_END) {
@@ -65,7 +65,7 @@ parse_sexp: (p0) {
             if (x1 == ')') {
                 return rl_reverse(x0);
             };
-            x0 = rl_cons(parse_sexp(x1), x0);
+            x0 = mkcons(parse_sexp(x1), x0);
         }
     };
     if (p0 == TOK_CHAR) {
@@ -90,11 +90,11 @@ label parse_err;
 parse_sexp_list: (p0) {
     allocate(2);
     if (p0 == TOK_END) {
-        return NULL;
+        return nil_sym;
     };
     x0 = parse_sexp(p0);
     x1 = parse_sexp_list(lex());
-    return rl_cons(x0, x1);
+    return mkcons(x0, x1);
 };
 
 (% p0: file name %);
