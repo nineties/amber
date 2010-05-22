@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-05-22 02:54:41 nineties $
+ % $Id: builtin.rl 2010-05-22 22:19:32 nineties $
  %);
 
 include(stddef,code);
@@ -12,7 +12,7 @@ export(sym_set, sym_name, sym_value);
 export(cons_p,sym_p,int_p,char_p,string_p,prim_p);
 export(prim_funptr);
 export(mkcons,car,cdr,length,reverse);
-export(nil_sym,true_sym,false_sym,if_sym,while_sym);
+export(nil_sym,true_sym,quote_sym,if_sym,while_sym);
 
 (%
  % symbol object:
@@ -114,12 +114,12 @@ check_code: (p0, p1) {
     if (p1[0] == p0) {
         return true_sym;
     };
-    return false_sym;
+    return nil_sym;
 };
 
 cons_p: (p0) {
     if (p0[0] == NODE_CONS) { return true_sym; };
-    return false_sym;
+    return nil_sym;
 };
 sym_p    : (p0) { return check_code(NODE_SYMBOL, p0); };
 int_p    : (p0) { return check_code(NODE_INT, p0); };
@@ -217,39 +217,45 @@ rl_getc: (p0) {
     return mkchar(getc());
 };
 
-nil_sym   : NULL;
-true_sym  : NULL;
-false_sym : NULL;
-cons_sym  : NULL;
-car_sym   : NULL;
-cdr_sym   : NULL;
-add_sym   : NULL;
-mul_sym   : NULL;
-print_sym : NULL;
-getc_sym  : NULL;
-if_sym    : NULL;
-while_sym : NULL;
+nil_sym     : NULL;
+true_sym    : NULL;
+quote_sym   : NULL;
+cons_sym    : NULL;
+car_sym     : NULL;
+cdr_sym     : NULL;
+length_sym  : NULL;
+reverse_sym : NULL;
+add_sym     : NULL;
+mul_sym     : NULL;
+print_sym   : NULL;
+getc_sym    : NULL;
+if_sym      : NULL;
+while_sym   : NULL;
 
 init_builtin_objects: () {
-    nil_sym   = mksym("nil");
-    true_sym  = mksym("true");
-    false_sym = mksym("false");
-    cons_sym  = mksym2("cons", mkprim(&rl_cons));
-    car_sym   = mksym2("car", mkprim(&rl_car));
-    cdr_sym   = mksym2("cdr", mkprim(&rl_cdr));
-    add_sym   = mksym2("add", mkprim(&rl_add));
-    mul_sym   = mksym2("mul", mkprim(&rl_mul));
-    print_sym = mksym2("print", mkprim(&rl_print));
-    getc_sym  = mksym2("getc", mkprim(&rl_getc));
-    if_sym    = mksym("if");
-    while_sym = mksym("while");
+    nil_sym     = mksym("nil");
+    true_sym    = mksym("true");
+    quote_sym   = mksym("quote");
+    cons_sym    = mksym2("cons", mkprim(&rl_cons));
+    car_sym     = mksym2("car", mkprim(&rl_car));
+    cdr_sym     = mksym2("cdr", mkprim(&rl_cdr));
+    length_sym  = mksym2("length", mkprim(&rl_length));
+    reverse_sym = mksym2("reverse", mkprim(&rl_reverse));
+    add_sym     = mksym2("add", mkprim(&rl_add));
+    mul_sym     = mksym2("mul", mkprim(&rl_mul));
+    print_sym   = mksym2("print", mkprim(&rl_print));
+    getc_sym    = mksym2("getc", mkprim(&rl_getc));
+    if_sym      = mksym("if");
+    while_sym   = mksym("while");
 
     assign("nil", nil_sym);
     assign("true", true_sym);
-    assign("false", false_sym);
+    assign("quote", quote_sym);
     assign("cons", cons_sym);
     assign("car", car_sym);
     assign("cdr", cdr_sym);
+    assign("length", length_sym);
+    assign("reverse", reverse_sym);
     assign("add", add_sym);
     assign("mul", mul_sym);
     assign("print", print_sym);
