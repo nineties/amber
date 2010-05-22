@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: eval.rl 2010-05-22 22:22:02 nineties $
+ % $Id: eval.rl 2010-05-22 22:53:47 nineties $
  %);
 
 include(stddef,code);
@@ -75,18 +75,28 @@ eval_cons: (p0) {
     x0 = car(p0);
     if (sym_p(x0) != true_sym) { goto &eval_cons_error; };
     x1 = eval_sexp(x0);
+    if (x1 == var_sym)   { return eval_var(cdr(p0)); };
     if (x1 == quote_sym) { return eval_quote(cdr(p0)); };
     if (x1 == if_sym)    { return eval_if(cdr(p0)); };
     if (x1 == while_sym) { return eval_while(cdr(p0)); };
     if (x1 == nil_sym)   { goto &eval_cons_error; };
-    x1 = sym_value(x1);
-    if (prim_p(x1)) { return (prim_funptr(x1))(eval_args(cdr(p0))); };
+    if (prim_p(x1))      { return (prim_funptr(x1))(eval_args(cdr(p0))); };
     return nil_sym;
 label eval_cons_error;
     fputs(stderr, "ERROR: invalid application of '");
     pp_sexp(stderr, car(p0));
     fputs(stderr, "'\n");
     exit(1);
+};
+
+(% (var <id> <value>) %);
+eval_var: (p0) {
+    allocate(2);
+    check_arity(p0, 2, "var");
+    x0 = car(p0);
+    x1 = eval_sexp(car(cdr(p0)));
+    assign(sym_name(x0), x1);
+    return nil_sym;
 };
 
 eval_quote: (p0) {
