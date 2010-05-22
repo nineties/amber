@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: eval.rl 2010-05-22 02:53:29 nineties $
+ % $Id: eval.rl 2010-05-22 22:22:02 nineties $
  %);
 
 include(stddef,code);
@@ -75,9 +75,10 @@ eval_cons: (p0) {
     x0 = car(p0);
     if (sym_p(x0) != true_sym) { goto &eval_cons_error; };
     x1 = eval_sexp(x0);
-    if (x1 == if_sym) { return eval_if(cdr(p0)); };
+    if (x1 == quote_sym) { return eval_quote(cdr(p0)); };
+    if (x1 == if_sym)    { return eval_if(cdr(p0)); };
     if (x1 == while_sym) { return eval_while(cdr(p0)); };
-    if (x1 == nil_sym) { goto &eval_cons_error; };
+    if (x1 == nil_sym)   { goto &eval_cons_error; };
     x1 = sym_value(x1);
     if (prim_p(x1)) { return (prim_funptr(x1))(eval_args(cdr(p0))); };
     return nil_sym;
@@ -88,43 +89,44 @@ label eval_cons_error;
     exit(1);
 };
 
+eval_quote: (p0) {
+    check_arity(p0, 1, "quote");
+    return car(p0);
+};
+
 (% p0 : (cond ifthen ifelse) %);
 eval_if: (p0) {
     allocate(1);
-    check_arity(p0, 3, "$if");
+    check_arity(p0, 3, "if");
     x0 = eval_sexp(car(p0));
     p0 = cdr(p0);
-    if (x0 == true_sym)  {
+    if (x0 != nil_sym)  {
         scope_push();
         x1 = eval_sexp(car(p0));
         scope_pop();
         return x1;
     };
-    if (x0 == false_sym) {
-        scope_push();
-        x1 = eval_sexp(car(cdr(p0)));
-        scope_pop();
-        return x1;
-    };
-    fputs(stderr, "ERROR '$if': conditional expression could not evaluated to $true/$false\n");
-    exit(1);
+    scope_push();
+    x1 = eval_sexp(car(cdr(p0)));
+    scope_pop();
+    return x1;
 };
 
 (% p0: (cond body) %);
 eval_while: (p0) {
     allocate(3);
-    check_arity(p0, 2, "$while");
+    check_arity(p0, 2, "while");
     x0 = car(p0); (% condition %);
     x1 = car(cdr(p0)); (% body %);
     x2 = eval_sexp(x0);
     scope_push();
-    while (x2 == true_sym) {
+    while (x2 != nil_sym) {
         eval_sexp(x1);
         x2 = eval_sexp(x0);
     };
     scope_pop();
-    if (x2 != false_sym) {
-        fputs(stderr, "ERROR '$while': conditional expression could not evaluated to $true/$false\n");
+    if (x2 != nil_sym) {
+        fputs(stderr, "ERROR 'while': conditional expression could not evaluated to true/false\n");
         exit(1);
     };
     return nil_sym;
