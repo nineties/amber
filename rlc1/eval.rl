@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: eval.rl 2010-05-24 00:58:08 nineties $
+ % $Id: eval.rl 2010-05-24 01:47:50 nineties $
  %);
 
 include(stddef,code);
@@ -79,6 +79,7 @@ eval_cons: (p0) {
     if (x1 == set_sym)   { return eval_set(cdr(p0)); };
     if (x1 == quote_sym) { return eval_quote(cdr(p0)); };
     if (x1 == if_sym)    { return eval_if(cdr(p0)); };
+    if (x1 == cond_sym)  { return eval_cond(cdr(p0)); };
     if (x1 == while_sym) { return eval_while(cdr(p0)); };
     if (x1 == do_sym)    { return eval_do(cdr(p0)); };
     if (x1 == nil_sym)   { goto &eval_cons_error; };
@@ -124,7 +125,7 @@ eval_quote: (p0) {
 
 (% p0 : (cond ifthen ifelse) %);
 eval_if: (p0) {
-    allocate(1);
+    allocate(2);
     check_arity(p0, 3, "if");
     x0 = eval_sexp(car(p0));
     p0 = cdr(p0);
@@ -138,6 +139,20 @@ eval_if: (p0) {
     x1 = eval_sexp(car(cdr(p0)));
     scope_pop();
     return x1;
+};
+
+eval_cond: (p0) {
+    allocate(1);
+    while (p0 != nil_sym) {
+        x0 = car(p0);
+        check_arity(x0, 2, "cond");
+        if (eval_sexp(car(x0)) != nil_sym) {
+            return eval_sexp(car(cdr(x0)));
+        };
+        p0 = cdr(p0);
+    };
+    fputs(stderr, "ERROR 'eval_cond': any condition was not met\n");
+    exit(1);
 };
 
 (% p0: (cond body) %);
