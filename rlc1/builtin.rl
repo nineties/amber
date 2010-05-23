@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-05-24 00:51:21 nineties $
+ % $Id: builtin.rl 2010-05-24 01:36:16 nineties $
  %);
 
 include(stddef,code);
@@ -12,7 +12,7 @@ export(sym_set, sym_name, sym_value);
 export(cons_p,sym_p,int_p,char_p,string_p,prim_p);
 export(prim_funptr);
 export(mkcons,car,cdr,length,reverse);
-export(nil_sym,true_sym,var_sym,set_sym,quote_sym,if_sym,while_sym,do_sym);
+export(nil_sym,true_sym,var_sym,set_sym,quote_sym,if_sym,cond_sym,while_sym,do_sym);
 
 (%
  % symbol object:
@@ -243,6 +243,7 @@ quote_sym   : NULL;
 var_sym     : NULL;
 set_sym     : NULL;
 if_sym      : NULL;
+cond_sym    : NULL;
 while_sym   : NULL;
 do_sym      : NULL;
 
@@ -257,6 +258,7 @@ init_builtin_objects: () {
     var_sym     = mksym("var");
     set_sym     = mksym("set");
     if_sym      = mksym("if");
+    cond_sym    = mksym("cond");
     while_sym   = mksym("while");
     do_sym      = mksym("do");
 
@@ -266,6 +268,7 @@ init_builtin_objects: () {
     assign("var"     , var_sym);
     assign("set"     , set_sym);
     assign("if"      , if_sym);
+    assign("cond"    , cond_sym);
     assign("while"   , while_sym);
     assign("do"      , do_sym);
     register_prim("cons"    , &rl_cons);
