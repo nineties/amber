@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-05-22 22:52:00 nineties $
+ % $Id: builtin.rl 2010-05-24 00:51:21 nineties $
  %);
 
 include(stddef,code);
@@ -12,7 +12,7 @@ export(sym_set, sym_name, sym_value);
 export(cons_p,sym_p,int_p,char_p,string_p,prim_p);
 export(prim_funptr);
 export(mkcons,car,cdr,length,reverse);
-export(nil_sym,true_sym,var_sym,quote_sym,if_sym,while_sym);
+export(nil_sym,true_sym,var_sym,set_sym,quote_sym,if_sym,while_sym,do_sym);
 
 (%
  % symbol object:
@@ -60,12 +60,26 @@ reverse: (p0) {
 };
 
 mksym: (p0) {
-    return mktup2(NODE_SYMBOL, strdup(p0));
+    return mktup3(NODE_SYMBOL, strdup(p0), NULL);
+};
+
+mksym2: (p0, p1) {
+    return mktup3(NODE_SYMBOL, strdup(p0), p1);
+};
+
+sym_set: (p0, p1) {
+    expect(p0, NODE_SYMBOL, "sym_set", "symbol object");
+    p0[2] = p1;
 };
 
 sym_name: (p0) {
     expect(p0, NODE_SYMBOL, "sym_name", "symbol object");
     return p0[1];
+};
+
+sym_value: (p0) {
+    expect(p0, NODE_SYMBOL, "sym_value", "symbol object");
+    return p0[2];
 };
 
 mkint: (p0) {
@@ -185,6 +199,26 @@ rl_mul: (p0) {
     return mkint(x0);
 };
 
+(% p0: operator name, p1: args, p2: pointer to the function %);
+int_binop_helper: (p0, p1, p2) {
+    allocate(2);
+    check_arity(p1, 2, p0);
+    x0 = car(p1);
+    x1 = car(cdr(p1));
+    expect(x0, NODE_INT, p0, "integer");
+    expect(x1, NODE_INT, p0, "integer");
+    return p2(int_value(x0), int_value(x1));
+};
+
+_lt: (p0, p1) { if (p0 < p1) { return true_sym; } else { return nil_sym; } };
+_gt: (p0, p1) { if (p0 > p1) { return true_sym; } else { return nil_sym; } };
+_le: (p0, p1) { if (p0 <= p1) { return true_sym; } else { return nil_sym; } };
+_ge: (p0, p1) { if (p0 >= p1) { return true_sym; } else { return nil_sym; } };
+rl_lt: (p0) { return int_binop_helper("lt", p0, &_lt); };
+rl_gt: (p0) { return int_binop_helper("gt", p0, &_gt); };
+rl_le: (p0) { return int_binop_helper("le", p0, &_le); };
+rl_ge: (p0) { return int_binop_helper("ge", p0, &_ge); };
+
 rl_print: (p0) {
     allocate(1);
     while (p0 != nil_sym) {
@@ -207,48 +241,44 @@ nil_sym     : NULL;
 true_sym    : NULL;
 quote_sym   : NULL;
 var_sym     : NULL;
-cons_sym    : NULL;
-car_sym     : NULL;
-cdr_sym     : NULL;
-length_sym  : NULL;
-reverse_sym : NULL;
-add_sym     : NULL;
-mul_sym     : NULL;
-print_sym   : NULL;
-getc_sym    : NULL;
+set_sym     : NULL;
 if_sym      : NULL;
 while_sym   : NULL;
+do_sym      : NULL;
+
+register_prim: (p0, p1) {
+    assign(p0, mksym2(p0, mkprim(p1)));
+};
 
 init_builtin_objects: () {
     nil_sym     = mksym("nil");
     true_sym    = mksym("true");
     quote_sym   = mksym("quote");
     var_sym     = mksym("var");
-    cons_sym    = mksym("cons");
-    car_sym     = mksym("car");
-    cdr_sym     = mksym("cdr");
-    length_sym  = mksym("length");
-    reverse_sym = mksym("reverse");
-    add_sym     = mksym("add");
-    mul_sym     = mksym("mul");
-    print_sym   = mksym("print");
-    getc_sym    = mksym("getc");
+    set_sym     = mksym("set");
     if_sym      = mksym("if");
     while_sym   = mksym("while");
+    do_sym      = mksym("do");
 
     assign("nil"     , nil_sym);
     assign("true"    , true_sym);
     assign("quote"   , quote_sym);
     assign("var"     , var_sym);
-    assign("cons"    , mkprim(&rl_cons));
-    assign("car"     , mkprim(&rl_car));
-    assign("cdr"     , mkprim(&rl_cdr));
-    assign("length"  , mkprim(&rl_length));
-    assign("reverse" , mkprim(&rl_reverse));
-    assign("add"     , mkprim(&rl_add));
-    assign("mul"     , mkprim(&rl_mul));
-    assign("print"   , mkprim(&rl_print));
-    assign("getc"    , mkprim(&rl_getc));
+    assign("set"     , set_sym);
     assign("if"      , if_sym);
     assign("while"   , while_sym);
+    assign("do"      , do_sym);
+    register_prim("cons"    , &rl_cons);
+    register_prim("car"     , &rl_car);
+    register_prim("cdr"     , &rl_cdr);
+    register_prim("length"  , &rl_length);
+    register_prim("reverse" , &rl_reverse);
+    register_prim("add"     , &rl_add);
+    register_prim("mul"     , &rl_mul);
+    register_prim("lt"      , &rl_lt);
+    register_prim("gt"      , &rl_gt);
+    register_prim("le"      , &rl_le);
+    register_prim("ge"      , &rl_ge);
+    register_prim("print"   , &rl_print);
+    register_prim("getc"    , &rl_getc);
 };

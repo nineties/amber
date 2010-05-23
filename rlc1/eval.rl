@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: eval.rl 2010-05-22 22:53:47 nineties $
+ % $Id: eval.rl 2010-05-24 00:58:08 nineties $
  %);
 
 include(stddef,code);
@@ -73,14 +73,16 @@ eval_args: (p0) {
 eval_cons: (p0) {
     allocate(2);
     x0 = car(p0);
-    if (sym_p(x0) != true_sym) { goto &eval_cons_error; };
+    if (sym_p(x0) == nil_sym) { goto &eval_cons_error; };
     x1 = eval_sexp(x0);
     if (x1 == var_sym)   { return eval_var(cdr(p0)); };
+    if (x1 == set_sym)   { return eval_set(cdr(p0)); };
     if (x1 == quote_sym) { return eval_quote(cdr(p0)); };
     if (x1 == if_sym)    { return eval_if(cdr(p0)); };
     if (x1 == while_sym) { return eval_while(cdr(p0)); };
+    if (x1 == do_sym)    { return eval_do(cdr(p0)); };
     if (x1 == nil_sym)   { goto &eval_cons_error; };
-    if (prim_p(x1))      { return (prim_funptr(x1))(eval_args(cdr(p0))); };
+    if (prim_p(x1) != nil_sym)      { return (prim_funptr(x1))(eval_args(cdr(p0))); };
     return nil_sym;
 label eval_cons_error;
     fputs(stderr, "ERROR: invalid application of '");
@@ -95,8 +97,24 @@ eval_var: (p0) {
     check_arity(p0, 2, "var");
     x0 = car(p0);
     x1 = eval_sexp(car(cdr(p0)));
-    assign(sym_name(x0), x1);
-    return nil_sym;
+    sym_set(x0, x1);
+    assign(sym_name(x0), x0);
+    return x0;
+};
+
+eval_set: (p0) {
+    allocate(2);
+    check_arity(p0, 2, "set");
+    x0 = deref(car(p0));
+    x1 = eval_sexp(car(cdr(p0)));
+    if (sym_value(x0) == NULL) {
+        fputs(stderr, "ERROR 'eval_set': undefined variable '");
+        fputs(stderr, sym_name(x0));
+        fputs(stderr, "'\n");
+        exit(1);
+    };
+    sym_set(x0, x1);
+    return x0;
 };
 
 eval_quote: (p0) {
@@ -142,15 +160,27 @@ eval_while: (p0) {
     return nil_sym;
 };
 
-eval_sexp: (p0) {
+eval_do: (p0) {
     allocate(1);
+    while (p0 != nil_sym) {
+        x0 = eval_sexp(car(p0));
+        p0 = cdr(p0);
+    };
+    return x0;
+};
+
+eval_sexp: (p0) {
+    allocate(2);
     x0 = p0[0]; (% node code %);
     if (x0 == NODE_CONS)   { return eval_cons(p0); };
-    if (x0 == NODE_SYMBOL) { return deref(p0); };
-    if (x0 == NODE_INT)    { return p0; };
-    if (x0 == NODE_CHAR)   { return p0; };
-    if (x0 == NODE_STRING) { return p0; };
-    panic("'eval_sexp': not reachable here");
+    if (x0 == NODE_SYMBOL) {
+        x1 = deref(p0);
+        if (sym_value(x1) != NULL) {
+            return eval_sexp(sym_value(x1));
+        };
+        return x1;
+    };
+    return p0;
 };
 
 init_evaluator: () {
