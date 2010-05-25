@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-05-25 21:55:23 nineties $
+ % $Id: builtin.rl 2010-05-25 22:12:28 nineties $
  %);
 
 include(stddef,code);
@@ -271,6 +271,10 @@ rl_reverse: (p0) {
     return reverse(car(p0));
 };
 
+rl_list: (p0) {
+    return p0;
+};
+
 rl_add: (p0) {
     allocate(2);
     x0 = 0;
@@ -396,33 +400,34 @@ register_prim: (p0, p1) {
 };
 
 init_builtin_objects: () {
-    nil_sym     = register_sym("nil");
-    true_sym    = register_sym("true");
-    quote_sym   = register_sym("quote");
-    var_sym     = register_sym("var");
-    set_sym     = register_sym("set");
-    if_sym      = register_sym("if");
-    cond_sym    = register_sym("cond");
-    while_sym   = register_sym("while");
-    do_sym      = register_sym("do");
-    lambda_sym  = register_sym("lambda");
-    macro_sym = register_sym("macro");
+    nil_sym    = register_sym("nil");
+    true_sym   = register_sym("true");
+    quote_sym  = register_sym("quote");
+    var_sym    = register_sym("var");
+    set_sym    = register_sym("set");
+    if_sym     = register_sym("if");
+    cond_sym   = register_sym("cond");
+    while_sym  = register_sym("while");
+    do_sym     = register_sym("do");
+    lambda_sym = register_sym("lambda");
+    macro_sym  = register_sym("macro");
 
-    register_prim("cons"    , &rl_cons);
-    register_prim("car"     , &rl_car);
-    register_prim("cdr"     , &rl_cdr);
-    register_prim("length"  , &rl_length);
-    register_prim("reverse" , &rl_reverse);
-    register_prim("add"     , &rl_add);
-    register_prim("sub"     , &rl_sub);
-    register_prim("mul"     , &rl_mul);
-    register_prim("lt"      , &rl_lt);
-    register_prim("gt"      , &rl_gt);
-    register_prim("le"      , &rl_le);
-    register_prim("ge"      , &rl_ge);
-    register_prim("print"   , &rl_print);
-    register_prim("getc"    , &rl_getc);
-    register_prim("array"   , &rl_array);
-    register_prim("array_get", &rl_array_get);
-    register_prim("array_set", &rl_array_set);
+    register_prim("cons"      , &rl_cons);
+    register_prim("car"       , &rl_car);
+    register_prim("cdr"       , &rl_cdr);
+    register_prim("length"    , &rl_length);
+    register_prim("reverse"   , &rl_reverse);
+    register_prim("list"      , &rl_list);
+    register_prim("array"     , &rl_array);
+    register_prim("array_get" , &rl_array_get);
+    register_prim("array_set" , &rl_array_set);
+    register_prim("add"       , &rl_add);
+    register_prim("sub"       , &rl_sub);
+    register_prim("mul"       , &rl_mul);
+    register_prim("lt"        , &rl_lt);
+    register_prim("gt"        , &rl_gt);
+    register_prim("le"        , &rl_le);
+    register_prim("ge"        , &rl_ge);
+    register_prim("print"     , &rl_print);
+    register_prim("getc"      , &rl_getc);
 };
