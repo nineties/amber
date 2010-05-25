@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: lex.rl 2010-05-21 23:41:59 nineties $
+ % $Id: lex.rl 2010-05-25 18:54:15 nineties $
  %);
 
 include(stddef, code);
@@ -25,7 +25,7 @@ export(lex, unput);
  % escape     : \\['"\\abfnrtv0]
  % character  : \'({escape}|[^\\\'\n])\'
  % string     : \"({escape}|[^\\\"\n])*\" | \(\/ .* \/\)
- % opchar     : [!#$%&=--^|`@+*:/?<>.\,_]
+ % opchar     : [!#$%&=--^|@+*:/?<>.\,_]
  % symbol     : ({letter}|{opchar})({letter}|{opchar}|[0-9])*
  %);
 
@@ -49,17 +49,18 @@ CH_BACKSLASH => 16; (% \\ %);
 CH_LPAREN    => 17; (% (  %);
 CH_RPAREN    => 18; (% )  %);
 CH_SEMI      => 19; (% ;  %);
-CH_SYMBOL    => 20; (% other characters %);
+CH_BACKQUOTE => 20; (% ` %);
+CH_SYMBOL    => 21; (% other characters %);
 
 chgroup : [
      0,  1,  1,  1,  1,  1,  1,  1,  1,  2,  3,  1,  1,  2,  1,  1,
      1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
-     2, 20, 14, 20, 20, 15, 20, 13, 17, 18, 20, 20, 20, 20, 20, 20,
-     4,  5,  5,  5,  5,  5,  5,  5,  6,  6, 20, 19, 20, 20, 20, 20,
-    20,  9,  9,  9,  9,  9,  9, 10, 10, 10, 10, 10, 10, 10, 10, 10,
-    10, 10, 10, 10, 10, 10, 10, 10, 11, 10, 10, 20, 16, 20, 20, 10,
+     2, 21, 14, 21, 21, 15, 21, 13, 17, 18, 21, 21, 21, 21, 21, 21,
+     4,  5,  5,  5,  5,  5,  5,  5,  6,  6, 21, 19, 21, 21, 21, 21,
+    21,  9,  9,  9,  9,  9,  9, 10, 10, 10, 10, 10, 10, 10, 10, 10,
+    10, 10, 10, 10, 10, 10, 10, 10, 11, 10, 10, 21, 16, 21, 21, 10,
     20,  7,  7,  9,  9,  9,  7, 10, 10, 10, 10, 10, 10, 10, 12, 10,
-    10, 10,  8, 10,  8, 10,  8, 10, 11, 10, 10, 20, 20, 20, 20,  1,
+    10, 10,  8, 10,  8, 10,  8, 10, 11, 10, 10, 21, 21, 21, 21,  1,
      1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
      1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
      1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
@@ -85,7 +86,7 @@ chgroup : [
  %       |       +---+  |    +---+
  %       |         ^    |[^\n]
  %       |         +----+
- %       | '()   +---+
+ %       | `()   +---+
  %       +------>|@3 | (special symbol)
  %       |       +---+                         (hexadecimal integer)
  %       | 0     +---+ xX      +---+ hexdigit +---+
@@ -144,61 +145,61 @@ chgroup : [
 
 (% === jump table ==== %);
 (%
- C   C   C   C   C   C   C   C   C   C   C   C   C   C   C   C   C   C   C   C   C
- H   H   H   H   H   H   H   H   H   H   H   H   H   H   H   H   H   H   H   H   H
- _   _   _   _   _   _   _   _   _   _   _   _   _   _   _   _   _   _   _   _   _
- E   I   S   N   Z   1   8   a   r   H   O   X   N   S   D   S   B   L   R   S   S
- O   N   P   L   E   _   _   b   t   E   T   :   :   Q   Q   L   A   P   P   E   Y
- F   V   A   :   R   7   9   f   v   X   H   :   :   U   U   A   C   A   A   M   M
- :   A   C   :   O   :   :   :   :   C   E   :   :   O   O   S   K   R   R   I   B
- :   L   E   :   :   :   :   :   :   H   R   :   :   T   T   H   S   E   E   :   O
- :   I   S   :   :   :   :   :   :   :   C   :   :   E   E   :   L   N   N   :   L
- :   D   :   :   :   :   :   :   :   :   H   :   :   :   :   :   A   :   :   :   :
- :   :   :   :   :   :   :   :   :   :   :   :   :   :   :   :   S   :   :   :   :
- :   :   :   :   :   :   :   :   :   :   :   :   :   :   :   :   H   :   :   :   :
- :   :   :   :   :   :   :   :   :   :   :   :   :   :   :   :   :   :   :   :   :
+ C   C   C   C   C   C   C   C   C   C   C   C   C   C   C   C   C   C   C   C   C   C
+ H   H   H   H   H   H   H   H   H   H   H   H   H   H   H   H   H   H   H   H   H   H
+ _   _   _   _   _   _   _   _   _   _   _   _   _   _   _   _   _   _   _   _   _   _
+ E   I   S   N   Z   1   8   a   r   H   O   X   N   S   D   S   B   L   R   S   B   S
+ O   N   P   L   E   _   _   b   t   E   T   :   :   Q   Q   L   A   P   P   E   A   Y
+ F   V   A   :   R   7   9   f   v   X   H   :   :   U   U   A   C   A   A   M   C   M
+ :   A   C   :   O   :   :   :   :   C   E   :   :   O   O   S   K   R   R   I   K   B
+ :   L   E   :   :   :   :   :   :   H   R   :   :   T   T   H   S   E   E   :   Q   O
+ :   I   S   :   :   :   :   :   :   :   C   :   :   E   E   :   L   N   N   :   U   L
+ :   D   :   :   :   :   :   :   :   :   H   :   :   :   :   :   A   :   :   :   O   :
+ :   :   :   :   :   :   :   :   :   :   :   :   :   :   :   :   S   :   :   :   T   :
+ :   :   :   :   :   :   :   :   :   :   :   :   :   :   :   :   H   :   :   :   E   :
+ :   :   :   :   :   :   :   :   :   :   :   :   :   :   :   :   :   :   :   :   :   :
 %);
 s0next: [
- s1, e1, s0, s0, s4, s8, s8,s20,s20,s20,s20,s20,s20,s11,s17,s20, e1, s3, s3, s2,s20
+ s1, e1, s0, s0, s4, s8, s8,s20,s20,s20,s20,s20,s20,s11,s17,s20, e1, s3, s3, s2, s3,s20
 ];
 s2next: [
- s1, e1, s2, s0, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2
+ s1, e1, s2, s0, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2, s2
 ];
 s4next: [
-fin, e1,fin,fin, s7, s7, e3, e3, e3, e3, e3, s5, e3, e3, e3, e3, e3, e3,fin,fin, e3
+fin, e1,fin,fin, s7, s7, e3, e3, e3, e3, e3, s5, e3, e3, e3, e3, e3, e3,fin,fin, e8, e3
 ];
 s5next: [
-fin, e1,fin,fin, s6, s6, s6, e4, e4, s6, e4, e4, e4, e4, e4, e4, e4, e4, e4,fin, e4
+fin, e1,fin,fin, s6, s6, s6, e4, e4, s6, e4, e4, e4, e4, e4, e4, e4, e4, e4,fin, e8, e4
 ];
 s6next: [
-fin, e1,fin,fin, s6, s6, s6, e4, e4, s6, e4, e4, e4, e4, e4, e4, e4, e4,fin,fin, e4
+fin, e1,fin,fin, s6, s6, s6, e4, e4, s6, e4, e4, e4, e4, e4, e4, e4, e4,fin,fin, e8, e4
 ];
 s7next: [
-fin, e1,fin,fin, s7, s7, e3, e3, e3, e3, e3, e3, e3, e3, e3, e3, e3, e3,fin,fin, e3
+fin, e1,fin,fin, s7, s7, e3, e3, e3, e3, e3, e3, e3, e3, e3, e3, e3, e3,fin,fin, e8, e3
 ];
 s8next: [
-fin, e1,fin,fin, s8, s8, s8, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2,fin,fin, e2
+fin, e1,fin,fin, s8, s8, s8, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2,fin,fin, e8, e2
 ];
 s9next: [
-fin, e1,fin,fin, e1,s10,s10, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2,fin,fin, e2
+fin, e1,fin,fin, e1,s10,s10, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2,fin,fin, e8, e2
 ];
 s10next: [
-fin, e1,fin,fin,s10,s10,s10, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2,fin,fin, e2
+fin, e1,fin,fin,s10,s10,s10, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2, e2,fin,fin, e8, e2
 ];
 s11next: [
- e6, e1,s12, e6,s12,s12,s12,s12,s12,s12,s12,s12,s12,s12,s12,s12,s14,s12,s12,s12,s12
+ e6, e1,s12, e6,s12,s12,s12,s12,s12,s12,s12,s12,s12,s12,s12,s12,s14,s12,s12,s12,s12,s12
 ];
 s14next: [
- e5, e1, e5, e5,s15, e5, e5,s15,s15, e5, e5, e5,s15,s15,s15, e5,s15, e5, e5, e5, e5
+ e5, e1, e5, e5,s15, e5, e5,s15,s15, e5, e5, e5,s15,s15,s15, e5,s15, e5, e5, e5, e5, e5
 ];
 s17next: [
- e7, e1,s17, e7,s17,s17,s17,s17,s17,s17,s17,s17,s17,s17,s19,s17,s18,s17,s17,s17,s17
+ e7, e1,s17, e7,s17,s17,s17,s17,s17,s17,s17,s17,s17,s17,s19,s17,s18,s17,s17,s17,s17,s17
 ];
 s18next: [
- e5, e1, e5, e5,s17, e5, e5,s17,s17, e5, e5, e5,s17,s17,s17, e5,s17, e5, e5, e5, e5
+ e5, e1, e5, e5,s17, e5, e5,s17,s17, e5, e5, e5,s17,s17,s17, e5,s17, e5, e5, e5, e5, e5
 ];
 s20next: [
-fin, e1,fin,fin,s20,s20,s20,s20,s20,s20,s20,s20,s20, e8, e8,s20, e8, e8,fin,fin,s20
+fin, e1,fin,fin,s20,s20,s20,s20,s20,s20,s20,s20,s20, e8, e8,s20, e8, e8,fin,fin, e8,s20
 ];
 
 srcfile  : NULL;

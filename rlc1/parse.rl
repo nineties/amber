@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: parse.rl 2010-05-22 02:53:37 nineties $
+ % $Id: parse.rl 2010-05-25 19:05:56 nineties $
  %);
 
 include(stddef, code, token);
@@ -55,6 +55,10 @@ unescape: (p0) {
 
 parse_sexp: (p0) {
     allocate(3);
+    if (p0 == '`') {
+        x0 = parse_sexp(lex());
+        return mkcons(mksym("quote"), mkcons(x0, nil_sym));
+    };
     if (p0 == '(') {
         x0 = nil_sym;
         while(1) {

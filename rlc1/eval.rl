@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: eval.rl 2010-05-25 14:29:03 nineties $
+ % $Id: eval.rl 2010-05-25 18:16:24 nineties $
  %);
 
 include(stddef,code);
@@ -60,7 +60,7 @@ check_arity: (p0, p1, p2) {
         fputs(stderr, p2);
         fputs(stderr, "': required ");
         fputi(stderr, p1);
-        fputi(stderr, " arguments");
+        fputs(stderr, " arguments");
         exit(1);
     }
 };
@@ -127,15 +127,14 @@ eval_quote: (p0) {
 eval_if: (p0) {
     allocate(2);
     check_arity(p0, 3, "if");
+    scope_push();
     x0 = eval_sexp(car(p0));
     p0 = cdr(p0);
     if (x0 != nil_sym)  {
-        scope_push();
         x1 = eval_sexp(car(p0));
         scope_pop();
         return x1;
     };
-    scope_push();
     x1 = eval_sexp(cadr(p0));
     scope_pop();
     return x1;
@@ -143,10 +142,12 @@ eval_if: (p0) {
 
 eval_cond: (p0) {
     allocate(1);
+    scope_push();
     while (p0 != nil_sym) {
         x0 = car(p0);
         check_arity(x0, 2, "cond");
         if (eval_sexp(car(x0)) != nil_sym) {
+            scope_pop();
             return eval_sexp(cadr(x0));
         };
         p0 = cdr(p0);
@@ -159,10 +160,10 @@ eval_cond: (p0) {
 eval_while: (p0) {
     allocate(3);
     check_arity(p0, 2, "while");
+    scope_push();
     x0 = car(p0); (% condition %);
     x1 = cadr(p0); (% body %);
     x2 = eval_sexp(x0);
-    scope_push();
     while (x2 != nil_sym) {
         eval_sexp(x1);
         x2 = eval_sexp(x0);
@@ -177,10 +178,12 @@ eval_while: (p0) {
 
 eval_do: (p0) {
     allocate(1);
+    scope_push();
     while (p0 != nil_sym) {
         x0 = eval_sexp(car(p0));
         p0 = cdr(p0);
     };
+    scope_pop();
     return x0;
 };
 
@@ -209,10 +212,12 @@ eval_apply: (p0, p1) {
         fputi(stderr, ")\n");
         exit(1);
     };
+    p1 = eval_args(p1);
+
     scope_push();
     while (x0 != nil_sym) {
-        x1 = car(x0);
-        sym_set(x1, eval_sexp(car(p1)));
+        x1 = mksym(sym_name(car(x0)));
+        sym_set(x1, car(p1));
         assign(sym_name(x1), x1);
         x0 = cdr(x0);
         p1 = cdr(p1);
