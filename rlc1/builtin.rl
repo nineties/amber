@@ -2,17 +2,21 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-05-25 13:50:45 nineties $
+ % $Id: builtin.rl 2010-05-25 14:19:43 nineties $
  %);
 
 include(stddef,code);
 export(init_builtin_objects);
-export(mksym, mkint, mkchar, mkstring);
-export(sym_set, sym_name, sym_value);
-export(cons_p,sym_p,int_p,char_p,string_p,prim_p);
+export(mksym, sym_set, sym_name, sym_value);
+export(mkint, int_value);
+export(mkchar, character);
+export(mkstring, string_value);
+export(mkarray, array_size, array_get, array_set);
+export(mklambda,lambda_arity,lambda_params,lambda_body);
+export(cons_p,sym_p,int_p,char_p,string_p,prim_p,array_p,lambda_p);
 export(prim_funptr);
-export(mkcons,car,cdr,length,reverse);
-export(nil_sym,true_sym,var_sym,set_sym,quote_sym,if_sym,cond_sym,while_sym,do_sym);
+export(mkcons,car,cdr,cadr,caddr,length,reverse);
+export(nil_sym,true_sym,var_sym,set_sym,quote_sym,if_sym,cond_sym,while_sym,do_sym,lambda_sym);
 
 (%
  % symbol object:
@@ -155,6 +159,27 @@ index_error: (p0) {
     fputs(stderr, "' : index out of range\n");
     exit(1);
 };
+
+(% p0: params, p1: body %);
+mklambda: (p0, p1) {
+    expect(p0, NODE_CONS, "lambda", "list of parameters");
+    return mktup3(NODE_LAMBDA, p0, p1);
+};
+
+lambda_params: (p0) {
+    expect(p0, NODE_LAMBDA, "lambda_params", "lambda object");
+    return p0[1];
+};
+
+lambda_body: (p0) {
+    expect(p0, NODE_LAMBDA, "lambda_body", "lambda object");
+    return p0[2];
+};
+
+lambda_arity: (p0) {
+    return rl_length(lambda_params(p0));
+};
+
 (% p0: code, p1: object %);
 check_code: (p0, p1) {
     if (p1[0] == p0) {
@@ -172,6 +197,8 @@ int_p    : (p0) { return check_code(NODE_INT, p0); };
 char_p   : (p0) { return check_code(NODE_CHAR, p0); };
 string_p : (p0) { return check_code(NODE_STRING, p0); };
 prim_p   : (p0) { return check_code(NODE_PRIM, p0); };
+array_p  : (p0) { return check_code(NODE_ARRAY, p0); };
+lambda_p : (p0) { return check_code(NODE_LAMBDA, p0); };
 
 prim_funptr: (p0) {
     expect(p0, NODE_PRIM, "prim_funptr", "primitive function");
@@ -321,31 +348,33 @@ if_sym      : NULL;
 cond_sym    : NULL;
 while_sym   : NULL;
 do_sym      : NULL;
+lambda_sym  : NULL;
 
+(% p0: name %);
+register_sym: (p0) {
+    allocate(1);
+    x0 = mksym(p0);
+    assign(p0, x0);
+    return x0;
+};
+
+(% p0: name, p1: address of function %);
 register_prim: (p0, p1) {
     assign(p0, mksym2(p0, mkprim(p1)));
 };
 
 init_builtin_objects: () {
-    nil_sym     = mksym("nil");
-    true_sym    = mksym("true");
-    quote_sym   = mksym("quote");
-    var_sym     = mksym("var");
-    set_sym     = mksym("set");
-    if_sym      = mksym("if");
-    cond_sym    = mksym("cond");
-    while_sym   = mksym("while");
-    do_sym      = mksym("do");
+    nil_sym     = register_sym("nil");
+    true_sym    = register_sym("true");
+    quote_sym   = register_sym("quote");
+    var_sym     = register_sym("var");
+    set_sym     = register_sym("set");
+    if_sym      = register_sym("if");
+    cond_sym    = register_sym("cond");
+    while_sym   = register_sym("while");
+    do_sym      = register_sym("do");
+    lambda_sym  = register_sym("lambda");
 
-    assign("nil"     , nil_sym);
-    assign("true"    , true_sym);
-    assign("quote"   , quote_sym);
-    assign("var"     , var_sym);
-    assign("set"     , set_sym);
-    assign("if"      , if_sym);
-    assign("cond"    , cond_sym);
-    assign("while"   , while_sym);
-    assign("do"      , do_sym);
     register_prim("cons"    , &rl_cons);
     register_prim("car"     , &rl_car);
     register_prim("cdr"     , &rl_cdr);
