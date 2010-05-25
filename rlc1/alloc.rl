@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  % 
- % $Id: alloc.rl 2010-04-13 17:18:08 nineties $
+ % $Id: alloc.rl 2010-05-25 18:22:41 nineties $
  %);
 
 include(stddef);
@@ -29,6 +29,7 @@ MAX_BLOCKS => 4096;     (% 4096 is enough for 32-bit machine %);
 
 block_used : int [MAX_BLOCKS];
 next_addr : 0;
+num_bytes: 0;
 num_block : 0;
 free_first : 0;
 free_last  : 0;
@@ -51,6 +52,7 @@ munmap: (p0, p1) {
     return syscall(SYS_MUNMAP, p0, p1);
 };
 
+
 (% alloc_block(size) %);
 alloc_block: (p0) {
     allocate (2); (% x0: address of new block %);
@@ -66,6 +68,7 @@ alloc_block: (p0) {
         }
     };
     x0 = x0 + BLOCK_SIZE - x1;
+    num_block = num_block + 1;
     return x0;
 };
 
@@ -98,17 +101,25 @@ memalloc: (p0) {
     };
     x0 = free_first;
     free_first = free_first + p0;
+    num_bytes = num_bytes + p0;
     return x0;
 };
 
 (% munmap all blocks %);
 finalize_mem: () {
     allocate(1);
+
+    puts("[DEBUG] total memory : ");
+    puti(num_bytes);
+    puts("bytes (");
+    puti(num_block);
+    puts(" blocks)\n");
+
     x0 = 0;
     while (x0 < MAX_BLOCKS) {
         if (block_used[x0]) {
             munmap(x0*BLOCK_SIZE, BLOCK_SIZE);
         };
         x0 = x0 + 1;
-    }
+    };
 };
