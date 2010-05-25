@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-05-24 01:36:16 nineties $
+ % $Id: builtin.rl 2010-05-25 13:50:45 nineties $
  %);
 
 include(stddef,code);
@@ -34,6 +34,9 @@ cdr: (p0) {
     expect(p0, NODE_CONS, "car", "cons object");
     return p0[2];
 };
+
+cadr: (p0) { return car(cdr(p0)); };
+caddr: (p0) { return car(cdr(cdr(p0))); };
 
 length: (p0) {
     allocate(2);
@@ -109,6 +112,49 @@ string_value: (p0) {
     return p0[1];
 };
 
+(% p0: init, p1: size (as int) %);
+mkarray: (p0, p1) {
+    allocate(2);
+    x0 = memalloc(p1*4);
+    x1 = 0;
+    while (x1 < p1) {
+        x0[x1] = p0;
+        x1 = x1 + 1;
+    };
+    return mktup3(NODE_ARRAY, p1, x0);
+};
+
+array_size: (p0) {
+    expect(p0, NODE_ARRAY, "array_size", "array object");
+    return p0[1];
+};
+
+(% p0: array object, p1: index (as int) %);
+array_get: (p0, p1) {
+    allocate(1);
+    expect(p0, NODE_ARRAY, "array_get", "array object");
+    if (p1 < 0) { index_error("array_get"); };
+    if (p1 >= array_size(p0)) { index_error("array_get"); };
+    x0 = p0[2];
+    return x0[p1];
+};
+
+(% p0: array object, p1: index (as int), p2: value %);
+array_set: (p0, p1, p2) {
+    allocate(1);
+    expect(p0, NODE_ARRAY, "array_get", "array_object");
+    if (p1 < 0) { index_error("array_set"); };
+    if (p1 >= array_size(p0)) { index_error("array_set"); };
+    x0 = p0[2];
+    x0[p1] = p2;
+};
+
+index_error: (p0) {
+    fputs(stderr, "ERROR '");
+    fputs(stderr, p0);
+    fputs(stderr, "' : index out of range\n");
+    exit(1);
+};
 (% p0: code, p1: object %);
 check_code: (p0, p1) {
     if (p1[0] == p0) {
@@ -152,7 +198,7 @@ mkprim: (p0) {
 
 rl_cons: (p0) {
     check_arity(p0, 2, "cons");
-    return mkcons(car(p0), car(cdr(p0)));
+    return mkcons(car(p0), cadr(p0));
 };
 
 rl_car: (p0) {
@@ -204,7 +250,7 @@ int_binop_helper: (p0, p1, p2) {
     allocate(2);
     check_arity(p1, 2, p0);
     x0 = car(p1);
-    x1 = car(cdr(p1));
+    x1 = cadr(p1);
     expect(x0, NODE_INT, p0, "integer");
     expect(x1, NODE_INT, p0, "integer");
     return p2(int_value(x0), int_value(x1));
@@ -235,6 +281,35 @@ rl_getc: (p0) {
         exit(1);
     };
     return mkchar(getc());
+};
+
+(% (array <init> <len>) %);
+rl_array: (p0) {
+    allocate(2);
+    check_arity(p0, 2, "array");
+    x0 = car(p0); (% init value %);
+    x1 = int_value(cadr(p0)); (% length %);
+    return mkarray(x0, x1);
+};
+
+(% (array_get <array> <index>) %);
+rl_array_get: (p0) {
+    allocate(2);
+    check_arity(p0, 2, "array_get");
+    x0 = car(p0); (% array %);
+    x1 = int_value(cadr(p0)); (% index %);
+    return array_get(x0, x1);
+};
+
+(% (array_set <array> <index> <value>) %);
+rl_array_set: (p0) {
+    allocate(3);
+    check_arity(p0, 3, "array_set");
+    x0 = car(p0); (% array %);
+    x1 = int_value(cadr(p0)); (% index %);
+    x2 = caddr(p0); (% value %);
+    array_set(x0, x1, x2);
+    return nil_sym;
 };
 
 nil_sym     : NULL;
@@ -284,4 +359,7 @@ init_builtin_objects: () {
     register_prim("ge"      , &rl_ge);
     register_prim("print"   , &rl_print);
     register_prim("getc"    , &rl_getc);
+    register_prim("array"   , &rl_array);
+    register_prim("array_get", &rl_array_get);
+    register_prim("array_set", &rl_array_set);
 };
