@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-05-25 16:03:34 nineties $
+ % $Id: builtin.rl 2010-05-25 21:55:23 nineties $
  %);
 
 include(stddef,code);
@@ -13,10 +13,12 @@ export(mkchar, character);
 export(mkstring, string_value);
 export(mkarray, array_size, array_get, array_set);
 export(mklambda,lambda_arity,lambda_params,lambda_body);
-export(cons_p,sym_p,int_p,char_p,string_p,prim_p,array_p,lambda_p);
+export(mkmacro,macro_arity,macro_params,macro_body);
+export(cons_p,sym_p,int_p,char_p,string_p,prim_p,array_p,lambda_p,macro_p);
 export(prim_funptr);
 export(mkcons,car,cdr,cadr,caddr,length,reverse);
-export(nil_sym,true_sym,var_sym,set_sym,quote_sym,if_sym,cond_sym,while_sym,do_sym,lambda_sym);
+export(nil_sym,true_sym,var_sym,set_sym,quote_sym,if_sym,cond_sym,while_sym,
+    do_sym,lambda_sym,macro_sym);
 
 (%
  % symbol object:
@@ -180,6 +182,26 @@ lambda_arity: (p0) {
     return rl_length(lambda_params(p0));
 };
 
+(% p0: params, p1: body %);
+mkmacro: (p0, p1) {
+    expect(p0, NODE_CONS, "macro", "list of parameters");
+    return mktup3(NODE_MACRO, p0, p1);
+};
+
+macro_params: (p0) {
+    expect(p0, NODE_MACRO, "macro_params", "macro object");
+    return p0[1];
+};
+
+macro_body: (p0) {
+    expect(p0, NODE_MACRO, "macro_body", "macro object");
+    return p0[2];
+};
+
+macro_arity: (p0) {
+    return rl_length(macro_params(p0));
+};
+
 (% p0: code, p1: object %);
 check_code: (p0, p1) {
     if (p1[0] == p0) {
@@ -199,6 +221,7 @@ string_p : (p0) { return check_code(NODE_STRING, p0); };
 prim_p   : (p0) { return check_code(NODE_PRIM, p0); };
 array_p  : (p0) { return check_code(NODE_ARRAY, p0); };
 lambda_p : (p0) { return check_code(NODE_LAMBDA, p0); };
+macro_p  : (p0) { return check_code(NODE_MACRO, p0); };
 
 prim_funptr: (p0) {
     expect(p0, NODE_PRIM, "prim_funptr", "primitive function");
@@ -357,6 +380,7 @@ cond_sym    : NULL;
 while_sym   : NULL;
 do_sym      : NULL;
 lambda_sym  : NULL;
+macro_sym : NULL;
 
 (% p0: name %);
 register_sym: (p0) {
@@ -382,6 +406,7 @@ init_builtin_objects: () {
     while_sym   = register_sym("while");
     do_sym      = register_sym("do");
     lambda_sym  = register_sym("lambda");
+    macro_sym = register_sym("macro");
 
     register_prim("cons"    , &rl_cons);
     register_prim("car"     , &rl_car);
