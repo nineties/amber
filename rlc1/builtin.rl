@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-05-25 22:12:28 nineties $
+ % $Id: builtin.rl 2010-05-26 16:42:24 nineties $
  %);
 
 include(stddef,code);
@@ -17,8 +17,8 @@ export(mkmacro,macro_arity,macro_params,macro_body);
 export(cons_p,sym_p,int_p,char_p,string_p,prim_p,array_p,lambda_p,macro_p);
 export(prim_funptr);
 export(mkcons,car,cdr,cadr,caddr,length,reverse);
-export(nil_sym,true_sym,var_sym,set_sym,quote_sym,if_sym,cond_sym,while_sym,
-    do_sym,lambda_sym,macro_sym);
+export(nil_sym,true_sym,var_sym,set_sym,quote_sym,unquote_sym,if_sym,cond_sym,
+    while_sym,do_sym,lambda_sym,macro_sym);
 
 (%
  % symbol object:
@@ -377,6 +377,7 @@ rl_array_set: (p0) {
 nil_sym     : NULL;
 true_sym    : NULL;
 quote_sym   : NULL;
+unquote_sym : NULL;
 var_sym     : NULL;
 set_sym     : NULL;
 if_sym      : NULL;
@@ -400,17 +401,18 @@ register_prim: (p0, p1) {
 };
 
 init_builtin_objects: () {
-    nil_sym    = register_sym("nil");
-    true_sym   = register_sym("true");
-    quote_sym  = register_sym("quote");
-    var_sym    = register_sym("var");
-    set_sym    = register_sym("set");
-    if_sym     = register_sym("if");
-    cond_sym   = register_sym("cond");
-    while_sym  = register_sym("while");
-    do_sym     = register_sym("do");
-    lambda_sym = register_sym("lambda");
-    macro_sym  = register_sym("macro");
+    nil_sym     = register_sym("nil");
+    true_sym    = register_sym("true");
+    quote_sym   = register_sym("quote");
+    unquote_sym = register_sym("unquote");
+    var_sym     = register_sym("var");
+    set_sym     = register_sym("set");
+    if_sym      = register_sym("if");
+    cond_sym    = register_sym("cond");
+    while_sym   = register_sym("while");
+    do_sym      = register_sym("do");
+    lambda_sym  = register_sym("lambda");
+    macro_sym   = register_sym("macro");
 
     register_prim("cons"      , &rl_cons);
     register_prim("car"       , &rl_car);
