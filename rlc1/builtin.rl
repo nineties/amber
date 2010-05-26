@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-05-26 16:42:24 nineties $
+ % $Id: builtin.rl 2010-05-26 19:09:07 nineties $
  %);
 
 include(stddef,code);
@@ -14,7 +14,9 @@ export(mkstring, string_value);
 export(mkarray, array_size, array_get, array_set);
 export(mklambda,lambda_arity,lambda_params,lambda_body);
 export(mkmacro,macro_arity,macro_params,macro_body);
-export(cons_p,sym_p,int_p,char_p,string_p,prim_p,array_p,lambda_p,macro_p);
+export(mkquote,quote_sexp);
+export(mkunquote,unquote_sexp);
+export(cons_p,sym_p,int_p,char_p,string_p,prim_p,array_p,lambda_p,macro_p,quote_p,unquote_p);
 export(prim_funptr);
 export(mkcons,car,cdr,cadr,caddr,length,reverse);
 export(nil_sym,true_sym,var_sym,set_sym,quote_sym,unquote_sym,if_sym,cond_sym,
@@ -202,6 +204,26 @@ macro_arity: (p0) {
     return rl_length(macro_params(p0));
 };
 
+(% p0: sexp %);
+mkquote: (p0) {
+    return mktup2(NODE_QUOTE, p0);
+};
+
+quote_sexp: (p0) {
+    expect(p0, NODE_QUOTE, "quote_sexp", "quoted S-expression");
+    return p0[1];
+};
+
+(% p0: sexp %);
+mkunquote: (p0) {
+    return mktup2(NODE_UNQUOTE, p0);
+};
+
+unquote_sexp: (p0) {
+    expect(p0, NODE_UNQUOTE, "unquote_sexp", "unquoted S-expression");
+    return p0[1];
+};
+
 (% p0: code, p1: object %);
 check_code: (p0, p1) {
     if (p1[0] == p0) {
@@ -210,18 +232,17 @@ check_code: (p0, p1) {
     return nil_sym;
 };
 
-cons_p: (p0) {
-    if (p0[0] == NODE_CONS) { return true_sym; };
-    return nil_sym;
-};
-sym_p    : (p0) { return check_code(NODE_SYMBOL, p0); };
-int_p    : (p0) { return check_code(NODE_INT, p0); };
-char_p   : (p0) { return check_code(NODE_CHAR, p0); };
-string_p : (p0) { return check_code(NODE_STRING, p0); };
-prim_p   : (p0) { return check_code(NODE_PRIM, p0); };
-array_p  : (p0) { return check_code(NODE_ARRAY, p0); };
-lambda_p : (p0) { return check_code(NODE_LAMBDA, p0); };
-macro_p  : (p0) { return check_code(NODE_MACRO, p0); };
+cons_p    : (p0) { return check_code(NODE_CONS, p0); };
+sym_p     : (p0) { return check_code(NODE_SYMBOL, p0); };
+int_p     : (p0) { return check_code(NODE_INT, p0); };
+char_p    : (p0) { return check_code(NODE_CHAR, p0); };
+string_p  : (p0) { return check_code(NODE_STRING, p0); };
+prim_p    : (p0) { return check_code(NODE_PRIM, p0); };
+array_p   : (p0) { return check_code(NODE_ARRAY, p0); };
+lambda_p  : (p0) { return check_code(NODE_LAMBDA, p0); };
+macro_p   : (p0) { return check_code(NODE_MACRO, p0); };
+quote_p   : (p0) { return check_code(NODE_QUOTE, p0); };
+unquote_p : (p0) { return check_code(NODE_UNQUOTE, p0); };
 
 prim_funptr: (p0) {
     expect(p0, NODE_PRIM, "prim_funptr", "primitive function");
@@ -376,8 +397,6 @@ rl_array_set: (p0) {
 
 nil_sym     : NULL;
 true_sym    : NULL;
-quote_sym   : NULL;
-unquote_sym : NULL;
 var_sym     : NULL;
 set_sym     : NULL;
 if_sym      : NULL;
@@ -403,8 +422,6 @@ register_prim: (p0, p1) {
 init_builtin_objects: () {
     nil_sym     = register_sym("nil");
     true_sym    = register_sym("true");
-    quote_sym   = register_sym("quote");
-    unquote_sym = register_sym("unquote");
     var_sym     = register_sym("var");
     set_sym     = register_sym("set");
     if_sym      = register_sym("if");

@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: pprint.rl 2010-05-25 10:15:54 nineties $
+ % $Id: pprint.rl 2010-05-26 18:58:39 nineties $
  %);
 
 include(stddef,code);
@@ -61,10 +61,12 @@ pp_cons: (p0, p1) {
 
 (% p0: output channel, p1: S-expression %);
 pp_sexp: (p0, p1) {
-    if (p1[0] == NODE_CONS)   { return pp_cons(p0, p1) };
-    if (p1[0] == NODE_SYMBOL) { return pp_symbol(p0, p1) };
-    if (p1[0] == NODE_INT)    { return pp_int(p0, p1) };
-    if (p1[0] == NODE_CHAR)   { return pp_char(p0, p1) };
-    if (p1[0] == NODE_STRING) { return pp_string(p0, p1) };
+    if (p1[0] == NODE_CONS)    { return pp_cons(p0, p1) };
+    if (p1[0] == NODE_SYMBOL)  { return pp_symbol(p0, p1) };
+    if (p1[0] == NODE_INT)     { return pp_int(p0, p1) };
+    if (p1[0] == NODE_CHAR)    { return pp_char(p0, p1) };
+    if (p1[0] == NODE_STRING)  { return pp_string(p0, p1) };
+    if (p1[0] == NODE_QUOTE)   { fputc(p0, '`'); return pp_sexp(p0, quote_sexp(p1)); };
+    if (p1[0] == NODE_UNQUOTE) { fputc(p0, '@'); return pp_sexp(p0, unquote_sexp(p1)); };
     panic("'pp_sexp': not reachable here");
 };

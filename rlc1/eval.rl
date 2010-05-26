@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: eval.rl 2010-05-26 17:13:45 nineties $
+ % $Id: eval.rl 2010-05-26 19:15:06 nineties $
  %);
 
 include(stddef,code);
@@ -77,8 +77,6 @@ eval_cons: (p0) {
     x1 = eval_sexp(x0);
     if (x1 == var_sym)     { return eval_var(cdr(p0)); };
     if (x1 == set_sym)     { return eval_set(cdr(p0)); };
-    if (x1 == quote_sym)   { return eval_quote(cdr(p0)); };
-    if (x1 == unquote_sym) { return eval_sexp(cdr(p0)); };
     if (x1 == if_sym)      { return eval_if(cdr(p0)); };
     if (x1 == cond_sym)    { return eval_cond(cdr(p0)); };
     if (x1 == while_sym)   { return eval_while(cdr(p0)); };
@@ -122,25 +120,19 @@ eval_set: (p0) {
 };
 
 eval_quote: (p0) {
-    allocate(4);
-    check_arity(p0, 1, "quote");
-    x0 = car(p0);
-    x1 = nil_sym;
-    while (x0 != nil_sym) {
-	x2 = car(x0);
-	if (cons_p(x2) != nil_sym) {
-	    x3 = car(x2);
-	    if (sym_p(x3) != nil_sym) {
-		if (streq(sym_name(x3), "unquote")) {
-		    puts("hoge\n");
-		    x2 = eval_sexp(cadr(x2));
-		};
-	    };
-	};
-	x1 = mkcons(x2, x1);
-	x0 = cdr(x0);
+    allocate(1);
+    if (cons_p(p0) != nil_sym) {
+        x0 = nil_sym;
+        while (p0 != nil_sym) {
+            x0 = mkcons(eval_quote(car(p0)), x0);
+            p0 = cdr(p0);
+        };
+        return reverse(x0);
     };
-    return reverse(x1);
+    if (unquote_p(p0) != nil_sym) {
+        return eval_sexp(unquote_sexp(p0));
+    };
+    return p0;
 };
 
 (% p0 : (cond ifthen ifelse) %);
@@ -232,7 +224,7 @@ eval_applambda: (p0, p1) {
     if (length(x0) != length(p1)) {
         fputs(stderr, "ERROR: invalid number of argument (must be ");
         fputi(stderr, length(x0));
-        fputi(stderr, ")\n");
+        fputs(stderr, ")\n");
         exit(1);
     };
     p1 = eval_args(p1);
@@ -257,15 +249,14 @@ eval_appmacro: (p0, p1) {
     if (length(x0) != length(p1)) {
         fputs(stderr, "ERROR: invalid number of argument (must be ");
         fputi(stderr, length(x0));
-        fputi(stderr, ")\n");
+        fputs(stderr, ")\n");
         exit(1);
     };
-    p1 = eval_args(p1);
 
     scope_push();
     while (x0 != nil_sym) {
         x1 = mksym(sym_name(car(x0)));
-        sym_set(x1, car(p1));
+        sym_set(x1, mkquote(car(p1)));
         assign(sym_name(x1), x1);
         x0 = cdr(x0);
         p1 = cdr(p1);
@@ -286,6 +277,7 @@ eval_sexp: (p0) {
         };
         return x1;
     };
+    if (x0 == NODE_QUOTE) { return eval_quote(quote_sexp(p0)); };
     return p0;
 };
 
