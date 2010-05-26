@@ -2,12 +2,12 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: parse.rl 2010-05-26 18:55:26 nineties $
+ % $Id: parse.rl 2010-05-26 21:39:01 nineties $
  %);
 
 include(stddef, code, token);
 
-export(parse);
+export(parse, parse_module);
 
 (% p0: character, p1: expected character %);
 eatchar: (p0, p1) {
@@ -111,4 +111,18 @@ parse: (p0) {
     x1 = parse_sexp_list(lex());
     close_in(x0);
     return x1;
+};
+
+(% p0: module name %);
+parse_module: (p0) {
+    allocate(4);
+    x0 = strlen(p0);
+    x1 = memalloc(x0 + 4 + 1); (% +4 for suffix '.rlc' %);
+    strcpy(x1, p0);
+    strcpy(x1 + x0, ".rlc");
+    x2 = open_in(x1);
+    lexer_push(x1, x2);
+    x3 = parse_sexp_list(lex());
+    close_in(x2);
+    return x3;
 };

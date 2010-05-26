@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: eval.rl 2010-05-26 19:15:06 nineties $
+ % $Id: eval.rl 2010-05-26 21:46:18 nineties $
  %);
 
 include(stddef,code);
@@ -83,6 +83,7 @@ eval_cons: (p0) {
     if (x1 == do_sym)      { return eval_do(cdr(p0)); };
     if (x1 == lambda_sym)  { return eval_lambda(cdr(p0)); };
     if (x1 == macro_sym)   { return eval_macro(cdr(p0)); };
+    if (x1 == import_sym)  { return eval_import(cdr(p0)); };
     if (prim_p(x1) != nil_sym)   { return (prim_funptr(x1))(eval_args(cdr(p0))); };
     if (lambda_p(x1) != nil_sym) { return eval_applambda(x1, eval_args(cdr(p0))); };
     if (macro_p(x1) != nil_sym)  { return eval_appmacro(x1, cdr(p0)); };
@@ -266,6 +267,29 @@ eval_appmacro: (p0, p1) {
     return eval_sexp(x2);
 };
 
+imported : NULL;
+
+eval_import: (p0) {
+    allocate(2);
+    check_arity(p0, 1, "import");
+    x0 = eval_sexp(car(p0));
+    if (string_p(x0) == nil_sym) {
+	fputs(stderr, "ERROR 'import': required string\n");
+	exit(1);
+    };
+    x1 = string_value(x0);
+    if (set_contains(imported, x1)) {
+        return nil_sym;
+    };
+    set_add(imported, x1);
+    x2 = parse_module(x1);
+    while (x2 != nil_sym) {
+	eval_sexp(car(x2));
+	x2 = cdr(x2);
+    };
+    return nil_sym;
+};
+
 eval_sexp: (p0) {
     allocate(2);
     x0 = p0[0]; (% node code %);
@@ -283,6 +307,7 @@ eval_sexp: (p0) {
 
 init_evaluator: () {
     symbol_map = mkmap(&symbol_hash, &symbol_equal, 100);
+    imported = mkset(&strhash, &streq, 10);
     scopeid_stack = mkvec(0);
     scope_push(); (% global scope %);
 };
