@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: pprint.rl 2010-05-26 18:58:39 nineties $
+ % $Id: pprint.rl 2010-05-27 17:19:38 nineties $
  %);
 
 include(stddef,code);
@@ -54,8 +54,14 @@ pp_cons: (p0, p1) {
         x0 = cdr(x0);
         if (x0 != nil_sym) {
             fputc(p0, ' ');
+        };
+        if (cons_p(x0) == nil_sym) {
+            fputs(p0, ". ");
+            pp_sexp(p0, x0);
+            goto &break;
         }
     };
+label break;
     fputc(p0, ')');
 };
 
