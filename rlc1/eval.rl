@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: eval.rl 2010-05-29 10:58:35 nineties $
+ % $Id: eval.rl 2010-05-29 11:05:11 nineties $
  %);
 
 include(stddef,code);
@@ -275,7 +275,7 @@ eval_appmacro: (p0, p1) {
 imported : NULL;
 
 eval_import: (p0) {
-    allocate(2);
+    allocate(3);
     check_arity(p0, 1, "import");
     x0 = eval_sexp(car(p0));
     if (string_p(x0) == nil_sym) {
