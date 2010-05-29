@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: eval.rl 2010-05-29 13:52:55 nineties $
+ % $Id: eval.rl 2010-05-29 17:25:39 nineties $
  %);
 
 include(stddef,code);
@@ -98,7 +98,7 @@ label eval_cons_error;
 eval_var: (p0) {
     allocate(2);
     check_arity(p0, 2, "var");
-    x0 = car(p0);
+    x0 = fresh_sym(car(p0));
     x1 = eval_sexp(cadr(p0));
     sym_set(x0, x1);
     assign(sym_name(x0), x0);
@@ -223,17 +223,27 @@ eval_macro: (p0) {
 match_args: (p0, p1) {
     allocate(1);
     if (sym_p(p0) != nil_sym) {
-        x0 = mksym(sym_name(p0));
+        x0 = fresh_sym(p0);
         sym_set(x0, p1);
         assign(sym_name(x0), x0);
         return;
     };
     if (cons_p(p0) != nil_sym) {
+        if (cons_p(p1) == nil_sym) {
+            fputs(stderr, "ERROR: argument pattern mismatch ");
+            pp_sexp(stderr, p0);
+            fputs(stderr, " <-> ");
+            pp_sexp(stderr, p1);
+            fputs(stderr, "\n");
+            exit(1);
+        };
         match_args(car(p0), car(p1));
         match_args(cdr(p0), cdr(p1));
         return;
     };
-    fputs(stderr, "ERROR: invalid argument pattern\n");
+    fputs(stderr, "ERROR: invalid argument pattern ");
+    pp_sexp(stderr, p0);
+    fputs(stderr, "\n");
     exit(1);
 };
 

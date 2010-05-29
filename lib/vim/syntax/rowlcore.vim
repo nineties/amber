@@ -1,6 +1,6 @@
 " Language:	rowl-core
 " Maintainer:	nineties <nineties48@gmail.com>
-" $Id: rowlcore.vim 2010-05-29 15:32:14 nineties $
+" $Id: rowlcore.vim 2010-05-29 16:07:37 nineties $
 
 if exists("b:current_syntax")
     finish
@@ -9,7 +9,7 @@ endif
 syn case match
 
 syn keyword rowlcoreConstant  nil true
-syn keyword rowlcoreSymbol    do if cond while for set var
+syn keyword rowlcoreSymbol    do if cond while for foreach set var
 syn keyword rowlcoreExternal  import define rewrite
 syn match rowlcoreIdentifier  /\<\h\w*/
 syn match rowlcoreInteger     /-\?\(0\o*\|[1-9]\d*\|0x\x\+\)\>/

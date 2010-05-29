@@ -2,12 +2,12 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-05-29 14:47:40 nineties $
+ % $Id: builtin.rl 2010-05-29 17:25:12 nineties $
  %);
 
 include(stddef,code);
 export(init_builtin_objects);
-export(mksym, sym_set, sym_name, sym_value);
+export(mksym, sym_set, sym_name, sym_value, fresh_sym);
 export(mkint, int_value);
 export(mkchar, character);
 export(mkstring, string_value);
@@ -39,7 +39,7 @@ car: (p0) {
 };
 
 cdr: (p0) {
-    expect(p0, NODE_CONS, "car", "cons object");
+    expect(p0, NODE_CONS, "cdr", "cons object");
     return p0[2];
 };
 
@@ -101,6 +101,11 @@ sym_name: (p0) {
 sym_value: (p0) {
     expect(p0, NODE_SYMBOL, "sym_value", "symbol object");
     return p0[2];
+};
+
+fresh_sym: (p0) {
+    expect(p0, NODE_SYMBOL, "fresh_sym", "symbol object");
+    return mksym(sym_name(p0));
 };
 
 mkint: (p0) {
@@ -295,7 +300,9 @@ expect: (p0, p1, p2, p3) {
     fputs(stderr, p2);
     fputs(stderr, "': ");
     fputs(stderr, p3);
-    fputs(stderr, " is required\n");
+    fputs(stderr, " is required (");
+    pp_sexp(stderr, p0);
+    fputs(stderr, ")\n");
     exit(1);
 };
 
@@ -431,6 +438,16 @@ rl_print: (p0) {
     while (p0 != nil_sym) {
         x0 = car(p0);
         pp_sexp(stdout, x0);
+        p0 = cdr(p0);
+    };
+    return nil_sym;
+};
+
+rl_eprint: (p0) {
+    allocate(1);
+    while (p0 != nil_sym) {
+        x0 = car(p0);
+        pp_sexp(stderr, x0);
         p0 = cdr(p0);
     };
     return nil_sym;
@@ -617,6 +634,7 @@ init_builtin_objects: () {
     register_prim("eq"         , &rl_eq);
     register_prim("ne"         , &rl_ne);
     register_prim("print"      , &rl_print);
+    register_prim("eprint"     , &rl_eprint);
     register_prim("getc"       , &rl_getc);
     register_prim("syscall"    , &rl_syscall);
     register_prim("exit"       , &rl_exit);
