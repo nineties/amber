@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-05-29 11:13:35 nineties $
+ % $Id: builtin.rl 2010-05-29 12:34:53 nineties $
  %);
 
 include(stddef,code);
@@ -43,8 +43,18 @@ cdr: (p0) {
     return p0[2];
 };
 
-cadr: (p0) { return car(cdr(p0)); };
-caddr: (p0) { return car(cdr(cdr(p0))); };
+cadr  : (p0) { return car(cdr(p0)); };
+caddr : (p0) { return car(cdr(cdr(p0))); };
+cddr  : (p0) { return cdr(cdr(p0)); };
+
+(% p0: list, p1: index %);
+nth: (p0, p1) {
+    while (p1 > 0) {
+        p0 = cdr(p0);
+        p1 = p1-1;
+    };
+    return car(p0);
+};
 
 length: (p0) {
     allocate(2);
@@ -155,6 +165,35 @@ array_set: (p0, p1, p2) {
     if (p1 >= array_size(p0)) { index_error("array_set"); };
     x0 = p0[2];
     x0[p1] = p2;
+};
+
+(% p0: size (as int) %);
+mkstrbuf: (p0) {
+    allocate(1);
+    x0 = memalloc(p0+1); (% +1 for '\0' %);
+    memset(x0,0,p0+1);
+    return mktup3(NODE_STRBUF, p0, x0);
+};
+
+strbuf_size: (p0) {
+    expect(p0, NODE_STRBUF, "strbuf_size", "strbuf object");
+    return p0[1];
+};
+
+(% p0: strbuf object, p1: index %);
+strbuf_get: (p0, p1) {
+    expect(p0, NODE_ARRAY, "strbuf_get", "strbuf object");
+    if (p1 < 0) { index_error("strbuf_get"); };
+    if (p1 >= strbuf_size(p0)) { index_error("strbuf_get"); };
+    return rch(p0[2], p1);
+};
+
+(% p0: strbuf object, p1: index (as int), p2: value %);
+strbuf_set: (p0, p1, p2) {
+    expect(p0, NODE_ARRAY, "strbuf_get", "strbuf_object");
+    if (p1 < 0) { index_error("strbuf_set"); };
+    if (p1 >= strbuf_size(p0)) { index_error("strbuf_set"); };
+    wch(p0[2], p1, p2);
 };
 
 index_error: (p0) {
@@ -347,6 +386,31 @@ rl_gt: (p0) { return int_binop_helper("gt", p0, &_gt); };
 rl_le: (p0) { return int_binop_helper("le", p0, &_le); };
 rl_ge: (p0) { return int_binop_helper("ge", p0, &_ge); };
 
+_eq: (p0, p1) {
+    if (p0[0] != p1[0]) { return FALSE; };
+    if (p0[0] == NODE_CONS) {
+        if (_eq(car(p0), car(p1)) == FALSE) { return TRUE; };
+        return _eq(cdr(p0), cdr(p1));
+    };
+    if (p0[0] == NODE_SYMBOL) { return streq(sym_name(p0), sym_name(p1)); };
+    if (p0[0] == NODE_INT)    { return int_value(p0) == int_value(p1); };
+    if (p0[0] == NODE_CHAR)   { return char_value(p0) == char_value(p1); };
+    if (p0[0] == NODE_PRIM)   { return prim_funptr(p0) == prim_funptr(p1); };
+    return FALSE;
+};
+
+rl_eq: (p0) {
+    check_arity(p0, 2, "eq");
+    if (_eq(car(p0), cadr(p0))) { return true_sym; };
+    return nil_sym;
+};
+
+rl_ne: (p0) {
+    check_arity(p0, 2, "ne");
+    if (_eq(car(p0), cadr(p0))) { return nil_sym; };
+    return true_sym;
+};
+
 rl_print: (p0) {
     allocate(1);
     while (p0 != nil_sym) {
@@ -370,7 +434,7 @@ rl_array: (p0) {
     allocate(2);
     check_arity(p0, 2, "array");
     x0 = car(p0); (% init value %);
-    x1 = int_value(cadr(p0)); (% length %);
+    x1 = int_value(cadr(p0)); (% size %);
     return mkarray(x0, x1);
 };
 
@@ -392,6 +456,78 @@ rl_array_set: (p0) {
     x2 = caddr(p0); (% value %);
     array_set(x0, x1, x2);
     return nil_sym;
+};
+
+(% (strbuf <len>) %);
+rl_strbuf: (p0) {
+    check_arity(p0, 1, "strbuf");
+    return mkstrbuf(int_value(car(p0)));
+};
+
+(% (strbuf_get <strbuf> <index>) %);
+rl_strbuf_get: (p0) {
+    allocate(2);
+    check_arity(p0, 2, "strbuf_get");
+    x0 = car(p0); (% strbuf %);
+    x1 = int_value(cadr(p0)); (% index %);
+    return strbuf_get(x0, x1);
+};
+
+(% (strbuf_set <strbuf> <index> <value>) %);
+rl_strbuf_set: (p0) {
+    allocate(3);
+    check_arity(p0, 3, "strbuf_set");
+    x0 = car(p0); (% strbuf %);
+    x1 = int_value(cadr(p0)); (% index %);
+    x2 = char_value(caddr(p0)); (% value %);
+    strbuf_set(x0, x1, x2);
+    return nil_sym;
+};
+
+(% (syscall <syscall-id> <arguments as int> %);
+rl_syscall: (p0) {
+    x0 = int_value(car(p0));
+    p0 = cdr(p0);
+    x1 = length(p0);
+    if (x1 == 0) { return syscall(x0); };
+    if (x1 == 1) { return syscall(x0, int_value(car(p0))); };
+    if (x1 == 2) {
+        return syscall(x0,
+            int_value(car(p0)),
+            int_value(cadr(p0)));
+    };
+    if (x1 == 3) {
+        return syscall(x0,
+            int_value(car(p0)),
+            int_value(cadr(p0)),
+            int_value(caddr(p0)));
+    };
+    if (x1 == 3) {
+        return syscall(x0,
+            int_value(car(p0)),
+            int_value(cadr(p0)),
+            int_value(caddr(p0)),
+            int_value(nth(p0, 3)));
+    };
+    if (x1 == 4) {
+        return syscall(x0,
+            int_value(car(p0)),
+            int_value(cadr(p0)),
+            int_value(caddr(p0)),
+            int_value(nth(p0, 3)),
+            int_value(nth(p0, 4)));
+    };
+    if (x1 == 4) {
+        return syscall(x0,
+            int_value(car(p0)),
+            int_value(cadr(p0)),
+            int_value(caddr(p0)),
+            int_value(nth(p0, 3)),
+            int_value(nth(p0, 4)),
+            int_value(nth(p0, 5)));
+    };
+    fputs(stderr, "ERROR 'syscall': too many arguments\n");
+    exit(1);
 };
 
 nil_sym    : NULL;
@@ -432,22 +568,28 @@ init_builtin_objects: () {
     macro_sym   = register_sym("macro");
     import_sym  = register_sym("import");
 
-    register_prim("cons"      , &rl_cons);
-    register_prim("car"       , &rl_car);
-    register_prim("cdr"       , &rl_cdr);
-    register_prim("length"    , &rl_length);
-    register_prim("reverse"   , &rl_reverse);
-    register_prim("list"      , &rl_list);
-    register_prim("array"     , &rl_array);
-    register_prim("array_get" , &rl_array_get);
-    register_prim("array_set" , &rl_array_set);
-    register_prim("add"       , &rl_add);
-    register_prim("sub"       , &rl_sub);
-    register_prim("mul"       , &rl_mul);
-    register_prim("lt"        , &rl_lt);
-    register_prim("gt"        , &rl_gt);
-    register_prim("le"        , &rl_le);
-    register_prim("ge"        , &rl_ge);
-    register_prim("print"     , &rl_print);
-    register_prim("getc"      , &rl_getc);
+    register_prim("cons"       , &rl_cons);
+    register_prim("car"        , &rl_car);
+    register_prim("cdr"        , &rl_cdr);
+    register_prim("length"     , &rl_length);
+    register_prim("reverse"    , &rl_reverse);
+    register_prim("list"       , &rl_list);
+    register_prim("array"      , &rl_array);
+    register_prim("array_get"  , &rl_array_get);
+    register_prim("array_set"  , &rl_array_set);
+    register_prim("strbuf"     , &rl_strbuf);
+    register_prim("strbuf_get" , &rl_strbuf_get);
+    register_prim("strbuf_set" , &rl_strbuf_set);
+    register_prim("add"        , &rl_add);
+    register_prim("sub"        , &rl_sub);
+    register_prim("mul"        , &rl_mul);
+    register_prim("lt"         , &rl_lt);
+    register_prim("gt"         , &rl_gt);
+    register_prim("le"         , &rl_le);
+    register_prim("ge"         , &rl_ge);
+    register_prim("eq"         , &rl_eq);
+    register_prim("ne"         , &rl_ne);
+    register_prim("print"      , &rl_print);
+    register_prim("getc"       , &rl_getc);
+    register_prim("syscall"    , &rl_syscall);
 };
