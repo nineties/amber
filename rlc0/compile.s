@@ -3,7 +3,7 @@
  * Copyright (C) 2009 nineties
  */
 
-/* $Id: compile.s 2010-03-25 02:17:12 nineties $ */
+/* $Id: compile.s 2010-05-29 14:29:49 nineties $ */
 
 .include "defs.s"
 .include "token.s"

@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-05-29 13:26:35 nineties $
+ % $Id: builtin.rl 2010-05-29 14:47:40 nineties $
  %);
 
 include(stddef,code);
@@ -281,6 +281,7 @@ lambda_p  : (p0) { return check_code(NODE_LAMBDA, p0); };
 macro_p   : (p0) { return check_code(NODE_MACRO, p0); };
 quote_p   : (p0) { return check_code(NODE_QUOTE, p0); };
 unquote_p : (p0) { return check_code(NODE_UNQUOTE, p0); };
+strbuf_p  : (p0) { return check_code(NODE_STRING, p0); };
 
 prim_funptr: (p0) {
     expect(p0, NODE_PRIM, "prim_funptr", "primitive function");
@@ -304,6 +305,20 @@ expect: (p0, p1, p2, p3) {
 mkprim: (p0) {
     return mktup2(NODE_PRIM, p0);
 };
+
+(% p0: args, p1: name, p2: address of xxx_p %);
+rl_xxx_p: (p0, p1, p2) {
+    check_arity(p0, 1, p1);
+    return p2(car(p0));
+};
+
+rl_cons_p   : (p0) { return rl_xxx_p(p0, "cons?", &cons_p); };
+rl_symbol_p : (p0) { return rl_xxx_p(p0, "symbol?", &sym_p); };
+rl_int_p    : (p0) { return rl_xxx_p(p0, "int?", &int_p); };
+rl_char_p   : (p0) { return rl_xxx_p(p0, "char?", &char_p); };
+rl_string_p : (p0) { return rl_xxx_p(p0, "string?", &string_p); };
+rl_array_p  : (p0) { return rl_xxx_p(p0, "array?", &array_p); };
+rl_strbuf_p : (p0) { return rl_xxx_p(p0, "strbuf?", &strbuf_p); };
 
 rl_cons: (p0) {
     check_arity(p0, 2, "cons");
@@ -530,6 +545,11 @@ rl_syscall: (p0) {
     exit(1);
 };
 
+rl_exit: (p0) {
+    check_arity(p0, 1, "exit");
+    exit(int_value(car(p0)));
+};
+
 nil_sym    : NULL;
 true_sym   : NULL;
 var_sym    : NULL;
@@ -580,6 +600,13 @@ init_builtin_objects: () {
     register_prim("strbuf"     , &rl_strbuf);
     register_prim("strbuf_get" , &rl_strbuf_get);
     register_prim("strbuf_set" , &rl_strbuf_set);
+    register_prim("cons?"      , &rl_cons_p);
+    register_prim("symbol?"    , &rl_symbol_p);
+    register_prim("int?"       , &rl_int_p);
+    register_prim("char?"      , &rl_char_p);
+    register_prim("string?"    , &rl_string_p);
+    register_prim("array?"     , &rl_array_p);
+    register_prim("strbuf?"    , &rl_strbuf_p);
     register_prim("add"        , &rl_add);
     register_prim("sub"        , &rl_sub);
     register_prim("mul"        , &rl_mul);
@@ -592,4 +619,5 @@ init_builtin_objects: () {
     register_prim("print"      , &rl_print);
     register_prim("getc"       , &rl_getc);
     register_prim("syscall"    , &rl_syscall);
+    register_prim("exit"       , &rl_exit);
 };
