@@ -2,19 +2,39 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm.rlc 2010-05-29 13:35:42 nineties $
+; $Id: vm.rlc 2010-05-29 13:54:11 nineties $
 ;
 
 ; generate assembly code of virtual machine
 
 (import "stdlib")
 
-(var vmcode `(
-    (int stack_size 0)
-    (int stack_top 0)
-))
+; === utilities ==
+(define dispatch (dispatcher code) (do
+    (var head (car code))
+    (var args (cdr code))
+    ((assoc head dispatcher) . args)))
 
-(define global_int args (do
+; === compilation of expressions ==
+(define emit args (println "\t" . args))
+(define transl_return args (do
+    (if args (transl_expr (car args)))
+    (emit "leave")
+    (emit "ret")
+    ))
+
+(var expr_dispatcher `(
+    (return . @transl_return)
+    ))
+
+(define transl_expr (expr) (dispatch expr_dispatcher expr))
+
+; === compilation of external declarations ===
+
+(define transl_fun (name params body) (
+    ))
+
+(define transl_static_int args (do
     (print (car args) ": .long ")
     (if (nil? (cdr args))
         (println 0)
@@ -22,21 +42,27 @@
         )
     ))
 
-(var global_translators `(
-    (int . @global_int)
+(var extdecl_dispatcher `(
+    (int . @transl_static_int)
+    (int* . @transl_static_int)
+    (fun . @transl_fun)
     ))
 
-(define compile_oneline (code) (do
-    (var head (car code))
-    (var args (cdr code))
-    ((assoc head global_translators) . args))
-    )
-
-(define compile (code)
-    (while code (do
-        (compile_oneline (car code))
-        (set code (cdr code))
+(define compile (prog)
+    (while prog (do
+        (dispatch extdecl_dispatcher (car prog))
+        (set prog (cdr prog))
         )
     ))
 
+; === program of virtual machine ===
+(var vmcode `(
+    (int stack_size 0)
+    (int stack_top 0)
+    (fun test () (
+        (return)
+        ))
+))
+
+(transl_expr `(return))
 (compile vmcode)
