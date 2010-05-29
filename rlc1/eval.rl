@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: eval.rl 2010-05-29 13:33:45 nineties $
+ % $Id: eval.rl 2010-05-29 13:52:55 nineties $
  %);
 
 include(stddef,code);
@@ -137,7 +137,6 @@ eval_quote: (p0) {
 (% p0 : (cond ifthen ifelse) %);
 eval_if: (p0) {
     allocate(2);
-    check_arity(p0, 3, "if");
     scope_push();
     x0 = eval_sexp(car(p0));
     p0 = cdr(p0);
@@ -146,7 +145,11 @@ eval_if: (p0) {
         scope_pop();
         return x1;
     };
-    x1 = eval_sexp(cadr(p0));
+    if (cdr(p0) != nil_sym) {
+        x1 = eval_sexp(cadr(p0));
+    } else {
+        x1 = nil_sym;
+    };
     scope_pop();
     return x1;
 };
