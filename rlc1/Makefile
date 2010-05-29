@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-05-29 11:44:58 nineties $
+# $Id: Makefile 2010-05-29 15:54:12 nineties $
 
 AS = as
 ASFLAGS =
@@ -42,6 +42,15 @@ eval.s   : $(RLC0) stddef.s code.s
 rlci: $(OBJECTS)
 	$(LD) $(OBJECTS) -o $@ $(LDFLAGS)
 
+VMSOURCES = vm.rlc
+VMOBJECTS = vm.o
+
+rlvm: $(VMOBJECTS)
+	$(LD) $(VMOBJECTS) -o $@ $(LDFLAGS)
+
+vm.s: rlci $(VMSOURCES)
+	./rlci $(VMSOURCES) > $@
+
 .SUFFIXES:
 .SUFFIXES: .o .s .rl
 
@@ -53,4 +62,4 @@ rlci: $(OBJECTS)
 
 .PHONY: clean
 clean:
-	rm -f *.o *.s rlc core
+	rm -f *.o *.s rlci rlvm core

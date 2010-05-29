@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm.rlc 2010-05-29 15:31:47 nineties $
+; $Id: vm.rlc 2010-05-29 15:54:39 nineties $
 ;
 
 ; generate assembly code of virtual machine
@@ -32,6 +32,8 @@
         (true (not_implemented "emit_operand" val))
         ))
 
+(define emit_label (name) (print name ":\n"))
+
 (define emit args (do
     (print '\t' (car args))
     (set args (cdr args))
@@ -50,46 +52,57 @@
 
 ; === compilation of expressions ==
 
-(var insn_table `((+ . "addl") (- . "subl") (* . "imul")))
+(var insn_table `((+ . "addl") (- . "subl") (* . "imul") (neg . "negl")))
 (define lookup_insn (op) (assoc op insn_table))
 
-(define transl_return (code) (do
+(define emit_return (code) (do
     (set code (cdr code)) ; skip 'return'
-    (if code (transl_expr (car code)))
+    (if code (emit_expr (car code)))
     (emit "leave")
     (emit "ret")
     ))
 
-(define transl_binexpr (code) (do
+(define emit_binexpr (code) (do
     (var insn (lookup_insn (car code)))
-    (transl_expr (cadr code))
-    (transl_expr (caddr code))
+    (emit_expr (cadr code))
+    (emit_expr (caddr code))
     (popl `%eax)
     (emit insn `%eax `top)
     ))
 
-(define transl_value (val)
+(define emit_unexpr (code) (do
+    (var insn (lookup_insn (car code)))
+    (emit_expr (cadr code))
+    (emit insn `top)
+    ))
+
+(define emit_value (val)
     (cond
         ((int? val)  (pushl val))
         ((char? val) (pushb val))
-        (true (not_implemented "transl_value" val))
+        (true (not_implemented "emit_value" val))
         ))
 
 (var expr_dispatcher `(
-    (return . @transl_return)
-    (+ . @transl_binexpr)
-    (- . @transl_binexpr)
-    (* . @transl_binexpr)
+    (return . @emit_return)
+    (+ . @emit_binexpr)
+    (- . @emit_binexpr)
+    (* . @emit_binexpr)
     ))
 
-(define transl_expr (expr) (dispatch expr_dispatcher transl_value expr))
+(define emit_expr (expr) (dispatch expr_dispatcher emit_value expr))
 
 ; === compilation of external declarations ===
 
-(define transl_fun (name params body) (
+(define emit_function ((fun name params body)) (do
+    (emit_label name)
+    (while body (do
+        (emit_expr (car body))
+        (set body (cdr body))
+        ))
     ))
 
-(define transl_static_int (code) (do
+(define emit_static_int (code) (do
     (set code (cdr code)) ; skip 'int'
     (print (car code) ": .long ")
     (if (nil? (cdr code))
@@ -99,9 +112,9 @@
     ))
 
 (var extdecl_dispatcher `(
-    (int . @transl_static_int)
-    (int* . @transl_static_int)
-    (fun . @transl_fun)
+    (int . @emit_static_int)
+    (int* . @emit_static_int)
+    (fun . @emit_function)
     ))
 
 (define compile (prog)
@@ -115,9 +128,7 @@
 (var vmcode `(
     (int stack_size 0)
     (int stack_top 0)
+    (fun test () ((return)))
 ))
 
-(transl_expr `(return))
-(transl_expr `(return 'a'))
-(transl_expr `(+ 1 2))
-(transl_expr `(* 2 3))
+(compile vmcode)
