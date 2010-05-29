@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: eval.rl 2010-05-29 11:42:08 nineties $
+ % $Id: eval.rl 2010-05-29 11:45:44 nineties $
  %);
 
 include(stddef,code);
@@ -252,8 +252,6 @@ eval_appmacro: (p0, p1) {
     match_args(macro_params(p0), p1);
     x0 = eval_sexp(macro_body(p0));
     scope_pop();
-    pp_sexp(stdout, x0);
-    putc('\n');
     return eval_sexp(x0);
 };
 

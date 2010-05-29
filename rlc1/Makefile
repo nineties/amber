@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-05-20 10:58:33 nineties $
+# $Id: Makefile 2010-05-29 11:44:58 nineties $
 
 AS = as
 ASFLAGS =
@@ -39,7 +39,7 @@ lex.s    : $(RLC0) stddef.s token.s
 parse.s  : $(RLC0) stddef.s token.s code.s
 eval.s   : $(RLC0) stddef.s code.s
 
-rlc: $(OBJECTS)
+rlci: $(OBJECTS)
 	$(LD) $(OBJECTS) -o $@ $(LDFLAGS)
 
 .SUFFIXES:
