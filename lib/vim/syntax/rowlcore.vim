@@ -1,6 +1,6 @@
 " Language:	rowl-core
 " Maintainer:	nineties <nineties48@gmail.com>
-" $Id: rowlcore.vim 2010-05-29 16:07:37 nineties $
+" $Id: rowlcore.vim 2010-05-30 01:42:31 nineties $
 
 if exists("b:current_syntax")
     finish
@@ -21,19 +21,19 @@ syn keyword rowlcoreTodo TODO FIXME NOTE XXX contained
 syn region  rowlcoreString start=/"/ skip=/\\"/ end=/"/
 syn region  rowlcoreComment start=/;/ end=/\n/ contains=rowlcoreComment,rowlcoreTodo
 
-syn match rowlcoreOperator "+"
-syn match rowlcoreOperator "-"
-syn match rowlcoreOperator "*"
-syn match rowlcoreOperator "/"
-syn match rowlcoreOperator "%"
-syn match rowlcoreOperator "<<"
-syn match rowlcoreOperator ">>"
-syn match rowlcoreOperator "<"
-syn match rowlcoreOperator ">"
-syn match rowlcoreOperator "<="
-syn match rowlcoreOperator ">="
-syn match rowlcoreOperator "=="
-syn match rowlcoreOperator "!="
+syn match rowlcoreOperator "\<+\>"
+syn match rowlcoreOperator "\<-\>"
+syn match rowlcoreOperator "\<*\>"
+syn match rowlcoreOperator "\</\>"
+syn match rowlcoreOperator "\<%\>"
+syn match rowlcoreOperator "\<<<\>"
+syn match rowlcoreOperator "\<>>\>"
+syn match rowlcoreOperator "\<<\>"
+syn match rowlcoreOperator "\<>\>"
+syn match rowlcoreOperator "\<<=\>"
+syn match rowlcoreOperator "\<>=\>"
+syn match rowlcoreOperator "\<==\>"
+syn match rowlcoreOperator "\<!=\>"
 
 hi def link rowlcoreComment   Comment
 hi def link rowlcoreCharacter Character

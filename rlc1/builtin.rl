@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-05-29 17:32:11 nineties $
+ % $Id: builtin.rl 2010-05-30 01:42:17 nineties $
  %);
 
 include(stddef,code);
@@ -378,11 +378,51 @@ rl_sub: (p0) {
 
 rl_mul: (p0) {
     allocate(2);
-    x0 = 1;
+    x0 = int_value(car(p0));
+    p0 = cdr(p0);
     while (p0 != nil_sym) {
         x1 = car(p0);
         expect(x1, NODE_INT, "mul", "integer");
         x0 = x0 * int_value(x1);
+        p0 = cdr(p0);
+    };
+    return mkint(x0);
+};
+
+rl_bitand: (p0) {
+    allocate(2);
+    x0 = int_value(car(p0));
+    p0 = cdr(p0);
+    while (p0 != nil_sym) {
+        x1 = car(p0);
+        expect(x1, NODE_INT, "bitand", "integer");
+        x0 = x0 & int_value(x1);
+        p0 = cdr(p0);
+    };
+    return mkint(x0);
+};
+
+rl_bitor: (p0) {
+    allocate(2);
+    x0 = int_value(car(p0));
+    p0 = cdr(p0);
+    while (p0 != nil_sym) {
+        x1 = car(p0);
+        expect(x1, NODE_INT, "bitor", "integer");
+        x0 = x0 | int_value(x1);
+        p0 = cdr(p0);
+    };
+    return mkint(x0);
+};
+
+rl_bitxor: (p0) {
+    allocate(2);
+    x0 = int_value(car(p0));
+    p0 = cdr(p0);
+    while (p0 != nil_sym) {
+        x1 = car(p0);
+        expect(x1, NODE_INT, "bitxor", "integer");
+        x0 = x0 ^ int_value(x1);
         p0 = cdr(p0);
     };
     return mkint(x0);
@@ -627,6 +667,9 @@ init_builtin_objects: () {
     register_prim("add"        , &rl_add);
     register_prim("sub"        , &rl_sub);
     register_prim("mul"        , &rl_mul);
+    register_prim("bitand"     , &rl_bitand);
+    register_prim("bitor"      , &rl_bitor);
+    register_prim("bitxor"     , &rl_bitxor);
     register_prim("lt"         , &rl_lt);
     register_prim("gt"         , &rl_gt);
     register_prim("le"         , &rl_le);

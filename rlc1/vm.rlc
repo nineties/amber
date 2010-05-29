@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm.rlc 2010-05-29 19:10:59 nineties $
+; $Id: vm.rlc 2010-05-30 01:33:51 nineties $
 ;
 
 ; === program of virtual machine ===
@@ -16,15 +16,37 @@
 (var SYS_WAITPID 7)
 (var SYS_UNLINK  10)
 (var SYS_EXECVE  11)
+(var SYS_MUNMAP  91)
+(var SYS_MMAP2   192)
+
+(var PROT_READ  0x1)
+(var PROT_WRITE 0x2)
+(var PROT_EXEC  0x4)
+(var PROT_SEM   0x8)
+(var PROT_NONE  0x0)
+(var MAP_SHARED     0x1)
+(var MAP_PRIVATE    0x2)
+(var MAP_TYPE       0xf)
+(var MAP_FIXED      0x10)
+(var MAP_ANONYMOUS  0x20)
 
 (var vmcode `(
-    (fun vmexit (status) (
-        (syscall @SYS_EXIT status)
-        ))
 
-    (extern _start)
-    (fun _start () (
-        (call vmexit (0))
-        ))
-    ))
+(int stack_size 0)
+(int stack_top 0)
+(int* stack)
 
+(fun mmap2 (addr size) (
+    (syscall @SYS_MMAP2 addr size @(| PROT_READ PROT_WRITE PROT_EXEC) @(| MAP_ANONYMOUS MAP_PRIVATE) -1 0)
+))
+
+(fun vmexit (status) (
+    (syscall @SYS_EXIT status)
+))
+
+(extern _start)
+(fun _start () (
+    (call vmexit (0))
+))
+
+))
