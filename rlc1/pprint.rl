@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: pprint.rl 2010-05-27 17:19:38 nineties $
+ % $Id: pprint.rl 2010-05-29 10:54:39 nineties $
  %);
 
 include(stddef,code);
@@ -54,15 +54,31 @@ pp_cons: (p0, p1) {
         x0 = cdr(x0);
         if (x0 != nil_sym) {
             fputc(p0, ' ');
+            if (cons_p(x0) == nil_sym) {
+                fputs(p0, ". ");
+                pp_sexp(p0, x0);
+                goto &break;
+            }
         };
-        if (cons_p(x0) == nil_sym) {
-            fputs(p0, ". ");
-            pp_sexp(p0, x0);
-            goto &break;
-        }
     };
 label break;
     fputc(p0, ')');
+};
+
+pp_lambda: (p0, p1) {
+    fputs(p0, "(lambda ");
+    pp_sexp(p0, lambda_params(p1));
+    fputs(p0, " ");
+    pp_sexp(p0, lambda_body(p1));
+    fputs(p0, ")");
+};
+
+pp_macro: (p0, p1) {
+    fputs(p0, "(macro ");
+    pp_sexp(p0, macro_params(p1));
+    fputs(p0, " ");
+    pp_sexp(p0, macro_body(p1));
+    fputs(p0, ")");
 };
 
 (% p0: output channel, p1: S-expression %);
@@ -74,5 +90,9 @@ pp_sexp: (p0, p1) {
     if (p1[0] == NODE_STRING)  { return pp_string(p0, p1) };
     if (p1[0] == NODE_QUOTE)   { fputc(p0, '`'); return pp_sexp(p0, quote_sexp(p1)); };
     if (p1[0] == NODE_UNQUOTE) { fputc(p0, '@'); return pp_sexp(p0, unquote_sexp(p1)); };
+    if (p1[0] == NODE_PRIM)    { fputs(p0, "prim<"); fputx(p0, prim_funptr); puts(">"); return };
+    if (p1[0] == NODE_LAMBDA)  { return pp_lambda(p0, p1) };
+    if (p1[0] == NODE_MACRO)   { return pp_macro(p0, p1) };
+    puti(p1[0]);
     panic("'pp_sexp': not reachable here");
 };

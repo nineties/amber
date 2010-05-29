@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-05-26 20:34:01 nineties $
+ % $Id: builtin.rl 2010-05-29 10:34:28 nineties $
  %);
 
 include(stddef,code);
@@ -166,7 +166,6 @@ index_error: (p0) {
 
 (% p0: params, p1: body %);
 mklambda: (p0, p1) {
-    expect(p0, NODE_CONS, "lambda", "list of parameters");
     return mktup3(NODE_LAMBDA, p0, p1);
 };
 

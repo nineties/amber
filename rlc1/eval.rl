@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: eval.rl 2010-05-27 17:19:16 nineties $
+ % $Id: eval.rl 2010-05-29 10:58:35 nineties $
  %);
 
 include(stddef,code);
@@ -85,7 +85,7 @@ eval_cons: (p0) {
     if (x1 == macro_sym)   { return eval_macro(cdr(p0)); };
     if (x1 == import_sym)  { return eval_import(cdr(p0)); };
     if (prim_p(x1) != nil_sym)   { return (prim_funptr(x1))(eval_args(cdr(p0))); };
-    if (lambda_p(x1) != nil_sym) { return eval_applambda(x1, eval_args(cdr(p0))); };
+    if (lambda_p(x1) != nil_sym) { return eval_applambda(x1, cdr(p0)); };
     if (macro_p(x1) != nil_sym)  { return eval_appmacro(x1, cdr(p0)); };
 label eval_cons_error;
     fputs(stderr, "ERROR: invalid application of '");
@@ -213,34 +213,43 @@ eval_macro: (p0) {
     return mkmacro(x0, x1);
 };
 
+(% p0: argument pattern, p1:arguments %);
+match_args: (p0, p1) {
+    allocate(1);
+    if (sym_p(p0) != nil_sym) {
+        x0 = mksym(sym_name(p0));
+        sym_set(x0, p1);
+        assign(sym_name(x0), x0);
+        return;
+    };
+    if (cons_p(p0) != nil_sym) {
+        match_args(car(p0), car(p1));
+        match_args(cdr(p0), cdr(p1));
+        return;
+    };
+    fputs(stderr, "ERROR: invalid argument pattern\n");
+    exit(1);
+};
+
 (% p0: lambda, p1: params %);
 eval_applambda: (p0, p1) {
-    allocate(3);
-    x0 = lambda_params(p0);
-    if (length(x0) != length(p1)) {
-        fputs(stderr, "ERROR: invalid number of argument (must be ");
-        fputi(stderr, length(x0));
-        fputs(stderr, ")\n");
-        exit(1);
-    };
-    p1 = eval_args(p1);
-
+    allocate(1);
     scope_push();
-    while (x0 != nil_sym) {
-        x1 = mksym(sym_name(car(x0)));
-        sym_set(x1, car(p1));
-        assign(sym_name(x1), x1);
-        x0 = cdr(x0);
-        p1 = cdr(p1);
-    };
-    x2 = eval_sexp(lambda_body(p0));
+    match_args(lambda_params(p0), eval_args(p1));
+    x0 = eval_sexp(lambda_body(p0));
     scope_pop();
-    return x2;
+    return x0;
 };
 
 (% p0: macro, p1: params %);
 eval_appmacro: (p0, p1) {
     allocate(3);
+    scope_push();
+    match_args(macro_params(p0), p1);
+    x0 = eval_sexp(macro_body(p0));
+    scope_pop();
+    return eval_sexp(x0);
+    (%
     x0 = macro_params(p0);
     if (length(x0) != length(p1)) {
         fputs(stderr, "ERROR: invalid number of argument (must be ");
@@ -252,7 +261,7 @@ eval_appmacro: (p0, p1) {
     scope_push();
     while (x0 != nil_sym) {
         x1 = mksym(sym_name(car(x0)));
-        sym_set(x1, mkquote(car(p1)));
+        sym_set(x1, car(p1));
         assign(sym_name(x1), x1);
         x0 = cdr(x0);
         p1 = cdr(p1);
@@ -260,6 +269,7 @@ eval_appmacro: (p0, p1) {
     x2 = eval_sexp(macro_body(p0));
     scope_pop();
     return eval_sexp(x2);
+    %);
 };
 
 imported : NULL;
@@ -292,7 +302,7 @@ eval_sexp: (p0) {
     if (x0 == NODE_SYMBOL) {
         x1 = deref(p0);
         if (sym_value(x1) != NULL) {
-            return eval_sexp(sym_value(x1));
+            return sym_value(x1);
         };
         return x1;
     };
