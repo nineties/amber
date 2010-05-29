@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm.rlc 2010-05-29 17:17:37 nineties $
+; $Id: vm.rlc 2010-05-29 17:47:23 nineties $
 ;
 
 ; generate assembly code of virtual machine
@@ -30,8 +30,14 @@
     (cond
         ((int? val)     (print '$' val))
         ((char? val)    (print "$'" val))
-        ((== `%top val)  (print "(%esp)"))
+        ((== `%top val) (print "(%esp)"))
         ((symbol? val)  (print val))
+        ((== `offset (car val)) (do
+            (if (!= (caddr val) 0) (print (caddr val)))
+            (print '(')
+            (emit_operand (cadr val))
+            (print ')')
+            ))
         (true (not_implemented "emit_operand" val))
         ))
 
@@ -48,6 +54,9 @@
         )
     (print '\n')))
 
+(define drop (len) (emit "addl" (* 4 len) `%esp))
+(define movl  (src dst) (emit "movl" src dst))
+(define movb  (src dst) (emit "movb" src dst))
 (define pushl (val) (emit "pushl" val))
 (define pushb (val) (emit "pushb" val))
 (define popl  (reg) (emit "popl" reg))
@@ -85,12 +94,14 @@
     (emit insn `%eax `%top)
     ))
 
-(define emit_syscall ((syscall code . args)) (do
+(define emit_syscall ((syscall . args)) (do
     (var regs `(%eax %ebx %ecx %edx %esi %edi %ebp))
     (var narg (length args))
-    (for r 5 narg (pushl (nth r regs)))
+    (for r 4 (- narg 1) (pushl (nth r regs)))
     (foreach e args (emit_expr e))
-    (emit "int" code)
+    (for r 1 narg (movl `(offset %esp @(* 4 (- narg r))) (nth (- r 1) regs)))
+    (drop narg)
+    (emit "int" 128)
     ))
 
 (var expr_dispatcher `(
@@ -105,10 +116,7 @@
 
 ; === compilation of external declarations ===
 
-(define emit_function ((fun name params body)) (do
-    (emit_label name)
-    (foreach e body (emit_expr e))
-    ))
+(define emit_extern ((extern . (name))) (print ".global " name '\n'))
 
 (define emit_static_int (code) (do
     (set code (cdr code)) ; skip 'int'
@@ -119,7 +127,13 @@
         )
     ))
 
+(define emit_function ((fun name params body)) (do
+    (emit_label name)
+    (foreach e body (emit_expr e))
+    ))
+
 (var extdecl_dispatcher `(
+    (extern . @emit_extern)
     (int . @emit_static_int)
     (int* . @emit_static_int)
     (fun . @emit_function)
@@ -132,7 +146,10 @@
 ; === program of virtual machine ===
 
 (var vmcode `(
-    (fun vmexit () ())
+    (extern _start)
+    (fun _start () (
+        (syscall 1 0)
+        ))
     ))
 
 ; === compile the VM ===

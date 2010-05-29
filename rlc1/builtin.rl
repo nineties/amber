@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-05-29 17:25:12 nineties $
+ % $Id: builtin.rl 2010-05-29 17:32:11 nineties $
  %);
 
 include(stddef,code);
@@ -224,7 +224,7 @@ lambda_body: (p0) {
 };
 
 lambda_arity: (p0) {
-    return rl_length(lambda_params(p0));
+    return length(lambda_params(p0));
 };
 
 (% p0: params, p1: body %);
@@ -244,7 +244,7 @@ macro_body: (p0) {
 };
 
 macro_arity: (p0) {
-    return rl_length(macro_params(p0));
+    return length(macro_params(p0));
 };
 
 (% p0: sexp %);
@@ -344,7 +344,7 @@ rl_cdr: (p0) {
 
 rl_length: (p0) {
     check_arity(p0, 1, "length");
-    return length(car(p0));
+    return mkint(length(car(p0)));
 };
 
 rl_reverse: (p0) {

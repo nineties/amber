@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-05-29 16:35:40 nineties $
+# $Id: Makefile 2010-05-29 17:43:34 nineties $
 
 AS = as
 ASFLAGS =
@@ -43,7 +43,7 @@ rlci: $(OBJECTS)
 	$(LD) $(OBJECTS) -o $@ $(LDFLAGS)
 
 rlvm: vm.o
-	$(LD) $(VMOBJECTS) -o $@ $(LDFLAGS)
+	$(LD) vm.o -o $@ $(LDFLAGS)
 
 vm.s: rlci vm.rlc stdlib.rlc
 	./rlci vm.rlc > $@
