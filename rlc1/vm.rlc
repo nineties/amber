@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm.rlc 2010-05-29 17:47:23 nineties $
+; $Id: vm.rlc 2010-05-29 19:02:37 nineties $
 ;
 
 ; generate assembly code of virtual machine
@@ -11,7 +11,10 @@
 
 ; === utilities ==
 (define not_reachable args (do (eprintln "not reachable here") (exit 1)))
-(define not_implemented msgs (eprintln "not implemented '" (car msgs) "' : " . (cdr msgs)))
+(define not_implemented args (do
+    (var msgs (cdr args))
+    (eprintln "not implemented '" (car args) "' : "  . msgs)
+    ))
 
 (define dispatch (dispatcher default code) (do
     (if (cons? code)
@@ -26,19 +29,26 @@
         (default code)
     )))
 
-(define emit_operand (val)
+(define emit_operand (opd)
     (cond
-        ((int? val)     (print '$' val))
-        ((char? val)    (print "$'" val))
-        ((== `%top val) (print "(%esp)"))
-        ((symbol? val)  (print val))
-        ((== `offset (car val)) (do
-            (if (!= (caddr val) 0) (print (caddr val)))
+        ((int? opd)     (print '$' opd))
+        ((char? opd)    (print "$'" opd))
+        ((== `%top opd) (print "(%esp)"))
+        ((symbol? opd)  (print opd))
+        ((== `offset (car opd)) (do
+            (if (!= (caddr opd) 0) (print (caddr opd)))
             (print '(')
-            (emit_operand (cadr val))
+            (emit_operand (cadr opd))
             (print ')')
             ))
-        (true (not_implemented "emit_operand" val))
+        ((== `arg (car opd)) (do
+            (print (* 4 (+ (cadr opd) 1)))
+            (print '(')
+            (emit_operand `%ebp)
+            (print ')')
+            ))
+        ((== `label (car opd)) (print (cadr opd)))
+        (true (not_implemented "emit_operand" opd))
         ))
 
 (define emit_label (name) (print name ":\n"))
@@ -62,7 +72,25 @@
 (define popl  (reg) (emit "popl" reg))
 (define popb  (reg) (emit "popb" reg))
 
-; === compilation of expressions ==
+; === management of variables ===
+(var vtable ())
+(var vindex 0)
+(define vtable_push () (set vtable (cons () vtable)))
+(define vtable_pop  () (set vtable (cdr vtable)))
+
+(define lookup_var (name) (do
+    (define loop (name tab)
+        (if (nil? tab) nil (do
+            (var v (assoc name (car tab)))
+            (if v v (loop name (cdr tab)))
+            )))
+    (var v (loop name vtable))
+    (if v v (do (eprintln "undefined variable : " name) (exit 1)))
+    ))
+
+(define add_var (name opd) (setcar vtable (cons `(@name . @opd) (car vtable))))
+
+; === compilation of expressions ===
 
 (var insn_table `((+ . "addl") (- . "subl") (* . "imul") (neg . "negl")))
 (define lookup_insn (op) (assoc op insn_table))
@@ -77,6 +105,7 @@
     (cond
         ((int? val)  (pushl val))
         ((char? val) (pushb val))
+        ((symbol? val) (pushl (lookup_var val)))
         (true (not_implemented "emit_value" val))
         ))
 
@@ -102,10 +131,23 @@
     (for r 1 narg (movl `(offset %esp @(* 4 (- narg r))) (nth (- r 1) regs)))
     (drop narg)
     (emit "int" 128)
+    (pushl `%eax)
+    ))
+
+(define emit_call ((call func args))
+    (if (symbol? func) (emit_directcall func args) (emit_indirectcall func args)))
+
+(define emit_directcall (func args) (do
+    (var narg (length args))
+    (foreach e args (emit_expr e))
+    (emit "call" `(label @func))
+    (if (> narg 0) (emit "addl" (* 4 narg) `%esp))
+    (pushl `%eax)
     ))
 
 (var expr_dispatcher `(
     (syscall . @emit_syscall)
+    (call . @emit_call)
     (return . @emit_return)
     (+ . @emit_binexpr)
     (- . @emit_binexpr)
@@ -128,8 +170,14 @@
     ))
 
 (define emit_function ((fun name params body)) (do
+    (vtable_push)
+    (var idx 1)
+    (foreach p params (do (add_var p `(arg @idx)) (incl idx)))
     (emit_label name)
+    (pushl `%ebp)
+    (movl `%esp `%ebp)
     (foreach e body (emit_expr e))
+    (vtable_pop)
     ))
 
 (var extdecl_dispatcher `(
@@ -144,13 +192,28 @@
     ))
 
 ; === program of virtual machine ===
+; system calls
+(var SYS_EXIT    1)
+(var SYS_FORK    2)
+(var SYS_READ    3)
+(var SYS_WRITE   4)
+(var SYS_OPEN    5)
+(var SYS_CLOSE   6)
+(var SYS_WAITPID 7)
+(var SYS_UNLINK  10)
+(var SYS_EXECVE  11)
 
 (var vmcode `(
     (extern _start)
     (fun _start () (
-        (syscall 1 0)
+        (call vmexit (0))
+        ))
+    (fun vmexit (status) (
+        (syscall @SYS_EXIT status)
         ))
     ))
 
 ; === compile the VM ===
+(vtable_push) ; global namespace
 (compile vmcode)
+(vtable_pop)

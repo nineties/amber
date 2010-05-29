@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: stdlib.rlc 2010-05-29 17:25:17 nineties $
+; $Id: stdlib.rlc 2010-05-29 18:53:12 nineties $
 ;
 
 (var rewrite (macro (name params body) `(var @name (macro @params @body))))
@@ -21,6 +21,9 @@
 
 ;=== utility ===
 (define nil? (a) (if a nil true))
+
+(rewrite incl (x) `(set @x (+ @x 1)))
+(rewrite decl (x) `(set @x (- @x 1)))
 
 ;=== loops ===
 (rewrite foreach (it list body) `(do
@@ -50,6 +53,9 @@
 (define cddr   (list) (cdr (cdr list)))
 (define cdar   (list) (cdr (car list)))
 (define nth    (idx list) (if (== idx 0) (car list) (nth (- idx 1) (cdr list))))
+
+(rewrite setcar (list v) `(set @list (cons @v (cdr @list))))
+(rewrite setcdr (list v) `(set @list (cons (car @list) @v)))
 
 (define assoc (key list)
     (cond
