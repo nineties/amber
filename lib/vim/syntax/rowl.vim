@@ -1,6 +1,6 @@
-" Language:	Rowl
+" Language:	rowl
 " Maintainer:	nineties <nineties48@gmail.com>
-" $Id: rowl.vim 2010-04-17 16:58:32 nineties $
+" $Id: rowl.vim 2010-05-29 15:23:57 nineties $
 
 if exists("b:current_syntax")
     finish
