@@ -2,5 +2,41 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm.rlc 2010-05-29 12:53:48 nineties $
+; $Id: vm.rlc 2010-05-29 13:35:42 nineties $
 ;
+
+; generate assembly code of virtual machine
+
+(import "stdlib")
+
+(var vmcode `(
+    (int stack_size 0)
+    (int stack_top 0)
+))
+
+(define global_int args (do
+    (print (car args) ": .long ")
+    (if (nil? (cdr args))
+        (println 0)
+        (println (cadr args))
+        )
+    ))
+
+(var global_translators `(
+    (int . @global_int)
+    ))
+
+(define compile_oneline (code) (do
+    (var head (car code))
+    (var args (cdr code))
+    ((assoc head global_translators) . args))
+    )
+
+(define compile (code)
+    (while code (do
+        (compile_oneline (car code))
+        (set code (cdr code))
+        )
+    ))
+
+(compile vmcode)

@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: eval.rl 2010-05-29 11:45:44 nineties $
+ % $Id: eval.rl 2010-05-29 13:33:45 nineties $
  %);
 
 include(stddef,code);
@@ -74,7 +74,6 @@ eval_args: (p0) {
 eval_cons: (p0) {
     allocate(2);
     x0 = car(p0);
-    if (sym_p(x0) == nil_sym) { goto &eval_cons_error; };
     x1 = eval_sexp(x0);
     if (x1 == var_sym)     { return eval_var(cdr(p0)); };
     if (x1 == set_sym)     { return eval_set(cdr(p0)); };
@@ -90,7 +89,7 @@ eval_cons: (p0) {
     if (macro_p(x1) != nil_sym)  { return eval_appmacro(x1, cdr(p0)); };
 label eval_cons_error;
     fputs(stderr, "ERROR: invalid application of '");
-    pp_sexp(stderr, car(p0));
+    pp_sexp(stderr, x1);
     fputs(stderr, "'\n");
     exit(1);
 };
