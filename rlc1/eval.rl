@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: eval.rl 2010-05-29 11:05:11 nineties $
+ % $Id: eval.rl 2010-05-29 11:21:13 nineties $
  %);
 
 include(stddef,code);
@@ -67,6 +67,7 @@ check_arity: (p0, p1, p2) {
 
 eval_args: (p0) {
     if (p0 == nil_sym) { return nil_sym; };
+    if (cons_p(p0) == nil_sym) { return eval_sexp(p0); };
     return mkcons(eval_sexp(car(p0)), eval_args(cdr(p0)));
 };
 
