@@ -2,194 +2,8 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm.rlc 2010-05-29 19:02:37 nineties $
+; $Id: vm.rlc 2010-05-29 19:10:59 nineties $
 ;
-
-; generate assembly code of virtual machine
-
-(import "stdlib")
-
-; === utilities ==
-(define not_reachable args (do (eprintln "not reachable here") (exit 1)))
-(define not_implemented args (do
-    (var msgs (cdr args))
-    (eprintln "not implemented '" (car args) "' : "  . msgs)
-    ))
-
-(define dispatch (dispatcher default code) (do
-    (if (cons? code)
-        (do
-            (var head (car code))
-            (var fun (assoc head dispatcher))
-            (if fun
-                (fun code)
-                (do (eprintln "undefined code : " code) (exit 1))
-            )
-        )
-        (default code)
-    )))
-
-(define emit_operand (opd)
-    (cond
-        ((int? opd)     (print '$' opd))
-        ((char? opd)    (print "$'" opd))
-        ((== `%top opd) (print "(%esp)"))
-        ((symbol? opd)  (print opd))
-        ((== `offset (car opd)) (do
-            (if (!= (caddr opd) 0) (print (caddr opd)))
-            (print '(')
-            (emit_operand (cadr opd))
-            (print ')')
-            ))
-        ((== `arg (car opd)) (do
-            (print (* 4 (+ (cadr opd) 1)))
-            (print '(')
-            (emit_operand `%ebp)
-            (print ')')
-            ))
-        ((== `label (car opd)) (print (cadr opd)))
-        (true (not_implemented "emit_operand" opd))
-        ))
-
-(define emit_label (name) (print name ":\n"))
-
-(define emit args (do
-    (print '\t' (car args))
-    (set args (cdr args))
-    (if args (print ' '))
-    (while args (do
-        (emit_operand (car args))
-        (if (cdr args) (print ", "))
-        (set args (cdr args)))
-        )
-    (print '\n')))
-
-(define drop (len) (emit "addl" (* 4 len) `%esp))
-(define movl  (src dst) (emit "movl" src dst))
-(define movb  (src dst) (emit "movb" src dst))
-(define pushl (val) (emit "pushl" val))
-(define pushb (val) (emit "pushb" val))
-(define popl  (reg) (emit "popl" reg))
-(define popb  (reg) (emit "popb" reg))
-
-; === management of variables ===
-(var vtable ())
-(var vindex 0)
-(define vtable_push () (set vtable (cons () vtable)))
-(define vtable_pop  () (set vtable (cdr vtable)))
-
-(define lookup_var (name) (do
-    (define loop (name tab)
-        (if (nil? tab) nil (do
-            (var v (assoc name (car tab)))
-            (if v v (loop name (cdr tab)))
-            )))
-    (var v (loop name vtable))
-    (if v v (do (eprintln "undefined variable : " name) (exit 1)))
-    ))
-
-(define add_var (name opd) (setcar vtable (cons `(@name . @opd) (car vtable))))
-
-; === compilation of expressions ===
-
-(var insn_table `((+ . "addl") (- . "subl") (* . "imul") (neg . "negl")))
-(define lookup_insn (op) (assoc op insn_table))
-
-(define emit_return (return . arg) (do
-    (if arg (emit_expr (car arg)))
-    (emit "leave")
-    (emit "ret")
-    ))
-
-(define emit_value (val)
-    (cond
-        ((int? val)  (pushl val))
-        ((char? val) (pushb val))
-        ((symbol? val) (pushl (lookup_var val)))
-        (true (not_implemented "emit_value" val))
-        ))
-
-(define emit_unexpr (code) (do
-    (var insn (lookup_insn (car code)))
-    (emit_expr (cadr code))
-    (emit insn `%top)
-    ))
-
-(define emit_binexpr (code) (do
-    (var insn (lookup_insn (car code)))
-    (emit_expr (cadr code))
-    (emit_expr (caddr code))
-    (popl `%eax)
-    (emit insn `%eax `%top)
-    ))
-
-(define emit_syscall ((syscall . args)) (do
-    (var regs `(%eax %ebx %ecx %edx %esi %edi %ebp))
-    (var narg (length args))
-    (for r 4 (- narg 1) (pushl (nth r regs)))
-    (foreach e args (emit_expr e))
-    (for r 1 narg (movl `(offset %esp @(* 4 (- narg r))) (nth (- r 1) regs)))
-    (drop narg)
-    (emit "int" 128)
-    (pushl `%eax)
-    ))
-
-(define emit_call ((call func args))
-    (if (symbol? func) (emit_directcall func args) (emit_indirectcall func args)))
-
-(define emit_directcall (func args) (do
-    (var narg (length args))
-    (foreach e args (emit_expr e))
-    (emit "call" `(label @func))
-    (if (> narg 0) (emit "addl" (* 4 narg) `%esp))
-    (pushl `%eax)
-    ))
-
-(var expr_dispatcher `(
-    (syscall . @emit_syscall)
-    (call . @emit_call)
-    (return . @emit_return)
-    (+ . @emit_binexpr)
-    (- . @emit_binexpr)
-    (* . @emit_binexpr)
-    ))
-
-(define emit_expr (expr) (dispatch expr_dispatcher emit_value expr))
-
-; === compilation of external declarations ===
-
-(define emit_extern ((extern . (name))) (print ".global " name '\n'))
-
-(define emit_static_int (code) (do
-    (set code (cdr code)) ; skip 'int'
-    (print (car code) ": .long ")
-    (if (nil? (cdr code))
-        (println 0)
-        (println (cadr code))
-        )
-    ))
-
-(define emit_function ((fun name params body)) (do
-    (vtable_push)
-    (var idx 1)
-    (foreach p params (do (add_var p `(arg @idx)) (incl idx)))
-    (emit_label name)
-    (pushl `%ebp)
-    (movl `%esp `%ebp)
-    (foreach e body (emit_expr e))
-    (vtable_pop)
-    ))
-
-(var extdecl_dispatcher `(
-    (extern . @emit_extern)
-    (int . @emit_static_int)
-    (int* . @emit_static_int)
-    (fun . @emit_function)
-    ))
-
-(define compile (prog) (do
-    (foreach decl prog (dispatch extdecl_dispatcher not_reachable decl))
-    ))
 
 ; === program of virtual machine ===
 ; system calls
@@ -204,16 +18,13 @@
 (var SYS_EXECVE  11)
 
 (var vmcode `(
+    (fun vmexit (status) (
+        (syscall @SYS_EXIT status)
+        ))
+
     (extern _start)
     (fun _start () (
         (call vmexit (0))
         ))
-    (fun vmexit (status) (
-        (syscall @SYS_EXIT status)
-        ))
     ))
 
-; === compile the VM ===
-(vtable_push) ; global namespace
-(compile vmcode)
-(vtable_pop)
