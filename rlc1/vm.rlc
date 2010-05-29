@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm.rlc 2010-05-29 15:54:39 nineties $
+; $Id: vm.rlc 2010-05-29 17:17:37 nineties $
 ;
 
 ; generate assembly code of virtual machine
@@ -10,15 +10,18 @@
 (import "stdlib")
 
 ; === utilities ==
-(define not_reachable args (do (println "not reachable here") (exit 1)))
-(define not_implemented msgs (print "not implemented '" (car msgs) "' : " . (cdr msgs)))
+(define not_reachable args (do (eprintln "not reachable here") (exit 1)))
+(define not_implemented msgs (eprintln "not implemented '" (car msgs) "' : " . (cdr msgs)))
 
 (define dispatch (dispatcher default code) (do
     (if (cons? code)
         (do
             (var head (car code))
             (var fun (assoc head dispatcher))
-            (fun code)
+            (if fun
+                (fun code)
+                (do (eprintln "undefined code : " code) (exit 1))
+            )
         )
         (default code)
     )))
@@ -27,7 +30,7 @@
     (cond
         ((int? val)     (print '$' val))
         ((char? val)    (print "$'" val))
-        ((== `top val)  (print "(%esp)"))
+        ((== `%top val)  (print "(%esp)"))
         ((symbol? val)  (print val))
         (true (not_implemented "emit_operand" val))
         ))
@@ -55,25 +58,10 @@
 (var insn_table `((+ . "addl") (- . "subl") (* . "imul") (neg . "negl")))
 (define lookup_insn (op) (assoc op insn_table))
 
-(define emit_return (code) (do
-    (set code (cdr code)) ; skip 'return'
-    (if code (emit_expr (car code)))
+(define emit_return (return . arg) (do
+    (if arg (emit_expr (car arg)))
     (emit "leave")
     (emit "ret")
-    ))
-
-(define emit_binexpr (code) (do
-    (var insn (lookup_insn (car code)))
-    (emit_expr (cadr code))
-    (emit_expr (caddr code))
-    (popl `%eax)
-    (emit insn `%eax `top)
-    ))
-
-(define emit_unexpr (code) (do
-    (var insn (lookup_insn (car code)))
-    (emit_expr (cadr code))
-    (emit insn `top)
     ))
 
 (define emit_value (val)
@@ -83,7 +71,30 @@
         (true (not_implemented "emit_value" val))
         ))
 
+(define emit_unexpr (code) (do
+    (var insn (lookup_insn (car code)))
+    (emit_expr (cadr code))
+    (emit insn `%top)
+    ))
+
+(define emit_binexpr (code) (do
+    (var insn (lookup_insn (car code)))
+    (emit_expr (cadr code))
+    (emit_expr (caddr code))
+    (popl `%eax)
+    (emit insn `%eax `%top)
+    ))
+
+(define emit_syscall ((syscall code . args)) (do
+    (var regs `(%eax %ebx %ecx %edx %esi %edi %ebp))
+    (var narg (length args))
+    (for r 5 narg (pushl (nth r regs)))
+    (foreach e args (emit_expr e))
+    (emit "int" code)
+    ))
+
 (var expr_dispatcher `(
+    (syscall . @emit_syscall)
     (return . @emit_return)
     (+ . @emit_binexpr)
     (- . @emit_binexpr)
@@ -96,10 +107,7 @@
 
 (define emit_function ((fun name params body)) (do
     (emit_label name)
-    (while body (do
-        (emit_expr (car body))
-        (set body (cdr body))
-        ))
+    (foreach e body (emit_expr e))
     ))
 
 (define emit_static_int (code) (do
@@ -117,18 +125,15 @@
     (fun . @emit_function)
     ))
 
-(define compile (prog)
-    (while prog (do
-        (dispatch extdecl_dispatcher not_reachable (car prog))
-        (set prog (cdr prog))
-        )
+(define compile (prog) (do
+    (foreach decl prog (dispatch extdecl_dispatcher not_reachable decl))
     ))
 
 ; === program of virtual machine ===
-(var vmcode `(
-    (int stack_size 0)
-    (int stack_top 0)
-    (fun test () ((return)))
-))
 
+(var vmcode `(
+    (fun vmexit () ())
+    ))
+
+; === compile the VM ===
 (compile vmcode)
