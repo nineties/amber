@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  % 
- % $Id: alloc.rl 2010-05-25 18:22:41 nineties $
+ % $Id: alloc.rl 2010-05-29 15:53:24 nineties $
  %);
 
 include(stddef);
@@ -109,11 +109,11 @@ memalloc: (p0) {
 finalize_mem: () {
     allocate(1);
 
-    puts("[DEBUG] total memory : ");
-    puti(num_bytes);
-    puts("bytes (");
-    puti(num_block);
-    puts(" blocks)\n");
+    fputs(stderr, "[DEBUG] total memory : ");
+    fputi(stderr, num_bytes);
+    fputs(stderr, "bytes (");
+    fputi(stderr, num_block);
+    fputs(stderr, " blocks)\n");
 
     x0 = 0;
     while (x0 < MAX_BLOCKS) {

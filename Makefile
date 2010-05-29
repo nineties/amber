@@ -3,11 +3,11 @@
 # Copyright (C) 2009 nineties
 #
 
-# $Id: Makefile 2010-05-29 11:45:20 nineties $
+# $Id: Makefile 2010-05-29 15:53:51 nineties $
 
 all: 
 	cd rlc0; $(MAKE) rlc
-	cd rlc1; $(MAKE) rlci
+	cd rlc1; $(MAKE) rlci rlvm
 
 .PHONY: clean
 clean:
