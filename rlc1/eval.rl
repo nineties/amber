@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: eval.rl 2010-05-29 11:21:13 nineties $
+ % $Id: eval.rl 2010-05-29 11:42:08 nineties $
  %);
 
 include(stddef,code);
@@ -125,6 +125,9 @@ eval_quote: (p0) {
     allocate(1);
     if (cons_p(p0) != nil_sym) {
         return mkcons(eval_quote(car(p0)), eval_quote(cdr(p0)));
+    };
+    if (quote_p(p0) != nil_sym) {
+        return mkquote(eval_quote(quote_sexp(p0)));
     };
     if (unquote_p(p0) != nil_sym) {
         return eval_sexp(unquote_sexp(p0));
@@ -249,28 +252,9 @@ eval_appmacro: (p0, p1) {
     match_args(macro_params(p0), p1);
     x0 = eval_sexp(macro_body(p0));
     scope_pop();
+    pp_sexp(stdout, x0);
+    putc('\n');
     return eval_sexp(x0);
-    (%
-    x0 = macro_params(p0);
-    if (length(x0) != length(p1)) {
-        fputs(stderr, "ERROR: invalid number of argument (must be ");
-        fputi(stderr, length(x0));
-        fputs(stderr, ")\n");
-        exit(1);
-    };
-
-    scope_push();
-    while (x0 != nil_sym) {
-        x1 = mksym(sym_name(car(x0)));
-        sym_set(x1, car(p1));
-        assign(sym_name(x1), x1);
-        x0 = cdr(x0);
-        p1 = cdr(p1);
-    };
-    x2 = eval_sexp(macro_body(p0));
-    scope_pop();
-    return eval_sexp(x2);
-    %);
 };
 
 imported : NULL;
