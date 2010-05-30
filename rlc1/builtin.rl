@@ -2,14 +2,14 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-05-30 02:11:25 nineties $
+ % $Id: builtin.rl 2010-05-31 01:03:26 nineties $
  %);
 
 include(stddef,code);
 export(init_builtin_objects);
 export(mksym, sym_set, sym_name, sym_value, fresh_sym);
 export(mkint, int_value);
-export(mkchar, character);
+export(mkchar, char_value);
 export(mkstring, string_value);
 export(mkarray, array_size, array_get, array_set);
 export(mklambda,lambda_arity,lambda_params,lambda_body);
@@ -172,35 +172,6 @@ array_set: (p0, p1, p2) {
     x0[p1] = p2;
 };
 
-(% p0: size (as int) %);
-mkstrbuf: (p0) {
-    allocate(1);
-    x0 = memalloc(p0+1); (% +1 for '\0' %);
-    memset(x0,0,p0+1);
-    return mktup3(NODE_STRBUF, p0, x0);
-};
-
-strbuf_size: (p0) {
-    expect(p0, NODE_STRBUF, "strbuf_size", "strbuf object");
-    return p0[1];
-};
-
-(% p0: strbuf object, p1: index %);
-strbuf_get: (p0, p1) {
-    expect(p0, NODE_ARRAY, "strbuf_get", "strbuf object");
-    if (p1 < 0) { index_error("strbuf_get"); };
-    if (p1 >= strbuf_size(p0)) { index_error("strbuf_get"); };
-    return rch(p0[2], p1);
-};
-
-(% p0: strbuf object, p1: index (as int), p2: value %);
-strbuf_set: (p0, p1, p2) {
-    expect(p0, NODE_ARRAY, "strbuf_get", "strbuf_object");
-    if (p1 < 0) { index_error("strbuf_set"); };
-    if (p1 >= strbuf_size(p0)) { index_error("strbuf_set"); };
-    wch(p0[2], p1, p2);
-};
-
 index_error: (p0) {
     fputs(stderr, "ERROR '");
     fputs(stderr, p0);
@@ -286,7 +257,6 @@ lambda_p  : (p0) { return check_code(NODE_LAMBDA, p0); };
 macro_p   : (p0) { return check_code(NODE_MACRO, p0); };
 quote_p   : (p0) { return check_code(NODE_QUOTE, p0); };
 unquote_p : (p0) { return check_code(NODE_UNQUOTE, p0); };
-strbuf_p  : (p0) { return check_code(NODE_STRING, p0); };
 
 prim_funptr: (p0) {
     expect(p0, NODE_PRIM, "prim_funptr", "primitive function");
@@ -325,7 +295,6 @@ rl_int_p    : (p0) { return rl_xxx_p(p0, "int?", &int_p); };
 rl_char_p   : (p0) { return rl_xxx_p(p0, "char?", &char_p); };
 rl_string_p : (p0) { return rl_xxx_p(p0, "string?", &string_p); };
 rl_array_p  : (p0) { return rl_xxx_p(p0, "array?", &array_p); };
-rl_strbuf_p : (p0) { return rl_xxx_p(p0, "strbuf?", &strbuf_p); };
 
 rl_cons: (p0) {
     check_arity(p0, 2, "cons");
@@ -354,6 +323,22 @@ rl_reverse: (p0) {
 
 rl_list: (p0) {
     return p0;
+};
+
+(% (string_get str idx) %);
+rl_string_get: (p0) {
+    allocate(2);
+    check_arity(p0, 2, "string_get");
+    x0 = car(p0);
+    x1 = int_value(cadr(p0));
+    return mkchar(rch(string_value(x0), x1));
+};
+
+(% (string_len str) %);
+rl_string_len: (p0) {
+    check_arity(p0, 1, "string_len");
+    x0 = car(p0);
+    return mkint(strlen(string_value(x0)));
 };
 
 rl_add: (p0) {
@@ -530,32 +515,6 @@ rl_array_set: (p0) {
     return nil_sym;
 };
 
-(% (strbuf <len>) %);
-rl_strbuf: (p0) {
-    check_arity(p0, 1, "strbuf");
-    return mkstrbuf(int_value(car(p0)));
-};
-
-(% (strbuf_get <strbuf> <index>) %);
-rl_strbuf_get: (p0) {
-    allocate(2);
-    check_arity(p0, 2, "strbuf_get");
-    x0 = car(p0); (% strbuf %);
-    x1 = int_value(cadr(p0)); (% index %);
-    return strbuf_get(x0, x1);
-};
-
-(% (strbuf_set <strbuf> <index> <value>) %);
-rl_strbuf_set: (p0) {
-    allocate(3);
-    check_arity(p0, 3, "strbuf_set");
-    x0 = car(p0); (% strbuf %);
-    x1 = int_value(cadr(p0)); (% index %);
-    x2 = char_value(caddr(p0)); (% value %);
-    strbuf_set(x0, x1, x2);
-    return nil_sym;
-};
-
 (% (syscall <syscall-id> <arguments as int> %);
 rl_syscall: (p0) {
     x0 = int_value(car(p0));
@@ -651,19 +610,17 @@ init_builtin_objects: () {
     register_prim("length"     , &rl_length);
     register_prim("reverse"    , &rl_reverse);
     register_prim("list"       , &rl_list);
+    register_prim("string_len" , &rl_string_len);
+    register_prim("string_get" , &rl_string_get);
     register_prim("array"      , &rl_array);
     register_prim("array_get"  , &rl_array_get);
     register_prim("array_set"  , &rl_array_set);
-    register_prim("strbuf"     , &rl_strbuf);
-    register_prim("strbuf_get" , &rl_strbuf_get);
-    register_prim("strbuf_set" , &rl_strbuf_set);
     register_prim("cons?"      , &rl_cons_p);
     register_prim("symbol?"    , &rl_symbol_p);
     register_prim("int?"       , &rl_int_p);
     register_prim("char?"      , &rl_char_p);
     register_prim("string?"    , &rl_string_p);
     register_prim("array?"     , &rl_array_p);
-    register_prim("strbuf?"    , &rl_strbuf_p);
     register_prim("add"        , &rl_add);
     register_prim("sub"        , &rl_sub);
     register_prim("mul"        , &rl_mul);
