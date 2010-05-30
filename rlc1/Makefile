@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-05-29 19:11:07 nineties $
+# $Id: Makefile 2010-05-31 00:40:32 nineties $
 
 AS = as
 ASFLAGS =
@@ -48,8 +48,8 @@ VMLDFLAGS = --nostdlib --entry=_start
 rlvm: vm.o
 	$(LD) vm.o -o $@ $(VMLDFLAGS)
 
-vm.s: rlci genvm.rlc vm.rlc stdlib.rlc
-	./rlci genvm.rlc > $@
+vm.s: rlci vmgen.rlc vm.rlc stdlib.rlc
+	./rlci vmgen.rlc > $@
 
 .SUFFIXES:
 .SUFFIXES: .o .s .rl
