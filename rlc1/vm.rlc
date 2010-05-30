@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm.rlc 2010-05-31 01:15:55 nineties $
+; $Id: vm.rlc 2010-05-31 02:03:53 nineties $
 ;
 
 ; === program of virtual machine ===
@@ -38,6 +38,13 @@
 
 (var vmcode `(
 
+(fun strlen (str) (
+    (int len 0)
+    (!= (*8 str) '\0')
+    (incl len)
+    (return len)
+    ))
+
 (int stack_size 0)
 (int stack_top 0)
 (void*[] 64 stack)  ; maximum number of stack blocks is 64 (64MB)
@@ -49,14 +56,14 @@
     ))
 
 (fun vmexit (status) (
-    (syscall @SYS_EXIT status)
+    (void (syscall @SYS_EXIT status))
     ))
 
 (string hello "Hello World\n")
 (extern _start)
 (fun _start () (
-    (syscall @SYS_WRITE @STDOUT_FD hello 12)
-    (call vmexit (0))
+    (void (syscall @SYS_WRITE @STDOUT_FD hello 12))
+    (void (call vmexit (0)))
     ))
 
 ))

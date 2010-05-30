@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vmgen.rlc 2010-05-31 01:28:34 nineties $
+; $Id: vmgen.rlc 2010-05-31 02:05:12 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -29,22 +29,21 @@
         (default code)
     )))
 
+(define escape (c)
+    (cond
+        ((== c '\n') "\\n")
+        ((== c '\0') "\\0")
+        ((== c '\a') "\\a")
+        ((== c '\b') "\\b")
+        ((== c '\f') "\\f")
+        ((== c '\r') "\\r")
+        ((== c '\t') "\\t")
+        ((== c '\v') "\\v")
+        (true        c)))
+
 (define emit_string (str) (do
     (print '"')
-    (for i 0 (- (string_len str) 1) (do
-        (var c ([] i str))
-        (cond
-            ((== c '\n') (print "\\n"))
-            ((== c '\0') (print "\\0"))
-            ((== c '\a') (print "\\a"))
-            ((== c '\b') (print "\\b"))
-            ((== c '\f') (print "\\f"))
-            ((== c '\r') (print "\\r"))
-            ((== c '\t') (print "\\t"))
-            ((== c '\v') (print "\\v"))
-            (true        (print c))
-            )
-        ))
+    (for i 0 (- (string_len str) 1) (print (escape ([] i str))))
     (print '"')
     ))
 
@@ -54,7 +53,7 @@
 (define emit_operand (opd)
     (cond
         ((int? opd)     (print '$' opd))
-        ((char? opd)    (print "$'" opd))
+        ((char? opd)    (print "$'" (escape opd)))
         ((== `%top opd) (print "(%esp)"))
         ((symbol? opd)  (print opd))
         ((== `var (car opd)) (do
@@ -102,9 +101,9 @@
 (define movl  (src dst) (emit "movl" src dst))
 (define movb  (src dst) (emit "movb" src dst))
 (define pushl (val) (emit "pushl" val))
-(define pushb (val) (emit "pushb" val))
+(define pushb (val) (do (emit "xorl" `%eax `%eax) (emit "movb" val `%al) (pushl `%eax)))
 (define popl  (reg) (emit "popl" reg))
-(define popb  (reg) (emit "popb" reg))
+(define popb  (reg) (emit "popl" reg))
 
 ; === management of variables ===
 (var vtable ())
@@ -167,18 +166,35 @@
         (true (not_implemented "emit_value" val))
         ))
 
-(define emit_unexpr (code) (do
-    (var insn (lookup_insn (car code)))
-    (emit_expr (cadr code))
+(define emit_deref8 ((*8 ptr)) (do
+    (emit_expr ptr)
+    (popl `%eax)
+    (pushb `(offset %eax 0))
+    ))
+
+(define emit_unexpr ((op arg)) (do
+    (var insn (lookup_insn op))
+    (emit_expr arg)
     (emit insn `%top)
     ))
 
-(define emit_binexpr (code) (do
-    (var insn (lookup_insn (car code)))
-    (emit_expr (cadr code))
-    (emit_expr (caddr code))
+(define emit_binexpr ((op lhs rhs)) (do
+    (var insn (lookup_insn op))
+    (emit_expr lhs)
+    (emit_expr rhs)
     (popl `%eax)
     (emit insn `%eax `%top)
+    ))
+
+(define emit_ne ((op lhs rhs)) (do
+    (emit_expr lhs)
+    (emit_expr rhs)
+    (popl `%eax)
+    (popl `%ebx)
+    (emit "cmpl" `%eax `%ebx)
+    (emit "setne" `%al)
+    (emit "movzbl" `%al `%eax)
+    (pushl `%eax)
     ))
 
 (define emit_syscall ((syscall . args)) (do
@@ -204,15 +220,17 @@
     ))
 
 (define emit_def ((type v . init))
-    (if init
-        (do
-            (emit_expr (car init))
-            (movl `%top `%eax)
-            (movl `%eax (lookup_var v)))
-        (pushl 0)
+    (if init (do (emit_expr (car init)) (popl (lookup_var v)))))
+
+(define emit_void ((void expr)) (do
+    (emit_expr expr)
+    (drop 1)
     ))
 
+(define emit_incl ((incl v)) (emit "incl" (lookup_var v)))
+
 (var expr_dispatcher `(
+    (void    . @emit_void)
     (syscall . @emit_syscall)
     (call    . @emit_call)
     (return  . @emit_return)
@@ -221,12 +239,17 @@
     (int     . @emit_def)
     (char    . @emit_def)
     (void*   . @emit_def)
+    (*8      . @emit_deref8)
     (+       . @emit_binexpr)
     (-       . @emit_binexpr)
     (*       . @emit_binexpr)
+    (!=      . @emit_ne)
+    (incl    . @emit_incl)
     ))
 
 (define emit_expr (expr) (dispatch expr_dispatcher emit_value expr))
+
+(define emit_block (block) (foreach e block (emit_expr e)))
 
 ; === compilation of external declarations ===
 
@@ -291,7 +314,7 @@
     ; allocate stack frame
     (if (> var_pos 0) (emit "subl" (* 4 var_pos) `%esp))
 
-    (foreach e body (do (emit_expr e) (drop 1)))
+    (emit_block body)
     (vtable_pop)
     ))
 
