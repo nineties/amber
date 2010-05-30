@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: genvm.rlc 2010-05-30 23:29:46 nineties $
+; $Id: vmgen.rlc 2010-05-31 01:28:34 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -29,6 +29,28 @@
         (default code)
     )))
 
+(define emit_string (str) (do
+    (print '"')
+    (for i 0 (- (string_len str) 1) (do
+        (var c ([] i str))
+        (cond
+            ((== c '\n') (print "\\n"))
+            ((== c '\0') (print "\\0"))
+            ((== c '\a') (print "\\a"))
+            ((== c '\b') (print "\\b"))
+            ((== c '\f') (print "\\f"))
+            ((== c '\r') (print "\\r"))
+            ((== c '\t') (print "\\t"))
+            ((== c '\v') (print "\\v"))
+            (true        (print c))
+            )
+        ))
+    (print '"')
+    ))
+
+(define address? (type)
+    (assoc type `((int . false) (string . true))))
+
 (define emit_operand (opd)
     (cond
         ((int? opd)     (print '$' opd))
@@ -43,9 +65,9 @@
             (print ')')
             ))
         ((== `global (car opd)) (do
-            (var type (cadr opd)) ; ignore type
+            (var type (cadr opd))
             (var sym  (caddr opd))
-            (print sym)
+            (if (address? type) (print '$' sym) (print sym))
             ))
         ((== `arg (car opd)) (do
             (print (* 4 (+ (cadr opd) 1)))
@@ -181,10 +203,14 @@
     (pushl `%eax)
     ))
 
-(define emit_def ((type v . init)) (if init (do
-    (emit_expr (car init))
-    (popl (lookup_var v))
-    )))
+(define emit_def ((type v . init))
+    (if init
+        (do
+            (emit_expr (car init))
+            (movl `%top `%eax)
+            (movl `%eax (lookup_var v)))
+        (pushl 0)
+    ))
 
 (var expr_dispatcher `(
     (syscall . @emit_syscall)
@@ -214,6 +240,13 @@
     (add_var sym `(global int @sym))
     ))
 
+(define emit_static_string ((string sym str)) (do
+    (print sym ": .string ")
+    (emit_string str)
+    (print '\n')
+    (add_var sym `(global string @sym))
+    ))
+
 (define emit_static_array ((type length name)) (do
     (var elemsz `((int[] . 4) (void*[] . 4) (char[] . 1) (byte[] . 1)))
     (println ".comm " name ", " (* length (assoc type elemsz)))
@@ -229,6 +262,7 @@
 
 (define ignore (code) ())
 (define scan_expr (e) (dispatch scan_function_dispatcher ignore e))
+
 (define scan_function (body) (do
     (set var_pos 0)
     (foreach e body (scan_expr e))
@@ -253,13 +287,18 @@
     (print_label name)
     (pushl `%ebp)
     (movl `%esp `%ebp)
-    (foreach e body (emit_expr e))
+
+    ; allocate stack frame
+    (if (> var_pos 0) (emit "subl" (* 4 var_pos) `%esp))
+
+    (foreach e body (do (emit_expr e) (drop 1)))
     (vtable_pop)
     ))
 
 (var extdecl_dispatcher `(
     (extern  . @emit_extern)
     (int     . @emit_static_int)
+    (string  . @emit_static_string)
     (int[]   . @emit_static_array)
     (char[]  . @emit_static_array)
     (void*[] . @emit_static_array)

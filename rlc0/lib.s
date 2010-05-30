@@ -3,7 +3,7 @@
  * Copyright (C) 2009 nineties
  */
 
-/* $Id: lib.s 2010-03-26 20:26:54 nineties $ */
+/* $Id: lib.s 2010-05-31 01:13:44 nineties $ */
 
 .include "defs.s"
 

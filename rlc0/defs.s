@@ -3,7 +3,7 @@
  * Copyright (C) 2009 nineties
  */
 
-/* $Id: defs.s 2010-01-15 04:01:07 nineties $ */
+/* $Id: defs.s 2010-05-31 01:26:00 nineties $ */
 
 /* file descriptors */
 .equ STDIN_FD, 0
