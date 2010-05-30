@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm.rlc 2010-05-30 01:33:51 nineties $
+; $Id: vm.rlc 2010-05-30 23:29:34 nineties $
 ;
 
 ; === program of virtual machine ===
@@ -19,6 +19,10 @@
 (var SYS_MUNMAP  91)
 (var SYS_MMAP2   192)
 
+(var STDIN_FD 0)
+(var STDOUT_FD 1)
+(var STDERR_FD 2)
+
 (var PROT_READ  0x1)
 (var PROT_WRITE 0x2)
 (var PROT_EXEC  0x4)
@@ -30,23 +34,27 @@
 (var MAP_FIXED      0x10)
 (var MAP_ANONYMOUS  0x20)
 
+(var BLOCK_SIZE (* 1024 1024)) ; 1MB
+
 (var vmcode `(
 
 (int stack_size 0)
 (int stack_top 0)
-(int* stack)
+(void*[] 64 stack)  ; maximum number of stack blocks is 64 (64MB)
 
 (fun mmap2 (addr size) (
-    (syscall @SYS_MMAP2 addr size @(| PROT_READ PROT_WRITE PROT_EXEC) @(| MAP_ANONYMOUS MAP_PRIVATE) -1 0)
-))
+    (void* ptr (syscall @SYS_MMAP2 addr size
+        @(| PROT_READ PROT_WRITE PROT_EXEC) @(| MAP_ANONYMOUS MAP_PRIVATE) -1 0))
+    (return ptr)
+    ))
 
 (fun vmexit (status) (
     (syscall @SYS_EXIT status)
-))
+    ))
 
 (extern _start)
 (fun _start () (
     (call vmexit (0))
-))
+    ))
 
 ))

@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: genvm.rlc 2010-05-30 00:55:40 nineties $
+; $Id: genvm.rlc 2010-05-30 23:29:46 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -23,7 +23,7 @@
             (var fun (assoc head dispatcher))
             (if fun
                 (fun code)
-                (do (eprintln "undefined code : " code) (exit 1))
+                (default code)
             )
         )
         (default code)
@@ -35,11 +35,17 @@
         ((char? opd)    (print "$'" opd))
         ((== `%top opd) (print "(%esp)"))
         ((symbol? opd)  (print opd))
-        ((== `offset (car opd)) (do
-            (if (!= (caddr opd) 0) (print (caddr opd)))
+        ((== `var (car opd)) (do
+            (var offs (cadr opd))
+            (print (* -4 (+ offs 1)))
             (print '(')
-            (emit_operand (cadr opd))
+            (emit_operand `%ebp)
             (print ')')
+            ))
+        ((== `global (car opd)) (do
+            (var type (cadr opd)) ; ignore type
+            (var sym  (caddr opd))
+            (print sym)
             ))
         ((== `arg (car opd)) (do
             (print (* 4 (+ (cadr opd) 1)))
@@ -47,11 +53,17 @@
             (emit_operand `%ebp)
             (print ')')
             ))
+        ((== `offset (car opd)) (do
+            (if (!= (caddr opd) 0) (print (caddr opd)))
+            (print '(')
+            (emit_operand (cadr opd))
+            (print ')')
+            ))
         ((== `label (car opd)) (print (cadr opd)))
         (true (not_implemented "emit_operand" opd))
         ))
 
-(define emit_label (name) (print name ":\n"))
+(define print_label (name) (print name ":\n"))
 
 (define emit args (do
     (print '\t' (car args))
@@ -78,15 +90,21 @@
 (define vtable_push () (set vtable (cons () vtable)))
 (define vtable_pop  () (set vtable (cdr vtable)))
 
-(define lookup_var (name) (do
-    (define loop (name tab)
+(define lookup_var_helper (sym) (do
+    (define loop (sym tab)
         (if (nil? tab) nil (do
-            (var v (assoc name (car tab)))
-            (if v v (loop name (cdr tab)))
+            (var v (assoc sym (car tab)))
+            (if v v (loop sym (cdr tab)))
             )))
-    (var v (loop name vtable))
-    (if v v (do (eprintln "undefined variable : " name) (exit 1)))
+    (loop sym vtable)
     ))
+
+(define lookup_var (sym) (do
+    (var v (lookup_var_helper sym))
+    (if v v (do (eprintln "undefined variable : " sym) (exit 1)))
+    ))
+
+(define variable? (sym) (lookup_var_helper sym))
 
 (define add_var (name opd) (setcar vtable (cons `(@name . @opd) (car vtable))))
 
@@ -95,11 +113,29 @@
 (var insn_table `((+ . "addl") (- . "subl") (* . "imul") (neg . "negl")))
 (define lookup_insn (op) (assoc op insn_table))
 
-(define emit_return (return . arg) (do
+(define emit_return ((return . arg)) (do
     (if arg (emit_expr (car arg)))
+    (popl `%eax)
     (emit "leave")
     (emit "ret")
     ))
+
+(define emit_label ((label name)) (print_label name))
+
+(define emit_directjump (opd) (emit "jmp" opd))
+(define emit_indirectjump (opd) (do
+    (emit_expr opd)
+    (movl `%top `%eax)
+    (drop 1)
+    (emit "jmp" `*%eax)
+    ))
+
+(define emit_goto ((goto opd))
+    (if (symbol? opd)
+        (if (variable? opd) (emit_indirectjump opd) (emit_directjump opd))
+        (emit_indirectjump opd)
+        ))
+
 
 (define emit_value (val)
     (cond
@@ -130,7 +166,7 @@
     (foreach e args (emit_expr e))
     (for r 1 narg (movl `(offset %esp @(* 4 (- narg r))) (nth (- r 1) regs)))
     (drop narg)
-    (emit "int" 128)
+    (emit "int" 0x80)
     (pushl `%eax)
     ))
 
@@ -145,13 +181,23 @@
     (pushl `%eax)
     ))
 
+(define emit_def ((type v . init)) (if init (do
+    (emit_expr (car init))
+    (popl (lookup_var v))
+    )))
+
 (var expr_dispatcher `(
     (syscall . @emit_syscall)
-    (call . @emit_call)
-    (return . @emit_return)
-    (+ . @emit_binexpr)
-    (- . @emit_binexpr)
-    (* . @emit_binexpr)
+    (call    . @emit_call)
+    (return  . @emit_return)
+    (label   . @emit_label)
+    (goto    . @emit_goto)
+    (int     . @emit_def)
+    (char    . @emit_def)
+    (void*   . @emit_def)
+    (+       . @emit_binexpr)
+    (-       . @emit_binexpr)
+    (*       . @emit_binexpr)
     ))
 
 (define emit_expr (expr) (dispatch expr_dispatcher emit_value expr))
@@ -160,20 +206,51 @@
 
 (define emit_extern ((extern . (name))) (print ".global " name '\n'))
 
-(define emit_static_int (code) (do
-    (set code (cdr code)) ; skip 'int'
-    (print (car code) ": .long ")
-    (if (nil? (cdr code))
-        (println 0)
-        (println (cadr code))
-        )
+(define emit_static_int ((int sym . init)) (do
+    (print sym ": .long ")
+    (if init
+        (println (car init))
+        (println 0))
+    (add_var sym `(global int @sym))
+    ))
+
+(define emit_static_array ((type length name)) (do
+    (var elemsz `((int[] . 4) (void*[] . 4) (char[] . 1) (byte[] . 1)))
+    (println ".comm " name ", " (* length (assoc type elemsz)))
+    ))
+
+(var var_pos 0)
+(define scan_defvar ((type v . init)) (do
+    (var sz (assoc type `((int . 1) (char . 1) (int* . 1) (void* . 1))))
+    (add_var v `(var @var_pos @sz))
+    (set var_pos (+ var_pos sz))
+    (if init (scan_expr init))
+    ))
+
+(define ignore (code) ())
+(define scan_expr (e) (dispatch scan_function_dispatcher ignore e))
+(define scan_function (body) (do
+    (set var_pos 0)
+    (foreach e body (scan_expr e))
+    ))
+
+(var scan_function_dispatcher `(
+    (int . @scan_defvar)
+    (char . @scan_defvar)
+    (int* . @scan_defvar)
+    (void* . @scan_defvar)
     ))
 
 (define emit_function ((fun name params body)) (do
     (vtable_push)
+
+    ; register parameters
     (var idx 1)
     (foreach p params (do (add_var p `(arg @idx)) (incl idx)))
-    (emit_label name)
+    ; register variables
+    (scan_function body)
+
+    (print_label name)
     (pushl `%ebp)
     (movl `%esp `%ebp)
     (foreach e body (emit_expr e))
@@ -181,15 +258,15 @@
     ))
 
 (var extdecl_dispatcher `(
-    (extern . @emit_extern)
-    (int . @emit_static_int)
-    (int* . @emit_static_int)
-    (fun . @emit_function)
+    (extern  . @emit_extern)
+    (int     . @emit_static_int)
+    (int[]   . @emit_static_array)
+    (char[]  . @emit_static_array)
+    (void*[] . @emit_static_array)
+    (fun     . @emit_function)
     ))
 
-(define compile (prog) (do
-    (foreach decl prog (dispatch extdecl_dispatcher not_reachable decl))
-    ))
+(define compile (prog) (foreach decl prog (dispatch extdecl_dispatcher not_reachable decl)))
 
 ; === compile the VM ===
 
