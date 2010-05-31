@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-05-31 01:03:26 nineties $
+ % $Id: builtin.rl 2010-05-31 11:39:15 nineties $
  %);
 
 include(stddef,code);
@@ -54,6 +54,11 @@ nth: (p0, p1) {
         p1 = p1-1;
     };
     return car(p0);
+};
+
+append: (p0, p1) {
+    if (p0 == nil_sym) { return p1; };
+    return mkcons(car(p0), append(cdr(p0), p1))
 };
 
 length: (p0) {
@@ -309,6 +314,14 @@ rl_car: (p0) {
 rl_cdr: (p0) {
     check_arity(p0, 1, "cdr");
     return cdr(car(p0));
+};
+
+rl_append: (p0) {
+    allocate(2);
+    check_arity(p0, 2, "append");
+    x0 = car(p0);
+    x1 = cadr(p0);
+    return append(x0, x1);
 };
 
 rl_length: (p0) {
@@ -607,6 +620,7 @@ init_builtin_objects: () {
     register_prim("cons"       , &rl_cons);
     register_prim("car"        , &rl_car);
     register_prim("cdr"        , &rl_cdr);
+    register_prim("append"     , &rl_append);
     register_prim("length"     , &rl_length);
     register_prim("reverse"    , &rl_reverse);
     register_prim("list"       , &rl_list);

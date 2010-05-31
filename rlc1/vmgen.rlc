@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vmgen.rlc 2010-05-31 11:26:46 nineties $
+; $Id: vmgen.rlc 2010-06-01 01:32:40 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -56,6 +56,7 @@
 (define emit_operand (opd)
     (cond
         ((int? opd)     (print '$' opd))
+        ((== opd '\0')      (print "$0"))
         ((char? opd)    (print "$'" (escape opd)))
         ((== `%top opd) (print "(%esp)"))
         ((symbol? opd)  (print opd))
@@ -107,7 +108,7 @@
 (define movl  (src dst) (emit "movl" src dst))
 (define movb  (src dst) (emit "movb" src dst))
 (define pushl (val) (emit "pushl" val))
-(define pushb (val) (do (emit "xorl" `%eax `%eax) (emit "movb" val `%al) (pushl `%eax)))
+(define pushb (val) (do (emit "movb" val `%al) (emit "movzbl" `%al `%eax) (pushl `%eax)))
 (define popl  (reg) (emit "popl" reg))
 (define popb  (reg) (emit "popl" reg))
 
@@ -162,9 +163,10 @@
     ))
 
 (define emit_goto ((goto opd))
-    (if (symbol? opd)
-        (if (variable? opd) (emit_indirectjump opd) (emit_directjump opd))
-        (emit_indirectjump opd)
+    (cond
+        ((and (symbol? opd) (not (variable? opd))) (emit_directjump opd))
+        ((and (cons? opd) (== `label (car opd)))   (emit_directjump opd))
+        (otherwise (emit_indirectjump opd))
         ))
 
 
@@ -241,8 +243,6 @@
 (define emit_incl ((incl v)) (emit "incl" (lookup_var v)))
 
 (define comparison? (op) (member op `(== != < > <= >=)))
-(define lookup_cond_jump_insn (op)
-    (assoc op `((== . "je") (!= . "jne") (< . "jl") (> . "jg") (<= . "jle") (>= . "jge"))))
 
 (define emit_if ((_if_ expr ifthen . ifelse))
     (if (and (cons? expr) (comparison? (car expr)))
@@ -260,7 +260,7 @@
         )))
 
 (define emit_cond_if (expr ifthen . ifelse) (do
-    (var insn (lookup_cond_jump_insn (car expr)))
+    (var insn (assoc (car expr) `((== . "jne") (!= . "je") (< . "jge") (> . "jle") (<= . "jg") (>= . "jl"))))
     (var ifend-lbl (mklabel `end))
     (var ifelse-lbl (if ifelse (mklabel `ifelse) nil))
     (emit_expr (cadr expr))  ; lhs
@@ -274,6 +274,12 @@
     (emit_label ifend-lbl)
     ))
 
+(define emit_while ((_while_ expr body)) (do
+    (var loop-lbl (mklabel `loop))
+    (emit_label loop-lbl)
+    (emit_if `(if @expr @(append body `((goto @loop-lbl)))))
+    ))
+
 (var expr_dispatcher `(
     (void    . @emit_void)
     (syscall . @emit_syscall)
@@ -282,6 +288,7 @@
     (label   . @emit_label)
     (goto    . @emit_goto)
     (if      . @emit_if)
+    (while   . @emit_while)
     (int     . @emit_def)
     (char    . @emit_def)
     (void*   . @emit_def)
