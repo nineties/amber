@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vmgen.rlc 2010-05-31 02:05:12 nineties $
+; $Id: vmgen.rlc 2010-05-31 11:26:46 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -29,6 +29,9 @@
         (default code)
     )))
 
+(var label_id 0)
+(define mklabel (sym) (do (incl label_id) `(label @sym @(- label_id 1))))
+
 (define escape (c)
     (cond
         ((== c '\n') "\\n")
@@ -39,7 +42,7 @@
         ((== c '\r') "\\r")
         ((== c '\t') "\\t")
         ((== c '\v') "\\v")
-        (true        c)))
+        (otherwise   c)))
 
 (define emit_string (str) (do
     (print '"')
@@ -80,8 +83,11 @@
             (emit_operand (cadr opd))
             (print ')')
             ))
-        ((== `label (car opd)) (print (cadr opd)))
-        (true (not_implemented "emit_operand" opd))
+        ((== `label (car opd)) (do
+            (print (cadr opd))
+            (if (cddr opd) (do (print '.') (print (caddr opd))))
+            ))
+        (otherwise (not_implemented "emit_operand" opd))
         ))
 
 (define print_label (name) (print name ":\n"))
@@ -141,7 +147,11 @@
     (emit "ret")
     ))
 
-(define emit_label ((label name)) (print_label name))
+(define emit_label ((label name . id)) (do
+    (print name)
+    (if id (print '.' (car id)))
+    (print ":\n")
+    ))
 
 (define emit_directjump (opd) (emit "jmp" opd))
 (define emit_indirectjump (opd) (do
@@ -158,12 +168,12 @@
         ))
 
 
-(define emit_value (val)
+(define emit_expr_default (val)
     (cond
         ((int? val)  (pushl val))
         ((char? val) (pushb val))
         ((symbol? val) (pushl (lookup_var val)))
-        (true (not_implemented "emit_value" val))
+        (otherwise (not_implemented "emit_expr_default" val))
         ))
 
 (define emit_deref8 ((*8 ptr)) (do
@@ -186,13 +196,14 @@
     (emit insn `%eax `%top)
     ))
 
-(define emit_ne ((op lhs rhs)) (do
+(define emit_comparison ((op lhs rhs)) (do
+    (var insn (assoc op `((== . "sete") (!= . "setne") (< . "setl") (> . "setg") (<= . "setle") (>= . "setge"))))
     (emit_expr lhs)
     (emit_expr rhs)
     (popl `%eax)
     (popl `%ebx)
     (emit "cmpl" `%eax `%ebx)
-    (emit "setne" `%al)
+    (emit insn `%al)
     (emit "movzbl" `%al `%eax)
     (pushl `%eax)
     ))
@@ -229,6 +240,40 @@
 
 (define emit_incl ((incl v)) (emit "incl" (lookup_var v)))
 
+(define comparison? (op) (member op `(== != < > <= >=)))
+(define lookup_cond_jump_insn (op)
+    (assoc op `((== . "je") (!= . "jne") (< . "jl") (> . "jg") (<= . "jle") (>= . "jge"))))
+
+(define emit_if ((_if_ expr ifthen . ifelse))
+    (if (and (cons? expr) (comparison? (car expr)))
+        (emit_cond_if expr ifthen . ifelse)
+        (do
+            (var ifend-lbl (mklabel `end))
+            (var ifelse-lbl (if ifelse (mklabel `ifelse) nil))
+            (emit_expr expr)
+            (popl `%eax)
+            (emit "cmpl" 0 `%eax)
+            (emit "je" (if ifelse-lbl ifelse-lbl ifend-lbl))
+            (emit_block ifthen)
+            (if ifelse-lbl (do (emit "jmp" ifend-lbl) (emit_label ifelse-lbl) (emit_block (car ifelse))))
+            (emit_label ifend-lbl)
+        )))
+
+(define emit_cond_if (expr ifthen . ifelse) (do
+    (var insn (lookup_cond_jump_insn (car expr)))
+    (var ifend-lbl (mklabel `end))
+    (var ifelse-lbl (if ifelse (mklabel `ifelse) nil))
+    (emit_expr (cadr expr))  ; lhs
+    (emit_expr (caddr expr)) ; rhs
+    (popl `%ebx)
+    (popl `%eax)
+    (emit "cmpl" `%eax `%ebx)
+    (emit insn (if ifelse-lbl ifelse-lbl ifend-lbl))
+    (emit_block ifthen)
+    (if ifelse-lbl (do (emit "jmp" ifend-lbl) (emit_label ifelse-lbl) (emit_block (car ifelse))))
+    (emit_label ifend-lbl)
+    ))
+
 (var expr_dispatcher `(
     (void    . @emit_void)
     (syscall . @emit_syscall)
@@ -236,6 +281,7 @@
     (return  . @emit_return)
     (label   . @emit_label)
     (goto    . @emit_goto)
+    (if      . @emit_if)
     (int     . @emit_def)
     (char    . @emit_def)
     (void*   . @emit_def)
@@ -243,11 +289,16 @@
     (+       . @emit_binexpr)
     (-       . @emit_binexpr)
     (*       . @emit_binexpr)
-    (!=      . @emit_ne)
+    (==      . @emit_comparison)
+    (!=      . @emit_comparison)
+    (<       . @emit_comparison)
+    (>       . @emit_comparison)
+    (<=      . @emit_comparison)
+    (>=      . @emit_comparison)
     (incl    . @emit_incl)
     ))
 
-(define emit_expr (expr) (dispatch expr_dispatcher emit_value expr))
+(define emit_expr (expr) (dispatch expr_dispatcher emit_expr_default expr))
 
 (define emit_block (block) (foreach e block (emit_expr e)))
 
