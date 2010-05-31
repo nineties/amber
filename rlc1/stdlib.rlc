@@ -2,13 +2,15 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: stdlib.rlc 2010-05-31 00:56:52 nineties $
+; $Id: stdlib.rlc 2010-05-31 11:18:25 nineties $
 ;
 
 (var rewrite (macro (name params body) `(var @name (macro @params @body))))
 (rewrite define (name params body) `(var @name (lambda @params @body)))
 
 ;=== aliases ===
+(var otherwise true)
+
 (var + add)
 (var - sub)
 (var * mul)
@@ -32,8 +34,11 @@
     (cond
         ((string? container) (string_get container idx))
         ((array? container) (array_get container idx))
-        (true (eprintln "invalid container for operator [] : " container))
+        (otherwise (eprintln "invalid container for operator [] : " container))
         ))
+
+(rewrite and (lhs rhs) `(if @lhs true @rhs))
+(rewrite or  (lhs rhs) `(if @lhs @rhs nil))
 
 ;=== loops ===
 (rewrite foreach (it list body) `(do
@@ -67,11 +72,18 @@
 (rewrite setcar (list v) `(set @list (cons @v (cdr @list))))
 (rewrite setcdr (list v) `(set @list (cons (car @list) @v)))
 
+(define member (val list)
+    (cond
+        ((nil? list) nil)
+        ((== key (car list)) true)
+        (otherwise (member val (cdr list)))
+        ))
+
 (define assoc (key list)
     (cond
         ((nil? list) nil)
         ((== key (caar list)) (cdar list))
-        (true (assoc key (cdr list)))
+        (otherwise (assoc key (cdr list)))
         )
     )
 
