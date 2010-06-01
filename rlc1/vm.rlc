@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm.rlc 2010-06-01 01:28:28 nineties $
+; $Id: vm.rlc 2010-06-01 13:56:09 nineties $
 ;
 
 ; === program of virtual machine ===
@@ -47,8 +47,9 @@
     (return len)
     ))
 
-(fun test (str) (
-    (if (< 1 2) ((return 0)) ((return 1)))
+(fun error (msg) (
+    (void (syscall @SYS_WRITE @STDERR_FD msg (call strlen msg)))
+    (void (call vmexit 1))
     ))
 
 (int stack_size 0)
@@ -58,6 +59,7 @@
 (fun mmap2 (addr size) (
     (void* ptr (syscall @SYS_MMAP2 addr size
         @(| PROT_READ PROT_WRITE PROT_EXEC) @(| MAP_ANONYMOUS MAP_PRIVATE) -1 0))
+    (if (&& (<= -128 ptr) (< ptr 0))  ((call error "ERROR: mmap2 failed\n")))
     (return ptr)
     ))
 
@@ -65,11 +67,9 @@
     (void (syscall @SYS_EXIT status))
     ))
 
-(string hello "Hello World\n")
 (extern _start)
 (fun _start () (
-    (void (syscall @SYS_WRITE @STDOUT_FD hello 12))
-    (void (call vmexit ((call strlen (hello)))))
+    (call vmexit 0)
     ))
 
 ))

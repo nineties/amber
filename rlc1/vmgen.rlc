@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vmgen.rlc 2010-06-01 01:32:40 nineties $
+; $Id: vmgen.rlc 2010-06-01 13:56:29 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -56,7 +56,7 @@
 (define emit_operand (opd)
     (cond
         ((int? opd)     (print '$' opd))
-        ((== opd '\0')      (print "$0"))
+        ((== opd '\0')  (print "$0"))
         ((char? opd)    (print "$'" (escape opd)))
         ((== `%top opd) (print "(%esp)"))
         ((symbol? opd)  (print opd))
@@ -90,8 +90,6 @@
             ))
         (otherwise (not_implemented "emit_operand" opd))
         ))
-
-(define print_label (name) (print name ":\n"))
 
 (define emit args (do
     (print '\t' (car args))
@@ -136,6 +134,14 @@
 
 (define add_var (name opd) (setcar vtable (cons `(@name . @opd) (car vtable))))
 
+(var string_table ())
+(define reset_string_table () (set string_table ()))
+(define register_string (str) (do
+    (var lbl (mklabel `str))
+    (set string_table (cons `(@lbl @str) string_table))
+    lbl
+    ))
+
 ; === compilation of expressions ===
 
 (var insn_table `((+ . "addl") (- . "subl") (* . "imul") (neg . "negl")))
@@ -169,12 +175,15 @@
         (otherwise (emit_indirectjump opd))
         ))
 
-
 (define emit_expr_default (val)
     (cond
         ((int? val)  (pushl val))
         ((char? val) (pushb val))
         ((symbol? val) (pushl (lookup_var val)))
+        ((string? val) (do
+            (var sym (register_string val))
+            (pushl `(global string @sym))
+            ))
         (otherwise (not_implemented "emit_expr_default" val))
         ))
 
@@ -221,7 +230,7 @@
     (pushl `%eax)
     ))
 
-(define emit_call ((call func args))
+(define emit_call ((call func . args))
     (if (symbol? func) (emit_directcall func args) (emit_indirectcall func args)))
 
 (define emit_directcall (func args) (do
@@ -235,6 +244,8 @@
 (define emit_def ((type v . init))
     (if init (do (emit_expr (car init)) (popl (lookup_var v)))))
 
+(define emit_nop ((_nop_)) ())
+
 (define emit_void ((void expr)) (do
     (emit_expr expr)
     (drop 1)
@@ -245,19 +256,51 @@
 (define comparison? (op) (member op `(== != < > <= >=)))
 
 (define emit_if ((_if_ expr ifthen . ifelse))
-    (if (and (cons? expr) (comparison? (car expr)))
-        (emit_cond_if expr ifthen . ifelse)
+    (cond
+        ((and (cons? expr) (== `! (car expr)))  (emit_unless (cadr expr) ifthen . ifelse))
+        ((and (cons? expr) (== `&& (car expr))) (emit_seqand_if (cadr expr) (caddr expr) ifthen . ifelse))
+        ((and (cons? expr) (== `|| (car expr))) (emit_seqor_if (cadr expr) (caddr expr) ifthen . ifelse))
+        ((and (cons? expr) (comparison? (car expr))) (emit_cond_if expr ifthen . ifelse))
+        (otherwise
+            (do
+                (var ifend-lbl (mklabel `end))
+                (var ifelse-lbl (if ifelse (mklabel `ifelse) nil))
+                (emit_expr expr)
+                (popl `%eax)
+                (emit "cmpl" 0 `%eax)
+                (emit "je" (if ifelse-lbl ifelse-lbl ifend-lbl))
+                (emit_block ifthen)
+                (if ifelse-lbl (do (emit "jmp" ifend-lbl) (emit_label ifelse-lbl) (emit_block (car ifelse))))
+                (emit_label ifend-lbl)
+            )
+        )))
+
+(define emit_unless (expr ifthen . ifelse)
+    (if ifelse
+        (emit_expr `(if @expr @(car ifelse) @ifthen))
+        (emit_expr `(if @expr ((nop)) @ifthen))
+        ))
+
+(define emit_seqand_if (expr1 expr2 ifthen . ifelse)
+    (if ifelse
         (do
             (var ifend-lbl (mklabel `end))
-            (var ifelse-lbl (if ifelse (mklabel `ifelse) nil))
-            (emit_expr expr)
-            (popl `%eax)
-            (emit "cmpl" 0 `%eax)
-            (emit "je" (if ifelse-lbl ifelse-lbl ifend-lbl))
-            (emit_block ifthen)
-            (if ifelse-lbl (do (emit "jmp" ifend-lbl) (emit_label ifelse-lbl) (emit_block (car ifelse))))
+            (emit_expr `(if @expr1 ((if @expr2 @(append @ifthen ((goto @ifend-lbl)))))))
+            (emit_expr ifelse)
             (emit_label ifend-lbl)
-        )))
+        )
+        (emit_expr `(if @expr1 ((if @expr2 @ifthen))))
+        ))
+
+(define emit_seqor_if (expr1 expr2 ifthen . ifelse)
+    (if ifelse
+        (emit_expr `(if (&& (! @expr1) (! @expr2)) @ifthen @(car ifelse)))
+        (do
+            (var ifend-lbl (mklabel `end))
+            (emit_expr `(if (&& (! @expr1) (! @expr2)) ((goto @ifend-lbl)) @ifthen))
+            (emit_label ifend-lbl)
+        )
+        ))
 
 (define emit_cond_if (expr ifthen . ifelse) (do
     (var insn (assoc (car expr) `((== . "jne") (!= . "je") (< . "jge") (> . "jle") (<= . "jg") (>= . "jl"))))
@@ -281,6 +324,7 @@
     ))
 
 (var expr_dispatcher `(
+    (nop     . @emit_nop)
     (void    . @emit_void)
     (syscall . @emit_syscall)
     (call    . @emit_call)
@@ -322,7 +366,8 @@
     ))
 
 (define emit_static_string ((string sym str)) (do
-    (print sym ": .string ")
+    (emit_label sym)
+    (print "\t.string ")
     (emit_string str)
     (print '\n')
     (add_var sym `(global string @sym))
@@ -358,6 +403,7 @@
 
 (define emit_function ((fun name params body)) (do
     (vtable_push)
+    (reset_string_table)
 
     ; register parameters
     (var idx 1)
@@ -365,7 +411,7 @@
     ; register variables
     (scan_function body)
 
-    (print_label name)
+    (emit_label `(label @name))
     (pushl `%ebp)
     (movl `%esp `%ebp)
 
@@ -374,6 +420,8 @@
 
     (emit_block body)
     (vtable_pop)
+
+    (foreach ent string_table (emit_static_string `(string @(car ent) @(cadr ent))))
     ))
 
 (var extdecl_dispatcher `(

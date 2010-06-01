@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: lex.rl 2010-05-30 01:40:25 nineties $
+ % $Id: lex.rl 2010-06-01 13:37:28 nineties $
  %);
 
 include(stddef, code);
@@ -414,7 +414,7 @@ label s9;
     goto s9next[lookahead()];
 label s10;
     x0 = consume();
-    tokval = - tokval * 10 - (x0 - '0');
+    tokval = tokval * 10 - (x0 - '0');
     accept(TOK_INT);
     goto s10next[lookahead()];
 label s11;
