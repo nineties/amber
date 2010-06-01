@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: stdlib.rlc 2010-06-01 22:53:35 nineties $
+; $Id: stdlib.rlc 2010-06-02 00:14:23 nineties $
 ;
 
 (var rewrite (macro (name params body) `(var @name (macro @params @body))))
@@ -40,6 +40,20 @@
 
 (rewrite and (lhs rhs) `(if @lhs @rhs nil))
 (rewrite or  (lhs rhs) `(if @lhs true @rhs))
+
+(define tos (val)
+    (cond
+        ((string? val) val)
+        ((char? val)   (char2s val))
+        ((int? val)    (int2s val))
+        ((symbol? val) (symbol2s val))
+        (otherwise (eprintln "invalid application of `tos` for " val))
+        ))
+
+(define ++ args (do
+    (set args (map tos args))
+    (sappend . args)
+    ))
 
 ;=== loops ===
 (rewrite foreach (it list body) `(do
@@ -87,6 +101,8 @@
         (otherwise (assoc key (cdr list)))
         )
     )
+
+(define map (lam list) (if (nil? list) nil (cons (lam (car list)) (map lam (cdr list)))))
 
 ;=== I/O functions ===
 

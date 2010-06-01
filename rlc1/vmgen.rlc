@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vmgen.rlc 2010-06-01 23:31:26 nineties $
+; $Id: vmgen.rlc 2010-06-02 00:27:11 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -30,7 +30,8 @@
     )))
 
 (var label_id 0)
-(define mklabel (sym) (do (incl label_id) `(label @sym @(- label_id 1))))
+(define mklabel (sym) (do (incl label_id) (tosym (++ sym '.' (- label_id 1)))))
+(define print_label (sym) (print sym ":\n"))
 
 (define escape (c)
     (cond
@@ -270,8 +271,8 @@
                 (emit "cmpl" 0 `%eax)
                 (emit "je" (if ifelse-lbl ifelse-lbl ifend-lbl))
                 (emit_block ifthen)
-                (if ifelse-lbl (do (emit "jmp" ifend-lbl) (emit_label ifelse-lbl) (emit_block (car ifelse))))
-                (emit_label ifend-lbl)
+                (if ifelse-lbl (do (emit "jmp" ifend-lbl) (print_label ifelse-lbl) (emit_block (car ifelse))))
+                (print_label ifend-lbl)
             )
         )))
 
@@ -287,7 +288,7 @@
             (var ifend-lbl (mklabel `end))
             (emit_expr `(if @expr1 ((if @expr2 @(append @ifthen ((goto @ifend-lbl)))))))
             (emit_expr ifelse)
-            (emit_label ifend-lbl)
+            (print_label ifend-lbl)
         )
         (emit_expr `(if @expr1 ((if @expr2 @ifthen))))
         ))
@@ -298,7 +299,7 @@
         (do
             (var ifend-lbl (mklabel `end))
             (emit_expr `(if (&& (! @expr1) (! @expr2)) ((goto @ifend-lbl)) @ifthen))
-            (emit_label ifend-lbl)
+            (print_label ifend-lbl)
         )
         ))
 
@@ -313,13 +314,13 @@
     (emit "cmpl" `%eax `%ebx)
     (emit insn (if ifelse-lbl ifelse-lbl ifend-lbl))
     (emit_block ifthen)
-    (if ifelse-lbl (do (emit "jmp" ifend-lbl) (emit_label ifelse-lbl) (emit_block (car ifelse))))
-    (emit_label ifend-lbl)
+    (if ifelse-lbl (do (emit "jmp" ifend-lbl) (print_label ifelse-lbl) (emit_block (car ifelse))))
+    (print_label ifend-lbl)
     ))
 
 (define emit_while ((_while_ expr body)) (do
     (var loop-lbl (mklabel `loop))
-    (emit_label loop-lbl)
+    (print_label loop-lbl)
     (emit_if `(if @expr @(append body `((goto @loop-lbl)))))
     ))
 
@@ -366,7 +367,7 @@
     ))
 
 (define emit_static_string ((string sym str)) (do
-    (emit_label sym)
+    (print_label sym)
     (print "\t.string ")
     (emit_string str)
     (print '\n')
@@ -411,7 +412,7 @@
     ; register variables
     (scan_function body)
 
-    (emit_label `(label @name))
+    (print_label name)
     (pushl `%ebp)
     (movl `%esp `%ebp)
 
@@ -439,10 +440,6 @@
 ; === compile the VM ===
 
 (import "vm")
-
-(eprintln (int2s 10))
-(eprintln (char2s 'a'))
-(eprintln (symbol2s `hoge))
 
 (vtable_push) ; global namespace
 (compile vmcode)
