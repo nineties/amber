@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-06-01 22:53:47 nineties $
+ % $Id: builtin.rl 2010-06-01 23:31:18 nineties $
  %);
 
 include(stddef,code);
@@ -619,6 +619,27 @@ rl_tosym: (p0) {
     return mksym(string_value(car(p0)));
 };
 
+rl_sappend: (p0) {
+    allocate(5);
+    x0 = p0;
+    x1 = 0; (% total length %);
+    while (x0 != nil_sym) {
+        x1 = x1 + strlen(string_value(car(x0)));
+        x0 = cdr(x0);
+    };
+    x2 = memalloc(x1 + 1);
+    x0 = p0;
+    x3 = 0;
+    while (x0 != nil_sym) {
+        x4 = string_value(car(x0));
+        strcpy(x2+x3, x4);
+        x3 = x3 + strlen(x4);
+        x0 = cdr(x0);
+    };
+    wch(x2, x1, '\0');
+    return mkstring(x2);
+};
+
 nil_sym    : NULL;
 true_sym   : NULL;
 var_sym    : NULL;
@@ -696,4 +717,5 @@ init_builtin_objects: () {
     register_prim("char2s"     , &rl_char2s);
     register_prim("symbol2s"   , &rl_symbol2s);
     register_prim("tosym"      , &rl_tosym);
+    register_prim("sappend"    , &rl_sappend);
 };
