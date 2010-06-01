@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-05-31 11:39:15 nineties $
+ % $Id: builtin.rl 2010-06-01 22:53:47 nineties $
  %);
 
 include(stddef,code);
@@ -579,6 +579,46 @@ rl_exit: (p0) {
     exit(int_value(car(p0)));
 };
 
+tosbuf: char [12];
+rl_int2s: (p0) {
+    allocate(2);
+    check_arity(p0, 1, "int2s");
+    x1 = int_value(car(p0));
+    if (x1 < 0) { x1 = -x1; };
+
+    wch(tosbuf, 11, '\0');
+    wch(tosbuf, 10, x1%10 + '0');
+    x0 = 10; (% index %);
+    x1 = x1/10;
+    while (x1 != 0) {
+        x0 = x0 - 1;
+        wch(tosbuf, x0, x1%10 + '0');
+        x1 = x1/10;
+    };
+    if (int_value(car(p0)) < 0) {
+        x0 = x0 - 1;
+        wch(tosbuf, x0, '-');
+    };
+    return mkstring(tosbuf+x0);
+};
+
+rl_char2s: (p0) {
+    check_arity(p0, 1, "char2s");
+    wch(tosbuf, 0, char_value(car(p0)));
+    wch(tosbuf, 1, '\0');
+    return mkstring(tosbuf);
+};
+
+rl_symbol2s: (p0) {
+    check_arity(p0, 1, "symbol2s");
+    return mkstring(sym_name(car(p0)));
+};
+
+rl_tosym: (p0) {
+    check_arity(p0, 1, "tosym");
+    return mksym(string_value(car(p0)));
+};
+
 nil_sym    : NULL;
 true_sym   : NULL;
 var_sym    : NULL;
@@ -652,4 +692,8 @@ init_builtin_objects: () {
     register_prim("getc"       , &rl_getc);
     register_prim("syscall"    , &rl_syscall);
     register_prim("exit"       , &rl_exit);
+    register_prim("int2s"      , &rl_int2s);
+    register_prim("char2s"     , &rl_char2s);
+    register_prim("symbol2s"   , &rl_symbol2s);
+    register_prim("tosym"      , &rl_tosym);
 };
