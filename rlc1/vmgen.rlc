@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vmgen.rlc 2010-06-02 11:55:08 nineties $
+; $Id: vmgen.rlc 2010-06-02 15:01:17 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -51,8 +51,7 @@
     (print '"')
     ))
 
-(define address? (type)
-    (assoc type `((int . false) (string . true))))
+(define address? (type) (assoc type `((int . @nil) (void* . @nil) (string . @true))))
 
 (define emit_operand (opd)
     (cond
@@ -417,15 +416,15 @@
 
 (define emit_extern ((extern . (name))) (print ".global " name '\n'))
 
-(define emit_static_int ((int sym . init)) (do
+(define emit_static_scalar ((type sym . init)) (do
     (print sym ": .long ")
     (if init
         (println (car init))
         (println 0))
-    (add_var sym `(global int @sym))
+    (add_var sym `(global @type @sym))
     ))
 
-(define emit_static_string ((string sym str)) (do
+(define emit_static_string ((_ sym str)) (do
     (print_label sym)
     (print "\t.string ")
     (emit_string str)
@@ -487,7 +486,8 @@
 
 (var extdecl_dispatcher `(
     (extern  . @emit_extern)
-    (int     . @emit_static_int)
+    (int     . @emit_static_scalar)
+    (void*   . @emit_static_scalar)
     (string  . @emit_static_string)
     (int[]   . @emit_static_array)
     (char[]  . @emit_static_array)
