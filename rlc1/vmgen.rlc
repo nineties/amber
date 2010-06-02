@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vmgen.rlc 2010-06-02 15:26:26 nineties $
+; $Id: vmgen.rlc 2010-06-02 15:39:35 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -228,6 +228,42 @@
     (if ret (emit_return `(return) nil nil))
     ))
 
+(define emit_div ((_ lhs rhs) dst ret) (do
+    (if dst
+        (do
+            (emit_expr lhs `%eax nil)
+            (pushl `%eax)
+            (emit_expr rhs `%ebx nil)
+            (popl `%eax)
+            (emit "xorl" `%edx `%edx)
+            (emit "idiv" `%ebx)
+            (movl `%eax dst)
+        )
+        (do
+            (emit_expr lhs nil nil)
+            (emit_expr rhs nil nil)
+        ))
+    (if ret (emit_return `(return) nil nil))
+    ))
+
+(define emit_mod ((_ lhs rhs) dst ret) (do
+    (if dst
+        (do
+            (emit_expr lhs `%eax nil)
+            (pushl `%eax)
+            (emit_expr rhs `%ebx nil)
+            (popl `%eax)
+            (emit "xorl" `%edx `%edx)
+            (emit "idiv" `%ebx)
+            (movl `%edx dst)
+        )
+        (do
+            (emit_expr lhs nil nil)
+            (emit_expr rhs nil nil)
+        ))
+    (if ret (emit_return `(return) nil nil))
+    ))
+
 (define emit_comparison ((op lhs rhs)) (do
     (var insn (assoc op `((== . "sete") (!= . "setne") (< . "setl") (> . "setg") (<= . "setle") (>= . "setge"))))
     (emit_expr lhs)
@@ -305,16 +341,16 @@
     ))
 
 (define emit_arrasgn ((_ arr idx e) dst ret) (do
-    ;(emit_expr arr `%eax nil)
-    ;(pushl `%eax)
-    ;(emit_expr idx `%eax nil)
-    ;(emit "imul" 4 `%eax)
-    ;(emit "addl" `%eax `%top)
-    ;(emit_expr e `%eax nil)
-    ;(popl `%ebx)
-    ;(movl `%eax `(offset %ebx 0))
-    ;(if dst (movl `%eax dst))
-    ;(if ret (emit_return `(return) nil nil))
+    (emit_expr arr `%eax nil)
+    (pushl `%eax)
+    (emit_expr idx `%eax nil)
+    (emit "imul" 4 `%eax)
+    (emit "addl" `%eax `%top)
+    (emit_expr e `%eax nil)
+    (popl `%ebx)
+    (movl `%eax `(offset %ebx 0))
+    (if dst (movl `%eax dst))
+    (if ret (emit_return `(return) nil nil))
     ))
 
 (define comparison? (op) (member op `(== != < > <= >=)))
@@ -408,6 +444,8 @@
     (+       . @emit_binexpr)
     (-       . @emit_binexpr)
     (*       . @emit_binexpr)
+    (/       . @emit_div)
+    (%       . @emit_mod)
     (&       . @emit_binexpr)
     (|       . @emit_binexpr)
     (^       . @emit_binexpr)
@@ -447,9 +485,10 @@
     (add_var sym `(global string @sym))
     ))
 
-(define emit_static_array ((type length name)) (do
+(define emit_static_array ((type length sym)) (do
     (var elemsz `((int[] . 4) (void*[] . 4) (char[] . 1) (byte[] . 1)))
-    (println ".comm " name ", " (* length (assoc type elemsz)))
+    (println ".comm " sym ", " (* length (assoc type elemsz)))
+    (add_var sym `(global @type @sym))
     ))
 
 (var var_pos 0)
