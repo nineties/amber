@@ -2,14 +2,14 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vmgen.rlc 2010-06-02 15:01:17 nineties $
+; $Id: vmgen.rlc 2010-06-02 15:26:26 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
 
 (import "stdlib")
 
-; === utilities ==
+; === utilities ===
 (define not_reachable args (do (eprintln "not reachable here") (exit 1)))
 (define not_implemented args (do
     (var msgs (cdr args))
@@ -291,8 +291,8 @@
 
 (define emit_nop ((_nop_) _ ret) (if ret (emit_return `(return) nil nil)))
 
-(define emit_incl ((_ v) dst ret) (do
-    (emit "incl" (lookup_var v))
+(define emit_incldecl ((inst v) dst ret) (do
+    (emit (if (== inst `incl) "incl" "decl") (lookup_var v))
     (if dst (movl (lookup_var v) dst))
     (if ret (emit_return `(return) nil nil))
     ))
@@ -302,6 +302,19 @@
     (movl `%eax (lookup_var v))
     (if dst (movl `%eax dst))
     (if ret (emit_return `(return) nil nil))
+    ))
+
+(define emit_arrasgn ((_ arr idx e) dst ret) (do
+    ;(emit_expr arr `%eax nil)
+    ;(pushl `%eax)
+    ;(emit_expr idx `%eax nil)
+    ;(emit "imul" 4 `%eax)
+    ;(emit "addl" `%eax `%top)
+    ;(emit_expr e `%eax nil)
+    ;(popl `%ebx)
+    ;(movl `%eax `(offset %ebx 0))
+    ;(if dst (movl `%eax dst))
+    ;(if ret (emit_return `(return) nil nil))
     ))
 
 (define comparison? (op) (member op `(== != < > <= >=)))
@@ -404,8 +417,10 @@
     (>       . @emit_comparison)
     (<=      . @emit_comparison)
     (>=      . @emit_comparison)
-    (asgn    . @emit_asgn)
-    (incl    . @emit_incl)
+    (=       . @emit_asgn)
+    ([]=     . @emit_arrasgn)
+    (incl    . @emit_incldecl)
+    (decl    . @emit_incldecl)
     ))
 
 (define emit_expr args (dispatch expr_dispatcher emit_expr_default args))
