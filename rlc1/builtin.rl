@@ -2,11 +2,12 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-06-01 23:31:18 nineties $
+ % $Id: builtin.rl 2010-06-02 09:23:35 nineties $
  %);
 
 include(stddef,code);
 export(init_builtin_objects);
+export(mkign);
 export(mksym, sym_set, sym_name, sym_value, fresh_sym);
 export(mkint, int_value);
 export(mkchar, char_value);
@@ -16,7 +17,7 @@ export(mklambda,lambda_arity,lambda_params,lambda_body);
 export(mkmacro,macro_arity,macro_params,macro_body);
 export(mkquote,quote_sexp);
 export(mkunquote,unquote_sexp);
-export(cons_p,sym_p,int_p,char_p,string_p,prim_p,array_p,lambda_p,macro_p,quote_p,unquote_p);
+export(cons_p,sym_p,ign_p,int_p,char_p,string_p,prim_p,array_p,lambda_p,macro_p,quote_p,unquote_p);
 export(prim_funptr);
 export(mkcons,car,cdr,cadr,caddr,length,reverse);
 export(nil_sym,true_sym,var_sym,set_sym,quote_sym,unquote_sym,if_sym,cond_sym,
@@ -83,6 +84,10 @@ reverse: (p0) {
         p0 = cdr(p0);
     };
     return x0;
+};
+
+mkign: () {
+    return mktup1(NODE_IGNORE)
 };
 
 mksym: (p0) {
@@ -253,6 +258,7 @@ check_code: (p0, p1) {
 
 cons_p    : (p0) { return check_code(NODE_CONS, p0); };
 sym_p     : (p0) { return check_code(NODE_SYMBOL, p0); };
+ign_p     : (p0) { return check_code(NODE_IGNORE, p0); };
 int_p     : (p0) { return check_code(NODE_INT, p0); };
 char_p    : (p0) { return check_code(NODE_CHAR, p0); };
 string_p  : (p0) { return check_code(NODE_STRING, p0); };

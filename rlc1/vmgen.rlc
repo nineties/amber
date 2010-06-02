@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vmgen.rlc 2010-06-02 09:13:06 nineties $
+; $Id: vmgen.rlc 2010-06-02 11:55:08 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -16,17 +16,17 @@
     (eprintln "not implemented '" (car args) "' : "  . msgs)
     ))
 
-(define dispatch (dispatcher default code) (do
-    (if (cons? code)
+(define dispatch (dispatcher default args) (do
+    (if (cons? (car args))
         (do
-            (var head (car code))
+            (var head (caar args))
             (var fun (assoc head dispatcher))
             (if fun
-                (fun code)
-                (default code)
+                (fun . args)
+                (default . args)
             )
         )
-        (default code)
+        (default . args)
     )))
 
 (var label_id 0)
@@ -103,9 +103,10 @@
         )
     (print '\n')))
 
+(define lookup_8breg (reg) (assoc reg `((%eax . %al) (%ebx . %bl) (%ecx . %cl) (%edx . %dl))))
 (define drop (len) (emit "addl" (* 4 len) `%esp))
-(define movl  (src dst) (emit "movl" src dst))
-(define movb  (src dst) (emit "movb" src dst))
+(define movl  (src dst) (if (!= src dst) (emit "movl" src dst)))
+(define movb  (src dst) (do (movl src dst) (emit "movzbl" (lookup_8breg dst) dst)))
 (define pushl (val) (emit "pushl" val))
 (define pushb (val) (do (emit "movb" val `%al) (emit "movzbl" `%al `%eax) (pushl `%eax)))
 (define popl  (reg) (emit "popl" reg))
@@ -148,9 +149,8 @@
 (var insn_table `((+ . "addl") (- . "subl") (* . "imul") (& . "andl") (| . "orl") (^ . "xorl") (neg . "negl")))
 (define lookup_insn (op) (assoc op insn_table))
 
-(define emit_return ((return . arg)) (do
-    (if arg (emit_expr (car arg)))
-    (popl `%eax)
+(define emit_return ((_ . arg) _ _) (do
+    (if arg (emit_expr (car arg) `%eax nil))
     (emit "leave")
     (emit "ret")
     ))
@@ -169,44 +169,64 @@
     (emit "jmp" `*%eax)
     ))
 
-(define emit_goto ((goto opd))
+(define emit_goto ((goto opd) nil nil)
     (cond
         ((and (symbol? opd) (not (variable? opd))) (emit_directjump opd))
         ((and (cons? opd) (== `label (car opd)))   (emit_directjump opd))
         (otherwise (emit_indirectjump opd))
         ))
 
-(define emit_expr_default (val)
-    (cond
-        ((int? val)  (pushl val))
-        ((char? val) (pushb val))
-        ((symbol? val) (pushl (lookup_var val)))
-        ((string? val) (do
-            (var sym (register_string val))
-            (pushl `(global string @sym))
-            ))
-        ((cons? val) (emit_call `(call . @val)))
-        (otherwise (not_implemented "emit_expr_default" val))
+(define emit_expr_default (expr dst ret) (do
+    (if (or dst (cons? expr))
+        (cond
+            ((int? expr)  (movl expr dst))
+            ((char? expr) (movb expr dst))
+            ((symbol? expr) (movl (lookup_var expr) dst))
+            ((string? expr) (do
+                (var sym (register_string expr))
+                (movl `(global string @sym) dst)
+                ))
+            ((cons? expr) (emit_call `(call . @expr) dst nil))
+            (otherwise (not_implemented "emit_expr_default" expr))
         ))
-
-(define emit_deref8 ((*8 ptr)) (do
-    (emit_expr ptr)
-    (popl `%eax)
-    (pushb `(offset %eax 0))
+    (if ret (emit_return `(return) nil nil))
     ))
 
-(define emit_unexpr ((op arg)) (do
-    (var insn (lookup_insn op))
-    (emit_expr arg)
-    (emit insn `%top)
+(define emit_deref8 ((*8 ptr) dst ret) (do
+    (if dst (do
+        (emit_expr ptr `%eax nil)
+        (movb `(offset %eax 0) dst)
+        ))
+    (if ret (emit_return `(return) nil nil))
     ))
 
-(define emit_binexpr ((op lhs rhs)) (do
+(define emit_unexpr ((op arg) dst ret) (do
     (var insn (lookup_insn op))
-    (emit_expr lhs)
-    (emit_expr rhs)
-    (popl `%eax)
-    (emit insn `%eax `%top)
+    (if dst
+        (do
+            (emit_expr arg dst nil)
+            (emit insn dst)
+        )
+        (emit_expr arg nil nil)
+        )
+    (if ret (emit_return `(return) nil nil))
+    ))
+
+(define emit_binexpr ((op lhs rhs) dst ret) (do
+    (var insn (lookup_insn op))
+    (if dst
+        (do
+            (emit_expr lhs `%eax nil)
+            (pushl `%eax)
+            (emit_expr rhs `%ebx nil)
+            (popl dst)
+            (emit insn `%ebx dst)
+        )
+        (do
+            (emit_expr lhs nil nil)
+            (emit_expr rhs nil nil)
+        ))
+    (if ret (emit_return `(return) nil nil))
     ))
 
 (define emit_comparison ((op lhs rhs)) (do
@@ -221,118 +241,147 @@
     (pushl `%eax)
     ))
 
-(define emit_syscall ((syscall . args)) (do
+(define emit_syscall ((syscall . args) dst ret) (do
     (var regs `(%eax %ebx %ecx %edx %esi %edi %ebp))
     (var narg (length args))
     (for r 4 (- narg 1) (pushl (nth r regs)))
-    (foreach e args (emit_expr e))
+    (foreach e args (do
+        (emit_expr e `%eax nil)
+        (pushl `%eax)
+        ))
     (for r 1 narg (movl `(offset %esp @(* 4 (- narg r))) (nth (- r 1) regs)))
     (drop narg)
     (emit "int" 0x80)
-    (pushl `%eax)
+    (if dst (movl `%eax dst))
+    (if ret (emit_return `(return) nil nil))
     ))
 
-(define emit_call ((call func . args))
-    (if (symbol? func) (emit_directcall func args) (emit_indirectcall func args)))
+(define emit_call ((call func . args) dst ret) (do
+    (if (symbol? func) (emit_directcall func args dst) (emit_indirectcall func args dst))
+    (if ret (emit_return `(return) nil nil))
+    ))
 
-(define emit_directcall (func args) (do
+(define emit_directcall (func args dst) (do
     (var narg (length args))
-    (foreach e args (emit_expr e))
+    (foreach e (reverse args) (do
+        (emit_expr e `%eax nil)
+        (pushl `%eax)
+        ))
     (emit "call" `(label @func))
     (if (> narg 0) (emit "addl" (* 4 narg) `%esp))
-    (pushl `%eax)
+    (if dst (movl `%eax dst))
     ))
 
-(define emit_def ((type v . init))
-    (if init (do (emit_expr (car init)) (popl (lookup_var v)))))
-
-(define emit_nop ((_nop_)) ())
-
-(define emit_void ((void expr)) (do
-    (emit_expr expr)
-    (drop 1)
+(define emit_indirectcall (func args dst) (do
+    (var narg (length args))
+    (foreach e (reverse args) (do
+        (emit_expr e `%eax nil)
+        (pushl `%eax)
+        ))
+    (emit "call" `(label @func))
+    (if (> narg 0) (emit "addl" (* 4 narg) `%esp))
+    (if dst (movl `%eax dst))
     ))
 
-(define emit_incl ((_incl_ v)) (emit "incl" (lookup_var v)))
+(define emit_def ((type sym . init) dst ret) (do
+    (var v (lookup_var sym))
+    (if init (do (emit_expr (car init) `%eax nil) (movl `%eax v)))
+    (if dst (movl v dst))
+    (if ret (emit_return `(return) nil nil))
+    ))
 
-(define emit_asgn ((_asgn_ v e)) (do
-    (emit_expr e)
-    (popl (lookup_var v))
+(define emit_nop ((_nop_) _ ret) (if ret (emit_return `(return) nil nil)))
+
+(define emit_incl ((_ v) dst ret) (do
+    (emit "incl" (lookup_var v))
+    (if dst (movl (lookup_var v) dst))
+    (if ret (emit_return `(return) nil nil))
+    ))
+
+(define emit_asgn ((_ v e) dst ret) (do
+    (emit_expr e `%eax nil)
+    (movl `%eax (lookup_var v))
+    (if dst (movl `%eax dst))
+    (if ret (emit_return `(return) nil nil))
     ))
 
 (define comparison? (op) (member op `(== != < > <= >=)))
 
-(define emit_if ((_if_ expr ifthen . ifelse))
+(define emit_if ((_ expr ifthen . ifelse) dst ret) (do
+    (set ifelse (if ifelse (car ifelse) nil))
     (cond
-        ((and (cons? expr) (== `! (car expr)))  (emit_unless (cadr expr) ifthen . ifelse))
-        ((and (cons? expr) (== `&& (car expr))) (emit_seqand_if (cadr expr) (caddr expr) ifthen . ifelse))
-        ((and (cons? expr) (== `|| (car expr))) (emit_seqor_if (cadr expr) (caddr expr) ifthen . ifelse))
-        ((and (cons? expr) (comparison? (car expr))) (emit_cond_if expr ifthen . ifelse))
+        ((and (cons? expr) (== `! (car expr)))  (emit_unless (cadr expr) ifthen ifelse dst ret))
+        ((and (cons? expr) (== `&& (car expr))) (emit_seqand_if (cadr expr) (caddr expr) ifthen ifelse dst ret))
+        ((and (cons? expr) (== `|| (car expr))) (emit_seqor_if (cadr expr) (caddr expr) ifthen ifelse dst ret))
+        ((and (cons? expr) (comparison? (car expr))) (emit_cond_if expr ifthen ifelse dst ret))
         (otherwise
             (do
                 (var ifend-lbl (mklabel `end))
                 (var ifelse-lbl (if ifelse (mklabel `ifelse) nil))
-                (emit_expr expr)
-                (popl `%eax)
+                (emit_expr expr `%eax nil)
                 (emit "cmpl" 0 `%eax)
                 (emit "je" (if ifelse-lbl ifelse-lbl ifend-lbl))
                 (emit_block ifthen)
-                (if ifelse-lbl (do (emit "jmp" ifend-lbl) (print_label ifelse-lbl) (emit_block (car ifelse))))
+                (if ifelse-lbl (do (emit "jmp" ifend-lbl) (print_label ifelse-lbl) (emit_block ifelse)))
                 (print_label ifend-lbl)
             )
-        )))
+        ))
+    ))
 
-(define emit_unless (expr ifthen . ifelse)
+(define emit_unless (expr ifthen ifelse _ ret)
     (if ifelse
-        (emit_expr `(if @expr @(car ifelse) @ifthen))
-        (emit_expr `(if @expr ((nop)) @ifthen))
+        (emit_expr `(if @expr @ifelse @ifthen) nil ret)
+        (emit_expr `(if @expr ((nop)) @ifthen) nil ret)
         ))
 
-(define emit_seqand_if (expr1 expr2 ifthen . ifelse)
+(define emit_seqand_if (expr1 expr2 ifthen ifelse _ ret)
     (if ifelse
         (do
             (var ifend-lbl (mklabel `end))
-            (emit_expr `(if @expr1 ((if @expr2 @(append @ifthen ((goto @ifend-lbl)))))))
+            (emit_expr `(if @expr1 ((if @expr2 @(append @ifthen ((goto @ifend-lbl)))))) nil nil)
             (emit_expr ifelse)
             (print_label ifend-lbl)
+            (if ret (emit_return `(return) nil nil))
         )
-        (emit_expr `(if @expr1 ((if @expr2 @ifthen))))
+        (emit_expr `(if @expr1 ((if @expr2 @ifthen))) nil ret)
         ))
 
-(define emit_seqor_if (expr1 expr2 ifthen . ifelse)
+(define emit_seqor_if (expr1 expr2 ifthen ifelse _ ret)
     (if ifelse
-        (emit_expr `(if (&& (! @expr1) (! @expr2)) @ifthen @(car ifelse)))
+        (emit_expr `(if (&& (! @expr1) (! @expr2)) @ifthen @ifelse) nil ret)
         (do
             (var ifend-lbl (mklabel `end))
-            (emit_expr `(if (&& (! @expr1) (! @expr2)) ((goto @ifend-lbl)) @ifthen))
+            (emit_expr `(if (&& (! @expr1) (! @expr2)) ((goto @ifend-lbl)) @ifthen) nil nil)
             (print_label ifend-lbl)
+            (if ret (emit_return `(return) nil nil))
         )
         ))
 
-(define emit_cond_if (expr ifthen . ifelse) (do
+(define emit_cond_if (expr ifthen ifelse dst ret) (do
     (var insn (assoc (car expr) `((== . "jne") (!= . "je") (< . "jge") (> . "jle") (<= . "jg") (>= . "jl"))))
     (var ifend-lbl (mklabel `end))
     (var ifelse-lbl (if ifelse (mklabel `ifelse) nil))
-    (emit_expr (cadr expr))  ; lhs
-    (emit_expr (caddr expr)) ; rhs
-    (popl `%ebx)
+    (emit_expr (cadr expr) `%eax nil)  ; lhs
+    (pushl `%eax)
+    (emit_expr (caddr expr) `%ebx nil) ; rhs
     (popl `%eax)
     (emit "cmpl" `%eax `%ebx)
     (emit insn (if ifelse-lbl ifelse-lbl ifend-lbl))
     (emit_block ifthen)
-    (if ifelse-lbl (do (emit "jmp" ifend-lbl) (print_label ifelse-lbl) (emit_block (car ifelse))))
+    (if ifelse-lbl (do (emit "jmp" ifend-lbl) (print_label ifelse-lbl) (emit_block ifelse)))
     (print_label ifend-lbl)
+    (if ret (emit_return `(return) nil nil))
     ))
 
-(define emit_while ((_while_ expr body)) (do
+(define emit_while ((_while_ expr body) _ ret) (do
     (var loop-lbl (mklabel `loop))
     (print_label loop-lbl)
-    (emit_if `(if @expr @(append body `((goto @loop-lbl)))))
+    (emit_if `(if @expr @(append body `((goto @loop-lbl)))) nil nil)
+    (if ret (emit_return `(return) nil nil))
     ))
 
 (var expr_dispatcher `(
     (nop     . @emit_nop)
-    (void    . @emit_void)
     (syscall . @emit_syscall)
     (call    . @emit_call)
     (return  . @emit_return)
@@ -360,9 +409,9 @@
     (incl    . @emit_incl)
     ))
 
-(define emit_expr (expr) (dispatch expr_dispatcher emit_expr_default expr))
+(define emit_expr args (dispatch expr_dispatcher emit_expr_default args))
 
-(define emit_block (block) (foreach e block (emit_expr e)))
+(define emit_block (block) (foreach e block (emit_expr e nil last?)))
 
 ; === compilation of external declarations ===
 
@@ -402,7 +451,7 @@
 
 (define scan_function (body) (do
     (set var_pos 0)
-    (foreach e body (scan_expr e))
+    (foreach e body (scan_expr `(@e)))
     ))
 
 (var scan_function_dispatcher `(
@@ -412,7 +461,7 @@
     (void* . @scan_defvar)
     ))
 
-(define emit_function ((fun name params body)) (do
+(define emit_function ((_ name params body)) (do
     (vtable_push)
     (reset_string_table)
 
@@ -430,7 +479,6 @@
     (if (> var_pos 0) (emit "subl" (* 4 var_pos) `%esp))
 
     (emit_block body)
-    (emit_return `(return))
 
     (vtable_pop)
 
@@ -447,7 +495,7 @@
     (fun     . @emit_function)
     ))
 
-(define compile (prog) (foreach decl prog (dispatch extdecl_dispatcher not_reachable decl)))
+(define compile (prog) (foreach decl prog (dispatch extdecl_dispatcher not_reachable `(@decl))))
 
 ; === compile the VM ===
 

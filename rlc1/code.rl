@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: code.rl 2010-05-31 00:51:45 nineties $
+ % $Id: code.rl 2010-06-02 09:20:21 nineties $
  %);
 
 NODE_CONS    => 0;
@@ -16,3 +16,4 @@ NODE_LAMBDA  => 7;  (% (code,params,body) %);
 NODE_MACRO   => 8;  (% (code,params,body) %);
 NODE_QUOTE   => 9;  (% (code,sexp) %);
 NODE_UNQUOTE => 10; (% (code,sexp) %);
+NODE_IGNORE  => 11;
