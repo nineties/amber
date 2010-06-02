@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vmgen.rlc 2010-06-02 21:34:25 nineties $
+; $Id: vmgen.rlc 2010-06-02 21:52:41 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -340,6 +340,11 @@
     (if ret (emit_return `(return) nil nil))
     ))
 
+(define emit_opasgn ((op v e) dst ret) (do
+    (var bop (assoc op `((+= . +) (-= . -) (*= . *) (/= . /) (%= . %))))
+    (emit_expr `(= @v (@bop @v @e)) dst ret)
+    ))
+
 (define emit_arrasgn ((_ arr idx e) dst ret) (do
     (emit_expr arr `%eax nil)
     (pushl `%eax)
@@ -456,6 +461,11 @@
     (<=      . @emit_comparison)
     (>=      . @emit_comparison)
     (=       . @emit_asgn)
+    (+=      . @emit_opasgn)
+    (-=      . @emit_opasgn)
+    (*=      . @emit_opasgn)
+    (/=      . @emit_opasgn)
+    (%=      . @emit_opasgn)
     ([]=     . @emit_arrasgn)
     (incl    . @emit_incldecl)
     (decl    . @emit_incldecl)
@@ -557,6 +567,6 @@
 (vtable_push) ; global namespace
 (import "vm-main")
 (compile vm-main-code)
-(import "vm-gc")
-(compile vm-gc-code)
+(import "vm-alloc")
+(compile vm-alloc-code)
 (vtable_pop)
