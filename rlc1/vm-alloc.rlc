@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-06-02 21:33:40 nineties $
+; $Id: vm-alloc.rlc 2010-06-02 21:52:52 nineties $
 ;
 
 (var SYS_MUNMAP  91)
@@ -24,7 +24,7 @@
 (var BLOCK_MASK (- BLOCK_SIZE 1))
 (var MAX_BLOCKS 4096) ; 4096 is enough for 32-bit machine
 
-(var vm-gc-code `(
+(var vm-alloc-code `(
 
 (fun mmap2 (addr size) (
     (void* ptr (syscall @SYS_MMAP2 addr size
@@ -43,13 +43,14 @@
 (void* free_last 0)
 (int[] @MAX_BLOCKS block_used)
 
-(fun alloc_block () (
-    (void* ptr (mmap2 0 @(* 2 BLOCK_SIZE)))
+(fun alloc_block (size) (
+    (+= size @BLOCK_SIZE)
+    (void* ptr (mmap2 0 size))
     (void* slop (& ptr @BLOCK_MASK))
     (if (< (munmap ptr (- @BLOCK_SIZE slop)) 0) ((error "ERROR: munmap failed\n")))
     (if (&& (> slop 0) (< (munmap (- (+ ptr @BLOCK_SIZE) slop) slop) 0))
         ((error "ERROR: munmap failed\n")))
-    (= ptr (- (+ ptr @BLOCK_SIZE) slop))
+    (= ptr (- (+ ptr size) slop))
     (return ptr)
     ))
 
@@ -58,12 +59,12 @@
     (void* addr)
     (if (> (+ num_block 1) @MAX_BLOCKS) ((error "ERROR: too many blocks\n")))
     (if (== next_addr 0)
-        ((= addr (alloc_block)))
+        ((= addr (alloc_block @BLOCK_SIZE)))
         (
             (= addr (mmap2 @BLOCK_SIZE))
             (if (!= (& addr @BLOCK_MASK) 0) (
                     (if (< (munmap addr @BLOCK_SIZE) 0) ((error "ERROR: munmap failed\n")))
-                    (= addr (alloc_block))
+                    (= addr (alloc_block @BLOCK_SIZE))
                 ))
         ))
     (= next_addr (+ addr @BLOCK_SIZE))
