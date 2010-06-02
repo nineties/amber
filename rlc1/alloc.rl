@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  % 
- % $Id: alloc.rl 2010-06-02 15:09:53 nineties $
+ % $Id: alloc.rl 2010-06-02 15:49:55 nineties $
  %);
 
 include(stddef);
@@ -68,7 +68,6 @@ alloc_block: (p0) {
         }
     };
     x0 = x0 + BLOCK_SIZE - x1;
-    num_block = num_block + 1;
     return x0;
 };
 
@@ -90,6 +89,7 @@ alloc_block_fast: () {
     block_used[x0/BLOCK_SIZE] = TRUE;
     free_first = x0;
     free_last  = next_addr;
+    num_block = num_block + 1;
 };
 
 (% memalloc(n): allocate heap memory of n byte %);

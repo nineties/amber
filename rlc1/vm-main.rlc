@@ -1,0 +1,52 @@
+;
+; rowl - generation 1
+; Copyright (C) 2010 nineties
+;
+; $Id: vm-main.rlc 2010-06-02 21:33:52 nineties $
+;
+
+(var TRUE  1)
+(var FALSE 0)
+
+; system calls
+(var SYS_EXIT    1)
+(var SYS_FORK    2)
+(var SYS_READ    3)
+(var SYS_WRITE   4)
+(var SYS_OPEN    5)
+(var SYS_CLOSE   6)
+(var SYS_WAITPID 7)
+(var SYS_UNLINK  10)
+(var SYS_EXECVE  11)
+
+; file descriptors
+(var STDIN_FD 0)
+(var STDOUT_FD 1)
+(var STDERR_FD 2)
+
+(var vm-main-code `(
+
+(fun strlen (str) (
+    (int len 0)
+    (while (!= (*8 str) '\0') (
+        (incl str)
+        (incl len)
+        ))
+    (return len)
+    ))
+
+(fun error (msg) (
+    (syscall @SYS_WRITE @STDERR_FD msg (strlen msg))
+    (vmexit 1)
+    ))
+
+(fun vmexit (status) (
+    (syscall @SYS_EXIT status)
+    ))
+
+(extern _start)
+(fun _start () (
+    (vmexit 0)
+    ))
+
+))
