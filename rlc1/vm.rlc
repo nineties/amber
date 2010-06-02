@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm.rlc 2010-06-02 09:08:34 nineties $
+; $Id: vm.rlc 2010-06-02 09:13:31 nineties $
 ;
 
 ; === program of virtual machine ===
@@ -50,13 +50,13 @@
 
 (fun error (msg) (
     (void (syscall @SYS_WRITE @STDERR_FD msg (call strlen msg)))
-    (void (call vmexit 1))
+    (void (vmexit 1))
     ))
 
 (fun mmap2 (addr size) (
     (void* ptr (syscall @SYS_MMAP2 addr size
         @(| PROT_READ PROT_WRITE PROT_EXEC) @(| MAP_ANONYMOUS MAP_PRIVATE) -1 0))
-    (if (&& (<= -128 ptr) (< ptr 0))  ((call error "ERROR: mmap2 failed\n")))
+    (if (&& (<= -128 ptr) (< ptr 0))  ((error "ERROR: mmap2 failed\n")))
     (return ptr)
     ))
 
@@ -65,11 +65,11 @@
     ))
 
 (fun alloc_block (size) (
-    (void* ptr (call mmap2 0 @(* 2 BLOCK_SIZE)))
+    (void* ptr (mmap2 0 @(* 2 BLOCK_SIZE)))
     (void* slop (& ptr @BLOCK_MASK))
-    (if (< (call munmap ptr (- @BLOCK_SIZE slop)) 0) ((call error "ERROR: munmap failed\n")))
-    (if (&& (> slop 0) (< (call munmap (- (+ ptr @BLOCK_SIZE) slop) slop) 0))
-        ((call error "ERROR: munmap failed\n")))
+    (if (< (munmap ptr (- @BLOCK_SIZE slop)) 0) ((error "ERROR: munmap failed\n")))
+    (if (&& (> slop 0) (< (munmap (- (+ ptr @BLOCK_SIZE) slop) slop) 0))
+        ((error "ERROR: munmap failed\n")))
     (asgn ptr (- (+ ptr @BLOCK_SIZE) slop))
     (return ptr)
     ))
@@ -80,7 +80,7 @@
 
 (extern _start)
 (fun _start () (
-    (call vmexit 0)
+    (vmexit 0)
     ))
 
 ))
