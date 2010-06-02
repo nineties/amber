@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: eval.rl 2010-05-29 17:25:39 nineties $
+ % $Id: eval.rl 2010-06-02 11:41:39 nineties $
  %);
 
 include(stddef,code);
@@ -219,9 +219,23 @@ eval_macro: (p0) {
     return mkmacro(x0, x1);
 };
 
-(% p0: argument pattern, p1:arguments %);
-match_args: (p0, p1) {
+(% p0: argument pattern, p1:arguments p2:lambda%);
+match_args: (p0, p1, p2) {
     allocate(1);
+    if (p0 == nil_sym) {
+        if (p1 == nil_sym) { return; };
+        fputs(stderr, "ERROR: argument patter mismatch ");
+        pp_sexp(stderr, p2);
+        fputs(stderr, ": ");
+        pp_sexp(stderr, p0);
+        fputs(stderr, " <-> ");
+        pp_sexp(stderr, p1);
+        fputs(stderr, "\n");
+        exit(1);
+    };
+    if (ign_p(p0) != nil_sym) {
+        return;
+    };
     if (sym_p(p0) != nil_sym) {
         x0 = fresh_sym(p0);
         sym_set(x0, p1);
@@ -231,17 +245,21 @@ match_args: (p0, p1) {
     if (cons_p(p0) != nil_sym) {
         if (cons_p(p1) == nil_sym) {
             fputs(stderr, "ERROR: argument pattern mismatch ");
+            pp_sexp(stderr, p2);
+            fputs(stderr, ": ");
             pp_sexp(stderr, p0);
             fputs(stderr, " <-> ");
             pp_sexp(stderr, p1);
             fputs(stderr, "\n");
             exit(1);
         };
-        match_args(car(p0), car(p1));
-        match_args(cdr(p0), cdr(p1));
+        match_args(car(p0), car(p1), p2);
+        match_args(cdr(p0), cdr(p1), p2);
         return;
     };
     fputs(stderr, "ERROR: invalid argument pattern ");
+    pp_sexp(stderr, p2);
+    fputs(stderr, ": ");
     pp_sexp(stderr, p0);
     fputs(stderr, "\n");
     exit(1);
@@ -251,7 +269,7 @@ match_args: (p0, p1) {
 eval_applambda: (p0, p1) {
     allocate(1);
     scope_push();
-    match_args(lambda_params(p0), eval_args(p1));
+    match_args(lambda_params(p0), eval_args(p1), p0);
     x0 = eval_sexp(lambda_body(p0));
     scope_pop();
     return x0;
@@ -261,7 +279,7 @@ eval_applambda: (p0, p1) {
 eval_appmacro: (p0, p1) {
     allocate(3);
     scope_push();
-    match_args(macro_params(p0), p1);
+    match_args(macro_params(p0), p1, p0);
     x0 = eval_sexp(macro_body(p0));
     scope_pop();
     return eval_sexp(x0);

@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: pprint.rl 2010-05-29 10:54:39 nineties $
+ % $Id: pprint.rl 2010-06-02 09:24:23 nineties $
  %);
 
 include(stddef,code);
@@ -93,6 +93,7 @@ pp_sexp: (p0, p1) {
     if (p1[0] == NODE_PRIM)    { fputs(p0, "prim<"); fputx(p0, prim_funptr); puts(">"); return };
     if (p1[0] == NODE_LAMBDA)  { return pp_lambda(p0, p1) };
     if (p1[0] == NODE_MACRO)   { return pp_macro(p0, p1) };
+    if (p1[0] == NODE_IGNORE)  { fputc(p0, '_'); return };
     puti(p1[0]);
     panic("'pp_sexp': not reachable here");
 };
