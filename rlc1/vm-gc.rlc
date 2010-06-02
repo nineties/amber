@@ -2,31 +2,11 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm.rlc 2010-06-02 15:33:13 nineties $
+; $Id: vm-gc.rlc 2010-06-02 21:33:40 nineties $
 ;
 
-; === program of virtual machine ===
-
-(var TRUE  1)
-(var FALSE 0)
-
-; system calls
-(var SYS_EXIT    1)
-(var SYS_FORK    2)
-(var SYS_READ    3)
-(var SYS_WRITE   4)
-(var SYS_OPEN    5)
-(var SYS_CLOSE   6)
-(var SYS_WAITPID 7)
-(var SYS_UNLINK  10)
-(var SYS_EXECVE  11)
 (var SYS_MUNMAP  91)
 (var SYS_MMAP2   192)
-
-; file descriptors
-(var STDIN_FD 0)
-(var STDOUT_FD 1)
-(var STDERR_FD 2)
 
 ; mmap options
 (var PROT_READ  0x1)
@@ -44,21 +24,7 @@
 (var BLOCK_MASK (- BLOCK_SIZE 1))
 (var MAX_BLOCKS 4096) ; 4096 is enough for 32-bit machine
 
-(var vmcode `(
-
-(fun strlen (str) (
-    (int len 0)
-    (while (!= (*8 str) '\0') (
-        (incl str)
-        (incl len)
-        ))
-    (return len)
-    ))
-
-(fun error (msg) (
-    (syscall @SYS_WRITE @STDERR_FD msg (strlen msg))
-    (vmexit 1)
-    ))
+(var vm-gc-code `(
 
 (fun mmap2 (addr size) (
     (void* ptr (syscall @SYS_MMAP2 addr size
@@ -106,13 +72,5 @@
     ([]= block_used (/ addr @BLOCK_SIZE) @TRUE)
     ))
 
-(fun vmexit (status) (
-    (syscall @SYS_EXIT status)
-    ))
-
-(extern _start)
-(fun _start () (
-    (vmexit 0)
-    ))
 
 ))
