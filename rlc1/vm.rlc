@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm.rlc 2010-06-02 11:50:16 nineties $
+; $Id: vm.rlc 2010-06-02 15:02:56 nineties $
 ;
 
 ; === program of virtual machine ===
@@ -36,6 +36,7 @@
 
 (var BLOCK_SIZE (* 1024 1024)) ; 1MB
 (var BLOCK_MASK (- BLOCK_SIZE 1))
+(var MAX_BLOCKS 4096) ; 4096 is enough for 32-bit machine
 
 (var vmcode `(
 
@@ -64,7 +65,12 @@
     (syscall @SYS_MUNMAP addr size)
     ))
 
-(fun alloc_block (size) (
+(int   num_block 0)
+(void* next_addr 0)
+(void* free_first 0)
+(void* free_last 0)
+
+(fun alloc_block () (
     (void* ptr (mmap2 0 @(* 2 BLOCK_SIZE)))
     (void* slop (& ptr @BLOCK_MASK))
     (if (< (munmap ptr (- @BLOCK_SIZE slop)) 0) ((error "ERROR: munmap failed\n")))
@@ -72,6 +78,24 @@
         ((error "ERROR: munmap failed\n")))
     (asgn ptr (- (+ ptr @BLOCK_SIZE) slop))
     (return ptr)
+    ))
+
+
+(fun alloc_block_fast () (
+    (void* addr)
+    (if (> (+ num_block 1) @MAX_BLOCKS) ((error "ERROR: too many blocks\n")))
+    (if (== next_addr 0)
+        ((asgn addr (alloc_block)))
+        (
+            (asgn addr (mmap2 @BLOCK_SIZE))
+            (if (!= (& addr @BLOCK_MASK) 0) (
+                    (if (< (munmap addr @BLOCK_SIZE) 0) ((error "ERROR: munmap failed\n")))
+                    (asgn addr (alloc_block))
+                ))
+        ))
+    (asgn next_addr (+ addr @BLOCK_SIZE))
+    (asgn free_first addr)
+    (asgn free_last  next_addr)
     ))
 
 (fun vmexit (status) (
