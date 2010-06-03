@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vmgen.rlc 2010-06-03 23:40:22 nineties $
+; $Id: vmgen.rlc 2010-06-03 23:51:31 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -47,7 +47,7 @@
 
 (define emit_string (str) (do
     (print '"')
-    (for i 0 (- (string_len str) 1) (print (escape ([] i str))))
+    (upto i 0 (- (string_len str) 1) (print (escape ([] i str))))
     (print '"')
     ))
 
@@ -279,15 +279,18 @@
 (define emit_syscall ((syscall . args) dst ret) (do
     (var regs `(%eax %ebx %ecx %edx %esi %edi %ebp))
     (var narg (length args))
-    (for r 4 (- narg 1) (pushl (nth r regs)))
+    ; evaculate special purpose registers
+    (upto r 4 (- narg 1) (pushl (nth r regs)))
     (foreach e args (do
         (emit_expr e `%eax nil)
         (pushl `%eax)
         ))
-    (for r 1 narg (movl `(offset %esp @(* 4 (- narg r))) (nth (- r 1) regs)))
+    (upto r 1 narg (movl `(offset %esp @(* 4 (- narg r))) (nth (- r 1) regs)))
     (drop narg)
     (emit "int" 0x80)
     (if dst (movl `%eax dst))
+    ; restore special purpose registers
+    (downto r (- narg 1) 4 (popl (nth r regs)))
     (if ret (emit_return `(return) nil nil))
     ))
 
