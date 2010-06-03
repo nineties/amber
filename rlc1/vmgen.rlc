@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vmgen.rlc 2010-06-02 21:52:41 nineties $
+; $Id: vmgen.rlc 2010-06-03 23:40:22 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -341,7 +341,7 @@
     ))
 
 (define emit_opasgn ((op v e) dst ret) (do
-    (var bop (assoc op `((+= . +) (-= . -) (*= . *) (/= . /) (%= . %))))
+    (var bop (assoc op `((+= . +) (-= . -) (*= . *) (/= . /) (%= . %) (&= . &) (|= . |) (^= . ^))))
     (emit_expr `(= @v (@bop @v @e)) dst ret)
     ))
 
@@ -374,8 +374,8 @@
                 (emit_expr expr `%eax nil)
                 (emit "cmpl" 0 `%eax)
                 (emit "je" (if ifelse-lbl ifelse-lbl ifend-lbl))
-                (emit_block ifthen)
-                (if ifelse-lbl (do (emit "jmp" ifend-lbl) (print_label ifelse-lbl) (emit_block ifelse)))
+                (emit_block ifthen ret)
+                (if ifelse-lbl (do (emit "jmp" ifend-lbl) (print_label ifelse-lbl) (emit_block ifelse ret)))
                 (print_label ifend-lbl)
             )
         ))
@@ -420,10 +420,9 @@
     (popl `%eax)
     (emit "cmpl" `%eax `%ebx)
     (emit insn (if ifelse-lbl ifelse-lbl ifend-lbl))
-    (emit_block ifthen)
-    (if ifelse-lbl (do (emit "jmp" ifend-lbl) (print_label ifelse-lbl) (emit_block ifelse)))
+    (emit_block ifthen ret)
+    (if ifelse-lbl (do (emit "jmp" ifend-lbl) (print_label ifelse-lbl) (emit_block ifelse ret)))
     (print_label ifend-lbl)
-    (if ret (emit_return `(return) nil nil))
     ))
 
 (define emit_while ((_while_ expr body) _ ret) (do
@@ -466,6 +465,9 @@
     (*=      . @emit_opasgn)
     (/=      . @emit_opasgn)
     (%=      . @emit_opasgn)
+    (&=      . @emit_opasgn)
+    (|=      . @emit_opasgn)
+    (^=      . @emit_opasgn)
     ([]=     . @emit_arrasgn)
     (incl    . @emit_incldecl)
     (decl    . @emit_incldecl)
@@ -473,14 +475,25 @@
 
 (define emit_expr args (dispatch expr_dispatcher emit_expr_default args))
 
-(define emit_block (block) (foreach e block (emit_expr e nil last?)))
+(define emit_block (block ret)
+    (if (nil? block)
+        (if ret (emit_return `(return) nil nil))
+        (foreach e block (emit_expr e nil (and ret last?)))
+        ))
 
 ; === compilation of external declarations ===
+
+(var current_area `text)
+(define emit_area (sym)
+    (println (assoc sym `((text . ".section .text") (data . ".section .data") (rodata . ".section .rodata")))))
+(define change_area (sym) (if (!= sym current_area) (do (emit_area sym) (set current_area sym))))
 
 (define emit_extern ((extern . (name))) (print ".global " name '\n'))
 
 (define emit_static_scalar ((type sym . init)) (do
-    (print sym ": .long ")
+    (change_area `data)
+    (print_label sym)
+    (print "\t.long ")
     (if init
         (println (car init))
         (println 0))
@@ -488,6 +501,7 @@
     ))
 
 (define emit_static_string ((_ sym str)) (do
+    (change_area `rodata)
     (print_label sym)
     (print "\t.string ")
     (emit_string str)
@@ -496,6 +510,7 @@
     ))
 
 (define emit_static_array ((type length sym)) (do
+    (change_area `data)
     (var elemsz `((int[] . 4) (void*[] . 4) (char[] . 1) (byte[] . 1)))
     (println ".comm " sym ", " (* length (assoc type elemsz)))
     (add_var sym `(global @type @sym))
@@ -534,6 +549,7 @@
     ; register variables
     (scan_function body)
 
+    (change_area `text)
     (print_label name)
     (pushl `%ebp)
     (movl `%esp `%ebp)
@@ -541,7 +557,7 @@
     ; allocate stack frame
     (if (> var_pos 0) (emit "subl" (* 4 var_pos) `%esp))
 
-    (emit_block body)
+    (emit_block body true)
 
     (vtable_pop)
 
@@ -552,6 +568,7 @@
     (extern  . @emit_extern)
     (int     . @emit_static_scalar)
     (void*   . @emit_static_scalar)
+    (int*    . @emit_static_scalar)
     (string  . @emit_static_string)
     (int[]   . @emit_static_array)
     (char[]  . @emit_static_array)
@@ -569,4 +586,6 @@
 (compile vm-main-code)
 (import "vm-alloc")
 (compile vm-alloc-code)
+(import "vm-eval")
+(compile vm-eval-code)
 (vtable_pop)
