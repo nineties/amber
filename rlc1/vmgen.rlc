@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vmgen.rlc 2010-06-03 23:51:31 nineties $
+; $Id: vmgen.rlc 2010-06-04 00:19:44 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -105,7 +105,13 @@
 (define lookup_8breg (reg) (assoc reg `((%eax . %al) (%ebx . %bl) (%ecx . %cl) (%edx . %dl))))
 (define drop (len) (emit "addl" (* 4 len) `%esp))
 (define movl  (src dst) (if (!= src dst) (emit "movl" src dst)))
-(define movb  (src dst) (do (movl src dst) (emit "movzbl" (lookup_8breg dst) dst)))
+(define movb (src dst)
+    (cond
+        ((int? src)     (emit "movb" src (lookup_8breg dst)))
+        ((char? src)    (emit "movb" src (lookup_8breg dst)))
+        (otherwise      (emit "movzbl" src dst))
+        ))
+
 (define pushl (val) (emit "pushl" val))
 (define pushb (val) (do (emit "movb" val `%al) (emit "movzbl" `%al `%eax) (pushl `%eax)))
 (define popl  (reg) (emit "popl" reg))
@@ -446,8 +452,10 @@
     (while   . @emit_while)
     (int     . @emit_def)
     (char    . @emit_def)
+    (byte    . @emit_def)
     (void*   . @emit_def)
     (*8      . @emit_deref8)
+    (fetch   . @emit_deref8)
     (+       . @emit_binexpr)
     (-       . @emit_binexpr)
     (*       . @emit_binexpr)
@@ -521,7 +529,7 @@
 
 (var var_pos 0)
 (define scan_defvar ((type v . init)) (do
-    (var sz (assoc type `((int . 1) (char . 1) (int* . 1) (void* . 1))))
+    (var sz (assoc type `((int . 1) (char . 1) (byte . 1) (int* . 1) (void* . 1))))
     (add_var v `(var @var_pos @sz))
     (set var_pos (+ var_pos sz))
     (if init (scan_expr init))
@@ -538,6 +546,7 @@
 (var scan_function_dispatcher `(
     (int . @scan_defvar)
     (char . @scan_defvar)
+    (byte . @scan_defvar)
     (int* . @scan_defvar)
     (void* . @scan_defvar)
     ))
