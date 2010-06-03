@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vmgen.rlc 2010-06-04 01:12:24 nineties $
+; $Id: vmgen.rlc 2010-06-04 02:18:31 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -51,7 +51,7 @@
     (print '"')
     ))
 
-(define address? (type) (assoc type `((int . @nil) (void* . @nil) (string . @true))))
+(define address? (type) (assoc type `((int . @nil) (void* . @nil) (string . @true) (int[] . @true))))
 
 (define emit_operand (opd)
     (cond
@@ -283,7 +283,7 @@
     (emit_expr rhs)
     (popl `%eax)
     (popl `%ebx)
-    (emit "cmpl" `%eax `%ebx)
+    (emit "cmpl" `%ebx `%eax)
     (emit insn `%al)
     (emit "movzbl" `%al `%eax)
     (pushl `%eax)
@@ -388,7 +388,7 @@
                 (var ifend-lbl (mklabel `end))
                 (var ifelse-lbl (if ifelse (mklabel `ifelse) nil))
                 (emit_expr expr `%eax nil)
-                (emit "cmpl" 0 `%eax)
+                (emit "cmpl" `%eax 0)
                 (emit "je" (if ifelse-lbl ifelse-lbl ifend-lbl))
                 (emit_block ifthen ret)
                 (if ifelse-lbl (do (emit "jmp" ifend-lbl) (print_label ifelse-lbl) (emit_block ifelse ret)))
@@ -434,7 +434,7 @@
     (pushl `%eax)
     (emit_expr (caddr expr) `%ebx nil) ; rhs
     (popl `%eax)
-    (emit "cmpl" `%eax `%ebx)
+    (emit "cmpl" `%ebx `%eax)
     (emit insn (if ifelse-lbl ifelse-lbl ifend-lbl))
     (emit_block ifthen ret)
     (if ifelse-lbl (do (emit "jmp" ifend-lbl) (print_label ifelse-lbl) (emit_block ifelse ret)))

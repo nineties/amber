@@ -2,8 +2,22 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-eval.rlc 2010-06-04 01:07:06 nineties $
+; $Id: vm-eval.rlc 2010-06-04 02:18:39 nineties $
 ;
+
+(var instructions `(
+    (fin ((return)))
+    ))
+
+(var insn_entries ())
+(do
+    (var idx 0)
+    (foreach e instructions (do
+        (set insn_entries (cons `(@idx @(cadr e)) insn_entries))
+        (incl idx)
+        ))
+    (set insn_entries (reverse insn_entries))
+)
 
 
 (var vm-eval-code `(
@@ -22,10 +36,7 @@
 
 (fun vm_eval (insns) (
     (byte code (fetch insns))
-    (tswitch 1 (
-        (0 ((= code 0) (break)))
-        (1 ((= code 1)))
-        ))
+    (tswitch code @insn_entries)
     ))
 
 ))
