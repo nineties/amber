@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vmgen.rlc 2010-06-04 00:19:44 nineties $
+; $Id: vmgen.rlc 2010-06-04 01:12:24 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -170,16 +170,23 @@
 (define emit_indirectjump (opd) (do
     (emit_expr opd)
     (movl `%top `%eax)
-    (drop 1)
     (emit "jmp" `*%eax)
     ))
 
-(define emit_goto ((goto opd) nil nil)
+(define emit_goto ((_ opd) _ _)
     (cond
         ((and (symbol? opd) (not (variable? opd))) (emit_directjump opd))
         ((and (cons? opd) (== `label (car opd)))   (emit_directjump opd))
         (otherwise (emit_indirectjump opd))
         ))
+
+(var break_points ())
+(define push_break_point () (set break_points (cons (mklabel `break) break_points)))
+(define pop_break_point  () (set break_points (cdr break_points)))
+(define break_point      () (car break_points))
+(define emit_break_point () (print_label (break_point)))
+
+(define emit_break ((_) _ _) (emit "jmp" (break_point)))
 
 (define emit_expr_default (expr dst ret) (do
     (if (or dst (cons? expr))
@@ -358,7 +365,7 @@
     (emit_expr arr `%eax nil)
     (pushl `%eax)
     (emit_expr idx `%eax nil)
-    (emit "imul" 4 `%eax)
+    (emit "sall" 2 `%eax)
     (emit "addl" `%eax `%top)
     (emit_expr e `%eax nil)
     (popl `%ebx)
@@ -434,10 +441,51 @@
     (print_label ifend-lbl)
     ))
 
-(define emit_while ((_while_ expr body) _ ret) (do
+(define emit_while ((_ expr body) _ ret) (do
     (var loop-lbl (mklabel `loop))
     (print_label loop-lbl)
+    (push_break_point)
     (emit_if `(if @expr @(append body `((goto @loop-lbl)))) nil nil)
+    (emit_break_point)
+    (pop_break_point)
+    (if ret (emit_return `(return) nil nil))
+    ))
+
+; switch implementation using table jump
+(define emit_tswitch ((_ expr body) _ ret) (do
+    (var size (length body))
+    (var table-lbl (mklabel `tbl))
+    (var labels ())
+    (upto i 1 size (set labels (cons (mklabel `case) labels)))
+    (set labels (reverse labels))
+
+    (emit_expr expr `%eax nil)
+    (emit "sall" 2 `%eax)
+    (movl `(offset %eax @table-lbl) `%eax)
+    (emit "jmp" `*%eax)
+
+    ; table area
+    (change_area `rodata)
+    (emit ".align 4")
+    (emit ".align 4")
+    (print_label table-lbl)
+    (foreach l labels (emit ".long" l))
+
+    ; code area
+    (push_break_point)
+    (var n 0)
+    (change_area `text)
+    (foreach case body (do
+        (var idx (car case))
+        (if (!= n idx) (do (eprintln "missing case label : " n) (exit 1)))
+        (incl n)
+        (print_label (car labels))
+        (set labels (cdr labels))
+        (emit_block (cadr case) nil)
+        ))
+    (emit_break_point)
+    (pop_break_point)
+
     (if ret (emit_return `(return) nil nil))
     ))
 
@@ -448,8 +496,10 @@
     (return  . @emit_return)
     (label   . @emit_label)
     (goto    . @emit_goto)
+    (break   . @emit_break)
     (if      . @emit_if)
     (while   . @emit_while)
+    (tswitch . @emit_tswitch)
     (int     . @emit_def)
     (char    . @emit_def)
     (byte    . @emit_def)
