@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vmgen.rlc 2010-06-04 02:26:09 nineties $
+; $Id: vmgen.rlc 2010-06-04 11:16:00 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -51,7 +51,10 @@
     (print '"')
     ))
 
-(define address? (type) (assoc type `((int . @nil) (void* . @nil) (string . @true) (int[] . @true))))
+(define address? (type)
+    (assoc type `((int . @nil) (void* . @nil) (string . @true)
+        (int[] . @true) (byte[] . @true) (char[] . @true) (void*[] . @true)
+        )))
 
 (define emit_operand (opd)
     (cond
@@ -204,7 +207,7 @@
     (if ret (emit_return `(return) nil nil))
     ))
 
-(define emit_deref8 ((*8 ptr) dst ret) (do
+(define emit_deref8 ((_ ptr) dst ret) (do
     (if dst (do
         (emit_expr ptr `%eax nil)
         (movb `(offset %eax 0) dst)
@@ -437,8 +440,8 @@
     (emit "cmpl" `%ebx `%eax)
     (emit insn (if ifelse-lbl ifelse-lbl ifend-lbl))
     (emit_block ifthen ret)
-    (if ifelse-lbl (do (emit "jmp" ifend-lbl) (print_label ifelse-lbl) (emit_block ifelse ret)))
-    (print_label ifend-lbl)
+    (if ifelse-lbl (do (if (nil? ret) (emit "jmp" ifend-lbl)) (print_label ifelse-lbl) (emit_block ifelse ret)))
+    (if (nil? ret) (print_label ifend-lbl))
     ))
 
 (define emit_while ((_ expr body) _ ret) (do
@@ -505,7 +508,7 @@
     (byte    . @emit_def)
     (void*   . @emit_def)
     (*8      . @emit_deref8)
-    (fetch   . @emit_deref8)
+    (load8   . @emit_deref8)
     (+       . @emit_binexpr)
     (-       . @emit_binexpr)
     (*       . @emit_binexpr)
@@ -542,6 +545,8 @@
         (foreach e block (emit_expr e nil (and ret last?)))
         ))
 
+(define add_new_expr (sym func) (set expr_dispatcher (cons `(@sym . @func) expr_dispatcher)))
+
 ; === compilation of external declarations ===
 
 (var current_area `text)
@@ -570,10 +575,21 @@
     (add_var sym `(global string @sym))
     ))
 
-(define emit_static_array ((type length sym)) (do
+(define emit_static_array ((type len sym . init)) (do
     (change_area `data)
-    (var elemsz `((int[] . 4) (void*[] . 4) (char[] . 1) (byte[] . 1)))
-    (println ".comm " sym ", " (* length (assoc type elemsz)))
+    (var elemsz (assoc type `((int[] . 4) (void*[] . 4) (char[] . 1) (byte[] . 1))))
+    (if init (do
+            (println sym ':')
+            (var directive (if (== elemsz 4) "\t.long " "\t.byte "))
+            (foreach v (car init) (println directive v))
+            (var rem (- len (length (car init))))
+            (if (> rem 0) (println "\t.zero " (* elemsz rem)))
+        )
+        (do
+            (println ".comm " sym ", " (* len elemsz))
+            (add_var sym `(global @type @sym))
+        )
+    )
     (add_var sym `(global @type @sym))
     ))
 
@@ -633,6 +649,7 @@
     (int*    . @emit_static_scalar)
     (string  . @emit_static_string)
     (int[]   . @emit_static_array)
+    (byte[]  . @emit_static_array)
     (char[]  . @emit_static_array)
     (void*[] . @emit_static_array)
     (fun     . @emit_function)

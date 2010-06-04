@@ -2,11 +2,12 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-eval.rlc 2010-06-04 02:38:23 nineties $
+; $Id: vm-eval.rlc 2010-06-04 11:17:12 nineties $
 ;
 
 (var instructions `(
-    (fin ((return)))
+    (fin        ((return)))
+    (imm_i0     ((vm_push 0)))
     ))
 
 (var insn_entries ())
@@ -19,11 +20,18 @@
     (set insn_entries (reverse insn_entries))
 )
 
+(define emit_vm_push ((_ val) _ _) (do
+    (emit_expr val `%eax nil)
+    (emit "subl" 4 (lookup_var sp))
+    (movl `%eax (lookup_var sp))
+    ))
+
+(add_new_expr `vm_push emit_vm_push)
 
 (var vm-eval-code `(
 
 (int* sp)          ; stack pointer
-(int stack_size)    ; in words
+(int stack_size)   ; in words
 (int* stack)
 
 (fun vm_init (stsize) (
@@ -31,11 +39,11 @@
     (&= stsize @BLOCK_MASK)
     (= stack (alloc_block stsize))
     (= stack_size stsize)
-    (= sp stack)
+    (= sp (+ stack (* 4 stack_size)))
     ))
 
-(fun vm_eval (insns) (
-    (byte code (fetch insns))
+(fun vm_eval (pc) (
+    (byte code (load8 pc))
     (tswitch code @insn_entries)
     ))
 
