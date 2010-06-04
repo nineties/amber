@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vmgen.rlc 2010-06-04 11:16:00 nineties $
+; $Id: vmgen.rlc 2010-06-04 14:52:06 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -52,8 +52,7 @@
     ))
 
 (define address? (type)
-    (assoc type `((int . @nil) (void* . @nil) (string . @true)
-        (int[] . @true) (byte[] . @true) (char[] . @true) (void*[] . @true)
+    (assoc type `((string . @true) (int[] . @true) (byte[] . @true) (char[] . @true) (void*[] . @true)
         )))
 
 (define emit_operand (opd)
@@ -455,35 +454,25 @@
     ))
 
 ; switch implementation using table jump
-(define emit_tswitch ((_ expr body) _ ret) (do
-    (var size (length body))
-    (var table-lbl (mklabel `tbl))
-    (var labels ())
-    (upto i 1 size (set labels (cons (mklabel `case) labels)))
-    (set labels (reverse labels))
+(define emit_tswitch ((_ tblname expr body) _ ret) (do
 
     (emit_expr expr `%eax nil)
     (emit "sall" 2 `%eax)
-    (movl `(offset %eax @table-lbl) `%eax)
+    (movl `(offset %eax @tblname) `%eax)
     (emit "jmp" `*%eax)
 
     ; table area
     (change_area `rodata)
     (emit ".align 4")
     (emit ".align 4")
-    (print_label table-lbl)
-    (foreach l labels (emit ".long" l))
+    (print_label tblname)
+    (foreach case body (emit ".long" (car case)))
 
     ; code area
     (push_break_point)
-    (var n 0)
     (change_area `text)
     (foreach case body (do
-        (var idx (car case))
-        (if (!= n idx) (do (eprintln "missing case label : " n) (exit 1)))
-        (incl n)
-        (print_label (car labels))
-        (set labels (cdr labels))
+        (print_label (car case))
         (emit_block (cadr case) nil)
         ))
     (emit_break_point)
@@ -647,6 +636,7 @@
     (int     . @emit_static_scalar)
     (void*   . @emit_static_scalar)
     (int*    . @emit_static_scalar)
+    (byte*   . @emit_static_scalar)
     (string  . @emit_static_string)
     (int[]   . @emit_static_array)
     (byte[]  . @emit_static_array)

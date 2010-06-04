@@ -2,37 +2,60 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-eval.rlc 2010-06-04 11:17:12 nineties $
+; $Id: vm-eval.rlc 2010-06-04 14:52:47 nineties $
 ;
 
 (var instructions `(
-    (fin        ((return)))
-    (imm_i0     ((vm_push 0)))
+    (fin      1 ((return)))
+    (nop      1 ())
+    (imm_i0   1 ((vm_push 0)))
+    (imm_i1   1 ((vm_push 1)))
+    (imm_i2   1 ((vm_push 2)))
+    (imm_i3   1 ((vm_push 3)))
+    (imm_i4   1 ((vm_push 4)))
+    (imm_i5   1 ((vm_push 5)))
+    (imm_im1  1 ((vm_push -1)))
     ))
 
 (var insn_entries ())
 (do
-    (var idx 0)
     (foreach e instructions (do
-        (set insn_entries (cons `(@idx @(cadr e)) insn_entries))
-        (incl idx)
+        (var label (mklabel (car e)))
+        (var len (cadr e))
+        (var code (caddr e))
+        (set code (append code `((vm_succ @len) (vm_fetch))))
+        (set insn_entries (cons `(@label @code) insn_entries))
         ))
     (set insn_entries (reverse insn_entries))
 )
 
 (define emit_vm_push ((_ val) _ _) (do
     (emit_expr val `%eax nil)
-    (emit "subl" 4 (lookup_var sp))
-    (movl `%eax (lookup_var sp))
+    (emit "subl" 4 `sp)
+    (movl `%eax `(offset sp 0))
     ))
 
-(add_new_expr `vm_push emit_vm_push)
+(define emit_vm_succ ((_ len) _ _) (do
+    (emit "addl" len (lookup_var pc))
+    ))
+
+(define emit_vm_fetch ((_) _ _) (do
+    (emit "movzbl" `(offset pc 0) `%eax)
+    (emit "sall" `%eax)
+    (movl `(offset %eax insn_table) `%eax)
+    (emit "jmp" `*%eax)
+    ))
+
+(add_new_expr `vm_push  emit_vm_push)
+(add_new_expr `vm_succ  emit_vm_succ)
+(add_new_expr `vm_fetch emit_vm_fetch)
 
 (var vm-eval-code `(
 
-(int* sp)          ; stack pointer
-(int stack_size)   ; in words
-(int* stack)
+(int*   sp)         ; stack pointer
+(int    stack_size) ; in words
+(int*   stack)
+(byte*  pc)         ; program counter
 
 (fun vm_init (stsize) (
     (+= stsize @BLOCK_SIZE)
@@ -42,9 +65,8 @@
     (= sp (+ stack (* 4 stack_size)))
     ))
 
-(fun vm_eval (pc) (
-    (byte code (load8 pc))
-    (tswitch code @insn_entries)
+(fun vm_eval () (
+    (tswitch insn_table (load8 pc) @insn_entries)
     ))
 
 ))
