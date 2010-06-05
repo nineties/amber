@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-eval.rlc 2010-06-05 20:35:15 nineties $
+; $Id: vm-eval.rlc 2010-06-05 20:50:04 nineties $
 ;
 
 ; rowlVM uses machine registers
@@ -37,17 +37,16 @@
 (define emit_vm_push ((_ val) _ _) (do
     (emit_expr val `%eax nil)
     (emit "subl" 4 `%esi)
-    (movl `%eax `(offset %esi 0))
+    (movl `%eax `(deref %esi 0))
     ))
 
 (define emit_vm_succ ((_ len) _ _) (do
-    (emit "addl" len (lookup_var pc))
+    (emit "addl" len `%ebx)
     ))
 
 (define emit_vm_fetch ((_) _ _) (do
-    (emit "movzbl" `(offset pc 0) `%eax)
-    (emit "sall" `%eax)
-    (movl `(offset %eax insn_table) `%eax)
+    (emit "movzbl" `(deref %ebx 0) `%eax)
+    (movl `(offset %eax insn_table 4) `%eax)
     (emit "jmp" `*%eax)
     ))
 
@@ -68,12 +67,13 @@
     ))
 
 (fun vm_eval (insn) (
-    (asm (movl stack %esi))
-    ;(asm (movl stack_size %eax))
-    ;(asm (emit "sall" 2 %eax))
-    ;(asm (emit "addl" %eax %esi))
-    ;(asm (movl insn %ebx))
-    ;(tswitch insn_table (load8 %ebx) @insn_entries)
+    (asm (movl `(global int* stack) `%esi))
+    (asm (movl `(global int stack_size) `%eax))
+    (asm (emit "sall" 2 `%eax))
+    (asm (emit "addl" `%eax `%esi))
+    (asm (movl `(arg 0) `%ebx))
+    (vm_fetch)
+    (gentable insn_table @insn_entries)
     ))
 
 ))

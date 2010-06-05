@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vmgen.rlc 2010-06-05 20:34:23 nineties $
+; $Id: vmgen.rlc 2010-06-05 20:51:56 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -80,10 +80,18 @@
             (emit_operand `%ebp)
             (print ')')
             ))
-        ((== `offset (car opd)) (do
+        ((== `deref (car opd)) (do
             (if (!= (caddr opd) 0) (print (caddr opd)))
             (print '(')
             (emit_operand (cadr opd))
+            (print ')')
+            ))
+        ((== `offset (car opd)) (do
+            (print (caddr opd))
+            (print "(,")
+            (emit_operand (cadr opd))
+            (print ',')
+            (print (cadddr opd))
             (print ')')
             ))
         ((== `label (car opd)) (do
@@ -209,7 +217,7 @@
 (define emit_deref8 ((_ ptr) dst ret) (do
     (if dst (do
         (emit_expr ptr `%eax nil)
-        (movb `(offset %eax 0) dst)
+        (movb `(deref %eax 0) dst)
         ))
     (if ret (emit_return `(return) nil nil))
     ))
@@ -301,7 +309,7 @@
         (emit_expr e `%eax nil)
         (pushl `%eax)
         ))
-    (upto r 1 narg (movl `(offset %esp @(* 4 (- narg r))) (nth (- r 1) regs)))
+    (upto r 1 narg (movl `(deref %esp @(* 4 (- narg r))) (nth (- r 1) regs)))
     (drop narg)
     (emit "int" 0x80)
     (if dst (movl `%eax dst))
@@ -373,7 +381,7 @@
     (emit "addl" `%eax `%top)
     (emit_expr e `%eax nil)
     (popl `%ecx)
-    (movl `%eax `(offset %ecx 0))
+    (movl `%eax `(deref %ecx 0))
     (if dst (movl `%eax dst))
     (if ret (emit_return `(return) nil nil))
     ))
@@ -456,13 +464,7 @@
     ))
 
 ; switch implementation using table jump
-(define emit_tswitch ((_ tblname expr body) _ ret) (do
-
-    (emit_expr expr `%eax nil)
-    (emit "sall" 2 `%eax)
-    (movl `(offset %eax @tblname) `%eax)
-    (emit "jmp" `*%eax)
-
+(define emit_gentable ((_ tblname body) _ ret) (do
     ; table area
     (change_area `rodata)
     (emit ".align 4")
@@ -498,7 +500,7 @@
     (break   . @emit_break)
     (if      . @emit_if)
     (while   . @emit_while)
-    (tswitch . @emit_tswitch)
+    (gentable . @emit_gentable)
     (int     . @emit_def)
     (char    . @emit_def)
     (byte    . @emit_def)
