@@ -2,8 +2,13 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-eval.rlc 2010-06-04 14:52:47 nineties $
+; $Id: vm-eval.rlc 2010-06-05 20:35:15 nineties $
 ;
+
+; rowlVM uses machine registers
+;   %eax, %ecx : general purpose register
+;   %ebx       : program counter
+;   %esi       : stack pointer
 
 (var instructions `(
     (fin      1 ((return)))
@@ -31,8 +36,8 @@
 
 (define emit_vm_push ((_ val) _ _) (do
     (emit_expr val `%eax nil)
-    (emit "subl" 4 `sp)
-    (movl `%eax `(offset sp 0))
+    (emit "subl" 4 `%esi)
+    (movl `%eax `(offset %esi 0))
     ))
 
 (define emit_vm_succ ((_ len) _ _) (do
@@ -52,21 +57,23 @@
 
 (var vm-eval-code `(
 
-(int*   sp)         ; stack pointer
 (int    stack_size) ; in words
 (int*   stack)
-(byte*  pc)         ; program counter
 
 (fun vm_init (stsize) (
     (+= stsize @BLOCK_SIZE)
     (&= stsize @BLOCK_MASK)
     (= stack (alloc_block stsize))
     (= stack_size stsize)
-    (= sp (+ stack (* 4 stack_size)))
     ))
 
-(fun vm_eval () (
-    (tswitch insn_table (load8 pc) @insn_entries)
+(fun vm_eval (insn) (
+    (asm (movl stack %esi))
+    ;(asm (movl stack_size %eax))
+    ;(asm (emit "sall" 2 %eax))
+    ;(asm (emit "addl" %eax %esi))
+    ;(asm (movl insn %ebx))
+    ;(tswitch insn_table (load8 %ebx) @insn_entries)
     ))
 
 ))
