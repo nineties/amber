@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-eval.rlc 2010-06-05 20:50:04 nineties $
+; $Id: vm-eval.rlc 2010-06-05 20:59:30 nineties $
 ;
 
 ; rowlVM uses machine registers
@@ -67,13 +67,17 @@
     ))
 
 (fun vm_eval (insn) (
+    (asm (pushl `%ebx))
+    (asm (pushl `%esi))
     (asm (movl `(global int* stack) `%esi))
     (asm (movl `(global int stack_size) `%eax))
     (asm (emit "sall" 2 `%eax))
     (asm (emit "addl" `%eax `%esi))
-    (asm (movl `(arg 0) `%ebx))
+    (asm (movl `(arg 1) `%ebx))
     (vm_fetch)
     (gentable insn_table @insn_entries)
+    (asm (popl `%esi))
+    (asm (popl `%ebx))
     ))
 
 ))
