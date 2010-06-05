@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-06-02 09:23:35 nineties $
+ % $Id: builtin.rl 2010-06-05 20:35:04 nineties $
  %);
 
 include(stddef,code);
@@ -288,6 +288,12 @@ expect: (p0, p1, p2, p3) {
 };
 
 (% primitive functions %);
+
+(% p0: S-expression %);
+rl_eval: (p0) {
+    check_arity(p0, 1, "eval");
+    return eval_sexp(car(p0));
+};
 
 (% p0: address of the function %);
 mkprim: (p0) {
@@ -684,6 +690,7 @@ init_builtin_objects: () {
     macro_sym   = register_sym("macro");
     import_sym  = register_sym("import");
 
+    register_prim("eval"       , &rl_eval);
     register_prim("cons"       , &rl_cons);
     register_prim("car"        , &rl_car);
     register_prim("cdr"        , &rl_cdr);
