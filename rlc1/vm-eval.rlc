@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-eval.rlc 2010-06-05 20:59:30 nineties $
+; $Id: vm-eval.rlc 2010-06-06 13:11:50 nineties $
 ;
 
 ; rowlVM uses machine registers
@@ -13,13 +13,15 @@
 (var instructions `(
     (fin      1 ((return)))
     (nop      1 ())
-    (imm_i0   1 ((vm_push 0)))
-    (imm_i1   1 ((vm_push 1)))
-    (imm_i2   1 ((vm_push 2)))
-    (imm_i3   1 ((vm_push 3)))
-    (imm_i4   1 ((vm_push 4)))
-    (imm_i5   1 ((vm_push 5)))
-    (imm_im1  1 ((vm_push -1)))
+    (imm_i0   1 ((vm_push $0) (vmexit 1)))
+    (imm_i1   1 ((vm_push $1)))
+    (imm_i2   1 ((vm_push $2)))
+    (imm_i3   1 ((vm_push $3)))
+    (imm_i4   1 ((vm_push $4)))
+    (imm_i5   1 ((vm_push $5)))
+    (imm_im1  1 ((vm_push $-1)))
+    (iadd     1 ((vm_pop %eax) (asm "addl %eax, (%esi)")))
+    (isub     1 ((vm_pop %eax) (asm "subl %eax, (%esi)")))
     ))
 
 (var insn_entries ())
@@ -35,9 +37,13 @@
 )
 
 (define emit_vm_push ((_ val) _ _) (do
-    (emit_expr val `%eax nil)
     (emit "subl" 4 `%esi)
-    (movl `%eax `(deref %esi 0))
+    (movl val `(deref %esi 0))
+    ))
+
+(define emit_vm_pop ((_ reg) _ _) (do
+    (movl `(deref %esi 0) reg)
+    (emit "addl" 4 `%esi)
     ))
 
 (define emit_vm_succ ((_ len) _ _) (do
@@ -51,6 +57,7 @@
     ))
 
 (add_new_expr `vm_push  emit_vm_push)
+(add_new_expr `vm_pop   emit_vm_pop)
 (add_new_expr `vm_succ  emit_vm_succ)
 (add_new_expr `vm_fetch emit_vm_fetch)
 
@@ -60,24 +67,25 @@
 (int*   stack)
 
 (fun vm_init (stsize) (
-    (+= stsize @BLOCK_SIZE)
-    (&= stsize @BLOCK_MASK)
     (= stack (alloc_block stsize))
     (= stack_size stsize)
+    (vmexit stack)
+    (asm "movl stack, %eax")
+    (asm "movl $0, (%eax)")
     ))
 
 (fun vm_eval (insn) (
-    (asm (pushl `%ebx))
-    (asm (pushl `%esi))
-    (asm (movl `(global int* stack) `%esi))
-    (asm (movl `(global int stack_size) `%eax))
-    (asm (emit "sall" 2 `%eax))
-    (asm (emit "addl" `%eax `%esi))
-    (asm (movl `(arg 1) `%ebx))
+    (asm "pushl %ebx")
+    (asm "pushl %esi")
+    (asm "movl stack, %esi")
+    (asm "movl stack_size, %eax")
+    (asm "sall $2, %eax")
+    (asm "addl %eax, %esi")
+    (asm "movl 8(%ebp), %ebx")
     (vm_fetch)
     (gentable insn_table @insn_entries)
-    (asm (popl `%esi))
-    (asm (popl `%ebx))
+    (asm "popl %esi")
+    (asm "popl %ebx")
     ))
 
 ))
