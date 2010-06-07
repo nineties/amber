@@ -1,0 +1,32 @@
+;
+; rowl - generation 1
+; Copyright (C) 2010 nineties
+;
+; $Id: vm-assemble.rlc 2010-06-07 11:31:26 nineties $
+;
+
+(import "stdlib")
+(import "vm-insn")
+
+; insn-name -> (code len)
+(var insn_table (do
+    (var code 0)
+    (var entries ())
+    (foreach i instructions (do
+        (var name (car i))
+        (var len  (cadr i))
+        (set entries (cons `(@name @code @len) entries))
+        (incl code)
+        ))
+    (reverse entries)
+    ))
+
+(define assemble_insn (insn) (list (car (assoc insn insn_table))))
+
+(define assemble (code)
+    (if code (append (assemble_insn (car code)) (assemble (cdr code))) ())
+    )
+
+(var test_code `(imm_i1 imm_i2 iadd exit))
+
+(print (assemble test_code))
