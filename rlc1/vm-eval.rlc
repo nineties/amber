@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-eval.rlc 2010-06-06 13:11:50 nineties $
+; $Id: vm-eval.rlc 2010-06-07 10:57:19 nineties $
 ;
 
 ; rowlVM uses machine registers
@@ -11,9 +11,9 @@
 ;   %esi       : stack pointer
 
 (var instructions `(
-    (fin      1 ((return)))
+    (fin      1 ((break)))
     (nop      1 ())
-    (imm_i0   1 ((vm_push $0) (vmexit 1)))
+    (imm_i0   1 ((vm_push $0)))
     (imm_i1   1 ((vm_push $1)))
     (imm_i2   1 ((vm_push $2)))
     (imm_i3   1 ((vm_push $3)))
@@ -69,9 +69,6 @@
 (fun vm_init (stsize) (
     (= stack (alloc_block stsize))
     (= stack_size stsize)
-    (vmexit stack)
-    (asm "movl stack, %eax")
-    (asm "movl $0, (%eax)")
     ))
 
 (fun vm_eval (insn) (
@@ -79,7 +76,6 @@
     (asm "pushl %esi")
     (asm "movl stack, %esi")
     (asm "movl stack_size, %eax")
-    (asm "sall $2, %eax")
     (asm "addl %eax, %esi")
     (asm "movl 8(%ebp), %ebx")
     (vm_fetch)
