@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-eval.rlc 2010-06-08 14:18:50 nineties $
+; $Id: vm-eval.rlc 2010-06-08 14:49:18 nineties $
 ;
 
 ; rowlVM register usage
@@ -44,8 +44,12 @@
     (emit "jmp" `*%eax)
     ))
 
-(define emit_vm_rdbyte ((_ offs reg) _ _) (do
+(define emit_vm_ubyte ((_ offs reg) _ _) (do
     (emit "movzbl" `(deref %ebx @offs) reg)
+    ))
+
+(define emit_vm_sbyte ((_ offs reg) _ _) (do
+    (emit "movsx" `(deref %ebx @offs) reg)
     ))
 
 ; switch implementation using table jump
@@ -70,12 +74,19 @@
     (if ret (emit_return `(return) nil nil))
     ))
 
+(define emit_vm_bin ((_ asmcode) _ ret) (do
+    (emit_expr `(vm_pop %eax) nil nil)
+    (emit_expr `(asm @asmcode " %eax, (%esi)") nil ret)
+    ))
+
 (add_new_expr `vm_push   emit_vm_push)
 (add_new_expr `vm_pop    emit_vm_pop)
 (add_new_expr `vm_succ   emit_vm_succ)
 (add_new_expr `vm_fetch  emit_vm_fetch)
-(add_new_expr `vm_rdbyte emit_vm_rdbyte)
+(add_new_expr `vm_ubyte  emit_vm_ubyte)
+(add_new_expr `vm_sbyte  emit_vm_sbyte)
 (add_new_expr `vm_table  emit_vm_table)
+(add_new_expr `vm_bin    emit_vm_bin)
 
 (var vm-eval-code `(
 
