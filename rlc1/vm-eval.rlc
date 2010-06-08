@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-eval.rlc 2010-06-08 14:49:18 nineties $
+; $Id: vm-eval.rlc 2010-06-08 19:27:04 nineties $
 ;
 
 ; rowlVM register usage
@@ -17,43 +17,55 @@
     (foreach e vm_instructions (do
         (var label (mklabel (car e)))
         (var len (cadr e))
-        (var code (caddr e))
-        (set code (append code `((vm_succ @len) (vm_fetch))))
+        (var code (cadddr e))
+        (if (caddr e) (set code (append code `((vmsucc @len) (vmfetch)))))
         (set insn_entries (cons `(@label @code) insn_entries))
         ))
     (set insn_entries (reverse insn_entries))
 )
 
-(define emit_vm_push ((_ val) _ _) (do
+(define emit_vmemit ((_ inst . opds) _ _) (do
+    (print '\t')
+    (print inst)
+    (print ' ')
+    (foreach o opds (do
+        (if (== o `%tos) (set o "(%esi)"))
+        (print o)
+        (if (not last?) (print ", "))
+        ))
+    (print '\n')
+    ))
+
+(define emit_vmpush ((_ val) _ _) (do
     (emit "subl" 4 `%esi)
     (movl val `(deref %esi 0))
     ))
 
-(define emit_vm_pop ((_ reg) _ _) (do
+(define emit_vmpop ((_ reg) _ _) (do
     (movl `(deref %esi 0) reg)
     (emit "addl" 4 `%esi)
     ))
 
-(define emit_vm_succ ((_ len) _ _) (do
+(define emit_vmsucc ((_ len) _ _) (do
     (emit "addl" len `%ebx)
     ))
 
-(define emit_vm_fetch ((_) _ _) (do
+(define emit_vmfetch ((_) _ _) (do
     (emit "movzbl" `(deref %ebx 0) `%eax)
     (movl `(offset %eax insn_table 4) `%eax)
     (emit "jmp" `*%eax)
     ))
 
-(define emit_vm_ubyte ((_ offs reg) _ _) (do
+(define emit_vmubyte ((_ offs reg) _ _) (do
     (emit "movzbl" `(deref %ebx @offs) reg)
     ))
 
-(define emit_vm_sbyte ((_ offs reg) _ _) (do
+(define emit_vmsbyte ((_ offs reg) _ _) (do
     (emit "movsx" `(deref %ebx @offs) reg)
     ))
 
 ; switch implementation using table jump
-(define emit_vm_table ((_ tblname body) _ ret) (do
+(define emit_vmtable ((_ tblname body) _ ret) (do
     ; table area
     (change_area `rodata)
     (emit ".align 4")
@@ -74,19 +86,20 @@
     (if ret (emit_return `(return) nil nil))
     ))
 
-(define emit_vm_bin ((_ asmcode) _ ret) (do
-    (emit_expr `(vm_pop %eax) nil nil)
+(define emit_vmbin ((_ asmcode) _ ret) (do
+    (emit_expr `(vmpop %eax) nil nil)
     (emit_expr `(asm @asmcode " %eax, (%esi)") nil ret)
     ))
 
-(add_new_expr `vm_push   emit_vm_push)
-(add_new_expr `vm_pop    emit_vm_pop)
-(add_new_expr `vm_succ   emit_vm_succ)
-(add_new_expr `vm_fetch  emit_vm_fetch)
-(add_new_expr `vm_ubyte  emit_vm_ubyte)
-(add_new_expr `vm_sbyte  emit_vm_sbyte)
-(add_new_expr `vm_table  emit_vm_table)
-(add_new_expr `vm_bin    emit_vm_bin)
+(add_new_expr `vmemit   emit_vmemit)
+(add_new_expr `vmpush   emit_vmpush)
+(add_new_expr `vmpop    emit_vmpop)
+(add_new_expr `vmsucc   emit_vmsucc)
+(add_new_expr `vmfetch  emit_vmfetch)
+(add_new_expr `vmubyte  emit_vmubyte)
+(add_new_expr `vmsbyte  emit_vmsbyte)
+(add_new_expr `vmtable  emit_vmtable)
+(add_new_expr `vmbin    emit_vmbin)
 
 (var vm-eval-code `(
 
@@ -105,8 +118,8 @@
     (asm "movl stack_size, %eax")
     (asm "addl %eax, %esi")
     (asm "movl 8(%ebp), %ebx")
-    (vm_fetch)
-    (vm_table insn_table @insn_entries)
+    (vmfetch)
+    (vmtable insn_table @insn_entries)
     (asm "popl %esi")
     (asm "popl %ebx")
     ))
