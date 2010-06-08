@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: eval.rl 2010-06-02 14:59:22 nineties $
+ % $Id: eval.rl 2010-06-08 13:48:48 nineties $
  %);
 
 include(stddef,code);
@@ -224,7 +224,7 @@ match_args: (p0, p1, p2) {
     allocate(1);
     if (p0 == nil_sym) {
         if (p1 == nil_sym) { return; };
-        fputs(stderr, "ERROR: argument patter mismatch ");
+        fputs(stderr, "ERROR: argument pattern mismatch ");
         pp_sexp(stderr, p2);
         fputs(stderr, ": ");
         pp_sexp(stderr, p0);

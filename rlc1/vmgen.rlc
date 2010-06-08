@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vmgen.rlc 2010-06-06 01:35:44 nineties $
+; $Id: vmgen.rlc 2010-06-08 14:18:12 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -465,28 +465,6 @@
     (if ret (emit_return `(return) nil nil))
     ))
 
-; switch implementation using table jump
-(define emit_gentable ((_ tblname body) _ ret) (do
-    ; table area
-    (change_area `rodata)
-    (emit ".align 4")
-    (emit ".align 4")
-    (print_label tblname)
-    (foreach case body (emit ".long" (car case)))
-
-    ; code area
-    (push_break_point)
-    (change_area `text)
-    (foreach case body (do
-        (print_label (car case))
-        (emit_block (cadr case) nil)
-        ))
-    (emit_break_point)
-    (pop_break_point)
-
-    (if ret (emit_return `(return) nil nil))
-    ))
-
 (define emit_asm ((_ code) _ ret) (do
     (print '\t' code '\n')
     (if ret (emit_return `(return) nil nil))
@@ -502,7 +480,6 @@
     (break   . @emit_break)
     (if      . @emit_if)
     (while   . @emit_while)
-    (gentable . @emit_gentable)
     (int     . @emit_def)
     (char    . @emit_def)
     (byte    . @emit_def)

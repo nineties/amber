@@ -2,31 +2,52 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-assemble.rlc 2010-06-07 11:31:26 nineties $
+; $Id: vm-assemble.rlc 2010-06-08 14:21:06 nineties $
 ;
 
 (import "stdlib")
 (import "vm-insn")
 
 ; insn-name -> (code len)
-(var insn_table (do
+(var vm_insn_table (do
     (var code 0)
     (var entries ())
-    (foreach i instructions (do
+    (foreach i vm_instructions (do
         (var name (car i))
         (var len  (cadr i))
-        (set entries (cons `(@name @code @len) entries))
+        (push entries `(@name @code @len))
         (incl code)
         ))
     (reverse entries)
     ))
 
-(define assemble_insn (insn) (list (car (assoc insn insn_table))))
+(define insn_head   (insn) (if (cons? insn) (car insn) insn))
+(define insn_code   (insn) (car  (assoc (insn_head insn) vm_insn_table)))
+(define insn_len    (insn) (cadr (assoc (insn_head insn) vm_insn_table)))
 
-(define assemble (code)
-    (if code (append (assemble_insn (car code)) (assemble (cdr code))) ())
-    )
+(define compute_addr (code) (do
+    (var addr_list ())
+    (var addr 0)
+    (foreach insn code
+        (if (and (cons? insn) (== (car insn) `label))
+            (push addr_list `(@(cadr insn) . @addr))
+            (set addr (+ addr (insn_len insn)))
+        ))
+    addr_list
+    ))
 
-(var test_code `(imm_i1 imm_i2 iadd exit))
+(define assemble_insn (addr_list insn)
+    (cond
+        ((not (cons? insn))         (list (car (assoc insn vm_insn_table))))
+        ((== (car insn) `label)     ())
+        ((== (car insn) `goto)      (list (car (assoc (car insn) vm_insn_table)) (assoc (cadr insn) addr_list)))
+        ))
 
-(print (assemble test_code))
+(define assemble_helper (addr_list code) (do
+    (if code (append (assemble_insn addr_list (car code)) (assemble_helper addr_list (cdr code))) ())
+    ))
+
+(define assemble (code) (do
+    (var addr_list (compute_addr code))
+    (assemble_helper addr_list code)
+    ))
