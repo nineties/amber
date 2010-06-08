@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-06-08 14:16:33 nineties $
+; $Id: vm-insn.rlc 2010-06-08 14:51:34 nineties $
 ;
 
 ; rowlVM register usage
@@ -20,8 +20,10 @@
     (imm_i4   1 ((vm_push $4)))
     (imm_i5   1 ((vm_push $5)))
     (imm_im1  1 ((vm_push $-1)))
-    (iadd     1 ((vm_pop %eax) (asm "addl %eax, (%esi)")))
-    (isub     1 ((vm_pop %eax) (asm "subl %eax, (%esi)")))
-    (goto     2 ((vm_rdbyte 1 %eax) (asm "addl %eax, %ebx") (vm_fetch)))
+    (imm_int  2 ((vm_sbyte 1 %eax) (vm_push %eax)))
+    (iadd     1 ((vm_bin "addl")))
+    (isub     1 ((vm_bin "subl")))
+    (imul     1 ((vm_pop %eax) (asm "imul (%esi), %eax") (asm "movl %eax, (%esi)")))
+    (goto     2 ((vm_ubyte 1 %eax) (asm "addl %eax, %ebx") (vm_fetch)))
     ))
 
