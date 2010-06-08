@@ -1,8 +1,8 @@
-;
+;l
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-assemble.rlc 2010-06-08 19:20:31 nineties $
+; $Id: vm-assemble.rlc 2010-06-08 23:24:28 nineties $
 ;
 
 (import "stdlib")
@@ -27,28 +27,40 @@
 
 (define compute_addr (code) (do
     (var addr_list ())
+    (var new_code ())
     (var addr 0)
     (foreach insn code
         (if (and (cons? insn) (== (car insn) `label))
             (push addr_list `(@(cadr insn) . @addr))
-            (set addr (+ addr (insn_len insn)))
+            (do
+                (push new_code `(@addr . @insn))
+                (set addr (+ addr (insn_len insn)))
+            )
         ))
-    addr_list
+    (list (reverse new_code) addr_list)
     ))
 
-(define assemble_insn (addr_list insn)
+(define insn_addr? (head) (member? head `(goto if_zero if_nonzero)))
+
+(define assemble_insn (addr_list addr_insn) (do
+    (var addr (car addr_insn))
+    (var insn (cdr addr_insn))
     (cond
         ((not (cons? insn))         (list (car (assoc insn vm_insn_table))))
         ((== (car insn) `imm_int)   (list (car (assoc (car insn) vm_insn_table)) (cadr insn)))
         ((== (car insn) `label)     ())
-        ((== (car insn) `goto)      (list (car (assoc (car insn) vm_insn_table)) (assoc (cadr insn) addr_list)))
+        ((insn_addr? (car insn))    (list
+            (car (assoc (car insn) vm_insn_table))
+            (- (assoc (cadr insn) addr_list) addr)
+            ))
         ))
+        )
 
 (define assemble_helper (addr_list code) (do
     (if code (append (assemble_insn addr_list (car code)) (assemble_helper addr_list (cdr code))) ())
     ))
 
 (define assemble (code) (do
-    (var addr_list (compute_addr code))
-    (assemble_helper addr_list code)
+    (var ret (compute_addr code))
+    (assemble_helper (cadr ret) (car ret))
     ))
