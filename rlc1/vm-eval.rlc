@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-eval.rlc 2010-06-08 19:27:04 nineties $
+; $Id: vm-eval.rlc 2010-06-09 00:51:02 nineties $
 ;
 
 ; rowlVM register usage
@@ -47,21 +47,21 @@
     ))
 
 (define emit_vmsucc ((_ len) _ _) (do
-    (emit "addl" len `%ebx)
+    (emit "addl" len `%ecx)
     ))
 
 (define emit_vmfetch ((_) _ _) (do
-    (emit "movzbl" `(deref %ebx 0) `%eax)
+    (emit "movzbl" `(deref %ecx 0) `%eax)
     (movl `(offset %eax insn_table 4) `%eax)
     (emit "jmp" `*%eax)
     ))
 
 (define emit_vmubyte ((_ offs reg) _ _) (do
-    (emit "movzbl" `(deref %ebx @offs) reg)
+    (emit "movzbl" `(deref %ecx @offs) reg)
     ))
 
 (define emit_vmsbyte ((_ offs reg) _ _) (do
-    (emit "movsx" `(deref %ebx @offs) reg)
+    (emit "movsx" `(deref %ecx @offs) reg)
     ))
 
 ; switch implementation using table jump
@@ -117,7 +117,8 @@
     (asm "movl stack, %esi")
     (asm "movl stack_size, %eax")
     (asm "addl %eax, %esi")
-    (asm "movl 8(%ebp), %ebx")
+    (asm "movl 8(%ebp), %ecx")
+    (asm "xorl %edx, %edx") ; initialize zero register
     (vmfetch)
     (vmtable insn_table @insn_entries)
     (asm "popl %esi")
