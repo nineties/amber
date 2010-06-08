@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-eval.rlc 2010-06-07 11:15:00 nineties $
+; $Id: vm-eval.rlc 2010-06-08 14:18:50 nineties $
 ;
 
 ; rowlVM register usage
@@ -14,7 +14,7 @@
 
 (var insn_entries ())
 (do
-    (foreach e instructions (do
+    (foreach e vm_instructions (do
         (var label (mklabel (car e)))
         (var len (cadr e))
         (var code (caddr e))
@@ -48,11 +48,34 @@
     (emit "movzbl" `(deref %ebx @offs) reg)
     ))
 
+; switch implementation using table jump
+(define emit_vm_table ((_ tblname body) _ ret) (do
+    ; table area
+    (change_area `rodata)
+    (emit ".align 4")
+    (emit ".align 4")
+    (print_label tblname)
+    (foreach case body (emit ".long" (car case)))
+
+    ; code area
+    (push_break_point)
+    (change_area `text)
+    (foreach case body (do
+        (print_label (car case))
+        (emit_block (cadr case) nil)
+        ))
+    (emit_break_point)
+    (pop_break_point)
+
+    (if ret (emit_return `(return) nil nil))
+    ))
+
 (add_new_expr `vm_push   emit_vm_push)
 (add_new_expr `vm_pop    emit_vm_pop)
 (add_new_expr `vm_succ   emit_vm_succ)
 (add_new_expr `vm_fetch  emit_vm_fetch)
 (add_new_expr `vm_rdbyte emit_vm_rdbyte)
+(add_new_expr `vm_table  emit_vm_table)
 
 (var vm-eval-code `(
 
@@ -72,9 +95,8 @@
     (asm "addl %eax, %esi")
     (asm "movl 8(%ebp), %ebx")
     (vm_fetch)
-    (gentable insn_table @insn_entries)
+    (vm_table insn_table @insn_entries)
     (asm "popl %esi")
     (asm "popl %ebx")
     ))
-
 ))
