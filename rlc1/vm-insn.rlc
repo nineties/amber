@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-06-08 23:24:04 nineties $
+; $Id: vm-insn.rlc 2010-06-09 00:21:26 nineties $
 ;
 
 ; rowlVM register usage
@@ -12,7 +12,7 @@
 
 (define gen_comparison (cmovname) `(
     (vmemit "movl" $2 %eax)
-    (vmubyte 1 %ecx)
+    (vmsbyte 1 %ecx)
     (vmemit "cmpl" $0 %tos)
     (vmemit @cmovname %ecx %eax)
     (vmsucc %eax)
@@ -34,7 +34,7 @@
     (imul       1 @true ((vmpop %eax) (vmemit "imul" %tos %eax) (vmemit "movl" %eax %tos)))
     (idiv       1 @true ((vmpop %ecx) (vmpop %eax) (vmemit "xorl" %edx %edx) (vmemit "idiv" %ecx) (vmpush %eax)))
     (imod       1 @true ((vmpop %ecx) (vmpop %eax) (vmemit "xorl" %edx %edx) (vmemit "idiv" %ecx) (vmpush %edx)))
-    (goto       2 @nil  ((vmubyte 1 %eax) (vmemit "addl" %eax %ebx) (vmfetch)))
+    (goto       2 @nil  ((vmsbyte 1 %eax) (vmemit "addl" %eax %ebx) (vmfetch)))
     (if_zero    2 @nil  @(gen_comparison "cmovz"))
     (if_nonzero 2 @nil  @(gen_comparison "cmovnz"))
     ))
