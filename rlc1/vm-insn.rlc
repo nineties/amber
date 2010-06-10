@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-06-09 03:13:59 nineties $
+; $Id: vm-insn.rlc 2010-06-11 00:56:13 nineties $
 ;
 
 ; rowlVM register usage
@@ -12,10 +12,10 @@
 ;   %esi       : stack pointer
 
 (define gen_comparison (cmovname) `(
-    (vmemit "movl" $2 %eax)
+    (asm "movl $2, %eax")
     (vmsbyte 1 %ebx)
-    (vmemit "cmpl" %edx %tos)
-    (vmemit @cmovname %ebx %eax)
+    (asm "cmpl %edx, (%esi)")
+    (asm @cmovname " %ebx, %eax")
     (vmsucc %eax)
     (vmfetch)))
 
@@ -32,29 +32,48 @@
     (imm_int    2 @true ((vmsbyte 1 %eax) (vmpush %eax)))
     (iadd       1 @true ((vmbin "addl")))
     (isub       1 @true ((vmbin "subl")))
-    (imul       1 @true ((vmpop %eax) (vmemit "imul" %tos %eax) (vmemit "movl" %eax %tos)))
+    (imul       1 @true ((vmpop %eax) (asm "imul (%esi), %eax") (asm "movl %eax, (%esi)")))
     (idiv       1 @true (
         (vmpop %ebx)
         (vmpop %eax)
-        (vmemit "idiv" %ebx)
+        (asm "idiv %ebx")
         (vmpush %eax)
-        (vmemit "xorl" %edx %edx) ; re-clear zero register
+        (asm "xorl %edx, %edx") ; re-clear zero register
         ))
     (imod       1 @true (
         (vmpop %ebx)
         (vmpop %eax)
-        (vmemit "idiv" %ebx)
+        (asm "idiv %ebx")
         (vmpush %edx)
-        (vmemit "xorl" %edx %edx) ; re-clear zero register
+        (asm "xorl %edx, %edx") ; re-clear zero register
         ))
-    (goto       2 @nil  ((vmsbyte 1 %eax) (vmemit "addl" %eax %ecx) (vmfetch)))
+    (goto       2 @nil  ((vmsbyte 1 %eax) (asm "addl %eax, %ecx") (vmfetch)))
     (if_zero    2 @nil  @(gen_comparison "cmovz"))
     (if_nonzero 2 @nil  @(gen_comparison "cmovnz"))
     (if_gt      2 @nil  @(gen_comparison "cmovg"))
     (if_ge      2 @nil  @(gen_comparison "cmovge"))
     (if_lt      2 @nil  @(gen_comparison "cmovl"))
     (if_le      2 @nil  @(gen_comparison "cmovle"))
-    (drop       1 @true ((vmemit "addl" $4 %esi)))
-    (drop2      1 @true ((vmemit "addl" $8 %esi)))
-    (dup        1 @true ((vmemit "movl" %tos %eax) (vmpush %eax)))
+    (drop       1 @true ((asm "addl $4, %esi")))
+    (drop2      1 @true ((asm "addl $8, %esi")))
+    (dup        1 @true ((asm "movl (%esi), %eax") (vmpush %eax)))
+    (vcall      3 @nil  (
+        (vmubyte 1 %eax)
+        (asm "addl $3, %ecx")
+        (vmpush %ecx)   ; store return point
+        (vmpush %edi)   ; store base pointer
+        (asm "movl %esi, %edi") ; set base pointer
+        (asm "movl funtable(,%eax,4), %ecx")
+        (vmfetch)
+        ))
+    (ireturn    1 @nil  (
+        (asm "movl (%esi), %ebx") ; return value
+        (asm "movl %edi, %esi")
+        (vmpop %edi)
+        (vmpop %ecx)
+        (vmubyte -1 %eax) ; total size of arguments
+        (asm "addl %eax, %esi")
+        (vmpush %ebx) ; push return value
+        (vmfetch)
+        ))
     ))

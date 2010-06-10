@@ -2,12 +2,13 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-eval.rlc 2010-06-09 00:51:02 nineties $
+; $Id: vm-eval.rlc 2010-06-11 00:37:44 nineties $
 ;
 
 ; rowlVM register usage
 ;   %eax, %ecx : general purpose register
 ;   %ebx       : program counter
+;   %edx       : zero register
 ;   %esi       : stack pointer
 
 (import "vm-insn")
@@ -23,18 +24,6 @@
         ))
     (set insn_entries (reverse insn_entries))
 )
-
-(define emit_vmemit ((_ inst . opds) _ _) (do
-    (print '\t')
-    (print inst)
-    (print ' ')
-    (foreach o opds (do
-        (if (== o `%tos) (set o "(%esi)"))
-        (print o)
-        (if (not last?) (print ", "))
-        ))
-    (print '\n')
-    ))
 
 (define emit_vmpush ((_ val) _ _) (do
     (emit "subl" 4 `%esi)
@@ -91,7 +80,6 @@
     (emit_expr `(asm @asmcode " %eax, (%esi)") nil ret)
     ))
 
-(add_new_expr `vmemit   emit_vmemit)
 (add_new_expr `vmpush   emit_vmpush)
 (add_new_expr `vmpop    emit_vmpop)
 (add_new_expr `vmsucc   emit_vmsucc)
@@ -106,9 +94,15 @@
 (int    stack_size) ; in words
 (int*   stack)
 
+(int[] 100 funtable) ; temporal implementation
+
 (fun vm_init (stsize) (
     (= stack (alloc_block stsize))
     (= stack_size stsize)
+    ))
+
+(fun vm_register_function (id seq) (
+    ([]= funtable id seq)
     ))
 
 (fun vm_eval (insn) (
