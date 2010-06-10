@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-main.rlc 2010-06-11 00:56:22 nineties $
+; $Id: vm-main.rlc 2010-06-11 01:32:01 nineties $
 ;
 
 (import "vm-assemble")
@@ -49,16 +49,42 @@
     ))
 
 (byte[] 100 test_code @(assemble `(
-    imm_i0
-    (if_zero hoge)
-    exit
-    (label hoge)
-    (vcall 0 0)
+    (imm_int 36)
+    (vcall 0 4)
     exit
     )))
 
+(byte[] 100 fact @(assemble `(
+    arg0
+    (if_zero hoge)
+    dup
+    imm_i1
+    isub
+    (vcall 0 4)
+    imul
+    ireturn
+    (label hoge)
+    imm_i1
+    ireturn
+    )))
+
 (byte[] 100 fib @(assemble `(
+    arg0
     imm_i2
+    isub
+    (if_lt hoge)
+    arg0
+    imm_i1
+    isub
+    (vcall 0 4)
+    arg0
+    imm_i2
+    isub
+    (vcall 0 4)
+    iadd
+    ireturn
+    (label hoge)
+    imm_i1
     ireturn
     )))
 
@@ -66,6 +92,7 @@
 (fun _start () (
     (vm_init @DEFAULT_STACK_SIZE)
     (vm_register_function 0 fib)
+    (vm_register_function 1 fact)
     (vmexit (vm_eval test_code))
     ))
 
