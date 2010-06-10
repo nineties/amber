@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-assemble.rlc 2010-06-08 23:24:28 nineties $
+; $Id: vm-assemble.rlc 2010-06-11 01:02:03 nineties $
 ;
 
 (import "stdlib")
@@ -42,13 +42,16 @@
 
 (define insn_addr? (head) (member? head `(goto if_zero if_nonzero)))
 
+(define assemble_insn_simple (insn) (cons (insn_code insn) (cdr insn)))
+
 (define assemble_insn (addr_list addr_insn) (do
     (var addr (car addr_insn))
     (var insn (cdr addr_insn))
     (cond
         ((not (cons? insn))         (list (car (assoc insn vm_insn_table))))
-        ((== (car insn) `imm_int)   (list (car (assoc (car insn) vm_insn_table)) (cadr insn)))
         ((== (car insn) `label)     ())
+        ((== (car insn) `imm_int)   (assemble_insn_simple insn))
+        ((== (car insn) `vcall)     (assemble_insn_simple insn))
         ((insn_addr? (car insn))    (list
             (car (assoc (car insn) vm_insn_table))
             (- (assoc (cadr insn) addr_list) addr)
