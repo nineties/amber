@@ -3,7 +3,7 @@
  * Copyright (C) 2009 nineties
  */
 
-/* $Id: compile.s 2010-05-29 14:29:49 nineties $ */
+/* $Id: compile.s 2010-06-13 13:58:11 nineties $ */
 
 .include "defs.s"
 .include "token.s"
@@ -1170,6 +1170,8 @@ _prefix_expr:
     je      3f
     cmpl    $'&, token_tag
     je      4f
+    cmpl    $'~, token_tag
+    je      8f
     call    _simple_item
     ret
 1:
@@ -1250,6 +1252,13 @@ _prefix_expr:
     call    _integer
     addl    $4, %esp
     call    _comma
+    call    _eax
+    call    _nl
+    ret
+8:  /* bitwise-not expr */
+    call    _lex
+    call    _simple_item
+    call    _notl
     call    _eax
     call    _nl
     ret
