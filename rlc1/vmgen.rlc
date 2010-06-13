@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vmgen.rlc 2010-06-13 13:49:01 nineties $
+; $Id: vmgen.rlc 2010-06-14 02:02:08 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -376,6 +376,11 @@
     (if ret (emit_return `(return) nil nil))
     ))
 
+(define emit_addressof ((_ v) dst ret) (do
+    (if dst (emit "leal" (lookup_var v) dst))
+    (if ret (emit_return `(return) nil nil))
+    ))
+
 (define emit_asgn ((_ v e) dst ret) (do
     (emit_expr e `%eax nil)
     (movl `%eax (lookup_var v))
@@ -539,6 +544,7 @@
     ([]=     . @emit_arrasgn)
     (incl    . @emit_incldecl)
     (decl    . @emit_incldecl)
+    (address . @emit_addressof)
     (asm     . @emit_asm)
     ))
 

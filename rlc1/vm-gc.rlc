@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-06-13 16:08:52 nineties $
+; $Id: vm-gc.rlc 2010-06-14 02:14:26 nineties $
 ;
 
 ; structure of page descriptor. It's size must be 4-word.
@@ -75,6 +75,7 @@
 (define BLOCK_INDEX (addr)   `(>> @addr @BLOCK_SHIFT))
 (define BLOCK_ADDR  (idx)    `(<< @idx  @BLOCK_SHIFT))
 
+
 (var vm-gc-code `(
 
 (fun mmap2 (addr size) (
@@ -128,16 +129,24 @@
     (incl num_block)
     ))
 
+(byte[] @(* BDESCR_SIZE MAX_BLOCKS) block_map)
+(int stack_base 0)
 
-;(fun initialize_page_descriptors (block_addr) (
-;    (void* page @(first_page block_addr))
-;    (void *pdf  @(first_pdescr block_addr))
-;    (void *pdl  @(last_pdescr block_addr))
-;    (while (<= pdf pdl) (
-;        (+= pdf @PDESCR_SIZE)
-;        (+= page @PAGE_SIZE)
-;        ))
-;    ))
+(fun initialize_page_descriptors (block_addr) (
+    (void* page @(FIRST_PAGE block_addr))
+    (void* pdf  @(FIRST_PDESCR block_addr))
+    (void* pdl  @(LAST_PDESCR block_addr))
+    (while (<= pdf pdl) (
+        (+= pdf @PDESCR_SIZE)
+        (+= page @PAGE_SIZE)
+        ))
+    ))
+
+(fun init_gc (stack_base_) (
+    (int x)
+    (if (! stack_base_) ((= stack_base_ (address x))))
+    (= stack_base stack_base_)
+    ))
 
 (fun cleanup_gc () (
     (for i 0 @MAX_BLOCKS (
@@ -146,7 +155,5 @@
             ))
         ))
     ))
-
-(byte[] @(* BDESCR_SIZE MAX_BLOCKS) block_map)
 
 ))
