@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-06-13 12:14:34 nineties $
+; $Id: vm-gc.rlc 2010-06-13 13:40:52 nineties $
 ;
 
 ; structure of page descriptor. It's size must be 4-word.
@@ -31,9 +31,14 @@
 (var MAP_FIXED      0x10)
 (var MAP_ANONYMOUS  0x20)
 
-(var BLOCK_SIZE (* 1024 1024)) ; 1MB
+(var BLOCK_SHIFT 20)
+(var BLOCK_SIZE (<< 1 BLOCK_SHIFT))
+;(var BLOCK_SIZE (* 1024 1024)) ; 1MB
 (var BLOCK_MASK (- BLOCK_SIZE 1))
 (var MAX_BLOCKS 4096) ; 4096 is enough for 32-bit machine
+
+(var PAGE_SIZE  512)    ; 512B
+(var PAGE_MASK (- PAGE_SIZE 1))
 
 (var PDESCR_SIZE    4)
 (var BDESCR_SIZE    2)
@@ -53,8 +58,6 @@
 
 (int   num_block 0)
 (void* next_addr 0)
-(void* free_first 0)
-(void* free_last 0)
 (int[] @MAX_BLOCKS block_used)
 
 ; `size` must be a multiple of BLOCK_SIZE
@@ -71,7 +74,7 @@
     ))
 
 
-(fun alloc_block_fast () (
+(fun alloc_new_block () (
     (void* addr)
     (if (> (+ num_block 1) @MAX_BLOCKS) ((error "ERROR: too many blocks\n")))
     (if (== next_addr 0)
@@ -89,12 +92,22 @@
             )
         ))
     (= next_addr (+ addr @BLOCK_SIZE))
-    (= free_first addr)
-    (= free_last  next_addr)
+    ;(initialize_page_descriptors addr)
+    (incl num_block)
     ))
 
 
-(fun cleanup_blocks () (
+;(fun initialize_page_descriptors (block_addr) (
+;    (void* page @(first_page block_addr))
+;    (void *pdf  @(first_pdescr block_addr))
+;    (void *pdl  @(last_pdescr block_addr))
+;    (while (<= pdf pdl) (
+;        (+= pdf @PDESCR_SIZE)
+;        (+= page @PAGE_SIZE)
+;        ))
+;    ))
+
+(fun cleanup_gc () (
     (for i 0 @MAX_BLOCKS (
         (if ([] block_used i) (
             (munmap 0 @BLOCK_SIZE)

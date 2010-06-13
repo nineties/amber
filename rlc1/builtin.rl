@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-06-05 20:35:04 nineties $
+ % $Id: builtin.rl 2010-06-13 13:49:33 nineties $
  %);
 
 include(stddef,code);
@@ -412,6 +412,19 @@ rl_bitand: (p0) {
     return mkint(x0);
 };
 
+rl_bitxor: (p0) {
+    allocate(2);
+    x0 = int_value(car(p0));
+    p0 = cdr(p0);
+    while (p0 != nil_sym) {
+        x1 = car(p0);
+        expect(x1, NODE_INT, "bitxor", "integer");
+        x0 = x0 ^ int_value(x1);
+        p0 = cdr(p0);
+    };
+    return mkint(x0);
+};
+
 rl_bitor: (p0) {
     allocate(2);
     x0 = int_value(car(p0));
@@ -425,15 +438,26 @@ rl_bitor: (p0) {
     return mkint(x0);
 };
 
-rl_bitxor: (p0) {
+rl_lshift: (p0) {
     allocate(2);
+    check_arity(p0, 2, "lshift");
     x0 = int_value(car(p0));
-    p0 = cdr(p0);
-    while (p0 != nil_sym) {
-        x1 = car(p0);
-        expect(x1, NODE_INT, "bitxor", "integer");
-        x0 = x0 ^ int_value(x1);
-        p0 = cdr(p0);
+    x1 = int_value(cadr(p0));
+    while (x1 > 0) {
+        x0 = 2*x0;
+        x1 = x1 - 1;
+    };
+    return mkint(x0);
+};
+
+rl_rshift: (p0) {
+    allocate(2);
+    check_arity(p0, 2, "rshift");
+    x0 = int_value(car(p0));
+    x1 = int_value(cadr(p0));
+    while (x1 > 0) {
+        x0 = x0/2;
+        x0 = x0 - 1;
     };
     return mkint(x0);
 };
@@ -715,6 +739,8 @@ init_builtin_objects: () {
     register_prim("bitand"     , &rl_bitand);
     register_prim("bitor"      , &rl_bitor);
     register_prim("bitxor"     , &rl_bitxor);
+    register_prim("lshift"     , &rl_lshift);
+    register_prim("rshift"     , &rl_rshift);
     register_prim("lt"         , &rl_lt);
     register_prim("gt"         , &rl_gt);
     register_prim("le"         , &rl_le);
