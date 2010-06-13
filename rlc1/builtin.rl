@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-06-13 14:02:55 nineties $
+ % $Id: builtin.rl 2010-06-13 16:05:20 nineties $
  %);
 
 include(stddef,code);
@@ -399,6 +399,14 @@ rl_mul: (p0) {
     return mkint(x0);
 };
 
+rl_div: (p0) {
+    allocate(2);
+    check_arity(p0, 2, "div");
+    x0 = int_value(car(p0));
+    x1 = int_value(cadr(p0));
+    return mkint(x0/x1);
+};
+
 rl_bitnot: (p0) {
     allocate(1);
     check_arity(p0, 1, "bitnot");
@@ -464,7 +472,7 @@ rl_rshift: (p0) {
     x1 = int_value(cadr(p0));
     while (x1 > 0) {
         x0 = x0/2;
-        x0 = x0 - 1;
+        x1 = x1 - 1;
     };
     return mkint(x0);
 };
@@ -743,6 +751,7 @@ init_builtin_objects: () {
     register_prim("add"        , &rl_add);
     register_prim("sub"        , &rl_sub);
     register_prim("mul"        , &rl_mul);
+    register_prim("div"        , &rl_div);
     register_prim("bitnot"     , &rl_bitnot);
     register_prim("bitand"     , &rl_bitand);
     register_prim("bitor"      , &rl_bitor);

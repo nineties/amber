@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-06-13 14:04:57 nineties $
+; $Id: vm-gc.rlc 2010-06-13 16:08:52 nineties $
 ;
 
 ; structure of page descriptor. It's size must be 4-word.
@@ -15,6 +15,10 @@
 ; structure of block descriptor.
 ; 32 bit : void *next    (Pointer to the next block)
 ; 32 bit : void *first   (Address of the beginning of the block)
+
+(var PDESCR_SIZE    16)
+(var PDESCR_SHIFT   4)  ; PDESCR_SIZE = 2^PDESCR_SHIFT
+(var BDESCR_SIZE    8)
 
 (var SYS_MUNMAP  91)
 (var SYS_MMAP2   192)
@@ -34,14 +38,42 @@
 (var BLOCK_SHIFT 20)    ; 1MB
 (var BLOCK_SIZE (<< 1 BLOCK_SHIFT))
 (var BLOCK_MASK (- BLOCK_SIZE 1))
-(var MAX_BLOCKS 4096) ; 4096 is enough for 32-bit machine
+(define BLOCK_ROUNDUP (addr)    `(& (+ @addr @BLOCK_SIZE -1) (~ @BLOCK_MASK)))
 
 (var PAGE_SHIFT 9)      ; 512B
 (var PAGE_SIZE (<< 1 PAGE_SHIFT))
 (var PAGE_MASK (- PAGE_SIZE 1))
+(define PAGE_ROUNDUP (addr)     `(& (+ @addr @PAGE_SIZE -1) (~ @PAGE_MASK)))
 
-(var PDESCR_SIZE    4)
-(var BDESCR_SIZE    2)
+(var GENERATION_SHIFT 31)
+(var GENERATION_MASK (<< 1 GENERATION_SHIFT))
+(define ADVANCE_GENERATION (old) `(& (+ @old 1) @GENERATION_MASK))
+
+; the page descriptor of the page
+(define PDESCR (page)
+    `(| (>> (& @page @BLOCK_MASK @(~ PAGE_MASK)) @(- PAGE_SHIFT PDESCR_SHIFT))
+        (& @page @(~ BLOCK_MASK))
+    ))
+
+; offset of first page from beginning of the block
+(var FIRST_PAGE_OFF (eval (PAGE_ROUNDUP (* PDESCR_SIZE (/ BLOCK_SIZE PAGE_SIZE)))))
+(define FIRST_PAGE (block_addr) `(+ @FIRST_PAGE_OFF @block_addr))
+(define LAST_PAGE (block_addr)  `(+ @block_addr @BLOCK_SIZE @(- PAGE_SIZE)))
+
+(var FIRST_PDESCR_OFF (>> FIRST_PAGE_OFF (- PAGE_SHIFT PDESCR_SHIFT)))
+(var LAST_PDESCR_OFF  (>> (- BLOCK_SIZE PAGE_SIZE) (- PAGE_SHIFT PDESCR_SHIFT)))
+
+(define FIRST_PDESCR (block_addr) `(+ @block_addr @FIRST_PDESCR_OFF))
+(define LAST_PDESCR  (block_addr) `(+ @block_addr @LAST_PDESCR_OFF))
+
+(define IS_FIRST_PDESCR (addr)  `(== (& @addr @BLOCK_MASK) @FIRST_PDESCR_OFF))
+(define IS_LAST_PDESCR  (addr)  `(== (& @addr @BLOCK_MASK) @LAST_PDESCR_OFF))
+
+(var PAGES_PER_BLOCK (/ (- BLOCK_SIZE FIRST_PAGE_OFF) PAGE_SIZE))
+
+(var MAX_BLOCKS 4096) ; 4096 is enough for 32-bit machine
+(define BLOCK_INDEX (addr)   `(>> @addr @BLOCK_SHIFT))
+(define BLOCK_ADDR  (idx)    `(<< @idx  @BLOCK_SHIFT))
 
 (var vm-gc-code `(
 
@@ -115,6 +147,6 @@
         ))
     ))
 
-(int[] @(* BDESCR_SIZE MAX_BLOCKS) block_map)
+(byte[] @(* BDESCR_SIZE MAX_BLOCKS) block_map)
 
 ))
