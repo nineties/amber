@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-main.rlc 2010-06-13 13:52:24 nineties $
+; $Id: vm-main.rlc 2010-06-14 02:18:13 nineties $
 ;
 
 (import "vm-assemble")
@@ -46,7 +46,7 @@
 
 (fun vmexit (status) (
     (cleanup_gc)
-    (cleanup_stack)
+    (cleanup_vmstack)
     (syscall @SYS_EXIT status)
     ))
 
@@ -93,8 +93,9 @@
     )))
 
 (extern _start)
-(fun _start () (
-    (vm_init @DEFAULT_STACK_SIZE)
+(fun _start (stack_base) (
+    (init_gc (address stack_base))
+    (init_vmstack @DEFAULT_STACK_SIZE)
     (vm_register_function 0 fib)
     (vm_register_function 1 fact)
     (vmexit (vm_eval test_code))
