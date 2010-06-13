@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vmgen.rlc 2010-06-08 23:01:02 nineties $
+; $Id: vmgen.rlc 2010-06-13 09:28:11 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -214,6 +214,19 @@
     (if ret (emit_return `(return) nil nil))
     ))
 
+(define emit_deref ((_ ptr idx) dst ret) (do
+    (if dst (do
+        (emit_expr ptr `%eax nil)
+        (if (!= idx 0) (do
+            (emit_expr idx `%ecx nil)
+            (emit "sall" 2 %ecx)
+            (emit "addl" %ecx %eax)
+            ))
+        (movl `(deref %eax 0) dst)
+        ))
+    (if ret (emit_return `(return) nil nil))
+    ))
+
 (define emit_deref8 ((_ ptr) dst ret) (do
     (if dst (do
         (emit_expr ptr `%eax nil)
@@ -402,7 +415,7 @@
                 (var ifend-lbl (mklabel `end))
                 (var ifelse-lbl (if ifelse (mklabel `ifelse) nil))
                 (emit_expr expr `%eax nil)
-                (emit "cmpl" `%eax 0)
+                (emit "cmpl" 0 `%eax)
                 (emit "je" (if ifelse-lbl ifelse-lbl ifend-lbl))
                 (emit_block ifthen ret)
                 (if ifelse-lbl (do (emit "jmp" ifend-lbl) (print_label ifelse-lbl) (emit_block ifelse ret)))
@@ -465,6 +478,17 @@
     (if ret (emit_return `(return) nil nil))
     ))
 
+(define emit_for ((_ v a b body) _ ret) (do
+    (var loop-lbl (mklabel `loop))
+    (emit_expr `(int @v @a) nil nil)
+    (print_label loop-lbl)
+    (push_break_point)
+    (emit_if `(if (< @v @b) @(append body `((incl @v) (goto @loop-lbl)))) nil nil)
+    (emit_break_point)
+    (pop_break_point)
+    (if ret (emit_return `(return) nil nil))
+    ))
+
 (define emit_asm ((_ . args) _ ret) (do
     (print '\t')
     (print . args)
@@ -482,12 +506,13 @@
     (break   . @emit_break)
     (if      . @emit_if)
     (while   . @emit_while)
+    (for     . @emit_for)
     (int     . @emit_def)
     (char    . @emit_def)
     (byte    . @emit_def)
     (void*   . @emit_def)
+    ([]      . @emit_deref)
     (*8      . @emit_deref8)
-    (load8   . @emit_deref8)
     (+       . @emit_binexpr)
     (-       . @emit_binexpr)
     (*       . @emit_binexpr)
@@ -581,6 +606,11 @@
     (if init (scan_expr init))
     ))
 
+(define scan_iter ((_ v _ _ body)) (do
+    (add_var v `(var @var_pos 1))
+    (set var_pos (+ var_pos 1))
+    ))
+
 (define ignore (code) ())
 (define scan_expr (e) (dispatch scan_function_dispatcher ignore e))
 
@@ -595,6 +625,7 @@
     (byte . @scan_defvar)
     (int* . @scan_defvar)
     (void* . @scan_defvar)
+    (for . @scan_iter)
     ))
 
 (define emit_function ((_ name params body)) (do
