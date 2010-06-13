@@ -3,7 +3,7 @@
  * Copyright (C) 2009 nineties
  */
 
-/* $Id: lex.s 2010-01-18 00:35:48 nineties $ */
+/* $Id: lex.s 2010-06-13 13:45:18 nineties $ */
 
 .include "defs.s"
 .include "token.s"
