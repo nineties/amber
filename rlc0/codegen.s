@@ -3,7 +3,7 @@
  * Copyright (C) 2009 nineties
  */
 
-/* $Id: codegen.s 2010-03-27 16:18:10 nineties $ */
+/* $Id: codegen.s 2010-06-13 13:59:33 nineties $ */
 
 .include "defs.s"
 .include "token.s"
@@ -86,6 +86,7 @@ shrl_text:    .string "\tshrl "
 andl_text:    .string "\tandl "
 orl_text:     .string "\torl "
 xorl_text:    .string "\txorl "
+notl_text:    .string "\tnotl "
 call_text:    .string "\tcall "
 cmpl_text:    .string "\tcmpl "
 jmp_text:     .string "\tjmp "
@@ -259,7 +260,7 @@ _popl_ebp:
     ret
 
 /* instructions */ 
-.global _movb, _movl, _addl, _subl, _imul, _idiv, _andl, _orl, _xorl, _negl, _shrl, _jmp, _je, _cmpl, _call, _ret, _pushl, _popl, _leave, _int, _pushf, _incl, _decl, _setg, _setg, _setge, _setl, _setle, _sete, _setne, _movzbl, _movsbl
+.global _movb, _movl, _addl, _subl, _imul, _idiv, _andl, _orl, _xorl, _notl, _negl, _shrl, _jmp, _je, _cmpl, _call, _ret, _pushl, _popl, _leave, _int, _pushf, _incl, _decl, _setg, _setg, _setge, _setl, _setle, _sete, _setne, _movzbl, _movsbl
 _movb:
     pushl   $movb_text
     call    _puts
@@ -322,6 +323,12 @@ _xorl:
     
 _orl:
     pushl   $orl_text
+    call    _puts
+    addl    $4, %esp
+    ret
+
+_notl:
+    pushl   $notl_text
     call    _puts
     addl    $4, %esp
     ret
