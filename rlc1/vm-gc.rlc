@@ -2,23 +2,8 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-06-14 02:14:26 nineties $
+; $Id: vm-gc.rlc 2010-06-15 22:14:42 nineties $
 ;
-
-; structure of page descriptor. It's size must be 4-word.
-;
-; 32 bit : joined flag   (1 if the page is joined with previous page)
-; 32 bit : generation    (ID number of generation whic this page belongs to)
-; 32 bit : void *first   (Address of the beginning of the page)
-; 32 bit : void *next    (Pointer to the next page in the page queue)
-
-; structure of block descriptor.
-; 32 bit : void *next    (Pointer to the next block)
-; 32 bit : void *first   (Address of the beginning of the block)
-
-(var PDESCR_SIZE    16)
-(var PDESCR_SHIFT   4)  ; PDESCR_SIZE = 2^PDESCR_SHIFT
-(var BDESCR_SIZE    8)
 
 (var SYS_MUNMAP  91)
 (var SYS_MMAP2   192)
@@ -34,6 +19,37 @@
 (var MAP_TYPE       0xf)
 (var MAP_FIXED      0x10)
 (var MAP_ANONYMOUS  0x20)
+
+; structure of page descriptor. It's size must be 4-word.
+;
+; 32 bit : joined flag   (1 if the page is joined with previous page)
+; 32 bit : generation    (ID number of generation whic this page belongs to)
+; 32 bit : void *first   (Address of the beginning of the page)
+; 32 bit : void *next    (Pointer to the next page in the page queue)
+
+(define pdescr->joined      (addr)  `([] @addr 0))
+(define pdescr->generation  (addr)  `([] @addr 1))
+(define pdescr->first       (addr)  `([] @addr 3))
+(define pdescr->next        (addr)  `([] @addr 4))
+
+(define pdescr->joined=      (addr val)  `([]= @addr 0 @val))
+(define pdescr->generation=  (addr val)  `([]= @addr 1 @val))
+(define pdescr->first=       (addr val)  `([]= @addr 3 @val))
+(define pdescr->next=        (addr val)  `([]= @addr 4 @val))
+
+; structure of block descriptor.
+; 32 bit : void *next    (Pointer to the next block)
+; 32 bit : void *first   (Address of the beginning of the block)
+
+(define bdescr->next    (addr)  `([] @addr 0))
+(define bdescr->first   (addr)  `([] @addr 1))
+
+(define bdescr->next=    (addr val)  `([]= @addr 0 @val))
+(define bdescr->first=   (addr val)  `([]= @addr 1 @val))
+
+(var PDESCR_SIZE    16)
+(var PDESCR_SHIFT   4)  ; PDESCR_SIZE = 2^PDESCR_SHIFT
+(var BDESCR_SIZE    8)
 
 (var BLOCK_SHIFT 20)    ; 1MB
 (var BLOCK_SIZE (<< 1 BLOCK_SHIFT))
@@ -74,9 +90,28 @@
 (var MAX_BLOCKS 4096) ; 4096 is enough for 32-bit machine
 (define BLOCK_INDEX (addr)   `(>> @addr @BLOCK_SHIFT))
 (define BLOCK_ADDR  (idx)    `(<< @idx  @BLOCK_SHIFT))
+(define IS_POINTER_TO_HEAP  (addr)  `(!= @(blockmap->first (BLOCK_INDEX addr)) 0))
 
+(define blockmap[] (idx)    `(+ block_map (* 2 @idx)))
+(define blockmap->next  (idx)       `([] block_map (* 2 @idx)))
+(define blockmap->first (idx)       `([] block_map (+ (* 2 @idx) 1)))
+(define blockmap->next=  (idx val)  `([]= block_map (* 2 @idx) @val))
+(define blockmap->first= (idx val)  `([]= block_map (+ (* 2 @idx) 1) @val))
 
 (var vm-gc-code `(
+
+
+(byte[] @(* BDESCR_SIZE MAX_BLOCKS) block_map)
+(int stack_base)    ; address of stack bottom
+(int current_gen)   ; current generation ID
+(int next_gen)      ; next generation ID (used during GC)
+(int num_block)     ; number of allocated blocks
+(void* next_addr 0)
+(int[] @MAX_BLOCKS block_used)
+(void* current_block)   ; bdescr of current free block
+(void* page_queue_head) ; page queue for breadth first scanning
+(void* page_queue_tail) ; page queue for breadth first scanning
+(void* freepage)        ; pdescr  of current free page
 
 (fun mmap2 (addr size) (
     (void* ptr (syscall @SYS_MMAP2 addr size
@@ -88,10 +123,6 @@
 (fun munmap (addr size) (
     (syscall @SYS_MUNMAP addr size)
     ))
-
-(int   num_block 0)
-(void* next_addr 0)
-(int[] @MAX_BLOCKS block_used)
 
 ; `size` must be a multiple of BLOCK_SIZE
 (fun alloc_block (size) (
@@ -125,18 +156,19 @@
             )
         ))
     (= next_addr (+ addr @BLOCK_SIZE))
-    ;(initialize_page_descriptors addr)
+    (init_pdescrs addr)
+    (void* blk @(blockmap[] (BLOCK_INDEX addr)))
     (incl num_block)
     ))
 
-(byte[] @(* BDESCR_SIZE MAX_BLOCKS) block_map)
-(int stack_base 0)
-
-(fun initialize_page_descriptors (block_addr) (
+(fun init_pdescrs (block_addr) (
     (void* page @(FIRST_PAGE block_addr))
     (void* pdf  @(FIRST_PDESCR block_addr))
     (void* pdl  @(LAST_PDESCR block_addr))
     (while (<= pdf pdl) (
+        @(pdescr->generation= pdf 0)
+        @(pdescr->first=      pdf page)
+        @(pdescr->next=       pdf 0)
         (+= pdf @PDESCR_SIZE)
         (+= page @PAGE_SIZE)
         ))
@@ -146,6 +178,14 @@
     (int x)
     (if (! stack_base_) ((= stack_base_ (address x))))
     (= stack_base stack_base_)
+    (memset block_map 0 @(* BDESCR_SIZE MAX_BLOCKS))
+    (= current_gen 1)
+    (= next_gen 1)
+    (= num_block 0)
+    (alloc_new_block)
+    (= page_queue_head 0)
+    (= page_queue_tail 0)
+    ;(= freepage @(FIRST_PDESCR (bdescr->first current_block)))
     ))
 
 (fun cleanup_gc () (
