@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vmgen.rlc 2010-06-14 02:02:08 nineties $
+; $Id: vmgen.rlc 2010-06-15 22:14:20 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -161,7 +161,9 @@
 
 ; === compilation of expressions ===
 
-(var insn_table `((+ . "addl") (- . "subl") (* . "imul") (& . "andl") (| . "orl") (^ . "xorl") (neg . "negl")))
+(var insn_table
+    `((+ . "addl") (- . "subl") (* . "imul") (& . "andl") (| . "orl") (^ . "xorl") (neg . "negl")))
+
 (define lookup_insn (op) (assoc op insn_table))
 
 (define emit_return ((_ . arg) _ _) (do
@@ -254,8 +256,9 @@
             (emit_expr lhs `%eax nil)
             (pushl `%eax)
             (emit_expr rhs `%ecx nil)
-            (popl dst)
-            (emit insn `%ecx dst)
+            (popl %eax)
+            (emit insn `%ecx `%eax)
+            (movl `%eax dst)
         )
         (do
             (emit_expr lhs nil nil)
@@ -296,6 +299,20 @@
         (do
             (emit_expr lhs nil nil)
             (emit_expr rhs nil nil)
+        ))
+    (if ret (emit_return `(return) nil nil))
+    ))
+
+(define emit_shift ((op lhs rhs) dst ret) (do
+    (var insn (assoc op `((<< . "shll") (>> . "shrl"))))
+    (if dst
+        (do
+            (emit_expr lhs `%eax nil)
+            (pushl `%eax)
+            (emit_expr rhs `%eax nil)
+            (popl `%ecx)
+            (emit insn `%cl `%eax)
+            (movl `%eax dst)
         ))
     (if ret (emit_return `(return) nil nil))
     ))
@@ -402,6 +419,18 @@
     (emit_expr e `%eax nil)
     (popl `%ecx)
     (movl `%eax `(deref %ecx 0))
+    (if dst (movl `%eax dst))
+    (if ret (emit_return `(return) nil nil))
+    ))
+
+(define emit_arrasgn8 ((_ arr idx e) dst ret) (do
+    (emit_expr arr `%eax nil)
+    (pushl `%eax)
+    (emit_expr idx `%eax nil)
+    (emit "addl" `%eax `%top)
+    (emit_expr e `%eax nil)
+    (popl `%ecx)
+    (emit "movb" `%al `(deref %ecx 0))
     (if dst (movl `%eax dst))
     (if ret (emit_return `(return) nil nil))
     ))
@@ -526,6 +555,8 @@
     (&       . @emit_binexpr)
     (|       . @emit_binexpr)
     (^       . @emit_binexpr)
+    (<<      . @emit_shift)
+    (>>      . @emit_shift)
     (==      . @emit_comparison)
     (!=      . @emit_comparison)
     (<       . @emit_comparison)
@@ -542,6 +573,7 @@
     (|=      . @emit_opasgn)
     (^=      . @emit_opasgn)
     ([]=     . @emit_arrasgn)
+    ([]=8    . @emit_arrasgn8)
     (incl    . @emit_incldecl)
     (decl    . @emit_incldecl)
     (address . @emit_addressof)
