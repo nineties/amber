@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-06-15 22:14:42 nineties $
+; $Id: vm-gc.rlc 2010-06-15 22:33:47 nineties $
 ;
 
 (var SYS_MUNMAP  91)
@@ -158,6 +158,10 @@
     (= next_addr (+ addr @BLOCK_SIZE))
     (init_pdescrs addr)
     (void* blk @(blockmap[] (BLOCK_INDEX addr)))
+    (if (== current_block 0) ((= current_block blk)))
+    @(bdescr->first= blk addr)
+    @(bdescr->next= blk (bdescr->next current_block))
+    @(bdescr->next= current_block blk)
     (incl num_block)
     ))
 
@@ -185,7 +189,7 @@
     (alloc_new_block)
     (= page_queue_head 0)
     (= page_queue_tail 0)
-    ;(= freepage @(FIRST_PDESCR (bdescr->first current_block)))
+    (= freepage @(FIRST_PDESCR (bdescr->first current_block)))
     ))
 
 (fun cleanup_gc () (
@@ -195,5 +199,4 @@
             ))
         ))
     ))
-
 ))
