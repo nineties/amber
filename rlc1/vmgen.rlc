@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vmgen.rlc 2010-06-16 17:04:29 nineties $
+; $Id: vmgen.rlc 2010-06-16 18:59:38 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -168,6 +168,7 @@
 
 (define emit_return ((_ . arg) _ _) (do
     (if arg (emit_expr (car arg) `%eax nil))
+    (popl `%ebx)
     (emit "leave")
     (emit "ret")
     ))
@@ -221,9 +222,9 @@
     (if dst (do
         (emit_expr ptr `%eax nil)
         (if (!= idx 0) (do
-            (emit_expr idx `%ecx nil)
-            (emit "sall" 2 %ecx)
-            (emit "addl" %ecx %eax)
+            (emit_expr idx `%ebx nil)
+            (emit "sall" 2 %ebx)
+            (emit "addl" %ebx %eax)
             ))
         (movl `(deref %eax 0) dst)
         ))
@@ -256,9 +257,9 @@
         (do
             (emit_expr lhs `%eax nil)
             (pushl `%eax)
-            (emit_expr rhs `%ecx nil)
+            (emit_expr rhs `%ebx nil)
             (popl %eax)
-            (emit insn `%ecx `%eax)
+            (emit insn `%ebx `%eax)
             (movl `%eax dst)
         )
         (do
@@ -273,10 +274,10 @@
         (do
             (emit_expr lhs `%eax nil)
             (pushl `%eax)
-            (emit_expr rhs `%ecx nil)
+            (emit_expr rhs `%ebx nil)
             (popl `%eax)
             (emit "xorl" `%edx `%edx)
-            (emit "idiv" `%ecx)
+            (emit "idiv" `%ebx)
             (movl `%eax dst)
         )
         (do
@@ -291,10 +292,10 @@
         (do
             (emit_expr lhs `%eax nil)
             (pushl `%eax)
-            (emit_expr rhs `%ecx nil)
+            (emit_expr rhs `%ebx nil)
             (popl `%eax)
             (emit "xorl" `%edx `%edx)
-            (emit "idiv" `%ecx)
+            (emit "idiv" `%ebx)
             (movl `%edx dst)
         )
         (do
@@ -323,8 +324,8 @@
     (emit_expr lhs)
     (emit_expr rhs)
     (popl `%eax)
-    (popl `%ecx)
-    (emit "cmpl" `%ecx `%eax)
+    (popl `%ebx)
+    (emit "cmpl" `%ebx `%eax)
     (emit insn `%al)
     (emit "movzbl" `%al `%eax)
     (pushl `%eax)
@@ -418,8 +419,8 @@
     (emit "sall" 2 `%eax)
     (emit "addl" `%eax `%top)
     (emit_expr e `%eax nil)
-    (popl `%ecx)
-    (movl `%eax `(deref %ecx 0))
+    (popl `%ebx)
+    (movl `%eax `(deref %ebx 0))
     (if dst (movl `%eax dst))
     (if ret (emit_return `(return) nil nil))
     ))
@@ -430,8 +431,8 @@
     (emit_expr idx `%eax nil)
     (emit "addl" `%eax `%top)
     (emit_expr e `%eax nil)
-    (popl `%ecx)
-    (emit "movb" `%al `(deref %ecx 0))
+    (popl `%ebx)
+    (emit "movb" `%al `(deref %ebx 0))
     (if dst (movl `%eax dst))
     (if ret (emit_return `(return) nil nil))
     ))
@@ -494,9 +495,9 @@
     (var ifelse-lbl (if ifelse (mklabel `ifelse) nil))
     (emit_expr (cadr expr) `%eax nil)  ; lhs
     (pushl `%eax)
-    (emit_expr (caddr expr) `%ecx nil) ; rhs
+    (emit_expr (caddr expr) `%ebx nil) ; rhs
     (popl `%eax)
-    (emit "cmpl" `%ecx `%eax)
+    (emit "cmpl" `%ebx `%eax)
     (emit insn (if ifelse-lbl ifelse-lbl ifend-lbl))
     (emit_block ifthen ret)
     (if ifelse-lbl (do (if (nil? ret) (emit "jmp" ifend-lbl)) (print_label ifelse-lbl) (emit_block ifelse ret)))
@@ -681,6 +682,7 @@
     (print_label name)
     (pushl `%ebp)
     (movl `%esp `%ebp)
+    (pushl `%ebx)
 
     ; allocate stack frame
     (if (> var_pos 0) (emit "subl" (* 4 var_pos) `%esp))
