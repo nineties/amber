@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-06-16 16:30:13 nineties $
+; $Id: vm-gc.rlc 2010-06-16 17:02:53 nineties $
 ;
 
 (var SYS_MUNMAP  91)
@@ -75,11 +75,11 @@
 (define BLOCK_ADDR (addr) `(& @addr @(~ BLOCK_MASK)))
 (define OBJ2PAGE   (obj)  `(& @addr @(~ PAGE_MASK)))
 (define OBJ2PDESCR (obj)
-    `(| @(BLOCK_ADDR @obj)
+    `(| @(BLOCK_ADDR obj)
         (>> (& @OBJ @(& BLOCK_MASK (~ PAGE_MASK))) @(- PAGE_SHIFT PDESCR_SHIFT))
         ))
 (define PDESCR2PAGE (pd)
-    `(| @(BLOCK_ADDR @pd)
+    `(| @(BLOCK_ADDR pd)
         (<< (& @pd @BLOCK_MASK) @(- PAGE_SHIFT PDESCR_SHIFT))
         ))
 
@@ -89,6 +89,8 @@
 (define FIRST_PAGE   (block) `(+ @block @FIRST_PAGE_OFF))
 (define FIRST_PDESCR (block) `(+ @block @FIRST_PDESCR_OFF))
 (define END_PDESCR   (block) (FIRST_PAGE block))
+
+(define IS_FIRST_PDESCR (pd) `(== (& @pd @BLOCK_MASK) @FIRST_PDESCR_OFF))
 
 (var MAX_BLOCKS 4096) ; 4096 is enough for 32-bit machine
 (define BLOCK2BIDX  (addr)  `(>> @addr @BLOCK_SHIFT))
@@ -134,6 +136,8 @@
 
 (define SET_HEADER (addr tag fieldsz objsz) `([]= @addr 0 @(HEADER tag fieldsz objsz)))
 
+(var IN_GC `(!= current_gen next_gen))
+
 (var vm-gc-code `(
 
 
@@ -148,7 +152,6 @@
 (void* page_queue_head) ; page queue for breadth first scanning
 (void* page_queue_tail) ; page queue for breadth first scanning
 (void* freepage)        ; pdescr of current free page
-
 (void* freep)    ; pointer to free memory in current free page
 (int free_words) ; size of free area in current page (in words)
 
@@ -210,8 +213,41 @@
         ))
     ))
 
-(fun allocate_page (words) (
+(fun allocate_page (npages) (
+    (int free 0)
+    (int allpages (* @PAGES_PER_BLOCK num_block))
+    (void* firstpage 0)
     (label retry)
+    (while allpages (
+        (decl allpages)
+        (if (&& (!= @(pdescr->generation firstpage) current_gen)
+                (!= @(pdescr->generation firstpage) next_gen))
+            (
+            (if (== free 0) ((= firstpage freepage)))
+            (incl free)
+            (if (== free npages) (
+                (= freep @(PDESCR2PAGE firstpage))
+                (= free_words (<< npages @PAGE_WORDS_SHIFT))
+                (= freepage @(pdescr->next freepage))
+                @(pdescr->generation= firstpage next_gen)
+                @(pdescr->joined=0 firstpage)
+                ;(if @IN_GC ((enqueue_page firstpage)))
+                (decl npages)
+                (while npages (
+                    (+= firstpage @PDESCR_SIZE)
+                    @(pdescr->generation= firstpage next_gen)
+                    @(pdescr->joined=1 firstpage)
+                    (decl npages)
+                    ))
+                (return)
+                ))
+            )
+            ((= free 0))
+            )
+        (= freepage @(pdescr->next freepage))
+        (if @(IS_FIRST_PDESCR freepage) ((= free 0)))
+        ))
+    ;(garbage_collect)
     (goto retry)
     ))
 
