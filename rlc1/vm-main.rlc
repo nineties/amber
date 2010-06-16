@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-main.rlc 2010-06-15 15:34:28 nineties $
+; $Id: vm-main.rlc 2010-06-16 18:15:05 nineties $
 ;
 
 (import "vm-assemble")
@@ -40,8 +40,10 @@
     ))
 
 (fun memset (ptr val size) (
-    (for i 0 size (
-        ([]=8 ptr i val)
+    (int i 0)
+    (while (< i size) (
+        ;([]=8 ptr i val)
+        (incl i)
         ))
     ))
 
@@ -57,8 +59,9 @@
     ))
 
 (byte[] 100 test_code @(assemble `(
-    (imm_int 36)
-    (vcall 0 4)
+    ;(imm_int 36)
+    ;(vcall 0 4)
+    (vcall 2 0)
     exit
     )))
 
@@ -98,12 +101,20 @@
     ireturn
     )))
 
+(byte[] 100 cons_test @(assemble `(
+    imm_i0
+    imm_i1
+    cons
+    ireturn
+    )))
+
 (extern _start)
 (fun _start (stack_base) (
     (init_gc (address stack_base))
     (init_vmstack @DEFAULT_STACK_SIZE)
     (vm_register_function 0 fib)
     (vm_register_function 1 fact)
+    (vm_register_function 2 cons_test)
     (vmexit (vm_eval test_code))
     ))
 
