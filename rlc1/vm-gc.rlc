@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-06-16 17:02:53 nineties $
+; $Id: vm-gc.rlc 2010-06-16 17:09:38 nineties $
 ;
 
 (var SYS_MUNMAP  91)
@@ -256,6 +256,10 @@
         (insert_padding)
         (allocate_page (>> (- (+ words @PAGE_WORDS) -1) @PAGE_WORDS_SHIFT))
         ))
+    (void* obj freep)
+    (if (< words @PAGE_WORDS) ((-= free_words words)) ((= free_words 0)))
+    (+= freep (* @WORD_SIZE words))
+    (return obj)
     ))
 
 (fun init_pdescrs (block_addr) (
