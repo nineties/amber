@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-06-16 17:09:38 nineties $
+; $Id: vm-gc.rlc 2010-06-16 17:25:45 nineties $
 ;
 
 (var SYS_MUNMAP  91)
@@ -120,7 +120,7 @@
 
 (var TAG_PADDING  0)
 (var TAG_PLAIN    1)
-(var TAG_CELL_SEQ 2)
+(var TAG_CONS_SEQ 2)
 (var TAG_ARRAY    3)
 (var TAG_TUPLE    4)
 
@@ -154,6 +154,8 @@
 (void* freepage)        ; pdescr of current free page
 (void* freep)    ; pointer to free memory in current free page
 (int free_words) ; size of free area in current page (in words)
+
+(void* cons_head 0)
 
 (fun mmap2 (addr size) (
     (void* ptr (syscall @SYS_MMAP2 addr size
@@ -251,7 +253,7 @@
     (goto retry)
     ))
 
-(fun allocate_object (code words) (
+(fun allocate_object (words) (
     (while (> words free_words) (
         (insert_padding)
         (allocate_page (>> (- (+ words @PAGE_WORDS) -1) @PAGE_WORDS_SHIFT))
@@ -260,6 +262,28 @@
     (if (< words @PAGE_WORDS) ((-= free_words words)) ((= free_words 0)))
     (+= freep (* @WORD_SIZE words))
     (return obj)
+    ))
+
+(fun allocate_cons_root () (
+    (void* ptr (allocate_object 3))
+    @(SET_HEADER ptr TAG_CONS_SEQ 0 3)
+    (= cons_head ptr)
+    (return (+ ptr @WORD_SIZE))
+    ))
+
+(fun allocate_cons_child () (
+    (void* ptr (allocate_object 2))
+    (int sz ([] cons_head 0))
+    (+= sz 2)
+    ([]= cons_head 0 sz)
+    (return ptr)
+    ))
+
+(fun allocate_cons () (
+    (if (|| (== cons_head 0) (> 2 free_words))
+        ((return (allocate_cons_root)))
+        ((return (allocate_cons_child)))
+        )
     ))
 
 (fun init_pdescrs (block_addr) (
