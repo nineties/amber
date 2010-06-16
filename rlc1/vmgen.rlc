@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vmgen.rlc 2010-06-15 22:14:20 nineties $
+; $Id: vmgen.rlc 2010-06-16 16:29:05 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -172,10 +172,11 @@
     (emit "ret")
     ))
 
-(define emit_label ((label name . id)) (do
+(define emit_label ((_ name . id) _ ret) (do
     (print name)
     (if id (print '.' (car id)))
     (print ":\n")
+    (if ret (emit_return `(return) nil nil))
     ))
 
 (define emit_directjump (opd) (emit "jmp" opd))
@@ -499,7 +500,7 @@
     (emit insn (if ifelse-lbl ifelse-lbl ifend-lbl))
     (emit_block ifthen ret)
     (if ifelse-lbl (do (if (nil? ret) (emit "jmp" ifend-lbl)) (print_label ifelse-lbl) (emit_block ifelse ret)))
-    (if (nil? ret) (print_label ifend-lbl))
+    (print_label ifend-lbl)
     ))
 
 (define emit_while ((_ expr body) _ ret) (do
