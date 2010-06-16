@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-06-15 22:33:47 nineties $
+; $Id: vm-gc.rlc 2010-06-16 16:30:13 nineties $
 ;
 
 (var SYS_MUNMAP  91)
@@ -20,83 +20,119 @@
 (var MAP_FIXED      0x10)
 (var MAP_ANONYMOUS  0x20)
 
+(var WORD_SHIFT 2)
+(var WORD_SIZE  4)
+
+; block and page management
+;
+; |<----------------------- 1 Mbyte ---------------------->|
+; |..padding..|pd0|pd1|....|pdN-1|page0|page1|.....|pageN-1|
+
 ; structure of page descriptor. It's size must be 4-word.
 ;
-; 32 bit : joined flag   (1 if the page is joined with previous page)
-; 32 bit : generation    (ID number of generation whic this page belongs to)
-; 32 bit : void *first   (Address of the beginning of the page)
-; 32 bit : void *next    (Pointer to the next page in the page queue)
+; 1 bit : joined flag (1 if the page is joined with previous page)
+; 31 bit : generation (ID number of generation to which this page belongs)
+; 32 bit : void *next (Pointer to the next page in the page queue)
 
-(define pdescr->joined      (addr)  `([] @addr 0))
-(define pdescr->generation  (addr)  `([] @addr 1))
-(define pdescr->first       (addr)  `([] @addr 3))
-(define pdescr->next        (addr)  `([] @addr 4))
+(define pdescr->joined      (addr)  `(& ([] @addr 0) 1))
+(define pdescr->generation  (addr)  `(>> ([] @addr 0) 1))
+(define pdescr->next        (addr)  `([] @addr 1))
 
-(define pdescr->joined=      (addr val)  `([]= @addr 0 @val))
-(define pdescr->generation=  (addr val)  `([]= @addr 1 @val))
-(define pdescr->first=       (addr val)  `([]= @addr 3 @val))
-(define pdescr->next=        (addr val)  `([]= @addr 4 @val))
+(define pdescr->joined=1    (addr)  `([]= @addr 0 (| ([] @addr 0) 1)))
+(define pdescr->joined=0    (addr)  `([]= @addr 0 (& ([] @addr 0) @(~ 1))))
+(define pdescr->generation= (addr val) `([]= @addr 0 (| (<< @val 1) ([] @addr 0))))
+(define pdescr->next=       (addr val)  `([]= @addr 1 @val))
 
 ; structure of block descriptor.
 ; 32 bit : void *next    (Pointer to the next block)
-; 32 bit : void *first   (Address of the beginning of the block)
 
-(define bdescr->next    (addr)  `([] @addr 0))
-(define bdescr->first   (addr)  `([] @addr 1))
+(define bdescr->next    (addr)      `([] @addr 0))
+(define bdescr->next=   (addr val)  `([]= @addr 0 @val))
 
-(define bdescr->next=    (addr val)  `([]= @addr 0 @val))
-(define bdescr->first=   (addr val)  `([]= @addr 1 @val))
-
-(var PDESCR_SIZE    16)
-(var PDESCR_SHIFT   4)  ; PDESCR_SIZE = 2^PDESCR_SHIFT
-(var BDESCR_SIZE    8)
+(var PDESCR_SIZE    8)
+(var PDESCR_SHIFT   3)  ; PDESCR_SIZE = 2^PDESCR_SHIFT
+(var BDESCR_SIZE    4)
+(var BDESCR_SHIFT   2)  ; BDESCR_SIZE = 2^BDESCR_SHIFT
 
 (var BLOCK_SHIFT 20)    ; 1MB
 (var BLOCK_SIZE (<< 1 BLOCK_SHIFT))
 (var BLOCK_MASK (- BLOCK_SIZE 1))
-(define BLOCK_ROUNDUP (addr)    `(& (+ @addr @BLOCK_SIZE -1) (~ @BLOCK_MASK)))
 
+; required constraints: 2*PAGE_SHIFT <= BLOCK_SHIFT
 (var PAGE_SHIFT 9)      ; 512B
 (var PAGE_SIZE (<< 1 PAGE_SHIFT))
+(var PAGE_WORDS_SHIFT (- PAGE_SHIFT WORD_SHIFT))
+(var PAGE_WORDS       (<< 1 PAGE_WORDS_SHIFT))
 (var PAGE_MASK (- PAGE_SIZE 1))
-(define PAGE_ROUNDUP (addr)     `(& (+ @addr @PAGE_SIZE -1) (~ @PAGE_MASK)))
 
 (var GENERATION_SHIFT 31)
-(var GENERATION_MASK (<< 1 GENERATION_SHIFT))
+(var GENERATION_MASK (- (<< 1 GENERATION_SHIFT) 1))
 (define ADVANCE_GENERATION (old) `(& (+ @old 1) @GENERATION_MASK))
 
-; the page descriptor of the page
-(define PDESCR (page)
-    `(| (>> (& @page @BLOCK_MASK @(~ PAGE_MASK)) @(- PAGE_SHIFT PDESCR_SHIFT))
-        (& @page @(~ BLOCK_MASK))
-    ))
+(var PAGES_PER_BLOCK (>> (* (- PAGE_SIZE PDESCR_SIZE) BLOCK_SIZE) (* 2 PAGE_SHIFT)))
 
-; offset of first page from beginning of the block
-(var FIRST_PAGE_OFF (eval (PAGE_ROUNDUP (* PDESCR_SIZE (/ BLOCK_SIZE PAGE_SIZE)))))
-(define FIRST_PAGE (block_addr) `(+ @FIRST_PAGE_OFF @block_addr))
-(define LAST_PAGE (block_addr)  `(+ @block_addr @BLOCK_SIZE @(- PAGE_SIZE)))
+; object address to page index
+(define BLOCK_ADDR (addr) `(& @addr @(~ BLOCK_MASK)))
+(define OBJ2PAGE   (obj)  `(& @addr @(~ PAGE_MASK)))
+(define OBJ2PDESCR (obj)
+    `(| @(BLOCK_ADDR @obj)
+        (>> (& @OBJ @(& BLOCK_MASK (~ PAGE_MASK))) @(- PAGE_SHIFT PDESCR_SHIFT))
+        ))
+(define PDESCR2PAGE (pd)
+    `(| @(BLOCK_ADDR @pd)
+        (<< (& @pd @BLOCK_MASK) @(- PAGE_SHIFT PDESCR_SHIFT))
+        ))
 
+(var FIRST_PAGE_OFF   (>> BLOCK_SIZE (- PAGE_SHIFT PDESCR_SHIFT)))
 (var FIRST_PDESCR_OFF (>> FIRST_PAGE_OFF (- PAGE_SHIFT PDESCR_SHIFT)))
-(var LAST_PDESCR_OFF  (>> (- BLOCK_SIZE PAGE_SIZE) (- PAGE_SHIFT PDESCR_SHIFT)))
 
-(define FIRST_PDESCR (block_addr) `(+ @block_addr @FIRST_PDESCR_OFF))
-(define LAST_PDESCR  (block_addr) `(+ @block_addr @LAST_PDESCR_OFF))
-
-(define IS_FIRST_PDESCR (addr)  `(== (& @addr @BLOCK_MASK) @FIRST_PDESCR_OFF))
-(define IS_LAST_PDESCR  (addr)  `(== (& @addr @BLOCK_MASK) @LAST_PDESCR_OFF))
-
-(var PAGES_PER_BLOCK (/ (- BLOCK_SIZE FIRST_PAGE_OFF) PAGE_SIZE))
+(define FIRST_PAGE   (block) `(+ @block @FIRST_PAGE_OFF))
+(define FIRST_PDESCR (block) `(+ @block @FIRST_PDESCR_OFF))
+(define END_PDESCR   (block) (FIRST_PAGE block))
 
 (var MAX_BLOCKS 4096) ; 4096 is enough for 32-bit machine
-(define BLOCK_INDEX (addr)   `(>> @addr @BLOCK_SHIFT))
-(define BLOCK_ADDR  (idx)    `(<< @idx  @BLOCK_SHIFT))
-(define IS_POINTER_TO_HEAP  (addr)  `(!= @(blockmap->first (BLOCK_INDEX addr)) 0))
+(define BLOCK2BIDX  (addr)  `(>> @addr @BLOCK_SHIFT))
+(define BIDX2BLOCK  (idx)   `(<< @idx @BLOCK_SHIFT))
+(define IS_POINTER_TO_HEAP  (addr)  `(!= @(blockmap->first (BLOCK2BIDX addr)) 0))
+
+(define BDESCR2BLOCK (bdescr) `(<< (- @bdescr block_map) @(- BLOCK_SHIFT BDESCR_SHIFT)))
 
 (define blockmap[] (idx)    `(+ block_map (* 2 @idx)))
 (define blockmap->next  (idx)       `([] block_map (* 2 @idx)))
 (define blockmap->first (idx)       `([] block_map (+ (* 2 @idx) 1)))
 (define blockmap->next=  (idx val)  `([]= block_map (* 2 @idx) @val))
 (define blockmap->first= (idx val)  `([]= block_map (+ (* 2 @idx) 1) @val))
+
+; structure of header field
+; MSB <- | 3bit (object tag) | 11bit (boxed fieid size) | 18bit (object size) |
+; tags:
+; 000 : padding
+; 001 : plain type
+; 010 : cons-cell sequence
+; 011 : array of boexed elements
+; 100 : tuple
+
+(var OBJECT_SIZE_BITS 18)
+(var BOXED_FIELD_SIZE_BITS 11)
+(var OBJECT_TAG_BITS 3)
+
+(var TAG_PADDING  0)
+(var TAG_PLAIN    1)
+(var TAG_CELL_SEQ 2)
+(var TAG_ARRAY    3)
+(var TAG_TUPLE    4)
+
+(define OBJECT_SIZE (addr)  `(& ([] @addr 0) @(- (<< 1 @OBJECT_SIZE_BITS) 1)))
+(define OBJECT_TAG  (addr)  `(>> ([] @addr 0) @(+ OBJECT_SIZE_BITS BOXED_FIELD_SIZE_BITS)))
+(define BOXED_FIELD_SIZE (addr)
+    `(& (>> ([] @addr 0) @OBJECT_SIZE_BITS) @(- (<< 1 @BOXED_FIELD_SIZE_BITS) 1)))
+
+(define HEADER (tag fieldsz objsz)
+    `(| (<< @tag @(+ BOXED_FIELD_SIZE_BITS OBJECT_SIZE_BITS))
+     (| (<< @fieldsz @OBJECT_SIZE_BITS)
+        @objsz)))
+
+(define SET_HEADER (addr tag fieldsz objsz) `([]= @addr 0 @(HEADER tag fieldsz objsz)))
 
 (var vm-gc-code `(
 
@@ -108,10 +144,13 @@
 (int num_block)     ; number of allocated blocks
 (void* next_addr 0)
 (int[] @MAX_BLOCKS block_used)
-(void* current_block)   ; bdescr of current free block
+(void* current_block)   ; bdescr of curret block
 (void* page_queue_head) ; page queue for breadth first scanning
 (void* page_queue_tail) ; page queue for breadth first scanning
-(void* freepage)        ; pdescr  of current free page
+(void* freepage)        ; pdescr of current free page
+
+(void* freep)    ; pointer to free memory in current free page
+(int free_words) ; size of free area in current page (in words)
 
 (fun mmap2 (addr size) (
     (void* ptr (syscall @SYS_MMAP2 addr size
@@ -133,7 +172,7 @@
     (if (&& (> slop 0) (< (munmap (- (+ ptr size) slop) slop) 0))
         ((error "ERROR: munmap failed\n")))
     (= ptr (- (+ ptr @BLOCK_SIZE) slop))
-    ([]= block_used (/ ptr @BLOCK_SIZE) (/ size @BLOCK_SIZE))
+    ([]= block_used (>> ptr @BLOCK_SHIFT) (>> size @BLOCK_SHIFT))
     (return ptr)
     ))
 
@@ -157,21 +196,38 @@
         ))
     (= next_addr (+ addr @BLOCK_SIZE))
     (init_pdescrs addr)
-    (void* blk @(blockmap[] (BLOCK_INDEX addr)))
+    (void* blk @(blockmap[] (BLOCK2BIDX addr)))
     (if (== current_block 0) ((= current_block blk)))
-    @(bdescr->first= blk addr)
     @(bdescr->next= blk (bdescr->next current_block))
     @(bdescr->next= current_block blk)
     (incl num_block)
     ))
 
+(fun insert_padding () (
+    (if (> free_words 0) (
+        @(SET_HEADER freep TAG_PADDING 0 free_words)
+        (= free_words 0)
+        ))
+    ))
+
+(fun allocate_page (words) (
+    (label retry)
+    (goto retry)
+    ))
+
+(fun allocate_object (code words) (
+    (while (> words free_words) (
+        (insert_padding)
+        (allocate_page (>> (- (+ words @PAGE_WORDS) -1) @PAGE_WORDS_SHIFT))
+        ))
+    ))
+
 (fun init_pdescrs (block_addr) (
     (void* page @(FIRST_PAGE block_addr))
     (void* pdf  @(FIRST_PDESCR block_addr))
-    (void* pdl  @(LAST_PDESCR block_addr))
-    (while (<= pdf pdl) (
+    (void* pde  @(END_PDESCR block_addr))
+    (while (< pdf pde) (
         @(pdescr->generation= pdf 0)
-        @(pdescr->first=      pdf page)
         @(pdescr->next=       pdf 0)
         (+= pdf @PDESCR_SIZE)
         (+= page @PAGE_SIZE)
@@ -189,7 +245,7 @@
     (alloc_new_block)
     (= page_queue_head 0)
     (= page_queue_tail 0)
-    (= freepage @(FIRST_PDESCR (bdescr->first current_block)))
+    (= freepage @(FIRST_PDESCR (BDESCR2BLOCK current_block)))
     ))
 
 (fun cleanup_gc () (
