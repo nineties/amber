@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vmgen.rlc 2010-06-17 12:57:01 nineties $
+; $Id: vmgen.rlc 2010-06-17 17:32:23 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -527,7 +527,7 @@
 
 (define emit_asm ((_ . args) _ ret) (do
     (print '\t')
-    (print . args)
+    (foreach a args (if (symbol? a) (emit_operand (lookup_var a)) (print a)))
     (print '\n')
     (if ret (emit_return `(return) nil nil))
     ))
@@ -646,10 +646,18 @@
     (if init (scan_expr init))
     ))
 
-(define scan_iter ((_ v _ _ body)) (do
+(define scan_if ((_ _ ifthen . ifelse)) (do
+    (foreach e ifthen (scan_expr `(@e)))
+    (if ifelse (foreach e (car ifelse) (scan_expr `(@e))))
+    ))
+
+(define scan_for ((_ v _ _ body)) (do
     (add_var v `(var @var_pos 1))
     (set var_pos (+ var_pos 1))
+    (foreach e body (scan_expr `(@e)))
     ))
+
+(define scan_while ((_ _ body)) (foreach e body (scan_expr `(@e))))
 
 (define ignore (code) ())
 (define scan_expr (e) (dispatch scan_function_dispatcher ignore e))
@@ -660,12 +668,14 @@
     ))
 
 (var scan_function_dispatcher `(
-    (int . @scan_defvar)
-    (char . @scan_defvar)
-    (byte . @scan_defvar)
-    (int* . @scan_defvar)
+    (int   . @scan_defvar)
+    (char  . @scan_defvar)
+    (byte  . @scan_defvar)
+    (int*  . @scan_defvar)
     (void* . @scan_defvar)
-    (for . @scan_iter)
+    (if    . @scan_if)
+    (while . @scan_while)
+    (for   . @scan_for)
     ))
 
 (define emit_function ((_ name params body)) (do
@@ -715,8 +725,8 @@
 (vtable_push) ; global namespace
 (import "vm-main")
 (compile vm-main-code)
-(import "vm-gc")
-(compile vm-gc-code)
 (import "vm-eval")
 (compile vm-eval-code)
+(import "vm-gc")
+(compile vm-gc-code)
 (vtable_pop)
