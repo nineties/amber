@@ -2,14 +2,8 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-06-17 16:11:55 nineties $
+; $Id: vm-insn.rlc 2010-06-17 21:31:09 nineties $
 ;
-
-; flag for trailing 2bits of pointer
-(var FLAG_PLAIN 0)
-(var FLAG_CONS  1)
-(var FLAG_TUPLE 2)
-(var FLAG_ARRAY 3)
 
 (define gen_comparison (cmovname) `(
     (asm "movl $2, %eax")
@@ -103,19 +97,19 @@
         (call allocate_cons)
         (vmrestore)
         (vmpop %ebx)
-        (asm "movl %ebx, " @(- 4 FLAG_CONS) "(%eax)")
+        (asm "movl %ebx, 4(%eax)")
         (asm "movl (%esi), %ebx")
-        (asm "movl %ebx, " @(- 0 FLAG_CONS) "(%eax)")
+        (asm "movl %ebx, (%eax)")
         (asm "movl %eax, (%esi)")
         ))
     (car        1 @true (
         (asm "movl (%esi), %eax")
-        (asm "movl " @(- 0 FLAG_CONS) "(%eax), %eax")
+        (asm "movl (%eax), %eax")
         (asm "movl %eax, (%esi)")
         ))
     (cdr        1 @true (
         (asm "movl (%esi), %eax")
-        (asm "movl " @(- 4 FLAG_CONS) "(%eax), %eax")
+        (asm "movl 4(%eax), %eax")
         (asm "movl %eax, (%esi)")
         ))
     ))
