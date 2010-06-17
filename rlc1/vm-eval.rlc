@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-eval.rlc 2010-06-16 17:37:08 nineties $
+; $Id: vm-eval.rlc 2010-06-17 15:33:33 nineties $
 ;
 
 ; rowlVM register usage
@@ -83,15 +83,26 @@
     (emit_expr `(asm @asmcode " %eax, (%esi)") nil ret)
     ))
 
-(add_new_expr `vmpush   emit_vmpush)
-(add_new_expr `vmpop    emit_vmpop)
-(add_new_expr `vmsucc   emit_vmsucc)
-(add_new_expr `vmfetch  emit_vmfetch)
-(add_new_expr `vmubyte  emit_vmubyte)
-(add_new_expr `vmsbyte  emit_vmsbyte)
-(add_new_expr `vmtable  emit_vmtable)
-(add_new_expr `vmbin    emit_vmbin)
-(add_new_expr `vmarg    emit_vmarg)
+(define emit_vmsave ((_) _ _) (do
+    (pushl `%ecx)
+    ))
+
+(define emit_vmrestore ((_) _ _) (do
+    (popl `%ecx)
+    (movl 0 `%edx)
+    ))
+
+(add_new_expr `vmpush    emit_vmpush)
+(add_new_expr `vmpop     emit_vmpop)
+(add_new_expr `vmsucc    emit_vmsucc)
+(add_new_expr `vmfetch   emit_vmfetch)
+(add_new_expr `vmubyte   emit_vmubyte)
+(add_new_expr `vmsbyte   emit_vmsbyte)
+(add_new_expr `vmtable   emit_vmtable)
+(add_new_expr `vmbin     emit_vmbin)
+(add_new_expr `vmarg     emit_vmarg)
+(add_new_expr `vmsave    emit_vmsave)
+(add_new_expr `vmrestore emit_vmrestore)
 
 (var vm-eval-code `(
 
