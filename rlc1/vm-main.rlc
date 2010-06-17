@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-main.rlc 2010-06-17 10:29:16 nineties $
+; $Id: vm-main.rlc 2010-06-17 15:36:29 nineties $
 ;
 
 (import "vm-assemble")
@@ -54,6 +54,53 @@
 
 (fun debug (msg) (
     (syscall @SYS_WRITE @STDOUT_FD msg (strlen msg))
+    ))
+
+(fun debugi (v) (
+    (int x (+ (% (/ v 10000000000) 10) '0'))
+    (syscall @SYS_WRITE @STDOUT_FD (address x) 1)
+    (= x (+ (% (/ v 1000000000) 10) '0'))
+    (syscall @SYS_WRITE @STDOUT_FD (address x) 1)
+    (= x (+ (% (/ v 100000000) 10) '0'))
+    (syscall @SYS_WRITE @STDOUT_FD (address x) 1)
+    (= x (+ (% (/ v 10000000) 10) '0'))
+    (syscall @SYS_WRITE @STDOUT_FD (address x) 1)
+    (= x (+ (% (/ v 1000000) 10) '0'))
+    (syscall @SYS_WRITE @STDOUT_FD (address x) 1)
+    (= x (+ (% (/ v 100000) 10) '0'))
+    (syscall @SYS_WRITE @STDOUT_FD (address x) 1)
+    (= x (+ (% (/ v 10000) 10) '0'))
+    (syscall @SYS_WRITE @STDOUT_FD (address x) 1)
+    (= x (+ (% (/ v 1000) 10) '0'))
+    (syscall @SYS_WRITE @STDOUT_FD (address x) 1)
+    (= x (+ (% (/ v 100) 10) '0'))
+    (syscall @SYS_WRITE @STDOUT_FD (address x) 1)
+    (= x (+ (% (/ v 10) 10) '0'))
+    (syscall @SYS_WRITE @STDOUT_FD (address x) 1)
+    (= x (+ (% v 10) '0'))
+    (syscall @SYS_WRITE @STDOUT_FD (address x) 1)
+    (debug "\n")
+    ))
+
+(string hexdigits "0123456789abcdef")
+(fun debugx (v) (
+    (int x (*8 (+ hexdigits (% (>> v 28) 0x10))))
+    (syscall @SYS_WRITE @STDOUT_FD (address x) 1)
+    (= x (*8 (+ hexdigits (% (>> v 24) 0x10))))
+    (syscall @SYS_WRITE @STDOUT_FD (address x) 1)
+    (= x (*8 (+ hexdigits (% (>> v 20) 0x10))))
+    (syscall @SYS_WRITE @STDOUT_FD (address x) 1)
+    (= x (*8 (+ hexdigits (% (>> v 16) 0x10))))
+    (syscall @SYS_WRITE @STDOUT_FD (address x) 1)
+    (= x (*8 (+ hexdigits (% (>> v 12) 0x10))))
+    (syscall @SYS_WRITE @STDOUT_FD (address x) 1)
+    (= x (*8 (+ hexdigits (% (>> v 8) 0x10))))
+    (syscall @SYS_WRITE @STDOUT_FD (address x) 1)
+    (= x (*8 (+ hexdigits (% (>> v 4) 0x10))))
+    (syscall @SYS_WRITE @STDOUT_FD (address x) 1)
+    (= x (*8 (+ hexdigits (% (>> v 0) 0x10))))
+    (syscall @SYS_WRITE @STDOUT_FD (address x) 1)
+    (debug "\n")
     ))
 
 (fun vmexit (status) (
@@ -109,7 +156,7 @@
     imm_i0
     imm_i1
     cons
-    imm_i2
+    car
     ireturn
     )))
 
