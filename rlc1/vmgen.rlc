@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vmgen.rlc 2010-06-16 18:59:38 nineties $
+; $Id: vmgen.rlc 2010-06-17 10:33:41 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -168,7 +168,6 @@
 
 (define emit_return ((_ . arg) _ _) (do
     (if arg (emit_expr (car arg) `%eax nil))
-    (popl `%ebx)
     (emit "leave")
     (emit "ret")
     ))
@@ -324,8 +323,8 @@
     (emit_expr lhs)
     (emit_expr rhs)
     (popl `%eax)
-    (popl `%ebx)
-    (emit "cmpl" `%ebx `%eax)
+    (popl `%ecx)
+    (emit "cmpl" `%ecx `%eax)
     (emit insn `%al)
     (emit "movzbl" `%al `%eax)
     (pushl `%eax)
@@ -480,7 +479,7 @@
 
 (define emit_seqor_if (expr1 expr2 ifthen ifelse _ ret)
     (if ifelse
-        (emit_expr `(if (&& (! @expr1) (! @expr2)) @ifthen @ifelse) nil ret)
+        (emit_expr `(if (&& (! @expr1) (! @expr2)) @ifelse @ifthen) nil ret)
         (do
             (var ifend-lbl (mklabel `end))
             (emit_expr `(if (&& (! @expr1) (! @expr2)) ((goto @ifend-lbl)) @ifthen) nil nil)
@@ -495,9 +494,9 @@
     (var ifelse-lbl (if ifelse (mklabel `ifelse) nil))
     (emit_expr (cadr expr) `%eax nil)  ; lhs
     (pushl `%eax)
-    (emit_expr (caddr expr) `%ebx nil) ; rhs
-    (popl `%eax)
-    (emit "cmpl" `%ebx `%eax)
+    (emit_expr (caddr expr) `%eax nil) ; rhs
+    (popl `%ecx)
+    (emit "cmpl" `%eax `%ecx)
     (emit insn (if ifelse-lbl ifelse-lbl ifend-lbl))
     (emit_block ifthen ret)
     (if ifelse-lbl (do (if (nil? ret) (emit "jmp" ifend-lbl)) (print_label ifelse-lbl) (emit_block ifelse ret)))
@@ -682,7 +681,6 @@
     (print_label name)
     (pushl `%ebp)
     (movl `%esp `%ebp)
-    (pushl `%ebx)
 
     ; allocate stack frame
     (if (> var_pos 0) (emit "subl" (* 4 var_pos) `%esp))
