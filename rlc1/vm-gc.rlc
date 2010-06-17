@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-06-17 17:50:25 nineties $
+; $Id: vm-gc.rlc 2010-06-17 21:29:53 nineties $
 ;
 
 (var SYS_MUNMAP  91)
@@ -106,8 +106,9 @@
 (define blockmap->first= (idx val)  `([]= block_map (+ (* @BDESCR_SIZE @idx) 1) @val))
 
 ; structure of header field
-; MSB <- | 3bit (object tag) | 11bit (boxed fieid size) | 18bit (object size) |
-; tags:
+; MSB <- | 3 (object tag) | 1 (copyed flag) | 10 (boxed fieid size) | 18 (object size) |
+
+; object tag:
 ; 000 : padding
 ; 001 : plain type
 ; 010 : cons-cell sequence
@@ -115,26 +116,37 @@
 ; 100 : tuple
 
 (var OBJECT_WORDS_BITS 18)
-(var BOXED_FIELD_SIZE_BITS 11)
+(var BOXED_FIELD_SIZE_BITS 10)
+(var BOXED_FIELD_SIZE_OFF OBJECT_WORDS_BITS)
+(var OBJECT_COPYED_OFF (+ OBJECT_WORDS_BITS BOXED_FIELD_SIZE_BITS))
 (var OBJECT_TAG_BITS 3)
+(var OBJECT_TAG_OFF (+ OBJECT_WORDS_BITS BOXED_FIELD_SIZE_BITS 1))
 
-(var TAG_PADDING  0)
-(var TAG_PLAIN    1)
-(var TAG_CONS_SEQ 2)
-(var TAG_ARRAY    3)
-(var TAG_TUPLE    4)
+; !!! DO NOT CHANGE THE ORDER TAGS !!!
+(var TAG_PADDING 0)
+(var TAG_PLAIN   1)
+(var TAG_CONS    2)
+(var TAG_ARRAY   3)
+(var TAG_TUPLE   4)
 
 (define OBJECT_WORDS (addr)  `(& ([] @addr 0) @(- (<< 1 OBJECT_WORDS_BITS) 1)))
-(define OBJECT_TAG  (addr)  `(>> ([] @addr 0) @(+ OBJECT_WORDS_BITS BOXED_FIELD_SIZE_BITS)))
+(define OBJECT_TAG (addr)    `(>> ([] @addr 0) @OBJECT_TAG_OFF))
+
+(define OBJECT_COPYED (addr) `(& (>> ([] @addr 0) @OBJECT_COPYED_OFF) 1))
+(define OBJECT_SETCOPYED (addr) `([]= @addr 0 (| ([] @addr 0) @(<< 1 OBJECT_TAG_OFF))))
+
 (define BOXED_FIELD_SIZE (addr)
-    `(& (>> ([] @addr 0) @OBJECT_WORDS_BITS) @(- (<< 1 BOXED_FIELD_SIZE_BITS) 1)))
+    `(& (>> ([] @addr 0) @BOXED_FIELD_SIZE_OFF) @(- (<< 1 BOXED_FIELD_SIZE_BITS) 1)))
 
 (define HEADER (tag fieldsz objsz)
-    `(| (<< @tag @(+ BOXED_FIELD_SIZE_BITS OBJECT_WORDS_BITS))
-     (| (<< @fieldsz @OBJECT_WORDS_BITS)
+    `(| (<< @tag @OBJECT_TAG_OFF)
+     (| (<< @fieldsz @BOXED_FIELD_SIZE_OFF)
         @objsz)))
 
 (define SET_HEADER (addr tag fieldsz objsz) `([]= @addr 0 @(HEADER tag fieldsz objsz)))
+
+(define FORWARD_ADDR (obj) `([] @obj @WORD_SIZE))
+(define SET_FORWARD_ADDR (obj addr) `([]= @obj @WORD_SIZE @addr))
 
 (var IN_GC `(!= current_gen next_gen))
 
@@ -243,7 +255,7 @@
     (void* p (address stack_top))
     (while (< p stack_base) (
         (promote_page ([] p 0))
-        (+= p 4)
+        (+= p @WORD_SIZE)
         ))
     ))
 
@@ -253,11 +265,55 @@
     (void* end (+ stack stack_size))
     (while (< p end) (
         (promote_page ([] p 0))
-        (+= p 4)
+        (+= p @WORD_SIZE)
         ))
     ))
 
+(fun copy_object (dst src words) (
+    (while (> words 0) (
+        ([]= dst 0 ([] src 0))
+        (+= dst @WORD_SIZE)
+        (+= src @WORD_SIZE)
+        (decl words)
+        ))
+    ))
+
+(fun move_object (objp) (
+    (void* obj ([] objp 0))
+
+    ; nil object
+    (if (! obj) ((return)))
+
+    ; this object is already in next generation
+    (if (== @(pdescr->generation (ADDR2PDESCR obj)) next_gen) ((return)))
+
+    ; this object is already copyed
+    (if @(OBJECT_COPYED obj) (
+        ([]= objp 0 @(FORWARD_ADDR obj))
+        (return)
+        ))
+
+    (int words @(OBJECT_WORDS obj))
+    (void* new_obj (allocate_object words))
+    (copy_object new_obj obj words)
+
+    @(SET_FORWARD_ADDR obj new_obj)
+    @(OBJECT_SETCOPYED obj)
+    ([]= objp 0 new_obj)
+    ))
+
 (fun move_fields (obj) (
+    (int tag @(OBJECT_TAG obj))
+    (if (<= tag @TAG_PLAIN) ((return)))
+    (if (== tag @TAG_CONS) (
+        (int len (- @(OBJECT_WORDS obj) 1)) ; -1 for the header itself
+        (+= obj @WORD_SIZE) ; skip the header
+        (void* end (+ obj (* @WORD_SIZE len)))
+        (while (< obj end) (
+            (move_object obj)
+            (+= obj @WORD_SIZE)
+            ))
+        ))
     (error "not implemented")
     ))
 
@@ -280,7 +336,7 @@
         (void* end (+ p @PAGE_SIZE))
         (while (&& (< p end) (!= p freep)) (
             (move_fields p)
-            (+= p (* 4 @(OBJECT_WORDS p)))
+            (+= p (* @WORD_SIZE @(OBJECT_WORDS p)))
             ))
         (= page_queue_head @(pdescr->next page_queue_head))
         ))
@@ -346,26 +402,10 @@
     (return obj)
     ))
 
-(fun allocate_cons_root () (
-    (void* ptr (allocate_object 3))
-    @(SET_HEADER ptr TAG_CONS_SEQ 0 3)
-    (= cons_head ptr)
-    (return (| @FLAG_CONS (+ ptr @WORD_SIZE)))
-    ))
-
-(fun allocate_cons_child () (
-    (void* ptr (allocate_object 2))
-    (int sz ([] cons_head 0))
-    (+= sz 2)
-    ([]= cons_head 0 sz)
-    (return (| @FLAG_CONS ptr))
-    ))
-
 (fun allocate_cons () (
-    (if (|| (== cons_head 0) (> 2 free_words))
-        ((return (allocate_cons_root)))
-        ((return (allocate_cons_child)))
-        )
+    (void* ptr (allocate_object 3))
+    @(SET_HEADER ptr TAG_CONS 0 3)
+    (return (+ ptr @WORD_SIZE))
     ))
 
 (fun init_pdescrs (block_addr) (
