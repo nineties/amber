@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-06-17 16:09:31 nineties $
+; $Id: vm-gc.rlc 2010-06-17 17:50:25 nineties $
 ;
 
 (var SYS_MUNMAP  91)
@@ -72,14 +72,14 @@
 (var PAGES_PER_BLOCK (>> (* (- PAGE_SIZE PDESCR_SIZE) BLOCK_SIZE) (* 2 PAGE_SHIFT)))
 
 ; object address to page index
-(define BLOCK_ADDR (addr) `(& @addr @(~ BLOCK_MASK)))
-(define OBJ2PAGE   (obj)  `(& @addr @(~ PAGE_MASK)))
-(define OBJ2PDESCR (obj)
-    `(| @(BLOCK_ADDR obj)
-        (>> (& @OBJ @(& BLOCK_MASK (~ PAGE_MASK))) @(- PAGE_SHIFT PDESCR_SHIFT))
+(define ADDR2BLOCK (addr) `(& @addr @(~ BLOCK_MASK)))
+(define ADDR2PAGE   (obj)  `(& @addr @(~ PAGE_MASK)))
+(define ADDR2PDESCR (obj)
+    `(| @(ADDR2BLOCK obj)
+        (>> (& @obj @(& BLOCK_MASK (~ PAGE_MASK))) @(- PAGE_SHIFT PDESCR_SHIFT))
         ))
 (define PDESCR2PAGE (pd)
-    `(| @(BLOCK_ADDR pd)
+    `(| @(ADDR2BLOCK pd)
         (<< (& @pd @BLOCK_MASK) @(- PAGE_SHIFT PDESCR_SHIFT))
         ))
 
@@ -114,7 +114,7 @@
 ; 011 : array of boexed elements
 ; 100 : tuple
 
-(var OBJECT_SIZE_BITS 18)
+(var OBJECT_WORDS_BITS 18)
 (var BOXED_FIELD_SIZE_BITS 11)
 (var OBJECT_TAG_BITS 3)
 
@@ -124,14 +124,14 @@
 (var TAG_ARRAY    3)
 (var TAG_TUPLE    4)
 
-(define OBJECT_SIZE (addr)  `(& ([] @addr 0) @(- (<< 1 @OBJECT_SIZE_BITS) 1)))
-(define OBJECT_TAG  (addr)  `(>> ([] @addr 0) @(+ OBJECT_SIZE_BITS BOXED_FIELD_SIZE_BITS)))
+(define OBJECT_WORDS (addr)  `(& ([] @addr 0) @(- (<< 1 OBJECT_WORDS_BITS) 1)))
+(define OBJECT_TAG  (addr)  `(>> ([] @addr 0) @(+ OBJECT_WORDS_BITS BOXED_FIELD_SIZE_BITS)))
 (define BOXED_FIELD_SIZE (addr)
-    `(& (>> ([] @addr 0) @OBJECT_SIZE_BITS) @(- (<< 1 @BOXED_FIELD_SIZE_BITS) 1)))
+    `(& (>> ([] @addr 0) @OBJECT_WORDS_BITS) @(- (<< 1 BOXED_FIELD_SIZE_BITS) 1)))
 
 (define HEADER (tag fieldsz objsz)
-    `(| (<< @tag @(+ BOXED_FIELD_SIZE_BITS OBJECT_SIZE_BITS))
-     (| (<< @fieldsz @OBJECT_SIZE_BITS)
+    `(| (<< @tag @(+ BOXED_FIELD_SIZE_BITS OBJECT_WORDS_BITS))
+     (| (<< @fieldsz @OBJECT_WORDS_BITS)
         @objsz)))
 
 (define SET_HEADER (addr tag fieldsz objsz) `([]= @addr 0 @(HEADER tag fieldsz objsz)))
@@ -208,6 +208,88 @@
     (incl num_block)
     ))
 
+(fun enqueue_page (pd) (
+    (if page_queue_head
+        (@(pdescr->next= page_queue_tail pd))
+        ((= page_queue_head pd))
+        )
+    @(pdescr->next= pd 0)
+    (= page_queue_tail pd)
+    ))
+
+(fun promote_page (addr) (
+    (if (! @(IS_POINTER_TO_HEAP addr)) ((return)))
+    (void* pd @(ADDR2PDESCR addr))
+    (if (== @(pdescr->generation pd) current_gen) (
+        (void* p pd)
+        (void* end @(END_PDESCR (ADDR2BLOCK addr)))
+
+        (+= p @PDESCR_SIZE)
+        (while (&& (< p end) @(pdescr->joined p)) (
+            @(pdescr->generation= p next_gen)
+            (+= p @PDESCR_SIZE)
+            ))
+        (while @(pdescr->joined pd) (
+            @(pdescr->generation= pd next_gen)
+            (-= p @PDESCR_SIZE)
+            ))
+        @(pdescr->generation= pd next_gen)
+        (enqueue_page pd)
+        ))
+    ))
+
+(fun scan_machine_stack () (
+    (int stack_top)
+    (void* p (address stack_top))
+    (while (< p stack_base) (
+        (promote_page ([] p 0))
+        (+= p 4)
+        ))
+    ))
+
+(fun scan_vm_stack () (
+    (void* p)
+    (asm "movl %esi, " p)
+    (void* end (+ stack stack_size))
+    (while (< p end) (
+        (promote_page ([] p 0))
+        (+= p 4)
+        ))
+    ))
+
+(fun move_fields (obj) (
+    (error "not implemented")
+    ))
+
+(fun garbage_collect () (
+    (if @IN_GC (
+        (alloc_new_block)
+        (return)
+        ))
+    (insert_padding) ; fill residual area in current page
+    (= next_gen @(ADVANCE_GENERATION current_gen))
+    (= page_queue_head 0)
+    (= page_queue_tail 0)
+
+    ; promote all pages which are refered from machine stack and vm-stack
+    (scan_machine_stack)
+    (scan_vm_stack)
+
+    (while page_queue_head (
+        (void* p @(PDESCR2PAGE page_queue_head))
+        (void* end (+ p @PAGE_SIZE))
+        (while (&& (< p end) (!= p freep)) (
+            (move_fields p)
+            (+= p (* 4 @(OBJECT_WORDS p)))
+            ))
+        (= page_queue_head @(pdescr->next page_queue_head))
+        ))
+
+    (insert_padding)
+
+    (= current_gen next_gen) ; switch to next generation
+    ))
+
 (fun insert_padding () (
     (if (> free_words 0) (
         @(SET_HEADER freep TAG_PADDING 0 free_words)
@@ -233,7 +315,7 @@
                 (= freepage @(pdescr->next freepage))
                 @(pdescr->generation= firstpage next_gen)
                 @(pdescr->joined=0 firstpage)
-                ;(if @IN_GC ((enqueue_page firstpage)))
+                (if @IN_GC ((enqueue_page firstpage)))
                 (decl npages)
                 (while npages (
                     (+= firstpage @PDESCR_SIZE)
@@ -249,7 +331,7 @@
         (= freepage @(pdescr->next freepage))
         (if @(IS_FIRST_PDESCR freepage) ((= free 0)))
         ))
-    ;(garbage_collect)
+    (garbage_collect)
     (goto retry)
     ))
 
