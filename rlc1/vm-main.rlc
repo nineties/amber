@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-main.rlc 2010-06-17 21:25:44 nineties $
+; $Id: vm-main.rlc 2010-06-18 11:06:51 nineties $
 ;
 
 (import "vm-assemble")
@@ -13,10 +13,7 @@
 ; system calls
 (var SYS_EXIT    1)
 (var SYS_FORK    2)
-(var SYS_READ    3)
 (var SYS_WRITE   4)
-(var SYS_OPEN    5)
-(var SYS_CLOSE   6)
 (var SYS_WAITPID 7)
 (var SYS_UNLINK  10)
 (var SYS_EXECVE  11)
@@ -103,8 +100,7 @@
     ))
 
 (fun vmexit (status) (
-    (cleanup_gc)
-    (cleanup_vmstack)
+    (cleanup_blocks)
     (syscall @SYS_EXIT status)
     ))
 
@@ -163,10 +159,14 @@
 (fun _start (stack_base) (
     (init_gc (address stack_base))
     (init_vmstack @DEFAULT_STACK_SIZE)
-    (vm_register_function 0 fib)
-    (vm_register_function 1 fact)
-    (vm_register_function 2 cons_test)
-    (vmexit (vm_eval test_code))
+
+    ; load program
+    (int fd (open "test.rlx"))
+    (int sz (read_file_size fd))
+    (void* prog (read_program fd (- sz 4)))
+    (void* code (get_code prog))
+
+    (vmexit (vm_eval code))
     ))
 
 ))
