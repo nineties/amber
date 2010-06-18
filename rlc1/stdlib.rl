@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: stdlib.rl 2010-05-29 15:57:34 nineties $
+ % $Id: stdlib.rl 2010-06-19 00:50:51 nineties $
  %);
 
 include(stddef);
@@ -109,6 +109,7 @@ close_in: (p0) {
 
 (% p0: output channel %);
 close_out: (p0) {
+    flush(p0);
     syscall(SYS_CLOSE, p0[OCHAN_FD]);
 };
 
