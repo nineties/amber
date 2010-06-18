@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-06-18 10:55:20 nineties $
+; $Id: vm-gc.rlc 2010-06-18 14:56:57 nineties $
 ;
 
 (var SYS_MUNMAP  91)
@@ -44,15 +44,18 @@
 (define pdescr->next=       (addr val)  `([]= @addr 1 @val))
 
 ; structure of block descriptor.
-; 32 bit : void *next    (Pointer to the next block)
+; 32 bit : void *next  (Pointer to the next block)
+; 32 bit : void *first (Pointer to the beginning of the block)
 
 (define bdescr->next    (addr)      `([] @addr 0))
 (define bdescr->next=   (addr val)  `([]= @addr 0 @val))
+(define bdescr->first   (addr)      `([] @addr 1))
+(define bdescr->first=  (addr val)  `([]= @addr 1 @val))
 
 (var PDESCR_SIZE    8)
 (var PDESCR_SHIFT   3)  ; PDESCR_SIZE = 2^PDESCR_SHIFT
-(var BDESCR_SIZE    4)
-(var BDESCR_SHIFT   2)  ; BDESCR_SIZE = 2^BDESCR_SHIFT
+(var BDESCR_SIZE    8)
+(var BDESCR_SHIFT   3)  ; BDESCR_SIZE = 2^BDESCR_SHIFT
 
 (var BLOCK_SHIFT 20)    ; 1MB
 (var BLOCK_SIZE (<< 1 BLOCK_SHIFT))
@@ -215,6 +218,7 @@
     (init_pdescrs addr)
     (void* blk @(blockmap[] (BLOCK2BIDX addr)))
     (if (== current_block 0) ((= current_block blk)))
+    @(bdescr->first= blk addr)
     @(bdescr->next= blk (bdescr->next current_block))
     @(bdescr->next= current_block blk)
     (incl num_block)
@@ -442,7 +446,7 @@
     (alloc_new_block)
     (= page_queue_head 0)
     (= page_queue_tail 0)
-    (= freepage @(FIRST_PDESCR (BDESCR2BLOCK current_block)))
+    (= freepage @(FIRST_PDESCR (bdescr->first current_block)))
     ))
 
 (fun cleanup_blocks () (
