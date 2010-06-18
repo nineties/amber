@@ -1,0 +1,61 @@
+;
+; rowl - generation 1
+; Copyright (C) 2010 nineties
+;
+; $Id: vm-load.rlc 2010-06-18 11:02:05 nineties $
+;
+
+; load rowl executable program from file
+
+; layout of executable program
+; 4bytes    : size of the file
+; 4bytes    : # of global heap objects (N1)
+; 4*N1bytes : global heap objects
+; 4bytes    : total size of global non-heap objects (N2)
+; N2bytes   : global non-heap objects
+; 4bytes    : length of the byte code (N3)
+; N3bytes   : byte code
+
+; system calls
+(var SYS_READ    3)
+(var SYS_OPEN    5)
+(var SYS_CLOSE   6)
+
+; IO flags
+(var O_RDONLY   0x0)
+(var O_WRONLY   0x1)
+(var O_RDWR     0x2)
+(var O_CREAT    0x40)
+(var O_TRUNC    0x100)
+(var O_APPEND   0x200)
+
+(var vm-load-code `(
+
+(fun get_code (prog) (
+    (int n ([] prog 0)) ; N1
+    (+= prog (* 4 (+ n 1)))
+    (= n ([] prog 0)) ; N2
+    (+= prog (+ n 4))
+    (+= prog 4) ; skip N3
+    (return prog)
+    ))
+
+(fun read_program (fd size) (
+    (void* mem (alloc_block @BLOCK_SIZE)) ; XXX: temporal implementation
+    (syscall @SYS_READ fd mem size)
+    (return mem)
+    ))
+
+(fun read_file_size (fd) (
+    (int size)
+    (syscall @SYS_READ fd (address size) 4)
+    (return size)
+    ))
+
+(fun open (path) (
+    (int fd (syscall @SYS_OPEN path @O_RDONLY))
+    (if (< fd 0) ((error "open failed")))
+    (return fd)
+    ))
+
+    ))
