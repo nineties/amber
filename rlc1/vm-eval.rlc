@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-eval.rlc 2010-06-18 10:54:54 nineties $
+; $Id: vm-eval.rlc 2010-06-18 14:09:43 nineties $
 ;
 
 ; rowlVM register usage
@@ -123,14 +123,20 @@
     ([]= funtable id seq)
     ))
 
-(fun vm_eval (insn) (
+(fun vm_eval (insn nref) (
     (asm "pushl %ebx")
     (asm "pushl %esi")
     (asm "movl stack, %esi")
     (asm "movl stack_size, %eax")
     (asm "addl %eax, %esi")
-    (asm "movl 8(%ebp), %ecx")
+    (asm "movl " insn ", %ecx")
     (asm "xorl %edx, %edx") ; initialize zero register
+
+    ; allocate area for global reference objects
+    (asm "movl " nref ", %eax")
+    (asm "shll $2, %eax")
+    (asm "subl %eax, %esi")
+
     (vmfetch)
     (vmtable insn_table @insn_entries)
     (asm "popl %esi")
