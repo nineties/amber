@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-main.rlc 2010-06-18 11:06:51 nineties $
+; $Id: vm-main.rlc 2010-06-18 12:58:35 nineties $
 ;
 
 (import "vm-assemble")
@@ -156,12 +156,17 @@
     )))
 
 (extern _start)
-(fun _start (stack_base) (
-    (init_gc (address stack_base))
+(fun _start (p) (
+    (void* argv (address p))
+
+    (if (== ([] argv 1) 0) ((error "USAGE: ./rlvm XXXXX.rlx\n")))
+
+    (int stack_bottom)
+    (init_gc (address stack_bottom))
     (init_vmstack @DEFAULT_STACK_SIZE)
 
     ; load program
-    (int fd (open "test.rlx"))
+    (int fd (open ([] argv 1)))
     (int sz (read_file_size fd))
     (void* prog (read_program fd (- sz 4)))
     (void* code (get_code prog))
