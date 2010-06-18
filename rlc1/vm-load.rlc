@@ -2,19 +2,17 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-load.rlc 2010-06-18 11:02:05 nineties $
+; $Id: vm-load.rlc 2010-06-18 14:00:29 nineties $
 ;
 
 ; load rowl executable program from file
 
 ; layout of executable program
-; 4bytes    : size of the file
-; 4bytes    : # of global heap objects (N1)
-; 4*N1bytes : global heap objects
-; 4bytes    : total size of global non-heap objects (N2)
-; N2bytes   : global non-heap objects
-; 4bytes    : length of the byte code (N3)
-; N3bytes   : byte code
+; 4bytes        : size of the file (=N)
+; 4bytes        : # of global reference objects
+; 4byte         : total size of global value objects (=M)
+; Mbytes        : global value objects
+; (N-M-12)bytes : byte code
 
 ; system calls
 (var SYS_READ    3)
@@ -40,16 +38,15 @@
     (return prog)
     ))
 
-(fun read_program (fd size) (
-    (void* mem (alloc_block @BLOCK_SIZE)) ; XXX: temporal implementation
-    (syscall @SYS_READ fd mem size)
-    (return mem)
-    ))
-
-(fun read_file_size (fd) (
+(fun read_program (fd nrefp) (
     (int size)
-    (syscall @SYS_READ fd (address size) 4)
-    (return size)
+    (int nref)
+    (int szval)
+    (syscall @SYS_READ fd (address size) 12)
+    ([]= nrefp 0 nref)
+    (void* mem (alloc_block @BLOCK_SIZE)) ; XXX: temporal implementation
+    (syscall @SYS_READ fd mem (- size 12))
+    (return (+ mem szval))
     ))
 
 (fun open (path) (
