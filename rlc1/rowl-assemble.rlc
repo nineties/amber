@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-assemble.rlc 2010-06-19 13:43:35 nineties $
+; $Id: rowl-assemble.rlc 2010-06-20 02:07:23 nineties $
 ;
 
 (import "stdlib")
@@ -25,8 +25,12 @@
 (define insn_code   (insn) (car  (assoc (insn_head insn) vm_insn_table)))
 (define insn_len    (insn) (cadr (assoc (insn_head insn) vm_insn_table)))
 
+(var addr_table ())
+(var addr 0)
+
 (define scan_fundecl ((_ name body)) (do
-    (length body)
+    (push addr_table `(@name . @addr))
+    (foreach i body (set addr (+ addr (insn_len i))))
     ))
 
 (define scan_decl (decl)
@@ -35,8 +39,19 @@
         (otherwise (eprintln "not implemented"))
         ))
 
+(define relative_address (sym) (- (assoc sym addr_table) addr))
+
+(define assemble_insn (insn)
+    (cond
+        ((symbol? insn)     (do (put_byte (insn_code insn)) (incl addr)))
+        ((== `call (car insn)) (do
+            (put_byte (insn_code `call))
+            (put_word (relative_address (cadr insn)))
+            (set addr (+ addr 3))
+            ))
+        ))
 (define assemble_fundecl ((_ name body)) (do
-    (foreach i body (put_byte (insn_code i)))
+    (foreach i body (assemble_insn i))
     ))
 
 (define assemble_decl (decl)
@@ -46,20 +61,30 @@
         ))
 
 (define assemble (prog) (do
-    (var len 0)
-    (foreach decl prog (set len (+ len (scan_decl decl))))
-    (set len (+ len 12))
-    (put_word len)
-    (put_word 0)
-    (put_word 0)
+    (set addr 0)
+    (foreach decl prog (scan_decl decl))
+    (put_long (+ addr 12))
+    (put_long 0)
+    (put_long 0)
+
+    (set addr 0)
     (foreach decl prog (assemble_decl decl))
     ))
 
 (assemble `(
 
 (fun main (
-    imm_i1
+    imm_i2
+    imm_i3
+    (call f)
     exit
+    ))
+
+(fun f (
+    arg0
+    arg1
+    iadd
+    ireturn
     ))
 
     ))

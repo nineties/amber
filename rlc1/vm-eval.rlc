@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-eval.rlc 2010-06-18 14:09:43 nineties $
+; $Id: vm-eval.rlc 2010-06-19 20:52:44 nineties $
 ;
 
 ; rowlVM register usage
@@ -52,7 +52,15 @@
     ))
 
 (define emit_vmsbyte ((_ offs reg) _ _) (do
-    (emit "movsx" `(deref %ecx @offs) reg)
+    (emit "movsbl" `(deref %ecx @offs) reg)
+    ))
+
+(define emit_vmuword ((_ offs reg) _ _) (do
+    (emit "movzwl" `(deref %ecx @offs) reg)
+    ))
+
+(define emit_vmsword ((_ offs reg) _ _) (do
+    (emit "movswl" `(deref %ecx @offs) reg)
     ))
 
 (define emit_vmarg ((_ offs reg) _ _) (do
@@ -101,6 +109,8 @@
 (add_new_expr `vmfetch   emit_vmfetch)
 (add_new_expr `vmubyte   emit_vmubyte)
 (add_new_expr `vmsbyte   emit_vmsbyte)
+(add_new_expr `vmuword   emit_vmuword)
+(add_new_expr `vmsword   emit_vmsword)
 (add_new_expr `vmtable   emit_vmtable)
 (add_new_expr `vmbin     emit_vmbin)
 (add_new_expr `vmarg     emit_vmarg)
@@ -112,15 +122,9 @@
 (int    stack_size) ; in bytes
 (int*   stack)
 
-(int[] 100 funtable) ; temporal implementation
-
 (fun init_vmstack (stsize) (
     (= stack (alloc_block stsize))
     (= stack_size stsize)
-    ))
-
-(fun vm_register_function (id seq) (
-    ([]= funtable id seq)
     ))
 
 (fun vm_eval (insn nref) (
