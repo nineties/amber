@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-06-19 13:33:52 nineties $
+ % $Id: builtin.rl 2010-06-20 02:07:52 nineties $
  %);
 
 include(stddef,code);
@@ -699,23 +699,24 @@ rl_put_byte: (p0) {
     return nil_sym;
 };
 
-rl_put_short: (p0) {
-    allocate(1);
-    check_arity(p0, 1, "put_short");
-    x0 = int_value(car(p0));
-    putc(x0%255);
-    putc((x0/256)%255);
-    return nil_sym;
-};
-
 rl_put_word: (p0) {
     allocate(1);
     check_arity(p0, 1, "put_word");
     x0 = int_value(car(p0));
-    putc(x0%255);
-    putc((x0/256)%255);
-    putc((x0/65536)%255);
-    putc((x0/16777216)%255);
+
+    putc(x0&255);
+    putc((x0/256)&255);
+    return nil_sym;
+};
+
+rl_put_long: (p0) {
+    allocate(1);
+    check_arity(p0, 1, "put_long");
+    x0 = int_value(car(p0));
+    putc(x0&255);
+    putc((x0/256)&255);
+    putc((x0/65536)&255);
+    putc((x0/16777216)&255);
     return nil_sym;
 };
 
@@ -803,6 +804,6 @@ init_builtin_objects: () {
     register_prim("tosym"      , &rl_tosym);
     register_prim("sappend"    , &rl_sappend);
     register_prim("put_byte"   , &rl_put_byte);
-    register_prim("put_short"  , &rl_put_short);
     register_prim("put_word"   , &rl_put_word);
+    register_prim("put_long"   , &rl_put_long);
 };
