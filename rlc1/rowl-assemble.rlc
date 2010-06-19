@@ -2,78 +2,64 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-assemble.rlc 2010-06-19 00:49:24 nineties $
+; $Id: rowl-assemble.rlc 2010-06-19 13:43:35 nineties $
 ;
 
 (import "stdlib")
 (import "vm-insn")
 
 ; insn-name -> (code len)
-;(var vm_insn_table (do
-;    (var code 0)
-;    (var entries ())
-;    (foreach i vm_instructions (do
-;        (var name (car i))
-;        (var len  (cadr i))
-;        (push entries `(@name @code @len))
-;        (incl code)
-;        ))
-;    (reverse entries)
-;    ))
-;
-;(define insn_head   (insn) (if (cons? insn) (car insn) insn))
-;(define insn_code   (insn) (car  (assoc (insn_head insn) vm_insn_table)))
-;(define insn_len    (insn) (cadr (assoc (insn_head insn) vm_insn_table)))
-;
-;(define compute_addr (code) (do
-;    (var addr_list ())
-;    (var new_code ())
-;    (var addr 0)
-;    (foreach insn code
-;        (if (and (cons? insn) (== (car insn) `label))
-;            (push addr_list `(@(cadr insn) . @addr))
-;            (do
-;                (push new_code `(@addr . @insn))
-;                (set addr (+ addr (insn_len insn)))
-;            )
-;        ))
-;    (list (reverse new_code) addr_list)
-;    ))
-;
-;(define insn_addr? (head) (member? head `(goto if_zero if_nonzero if_lt if_le if_gt if_ge)))
-;
-;(define assemble_insn_simple (insn) (cons (insn_code insn) (cdr insn)))
-;
-;(define assemble_insn (addr_list addr_insn) (do
-;    (var addr (car addr_insn))
-;    (var insn (cdr addr_insn))
-;    (cond
-;        ((not (cons? insn))         (list (car (assoc insn vm_insn_table))))
-;        ((== (car insn) `label)     ())
-;        ((== (car insn) `imm_int)   (assemble_insn_simple insn))
-;        ((== (car insn) `vcall)     (assemble_insn_simple insn))
-;        ((== (car insn) `scall)     (assemble_insn_simple insn))
-;        ((insn_addr? (car insn))    (list
-;            (car (assoc (car insn) vm_insn_table))
-;            (- (assoc (cadr insn) addr_list) addr)
-;            ))
-;        ))
-;        )
-;
-;(define assemble_helper (addr_list code) (do
-;    (if code (append (assemble_insn addr_list (car code)) (assemble_helper addr_list (cdr code))) ())
-;    ))
-;
-;(define assemble (code) (do
-;    (var ret (compute_addr code))
-;    (assemble_helper (cadr ret) (car ret))
-;    ))
-
-(define assemble (file) (do
-    (var chan (open_out file))
-    (put_byte chan 1)
-    (put_byte chan 2)
-    (close_out chan)
+(var vm_insn_table (do
+    (var code 0)
+    (var entries ())
+    (foreach i vm_instructions (do
+        (var name (car i))
+        (var len  (cadr i))
+        (push entries `(@name @code @len))
+        (incl code)
+        ))
+    (reverse entries)
     ))
 
-(assemble "test2.rlx")
+(define insn_head   (insn) (if (cons? insn) (car insn) insn))
+(define insn_code   (insn) (car  (assoc (insn_head insn) vm_insn_table)))
+(define insn_len    (insn) (cadr (assoc (insn_head insn) vm_insn_table)))
+
+(define scan_fundecl ((_ name body)) (do
+    (length body)
+    ))
+
+(define scan_decl (decl)
+    (cond
+        ((== `fun (car decl)) (scan_fundecl decl))
+        (otherwise (eprintln "not implemented"))
+        ))
+
+(define assemble_fundecl ((_ name body)) (do
+    (foreach i body (put_byte (insn_code i)))
+    ))
+
+(define assemble_decl (decl)
+    (cond
+        ((== `fun (car decl)) (assemble_fundecl decl))
+        (otherwise (eprintln "not implemented"))
+        ))
+
+(define assemble (prog) (do
+    (var len 0)
+    (foreach decl prog (set len (+ len (scan_decl decl))))
+    (set len (+ len 12))
+    (put_word len)
+    (put_word 0)
+    (put_word 0)
+    (foreach decl prog (assemble_decl decl))
+    ))
+
+(assemble `(
+
+(fun main (
+    imm_i1
+    exit
+    ))
+
+    ))
