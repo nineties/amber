@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-06-19 00:50:27 nineties $
+ % $Id: builtin.rl 2010-06-19 13:33:52 nineties $
  %);
 
 include(stddef,code);
@@ -691,50 +691,31 @@ rl_sappend: (p0) {
     return mkstring(x2);
 };
 
-rl_open_out: (p0) {
-    allocate(2);
-    check_arity(p0, 1, "open_out");
-    x0 = string_value(car(p0));
-    x1 = open_out(x0);
-    return mkint(x1);
-};
-
-rl_close_out: (p0) {
-    allocate(2);
-    check_arity(p0, 1, "close_out");
-    x0 = int_value(car(p0));
-    close_out(x0);
-    return nil_sym;
-};
-
 rl_put_byte: (p0) {
-    allocate(2);
-    check_arity(p0, 2, "put_byte");
-    x0 = int_value(car(p0)); (% output channel %);
-    x1 = int_value(cadr(p0));
-    fputc(x0, x1);
+    allocate(1);
+    check_arity(p0, 1, "put_byte");
+    x0 = int_value(car(p0));
+    putc(x0);
     return nil_sym;
 };
 
 rl_put_short: (p0) {
-    allocate(2);
-    check_arity(p0, 2, "put_short");
-    x0 = int_value(car(p0)); (% output channel %);
-    x1 = int_value(cadr(p0));
-    fputc(x0, x1%255);
-    fputc(x0, (x1/256)%255);
+    allocate(1);
+    check_arity(p0, 1, "put_short");
+    x0 = int_value(car(p0));
+    putc(x0%255);
+    putc((x0/256)%255);
     return nil_sym;
 };
 
 rl_put_word: (p0) {
-    allocate(2);
-    check_arity(p0, 2, "put_word");
-    x0 = int_value(car(p0)); (% output channel %);
-    x1 = int_value(cadr(p0));
-    fputc(x0, x1%255);
-    fputc(x0, (x1/256)%255);
-    fputc(x0, (x1/65536)%255);
-    fputc(x0, (x1/16777216)%255);
+    allocate(1);
+    check_arity(p0, 1, "put_word");
+    x0 = int_value(car(p0));
+    putc(x0%255);
+    putc((x0/256)%255);
+    putc((x0/65536)%255);
+    putc((x0/16777216)%255);
     return nil_sym;
 };
 
@@ -821,8 +802,6 @@ init_builtin_objects: () {
     register_prim("symbol2s"   , &rl_symbol2s);
     register_prim("tosym"      , &rl_tosym);
     register_prim("sappend"    , &rl_sappend);
-    register_prim("open_out"   , &rl_open_out);
-    register_prim("close_out"  , &rl_close_out);
     register_prim("put_byte"   , &rl_put_byte);
     register_prim("put_short"  , &rl_put_short);
     register_prim("put_word"   , &rl_put_word);
