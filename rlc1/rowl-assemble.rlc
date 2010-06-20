@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-assemble.rlc 2010-06-20 02:07:23 nineties $
+; $Id: rowl-assemble.rlc 2010-06-20 13:51:53 nineties $
 ;
 
 (import "stdlib")
@@ -28,9 +28,15 @@
 (var addr_table ())
 (var addr 0)
 
+(define scan_insn (insn)
+    (cond
+        ((and (cons? insn) (== `label (car insn))) (push addr_table `(@(cadr insn) . @addr)))
+        (otherwise (set addr (+ addr (insn_len insn))))
+        ))
+
 (define scan_fundecl ((_ name body)) (do
     (push addr_table `(@name . @addr))
-    (foreach i body (set addr (+ addr (insn_len i))))
+    (foreach i body (scan_insn i))
     ))
 
 (define scan_decl (decl)
@@ -44,11 +50,13 @@
 (define assemble_insn (insn)
     (cond
         ((symbol? insn)     (do (put_byte (insn_code insn)) (incl addr)))
-        ((== `call (car insn)) (do
-            (put_byte (insn_code `call))
+        ((== `label (car insn)) ())
+        ((symbol? (cadr insn)) (do
+            (put_byte (insn_code insn))
             (put_word (relative_address (cadr insn)))
-            (set addr (+ addr 3))
+            (set addr (+ addr (insn_len insn)))
             ))
+        (otherwise (eprintln "not reachable here"))
         ))
 (define assemble_fundecl ((_ name body)) (do
     (foreach i body (assemble_insn i))
@@ -74,6 +82,7 @@
 (assemble `(
 
 (fun main (
+    imm_i0
     imm_i2
     imm_i3
     (call f)
