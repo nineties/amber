@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-06-20 00:33:53 nineties $
+; $Id: vm-insn.rlc 2010-06-20 13:50:49 nineties $
 ;
 
 (define gen_comparison (cmovname) `(
@@ -14,8 +14,8 @@
     (vmfetch)))
 
 (var vm_instructions `(
-    (exit       1 @true ((vmpop %eax) (break)))
     (nop        1 @true ())
+    (exit       1 @true ((vmpop %eax) (break)))
     (imm_i0     1 @true ((vmpush %edx)))
     (imm_i1     1 @true ((vmpush $1)))
     (imm_i2     1 @true ((vmpush $2)))
@@ -57,15 +57,16 @@
         (vmpush %eax) ; store return point
         (vmpush %edi) ; store base pointer
         (vmsword 1 %eax) ; offset of address of the function
+        (asm "movl %esi, %edi") ; set base pointer
         (asm "addl %eax, %ecx")
         (vmfetch)
         ))
     (ireturn    1 @nil  (
         (asm "movl (%esi), %ebx") ; return value
         (asm "movl %edi, %esi")
-        (vmpop %edi)
-        (vmpop %ecx)
-        (vmubyte -1 %eax) ; total size of arguments
+        (vmpop %edi) ; base pointer
+        (vmpop %ecx) ; return address
+        (vmpop %eax) ; total bytes of arguments
         (asm "addl %eax, %esi")
         (vmpush %ebx) ; push return value
         (vmfetch)
