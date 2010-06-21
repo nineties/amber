@@ -2,10 +2,195 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-06-19 00:27:30 nineties $
+; $Id: rowl-compile.rlc 2010-06-22 01:20:21 nineties $
 ;
 
 (import "stdlib")
-(import "vm-insn")
+(import "rowl-assemble")
 
+(var vtable ()) ; variable table
+(var label_id 0)
+(define mklabel () (do
+    (incl label_id)
+    (tosym (++ "label." label_id))
+    ))
 
+(var insn_seq ())
+(define reset_insn_seq () (set insn_seq ()))
+(define get_insn_seq () (reverse insn_seq))
+(define emit_insn (insn) (push insn_seq insn))
+
+(define arg_insn (idx)
+    (cond
+        ((== idx 0) `arg0)
+        ((== idx 1) `arg1)
+        ((== idx 2) `arg2)
+        ((== idx 3) `arg3)
+        ((== idx 4) `arg4)
+        (otherwise `(@arg @idx))
+        ))
+
+(define compile_var (vtable sym) (do
+    (var loc (assoc sym vtable))
+    (cond
+        ((== `arg (car loc)) (emit_insn (arg_insn (cadr loc))))
+        (otherwise (eprintln "compile_var: not implemented"))
+        )))
+
+(define compile_int_lit (val)
+    (cond
+        ((== val 0)  (emit_insn `imm_i0))
+        ((== val 1)  (emit_insn `imm_i1))
+        ((== val 2)  (emit_insn `imm_i2))
+        ((== val 3)  (emit_insn `imm_i3))
+        ((== val 4)  (emit_insn `imm_i4))
+        ((== val 5)  (emit_insn `imm_i5))
+        ((== val -1) (emit_insn `imm_im1))
+        ((and (<= val 32768) (> val -32769)) (emit_insn `(imm_int @val))) ; 16bit signed integer
+        (otherwise (eprintln "compile_int_lit: not implemented"))
+        ))
+
+(define compile_exit (vtable expr) (do
+    (compile_expr vtable (cadr expr))
+    (emit_insn `exit)
+    ))
+
+(define compile_return (vtable expr) (do
+    (compile_expr vtable (cadr expr))
+    (emit_insn `ireturn)
+    ))
+
+(var binary_operator `((+ . iadd) (- . isub) (* . imul) (/ . idiv) (% . imod)))
+(var unary_operator `((- . ineg)))
+
+(define binary_operator? (op) (assoc op binary_operator))
+(define unary_operator? (op) (assoc op unary_operator))
+
+(define compile_binexpr (vtable expr) (do
+    (var insn (assoc (car expr) binary_operator))
+    (var lhs (cadr expr))
+    (var rhs (caddr expr))
+    (compile_expr vtable lhs)
+    (compile_expr vtable rhs)
+    (emit_insn insn)
+    ))
+
+(define compile_unexpr (vtable expr) (do
+    (var insn (assoc (car expr) unary_operator))
+    (var arg (cadr expr))
+    (compile_expr vtable arg)
+    (emit_insn insn)
+    ))
+
+(define compile_call (vtable expr) (do
+    (var fun (car expr))
+    (var args (cdr expr))
+    (var narg (length args))
+    (foreach a (reverse args) (compile_expr vtable a))
+    (emit_insn `(call @fun @(* 4 narg)))
+    ))
+
+(var comparison_operator
+    `((< . if_lt) (> . if_gt) (<= . if_le) (>= . if_ge) (== . if_eq) (!= . if_ne)))
+(define comparison_expr? (expr) (and (cons? expr) (assoc (car expr) comparison_operator)))
+
+(define compile_comp_if (vtable expr) (do
+    (var condexpr (cadr expr))
+    (var insn (assoc (car condexpr) comparison_operator))
+    (var lhs (cadr condexpr))
+    (var rhs (caddr condexpr))
+    (var ifthen (caddr expr))
+    (var ifelse (cadddr expr))
+    (var ifelse-label (mklabel))
+    (var end-label (mklabel))
+    (compile_expr vtable lhs)
+    (compile_expr vtable rhs)
+    (emit_insn `(@insn @ifelse-label))
+    (compile_expr vtable ifthen)
+    (emit_insn `(goto @end-label))
+    (emit_insn `(label @ifelse-label))
+    (compile_expr vtable ifelse)
+    (emit_insn `(label @end-label))
+    ))
+
+(define compile_if (vtable expr)
+    (if (comparison_expr? (cadr expr))
+        (compile_comp_if vtable expr)
+        (do
+            (var condition (cadr expr))
+            (var ifthen (caddr expr))
+            (var ifelse (cadddr expr))
+            (var ifelse-label (mklabel))
+            (var end-label (mklabel))
+            (compile_expr vtable condition)
+            (emit_insn `(if_zero @ifelse-label))
+            (compile_expr vtable ifthen)
+            (emit_insn `(goto @end-label))
+            (emit_insn `(label @ifelse-label))
+            (compile_expr vtable ifelse)
+            (emit_insn `(label @end-label))
+        )
+        )
+    )
+
+(define compile_expr (vtable expr)
+    (cond
+        ((int? expr) (compile_int_lit expr))
+        ((symbol? expr) (compile_var vtable expr))
+        ((== `if (car expr)) (compile_if vtable expr))
+        ((== `exit (car expr)) (compile_exit vtable expr))
+        ((== `return (car expr)) (compile_return vtable expr))
+        ((and (== 3 (length expr)) (binary_operator? (car expr)))
+            (compile_binexpr vtable expr))
+        ((and (== 2 (length expr)) (unary_operator? (car expr)))
+            (compile_unexpr vtable expr))
+        (otherwise (compile_call vtable expr))
+        ))
+
+(define compile_block (vtable block) (do
+    (foreach e block (compile_expr vtable e))
+    ))
+
+(define compile_fundecl ((_ name params body)) (do
+    (reset_insn_seq)
+    (var pidx 0) ; parameter index
+    (foreach p params (do
+        (push vtable `(@p . (arg @pidx)))
+        (incl pidx)
+        ))
+    (compile_block vtable body)
+    `(fun @name @(get_insn_seq))
+    ))
+
+(define compile_decl (decl)
+    (cond
+        ((== `fun (car decl)) (compile_fundecl decl))
+        (otherwise (eprintln "compile_decl: not implemented"))
+        ))
+
+(define compile_main (code) (do
+    (var asm_code ())
+    (foreach decl code (push asm_code (compile_decl decl)))
+    (reverse asm_code)
+    ))
+
+(define compile (code) (do
+    (var asm_code (compile_main code))
+    (eprintln asm_code)
+    (assemble asm_code)
+    ))
+
+; test code
+(compile `(
+
+(fun main () (
+    (exit (fib 36))
+    ))
+
+(fun fib (n) (
+    (if (< n 3)
+        (return 1)
+        (return (+ (fib (- n 1)) (fib (- n 2)))))
+    ))
+
+    ))
