@@ -2,10 +2,11 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-06-22 13:39:31 nineties $
+; $Id: rowl-compile.rlc 2010-06-22 16:49:05 nineties $
 ;
 
 (import "stdlib")
+(import "vm-prim")
 (import "rowl-assemble")
 
 (var vtable ()) ; variable table
@@ -86,10 +87,21 @@
 
 (define compile_call (vtable expr) (do
     (var fun (car expr))
-    (var args (cdr expr))
+    (var prim (assoc fun prim_table)) ; (index name)
+    (if prim
+        (compile_extcall vtable (car prim) (cdr expr))
+        (do
+            (var args (cdr expr))
+            (var narg (length args))
+            (foreach a (reverse args) (compile_expr vtable a))
+            (emit_insn `(call @fun @(* 4 narg)))
+        ))
+    ))
+
+(define compile_extcall (vtable prim_idx args) (do
     (var narg (length args))
-    (foreach a (reverse args) (compile_expr vtable a))
-    (emit_insn `(call @fun @(* 4 narg)))
+    (foreach a (reverse args) (compile_extcall vtable a))
+    (emit_insn `(extcall @prim_idx @(* 4 narg)))
     ))
 
 (var comparison_operator
@@ -179,7 +191,7 @@
 
 (define compile (code) (do
     (var asm_code (compile_main code))
-    (eprintln asm_code)
+    (eprintln "asm_code:" asm_code)
     (assemble asm_code)
     ))
 
@@ -187,6 +199,7 @@
 (compile `(
 
 (fun main () (
+    (hello)
     (exit (fib 36))
     ))
 

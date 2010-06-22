@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-06-22 16:01:36 nineties $
+# $Id: Makefile 2010-06-22 16:47:29 nineties $
 
 AS = as
 ASFLAGS =
@@ -54,6 +54,9 @@ vm-load.rlc    : stdlib.rlc vm-compile.rlc
 rlvm: vm-main.o vm-eval.o vm-gc.o vm-load.o
 	$(LD) $^ -o $@ $(VMLDFLAGS)
 
+rlc1: rowl-compile.rlc
+	./rlci $< > $@
+
 .SUFFIXES:
 .SUFFIXES: .o .s .rl .rlc
 
@@ -68,4 +71,4 @@ rlvm: vm-main.o vm-eval.o vm-gc.o vm-load.o
 
 .PHONY: clean
 clean:
-	rm -f *.o *.s rlci rlvm core
+	rm -f *.o *.s rlci rlvm rlc1 core
