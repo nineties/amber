@@ -2,11 +2,11 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-main.rlc 2010-06-19 00:09:34 nineties $
+; $Id: vm-main.rlc 2010-06-22 15:28:08 nineties $
 ;
 
-(var TRUE  1)
-(var FALSE 0)
+(import "stdlib")
+(import "vm-compile")
 
 ; system calls
 (var SYS_EXIT    1)
@@ -21,8 +21,6 @@
 (var STDOUT_FD 1)
 (var STDERR_FD 2)
 
-(var DEFAULT_STACK_SIZE (* 2 1024 1024)) ; 2MB
-
 (var vm-main-code `(
 
 (fun strlen (str) (
@@ -34,6 +32,7 @@
     (return len)
     ))
 
+(export memset)
 (fun memset (ptr val size) (
     (for i 0 size (
         ([]=8 ptr i val)
@@ -41,15 +40,18 @@
         ))
     ))
 
+(export error)
 (fun error (msg) (
     (syscall @SYS_WRITE @STDERR_FD msg (strlen msg))
     (vmexit 1)
     ))
 
+(export debug)
 (fun debug (msg) (
     (syscall @SYS_WRITE @STDOUT_FD msg (strlen msg))
     ))
 
+(export debugi)
 (fun debugi (v) (
     (int x (+ (% (/ v 10000000000) 10) '0'))
     (syscall @SYS_WRITE @STDOUT_FD (address x) 1)
@@ -76,6 +78,7 @@
     (debug "\n")
     ))
 
+(export debugx)
 (string hexdigits "0123456789abcdef")
 (fun debugx (v) (
     (int x (*8 (+ hexdigits (% (>> v 28) 0x10))))
@@ -97,12 +100,13 @@
     (debug "\n")
     ))
 
+(export vmexit)
 (fun vmexit (status) (
     (cleanup_blocks)
     (syscall @SYS_EXIT status)
     ))
 
-(extern _start)
+(export _start)
 (fun _start (p) (
     (void* argv (address p))
 
@@ -120,3 +124,7 @@
     ))
 
 ))
+
+(vtable_push)
+(compile vm-main-code)
+(vtable_pop)
