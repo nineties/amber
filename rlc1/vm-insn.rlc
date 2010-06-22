@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-06-22 01:48:06 nineties $
+; $Id: vm-insn.rlc 2010-06-22 11:50:53 nineties $
 ;
 
 (define gen_comparison1 (cmovname) `(
@@ -27,7 +27,7 @@
 (var vm_instructions `(
     (nop        1 @true ())
     (exit       1 @true ((vmpop %eax) (break)))
-    (imm_i0     1 @true ((vmpush %edx)))
+    (imm_i0     1 @true ((vmpush %edx))) ; also used for 'nil'
     (imm_i1     1 @true ((vmpush $1)))
     (imm_i2     1 @true ((vmpush $2)))
     (imm_i3     1 @true ((vmpush $3)))
@@ -107,14 +107,42 @@
         (asm "movl %ebx, (%eax)")
         (asm "movl %eax, (%esi)")
         ))
-    (car        1 @true (
+    (get_field0 1 @true ( ; also used for 'car'
         (asm "movl (%esi), %eax")
         (asm "movl (%eax), %eax")
         (asm "movl %eax, (%esi)")
         ))
-    (cdr        1 @true (
+    (get_field1 1 @true ( ; also used for 'cdr'
         (asm "movl (%esi), %eax")
         (asm "movl 4(%eax), %eax")
+        (asm "movl %eax, (%esi)")
+        ))
+    (get_field2 1 @true (
+        (asm "movl (%esi), %eax")
+        (asm "movl 8(%eax), %eax")
+        (asm "movl %eax, (%esi)")
+        ))
+    (get_field3 1 @true (
+        (asm "movl (%esi), %eax")
+        (asm "movl 12(%eax), %eax")
+        (asm "movl %eax, (%esi)")
+        ))
+    (get_field4 1 @true (
+        (asm "movl (%esi), %eax")
+        (asm "movl 16(%eax), %eax")
+        (asm "movl %eax, (%esi)")
+        ))
+    (get_field5 1 @true (
+        (asm "movl (%esi), %eax")
+        (asm "movl 20(%eax), %eax")
+        (asm "movl %eax, (%esi)")
+        ))
+    (get_field 2 @true (
+        (vmubyte 1 %eax)
+        (asm "sall $2, %eax")
+        (asm "movl (%esi), %ebx")
+        (asm "addl %ebx, %eax")
+        (asm "movl (%eax), %eax")
         (asm "movl %eax, (%esi)")
         ))
     ))

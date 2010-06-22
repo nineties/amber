@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-06-22 02:24:37 nineties $
+; $Id: rowl-compile.rlc 2010-06-22 11:56:52 nineties $
 ;
 
 (import "stdlib")
@@ -60,8 +60,10 @@
     (emit_insn `ireturn)
     ))
 
-(var binary_operator `((+ . iadd) (- . isub) (* . imul) (/ . idiv) (% . imod)))
-(var unary_operator `((- . ineg)))
+(var binary_operator
+    `((+ . iadd) (- . isub) (* . imul) (/ . idiv) (% . imod) (cons . cons))
+    )
+(var unary_operator `((- . ineg) (car . get_field0) (cdr . get_field1) ))
 
 (define binary_operator? (op) (assoc op binary_operator))
 (define unary_operator? (op) (assoc op unary_operator))
@@ -135,6 +137,7 @@
 
 (define compile_expr (vtable expr)
     (cond
+        ((nil? expr) (emit_insn `imm_i0))
         ((int? expr) (compile_int_lit expr))
         ((symbol? expr) (compile_var vtable expr))
         ((== `if (car expr)) (compile_if vtable expr))
@@ -184,12 +187,12 @@
 (compile `(
 
 (fun main () (
-    (exit (fib 39))
+    (exit (fib 36))
     ))
 
 (fun fib (n) (
-    (if (< n 2)
-        (return n)
+    (if (< n 3)
+        (return 1)
         (return (+ (fib (- n 1)) (fib (- n 2)))))
     ))
 
