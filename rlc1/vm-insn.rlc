@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-06-22 19:12:24 nineties $
+; $Id: vm-insn.rlc 2010-06-22 19:28:12 nineties $
 ;
 
 (define gen_comparison1 (cmovname) `(
@@ -28,6 +28,15 @@
     (asm "movl (%esi), %eax")
     (asm "movl " @(* 4 idx) "(%eax), %eax")
     (asm "movl %eax, (%esi)")
+    ))
+
+(define gen_set (idx) `(
+    (vmubyte 1 %eax) ; index
+    (asm "sall $2, %eax")
+    (vmpop %ebx) ; obj
+    (asm "addl %eax, %ebx")
+    (asm "movl (%esi), %eax") ; value
+    (asm "movl %eax, (%ebx)")
     ))
 
 (var vm_instructions `(
@@ -104,12 +113,12 @@
         (vmpush %ebx) ; push return value
         (vmfetch)
         ))
-    (arg0       1 @true ((vmarg 0 %eax) (vmpush %eax)))
-    (arg1       1 @true ((vmarg 1 %eax) (vmpush %eax)))
-    (arg2       1 @true ((vmarg 2 %eax) (vmpush %eax)))
-    (arg3       1 @true ((vmarg 3 %eax) (vmpush %eax)))
-    (arg4       1 @true ((vmarg 4 %eax) (vmpush %eax)))
-    (arg        2 @true (
+    (arg0 1 @true ((vmarg 0 %eax) (vmpush %eax)))
+    (arg1 1 @true ((vmarg 1 %eax) (vmpush %eax)))
+    (arg2 1 @true ((vmarg 2 %eax) (vmpush %eax)))
+    (arg3 1 @true ((vmarg 3 %eax) (vmpush %eax)))
+    (arg4 1 @true ((vmarg 4 %eax) (vmpush %eax)))
+    (arg  2 @true (
         (vmubyte 1 %eax)
         (asm "addl $2, %eax")
         (asm "sall $2, %eax")
@@ -117,7 +126,7 @@
         (asm "movl (%eax), %eax")
         (vmpush %eax)
         ))
-    (cons       1 @true (
+    (cons 1 @true (
         (vmsave)
         (call allocate_cons)
         (vmrestore)
@@ -127,13 +136,25 @@
         (asm "movl %ebx, (%eax)")
         (asm "movl %eax, (%esi)")
         ))
+    ; allocate plain object
+    ; arg0 = size (in words)
+    ; NB: allocated memory is not be zero-cleared
+    (plain 1 @true (
+        (asm "movl (%esi), %eax")
+        (vmsave)
+        (asm "pushl %eax")
+        (call allocate_plain)
+        (vmrestore)
+        (asm "addl $4, %esp")
+        (asm "movl %eax, (%esi)")
+        ))
     (get0 1 @true @(gen_get 0)) ; also used for 'car'
     (get1 1 @true @(gen_get 1)) ; also used for 'cdr'
     (get2 1 @true @(gen_get 2))
     (get3 1 @true @(gen_get 3))
     (get4 1 @true @(gen_get 4))
     (get5 1 @true @(gen_get 5))
-    (get 2 @true (
+    (get  2 @true (
         (vmubyte 1 %eax)
         (asm "sall $2, %eax")
         (asm "movl (%esi), %ebx")
@@ -141,5 +162,19 @@
         (asm "movl (%eax), %eax")
         (asm "movl %eax, (%esi)")
         ))
-    (
+    ; set val obj
+    (set0 1 @true @(gen_set 0))
+    (set1 1 @true @(gen_set 1))
+    (set2 1 @true @(gen_set 2))
+    (set3 1 @true @(gen_set 3))
+    (set4 1 @true @(gen_set 4))
+    (set5 1 @true @(gen_set 5))
+    (set  2 @true (
+        (vmubyte 1 %eax) ; index
+        (asm "sall $2, %eax")
+        (vmpop %ebx) ; obj
+        (asm "addl %eax, %ebx")
+        (asm "movl (%esi), %eax")
+        (asm "movl %eax, (%ebx)")
+        ))
     ))
