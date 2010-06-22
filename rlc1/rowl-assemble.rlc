@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-assemble.rlc 2010-06-22 02:25:18 nineties $
+; $Id: rowl-assemble.rlc 2010-06-22 16:38:33 nineties $
 ;
 
 (import "stdlib")
@@ -57,6 +57,12 @@
             (put_byte (insn_code insn))
             (put_word (relative_address (cadr insn)))
             (put_byte (caddr insn))
+            (set addr (+ addr (insn_len insn)))
+            ))
+        ((== `extcall (car insn)) (do
+            (put_byte (insn_code insn))
+            (put_word (cadr insn)) ; index of the function
+            (put_byte (caddr insn)) ; size of arguments
             (set addr (+ addr (insn_len insn)))
             ))
         ((symbol? (cadr insn)) (do
