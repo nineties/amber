@@ -2,12 +2,13 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vmgen.rlc 2010-06-18 13:47:26 nineties $
+; $Id: vm-compile.rlc 2010-06-22 15:34:08 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
 
 (import "stdlib")
+(import "vm-config")
 
 ; === utilities ===
 (define not_reachable args (do (eprintln "not reachable here") (exit 1)))
@@ -352,8 +353,12 @@
     (if ret (emit_return `(return) nil nil))
     ))
 
-(define emit_call ((call func . args) dst ret) (do
-    (if (symbol? func) (emit_directcall func args dst) (emit_indirectcall func args dst))
+(define emit_call ((_ func . args) dst ret) (do
+    (emit_directcall func args dst)
+    (if ret (emit_return `(return) nil nil))
+    ))
+(define emit_indcall ((_ func . args) dst ret) (do
+    (emit_indirectcall func args dst)
     (if ret (emit_return `(return) nil nil))
     ))
 
@@ -374,7 +379,8 @@
         (emit_expr e `%eax nil)
         (pushl `%eax)
         ))
-    (emit "call" `(label @func))
+    (emit_expr func `%eax nil)
+    (emit "call *%eax")
     (if (> narg 0) (emit "addl" (* 4 narg) `%esp))
     (if dst (movl `%eax dst))
     ))
@@ -536,6 +542,7 @@
     (nop     . @emit_nop)
     (syscall . @emit_syscall)
     (call    . @emit_call)
+    (indcall . @emit_indcall)
     (return  . @emit_return)
     (label   . @emit_label)
     (goto    . @emit_goto)
@@ -599,7 +606,9 @@
     (println (assoc sym `((text . ".section .text") (data . ".section .data") (rodata . ".section .rodata")))))
 (define change_area (sym) (if (!= sym current_area) (do (emit_area sym) (set current_area sym))))
 
-(define emit_extern ((extern . (name))) (print ".global " name '\n'))
+(define emit_export ((_ name)) (print ".global " name '\n'))
+
+(define emit_extern ((_ type name)) (add_var name `(global @type @name)))
 
 (define emit_static_scalar ((type sym . init)) (do
     (change_area `data)
@@ -701,9 +710,11 @@
     (vtable_pop)
 
     (foreach ent string_table (emit_static_string `(string @(car ent) @(cadr ent))))
+
     ))
 
 (var extdecl_dispatcher `(
+    (export  . @emit_export)
     (extern  . @emit_extern)
     (int     . @emit_static_scalar)
     (void*   . @emit_static_scalar)
@@ -718,17 +729,3 @@
     ))
 
 (define compile (prog) (foreach decl prog (dispatch extdecl_dispatcher not_reachable `(@decl))))
-
-; === compile the VM ===
-
-
-(vtable_push) ; global namespace
-(import "vm-main")
-(compile vm-main-code)
-(import "vm-eval")
-(compile vm-eval-code)
-(import "vm-gc")
-(compile vm-gc-code)
-(import "vm-load")
-(compile vm-load-code)
-(vtable_pop)

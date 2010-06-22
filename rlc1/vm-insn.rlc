@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-06-22 11:50:53 nineties $
+; $Id: vm-insn.rlc 2010-06-22 13:36:50 nineties $
 ;
 
 (define gen_comparison1 (cmovname) `(
@@ -73,6 +73,20 @@
         (asm "movl %esi, %edi") ; set base pointer
         (asm "addl %eax, %ecx")
         (vmfetch)
+        ))
+    (extcall    4 @true ( ; 'extcall:1' 'index of the external function:2' 'size of arguments:1'
+        (vmsave)
+        (vmuword 1 %eax)
+        (vmubyte 3 %ebx)
+        (asm "pushl %esi") ; push argv
+        (asm "pushl %ebx") ; push argc
+        (asm "pushl %eax") ; push index
+        (call vm_extcall)
+        (asm "addl $12, %esp")
+        (vmrestore)
+        (vmubyte 3 %ebx) ; total size of arguments
+        (asm "addl %ebx, %esi") ; remove arguments from stack
+        (vmpush %eax) ; push return value
         ))
     (ireturn    1 @nil  (
         (asm "movl (%esi), %ebx") ; return value

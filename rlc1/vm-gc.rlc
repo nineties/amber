@@ -2,8 +2,11 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-06-18 14:56:57 nineties $
+; $Id: vm-gc.rlc 2010-06-22 15:27:49 nineties $
 ;
+
+(import "stdlib")
+(import "vm-compile")
 
 (var SYS_MUNMAP  91)
 (var SYS_MMAP2   192)
@@ -57,8 +60,6 @@
 (var BDESCR_SIZE    8)
 (var BDESCR_SHIFT   3)  ; BDESCR_SIZE = 2^BDESCR_SHIFT
 
-(var BLOCK_SHIFT 20)    ; 1MB
-(var BLOCK_SIZE (<< 1 BLOCK_SHIFT))
 (var BLOCK_MASK (- BLOCK_SIZE 1))
 
 ; required constraints: 2*PAGE_SHIFT <= BLOCK_SHIFT
@@ -155,6 +156,8 @@
 
 (var vm-gc-code `(
 
+(extern void* stack)
+(extern int stack_size)
 
 (byte[] @(* BDESCR_SIZE MAX_BLOCKS) block_map)
 (int stack_base)    ; address of stack bottom
@@ -184,6 +187,7 @@
     ))
 
 ; `size` must be a multiple of BLOCK_SIZE
+(export alloc_block)
 (fun alloc_block (size) (
     (+= size @BLOCK_SIZE)
     (void* ptr (mmap2 0 size))
@@ -417,6 +421,7 @@
     (return obj)
     ))
 
+(export allocate_cons)
 (fun allocate_cons () (
     (void* ptr (allocate_object 3))
     @(SET_HEADER ptr TAG_CONS 0 3)
@@ -435,6 +440,7 @@
         ))
     ))
 
+(export init_gc)
 (fun init_gc (stack_base_) (
     (int x)
     (if (! stack_base_) ((= stack_base_ (address x))))
@@ -449,6 +455,7 @@
     (= freepage @(FIRST_PDESCR (bdescr->first current_block)))
     ))
 
+(export cleanup_blocks)
 (fun cleanup_blocks () (
     (for i 0 @MAX_BLOCKS (
         (if ([] block_used i) (
@@ -457,3 +464,7 @@
         ))
     ))
 ))
+
+(vtable_push)
+(compile vm-gc-code)
+(vtable_pop)
