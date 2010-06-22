@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-06-22 16:49:05 nineties $
+; $Id: rowl-compile.rlc 2010-06-22 17:33:05 nineties $
 ;
 
 (import "stdlib")
@@ -36,9 +36,11 @@
     (cond
         ((== `arg (car loc)) (emit_insn (arg_insn (cadr loc))))
         (otherwise (eprintln "compile_var: not implemented"))
-        )))
+        )
+    true
+    ))
 
-(define compile_int_lit (val)
+(define compile_int_lit (val) (do
     (cond
         ((== val 0)  (emit_insn `imm_i0))
         ((== val 1)  (emit_insn `imm_i1))
@@ -49,16 +51,20 @@
         ((== val -1) (emit_insn `imm_im1))
         ((and (<= val 32768) (> val -32769)) (emit_insn `(imm_int @val))) ; 16bit signed integer
         (otherwise (eprintln "compile_int_lit: not implemented"))
-        ))
+        )
+    true
+    ))
 
 (define compile_exit (vtable expr) (do
     (compile_expr vtable (cadr expr))
     (emit_insn `exit)
+    nil
     ))
 
 (define compile_return (vtable expr) (do
     (compile_expr vtable (cadr expr))
     (emit_insn `ireturn)
+    nil
     ))
 
 (var binary_operator
@@ -76,6 +82,7 @@
     (compile_expr vtable lhs)
     (compile_expr vtable rhs)
     (emit_insn insn)
+    true
     ))
 
 (define compile_unexpr (vtable expr) (do
@@ -83,6 +90,7 @@
     (var arg (cadr expr))
     (compile_expr vtable arg)
     (emit_insn insn)
+    true
     ))
 
 (define compile_call (vtable expr) (do
@@ -95,6 +103,7 @@
             (var narg (length args))
             (foreach a (reverse args) (compile_expr vtable a))
             (emit_insn `(call @fun @(* 4 narg)))
+            true
         ))
     ))
 
@@ -102,6 +111,7 @@
     (var narg (length args))
     (foreach a (reverse args) (compile_extcall vtable a))
     (emit_insn `(extcall @prim_idx @(* 4 narg)))
+    true
     ))
 
 (var comparison_operator
@@ -120,11 +130,12 @@
     (compile_expr vtable lhs)
     (compile_expr vtable rhs)
     (emit_insn `(@insn @ifelse-label))
-    (compile_expr vtable ifthen)
+    (if (compile_expr vtable ifthen) (emit_insn `drop))
     (emit_insn `(goto @end-label))
     (emit_insn `(label @ifelse-label))
-    (compile_expr vtable ifelse)
+    (if (compile_expr vtable ifelse) (emit_insn `drop))
     (emit_insn `(label @end-label))
+    nil
     ))
 
 (define compile_if (vtable expr)
@@ -138,18 +149,19 @@
             (var end-label (mklabel))
             (compile_expr vtable condition)
             (emit_insn `(if_zero @ifelse-label))
-            (compile_expr vtable ifthen)
+            (if (compile_expr vtable ifthen) (emit_insn `drop))
             (emit_insn `(goto @end-label))
             (emit_insn `(label @ifelse-label))
-            (compile_expr vtable ifelse)
+            (if (compile_expr vtable ifelse) (emit_insn `drop))
             (emit_insn `(label @end-label))
+            nil
         )
         )
     )
 
 (define compile_expr (vtable expr)
     (cond
-        ((nil? expr) (emit_insn `imm_i0))
+        ((nil? expr) (do (emit_insn `imm_i0 true)))
         ((int? expr) (compile_int_lit expr))
         ((symbol? expr) (compile_var vtable expr))
         ((== `if (car expr)) (compile_if vtable expr))
@@ -163,7 +175,10 @@
         ))
 
 (define compile_block (vtable block) (do
-    (foreach e block (compile_expr vtable e))
+    (foreach e block
+        (if (compile_expr vtable e) (emit_insn `drop))
+        )
+    nil
     ))
 
 (define compile_fundecl ((_ name params body)) (do
