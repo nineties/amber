@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-06-22 18:01:33 nineties $
+; $Id: vm-insn.rlc 2010-06-22 19:12:24 nineties $
 ;
 
 (define gen_comparison1 (cmovname) `(
@@ -23,6 +23,12 @@
     (asm @cmovname " %ebx, %eax")
     (vmsucc %eax)
     (vmfetch)))
+
+(define gen_get (idx) `(
+    (asm "movl (%esi), %eax")
+    (asm "movl " @(* 4 idx) "(%eax), %eax")
+    (asm "movl %eax, (%esi)")
+    ))
 
 (var vm_instructions `(
     (nop        1 @true ())
@@ -121,37 +127,13 @@
         (asm "movl %ebx, (%eax)")
         (asm "movl %eax, (%esi)")
         ))
-    (get_field0 1 @true ( ; also used for 'car'
-        (asm "movl (%esi), %eax")
-        (asm "movl (%eax), %eax")
-        (asm "movl %eax, (%esi)")
-        ))
-    (get_field1 1 @true ( ; also used for 'cdr'
-        (asm "movl (%esi), %eax")
-        (asm "movl 4(%eax), %eax")
-        (asm "movl %eax, (%esi)")
-        ))
-    (get_field2 1 @true (
-        (asm "movl (%esi), %eax")
-        (asm "movl 8(%eax), %eax")
-        (asm "movl %eax, (%esi)")
-        ))
-    (get_field3 1 @true (
-        (asm "movl (%esi), %eax")
-        (asm "movl 12(%eax), %eax")
-        (asm "movl %eax, (%esi)")
-        ))
-    (get_field4 1 @true (
-        (asm "movl (%esi), %eax")
-        (asm "movl 16(%eax), %eax")
-        (asm "movl %eax, (%esi)")
-        ))
-    (get_field5 1 @true (
-        (asm "movl (%esi), %eax")
-        (asm "movl 20(%eax), %eax")
-        (asm "movl %eax, (%esi)")
-        ))
-    (get_field 2 @true (
+    (get0 1 @true @(gen_get 0)) ; also used for 'car'
+    (get1 1 @true @(gen_get 1)) ; also used for 'cdr'
+    (get2 1 @true @(gen_get 2))
+    (get3 1 @true @(gen_get 3))
+    (get4 1 @true @(gen_get 4))
+    (get5 1 @true @(gen_get 5))
+    (get 2 @true (
         (vmubyte 1 %eax)
         (asm "sall $2, %eax")
         (asm "movl (%esi), %ebx")
@@ -159,4 +141,5 @@
         (asm "movl (%eax), %eax")
         (asm "movl %eax, (%esi)")
         ))
+    (
     ))
