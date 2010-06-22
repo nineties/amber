@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-06-22 15:33:38 nineties $
+# $Id: Makefile 2010-06-22 16:01:36 nineties $
 
 AS = as
 ASFLAGS =
@@ -47,7 +47,7 @@ VMLDFLAGS = --nostdlib --entry=_start
 
 vm-compile.rlc : stdlib.rlc vm-config.rlc
 vm-main.rlc    : stdlib.rlc vm-compile.rlc
-vm-eval.rlc    : stdlib.rlc vm-compile.rlc vm-insn.rlc
+vm-eval.rlc    : stdlib.rlc vm-compile.rlc vm-insn.rlc vm-prim.rlc
 vm-gc.rlc      : stdlib.rlc vm-compile.rlc
 vm-load.rlc    : stdlib.rlc vm-compile.rlc
 
