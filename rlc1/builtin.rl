@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-06-26 23:32:56 nineties $
+ % $Id: builtin.rl 2010-06-27 00:06:30 nineties $
  %);
 
 include(stddef,code);
@@ -727,6 +727,15 @@ rl_put_word: (p0) {
     return nil_sym;
 };
 
+rl_put_str: (p0) {
+    allocate(1);
+    check_arity(p0, 1, "put_str");
+    x0 = string_value(car(p0));
+    puts(x0);
+    putc('\0');
+    return nil_sym;
+};
+
 nil_sym    : NULL;
 true_sym   : NULL;
 var_sym    : NULL;
@@ -814,4 +823,5 @@ init_builtin_objects: () {
     register_prim("put_byte"   , &rl_put_byte);
     register_prim("put_short"  , &rl_put_short);
     register_prim("put_word"   , &rl_put_word);
+    register_prim("put_str"    , &rl_put_str);
 };

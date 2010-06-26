@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-assemble.rlc 2010-06-26 23:33:46 nineties $
+; $Id: rowl-assemble.rlc 2010-06-27 00:25:35 nineties $
 ;
 
 (import "stdlib")
@@ -37,21 +37,32 @@
 (var align1_table ()) ; list of (type name value)
 (var value_addr_table ())
 
+(define value_length (val)
+    (cond
+        ((char? val)    1)
+        ((int? val)     4)
+        ((string? val)  (+ (string_len val) 1))
+        (otherwise (error "value_length: not implemented"))
+        ))
+
 (define get_alignment (ty) (assoc ty `((char . 1) (int . 4) (long . 8) (string . 1))))
-(define construct_value_addr_table () (do
+
+(var value_area_size 0)
+(define compute_value_addrs () (do
     (var addr 0)
     (foreach ent align8_table (do
         (push value_addr_table `(@(cadr ent) . @addr))
-        (set addr (+ addr 8))
+        (set addr (+ addr (value_length (caddr ent))))
         ))
     (foreach ent align4_table (do
         (push value_addr_table `(@(cadr ent) . @addr))
-        (set addr (+ addr 4))
+        (set addr (+ addr (value_length (caddr ent))))
         ))
     (foreach ent align1_table (do
         (push value_addr_table `(@(cadr ent) . @addr))
-        (set addr (+ addr 1))
+        (set addr (+ addr (value_length (caddr ent))))
         ))
+    (set value_area_size addr)
     ))
 
 (define get_value_addr (name) (do
@@ -86,15 +97,16 @@
 
 (define scan_decl (decl)
     (cond
-        ((== `fun (car decl))  (scan_fundecl decl))
-        ((== `int (car decl))  (scan_value_decl decl))
-        ((== `char (car decl)) (scan_value_decl decl))
+        ((== `fun (car decl))       (scan_fundecl decl))
+        ((== `int (car decl))       (scan_value_decl decl))
+        ((== `char (car decl))      (scan_value_decl decl))
+        ((== `string (car decl))    (scan_value_decl decl))
         (otherwise (error "scan_decl: not implemented"))
         ))
 
 (define relative_address (sym) (- (assoc sym label_addr_table) addr))
 
-(define is_getXXX (head) (member? head `(getbyte getword getlong)))
+(define is_getXXX (head) (member? head `(loadb loadw getlong)))
 (define assemble_insn (insn)
     (cond
         ((symbol? insn) (do (put_byte (insn_code insn)) (incl addr)))
@@ -139,34 +151,21 @@
         (otherwise ())
         ))
 
-(var value_area_size_cache nil)
-(define value_area_size ()
-    (if value_area_size_cache
-        value_area_size_cache
-        (do
-            (var sz 0)
-            (set sz (+ sz (* 8 (length align8_table))))
-            (set sz (+ sz (* 4 (length align4_table))))
-            (set sz (+ sz (length align1_table)))
-            (set value_area_size_cache sz)
-            sz
-        ))
-    )
-
 (define emit_value ((type name value))
     (cond
         ((== `int type) (put_word value))
         ((== `char type) (put_byte (char2int value)))
+        ((== `string type) (put_str value))
         (otherwise (error "emit_value: not implemented"))
         ))
 
 (define assemble (prog) (do
     (set addr 0)
     (foreach decl prog (scan_decl decl))
-    (construct_value_addr_table)
-    (put_word (+ (+ addr 12) (value_area_size)))
+    (compute_value_addrs)
+    (put_word (+ (+ addr 12) value_area_size))
     (put_word 0)
-    (put_word (value_area_size))
+    (put_word value_area_size)
     (foreach v align8_table (error "multi-word values are not supported yet"))
     (foreach v align4_table (emit_value v))
     (foreach v align1_table (emit_value v))
