@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-06-26 18:58:46 nineties $
+ % $Id: builtin.rl 2010-06-26 23:32:56 nineties $
  %);
 
 include(stddef,code);
@@ -630,6 +630,13 @@ rl_exit: (p0) {
     exit(int_value(car(p0)));
 };
 
+rl_char2int: (p0) {
+    allocate(1);
+    check_arity(p0, 1, "char2int");
+    x0 = char_value(car(p0));
+    return mkint(x0);
+};
+
 tosbuf: char [12];
 rl_int2s: (p0) {
     allocate(2);
@@ -798,12 +805,13 @@ init_builtin_objects: () {
     register_prim("getc"       , &rl_getc);
     register_prim("syscall"    , &rl_syscall);
     register_prim("exit"       , &rl_exit);
+    register_prim("char2int"   , &rl_char2int);
     register_prim("int2s"      , &rl_int2s);
     register_prim("char2s"     , &rl_char2s);
     register_prim("symbol2s"   , &rl_symbol2s);
     register_prim("tosym"      , &rl_tosym);
     register_prim("sappend"    , &rl_sappend);
     register_prim("put_byte"   , &rl_put_byte);
-    register_prim("put_short"   , &rl_put_short);
+    register_prim("put_short"  , &rl_put_short);
     register_prim("put_word"   , &rl_put_word);
 };

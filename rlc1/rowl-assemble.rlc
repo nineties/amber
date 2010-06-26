@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-assemble.rlc 2010-06-26 22:22:07 nineties $
+; $Id: rowl-assemble.rlc 2010-06-26 23:33:46 nineties $
 ;
 
 (import "stdlib")
@@ -24,7 +24,7 @@
 (define insn_head (insn) (if (cons? insn) (car insn) insn))
 (define insn_info (insn) (do
     (var info (assoc (insn_head insn) vm_insn_table))
-    (if (nil? info) (eprintln "undefined instruction : " insn))
+    (if (nil? info) (error "undefined instruction : " insn))
     info
     ))
 (define insn_code (insn) (car  (insn_info insn)))
@@ -56,7 +56,7 @@
 
 (define get_value_addr (name) (do
     (var addr (assoc name value_addr_table))
-    (if (nil? addr) (eprintln "unknown value named " name))
+    (if (nil? addr) (error "unknown value named " name))
     addr
     ))
 
@@ -81,21 +81,23 @@
         ((== align 1) (push align1_table decl))
         ((== align 4) (push align4_table decl))
         ((== align 8) (push align8_table decl))
-        (otherwise (eprintln "invalid type: " (car decl)))
+        (otherwise (error "invalid type: " (car decl)))
         )))
 
 (define scan_decl (decl)
     (cond
-        ((== `fun (car decl)) (scan_fundecl decl))
-        ((== `int (car decl)) (scan_value_decl decl))
-        (otherwise (eprintln "scan_decl: not implemented"))
+        ((== `fun (car decl))  (scan_fundecl decl))
+        ((== `int (car decl))  (scan_value_decl decl))
+        ((== `char (car decl)) (scan_value_decl decl))
+        (otherwise (error "scan_decl: not implemented"))
         ))
 
 (define relative_address (sym) (- (assoc sym label_addr_table) addr))
 
+(define is_getXXX (head) (member? head `(getbyte getword getlong)))
 (define assemble_insn (insn)
     (cond
-        ((symbol? insn)     (do (put_byte (insn_code insn)) (incl addr)))
+        ((symbol? insn) (do (put_byte (insn_code insn)) (incl addr)))
         ((== `label (car insn)) ())
         ((== `call (car insn)) (do
             (put_byte (insn_code insn))
@@ -109,7 +111,7 @@
             (put_byte (caddr insn)) ; size of arguments
             (set addr (+ addr (insn_len insn)))
             ))
-        ((== `getword (car insn)) (do
+        ((is_getXXX (car insn)) (do
             (put_byte (insn_code insn))
             (put_short (get_value_addr (cadr insn)))
             (set addr (+ addr (insn_len insn)))
@@ -124,7 +126,7 @@
             (put_short (cadr insn))
             (set addr (+ addr (insn_len insn)))
             ))
-        (otherwise (eprintln "assemble_insn: not reachable here"))
+        (otherwise (error "assemble_insn: not reachable here"))
         ))
 
 (define assemble_fundecl ((_ name body)) (do
@@ -151,6 +153,13 @@
         ))
     )
 
+(define emit_value ((type name value))
+    (cond
+        ((== `int type) (put_word value))
+        ((== `char type) (put_byte (char2int value)))
+        (otherwise (error "emit_value: not implemented"))
+        ))
+
 (define assemble (prog) (do
     (set addr 0)
     (foreach decl prog (scan_decl decl))
@@ -158,9 +167,9 @@
     (put_word (+ (+ addr 12) (value_area_size)))
     (put_word 0)
     (put_word (value_area_size))
-    (foreach v align8_table (eprintln "multi-word values are not supported yet"))
-    (foreach v align4_table (put_word (caddr v)))
-    (foreach v align1_table (eprintln "byte values are not supported yet"))
+    (foreach v align8_table (error "multi-word values are not supported yet"))
+    (foreach v align4_table (emit_value v))
+    (foreach v align1_table (emit_value v))
     (set addr 0)
     (foreach decl prog (assemble_decl decl))
     ))

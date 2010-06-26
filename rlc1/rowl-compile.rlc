@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-06-26 22:22:36 nineties $
+; $Id: rowl-compile.rlc 2010-06-26 22:57:39 nineties $
 ;
 
 (import "stdlib")
@@ -36,11 +36,18 @@
     (cond
         ((nil? loc) (eprintln "undefined variable: " sym))
         ((== `arg (car loc)) (emit_insn (arg_insn (cadr loc))))
-        ((== `global (car loc)) (emit_insn `(getword @(cadr loc))))
+        ((== `global (car loc)) (compile_global_val loc))
         (otherwise (eprintln "compile_var: not implemented"))
         )
     true
     ))
+
+(define compile_global_val ((_ type name))
+    (cond
+        ((== `char type) (emit_insn `(getbyte @name)))
+        ((== `int type)  (emit_insn `(getword @name)))
+        (otherwise (eprintln "compile_global_val: not implemented"))
+        ))
 
 (define compile_int_lit (val) (do
     (cond
@@ -198,13 +205,14 @@
     (eprintln "compile_heap_object_decl: not implemented"))
 
 (define compile_value_object_decl (name value) (do
-    (push vtable `(@name . (global @name)))
-    (cond
-        ((char? value)  `(char @name @value))
-        ((int? value)   `(int @name @value))
+    (var type (cond
+        ((char? value) `char)
+        ((int? value) `int)
         (otherwise (eprintln "compile_value_object_decl: not implemented"))
         ))
-    )
+    (push vtable `(@name . (global @type @name)))
+    `(@type @name @value)
+    ))
 
 (define is_heap_object (value)
     (cond
@@ -241,10 +249,11 @@
 (compile `(
 
 (x 0)
+(y 'a')
 
 (fun main () (
     (hello)
-    (exit x)
+    (exit y)
     ;(exit (fib 36))
     ))
 
