@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-06-26 22:57:39 nineties $
+; $Id: rowl-compile.rlc 2010-06-27 00:14:49 nineties $
 ;
 
 (import "stdlib")
@@ -34,19 +34,20 @@
 (define compile_var (vtable sym) (do
     (var loc (assoc sym vtable))
     (cond
-        ((nil? loc) (eprintln "undefined variable: " sym))
+        ((nil? loc) (error "undefined variable: " sym))
         ((== `arg (car loc)) (emit_insn (arg_insn (cadr loc))))
         ((== `global (car loc)) (compile_global_val loc))
-        (otherwise (eprintln "compile_var: not implemented"))
+        (otherwise (error "compile_var: not implemented"))
         )
     true
     ))
 
 (define compile_global_val ((_ type name))
     (cond
-        ((== `char type) (emit_insn `(getbyte @name)))
-        ((== `int type)  (emit_insn `(getword @name)))
-        (otherwise (eprintln "compile_global_val: not implemented"))
+        ((== `char type)    (emit_insn `(loadb @name)))
+        ((== `int type)     (emit_insn `(loadw @name)))
+        ((== `string type)  (emit_insn `(loadarr @name)))
+        (otherwise (error "compile_global_val: not implemented"))
         ))
 
 (define compile_int_lit (val) (do
@@ -59,7 +60,7 @@
         ((== val 5)  (emit_insn `imm_i5))
         ((== val -1) (emit_insn `imm_im1))
         ((and (<= val 32768) (> val -32769)) (emit_insn `(imm_int @val))) ; 16bit signed integer
-        (otherwise (eprintln "compile_int_lit: not implemented"))
+        (otherwise (error "compile_int_lit: not implemented"))
         )
     true
     ))
@@ -202,13 +203,14 @@
     ))
 
 (define compile_heap_object_decl (name value)
-    (eprintln "compile_heap_object_decl: not implemented"))
+    (error "compile_heap_object_decl: not implemented"))
 
 (define compile_value_object_decl (name value) (do
     (var type (cond
         ((char? value) `char)
         ((int? value) `int)
-        (otherwise (eprintln "compile_value_object_decl: not implemented"))
+        ((string? value) `string)
+        (otherwise (error "compile_value_object_decl: not implemented"))
         ))
     (push vtable `(@name . (global @type @name)))
     `(@type @name @value)
@@ -248,13 +250,11 @@
 ; test code
 (compile `(
 
-(x 0)
-(y 'a')
+(msg "Hello World\n")
 
 (fun main () (
     (hello)
-    (exit y)
-    ;(exit (fib 36))
+    (exit (fib 36))
     ))
 
 (fun fib (n) (
