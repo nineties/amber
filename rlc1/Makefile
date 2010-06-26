@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-06-22 17:51:14 nineties $
+# $Id: Makefile 2010-06-26 14:07:42 nineties $
 
 AS = as
 ASFLAGS =
@@ -54,7 +54,7 @@ vm-load.o    : stdlib.rlc vm-compile.rlc
 rlvm: vm-main.o vm-eval.o vm-gc.o vm-load.o
 	$(LD) $^ -o $@ $(VMLDFLAGS)
 
-rlc1: rowl-compile.rlc
+rlc1: rowl-compile.rlc rowl-assemble.rlc
 	./rlci $< > $@
 
 .SUFFIXES:

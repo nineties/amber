@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-06-22 19:12:15 nineties $
+; $Id: rowl-compile.rlc 2010-06-26 22:22:36 nineties $
 ;
 
 (import "stdlib")
@@ -34,7 +34,9 @@
 (define compile_var (vtable sym) (do
     (var loc (assoc sym vtable))
     (cond
+        ((nil? loc) (eprintln "undefined variable: " sym))
         ((== `arg (car loc)) (emit_insn (arg_insn (cadr loc))))
+        ((== `global (car loc)) (emit_insn `(getval @(cadr loc))))
         (otherwise (eprintln "compile_var: not implemented"))
         )
     true
@@ -192,10 +194,35 @@
     `(fun @name @(get_insn_seq))
     ))
 
+(define compile_heap_object_decl (name value)
+    (eprintln "compile_heap_object_decl: not implemented"))
+
+(define compile_value_object_decl (name value) (do
+    (push vtable `(@name . (global @name)))
+    (cond
+        ((char? value)  `(char @name @value))
+        ((int? value)   `(int @name @value))
+        (otherwise (eprintln "compile_value_object_decl: not implemented"))
+        ))
+    )
+
+(define is_heap_object (value)
+    (cond
+        ((nil? value) true)
+        ((cons? value) true)
+        (otherwise nil)
+        ))
+
+(define compile_vardecl ((name value))
+    (if (is_heap_object value)
+        (compile_heap_object_decl name value)
+        (compile_value_object_decl name value)
+    ))
+
 (define compile_decl (decl)
     (cond
         ((== `fun (car decl)) (compile_fundecl decl))
-        (otherwise (eprintln "compile_decl: not implemented"))
+        (otherwise (compile_vardecl decl))
         ))
 
 (define compile_main (code) (do
@@ -213,9 +240,12 @@
 ; test code
 (compile `(
 
+(x 0)
+
 (fun main () (
     (hello)
-    (exit (fib 36))
+    (exit x)
+    ;(exit (fib 36))
     ))
 
 (fun fib (n) (
