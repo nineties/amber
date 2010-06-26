@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-assemble.rlc 2010-06-27 00:25:35 nineties $
+; $Id: rowl-assemble.rlc 2010-06-27 01:34:13 nineties $
 ;
 
 (import "stdlib")
@@ -31,7 +31,7 @@
 (define insn_len  (insn) (cadr (insn_info insn)))
 
 (var label_addr_table ())
-(var addr 0)
+(var current_addr 0)
 (var align8_table ()) ; list of (type name value)
 (var align4_table ()) ; list of (type name value)
 (var align1_table ()) ; list of (type name value)
@@ -75,14 +75,14 @@
 
 (define scan_insn (insn)
     (cond
-        ((symbol? insn) (set addr (+ addr (insn_len insn))))
-        ((== `label (car insn)) (push label_addr_table `(@(cadr insn) . @addr)))
-        ((== `addr  (car insn)) (set addr (+ addr (insn_len `imm_int))))
-        (otherwise (set addr (+ addr (insn_len insn))))
+        ((symbol? insn) (set current_addr (+ current_addr (insn_len insn))))
+        ((== `label (car insn)) (push label_addr_table `(@(cadr insn) . @current_addr)))
+        ((== `addr  (car insn)) (set current_addr (+ current_addr (insn_len `imm_int))))
+        (otherwise (set current_addr (+ current_addr (insn_len insn))))
         ))
 
 (define scan_fundecl ((_ name body)) (do
-    (push label_addr_table `(@name . @addr))
+    (push label_addr_table `(@name . @current_addr))
     (foreach i body (scan_insn i))
     ))
 
@@ -104,39 +104,43 @@
         (otherwise (error "scan_decl: not implemented"))
         ))
 
-(define relative_address (sym) (- (assoc sym label_addr_table) addr))
+(define relative_address (sym) (do
+    (var label_addr (assoc sym label_addr_table))
+    (if (nil? label_addr) (error "undefined symbol:" sym))
+    (- label_addr current_addr))
+    )
 
-(define is_getXXX (head) (member? head `(loadb loadw getlong)))
+(define is_load (head) (member? head `(loadb loadw loadl loadarr)))
 (define assemble_insn (insn)
     (cond
-        ((symbol? insn) (do (put_byte (insn_code insn)) (incl addr)))
+        ((symbol? insn) (do (put_byte (insn_code insn)) (incl current_addr)))
         ((== `label (car insn)) ())
         ((== `call (car insn)) (do
             (put_byte (insn_code insn))
             (put_short (relative_address (cadr insn)))
             (put_byte (caddr insn))
-            (set addr (+ addr (insn_len insn)))
+            (set current_addr (+ current_addr (insn_len insn)))
             ))
         ((== `extcall (car insn)) (do
             (put_byte (insn_code insn))
             (put_short (cadr insn)) ; index of the function
             (put_byte (caddr insn)) ; size of arguments
-            (set addr (+ addr (insn_len insn)))
+            (set current_addr (+ current_addr (insn_len insn)))
             ))
-        ((is_getXXX (car insn)) (do
+        ((is_load (car insn)) (do
             (put_byte (insn_code insn))
             (put_short (get_value_addr (cadr insn)))
-            (set addr (+ addr (insn_len insn)))
+            (set current_addr (+ current_addr (insn_len insn)))
             ))
         ((symbol? (cadr insn)) (do
             (put_byte (insn_code insn))
             (put_short (relative_address (cadr insn)))
-            (set addr (+ addr (insn_len insn)))
+            (set current_addr (+ current_addr (insn_len insn)))
             ))
         ((int? (cadr insn)) (do
             (put_byte (insn_code insn))
             (put_short (cadr insn))
-            (set addr (+ addr (insn_len insn)))
+            (set current_addr (+ current_addr (insn_len insn)))
             ))
         (otherwise (error "assemble_insn: not reachable here"))
         ))
@@ -160,16 +164,16 @@
         ))
 
 (define assemble (prog) (do
-    (set addr 0)
+    (set current_addr 0)
     (foreach decl prog (scan_decl decl))
     (compute_value_addrs)
-    (put_word (+ (+ addr 12) value_area_size))
+    (put_word (+ (+ current_addr 12) value_area_size))
     (put_word 0)
     (put_word value_area_size)
     (foreach v align8_table (error "multi-word values are not supported yet"))
     (foreach v align4_table (emit_value v))
     (foreach v align1_table (emit_value v))
-    (set addr 0)
+    (set current_addr 0)
     (foreach decl prog (assemble_decl decl))
     ))
 
