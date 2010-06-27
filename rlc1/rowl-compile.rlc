@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-06-27 01:38:35 nineties $
+; $Id: rowl-compile.rlc 2010-06-27 13:21:02 nineties $
 ;
 
 (import "stdlib")
@@ -36,18 +36,18 @@
     (cond
         ((nil? loc) (error "undefined variable: " sym))
         ((== `arg (car loc)) (emit_insn (arg_insn (cadr loc))))
-        ((== `global (car loc)) (compile_global_val loc))
+        ((== `global (car loc)) (compile_global_var loc))
         (otherwise (error "compile_var: not implemented"))
         )
     true
     ))
 
-(define compile_global_val ((_ type name))
+(define compile_global_var ((_ type name))
     (cond
         ((== `char type)    (emit_insn `(loadb @name)))
         ((== `int type)     (emit_insn `(loadw @name)))
         ((== `string type)  (emit_insn `(loadarr @name)))
-        (otherwise (error "compile_global_val: not implemented"))
+        (otherwise (error "compile_global_var: not implemented"))
         ))
 
 (define compile_int_lit (val) (do
@@ -62,6 +62,15 @@
         ((and (<= val 32768) (> val -32769)) (emit_insn `(imm_int @val))) ; 16bit signed integer
         (otherwise (error "compile_int_lit: not implemented"))
         )
+    true
+    ))
+
+(var string_decls ())
+(define compile_string_lit (str) (do
+    (var strlbl (mklabel))
+    (push vtable `(@strlbl . (global string @strlbl)))
+    (push string_decls `(string @strlbl @str))
+    (emit_insn `(loadarr @strlbl))
     true
     ))
 
@@ -81,9 +90,12 @@
     `((+ . iadd) (- . isub) (* . imul) (/ . idiv) (% . imod) (cons . cons))
     )
 (var unary_operator `((- . ineg) (car . get0) (cdr . get1) ))
+(var assignment_operator `((= . nop) (+= . iadd) (-= . isub) (*= . imul)
+    (/= . idiv) (%= . imod)))
 
 (define binary_operator? (op) (assoc op binary_operator))
 (define unary_operator? (op) (assoc op unary_operator))
+(define assignment_operator? (op) (assoc op assignment_operator))
 
 (define compile_binexpr (vtable expr) (do
     (var insn (assoc (car expr) binary_operator))
@@ -101,6 +113,35 @@
     (compile_expr vtable arg)
     (emit_insn insn)
     true
+    ))
+
+(define compile_global_assign (vtable insn (_ type name) rhs) (do
+    (var load_store_op (assoc type `((char . (loadb storeb)) (int . (loadw storew)))))
+    (if (!= `nop insn)
+        (do
+            (emit_insn `(@(car load_store_op) @name))
+            (compile_expr vtable rhs)
+            (emit_insn insn)
+            (emit_insn `(@(cadr load_store_op) @name))
+        )
+        (do
+            (compile_expr vtable rhs)
+            (emit_insn `(@(cadr load_store_op) @name))
+        )
+        )
+    ))
+
+(define compile_assign (vtable expr) (do
+    (var insn (assoc (car expr) assignment_operator))
+    (var lhs (cadr expr))
+    (var rhs (caddr expr))
+    (var loc (assoc lhs vtable))
+    (cond
+        ((nil? loc) (error "undefined variable: " sym))
+        ((== `global (car loc)) (compile_global_assign vtable insn loc rhs))
+        (otherwise (error "compile_assign: not implemented"))
+        )
+    nil
     ))
 
 (define compile_call (vtable expr) (do
@@ -172,7 +213,9 @@
 (define compile_expr (vtable expr)
     (cond
         ((nil? expr) (do (emit_insn `imm_i0 true)))
+        ((char? expr) (compile_int_lit (char2int expr)))
         ((int? expr) (compile_int_lit expr))
+        ((string? expr) (compile_string_lit expr))
         ((symbol? expr) (compile_var vtable expr))
         ((== `if (car expr)) (compile_if vtable expr))
         ((== `exit (car expr)) (compile_exit vtable expr))
@@ -181,6 +224,8 @@
             (compile_binexpr vtable expr))
         ((and (== 2 (length expr)) (unary_operator? (car expr)))
             (compile_unexpr vtable expr))
+        ((and (== 3 (length expr)) (assignment_operator? (car expr)))
+            (compile_assign vtable expr))
         (otherwise (compile_call vtable expr))
         ))
 
@@ -238,7 +283,7 @@
 (define compile_main (code) (do
     (var asm_code ())
     (foreach decl code (push asm_code (compile_decl decl)))
-    (reverse asm_code)
+    (append string_decls (reverse asm_code))
     ))
 
 (define compile (code) (do
@@ -250,11 +295,12 @@
 ; test code
 (compile `(
 
-(msg "Hello World\n")
+(x 2)
 
 (fun main () (
-    (print_string msg)
-    (exit 0)
+    (print_string "Hello World\n")
+    (-= x 1)
+    (exit x)
     ))
 
 (fun fib (n) (

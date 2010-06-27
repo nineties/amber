@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-assemble.rlc 2010-06-27 01:34:13 nineties $
+; $Id: rowl-assemble.rlc 2010-06-27 13:19:46 nineties $
 ;
 
 (import "stdlib")
@@ -110,7 +110,7 @@
     (- label_addr current_addr))
     )
 
-(define is_load (head) (member? head `(loadb loadw loadl loadarr)))
+(define is_load_store (head) (member? head `(loadb loadw loadl loadarr storeb storew)))
 (define assemble_insn (insn)
     (cond
         ((symbol? insn) (do (put_byte (insn_code insn)) (incl current_addr)))
@@ -127,7 +127,7 @@
             (put_byte (caddr insn)) ; size of arguments
             (set current_addr (+ current_addr (insn_len insn)))
             ))
-        ((is_load (car insn)) (do
+        ((is_load_store (car insn)) (do
             (put_byte (insn_code insn))
             (put_short (get_value_addr (cadr insn)))
             (set current_addr (+ current_addr (insn_len insn)))
