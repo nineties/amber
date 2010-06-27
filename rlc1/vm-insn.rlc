@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-06-27 13:21:34 nineties $
+; $Id: vm-insn.rlc 2010-06-27 17:07:08 nineties $
 ;
 
 (define gen_comparison1 (cmovname) `(
@@ -177,33 +177,64 @@
         (asm "movl (%esi), %eax")
         (asm "movl %eax, (%ebx)")
         ))
-    (loadb 3 @true (
+    ; allocate stack area for local variables
+    (allocate 3 @true (
+        (vmushort 1 %eax)
+        (asm "sall $2, %eax")
+        (asm "subl %eax, %esi")
+        ))
+    ; load word from local
+    (loadwl 3 @true (
+        (vmushort 1 %ebx) ; index
+        (asm "incl %ebx")
+        (asm "sall $2, %ebx")
+        (asm "movl %edi, %eax")
+        (asm "subl %ebx, %eax")
+        (asm "movl (%eax), %eax")
+        (vmpush %eax)
+        ))
+    ; store word to local
+    (storewl 3 @true (
+        (vmushort 1 %ebx) ; index
+        (asm "incl %ebx")
+        (asm "sall $2, %ebx")
+        (asm "movl %edi, %eax")
+        (asm "subl %ebx, %eax")
+        (vmpop %ebx)
+        (asm "movl %ebx, (%eax)")
+        ))
+    ; load byte from value area
+    (loadbv 3 @true (
         (vmushort 1 %eax)
         (asm "addl value_area_base, %eax")
         (asm "movzbl (%eax), %eax")
         (vmpush %eax)
         ))
-    (loadw 3 @true (
+    ; load word from value area
+    (loadwv 3 @true (
         (vmushort 1 %eax)
         (asm "addl value_area_base, %eax")
         (asm "movl (%eax), %eax")
         (vmpush %eax)
         ))
-    (loadarr 3 @true (
+    ; load address of array from value area
+    (loadav 3 @true (
         (vmushort 1 %eax)
         (asm "addl value_area_base, %eax")
         (vmpush %eax)
         ))
-    (storew 3 @true (
-        (vmushort 1 %eax)
-        (asm "addl value_area_base, %eax")
-        (vmpop %ebx)
-        (asm "movl %ebx, (%eax)")
-        ))
-    (storeb 3 @true (
+    ; store byte to value area
+    (storebv 3 @true (
         (vmushort 1 %eax)
         (asm "addl value_area_base, %eax")
         (vmpop %ebx)
         (asm "movb %bl, (%eax)")
+        ))
+    ; store word to value area
+    (storewv 3 @true (
+        (vmushort 1 %eax)
+        (asm "addl value_area_base, %eax")
+        (vmpop %ebx)
+        (asm "movl %ebx, (%eax)")
         ))
     ))
