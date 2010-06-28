@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-06-28 19:57:46 nineties $
+; $Id: rowl-compile.rlc 2010-06-28 21:39:27 nineties $
 ;
 
 (import "stdlib")
@@ -85,7 +85,7 @@
         ((== idx 3) (emit_insn `loadwl3))
         ((== idx 4) (emit_insn `loadwl4))
         ((== idx 5) (emit_insn `loadwl5))
-        ((< val 256) (emit_insn `(loadwl @idx)))
+        ((< idx 256) (emit_insn `(loadwl @idx)))
         (otherwise (error "too many local variables"))
         ))
 
@@ -170,6 +170,29 @@
         )
     ))
 
+(define compile_local_assign (insn loc rhs) (do
+    (if (!= `nop insn)
+        (do
+            (compile_local_var loc)
+            (compile_expr rhs)
+            (emit_insn insn)
+        )
+        (do
+            (compile_expr rhs)
+        )
+        )
+    (var idx (cadr loc))
+    (cond
+        ((== idx 0) (emit_insn `storewl0))
+        ((== idx 1) (emit_insn `storewl1))
+        ((== idx 2) (emit_insn `storewl2))
+        ((== idx 3) (emit_insn `storewl3))
+        ((== idx 4) (emit_insn `storewl4))
+        ((== idx 5) (emit_insn `storewl5))
+        ((< idx 256) (emit_insn `(storewl @idx)))
+        (otherwise (error "too many local variables"))
+        )
+    ))
 (define compile_assign (expr) (do
     (var insn (assoc (car expr) assignment_operator))
     (var lhs (cadr expr))
@@ -178,6 +201,7 @@
     (cond
         ((nil? loc) (error "undefined variable: " sym))
         ((== `global (car loc)) (compile_global_assign insn loc rhs))
+        ((== `local (car loc)) (compile_local_assign insn loc rhs))
         (otherwise (error "compile_assign: not implemented"))
         )
     nil
@@ -214,17 +238,17 @@
     (var lhs (cadr condexpr))
     (var rhs (caddr condexpr))
     (var ifthen (caddr expr))
-    (var ifelse (cadddr expr))
-    (var ifelse-label (mklabel))
-    (var end-label (mklabel))
+    (var ifelse (if (cdddr expr) (cadddr expr) `nop))
+    (var ifelse_label (mklabel))
+    (var end_label (mklabel))
     (compile_expr lhs)
     (compile_expr rhs)
-    (emit_insn `(@insn @ifelse-label))
+    (emit_insn `(@insn @ifelse_label))
     (if (compile_expr ifthen) (emit_insn `drop))
-    (emit_insn `(goto @end-label))
-    (emit_insn `(label @ifelse-label))
+    (emit_insn `(goto @end_label))
+    (emit_insn `(label @ifelse_label))
     (if (compile_expr ifelse) (emit_insn `drop))
-    (emit_insn `(label @end-label))
+    (emit_insn `(label @end_label))
     nil
     ))
 
@@ -234,20 +258,45 @@
         (do
             (var condition (cadr expr))
             (var ifthen (caddr expr))
-            (var ifelse (cadddr expr))
-            (var ifelse-label (mklabel))
-            (var end-label (mklabel))
+            (var ifelse (if (cdddr expr) (cadddr expr) `nop))
+            (var ifelse_label (mklabel))
+            (var end_label (mklabel))
             (compile_expr condition)
-            (emit_insn `(if_zero @ifelse-label))
+            (emit_insn `(if_zero @ifelse_label))
             (if (compile_expr ifthen) (emit_insn `drop))
-            (emit_insn `(goto @end-label))
-            (emit_insn `(label @ifelse-label))
+            (emit_insn `(goto @end_label))
+            (emit_insn `(label @ifelse_label))
             (if (compile_expr ifelse) (emit_insn `drop))
-            (emit_insn `(label @end-label))
+            (emit_insn `(label @end_label))
             nil
         )
         )
     )
+
+; while (e1) e2
+;
+; is equal to
+;
+; if (e1) {
+; loop:
+;     e2;
+;     if (e1) goto loop;
+; }
+
+(define compile_while ((_ expr body)) (do
+    (var loop_label (mklabel))
+    (compile_if `(if @expr (do (label @loop_label) @body (if @expr (goto @loop_label)))))
+    ))
+
+(define compile_label ((_ name)) (do
+    (emit_insn `(label @name))
+    nil
+    ))
+
+(define compile_goto ((_ name)) (do
+    (emit_insn `(goto @name))
+    nil
+    ))
 
 (define compile_local_vardecl ((_ name val)) (do
     (var idx (register_local_var name))
@@ -267,13 +316,17 @@
 
 (define compile_expr (expr)
     (cond
-        ((nil? expr) (do (emit_insn `imm_i0 true)))
+        ((== `nop expr) nil)
         ((char? expr) (compile_int_lit (char2int expr)))
         ((int? expr) (compile_int_lit expr))
         ((string? expr) (compile_string_lit expr))
         ((symbol? expr) (compile_var expr))
         ((== `var (car expr)) (compile_local_vardecl expr))
         ((== `if (car expr)) (compile_if expr))
+        ((== `while (car expr)) (compile_while expr))
+        ((== `label (car expr)) (compile_label expr))
+        ((== `goto (car expr)) (compile_goto expr))
+        ((== `do (car expr)) (compile_block (cdr expr)))
         ((== `exit (car expr)) (compile_exit expr))
         ((== `return (car expr)) (compile_return expr))
         ((and (== 3 (length expr)) (binary_operator? (car expr)))
@@ -361,13 +414,13 @@
 ; test code
 (compile `(
 
-(var x 2)
-
 (fun main () (
-    (var y 3)
-    (print_string "Hello World\n")
-    (-= x 1)
-    (exit (+ x y))
+    (var x 0)
+    (while (< x 3) (do
+        (print_string "Hello World\n")
+        (+= x 1)
+        ))
+    (exit 1)
     ))
 
 (fun fib (n) (
