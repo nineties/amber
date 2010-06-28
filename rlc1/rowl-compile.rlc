@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-06-28 21:39:27 nineties $
+; $Id: rowl-compile.rlc 2010-06-28 22:34:18 nineties $
 ;
 
 (import "stdlib")
@@ -288,6 +288,33 @@
     (compile_if `(if @expr (do (label @loop_label) @body (if @expr (goto @loop_label)))))
     ))
 
+; for v low high body
+;
+; is equal to
+;
+; v = low;
+; e = high;
+; if (v < e) {
+; loop:
+;     body;
+;     incl v;
+;     if (v < e) goto loop;
+; }
+
+(define compile_for ((_ it low high body)) (do
+    (var loop_label (mklabel))
+    (compile_block `(
+        (var @it @low)
+        (var end @high)
+        (if (< @it end) (do
+            (label @loop_label)
+            @body
+            (+= @it 1)
+            (if (< @it end) (goto @loop_label))
+            ))
+        ))
+    ))
+
 (define compile_label ((_ name)) (do
     (emit_insn `(label @name))
     nil
@@ -308,7 +335,7 @@
         ((== idx 3) (emit_insn `storewl3))
         ((== idx 4) (emit_insn `storewl4))
         ((== idx 5) (emit_insn `storewl5))
-        ((< val 256) (emit_insn `(storewl @idx)))
+        ((< idx 256) (emit_insn `(storewl @idx)))
         (otherwise (error "too many local variables"))
         )
     nil
@@ -324,6 +351,7 @@
         ((== `var (car expr)) (compile_local_vardecl expr))
         ((== `if (car expr)) (compile_if expr))
         ((== `while (car expr)) (compile_while expr))
+        ((== `for (car expr)) (compile_for expr))
         ((== `label (car expr)) (compile_label expr))
         ((== `goto (car expr)) (compile_goto expr))
         ((== `do (car expr)) (compile_block (cdr expr)))
@@ -415,12 +443,10 @@
 (compile `(
 
 (fun main () (
-    (var x 0)
-    (while (< x 3) (do
+    (for i 0 100 (do
         (print_string "Hello World\n")
-        (+= x 1)
         ))
-    (exit 1)
+    (exit 0)
     ))
 
 (fun fib (n) (
