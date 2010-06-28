@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-06-27 19:03:21 nineties $
+; $Id: rowl-compile.rlc 2010-06-28 19:57:46 nineties $
 ;
 
 (import "stdlib")
@@ -10,6 +10,24 @@
 (import "rowl-assemble")
 
 (var vtable ()) ; variable table
+(define vtable_push () (set vtable (cons () vtable)))
+(define vtable_pop  () (set vtable (cdr vtable)))
+(define lookup_var_helper (sym) (do
+    (define loop (sym tab)
+        (if (nil? tab) nil (do
+            (var v (assoc sym (car tab)))
+            (if v v (loop sym (cdr tab)))
+            )))
+    (loop sym vtable)
+    ))
+
+(define lookup_var (sym) (do
+    (var v (lookup_var_helper sym))
+    (if v v (do (eprintln "undefined variable : " sym) (exit 1)))
+    ))
+
+(define add_var (name opd) (setcar vtable (cons `(@name . @opd) (car vtable))))
+
 (var label_id 0)
 (define mklabel () (do
     (incl label_id)
@@ -19,7 +37,7 @@
 (var num_local_var 0)
 (define register_local_var (name) (do
     (var idx num_local_var)
-    (push vtable `(@name . (local @idx)))
+    (add_var name `(local @idx))
     (incl num_local_var)
     idx
     ))
@@ -40,7 +58,7 @@
         ))
 
 (define compile_var (sym) (do
-    (var loc (assoc sym vtable))
+    (var loc (lookup_var sym))
     (cond
         ((nil? loc) (error "undefined variable: " sym))
         ((== `arg (car loc)) (emit_insn (arg_insn (cadr loc))))
@@ -89,7 +107,7 @@
 (var string_decls ())
 (define compile_string_lit (str) (do
     (var strlbl (mklabel))
-    (push vtable `(@strlbl . (global string @strlbl)))
+    (add_var strlbl `(global string @strlbl))
     (push string_decls `(string @strlbl @str))
     (emit_insn `(loadav @strlbl))
     true
@@ -156,7 +174,7 @@
     (var insn (assoc (car expr) assignment_operator))
     (var lhs (cadr expr))
     (var rhs (caddr expr))
-    (var loc (assoc lhs vtable))
+    (var loc (lookup_var lhs))
     (cond
         ((nil? loc) (error "undefined variable: " sym))
         ((== `global (car loc)) (compile_global_assign insn loc rhs))
@@ -268,24 +286,28 @@
         ))
 
 (define compile_block (block) (do
+    (vtable_push)
     (foreach e block
         (if (compile_expr e) (emit_insn `drop))
         )
+    (vtable_pop)
     nil
     ))
 
 (define compile_fundecl ((_ name params body)) (do
+    (vtable_push)
     (reset_insn_seq)
     (set num_local_var 0)
     (var pidx 0) ; parameter index
     (foreach p params (do
-        (push vtable `(@p . (arg @pidx)))
+        (add_var p `(arg @pidx))
         (incl pidx)
         ))
     (compile_block body)
     (var insn_seq (get_insn_seq))
     (if (> num_local_var 0)
         (set insn_seq (cons `(allocate @num_local_var) insn_seq)))
+    (vtable_pop)
     `(fun @name @insn_seq)
     ))
 
@@ -299,7 +321,7 @@
         ((string? value) `string)
         (otherwise (error "compile_value_object_decl: not implemented"))
         ))
-    (push vtable `(@name . (global @type @name)))
+    (add_var name `(global @type @name))
     `(@type @name @value)
     ))
 
@@ -324,7 +346,9 @@
 
 (define compile_main (code) (do
     (var asm_code ())
+    (vtable_push)
     (foreach decl code (push asm_code (compile_decl decl)))
+    (vtable_pop)
     (append string_decls (reverse asm_code))
     ))
 
