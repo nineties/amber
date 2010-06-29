@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-assemble.rlc 2010-06-27 17:22:17 nineties $
+; $Id: rowl-assemble.rlc 2010-06-29 16:31:49 nineties $
 ;
 
 (import "stdlib")
@@ -24,7 +24,7 @@
 (define insn_head (insn) (if (cons? insn) (car insn) insn))
 (define insn_info (insn) (do
     (var info (assoc (insn_head insn) vm_insn_table))
-    (if (nil? info) (error "undefined instruction : " insn))
+    (if (nil? info) (error "undefined instruction: " insn))
     info
     ))
 (define insn_code (insn) (car  (insn_info insn)))
@@ -77,7 +77,7 @@
     (cond
         ((symbol? insn) (set current_addr (+ current_addr (insn_len insn))))
         ((== `label (car insn)) (push label_addr_table `(@(cadr insn) . @current_addr)))
-        ((== `addr  (car insn)) (set current_addr (+ current_addr (insn_len `imm_int))))
+        ((== `addr  (car insn)) (set current_addr (+ current_addr (insn_len `imm_int16))))
         (otherwise (set current_addr (+ current_addr (insn_len insn))))
         ))
 
@@ -106,44 +106,30 @@
 
 (define relative_address (sym) (do
     (var label_addr (assoc sym label_addr_table))
-    (if (nil? label_addr) (error "undefined symbol:" sym))
+    (if (nil? label_addr) (error "undefined symbol: " sym))
     (- label_addr current_addr))
     )
 
-(define is_load_store (head) (member? head `(loadbv loadwv loadl loadav storebv storewv)))
+;(define is_load_store (head) (member? head `(loadbv loadwv loadl loadav storebv storewv)))
+(define put_operand (opd)
+    (cond
+        ((== `byte (car opd))   (put_byte (cadr opd)))
+        ((== `short (car opd))  (put_short (cadr opd)))
+        ((== `long (car opd))   (put_long (cadr opd)))
+        ((== `address (car opd)) (put_short (relative_address (cadr opd))))
+        (otherwise (error "unknown operand: " opd))
+        ))
+
 (define assemble_insn (insn)
     (cond
         ((symbol? insn) (do (put_byte (insn_code insn)) (incl current_addr)))
         ((== `label (car insn)) ())
-        ((== `call (car insn)) (do
+        (otherwise (do
             (put_byte (insn_code insn))
-            (put_short (relative_address (cadr insn)))
-            (put_byte (caddr insn))
+            (foreach opd (cdr insn) (put_operand opd))
             (set current_addr (+ current_addr (insn_len insn)))
             ))
-        ((== `extcall (car insn)) (do
-            (put_byte (insn_code insn))
-            (put_short (cadr insn)) ; index of the function
-            (put_byte (caddr insn)) ; size of arguments
-            (set current_addr (+ current_addr (insn_len insn)))
             ))
-        ((is_load_store (car insn)) (do
-            (put_byte (insn_code insn))
-            (put_short (get_value_addr (cadr insn)))
-            (set current_addr (+ current_addr (insn_len insn)))
-            ))
-        ((symbol? (cadr insn)) (do
-            (put_byte (insn_code insn))
-            (put_short (relative_address (cadr insn)))
-            (set current_addr (+ current_addr (insn_len insn)))
-            ))
-        ((int? (cadr insn)) (do
-            (put_byte (insn_code insn))
-            (put_short (cadr insn))
-            (set current_addr (+ current_addr (insn_len insn)))
-            ))
-        (otherwise (error "assemble_insn: not reachable here"))
-        ))
 
 (define assemble_fundecl ((_ name body)) (do
     (foreach i body (assemble_insn i))
@@ -157,7 +143,7 @@
 
 (define emit_value ((type name value))
     (cond
-        ((== `int type) (put_word value))
+        ((== `int type) (put_long value))
         ((== `char type) (put_byte (char2int value)))
         ((== `string type) (put_str value))
         (otherwise (error "emit_value: not implemented"))
@@ -167,9 +153,9 @@
     (set current_addr 0)
     (foreach decl prog (scan_decl decl))
     (compute_value_addrs)
-    (put_word (+ (+ current_addr 12) value_area_size))
-    (put_word 0)
-    (put_word value_area_size)
+    (put_long (+ (+ current_addr 12) value_area_size))
+    (put_long 0)
+    (put_long value_area_size)
     (foreach v align8_table (error "multi-word values are not supported yet"))
     (foreach v align4_table (emit_value v))
     (foreach v align1_table (emit_value v))
