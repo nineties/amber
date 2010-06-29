@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-06-29 16:38:04 nineties $
+; $Id: rowl-compile.rlc 2010-06-29 18:22:23 nineties $
 ;
 
 (import "stdlib")
@@ -72,20 +72,20 @@
 (define compile_global_var ((_ type name))
     (cond
         ((== `char type)    (emit_insn `(loadbv (value @name))))
-        ((== `int type)     (emit_insn `(loadwv (value @name))))
+        ((== `int type)     (emit_insn `(loadv (value @name))))
         ((== `string type)  (emit_insn `(loadav (value @name))))
         (otherwise (error "compile_global_var: not implemented"))
         ))
 
 (define compile_local_var ((_ idx))
     (cond
-        ((== idx 0) (emit_insn `loadwl0))
-        ((== idx 1) (emit_insn `loadwl1))
-        ((== idx 2) (emit_insn `loadwl2))
-        ((== idx 3) (emit_insn `loadwl3))
-        ((== idx 4) (emit_insn `loadwl4))
-        ((== idx 5) (emit_insn `loadwl5))
-        ((< idx 256) (emit_insn `(loadwl (byte @idx))))
+        ((== idx 0) (emit_insn `loadl0))
+        ((== idx 1) (emit_insn `loadl1))
+        ((== idx 2) (emit_insn `loadl2))
+        ((== idx 3) (emit_insn `loadl3))
+        ((== idx 4) (emit_insn `loadl4))
+        ((== idx 5) (emit_insn `loadl5))
+        ((< idx 256) (emit_insn `(loadl (byte @idx))))
         (otherwise (error "too many local variables"))
         ))
 
@@ -125,6 +125,29 @@
     nil
     ))
 
+(define compile_local_incrdecr (op (_ idx)) (do
+    (if (< idx 6)
+        (do
+            (var insn (tosym (++ op 'l' idx)))
+            (emit_insn insn)
+        )
+        (do
+            (var insn (tosym (++ op 'l')))
+            (emit_insn `(@insn (byte @idx)))
+        )
+        )
+    nil
+    ))
+
+(define compile_incrdecr ((op v)) (do
+    (var loc (lookup_var v))
+    (cond
+        ((== `local (car loc)) (compile_local_incrdecr op loc))
+        ((== `incr op) (compile_expr `(+= @v 1)))
+        ((== `decr op) (compile_expr `(-= @v 1)))
+        )
+    ))
+
 (var binary_operator
     `((+ . iadd) (- . isub) (* . imul) (/ . idiv) (% . imod) (cons . cons))
     )
@@ -155,7 +178,7 @@
     ))
 
 (define compile_global_assign (insn (_ type name) rhs) (do
-    (var load_store_op (assoc type `((char . (loadbv storebv)) (int . (loadwv storewv)))))
+    (var load_store_op (assoc type `((char . (loadbv storebv)) (int . (loadv storewv)))))
     (if (!= `nop insn)
         (do
             (emit_insn `(@(car load_store_op) (value @name)))
@@ -183,13 +206,13 @@
         )
     (var idx (cadr loc))
     (cond
-        ((== idx 0) (emit_insn `storewl0))
-        ((== idx 1) (emit_insn `storewl1))
-        ((== idx 2) (emit_insn `storewl2))
-        ((== idx 3) (emit_insn `storewl3))
-        ((== idx 4) (emit_insn `storewl4))
-        ((== idx 5) (emit_insn `storewl5))
-        ((< idx 256) (emit_insn `(storewl (byte @idx))))
+        ((== idx 0) (emit_insn `storel0))
+        ((== idx 1) (emit_insn `storel1))
+        ((== idx 2) (emit_insn `storel2))
+        ((== idx 3) (emit_insn `storel3))
+        ((== idx 4) (emit_insn `storel4))
+        ((== idx 5) (emit_insn `storel5))
+        ((< idx 256) (emit_insn `(storel (byte @idx))))
         (otherwise (error "too many local variables"))
         )
     ))
@@ -297,7 +320,7 @@
 ; if (v < e) {
 ; loop:
 ;     body;
-;     incl v;
+;     incr v;
 ;     if (v < e) goto loop;
 ; }
 
@@ -309,7 +332,7 @@
         (if (< @it end) (do
             (label @loop_label)
             @body
-            (+= @it 1)
+            (incr @it)
             (if (< @it end) (goto @loop_label))
             ))
         ))
@@ -329,13 +352,13 @@
     (var idx (register_local_var name))
     (compile_expr val)
     (cond
-        ((== idx 0) (emit_insn `storewl0))
-        ((== idx 1) (emit_insn `storewl1))
-        ((== idx 2) (emit_insn `storewl2))
-        ((== idx 3) (emit_insn `storewl3))
-        ((== idx 4) (emit_insn `storewl4))
-        ((== idx 5) (emit_insn `storewl5))
-        ((< idx 256) (emit_insn `(storewl (byte @idx))))
+        ((== idx 0) (emit_insn `storel0))
+        ((== idx 1) (emit_insn `storel1))
+        ((== idx 2) (emit_insn `storel2))
+        ((== idx 3) (emit_insn `storel3))
+        ((== idx 4) (emit_insn `storel4))
+        ((== idx 5) (emit_insn `storel5))
+        ((< idx 256) (emit_insn `(storel (byte @idx))))
         (otherwise (error "too many local variables"))
         )
     nil
@@ -357,6 +380,8 @@
         ((== `do (car expr)) (compile_block (cdr expr)))
         ((== `exit (car expr)) (compile_exit expr))
         ((== `return (car expr)) (compile_return expr))
+        ((== `incr (car expr)) (compile_incrdecr expr))
+        ((== `decr (car expr)) (compile_incrdecr expr))
         ((and (== 3 (length expr)) (binary_operator? (car expr)))
             (compile_binexpr expr))
         ((and (== 2 (length expr)) (unary_operator? (car expr)))
@@ -435,7 +460,6 @@
 
 (define compile (code) (do
     (var asm_code (compile_main code))
-    (eprintln "asm_code:" asm_code)
     (assemble asm_code)
     ))
 
