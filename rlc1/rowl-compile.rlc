@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-06-28 22:34:18 nineties $
+; $Id: rowl-compile.rlc 2010-06-29 16:38:04 nineties $
 ;
 
 (import "stdlib")
@@ -54,7 +54,7 @@
         ((== idx 2) `arg2)
         ((== idx 3) `arg3)
         ((== idx 4) `arg4)
-        (otherwise `(@arg @idx))
+        (otherwise `(@arg (byte @idx)))
         ))
 
 (define compile_var (sym) (do
@@ -71,9 +71,9 @@
 
 (define compile_global_var ((_ type name))
     (cond
-        ((== `char type)    (emit_insn `(loadbv @name)))
-        ((== `int type)     (emit_insn `(loadwv @name)))
-        ((== `string type)  (emit_insn `(loadav @name)))
+        ((== `char type)    (emit_insn `(loadbv (value @name))))
+        ((== `int type)     (emit_insn `(loadwv (value @name))))
+        ((== `string type)  (emit_insn `(loadav (value @name))))
         (otherwise (error "compile_global_var: not implemented"))
         ))
 
@@ -85,7 +85,7 @@
         ((== idx 3) (emit_insn `loadwl3))
         ((== idx 4) (emit_insn `loadwl4))
         ((== idx 5) (emit_insn `loadwl5))
-        ((< idx 256) (emit_insn `(loadwl @idx)))
+        ((< idx 256) (emit_insn `(loadwl (byte @idx))))
         (otherwise (error "too many local variables"))
         ))
 
@@ -98,8 +98,8 @@
         ((== val 4)  (emit_insn `imm_i4))
         ((== val 5)  (emit_insn `imm_i5))
         ((== val -1) (emit_insn `imm_im1))
-        ((and (<= val 32768) (> val -32769)) (emit_insn `(imm_int @val))) ; 16bit signed integer
-        (otherwise (error "compile_int_lit: not implemented"))
+        ((and (<= val 32768) (> val -32769)) (emit_insn `(imm_int16 (short @val))))
+        (otherwise (emit_insn `(imm_int32 (long @val))))
         )
     true
     ))
@@ -109,7 +109,7 @@
     (var strlbl (mklabel))
     (add_var strlbl `(global string @strlbl))
     (push string_decls `(string @strlbl @str))
-    (emit_insn `(loadav @strlbl))
+    (emit_insn `(loadav (value @strlbl)))
     true
     ))
 
@@ -158,14 +158,14 @@
     (var load_store_op (assoc type `((char . (loadbv storebv)) (int . (loadwv storewv)))))
     (if (!= `nop insn)
         (do
-            (emit_insn `(@(car load_store_op) @name))
+            (emit_insn `(@(car load_store_op) (value @name)))
             (compile_expr rhs)
             (emit_insn insn)
-            (emit_insn `(@(cadr load_store_op) @name))
+            (emit_insn `(@(cadr load_store_op) (value @name)))
         )
         (do
             (compile_expr rhs)
-            (emit_insn `(@(cadr load_store_op) @name))
+            (emit_insn `(@(cadr load_store_op) (value @name)))
         )
         )
     ))
@@ -189,7 +189,7 @@
         ((== idx 3) (emit_insn `storewl3))
         ((== idx 4) (emit_insn `storewl4))
         ((== idx 5) (emit_insn `storewl5))
-        ((< idx 256) (emit_insn `(storewl @idx)))
+        ((< idx 256) (emit_insn `(storewl (byte @idx))))
         (otherwise (error "too many local variables"))
         )
     ))
@@ -216,7 +216,7 @@
             (var args (cdr expr))
             (var narg (length args))
             (foreach a (reverse args) (compile_expr a))
-            (emit_insn `(call @fun @(* 4 narg)))
+            (emit_insn `(call (address @fun) (byte @(* 4 narg))))
             true
         ))
     ))
@@ -224,7 +224,7 @@
 (define compile_extcall (prim_idx args) (do
     (var narg (length args))
     (foreach a (reverse args) (compile_expr a))
-    (emit_insn `(extcall @prim_idx @narg))
+    (emit_insn `(extcall (short @prim_idx) (byte @narg)))
     true
     ))
 
@@ -243,9 +243,9 @@
     (var end_label (mklabel))
     (compile_expr lhs)
     (compile_expr rhs)
-    (emit_insn `(@insn @ifelse_label))
+    (emit_insn `(@insn (address @ifelse_label)))
     (if (compile_expr ifthen) (emit_insn `drop))
-    (emit_insn `(goto @end_label))
+    (emit_insn `(goto (address @end_label)))
     (emit_insn `(label @ifelse_label))
     (if (compile_expr ifelse) (emit_insn `drop))
     (emit_insn `(label @end_label))
@@ -262,9 +262,9 @@
             (var ifelse_label (mklabel))
             (var end_label (mklabel))
             (compile_expr condition)
-            (emit_insn `(if_zero @ifelse_label))
+            (emit_insn `(if_zero (address @ifelse_label)))
             (if (compile_expr ifthen) (emit_insn `drop))
-            (emit_insn `(goto @end_label))
+            (emit_insn `(goto (address @end_label)))
             (emit_insn `(label @ifelse_label))
             (if (compile_expr ifelse) (emit_insn `drop))
             (emit_insn `(label @end_label))
@@ -321,7 +321,7 @@
     ))
 
 (define compile_goto ((_ name)) (do
-    (emit_insn `(goto @name))
+    (emit_insn `(goto (address @name)))
     nil
     ))
 
@@ -335,7 +335,7 @@
         ((== idx 3) (emit_insn `storewl3))
         ((== idx 4) (emit_insn `storewl4))
         ((== idx 5) (emit_insn `storewl5))
-        ((< idx 256) (emit_insn `(storewl @idx)))
+        ((< idx 256) (emit_insn `(storewl (byte @idx))))
         (otherwise (error "too many local variables"))
         )
     nil
@@ -387,7 +387,7 @@
     (compile_block body)
     (var insn_seq (get_insn_seq))
     (if (> num_local_var 0)
-        (set insn_seq (cons `(allocate @num_local_var) insn_seq)))
+        (set insn_seq (cons `(allocate (byte @num_local_var)) insn_seq)))
     (vtable_pop)
     `(fun @name @insn_seq)
     ))
@@ -443,9 +443,7 @@
 (compile `(
 
 (fun main () (
-    (for i 0 100 (do
-        (print_string "Hello World\n")
-        ))
+    (for i 0 100000000 nop)
     (exit 0)
     ))
 

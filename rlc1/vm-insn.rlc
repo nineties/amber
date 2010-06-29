@@ -2,14 +2,14 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-06-28 22:14:47 nineties $
+; $Id: vm-insn.rlc 2010-06-29 16:35:26 nineties $
 ;
 
 (define gen_comparison1 (cmovname) `(
     (vmpop %eax)
     (asm "cmpl %edx, %eax")
     (asm "movl $3, %eax")
-    (vmsword 1 %ebx)
+    (vmsshort 1 %ebx)
     (asm @cmovname " %ebx, %eax")
     (vmsucc %eax)
     (vmfetch)))
@@ -19,7 +19,7 @@
     (vmpop %ebx)
     (asm "cmpl %eax, %ebx")
     (asm "movl $3, %eax")
-    (vmsword 1 %ebx)
+    (vmsshort 1 %ebx)
     (asm @cmovname " %ebx, %eax")
     (vmsucc %eax)
     (vmfetch)))
@@ -49,7 +49,8 @@
     (imm_i4     1 @true ((vmpush $4)))
     (imm_i5     1 @true ((vmpush $5)))
     (imm_im1    1 @true ((vmpush $-1)))
-    (imm_int    3 @true ((vmsword 1 %eax) (vmpush %eax)))
+    (imm_int16  3 @true ((vmsshort 1 %eax) (vmpush %eax)))
+    (imm_int32  5 @true ((vmlong 1 %eax) (vmpush %eax)))
     (iadd       1 @true ((vmbin "addl")))
     (isub       1 @true ((vmbin "subl")))
     (imul       1 @true ((vmpop %eax) (asm "imul (%esi), %eax") (asm "movl %eax, (%esi)")))
@@ -69,7 +70,7 @@
         ))
     (incl       1 @true ((asm "incl (%esi)")))
     (decl       1 @true ((asm "decl (%esi)")))
-    (goto       3 @nil  ((vmsword 1 %eax) (asm "addl %eax, %ecx") (vmfetch)))
+    (goto       3 @nil  ((vmsshort 1 %eax) (asm "addl %eax, %ecx") (vmfetch)))
     (if_zero    3 @nil  @(gen_comparison1 "cmovz"))
     (if_nonzero 3 @nil  @(gen_comparison1 "cmovnz"))
     (if_eq      3 @nil  @(gen_comparison2 "cmove"))
@@ -86,7 +87,7 @@
         (asm "addl $4, %eax")
         (vmpush %eax) ; store return point
         (vmpush %edi) ; store base pointer
-        (vmsword 1 %eax) ; offset of address of the function
+        (vmsshort 1 %eax) ; offset of address of the function
         (asm "movl %esi, %edi") ; set base pointer
         (asm "addl %eax, %ecx")
         (vmfetch)
@@ -180,8 +181,8 @@
         (asm "movl %eax, (%ebx)")
         ))
     ; allocate stack area for local variables
-    (allocate 3 @true (
-        (vmushort 1 %eax)
+    (allocate 2 @true (
+        (vmubyte 1 %eax)
         (asm "sall $2, %eax")
         (asm "subl %eax, %esi")
         ))
