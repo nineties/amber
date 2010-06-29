@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-assemble.rlc 2010-06-29 16:31:49 nineties $
+; $Id: rowl-assemble.rlc 2010-06-29 18:13:59 nineties $
 ;
 
 (import "stdlib")
@@ -73,13 +73,15 @@
 
 (var object_table ()) ; list of name
 
-(define scan_insn (insn)
+(define scan_insn (insn) (do
+    (eprintln current_addr ": " insn)
     (cond
         ((symbol? insn) (set current_addr (+ current_addr (insn_len insn))))
         ((== `label (car insn)) (push label_addr_table `(@(cadr insn) . @current_addr)))
         ((== `addr  (car insn)) (set current_addr (+ current_addr (insn_len `imm_int16))))
         (otherwise (set current_addr (+ current_addr (insn_len insn))))
         ))
+    )
 
 (define scan_fundecl ((_ name body)) (do
     (push label_addr_table `(@name . @current_addr))
@@ -106,11 +108,11 @@
 
 (define relative_address (sym) (do
     (var label_addr (assoc sym label_addr_table))
-    (if (nil? label_addr) (error "undefined symbol: " sym))
+    (if (nil? label_addr) (error "undefined label: " sym))
     (- label_addr current_addr))
     )
 
-;(define is_load_store (head) (member? head `(loadbv loadwv loadl loadav storebv storewv)))
+;(define is_load_store (head) (member? head `(loadbv loadv loadl loadav storebv storewv)))
 (define put_operand (opd)
     (cond
         ((== `byte (car opd))   (put_byte (cadr opd)))
