@@ -2,13 +2,18 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim.rlc 2010-06-27 19:14:01 nineties $
+; $Id: vm-prim.rlc 2010-06-30 00:07:57 nineties $
 ;
 
 ; primitive functions
 
+(var SYS_READ 3)
 (var SYS_WRITE 4)
+(var STDIN_FD 0)
 (var STDOUT_FD 1)
+(var RDBUFSZ 512) ; read buffer size
+(var WRBUFSZ 512) ; write buffer size
+(var EOF -1)
 
 (define assign_indices (table) (do
     (var idx 0)
@@ -19,7 +24,10 @@
     ))
 
 (var prim_table (assign_indices `(
-    (print_string . prim_print_string)
+    (flush . prim_flush)
+    (getc . prim_getc)
+    (getc . prim_nextc)
+    (putc . prim_putc)
     )))
 
 (var vm-prim-code `(
@@ -33,11 +41,55 @@
     (return len)
     ))
 
-; TODO: implement buffering
-(fun prim_print_string (ptr) (
-    (int len (strlen ptr))
-    (syscall @SYS_WRITE @STDOUT_FD ptr len)
+(char[] @RDBUFSZ stdin_buf)
+(int stdin_beg 0)
+(int stdin_end 0)
+
+(char[] @WRBUFSZ stdout_buf)
+(int stdout_pos 0)
+
+; flush stdout
+(fun prim_flush () (
+    (if (> stdout_pos 0) (
+        (syscall @SYS_WRITE @STDOUT_FD stdout_buf stdout_pos)
+        (= stdout_pos 0)
+        ))
     ))
 
+(fun fill_stdin_buf () (
+    (if (== stdin_beg stdin_end) (
+        ; input buffer is empty
+        (int sz (syscall @SYS_READ @STDIN_FD stdin_buf @RDBUFSZ))
+        (= stdin_end sz)
+        (= stdin_beg 0)
+        ))
+    ))
+
+(fun prim_getc () (
+    (fill_stdin_buf)
+    (if (== stdin_beg stdin_end) ((return @EOF)))
+    (int c (*8 (+ stdin_buf stdin_beg)))
+    (incl stdin_beg)
+    (return c)
+    ))
+
+(fun prim_nextc () (
+    (fill_stdin_buf)
+    (fill_stdin_buf)
+    (if (== stdin_beg stdin_end) ((return @EOF)))
+    (return (*8 (+ stdin_buf stdin_beg)))
+    ))
+
+(fun prim_putc (c) (
+    ([]=8 stdout_buf stdout_pos c)
+    (incl stdout_pos)
+    (if (== stdout_pos @WRBUFSZ) (
+        (prim_flush)
+        (return)
+        ))
+    (if (== '\n' c) (
+        (prim_flush)
+        ))
+    ))
 ))
 
