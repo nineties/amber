@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-assemble.rlc 2010-06-29 18:13:59 nineties $
+; $Id: rowl-assemble.rlc 2010-06-29 23:18:00 nineties $
 ;
 
 (import "stdlib")
@@ -37,30 +37,39 @@
 (var align1_table ()) ; list of (type name value)
 (var value_addr_table ())
 
-(define value_length (val)
+(define type_length (ty) (assoc ty `((char . 1) (int . 4) (long . 8))))
+(define value_length (ent) (do
+    (var type (car ent))
+    (var value (caddr ent))
     (cond
-        ((char? val)    1)
-        ((int? val)     4)
-        ((string? val)  (+ (string_len val) 1))
-        (otherwise (error "value_length: not implemented"))
+        ((== `string type) (+ (string_len value) 1))
+        ((and (cons? type) (== `array (car type))) (* (type_length (cadr type)) (caddr type)))
+        (otherwise (type_length (car ent)))
         ))
+    )
 
-(define get_alignment (ty) (assoc ty `((char . 1) (int . 4) (long . 8) (string . 1))))
+(define get_alignment (decl) (do
+    (var ty (cond
+        ((and (cons? decl) (== `array (caar decl))) (cadr (car decl)))
+        (otherwise (car decl))
+        ))
+    (assoc ty `((char . 1) (int . 4) (long . 8) (string . 1))))
+    )
 
 (var value_area_size 0)
 (define compute_value_addrs () (do
     (var addr 0)
     (foreach ent align8_table (do
         (push value_addr_table `(@(cadr ent) . @addr))
-        (set addr (+ addr (value_length (caddr ent))))
+        (set addr (+ addr (value_length ent)))
         ))
     (foreach ent align4_table (do
         (push value_addr_table `(@(cadr ent) . @addr))
-        (set addr (+ addr (value_length (caddr ent))))
+        (set addr (+ addr (value_length ent)))
         ))
     (foreach ent align1_table (do
         (push value_addr_table `(@(cadr ent) . @addr))
-        (set addr (+ addr (value_length (caddr ent))))
+        (set addr (+ addr (value_length ent)))
         ))
     (set value_area_size addr)
     ))
@@ -74,11 +83,9 @@
 (var object_table ()) ; list of name
 
 (define scan_insn (insn) (do
-    (eprintln current_addr ": " insn)
     (cond
         ((symbol? insn) (set current_addr (+ current_addr (insn_len insn))))
         ((== `label (car insn)) (push label_addr_table `(@(cadr insn) . @current_addr)))
-        ((== `addr  (car insn)) (set current_addr (+ current_addr (insn_len `imm_int16))))
         (otherwise (set current_addr (+ current_addr (insn_len insn))))
         ))
     )
@@ -89,13 +96,14 @@
     ))
 
 (define scan_value_decl (decl) (do
-    (var align (get_alignment (car decl)))
+    (var align (get_alignment decl))
     (cond
         ((== align 1) (push align1_table decl))
         ((== align 4) (push align4_table decl))
         ((== align 8) (push align8_table decl))
-        (otherwise (error "invalid type: " (car decl)))
-        )))
+        (otherwise (error "invalid declaration: " decl))
+        )
+    ))
 
 (define scan_decl (decl)
     (cond
@@ -103,6 +111,7 @@
         ((== `int (car decl))       (scan_value_decl decl))
         ((== `char (car decl))      (scan_value_decl decl))
         ((== `string (car decl))    (scan_value_decl decl))
+        ((and (cons? (car decl)) (== `array (caar decl))) (scan_value_decl decl))
         (otherwise (error "scan_decl: not implemented"))
         ))
 
@@ -112,7 +121,6 @@
     (- label_addr current_addr))
     )
 
-;(define is_load_store (head) (member? head `(loadbv loadv loadl loadav storebv storewv)))
 (define put_operand (opd)
     (cond
         ((== `byte (car opd))   (put_byte (cadr opd)))
@@ -122,7 +130,8 @@
         (otherwise (error "unknown operand: " opd))
         ))
 
-(define assemble_insn (insn)
+(define assemble_insn (insn) (do
+    (eprintln current_addr ": " insn)
     (cond
         ((symbol? insn) (do (put_byte (insn_code insn)) (incl current_addr)))
         ((== `label (car insn)) ())
@@ -131,7 +140,8 @@
             (foreach opd (cdr insn) (put_operand opd))
             (set current_addr (+ current_addr (insn_len insn)))
             ))
-            ))
+        )
+        ))
 
 (define assemble_fundecl ((_ name body)) (do
     (foreach i body (assemble_insn i))
@@ -143,11 +153,21 @@
         (otherwise ())
         ))
 
+(define emit_array ((_ type length) values) (do
+    (foreach v values (do
+        (emit_value (list type nil v))
+        (decl length)
+        ))
+    (var rem (* (type_length type) length))
+    (upto i 1 rem (put_byte 0))
+    ))
+
 (define emit_value ((type name value))
     (cond
         ((== `int type) (put_long value))
-        ((== `char type) (put_byte (char2int value)))
+        ((== `char type) (put_byte (if (char? value) (char2int value) value)))
         ((== `string type) (put_str value))
+        ((and (cons? type) (== `array (car type))) (emit_array type value))
         (otherwise (error "emit_value: not implemented"))
         ))
 
