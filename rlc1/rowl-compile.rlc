@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-06-29 23:18:36 nineties $
+; $Id: rowl-compile.rlc 2010-06-30 00:10:31 nineties $
 ;
 
 (import "stdlib")
@@ -216,6 +216,7 @@
         (otherwise (error "too many local variables"))
         )
     ))
+
 (define compile_assign (expr) (do
     (var insn (assoc (car expr) assignment_operator))
     (var lhs (cadr expr))
@@ -252,7 +253,7 @@
     ))
 
 (var comparison_operator
-    `((< . if_ge) (> . if_le) (<= . if_g) (>= . if_l) (== . if_ne) (!= . if_e)))
+    `((< . if_ge) (> . if_le) (<= . if_g) (>= . if_l) (== . if_ne) (!= . if_eq)))
 (define comparison_expr? (expr) (and (cons? expr) (assoc (car expr) comparison_operator)))
 
 (define compile_comp_if (expr) (do
@@ -476,9 +477,13 @@
 ; test code
 (compile `(
 
-(array int x (1 2 3))
-
 (fun main () (
+    (var c 0)
+    (= c (getc))
+    (while (!= c -1) (do
+        (putc c)
+        (= c (getc))
+        ))
     (exit 0)
     ))
 
