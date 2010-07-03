@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim.rlc 2010-06-30 00:07:57 nineties $
+; $Id: vm-prim.rlc 2010-07-03 09:46:12 nineties $
 ;
 
 ; primitive functions
@@ -28,6 +28,7 @@
     (getc . prim_getc)
     (getc . prim_nextc)
     (putc . prim_putc)
+    (puti . prim_puti)
     )))
 
 (var vm-prim-code `(
@@ -48,6 +49,7 @@
 (char[] @WRBUFSZ stdout_buf)
 (int stdout_pos 0)
 
+(export prim_flush)
 ; flush stdout
 (fun prim_flush () (
     (if (> stdout_pos 0) (
@@ -91,5 +93,26 @@
         (prim_flush)
         ))
     ))
+
+(char[] 10 puti_digits)
+(fun prim_puti (n) (
+    (if (< n 0) (
+        (prim_putc '-')
+        (= n (neg n))
+        ))
+    ([]=8 puti_digits 0 (+ (% n 10) '0'))
+    (= n (/ n 10))
+    (int i 0)
+    (while (!= n 0) (
+        (incl i)
+        ([]=8 puti_digits i (+ (% n 10) '0'))
+        (= n (/ n 10))
+        ))
+    (while (>= i 0) (
+        (prim_putc (*8 (+ puti_digits i)))
+        (decl i)
+        ))
+    ))
+
 ))
 

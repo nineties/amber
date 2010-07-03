@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-06-22 19:18:53 nineties $
+; $Id: vm-gc.rlc 2010-07-03 13:46:22 nineties $
 ;
 
 (import "stdlib")
@@ -89,12 +89,14 @@
 
 (var FIRST_PAGE_OFF   (>> BLOCK_SIZE (- PAGE_SHIFT PDESCR_SHIFT)))
 (var FIRST_PDESCR_OFF (>> FIRST_PAGE_OFF (- PAGE_SHIFT PDESCR_SHIFT)))
+(var END_PDESCR_OFF   FIRST_PAGE_OFF)
 
 (define FIRST_PAGE   (block) `(+ @block @FIRST_PAGE_OFF))
 (define FIRST_PDESCR (block) `(+ @block @FIRST_PDESCR_OFF))
 (define END_PDESCR   (block) (FIRST_PAGE block))
 
 (define IS_FIRST_PDESCR (pd) `(== (& @pd @BLOCK_MASK) @FIRST_PDESCR_OFF))
+(define IS_END_PDESCR   (pd) `(== (& @pd @BLOCK_MASK) @END_PDESCR_OFF))
 
 (var MAX_BLOCKS 4096) ; 4096 is enough for 32-bit machine
 (define BLOCK2BIDX  (addr)  `(>> @addr @BLOCK_SHIFT))
@@ -372,6 +374,15 @@
         ))
     ))
 
+(fun nextpage (pd) (
+    (+= pd @PDESCR_SIZE)
+    (if @(IS_END_PDESCR pd) (
+        (= current_block @(bdescr->next current_block))
+        (= pd @(FIRST_PDESCR (bdescr->first current_block)))
+        ))
+    (return pd)
+    ))
+
 (fun allocate_page (npages) (
     (int free 0)
     (int allpages (* @PAGES_PER_BLOCK num_block))
@@ -387,7 +398,7 @@
             (if (== free npages) (
                 (= freep @(PDESCR2PAGE firstpage))
                 (= free_words (<< npages @PAGE_WORDS_SHIFT))
-                (= freepage @(pdescr->next freepage))
+                (= freepage (nextpage freepage))
                 @(pdescr->generation= firstpage next_gen)
                 @(pdescr->joined=0 firstpage)
                 (if @IN_GC ((enqueue_page firstpage)))
@@ -403,7 +414,7 @@
             )
             ((= free 0))
             )
-        (= freepage @(pdescr->next freepage))
+        (= freepage (nextpage freepage))
         (if @(IS_FIRST_PDESCR freepage) ((= free 0)))
         ))
     (garbage_collect)
@@ -413,7 +424,7 @@
 (fun allocate_object (words) (
     (while (> words free_words) (
         (insert_padding)
-        (allocate_page (>> (- (+ words @PAGE_WORDS) -1) @PAGE_WORDS_SHIFT))
+        (allocate_page (>> (- (+ words @PAGE_WORDS) 1) @PAGE_WORDS_SHIFT))
         ))
     (void* obj freep)
     (if (< words @PAGE_WORDS) ((-= free_words words)) ((= free_words 0)))
@@ -429,7 +440,8 @@
     ))
 
 (export allocate_plain)
-(fun allocate_plain (words) (
+(fun allocate_plain (bytes) (
+    (int words (/ (+ bytes 3) 4))
     (incl words)
     (void* ptr (allocate_object words))
     @(SET_HEADER ptr TAG_PLAIN 0 words)

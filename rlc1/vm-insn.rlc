@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-06-30 00:09:11 nineties $
+; $Id: vm-insn.rlc 2010-07-03 01:37:55 nineties $
 ;
 
 (define gen_comparison1 (cmovname) `(
@@ -24,13 +24,13 @@
     (vmsucc %eax)
     (vmfetch)))
 
-(define gen_get (idx) `(
+(define gen_field_get (idx) `(
     (asm "movl (%esi), %eax")
     (asm "movl " @(* 4 idx) "(%eax), %eax")
     (asm "movl %eax, (%esi)")
     ))
 
-(define gen_set (idx) `(
+(define gen_field_set (idx) `(
     (vmubyte 1 %eax) ; index
     (asm "sall $2, %eax")
     (vmpop %ebx) ; obj
@@ -41,7 +41,7 @@
 
 (var vm_instructions `(
     (nop        1 @true ())
-    (exit       1 @true ((vmpop %eax) (asm "call prim_flush") (break)))
+    (exit       1 @true ((vmpop %eax) (break)))
     (imm_i0     1 @true ((vmpush %edx))) ; also used for 'nil'
     (imm_i1     1 @true ((vmpush $1)))
     (imm_i2     1 @true ((vmpush $2)))
@@ -140,23 +140,23 @@
         (asm "movl %eax, (%esi)")
         ))
     ; allocate plain object
-    ; arg0 = size (in words)
+    ; arg0 = size (in bytes)
     ; NB: allocated memory is not be zero-cleared
     (plain 1 @true (
         (asm "movl (%esi), %eax")
         (vmsave)
         (asm "pushl %eax")
         (call allocate_plain)
-        (vmrestore)
         (asm "addl $4, %esp")
+        (vmrestore)
         (asm "movl %eax, (%esi)")
         ))
-    (get0 1 @true @(gen_get 0)) ; also used for 'car'
-    (get1 1 @true @(gen_get 1)) ; also used for 'cdr'
-    (get2 1 @true @(gen_get 2))
-    (get3 1 @true @(gen_get 3))
-    (get4 1 @true @(gen_get 4))
-    (get5 1 @true @(gen_get 5))
+    (field_get0 1 @true @(gen_field_get 0)) ; also used for 'car'
+    (field_get1 1 @true @(gen_field_get 1)) ; also used for 'cdr'
+    (field_get2 1 @true @(gen_field_get 2))
+    (field_get3 1 @true @(gen_field_get 3))
+    (field_get4 1 @true @(gen_field_get 4))
+    (field_get5 1 @true @(gen_field_get 5))
     (get  2 @true (
         (vmubyte 1 %eax)
         (asm "sall $2, %eax")
@@ -165,20 +165,39 @@
         (asm "movl (%eax), %eax")
         (asm "movl %eax, (%esi)")
         ))
-    ; set val obj
-    (set0 1 @true @(gen_set 0))
-    (set1 1 @true @(gen_set 1))
-    (set2 1 @true @(gen_set 2))
-    (set3 1 @true @(gen_set 3))
-    (set4 1 @true @(gen_set 4))
-    (set5 1 @true @(gen_set 5))
-    (set  2 @true (
+    ; field_set val obj
+    (field_set0 1 @true @(gen_field_set 0))
+    (field_set1 1 @true @(gen_field_set 1))
+    (field_set2 1 @true @(gen_field_set 2))
+    (field_set3 1 @true @(gen_field_set 3))
+    (field_set4 1 @true @(gen_field_set 4))
+    (field_set5 1 @true @(gen_field_set 5))
+    (field_set  2 @true (
         (vmubyte 1 %eax) ; index
         (asm "sall $2, %eax")
         (vmpop %ebx) ; obj
         (asm "addl %eax, %ebx")
         (asm "movl (%esi), %eax")
         (asm "movl %eax, (%ebx)")
+        ))
+    ; array_get ary idx
+    (array_get32 1 @true (
+        (vmpop %eax) ; index
+        (asm "sall $2, %eax")
+        (asm "movl (%esi), %ebx")
+        (asm "addl %eax, %ebx")
+        (asm "movl (%ebx), %eax")
+        (asm "movl %eax, (%esi)")
+        ))
+    ; array_set ary idx val
+    (array_set32 1 @true (
+        (asm "movl 4(%esi), %eax") ; index
+        (asm "sall $2, %eax")
+        (asm "movl 8(%esi), %ebx") ; array
+        (asm "addl %eax, %ebx")
+        (asm "movl (%esi), %eax")
+        (asm "movl %eax, (%ebx)")
+        (asm "addl $12, %esi")
         ))
     ; allocate stack area for local variables
     (allocate 2 @true (
