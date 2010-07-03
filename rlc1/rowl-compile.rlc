@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-06-30 00:10:31 nineties $
+; $Id: rowl-compile.rlc 2010-07-03 13:51:14 nineties $
 ;
 
 (import "stdlib")
@@ -20,6 +20,9 @@
             )))
     (loop sym vtable)
     ))
+
+(define unboxed_type? (type) (member? type `(char int)))
+(define unboxed_type_size (type) (assoc type `((char . 1) (int . 4))))
 
 (define lookup_var (sym) (do
     (var v (lookup_var_helper sym))
@@ -253,7 +256,7 @@
     ))
 
 (var comparison_operator
-    `((< . if_ge) (> . if_le) (<= . if_g) (>= . if_l) (== . if_ne) (!= . if_eq)))
+    `((< . if_ge) (> . if_le) (<= . if_gt) (>= . if_lt) (== . if_ne) (!= . if_eq)))
 (define comparison_expr? (expr) (and (cons? expr) (assoc (car expr) comparison_operator)))
 
 (define compile_comp_if (expr) (do
@@ -365,7 +368,42 @@
     nil
     ))
 
-(define compile_expr (expr)
+(define compile_unboxed_array (type len) (do
+    (var elem_sz (unboxed_type_size type))
+    (compile_expr `(* @elem_sz @len))
+    (emit_insn `plain)
+    true
+    ))
+
+(define compile_boxed_array (type len) (do
+    (error "compile_boxed_array: not implemented")
+    ))
+
+(define compile_array ((_ type len))
+    (if (unboxed_type? type)
+        (compile_unboxed_array type len)
+        (compile_boxed_array type len)
+        )
+    )
+
+(define compile_array_get ((_ type ary idx)) (do
+    (var insn (assoc type `((int . array_get32))))
+    (compile_expr ary)
+    (compile_expr idx)
+    (emit_insn insn)
+    true
+    ))
+
+(define compile_array_set ((_ type ary idx val)) (do
+    (var insn (assoc type `((int . array_set32))))
+    (compile_expr ary)
+    (compile_expr idx)
+    (compile_expr val)
+    (emit_insn insn)
+    nil
+    ))
+
+(define compile_expr (expr) (do
     (cond
         ((== `nop expr) nil)
         ((char? expr) (compile_int_lit (char2int expr)))
@@ -383,6 +421,9 @@
         ((== `return (car expr)) (compile_return expr))
         ((== `incr (car expr)) (compile_incrdecr expr))
         ((== `decr (car expr)) (compile_incrdecr expr))
+        ((== `array (car expr)) (compile_array expr))
+        ((== `array_get (car expr)) (compile_array_get expr))
+        ((== `array_set (car expr)) (compile_array_set expr))
         ((and (== 3 (length expr)) (binary_operator? (car expr)))
             (compile_binexpr expr))
         ((and (== 2 (length expr)) (unary_operator? (car expr)))
@@ -390,7 +431,7 @@
         ((and (== 3 (length expr)) (assignment_operator? (car expr)))
             (compile_assign expr))
         (otherwise (compile_call expr))
-        ))
+        )))
 
 (define compile_block (block) (do
     (vtable_push)
@@ -478,13 +519,28 @@
 (compile `(
 
 (fun main () (
-    (var c 0)
-    (= c (getc))
-    (while (!= c -1) (do
-        (putc c)
-        (= c (getc))
-        ))
+    (sieve 200000)
     (exit 0)
+    ))
+
+(fun sieve (n) (
+    (var ary (array int n))
+    (array_set int ary 0 0)
+    (for i 1 n (array_set int ary i 1))
+    (for i 2 (/ n 2) (do
+        (var j 2)
+        (while (<= (* i j) n) (do
+            (array_set int ary (- (* i j) 1) 0)
+            (+= j 1)
+            ))
+        ))
+    (for i 0 n (do
+        (if (array_get int ary i) (do
+            (puti (+ i 1))
+            (putc '\n')
+            ))
+        ))
+    (return 0)
     ))
 
 (fun fib (n) (

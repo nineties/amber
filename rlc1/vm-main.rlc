@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-main.rlc 2010-06-22 15:28:08 nineties $
+; $Id: vm-main.rlc 2010-07-03 01:40:25 nineties $
 ;
 
 (import "stdlib")
@@ -102,6 +102,7 @@
 
 (export vmexit)
 (fun vmexit (status) (
+    (prim_flush)
     (cleanup_blocks)
     (syscall @SYS_EXIT status)
     ))
@@ -120,7 +121,8 @@
     (int nref)
     (void* code (read_program ([] argv 1) (address nref)))
 
-    (vmexit (vm_eval code nref))
+    (int ret (vm_eval code nref))
+    (vmexit ret)
     ))
 
 ))
