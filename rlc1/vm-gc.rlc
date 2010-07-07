@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-07-07 00:12:35 nineties $
+; $Id: vm-gc.rlc 2010-07-07 21:38:32 nineties $
 ;
 
 (import "stdlib")
@@ -120,6 +120,7 @@
 ; 010 : cons-cell
 ; 011 : array of boexed elements
 ; 100 : tuple
+; 101 : variant
 
 (var OBJECT_WORDS_BITS 18)
 (var BOXED_FIELD_SIZE_BITS 10)
@@ -134,6 +135,7 @@
 (var TAG_CONS    2)
 (var TAG_ARRAY   3)
 (var TAG_TUPLE   4)
+(var TAG_VARIANT 5)
 
 (define OBJECT_WORDS (addr)  `(& ([] @addr 0) @(- (<< 1 OBJECT_WORDS_BITS) 1)))
 (define OBJECT_TAG (addr)    `(>> ([] @addr 0) @OBJECT_TAG_OFF))
@@ -318,6 +320,7 @@
     (if (== tag @TAG_CONS) (
         (move_object (+ obj @WORD_SIZE)) ; car
         (move_object (+ obj @(* 2 WORD_SIZE))) ; cons
+        (return)
         ))
     (if (== tag @TAG_ARRAY) (
         (int len (- @(OBJECT_WORDS obj) 1)) ; -1 for the header
@@ -326,14 +329,25 @@
             (move_object obj)
             (+= obj @WORD_SIZE)
             ))
+        (return)
         ))
     (if (== tag @TAG_TUPLE) (
-        (int len (- @(BOXED_FIELD_SIZE obj) 1)) ; -1 for the header
-        (+= obj @WORD_SIZE)
+        (int len @(BOXED_FIELD_SIZE obj))
+        (+= obj @WORD_SIZE) ; skip header
         (while (> len 0) (
             (move_object obj)
             (+= obj @WORD_SIZE)
             ))
+        (return)
+        ))
+    (if (== tag @TAG_VARIANT) (
+        (int len @(BOXED_FIELD_SIZE obj))
+        (+= obj @WORD_SIZE) ; skip header and variant tag
+        (while (> len 0) (
+            (move_object obj)
+            (+= obj @WORD_SIZE)
+            ))
+        (return)
         ))
     (error "not reachable")
     ))

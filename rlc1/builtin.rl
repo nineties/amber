@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-06-29 21:54:43 nineties $
+ % $Id: builtin.rl 2010-07-07 21:52:31 nineties $
  %);
 
 include(stddef,code);
@@ -58,8 +58,14 @@ nth: (p0, p1) {
 };
 
 append: (p0, p1) {
+    allocate(1);
     if (p0 == nil_sym) { return p1; };
-    return mkcons(car(p0), append(cdr(p0), p1))
+    x0 = p0;
+    while (x0[2] != nil_sym) {
+        x0 = x0[2];
+    };
+    x0[2] = p1;
+    return p0;
 };
 
 length: (p0) {
