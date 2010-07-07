@@ -2,43 +2,55 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl.rlc 2010-07-07 21:30:26 nineties $
+; $Id: rowl.rlc 2010-07-07 23:01:18 nineties $
 ;
 
 (import "rowl-compile")
 
-; test code
+; Regular expressions
+;
+; spaces     : [\n\r\t ]
+; letter     : [A-Za-z_]
+; deciaml    : -?[1-9][0-9]*
+; octal      : 0[0-7]*
+; hex        : ("0x"|"0X")[0-9a-fA-F]+
+; escape     : \\['"\\abfnrtv0]
+; character  : \'({escape}|[^\\\'\n])\'
+; string     : \"({escape}|[^\\\"\n]*\"
+; opchar     : [!#$%&=-^|@+*:/?<>.,]
+; identifier : {letter}({letter}|[0-9_])*
+
+; character group
+(var CH_EOF         0)  ; [\0]
+(var CH_INVALID     1)
+(var CH_SPACES      2)  ; [\t\r ]
+(var CH_NL          3)  ; [\n]
+(var CH_ZERO        4)  ; [0]
+(var CH_1_7         5)  ; [1-7]
+(var CH_8_9         6)  ; [89]
+(var CH_abf         7)  ; [abf]
+(var CH_rtv         8)  ; [rtv]
+(var CH_xX          9)  ; [xX]
+(var CH_n           10) ; [n]
+(var CH_HEX         11) ; [A-Fa-f]/[abf]
+(var CH_OTHER       12)
+(var CH_SQUOTE      13) ; [\']
+(var CH_DQUOTE      14) ; [\"]
+(var CH_BACKSLASH   15) ; [\\]
+(var CH_LPAREN      16) ; [(]
+(var CH_RPAREN      17) ; [)]
+(var CH_SEMI        18) ; [;]
+(var CH_MINUS       19) ; [-]
+(var CH_OP          20) ; [!#$%&=-^|@+*:/?<>.,]
+
 (compile `(
 
 (fun main () (
-    (sieve 200000)
     (exit 0)
     ))
 
-(fun sieve (n) (
-    (var ary (array int n))
-    (array_set int ary 0 0)
-    (for i 1 n (array_set int ary i 1))
-    (for i 2 (/ n 2) (do
-        (var j 2)
-        (while (<= (* i j) n) (do
-            (array_set int ary (- (* i j) 1) 0)
-            (+= j 1)
-            ))
-        ))
-    (for i 0 n (do
-        (if (array_get int ary i) (do
-            (puti (+ i 1))
-            (putc '\n')
-            ))
-        ))
-    return
-    ))
-
-(fun fib (n) (
-    (if (< n 3)
-        (return 1)
-        (return (+ (fib (- n 1)) (fib (- n 2)))))
-    ))
+;============================================================
+;                          lexer
+;============================================================
 
     ))
