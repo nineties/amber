@@ -1,6 +1,6 @@
 " Language:	rowl-core
 " Maintainer:	nineties <nineties48@gmail.com>
-" $Id: rowlcore.vim 2010-06-28 22:17:11 nineties $
+" $Id: rowlcore.vim 2010-07-07 22:17:44 nineties $
 
 if exists("b:current_syntax")
     finish
@@ -19,7 +19,7 @@ syn match rowlcoreCharacter   /'\(\\["?\\abfnrtv0]\|[^\\\n]\)'/ contains=rowlcor
 syn match rowlcoreString      /"\(\\['"?\\abfnrtv0]\|[^\\\"\n]\)*"/ contains=rowlcoreEscape
 syn keyword rowlcoreTodo TODO FIXME NOTE XXX contained
 syn region  rowlcoreString start=/"/ skip=/\\"/ end=/"/
-syn region  rowlcoreComment start=/;/ end=/$/ contains=rowlcoreComment,rowlcoreTodo
+syn region  rowlcoreComment start=/;/ end=/$/ contains=rowlcoreTodo
 
 syn match rowlcoreOperator "\<+\>"
 syn match rowlcoreOperator "\<-\>"

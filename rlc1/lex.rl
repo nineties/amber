@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: lex.rl 2010-07-07 21:56:35 nineties $
+ % $Id: lex.rl 2010-07-07 22:03:11 nineties $
  %);
 
 include(stddef, code);
@@ -24,8 +24,8 @@ export(lex, unput);
  % hex        : ("0x"|"0X")[0-9a-fA-F]+
  % escape     : \\['"\\abfnrtv0]
  % character  : \'({escape}|[^\\\'\n])\'
- % string     : \"({escape}|[^\\\"\n])*\" | \(\/ .* \/\)
- % opchar     : [!#$%&=--^|@+*:/?<>.\,_]
+ % string     : \"({escape}|[^\\\"\n])*\"
+ % opchar     : [!#$%&=-^|@+*:/?<>.\,_]
  % symbol     : ({letter}|{opchar})({letter}|{opchar}|[0-9])*
  %);
 
