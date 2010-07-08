@@ -2,15 +2,26 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim.rlc 2010-07-08 21:35:58 nineties $
+; $Id: vm-prim.rlc 2010-07-08 22:36:03 nineties $
 ;
 
 ; primitive functions
 
 (var SYS_READ 3)
 (var SYS_WRITE 4)
+(var SYS_OPEN 5)
+(var SYS_CLOSE 6)
+
+(var O_RDONLY 0)
+(var O_WRONLY 1)
+(var O_RDWR   2)
+(var O_CREAT  64)
+(var O_TRUNC  512)
+(var O_APPEND 1024)
+
 (var STDIN_FD 0)
 (var STDOUT_FD 1)
+
 (var RDBUFSZ 512) ; read buffer size
 (var WRBUFSZ 512) ; write buffer size
 (var EOF -1)
@@ -19,19 +30,17 @@
     (var idx 0)
     (map (lambda (ent) (do
         (incr idx)
-        `(@(car ent) @(- idx 1) @(cdr ent))
+        `(@ent @(- idx 1) @ent)
         )) table)
     ))
 
 (var prim_table (assign_indices `(
-    (flush  .   prim_flush)
-    (getc   .   prim_getc)
-    (nextc  .   prim_nextc)
-    (putc   .   prim_putc)
-    (puti   .   prim_puti)
-    (error  .   prim_error)
-    (memset .   prim_memset)
-    (memcpy .   prim_memcpy)
+    ; I/O functions
+    flush getc nextc putc puti error
+    ; memory operations
+    memset memcpy
+    ; vector of characters
+    make_cvector cvector_at cvector_put cvector_reserve cvector_resize cvector_pushback
     )))
 
 (var vm-prim-code `(
@@ -53,8 +62,8 @@
 (int stdout_pos 0)
 
 ; flush stdout
-(export prim_flush)
-(fun prim_flush () (
+(export flush)
+(fun flush () (
     (if (> stdout_pos 0) (
         (syscall @SYS_WRITE @STDOUT_FD stdout_buf stdout_pos)
         (= stdout_pos 0)
@@ -70,7 +79,7 @@
         ))
     ))
 
-(fun prim_getc () (
+(fun getc () (
     (fill_stdin_buf)
     (if (== stdin_beg stdin_end) ((return @EOF)))
     (int c (*8 (+ stdin_buf stdin_beg)))
@@ -78,38 +87,38 @@
     (return c)
     ))
 
-(fun prim_nextc () (
+(fun nextc () (
     (fill_stdin_buf)
     (fill_stdin_buf)
     (if (== stdin_beg stdin_end) ((return @EOF)))
     (return (*8 (+ stdin_buf stdin_beg)))
     ))
 
-(fun prim_putc (c) (
+(fun putc (c) (
     ([]=8 stdout_buf stdout_pos c)
     (incr stdout_pos)
     (if (== stdout_pos @WRBUFSZ) (
-        (prim_flush)
+        (flush)
         (return)
         ))
     (if (== '\n' c) (
-        (prim_flush)
+        (flush)
         ))
     ))
 
-(fun prim_puts (str) (
+(fun puts (str) (
     (char c (*8 str))
     (while c (
-        (prim_putc c)
+        (putc c)
         (incr str)
         (= c (*8 str))
         ))
     ))
 
 (char[] 10 puti_digits)
-(fun prim_puti (n) (
+(fun puti (n) (
     (if (< n 0) (
-        (prim_putc '-')
+        (putc '-')
         (= n (neg n))
         ))
     ([]=8 puti_digits 0 (+ (% n 10) '0'))
@@ -121,27 +130,74 @@
         (= n (/ n 10))
         ))
     (while (>= i 0) (
-        (prim_putc (*8 (+ puti_digits i)))
+        (putc (*8 (+ puti_digits i)))
         (decr i)
         ))
     ))
 
-(fun prim_error (msg) (
-    (prim_puts msg)
-    (vmexit 1)
+(fun error (msg) (
+    (error msg)
     ))
 
-(fun prim_memset (ptr val bytes) (
+(fun memset (ptr val bytes) (
     (for i 0 bytes (
         ([]=8 ptr i val)
         ))
     ))
 
-(fun prim_memcpy (dst src bytes) (
+(fun memcpy (dst src bytes) (
     (for i 0 bytes (
         ([]=8 dst i ([]8 src i))
         ))
     ))
 
+; vector of characters
+(fun make_cvector_with_capa (size capa) (
+    (void* buf (allocate_plain capa))
+    (memset buf 0 capa)
+    (void* tup (allocate_tuple 3 1))
+    ([]= tup 0 buf)
+    ([]= tup 1 size)
+    ([]= tup 2 capa)
+    (return tup)
+    ))
+
+(fun make_cvector (size) (
+    (if (!= size 0)
+        (return (make_cvector_with_capa size size))
+        (return (make_cvector_with_capa 0 10))
+        )
+    ))
+
+(fun cvector_at (vec idx) (
+    (return ([]8 ([] vec 0) idx))
+    ))
+
+(fun cvector_put (vec idx val) (
+    ([]=8 ([] vec 0) idx val)
+    ))
+
+(fun cvector_reserve (vec capa) (
+    (if (< ([] vec 2) capa) (do
+        (void* new_buf (allocate_plain capa))
+        (memcpy new_buf ([] vec 0) ([] vec 1))
+        ([]= vec 0 new_buf)
+        ([]= vec 2 capa)
+        ))
+    ))
+
+(fun cvector_resize (vec new_size) (
+    (if (> new_size ([] vec 2)) (cvector_reserve vec new_size))
+    ([]= vec 1 new_size)
+    ))
+
+(fun cvector_pushback (vec value) (
+    (if (== ([] vec 1) ([] vec 2))
+        (cvector_reserve vec (* 2 ([] vec 2)))
+        )
+    (int sz ([] vec 1))
+    (cvector_put vec sz value)
+    ([]= vec 1 (+ sz 1))
+    ))
 ))
 
