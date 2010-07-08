@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl.rlc 2010-07-08 18:31:51 nineties $
+; $Id: rowl.rlc 2010-07-08 19:15:42 nineties $
 ;
 
 (import "rowl-compile")
@@ -147,17 +147,18 @@
 ;                    rowl1 compiler
 ;============================================================
 
+; tokens
+(var TOK_EOF      256)
+(var TOK_CHAR     257)
+(var TOK_INT      258)
+(var TOK_STRING   259)
+(var TOK_IDENT    260)
+(var TOK_OPERATOR 261)
+
 (compile `(
 
 (fun main () (
-    (var vec (make_cvector 0))
-    (cvector_pushback vec 0)
-    (cvector_pushback vec 1)
-    (cvector_pushback vec 2)
-    (cvector_pushback vec 3)
-    (cvector_pushback vec 4)
-    (cvector_pushback vec 5)
-    (exit (cvector_at vec 3))
+    (exit (lex))
     ))
 
 ;============================================================
@@ -248,24 +249,28 @@
 ;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  S  :  :  :
 ;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  H  :  :  :
 ;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :
-;(array char s0next  ( 1 90  1  1 90 90 90 90 90 90 90 90 90 90 90  2 90 90 90 90))
-;
-;(fun lookahead () (
-;    (return (array_get char chgroup (nextc)))
-;    ))
-;
-;(fun lex () (
-;    (var state 0)
-;    (var ch 0)
-;    (label lex_loop)
-;    (tswitch state (
-;        (0 . (do
-;            (= state (array_get char s0next (lookahead)))
-;            (goto lex_loop)
-;            ))
-;        (1 . (return 11))
-;        ))
-;    (return ch)
-;    ))
+(array char s0next  ( 1 90  1  1 90 90 90 90 90 90 90 90 90 90 90  2 90 90 90 90))
+
+(fun look_ahead () (
+    (return (array_get char chgroup (nextc)))
+    ))
+
+(fun next_state (table) (
+    (return (array_get char table (look_ahead)))
+    ))
+
+(fun lex () (
+    (var state 0)
+    (var ch 0)
+    (label lex_loop)
+    (tswitch state (
+        (0 . (do
+            (= state (next_state s0next))
+            (goto lex_loop)
+            ))
+        (1 . (return @TOK_EOF))
+        (default . (error "BUG: invalid state"))
+        ))
+    ))
 
     ))

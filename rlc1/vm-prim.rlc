@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim.rlc 2010-07-08 17:23:45 nineties $
+; $Id: vm-prim.rlc 2010-07-08 19:08:02 nineties $
 ;
 
 ; primitive functions
@@ -18,7 +18,7 @@
 (define assign_indices (table) (do
     (var idx 0)
     (map (lambda (ent) (do
-        (incl idx)
+        (incr idx)
         `(@(car ent) @(- idx 1) @(cdr ent))
         )) table)
     ))
@@ -29,6 +29,7 @@
     (nextc  .   prim_nextc)
     (putc   .   prim_putc)
     (puti   .   prim_puti)
+    (error  .   prim_error)
     (memset .   prim_memset)
     (memcpy .   prim_memcpy)
     )))
@@ -38,8 +39,8 @@
 (fun strlen (str) (
     (int len 0)
     (while (!= (*8 str) '\0') (
-        (incl str)
-        (incl len)
+        (incr str)
+        (incr len)
         ))
     (return len)
     ))
@@ -73,7 +74,7 @@
     (fill_stdin_buf)
     (if (== stdin_beg stdin_end) ((return @EOF)))
     (int c (*8 (+ stdin_buf stdin_beg)))
-    (incl stdin_beg)
+    (incr stdin_beg)
     (return c)
     ))
 
@@ -86,13 +87,22 @@
 
 (fun prim_putc (c) (
     ([]=8 stdout_buf stdout_pos c)
-    (incl stdout_pos)
+    (incr stdout_pos)
     (if (== stdout_pos @WRBUFSZ) (
         (prim_flush)
         (return)
         ))
     (if (== '\n' c) (
         (prim_flush)
+        ))
+    ))
+
+(fun prim_puts (str) (
+    (char c (*8 str))
+    (while c (
+        (prim_putc c)
+        (incr str)
+        (= c (*8 str))
         ))
     ))
 
@@ -106,14 +116,19 @@
     (= n (/ n 10))
     (int i 0)
     (while (!= n 0) (
-        (incl i)
+        (incr i)
         ([]=8 puti_digits i (+ (% n 10) '0'))
         (= n (/ n 10))
         ))
     (while (>= i 0) (
         (prim_putc (*8 (+ puti_digits i)))
-        (decl i)
+        (decr i)
         ))
+    ))
+
+(fun prim_error (msg) (
+    (prim_puts msg)
+    (vmexit 1)
     ))
 
 (fun prim_memset (ptr val bytes) (

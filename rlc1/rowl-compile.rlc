@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-07-08 17:34:02 nineties $
+; $Id: rowl-compile.rlc 2010-07-08 19:11:46 nineties $
 ;
 
 (import "stdlib")
@@ -33,7 +33,7 @@
 
 (var label_id 0)
 (define mklabel () (do
-    (incl label_id)
+    (incr label_id)
     (tosym (++ "label." label_id))
     ))
 
@@ -52,7 +52,7 @@
 (define register_local_var (name) (do
     (var idx num_local_var)
     (add_var name `(local @idx))
-    (incl num_local_var)
+    (incr num_local_var)
     idx
     ))
 
@@ -87,7 +87,7 @@
     (cond
         ((== `char type)    (emit_insn `(loadbv (value @name))))
         ((== `int type)     (emit_insn `(loadv (value @name))))
-        ((== `void* type)   (emit_insn `(loadv (value @name))))
+        ((== `void* type)   (emit_insn `(loadav (value @name))))
         ((== `string type)  (emit_insn `(loadav (value @name))))
         (otherwise (error "compile_global_var: not implemented"))
         ))
@@ -365,16 +365,17 @@
     (var idx 0)
     (var labels ())
     (foreach c cases (do
-        (if (!= (car c) idx) (error "case " idx " is missing"))
+        (if (and last? (!= (car c) `default)) (error "default case is missing"))
+        (if (and (not last?) (!= (car c) idx)) (error "case " idx " is missing"))
         (push labels (mklabel))
-        (incl idx)
+        (incr idx)
         ))
     (set labels (reverse labels))
 
     (compile_expr e)
 
     (push_break_label)
-    (emit_insn `(tswitch (short @ncase)))
+    (emit_insn `(tswitch (short @(- ncase 1))))
     (foreach l labels (do
         (emit_insn `(tswitch_ent (address @l)))
         ))
@@ -544,7 +545,7 @@
     (var pidx 0) ; parameter index
     (foreach p params (do
         (add_var p `(arg @pidx))
-        (incl pidx)
+        (incr pidx)
         ))
     (compile_block body)
     (var insn_seq (get_insn_seq))
