@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-07-08 19:03:56 nineties $
+; $Id: vm-gc.rlc 2010-07-08 21:55:48 nineties $
 ;
 
 (import "stdlib")
@@ -463,11 +463,16 @@
     ))
 
 (export allocate_tuple)
-(fun allocate_tuple (nelem nboxed values) (
+(fun allocate_tuple (nelem nboxed) (
     (int words (+ nelem 1))
     (void* ptr (allocate_object words))
     @(SET_HEADER ptr TAG_TUPLE nboxed words)
-    (+= ptr @WORD_SIZE)
+    (return (+ ptr @WORD_SIZE))
+    ))
+
+(export allocate_tuple_with_values)
+(fun allocate_tuple_with_values (nelem nboxed values) (
+    (void* ptr (allocate_tuple nelem nboxed))
     (for i 0 nelem (
         ([]= ptr i ([] values i))
         ))
