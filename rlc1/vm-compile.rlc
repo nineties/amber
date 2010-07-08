@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-compile.rlc 2010-07-08 17:27:58 nineties $
+; $Id: vm-compile.rlc 2010-07-08 19:01:41 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -31,7 +31,7 @@
     )))
 
 (var label_id 0)
-(define mklabel (sym) (do (incl label_id) (tosym (++ sym '.' (- label_id 1)))))
+(define mklabel (sym) (do (incr label_id) (tosym (++ sym '.' (- label_id 1)))))
 (define print_label (sym) (print sym ":\n"))
 
 (define escape (c)
@@ -410,8 +410,8 @@
 
 (define emit_nop ((_nop_) _ ret) (if ret (emit_return `(return) nil nil)))
 
-(define emit_incldecl ((inst v) dst ret) (do
-    (emit (if (== inst `incl) "incl" "decl") (lookup_var v))
+(define emit_incrdecr ((inst v) dst ret) (do
+    (emit (if (== inst `incr) "incl" "decl") (lookup_var v))
     (if dst (movl (lookup_var v) dst))
     (if ret (emit_return `(return) nil nil))
     ))
@@ -541,7 +541,7 @@
     (emit_expr `(int @v @a) nil nil)
     (print_label loop-lbl)
     (push_break_point)
-    (emit_if `(if (< @v @b) @(append body `((incl @v) (goto @loop-lbl)))) nil nil)
+    (emit_if `(if (< @v @b) @(append body `((incr @v) (goto @loop-lbl)))) nil nil)
     (emit_break_point)
     (pop_break_point)
     (if ret (emit_return `(return) nil nil))
@@ -601,8 +601,8 @@
     (^=      . @emit_opasgn)
     ([]=     . @emit_arrasgn)
     ([]=8    . @emit_arrasgn8)
-    (incl    . @emit_incldecl)
-    (decl    . @emit_incldecl)
+    (incr    . @emit_incrdecr)
+    (decr    . @emit_incrdecr)
     (address . @emit_addressof)
     (asm     . @emit_asm)
     ))
@@ -711,7 +711,7 @@
 
     ; register parameters
     (var idx 1)
-    (foreach p params (do (add_var p `(arg @idx)) (incl idx)))
+    (foreach p params (do (add_var p `(arg @idx)) (incr idx)))
     ; register variables
     (scan_function body)
 
