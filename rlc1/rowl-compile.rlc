@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-07-07 21:56:50 nineties $
+; $Id: rowl-compile.rlc 2010-07-08 15:22:02 nineties $
 ;
 
 (import "stdlib")
@@ -35,6 +35,17 @@
 (define mklabel () (do
     (incl label_id)
     (tosym (++ "label." label_id))
+    ))
+
+(var break_labels ())
+(define push_break_label () (do
+    (var lbl (mklabel))
+    (push break_labels lbl)
+    ))
+(define pop_break_label () (do
+    (var lbl (car break_labels))
+    (set break_labels (cdr break_labels))
+    (emit_insn `(label @lbl))
     ))
 
 (var num_local_var 0)
@@ -312,7 +323,10 @@
 
 (define compile_while ((_ expr body)) (do
     (var loop_label (mklabel))
+    (push_break_label)
     (compile_if `(if @expr (do (label @loop_label) @body (if @expr (goto @loop_label)))))
+    (pop_break_label)
+    nil
     ))
 
 ; for v low high body
@@ -330,6 +344,7 @@
 
 (define compile_for ((_ it low high body)) (do
     (var loop_label (mklabel))
+    (push_break_label)
     (compile_block `(
         (var @it @low)
         (var end @high)
@@ -340,6 +355,35 @@
             (if (< @it end) (goto @loop_label))
             ))
         ))
+    (pop_break_label)
+    nil
+    ))
+
+(define compile_tswitch ((_ e cases)) (do
+    (var ncase (length cases))
+    (var idx 0)
+    (var labels ())
+    (foreach c cases (do
+        (if (!= (car c) idx) (error "case " idx " is missing"))
+        (push labels (mklabel))
+        (incl idx)
+        ))
+    (set labels (reverse labels))
+
+    (compile_expr e)
+
+    (push_break_label)
+    (emit_insn `(tswitch (short @ncase)))
+    (foreach l labels (do
+        (emit_insn `(tswitch_ent (address @l)))
+        ))
+    (foreach c cases (do
+        (emit_insn `(label @(car labels)))
+        (compile_expr (cdr c))
+        (set labels (cdr labels))
+        ))
+    (pop_break_label)
+    nil
     ))
 
 (define compile_label ((_ name)) (do
@@ -349,6 +393,12 @@
 
 (define compile_goto ((_ name)) (do
     (emit_insn `(goto (address @name)))
+    nil
+    ))
+
+(define compile_break (_) (do
+    (var break_label (car break_labels))
+    (emit_insn `(goto (address @break_label)))
     nil
     ))
 
@@ -406,7 +456,8 @@
 (define compile_expr (expr) (do
     (cond
         ((== `nop expr) nil)
-        ((== `return expr) (do (emit_insn `imm_i0) (emit_insn `ireturn)))
+        ((== `return expr) (do (emit_insn `imm_i0) (emit_insn `ireturn) nil))
+        ((== `break expr) (compile_break expr))
         ((char? expr) (compile_int_lit (char2int expr)))
         ((int? expr) (compile_int_lit expr))
         ((string? expr) (compile_string_lit expr))
@@ -415,6 +466,7 @@
         ((== `if (car expr)) (compile_if expr))
         ((== `while (car expr)) (compile_while expr))
         ((== `for (car expr)) (compile_for expr))
+        ((== `tswitch (car expr)) (compile_tswitch expr))
         ((== `label (car expr)) (compile_label expr))
         ((== `goto (car expr)) (compile_goto expr))
         ((== `do (car expr)) (compile_block (cdr expr)))

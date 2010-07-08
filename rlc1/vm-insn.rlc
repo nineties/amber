@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-07-07 22:56:17 nineties $
+; $Id: vm-insn.rlc 2010-07-08 15:14:16 nineties $
 ;
 
 (define gen_comparison1 (cmovname) `(
@@ -298,5 +298,17 @@
         (asm "addl value_area_base, %eax")
         (vmpop %ebx)
         (asm "movl %ebx, (%eax)")
+        ))
+    (tswitch 3 @nil (
+        (vmpop %eax)
+        (vmushort 1 %ebx) ; number of cases
+        (asm "cmpl %eax, %ebx")
+        (asm "cmovle %ebx, %eax")
+        (asm "sall $1, %eax")
+        (asm "addl $3, %ecx")
+        (asm "addl %eax, %ecx")
+        (asm "movzwl (%ecx), %eax")
+        (asm "addl %eax, %ecx")
+        (vmfetch)
         ))
     ))
