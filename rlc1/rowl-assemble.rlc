@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-assemble.rlc 2010-06-29 23:18:00 nineties $
+; $Id: rowl-assemble.rlc 2010-07-08 15:15:27 nineties $
 ;
 
 (import "stdlib")
@@ -86,6 +86,7 @@
     (cond
         ((symbol? insn) (set current_addr (+ current_addr (insn_len insn))))
         ((== `label (car insn)) (push label_addr_table `(@(cadr insn) . @current_addr)))
+        ((== `tswitch_ent (car insn)) (set current_addr (+ current_addr 2)))
         (otherwise (set current_addr (+ current_addr (insn_len insn))))
         ))
     )
@@ -135,6 +136,10 @@
     (cond
         ((symbol? insn) (do (put_byte (insn_code insn)) (incl current_addr)))
         ((== `label (car insn)) ())
+        ((== `tswitch_ent (car insn)) (do
+            (put_operand (cadr insn))
+            (set current_addr (+ current_addr 2))
+            ))
         (otherwise (do
             (put_byte (insn_code insn))
             (foreach opd (cdr insn) (put_operand opd))
