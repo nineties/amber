@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-07-08 19:03:21 nineties $
+; $Id: vm-insn.rlc 2010-07-08 20:41:27 nineties $
 ;
 
 (define gen_comparison1 (cmovname) `(
@@ -38,7 +38,6 @@
 
 (var vm_instructions `(
     (nop        1 @true ())
-    (exit       1 @true ((vmpop %eax) (break)))
     (imm_i0     1 @true ((vmpush %edx))) ; also used for 'nil'
     (imm_i1     1 @true ((vmpush $1)))
     (imm_i2     1 @true ((vmpush $2)))
@@ -67,62 +66,9 @@
         ))
     (iadd1      1 @true ((asm "incl (%esi)")))
     (isub1      1 @true ((asm "decl (%esi)")))
-    (goto       3 @nil  ((vmsshort 1 %eax) (asm "addl %eax, %ecx") (vmfetch)))
-    (if_zero    3 @nil  @(gen_comparison1 "cmovz"))
-    (if_nonzero 3 @nil  @(gen_comparison1 "cmovnz"))
-    (if_eq      3 @nil  @(gen_comparison2 "cmove"))
-    (if_ne      3 @nil  @(gen_comparison2 "cmovne"))
-    (if_gt      3 @nil  @(gen_comparison2 "cmovg"))
-    (if_ge      3 @nil  @(gen_comparison2 "cmovge"))
-    (if_lt      3 @nil  @(gen_comparison2 "cmovl"))
-    (if_le      3 @nil  @(gen_comparison2 "cmovle"))
     (drop       1 @true ((asm "addl $4, %esi")))
     (drop2      1 @true ((asm "addl $8, %esi")))
     (dup        1 @true ((asm "movl (%esi), %eax") (vmpush %eax)))
-    (call       4 @nil  (
-        (asm "movl %ecx, %eax")
-        (asm "addl $4, %eax")
-        (vmpush %eax) ; store return point
-        (vmpush %edi) ; store base pointer
-        (vmsshort 1 %eax) ; offset of address of the function
-        (asm "movl %esi, %edi") ; set base pointer
-        (asm "addl %eax, %ecx")
-        (vmfetch)
-        ))
-    (extcall    4 @true ( ; 'extcall:1' 'index of the external function:2' 'size of arguments:1'
-        (vmsave)
-        (vmushort 1 %eax)
-        (vmubyte 3 %ebx)
-        (asm "pushl %esi") ; push argv
-        (asm "pushl %ebx") ; push argc
-        (asm "pushl %eax") ; push index
-        (call vm_extcall)
-        (asm "addl $12, %esp")
-        (vmrestore)
-        (vmubyte 3 %ebx) ; total size of arguments
-        (asm "addl %ebx, %esi") ; remove arguments from stack
-        (vmpush %eax) ; push return value
-        ))
-    (return     1 @nil  (
-        (asm "movl $0, %ebx") ; return value
-        (asm "movl %edi, %esi")
-        (vmpop %edi) ; base pointer
-        (vmpop %ecx) ; return address
-        (asm "movzbl -1(%ecx), %eax") ; total size of arguments
-        (asm "addl %eax, %esi")
-        (vmpush %ebx) ; push return value
-        (vmfetch)
-        ))
-    (ireturn    1 @nil  (
-        (asm "movl (%esi), %ebx") ; return value
-        (asm "movl %edi, %esi")
-        (vmpop %edi) ; base pointer
-        (vmpop %ecx) ; return address
-        (asm "movzbl -1(%ecx), %eax") ; total size of arguments
-        (asm "addl %eax, %esi")
-        (vmpush %ebx) ; push return value
-        (vmfetch)
-        ))
     (arg0 1 @true ((vmarg 0 %eax) (vmpush %eax)))
     (arg1 1 @true ((vmarg 1 %eax) (vmpush %eax)))
     (arg2 1 @true ((vmarg 2 %eax) (vmpush %eax)))
@@ -344,6 +290,65 @@
         (vmpop %ebx)
         (asm "movl %ebx, (%eax)")
         ))
+    ; load global heap object
+    (loado 3 @true (
+        (vmushort 1 %eax)
+        (asm "addl object_area_base, %eax")
+        (asm "movl (%eax), %eax")
+        (vmpush %eax)
+        ))
+    ; store global heap object
+    (storeo 3 @true (
+        (vmushort 1 %eax)
+        (asm "addl object_area_base, %eax")
+        (vmpop %ebx)
+        (asm "movl %ebx, (%eax)")
+        ))
+    (exit       1 @true ((vmpop %eax) (break)))
+    (call       4 @nil  (
+        (asm "movl %ecx, %eax")
+        (asm "addl $4, %eax")
+        (vmpush %eax) ; store return point
+        (vmpush %edi) ; store base pointer
+        (vmsshort 1 %eax) ; offset of address of the function
+        (asm "movl %esi, %edi") ; set base pointer
+        (asm "addl %eax, %ecx")
+        (vmfetch)
+        ))
+    (extcall    4 @true ( ; 'extcall:1' 'index of the external function:2' 'size of arguments:1'
+        (vmsave)
+        (vmushort 1 %eax)
+        (vmubyte 3 %ebx)
+        (asm "pushl %esi") ; push argv
+        (asm "pushl %ebx") ; push argc
+        (asm "pushl %eax") ; push index
+        (call vm_extcall)
+        (asm "addl $12, %esp")
+        (vmrestore)
+        (vmubyte 3 %ebx) ; total size of arguments
+        (asm "addl %ebx, %esi") ; remove arguments from stack
+        (vmpush %eax) ; push return value
+        ))
+    (return     1 @nil  (
+        (asm "movl $0, %ebx") ; return value
+        (asm "movl %edi, %esi")
+        (vmpop %edi) ; base pointer
+        (vmpop %ecx) ; return address
+        (asm "movzbl -1(%ecx), %eax") ; total size of arguments
+        (asm "addl %eax, %esi")
+        (vmpush %ebx) ; push return value
+        (vmfetch)
+        ))
+    (ireturn    1 @nil  (
+        (asm "movl (%esi), %ebx") ; return value
+        (asm "movl %edi, %esi")
+        (vmpop %edi) ; base pointer
+        (vmpop %ecx) ; return address
+        (asm "movzbl -1(%ecx), %eax") ; total size of arguments
+        (asm "addl %eax, %esi")
+        (vmpush %ebx) ; push return value
+        (vmfetch)
+        ))
     (tswitch 3 @nil (
         (vmpop %eax)
         (vmushort 1 %ebx) ; number of cases
@@ -356,4 +361,13 @@
         (asm "addl %eax, %ecx")
         (vmfetch)
         ))
+    (goto       3 @nil  ((vmsshort 1 %eax) (asm "addl %eax, %ecx") (vmfetch)))
+    (if_zero    3 @nil  @(gen_comparison1 "cmovz"))
+    (if_nonzero 3 @nil  @(gen_comparison1 "cmovnz"))
+    (if_eq      3 @nil  @(gen_comparison2 "cmove"))
+    (if_ne      3 @nil  @(gen_comparison2 "cmovne"))
+    (if_gt      3 @nil  @(gen_comparison2 "cmovg"))
+    (if_ge      3 @nil  @(gen_comparison2 "cmovge"))
+    (if_lt      3 @nil  @(gen_comparison2 "cmovl"))
+    (if_le      3 @nil  @(gen_comparison2 "cmovle"))
     ))

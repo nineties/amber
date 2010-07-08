@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-07-08 19:11:46 nineties $
+; $Id: rowl-compile.rlc 2010-07-08 21:30:00 nineties $
 ;
 
 (import "stdlib")
@@ -60,6 +60,13 @@
 (define reset_insn_seq () (set insn_seq ()))
 (define get_insn_seq () (reverse insn_seq))
 (define emit_insn (insn) (push insn_seq insn))
+
+(var init_code ()
+(define push_init_code (code) (set init_code (append code init_code)))
+
+(define gen_init_func ()
+    `(fun __initialize__ @(append init_code `((call (address main) (byte 0)))))
+    )
 
 (define arg_insn (idx)
     (cond
@@ -555,8 +562,15 @@
     `(fun @name @insn_seq)
     ))
 
-(define compile_heap_object_decl (name value)
-    (error "compile_heap_object_decl: not implemented"))
+(define compile_heap_object_decl (name value) (do
+    (add_var name `(heap @name))
+    (reset_insn_seq)
+    (compile_expr value)
+    (emit_insn `(storeo (object @name)))
+    (var insn_seq (get_insn_seq))
+    (push_init_code insn_seq)
+    `(object @name)
+    ))
 
 (define compile_value_object_decl (name value) (do
     (var type (cond
@@ -602,12 +616,16 @@
 (define compile_main (code) (do
     (var asm_code ())
     (vtable_push)
-    (foreach decl code (push asm_code (compile_decl decl)))
+    (foreach decl code (do
+        (var asm (compile_decl decl))
+        (if asm (push asm_code asm))
+        ))
     (vtable_pop)
     (append string_decls (reverse asm_code))
     ))
 
 (define compile (code) (do
     (var asm_code (compile_main code))
-    (assemble asm_code)
+    (var init_func (gen_init_func))
+    (assemble (cons init_func asm_code))
     ))

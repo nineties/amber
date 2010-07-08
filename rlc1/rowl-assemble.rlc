@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-assemble.rlc 2010-07-08 19:15:04 nineties $
+; $Id: rowl-assemble.rlc 2010-07-08 20:47:12 nineties $
 ;
 
 (import "stdlib")
@@ -36,6 +36,9 @@
 (var align4_table ()) ; list of (type name value)
 (var align1_table ()) ; list of (type name value)
 (var value_addr_table ())
+
+(var object_table ())
+(var object_index 0)
 
 (define type_length (ty) (assoc ty `((char . 1) (int . 4) (long . 8))))
 (define value_length (ent) (do
@@ -76,10 +79,15 @@
 
 (define get_value_addr (name) (do
     (var addr (assoc name value_addr_table))
-    (if (nil? addr) (error "unknown value named " name))
+    (if (nil? addr) (error "unknown value name " name))
     addr
     ))
 
+(define get_object_index (name) (do
+    (var idx (assoc name object_table))
+    (if (nil? idx) (error "unknown object name " name))
+    idx
+    ))
 (var object_table ()) ; list of name
 
 (define scan_insn (insn) (do
@@ -106,12 +114,18 @@
         )
     ))
 
+(define scan_object_decl ((_ name)) (do
+    (push object_table `(@name . @object_index))
+    (incr object_index)
+    ))
+
 (define scan_decl (decl)
     (cond
         ((== `fun (car decl))       (scan_fundecl decl))
         ((== `int (car decl))       (scan_value_decl decl))
         ((== `char (car decl))      (scan_value_decl decl))
         ((== `string (car decl))    (scan_value_decl decl))
+        ((== `object (car decl))    (scan_object_decl decl))
         ((and (cons? (car decl)) (== `array (caar decl))) (scan_value_decl decl))
         (otherwise (error "scan_decl: not implemented"))
         ))
@@ -129,6 +143,7 @@
         ((== `long (car opd))    (put_long (cadr opd)))
         ((== `address (car opd)) (put_short (relative_address (cadr opd))))
         ((== `value (car opd))   (put_short (get_value_addr (cadr opd))))
+        ((== `object (car opd))  (put_short (get_object_index (cadr opd))))
         (otherwise (error "unknown operand: " opd))
         ))
 
@@ -187,6 +202,10 @@
     (foreach v align4_table (emit_value v))
     (foreach v align1_table (emit_value v))
     (set current_addr 0)
+
+    ; generate initialization code
+
+    ; generate functions
     (foreach decl prog (assemble_decl decl))
     ))
 
