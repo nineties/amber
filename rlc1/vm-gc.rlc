@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-07-07 21:38:32 nineties $
+; $Id: vm-gc.rlc 2010-07-08 16:53:29 nineties $
 ;
 
 (import "stdlib")
@@ -112,7 +112,7 @@
 (define blockmap->first= (idx val)  `([]= block_map (+ (* @BDESCR_SIZE @idx) 1) @val))
 
 ; structure of header field
-; MSB <- | 3 (object tag) | 1 (copyed flag) | 10 (# of boxed fieids) | 18 (object size) |
+; MSB <- | 3 (object tag) | 1 (copyed flag) | 8 (# of boxed fieids) | 20 (object words) |
 
 ; object tag:
 ; 000 : padding
@@ -122,8 +122,8 @@
 ; 100 : tuple
 ; 101 : variant
 
-(var OBJECT_WORDS_BITS 18)
-(var BOXED_FIELD_SIZE_BITS 10)
+(var OBJECT_WORDS_BITS 20)
+(var BOXED_FIELD_SIZE_BITS 8)
 (var BOXED_FIELD_SIZE_OFF OBJECT_WORDS_BITS)
 (var OBJECT_COPYED_OFF (+ OBJECT_WORDS_BITS BOXED_FIELD_SIZE_BITS))
 (var OBJECT_TAG_BITS 3)
@@ -146,12 +146,12 @@
 (define BOXED_FIELD_SIZE (addr)
     `(& (>> ([] @addr 0) @BOXED_FIELD_SIZE_OFF) @(- (<< 1 BOXED_FIELD_SIZE_BITS) 1)))
 
-(define HEADER (tag fieldsz objsz)
+(define HEADER (tag nboxed objsz)
     `(| (<< @tag @OBJECT_TAG_OFF)
-     (| (<< @fieldsz @BOXED_FIELD_SIZE_OFF)
+     (| (<< @nboxed @BOXED_FIELD_SIZE_OFF)
         @objsz)))
 
-(define SET_HEADER (addr tag fieldsz objsz) `([]= @addr 0 @(HEADER tag fieldsz objsz)))
+(define SET_HEADER (addr tag nboxed objsz) `([]= @addr 0 @(HEADER tag nboxed objsz)))
 
 (define FORWARD_ADDR (obj) `([] @obj @WORD_SIZE))
 (define SET_FORWARD_ADDR (obj addr) `([]= @obj @WORD_SIZE @addr))
@@ -460,6 +460,18 @@
     (void* ptr (allocate_object words))
     @(SET_HEADER ptr TAG_PLAIN 0 words)
     (return (+ ptr @WORD_SIZE))
+    ))
+
+(export allocate_tuple)
+(fun allocate_tuple (nelem nboxed values) (
+    (int words (+ nelem 1))
+    (void* ptr (allocate_object words))
+    @(SET_HEADER ptr TAG_TUPLE nboxed words)
+    (+= ptr @WORD_SIZE)
+    (for i 0 nelem (
+        ([]= ptr i ([] values i))
+        ))
+    (return ptr)
     ))
 
 (fun init_pdescrs (block_addr) (
