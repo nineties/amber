@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-07-08 15:22:02 nineties $
+; $Id: rowl-compile.rlc 2010-07-08 15:34:19 nineties $
 ;
 
 (import "stdlib")
@@ -87,6 +87,7 @@
     (cond
         ((== `char type)    (emit_insn `(loadbv (value @name))))
         ((== `int type)     (emit_insn `(loadv (value @name))))
+        ((== `void* type)   (emit_insn `(loadv (value @name))))
         ((== `string type)  (emit_insn `(loadav (value @name))))
         (otherwise (error "compile_global_var: not implemented"))
         ))
@@ -437,7 +438,7 @@
     )
 
 (define compile_array_get ((_ type ary idx)) (do
-    (var insn (assoc type `((int . array_get32))))
+    (var insn (assoc type `((char . array_get8) (int . array_get32))))
     (compile_expr ary)
     (compile_expr idx)
     (emit_insn insn)
@@ -545,6 +546,7 @@
 (define compile_arraydecl ((_ type name . args)) (do
     (var length (if (int? (car args)) (car args) (length (car args))))
     (var value_list (if (cons? (car args)) (car args) (cadr args)))
+    (add_var name `(global void* @name))
     `((array @type @length) @name @value_list)
     ))
 
