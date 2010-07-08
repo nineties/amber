@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-compile.rlc 2010-07-03 09:21:29 nineties $
+; $Id: vm-compile.rlc 2010-07-08 17:27:58 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -218,7 +218,7 @@
     (if ret (emit_return `(return) nil nil))
     ))
 
-(define emit_deref ((_ ptr idx) dst ret) (do
+(define emit_subs ((_ ptr idx) dst ret) (do
     (if dst (do
         (emit_expr ptr `%eax nil)
         (if (!= idx 0) (do
@@ -229,6 +229,20 @@
             (emit "addl" %ebx %eax)
             ))
         (movl `(deref %eax 0) dst)
+        ))
+    (if ret (emit_return `(return) nil nil))
+    ))
+
+(define emit_subs8 ((_ ptr idx) dst ret) (do
+    (if dst (do
+        (emit_expr ptr `%eax nil)
+        (if (!= idx 0) (do
+            (pushl `%eax)
+            (emit_expr idx `%ebx nil)
+            (popl `%eax)
+            (emit "addl" %ebx %eax)
+            ))
+        (movb `(deref %eax 0) dst)
         ))
     (if ret (emit_return `(return) nil nil))
     ))
@@ -556,7 +570,8 @@
     (char    . @emit_def)
     (byte    . @emit_def)
     (void*   . @emit_def)
-    ([]      . @emit_deref)
+    ([]      . @emit_subs)
+    ([]8     . @emit_subs8)
     (*8      . @emit_deref8)
     (neg     . @emit_unexpr)
     (+       . @emit_binexpr)

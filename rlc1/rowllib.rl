@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: rowllib.rl 2010-07-07 22:21:59 nineties $
+ % $Id: rowllib.rl 2010-07-08 17:35:18 nineties $
  %);
 
 include(stddef);
@@ -243,7 +243,7 @@ cvec_reserve: (p0, p1) {
 
 (% p0: cvector, p1: new size %);
 cvec_resize: (p0, p1) {
-    if (p1 > p0[VEC_SIZE]) {
+    if (p1 > p0[VEC_CAPA]) {
         cvec_reserve(p0, p1);
     };
     p0[VEC_SIZE] = p1;
