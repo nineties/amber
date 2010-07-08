@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-07-08 17:01:14 nineties $
+; $Id: vm-insn.rlc 2010-07-08 18:30:21 nineties $
 ;
 
 (define gen_comparison1 (cmovname) `(
@@ -31,12 +31,9 @@
     ))
 
 (define gen_field_set (idx) `(
-    (vmubyte 1 %eax) ; index
-    (asm "sall $2, %eax")
-    (vmpop %ebx) ; obj
-    (asm "addl %eax, %ebx")
-    (asm "movl (%esi), %eax") ; value
-    (asm "movl %eax, (%ebx)")
+    (vmpop %ebx) ; value
+    (vmpop %eax) ; ptr
+    (asm "movl %ebx, " @(* 4 idx) "(%eax)")
     ))
 
 (var vm_instructions `(
@@ -59,14 +56,14 @@
         (vmpop %eax)
         (asm "idiv %ebx")
         (vmpush %eax)
-        (asm "xorl %edx, %edx") ; re-clear zero register
+        (asm "xorl %edx, %edx") ; clear zero register
         ))
     (imod       1 @true (
         (vmpop %ebx)
         (vmpop %eax)
         (asm "idiv %ebx")
         (vmpush %edx)
-        (asm "xorl %edx, %edx") ; re-clear zero register
+        (asm "xorl %edx, %edx") ; clear zero register
         ))
     (iadd1      1 @true ((asm "incl (%esi)")))
     (isub1      1 @true ((asm "decl (%esi)")))
@@ -105,6 +102,16 @@
         (vmubyte 3 %ebx) ; total size of arguments
         (asm "addl %ebx, %esi") ; remove arguments from stack
         (vmpush %eax) ; push return value
+        ))
+    (return     1 @nil  (
+        (asm "movl $0, %ebx") ; return value
+        (asm "movl %edi, %esi")
+        (vmpop %edi) ; base pointer
+        (vmpop %ecx) ; return address
+        (asm "movzbl -1(%ecx), %eax") ; total size of arguments
+        (asm "addl %eax, %esi")
+        (vmpush %ebx) ; push return value
+        (vmfetch)
         ))
     (ireturn    1 @nil  (
         (asm "movl (%esi), %ebx") ; return value
@@ -220,6 +227,14 @@
         (asm "movl %eax, (%esi)")
         ))
     ; array_set ary idx val
+    (array_set8 1 @true (
+        (asm "movl 4(%esi), %eax") ; index
+        (asm "movl 8(%esi), %ebx") ; array
+        (asm "addl %eax, %ebx")
+        (asm "movl (%esi), %eax")
+        (asm "movb %al, (%ebx)")
+        (asm "addl $12, %esi")
+        ))
     (array_set32 1 @true (
         (asm "movl 4(%esi), %eax") ; index
         (asm "sall $2, %eax")

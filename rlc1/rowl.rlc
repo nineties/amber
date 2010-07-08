@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl.rlc 2010-07-08 16:56:39 nineties $
+; $Id: rowl.rlc 2010-07-08 18:31:51 nineties $
 ;
 
 (import "rowl-compile")
@@ -130,11 +130,34 @@
 ;   e8: invalid symbol character
 ;
 
+;============================================================
+;                        macros
+;============================================================
+
+; character vector
+(define CVECTOR (buf size capa) `(tuple 1 @buf @size @capa))
+(define CVEC_BUF  (vec)  `(field_get @vec 0))
+(define CVEC_SIZE (vec)  `(field_get @vec 1))
+(define CVEC_CAPA (vec)  `(field_get @vec 2))
+(define CVEC_BUF=  (vec val)  `(field_set @vec 0 @val))
+(define CVEC_SIZE= (vec val)  `(field_set @vec 1 @val))
+(define CVEC_CAPA= (vec val)  `(field_set @vec 2 @val))
+
+;============================================================
+;                    rowl1 compiler
+;============================================================
+
 (compile `(
 
 (fun main () (
-    (var x (make_cvector_with_capa 10 10))
-    (exit (field_get x 1))
+    (var vec (make_cvector 0))
+    (cvector_pushback vec 0)
+    (cvector_pushback vec 1)
+    (cvector_pushback vec 2)
+    (cvector_pushback vec 3)
+    (cvector_pushback vec 4)
+    (cvector_pushback vec 5)
+    (exit (cvector_at vec 3))
     ))
 
 ;============================================================
@@ -145,9 +168,50 @@
 (fun make_cvector_with_capa (size capa) (
     (var buf (array char capa))
     (memset buf 0 capa)
-    (return (tuple 1 buf size capa))
+    (return @(CVECTOR buf size capa))
     ))
 
+(fun make_cvector (size) (
+    (if (!= size 0)
+        (return (make_cvector_with_capa size size))
+        (return (make_cvector_with_capa 0 10))
+        )
+    ))
+
+(fun cvector_at (vec idx) (
+    (return (array_get char @(CVEC_BUF vec) idx))
+    ))
+
+(fun cvector_put (vec idx val) (
+    (array_set char @(CVEC_BUF vec) idx val)
+    return
+    ))
+
+(fun cvector_reserve (vec capa) (
+    (if (< @(CVEC_CAPA vec) capa) (do
+        (var new_buf (array char capa))
+        (memcpy new_buf @(CVEC_BUF vec) @(CVEC_SIZE vec))
+        @(CVEC_BUF= vec new_buf)
+        @(CVEC_CAPA= vec capa)
+        ))
+    return
+    ))
+
+(fun cvector_resize (vec new_size) (
+    (if (> new_size @(CVEC_CAPA vec)) (cvector_reserve vec new_size))
+    @(CVEC_SIZE= vec new_size)
+    return
+    ))
+
+(fun cvector_pushback (vec value) (
+    (if (== @(CVEC_SIZE vec) @(CVEC_CAPA vec))
+        (cvector_reserve vec (* 2 @(CVEC_CAPA vec)))
+        )
+    (var sz @(CVEC_SIZE vec))
+    (cvector_put vec sz value)
+    @(CVEC_SIZE= vec `(+ sz 1))
+    return
+    ))
 
 ;============================================================
 ;                          lexer

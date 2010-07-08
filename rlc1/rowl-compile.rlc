@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-07-08 17:00:51 nineties $
+; $Id: rowl-compile.rlc 2010-07-08 17:34:02 nineties $
 ;
 
 (import "stdlib")
@@ -446,7 +446,7 @@
     ))
 
 (define compile_array_set ((_ type ary idx val)) (do
-    (var insn (assoc type `((int . array_set32))))
+    (var insn (assoc type `((int . array_set32) (char . array_set8))))
     (compile_expr ary)
     (compile_expr idx)
     (compile_expr val)
@@ -476,7 +476,7 @@
     true
     ))
 
-(define compile_field_get ((_ tup idx val)) (do
+(define compile_field_set ((_ tup idx val)) (do
     (compile_expr tup)
     (compile_expr val)
     (emit_insn (cond
@@ -495,7 +495,7 @@
 (define compile_expr (expr) (do
     (cond
         ((== `nop expr) nil)
-        ((== `return expr) (do (emit_insn `imm_i0) (emit_insn `ireturn) nil))
+        ((== `return expr) (do (emit_insn `return) nil))
         ((== `break expr) (compile_break expr))
         ((char? expr) (compile_int_lit (char2int expr)))
         ((int? expr) (compile_int_lit expr))
