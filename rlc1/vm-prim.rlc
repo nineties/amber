@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim.rlc 2010-07-08 22:36:03 nineties $
+; $Id: vm-prim.rlc 2010-07-09 11:12:11 nineties $
 ;
 
 ; primitive functions
@@ -30,13 +30,15 @@
     (var idx 0)
     (map (lambda (ent) (do
         (incr idx)
-        `(@ent @(- idx 1) @ent)
+        `(@ent @(- idx 1) @(tosym (++ "prim_" ent)))
         )) table)
     ))
 
 (var prim_table (assign_indices `(
     ; I/O functions
-    flush getc nextc putc puti error
+    flush getc nextc putc puti puts error
+    ; System operations
+    cmd_argc cmd_argv
     ; memory operations
     memset memcpy
     ; vector of characters
@@ -62,8 +64,8 @@
 (int stdout_pos 0)
 
 ; flush stdout
-(export flush)
-(fun flush () (
+(export prim_flush)
+(fun prim_flush () (
     (if (> stdout_pos 0) (
         (syscall @SYS_WRITE @STDOUT_FD stdout_buf stdout_pos)
         (= stdout_pos 0)
@@ -79,7 +81,7 @@
         ))
     ))
 
-(fun getc () (
+(fun prim_getc () (
     (fill_stdin_buf)
     (if (== stdin_beg stdin_end) ((return @EOF)))
     (int c (*8 (+ stdin_buf stdin_beg)))
@@ -87,38 +89,38 @@
     (return c)
     ))
 
-(fun nextc () (
+(fun prim_nextc () (
     (fill_stdin_buf)
     (fill_stdin_buf)
     (if (== stdin_beg stdin_end) ((return @EOF)))
     (return (*8 (+ stdin_buf stdin_beg)))
     ))
 
-(fun putc (c) (
+(fun prim_putc (c) (
     ([]=8 stdout_buf stdout_pos c)
     (incr stdout_pos)
     (if (== stdout_pos @WRBUFSZ) (
-        (flush)
+        (prim_flush)
         (return)
         ))
     (if (== '\n' c) (
-        (flush)
+        (prim_flush)
         ))
     ))
 
-(fun puts (str) (
+(fun prim_puts (str) (
     (char c (*8 str))
     (while c (
-        (putc c)
+        (prim_putc c)
         (incr str)
         (= c (*8 str))
         ))
     ))
 
 (char[] 10 puti_digits)
-(fun puti (n) (
+(fun prim_puti (n) (
     (if (< n 0) (
-        (putc '-')
+        (prim_putc '-')
         (= n (neg n))
         ))
     ([]=8 puti_digits 0 (+ (% n 10) '0'))
@@ -130,22 +132,25 @@
         (= n (/ n 10))
         ))
     (while (>= i 0) (
-        (putc (*8 (+ puti_digits i)))
+        (prim_putc (*8 (+ puti_digits i)))
         (decr i)
         ))
     ))
 
-(fun error (msg) (
+(fun prim_error (msg) (
     (error msg)
     ))
 
-(fun memset (ptr val bytes) (
+(fun prim_cmd_argc () ((return cmd_argc)))
+(fun prim_cmd_argv () ((return cmd_argv)))
+
+(fun prim_memset (ptr val bytes) (
     (for i 0 bytes (
         ([]=8 ptr i val)
         ))
     ))
 
-(fun memcpy (dst src bytes) (
+(fun prim_memcpy (dst src bytes) (
     (for i 0 bytes (
         ([]=8 dst i ([]8 src i))
         ))
@@ -162,41 +167,41 @@
     (return tup)
     ))
 
-(fun make_cvector (size) (
+(fun prim_make_cvector (size) (
     (if (!= size 0)
         (return (make_cvector_with_capa size size))
         (return (make_cvector_with_capa 0 10))
         )
     ))
 
-(fun cvector_at (vec idx) (
+(fun prim_cvector_at (vec idx) (
     (return ([]8 ([] vec 0) idx))
     ))
 
-(fun cvector_put (vec idx val) (
+(fun prim_cvector_put (vec idx val) (
     ([]=8 ([] vec 0) idx val)
     ))
 
-(fun cvector_reserve (vec capa) (
+(fun prim_cvector_reserve (vec capa) (
     (if (< ([] vec 2) capa) (do
         (void* new_buf (allocate_plain capa))
-        (memcpy new_buf ([] vec 0) ([] vec 1))
+        (prim_memcpy new_buf ([] vec 0) ([] vec 1))
         ([]= vec 0 new_buf)
         ([]= vec 2 capa)
         ))
     ))
 
-(fun cvector_resize (vec new_size) (
-    (if (> new_size ([] vec 2)) (cvector_reserve vec new_size))
+(fun prim_cvector_resize (vec new_size) (
+    (if (> new_size ([] vec 2)) (prim_cvector_reserve vec new_size))
     ([]= vec 1 new_size)
     ))
 
-(fun cvector_pushback (vec value) (
+(fun prim_cvector_pushback (vec value) (
     (if (== ([] vec 1) ([] vec 2))
-        (cvector_reserve vec (* 2 ([] vec 2)))
+        (prim_cvector_reserve vec (* 2 ([] vec 2)))
         )
     (int sz ([] vec 1))
-    (cvector_put vec sz value)
+    (prim_cvector_put vec sz value)
     ([]= vec 1 (+ sz 1))
     ))
 ))
