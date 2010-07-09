@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-07-09 11:09:29 nineties $
+; $Id: rowl-compile.rlc 2010-07-09 11:35:49 nineties $
 ;
 
 (import "stdlib")
@@ -64,9 +64,12 @@
 (var init_code ())
 (define push_init_code (code) (set init_code (append code init_code)))
 
-(define gen_init_func ()
-    `(fun __initialize__ @(append init_code `((call (address main) (byte 0)))))
-    )
+(define gen_init_func () (do
+    (reset_insn_seq)
+    (compile_expr `(exit (main (cmd_argc) (cmd_argv))))
+    (var call_main (get_insn_seq))
+    `(fun __initialize__ @(append init_code call_main))
+    ))
 
 (define arg_insn (idx)
     (cond
@@ -267,9 +270,9 @@
         ))
     ))
 
-(define compile_extcall (prim_idx args) (do
-    (var narg (length args))
-    (foreach a (reverse args) (compile_expr a))
+(define compile_extcall (prim_idx argv) (do
+    (var narg (length argv))
+    (foreach a (reverse argv) (compile_expr a))
     (emit_insn `(extcall (short @prim_idx) (byte @narg)))
     true
     ))
