@@ -2,10 +2,13 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim.rlc 2010-07-10 01:42:22 nineties $
+; $Id: vm-prim.rlc 2010-07-10 01:48:21 nineties $
 ;
 
 ; primitive functions
+
+(import "stdlib")
+(import "vm-compile")
 
 (var SYS_READ 3)
 (var SYS_WRITE 4)
@@ -26,26 +29,6 @@
 (var WRBUFSZ 512) ; write buffer size
 (var EOF -1)
 
-(define assign_indices (table) (do
-    (var idx 0)
-    (map (lambda (ent) (do
-        (incr idx)
-        `(@ent @(- idx 1) @(tosym (++ "prim_" ent)))
-        )) table)
-    ))
-
-(var prim_table (assign_indices `(
-    ; System operations
-    cmd_argc cmd_argv
-    ; memory operations
-    memset memcpy
-    ; vector of characters
-    make_cvector cvector_at cvector_put cvector_reserve cvector_resize cvector_pushback
-    ; I/O functions
-    open_in close_in open_out close_out
-    flush getc nextc putc puti puts error
-    )))
-
 (var vm-prim-code `(
 
 (fun strlen (str) (
@@ -57,15 +40,21 @@
     (return len)
     ))
 
+(extern int cmd_argc)
+(extern void* cmd_argv)
+(export prim_cmd_argc)
 (fun prim_cmd_argc () ((return cmd_argc)))
+(export prim_cmd_argv)
 (fun prim_cmd_argv () ((return cmd_argv)))
 
+(export prim_memset)
 (fun prim_memset (ptr val bytes) (
     (for i 0 bytes (
         (set8 ptr i val)
         ))
     ))
 
+(export prim_memcpy)
 (fun prim_memcpy (dst src bytes) (
     (for i 0 bytes (
         (set8 dst i (get8 src i))
@@ -83,6 +72,7 @@
     (return tup)
     ))
 
+(export prim_make_cvector)
 (fun prim_make_cvector (size) (
     (if (!= size 0)
         (return (make_cvector_with_capa size size))
@@ -90,14 +80,17 @@
         )
     ))
 
+(export prim_cvector_at)
 (fun prim_cvector_at (vec idx) (
     (return (get8 (get vec 0) idx))
     ))
 
+(export prim_cvector_put)
 (fun prim_cvector_put (vec idx val) (
     (set8 (get vec 0) idx val)
     ))
 
+(export prim_cvector_reserve)
 (fun prim_cvector_reserve (vec capa) (
     (if (< (get vec 2) capa) (do
         (void* new_buf (allocate_plain capa))
@@ -107,11 +100,13 @@
         ))
     ))
 
+(export prim_cvector_resize)
 (fun prim_cvector_resize (vec new_size) (
     (if (> new_size (get vec 2)) (prim_cvector_reserve vec new_size))
     (set vec 1 new_size)
     ))
 
+(export prim_cvector_pushback)
 (fun prim_cvector_pushback (vec value) (
     (if (== (get vec 1) (get vec 2))
         (prim_cvector_reserve vec (* 2 (get vec 2)))
@@ -146,6 +141,7 @@
         ))
     ))
 
+(export prim_getc)
 (fun prim_getc () (
     (fill_stdin_buf)
     (if (== stdin_beg stdin_end) ((return @EOF)))
@@ -154,6 +150,7 @@
     (return c)
     ))
 
+(export prim_nextc)
 (fun prim_nextc () (
     (fill_stdin_buf)
     (fill_stdin_buf)
@@ -161,6 +158,7 @@
     (return (*8 (+ stdin_buf stdin_beg)))
     ))
 
+(export prim_putc)
 (fun prim_putc (c) (
     (set8 stdout_buf stdout_pos c)
     (incr stdout_pos)
@@ -173,6 +171,7 @@
         ))
     ))
 
+(export prim_puts)
 (fun prim_puts (str) (
     (char c (*8 str))
     (while c (
@@ -183,6 +182,7 @@
     ))
 
 (char[] 10 puti_digits)
+(export prim_puti)
 (fun prim_puti (n) (
     (if (< n 0) (
         (prim_putc '-')
@@ -202,6 +202,7 @@
         ))
     ))
 
+(export prim_error)
 (fun prim_error (msg) (
     (error msg)
     ))
@@ -256,24 +257,31 @@
 (fun make_ichan (fd) ((return (make_tuple4 1 (make_array @RDBUFSZ) fd 0 0))))
 (fun make_ochan (fd) ((return (make_tuple3 1 (make_array @WRBUFSZ) fd 0))))
 
+(export prim_open_in)
 (fun prim_open_in (path) (
     (int fd (syscall @SYS_OPEN path @O_RDONLY))
     (if (< fd 0) ((error "open failed")))
     (return (make_ichan fd))
     ))
 
+(export prim_close_in)
 (fun prim_close_in (ichan) (
     (syscall @SYS_CLOSE (get ichan 1))
     ))
 
+(export prim_open_out)
 (fun prim_open_out (path) (
     (int fd (syscall @SYS_OPEN path @(| O_WRONLY O_CREAT O_TRUNC) 0644))
     (if (< fd 0) ((error "open failed")))
     (return (make_ochan fd))
     ))
 
+(export prim_close_out)
 (fun prim_close_out (ochan) (
     (syscall @SYS_CLOSE (get ochan 1))
     ))
 ))
 
+(vtable_push)
+(compile vm-prim-code)
+(vtable_pop)
