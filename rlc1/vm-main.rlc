@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-main.rlc 2010-07-08 22:36:23 nineties $
+; $Id: vm-main.rlc 2010-07-09 11:01:10 nineties $
 ;
 
 (import "stdlib")
@@ -102,16 +102,17 @@
 
 (export vmexit)
 (fun vmexit (status) (
-    (flush)
+    (prim_flush)
     (cleanup_blocks)
     (syscall @SYS_EXIT status)
     ))
 
 (export _start)
 (fun _start (p) (
+    (int   argc ([] (- (address p) 4) 0))
     (void* argv (address p))
 
-    (if (== ([] argv 1) 0) ((error "USAGE: ./rlvm XXXXX.rlx\n")))
+    (if (< argc 2) ((error "USAGE: ./rlvm FILENAME\n")))
 
     (int stack_bottom)
     (init_gc (address stack_bottom))
@@ -121,7 +122,10 @@
     (int nref)
     (void* code (read_program ([] argv 1) (address nref)))
 
-    (int ret (vm_eval code nref))
+    (-= argc 1)
+    (+= argv 4)
+
+    (int ret (vm_eval argc argv code nref))
     (vmexit ret)
     ))
 
