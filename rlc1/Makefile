@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-07-11 01:09:25 nineties $
+# $Id: Makefile 2010-07-11 01:23:57 nineties $
 
 AS = as
 ASFLAGS =
@@ -43,14 +43,24 @@ rlci: $(OBJECTS)
 
 
 VMLDFLAGS = --nostdlib --entry=_start
+VMOBJECTS = vm-main.o\
+	    vm-eval.o\
+	    vm-gc.o\
+	    vm-load.o\
+	    vm-prim-util.o\
+	    vm-prim-io.o\
+	    vm-prim-vector.o
 
-vm-compile.o : stdlib.rlc vm-config.rlc
-vm-main.o    : stdlib.rlc vm-compile.rlc
-vm-eval.o    : stdlib.rlc vm-compile.rlc vm-insn.rlc vm-prim.rlc
-vm-gc.o      : stdlib.rlc vm-compile.rlc
-vm-load.o    : stdlib.rlc vm-compile.rlc
+vm-compile.o     : stdlib.rlc vm-config.rlc
+vm-main.o        : stdlib.rlc vm-compile.rlc
+vm-eval.o        : stdlib.rlc vm-compile.rlc vm-insn.rlc vm-prim-inc.rlc
+vm-gc.o          : stdlib.rlc vm-compile.rlc
+vm-load.o        : stdlib.rlc vm-compile.rlc
+vm-prim-util.o	 : stdlib.rlc vm-compile.rlc
+vm-prim-io.o     : stdlib.rlc vm-compile.rlc
+vm-prim-vector.o : stdlib.rlc vm-compile.rlc
 
-rlvm: vm-main.o vm-eval.o vm-gc.o vm-load.o vm-prim.o
+rlvm: $(VMOBJECTS)
 	$(LD) $^ -o $@ $(VMLDFLAGS)
 
 rlc1: rowl.rlc rlvm rlci rowl-compile.rlc rowl-assemble.rlc
