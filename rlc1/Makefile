@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-07-10 01:45:15 nineties $
+# $Id: Makefile 2010-07-11 01:05:37 nineties $
 
 AS = as
 ASFLAGS =
@@ -56,6 +56,8 @@ rlvm: vm-main.o vm-eval.o vm-gc.o vm-load.o vm-prim.o
 
 rlc1: rowl.rlc rlvm rlci rowl-compile.rlc rowl-assemble.rlc
 	./rlci $< > $@
+
+linker: linker.rlc
 
 .SUFFIXES:
 .SUFFIXES: .o .s .rl .rlc

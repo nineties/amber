@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl.rlc 2010-07-10 23:31:48 nineties $
+; $Id: rowl.rlc 2010-07-11 01:05:19 nineties $
 ;
 
 (import "rowl-compile")
@@ -143,15 +143,15 @@
 (var TOK_IDENT    261)
 (var TOK_OPERATOR 262)
 
-(compile `(
+(compile `object `(
 
-(var stdin  (get_stdin))
-(var stdout (get_stdout))
-(var stderr (get_stderr))
+;(var stdin  (get_stdin))
+;(var stdout (get_stdout))
+;(var stderr (get_stderr))
 
 (fun main (argc argv) (
-    (init_lexer "stdin" stdin)
-    (lex)
+;    (init_lexer "stdin" stdin)
+;    (lex)
     (return 0)
     ))
 
@@ -159,24 +159,24 @@
 ;                          lexer
 ;============================================================
 
-(array char chgroup (
-     0  1  1  1  1  1  1  1  1  2  3  1  1  2  1  1
-     1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
-     2 19 14 19 19 19 19 13 17 18 19 19 19 19 19 15
-     4  5  5  5  5  5  5  5  6  6 19 19 19 19 19 19
-    19 11 11 11 11 11 11 12 12 12 12 12 12 12 12 12
-    12 12 12 12 12 12 12 12  9 12 12 19 16 19 19 12
-    19  7  7  9  9  9  9 12 12 12 12 12 12 12 10 12
-    12 12  8 12  8 12  8 12  9 12 12 19 19 19 19 1
-     1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
-     1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
-     1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
-     1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
-     1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
-     1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
-     1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
-     1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
-    ))
+;(array char chgroup (
+;     0  1  1  1  1  1  1  1  1  2  3  1  1  2  1  1
+;     1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
+;     2 19 14 19 19 19 19 13 17 18 19 19 19 19 19 15
+;     4  5  5  5  5  5  5  5  6  6 19 19 19 19 19 19
+;    19 11 11 11 11 11 11 12 12 12 12 12 12 12 12 12
+;    12 12 12 12 12 12 12 12  9 12 12 19 16 19 19 12
+;    19  7  7  9  9  9  9 12 12 12 12 12 12 12 10 12
+;    12 12  8 12  8 12  8 12  9 12 12 19 19 19 19 1
+;     1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
+;     1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
+;     1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
+;     1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
+;     1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
+;     1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
+;     1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
+;     1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
+;    ))
 
 ;                     C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C
 ;                     H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H
@@ -192,122 +192,122 @@
 ;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  H  :  :  :
 ;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :
 
-(array char s0next  ( 1 90  1  1 90 90 90 90 90 90 90 90 90 90 90  2 90 90 90 90))
-
-(var lexichan null)
-(var lexbuf null)
-(var lexbuf_end 0)
-(var token_tag @TOK_NONE)
-(var token_value 0) ; for integer and character
-(var token_buf null)
-(var srcfile null)
-(var srcline 1)
-(var srcclmn 1)
-(var unputted 0)
-
-(fun token_text () ((return (cvector_ptr token_buf))))
-(fun token_len  () ((return (- (cvector_size token_buf) 1))))
-
-(fun init_token_buf () (
-    (= token_tag @TOK_NONE)
-    (= token_value 0)
-    (cvector_resize token_buf 0)
-    (cvector_pushback token_buf '\0')
-    return
-    ))
-
-(fun look_ahead () (
-    (if (== lexbuf_end (cvector_size lexbuf))
-        (cvector_pushback lexbuf (input_char lexichan))
-        )
-    (var c (cvector_at lexbuf lexbuf_end))
-    (if (== c -1) (return @CH_EOF))
-    (return (array_get char chgroup c))
-    ))
-
-(fun consume () (
-    (if (== lexbuf_end (cvector_size lexbuf))
-        (cvector_pushback lexbuf (input_char lexichan))
-        )
-    (var c (cvector_at lexbuf lexbuf_end))
-    (incr lexbuf_end)
-    (if (== c '\n') (do
-        (incr srcline)
-        (= srcclmn 1)
-        )
-        (incr srcclmn)
-        )
-    (cvector_put token_buf (- (cvector_size token_buf) 1) c)
-    (cvector_pushback token_buf '\0')
-    (return c)
-    ))
-
-(fun unput () (
-    (if unputted (error "ERROR: try to unput two or more tokens\n"))
-    (= unputted 1)
-    return
-    ))
-
-(fun next_state (table) (
-    (return (array_get char table (look_ahead)))
-    ))
-
-(fun accept (tag) (
-    (= token_tag tag)
-    return
-    ))
-
-(fun init_lexer (fname ichan) (
-    (= srcfile fname)
-    (= srcline 1)
-    (= srcclmn 1)
-    (= token_tag @TOK_NONE)
-    (= token_value 0)
-    (= unputted 0)
-    (= lexichan ichan)
-    (= token_buf (make_cvector 0))
-    (cvector_pushback token_buf '\0')
-    (= lexbuf (make_cvector 0))
-    (= lexbuf_end 0)
-    return
-    ))
-
-(fun lex () (
-    (var state 0)
-
-    (label lex_loop)
-    (tswitch state (
-        (0 . (do
-            (var c (look_ahead))
-            (while (|| (== c @CH_SPACES) (== c @CH_NL)) (do
-                (consume)
-                (= c (look_ahead))
-                ))
-            (init_token_buf)
-            (= state (next_state s0next))
-            (goto lex_loop)
-            ))
-        (1 . (return @TOK_EOF))
-        (2 . (do
-            (consume)
-            (if (== (look_ahead) @CH_SLASH) (do
-                (= state 3)
-                (goto lex_loop)
-                ))
-            (error "BUG: not implemented")
-            ))
-        (3 . (do
-            ; comment
-            (consume)
-            (while (!= (look_ahead) @CH_NL)
-                (consume)
-                )
-            (consume)
-            (goto lex_loop)
-            ))
-        (default . (error "BUG: invalid state"))
-        ))
-    (error "BUG: not reachable")
-    ))
-
+;(array char s0next  ( 1 90  1  1 90 90 90 90 90 90 90 90 90 90 90  2 90 90 90 90))
+;
+;(var lexichan null)
+;(var lexbuf null)
+;(var lexbuf_end 0)
+;(var token_tag @TOK_NONE)
+;(var token_value 0) ; for integer and character
+;(var token_buf null)
+;(var srcfile null)
+;(var srcline 1)
+;(var srcclmn 1)
+;(var unputted 0)
+;
+;(fun token_text () ((return (cvector_ptr token_buf))))
+;(fun token_len  () ((return (- (cvector_size token_buf) 1))))
+;
+;(fun init_token_buf () (
+;    (= token_tag @TOK_NONE)
+;    (= token_value 0)
+;    (cvector_resize token_buf 0)
+;    (cvector_pushback token_buf '\0')
+;    return
+;    ))
+;
+;(fun look_ahead () (
+;    (if (== lexbuf_end (cvector_size lexbuf))
+;        (cvector_pushback lexbuf (input_char lexichan))
+;        )
+;    (var c (cvector_at lexbuf lexbuf_end))
+;    (if (== c -1) (return @CH_EOF))
+;    (return (array_get char chgroup c))
+;    ))
+;
+;(fun consume () (
+;    (if (== lexbuf_end (cvector_size lexbuf))
+;        (cvector_pushback lexbuf (input_char lexichan))
+;        )
+;    (var c (cvector_at lexbuf lexbuf_end))
+;    (incr lexbuf_end)
+;    (if (== c '\n') (do
+;        (incr srcline)
+;        (= srcclmn 1)
+;        )
+;        (incr srcclmn)
+;        )
+;    (cvector_put token_buf (- (cvector_size token_buf) 1) c)
+;    (cvector_pushback token_buf '\0')
+;    (return c)
+;    ))
+;
+;(fun unput () (
+;    (if unputted (error "ERROR: try to unput two or more tokens\n"))
+;    (= unputted 1)
+;    return
+;    ))
+;
+;(fun next_state (table) (
+;    (return (array_get char table (look_ahead)))
+;    ))
+;
+;(fun accept (tag) (
+;    (= token_tag tag)
+;    return
+;    ))
+;
+;(fun init_lexer (fname ichan) (
+;    (= srcfile fname)
+;    (= srcline 1)
+;    (= srcclmn 1)
+;    (= token_tag @TOK_NONE)
+;    (= token_value 0)
+;    (= unputted 0)
+;    (= lexichan ichan)
+;    (= token_buf (make_cvector 0))
+;    (cvector_pushback token_buf '\0')
+;    (= lexbuf (make_cvector 0))
+;    (= lexbuf_end 0)
+;    return
+;    ))
+;
+;(fun lex () (
+;    (var state 0)
+;
+;    (label lex_loop)
+;    (tswitch state (
+;        (0 . (do
+;            (var c (look_ahead))
+;            (while (|| (== c @CH_SPACES) (== c @CH_NL)) (do
+;                (consume)
+;                (= c (look_ahead))
+;                ))
+;            (init_token_buf)
+;            (= state (next_state s0next))
+;            (goto lex_loop)
+;            ))
+;        (1 . (return @TOK_EOF))
+;        (2 . (do
+;            (consume)
+;            (if (== (look_ahead) @CH_SLASH) (do
+;                (= state 3)
+;                (goto lex_loop)
+;                ))
+;            (error "BUG: not implemented")
+;            ))
+;        (3 . (do
+;            ; comment
+;            (consume)
+;            (while (!= (look_ahead) @CH_NL)
+;                (consume)
+;                )
+;            (consume)
+;            (goto lex_loop)
+;            ))
+;        (default . (error "BUG: invalid state"))
+;        ))
+;    (error "BUG: not reachable")
+;    ))
+;
     ))
