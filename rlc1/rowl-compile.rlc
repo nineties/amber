@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-07-10 01:50:03 nineties $
+; $Id: rowl-compile.rlc 2010-07-10 14:17:33 nineties $
 ;
 
 (import "stdlib")
@@ -86,21 +86,26 @@
     (cond
         ((nil? loc) (error "undefined variable: " sym))
         ((== `arg (car loc)) (emit_insn (arg_insn (cadr loc))))
-        ((== `global (car loc)) (compile_global_var loc))
         ((== `local (car loc)) (compile_local_var loc))
-        (otherwise (error "compile_var: not implemented"))
+        ((== `global (car loc)) (compile_value loc))
+        ((== `object (car loc)) (compile_object loc))
+        (otherwise (error "compile_var: not implemented" loc))
         )
     true
     ))
 
-(define compile_global_var ((_ type name))
+(define compile_value ((_ type name))
     (cond
         ((== `char type)    (emit_insn `(loadbv (value @name))))
         ((== `int type)     (emit_insn `(loadv (value @name))))
         ((== `void* type)   (emit_insn `(loadav (value @name))))
         ((== `string type)  (emit_insn `(loadav (value @name))))
-        (otherwise (error "compile_global_var: not implemented"))
+        (otherwise (error "compile_value: not implemented"))
         ))
+
+(define compile_object ((_ name)) (do
+    (emit_insn `(loado (object @name)))
+    ))
 
 (define compile_local_var ((_ idx))
     (cond
@@ -506,6 +511,7 @@
 (define compile_expr (expr) (do
     (cond
         ((== `nop expr) nil)
+        ((== `null expr)   (do (emit_insn `imm_i0) true))
         ((== `return expr) (do (emit_insn `return) nil))
         ((== `break expr) (compile_break expr))
         ((char? expr) (compile_int_lit (char2int expr)))
@@ -565,8 +571,8 @@
     `(fun @name @insn_seq)
     ))
 
-(define compile_heap_object_decl (name value) (do
-    (add_var name `(heap @name))
+(define compile_object_decl (name value) (do
+    (add_var name `(object @name))
     (reset_insn_seq)
     (compile_expr value)
     (emit_insn `(storeo (object @name)))
@@ -575,28 +581,28 @@
     `(object @name)
     ))
 
-(define compile_value_object_decl (name value) (do
+(define compile_value_decl (name value) (do
     (var type (cond
         ((char? value) `char)
         ((int? value) `int)
         ((string? value) `string)
-        (otherwise (error "compile_value_object_decl: not implemented"))
+        (otherwise (error "compile_value_decl: not implemented"))
         ))
     (add_var name `(global @type @name))
     `(@type @name @value)
     ))
 
-(define is_heap_object (value)
+(define is_object (value)
     (cond
-        ((nil? value) true)
+        ((== `null value) true)
         ((cons? value) true)
         (otherwise nil)
         ))
 
 (define compile_vardecl ((_ name value))
-    (if (is_heap_object value)
-        (compile_heap_object_decl name value)
-        (compile_value_object_decl name value)
+    (if (is_object value)
+        (compile_object_decl name value)
+        (compile_value_decl name value)
     ))
 
 ; (array type name length)
