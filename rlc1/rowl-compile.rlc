@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-07-10 14:17:33 nineties $
+; $Id: rowl-compile.rlc 2010-07-10 14:51:43 nineties $
 ;
 
 (import "stdlib")
@@ -306,16 +306,35 @@
     nil
     ))
 
-(define compile_if (expr)
-    (if (comparison_expr? (cadr expr))
-        (compile_comp_if expr)
-        (do
-            (var condition (cadr expr))
-            (var ifthen (caddr expr))
-            (var ifelse (if (cdddr expr) (cadddr expr) `nop))
+(define compile_unless (expr ifthen ifelse) (do
+    (compile_expr `(if @expr @ifelse @ifthen))
+    ))
+
+(define compile_seqand_if (lhs rhs ifthen ifelse) (do
+    (var ifend_label (mklabel))
+    (compile_expr `(if @lhs (if @rhs (do @ifthen (goto @ifend_label)))))
+    (compile_expr ifelse)
+    (emit_insn `(label @ifend_label))
+    nil
+    ))
+
+(define compile_seqor_if (lhs rhs ifthen ifelse) (do
+    (compile_expr `(if (&& (! @lhs) (! @rhs)) @ifelse @ifthen))
+    ))
+
+(define compile_if (expr) (do
+    (var e (cadr expr))
+    (var ifthen (caddr expr))
+    (var ifelse (if (cdddr expr) (cadddr expr) `nop))
+    (cond
+        ((and (cons? e) (== `! (car e))) (compile_unless (cadr e) ifthen ifelse))
+        ((and (cons? e) (== `&& (car e))) (compile_seqand_if (cadr e) (caddr e) ifthen ifelse))
+        ((and (cons? e) (== `|| (car e))) (compile_seqor_if (cadr e) (caddr e) ifthen ifelse))
+        ((comparison_expr? e) (compile_comp_if expr))
+        (otherwise  (do
             (var ifelse_label (mklabel))
             (var end_label (mklabel))
-            (compile_expr condition)
+            (compile_expr e)
             (emit_insn `(if_zero (address @ifelse_label)))
             (if (compile_expr ifthen) (emit_insn `drop))
             (emit_insn `(goto (address @end_label)))
@@ -323,9 +342,8 @@
             (if (compile_expr ifelse) (emit_insn `drop))
             (emit_insn `(label @end_label))
             nil
-        )
-        )
-    )
+            ))
+        )))
 
 ; while (e1) e2
 ;
