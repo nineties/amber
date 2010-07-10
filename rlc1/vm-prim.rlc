@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim.rlc 2010-07-10 10:46:01 nineties $
+; $Id: vm-prim.rlc 2010-07-10 13:42:06 nineties $
 ;
 
 ; primitive functions
@@ -24,6 +24,7 @@
 
 (var STDIN_FD 0)
 (var STDOUT_FD 1)
+(var STDERR_FD 2)
 
 (var RDBUFSZ 512) ; read buffer size
 (var WRBUFSZ 512) ; write buffer size
@@ -116,98 +117,6 @@
     (set vec 1 (+ sz 1))
     ))
 
-(char[] @RDBUFSZ stdin_buf)
-(int stdin_beg 0)
-(int stdin_end 0)
-
-(char[] @WRBUFSZ stdout_buf)
-(int stdout_pos 0)
-
-; flush stdout
-(export prim_flush)
-(fun prim_flush () (
-    (if (> stdout_pos 0) (
-        (syscall @SYS_WRITE @STDOUT_FD stdout_buf stdout_pos)
-        (= stdout_pos 0)
-        ))
-    ))
-
-(fun fill_stdin_buf () (
-    (if (== stdin_beg stdin_end) (
-        ; input buffer is empty
-        (int sz (syscall @SYS_READ @STDIN_FD stdin_buf @RDBUFSZ))
-        (= stdin_end sz)
-        (= stdin_beg 0)
-        ))
-    ))
-
-(export prim_getc)
-(fun prim_getc () (
-    (fill_stdin_buf)
-    (if (== stdin_beg stdin_end) ((return @EOF)))
-    (int c (*8 (+ stdin_buf stdin_beg)))
-    (incr stdin_beg)
-    (return c)
-    ))
-
-(export prim_nextc)
-(fun prim_nextc () (
-    (fill_stdin_buf)
-    (fill_stdin_buf)
-    (if (== stdin_beg stdin_end) ((return @EOF)))
-    (return (*8 (+ stdin_buf stdin_beg)))
-    ))
-
-(export prim_putc)
-(fun prim_putc (c) (
-    (set8 stdout_buf stdout_pos c)
-    (incr stdout_pos)
-    (if (== stdout_pos @WRBUFSZ) (
-        (prim_flush)
-        (return)
-        ))
-    (if (== '\n' c) (
-        (prim_flush)
-        ))
-    ))
-
-(export prim_puts)
-(fun prim_puts (str) (
-    (char c (*8 str))
-    (while c (
-        (prim_putc c)
-        (incr str)
-        (= c (*8 str))
-        ))
-    ))
-
-(char[] 10 puti_digits)
-(export prim_puti)
-(fun prim_puti (n) (
-    (if (< n 0) (
-        (prim_putc '-')
-        (= n (neg n))
-        ))
-    (set8 puti_digits 0 (+ (% n 10) '0'))
-    (= n (/ n 10))
-    (int i 0)
-    (while (!= n 0) (
-        (incr i)
-        (set8 puti_digits i (+ (% n 10) '0'))
-        (= n (/ n 10))
-        ))
-    (while (>= i 0) (
-        (prim_putc (*8 (+ puti_digits i)))
-        (decr i)
-        ))
-    ))
-
-(export prim_error)
-(fun prim_error (msg) (
-    (error msg)
-    ))
-
-
 ; containers for internal purpose
 (fun make_cons (car cdr) (
     (void* c (allocate_cons))
@@ -276,6 +185,9 @@
 ; I/O functions
 (void* ichan_list 0) ; list of opened ichan
 (void* ochan_list 0) ; list of opened ochan
+(void* stdin)
+(void* stdout)
+(void* stderr)
 
 (fun make_ichan (fd) (
     (void* chan (make_tuple4 1 (make_array @RDBUFSZ) fd 0 0))
@@ -309,14 +221,120 @@
     (return (make_ochan fd))
     ))
 
+(export prim_flush)
+(fun prim_flush (ochan) (
+    (if (> (get ochan 2) 0) (
+        (syscall @SYS_WRITE (get ochan 1) (get ochan 0) (get ochan 2))
+        (set ochan 2 0)
+        ))
+    ))
+
 (export prim_close_out)
 (fun prim_close_out (ochan) (
+    (prim_flush ochan)
     (= ochan_list (remove_from_list ochan_list ochan))
     (syscall @SYS_CLOSE (get ochan 1))
     ))
 
+(fun fill_ichan (ichan) (
+    (if (!= (get ichan 2) (get ichan 3)) (
+        (return))
+        )
+    ; here input buffer is empty
+    (int sz (syscall @SYS_READ (get ichan 1) (get ichan 0) @RDBUFSZ))
+    (set ichan 2 0)
+    (set ichan 3 sz)
+    ))
+
+(export prim_input_char)
+(fun prim_input_char (ichan) (
+    (fill_ichan ichan)
+    (if (== (get ichan 2) (get ichan 3)) (
+        (return -1) ; EOF
+        ))
+    (int c (get8 (get ichan 0) (get ichan 2)))
+    (set ichan 2 (+ (get ichan 2) 1))
+    (return c)
+    ))
+
+(export prim_read_char)
+(fun prim_read_char () (
+    (return (prim_input_char stdin))
+    ))
+
+(export prim_output_char)
+(fun prim_output_char (ochan c) (
+    (if (== (get ochan 1) @STDERR_FD) (
+        ; Do not buffer outputs to stderr
+        (syscall @SYS_WRITE @STDERR_FD (address c) 1)
+        (return)
+        ))
+    (set8 (get ochan 0) (get ochan 2) c)
+    (set ochan 2 (+ (get ochan 2) 1))
+    (if (|| (== c '\n') (== (get ochan 2) @WRBUFSZ)) (
+        (prim_flush ochan)
+        (return)
+        ))
+    ))
+
+(export prim_output_string)
+(fun prim_output_string (ochan str) (
+    (if (== (get ochan 1) @STDERR_FD) (
+        ; Do not buffer outputs to stderr
+        (syscall @SYS_WRITE @STDERR_FD str (strlen str))
+        (return)
+        ))
+    (while (!= (*8 str) '\0') (
+        (prim_output_char ochan (*8 str))
+        (incr str)
+        ))
+    ))
+
+(char[] 10 output_int_digits)
+(export prim_output_int)
+(fun prim_output_int (ochan num) (
+    (if (< num 0) (
+        (prim_output_char ochan '-')
+        (prim_output_int (neg num))
+        (return)
+        ))
+    (set8 output_int_digits 0 (+ (% num 10) '0'))
+    (/= num 10)
+    (int i 0)
+    (while (!= num 0) (
+        (incr i)
+        (set8 output_int_digits i (+ (% num 10) '0'))
+        (/= num 10)
+        ))
+    (while (>= i 0) (
+        (prim_output_char ochan (get8 output_int_digits i))
+        (decr i)
+        ))
+    ))
+
+(export prim_print_char)
+(fun prim_print_char (c) (
+    (return (prim_output_char stdout c))
+    ))
+
+(export prim_print_string)
+(fun prim_print_string (str) (
+    (return (prim_output_string stdout str))
+    ))
+
+(export prim_print_int)
+(fun prim_print_int (num) (
+    (return (prim_output_int stdout num))
+    ))
+
 (export init_prim)
 (fun init_prim () (
+    (= stdin  (make_ichan @STDIN_FD))
+    (= stdout (make_ochan @STDOUT_FD))
+    (= stderr (make_ochan @STDERR_FD))
+    (register_static (address stdin))
+    (register_static (address stdout))
+    (register_static (address stderr))
     (register_static (address ichan_list))
     (register_static (address ochan_list))
     ))
@@ -328,7 +346,7 @@
         (prim_close_in (get ichan_list 0))
         ))
     (while ochan_list (
-        (prim_close_in (get ochan_list 0))
+        (prim_close_out (get ochan_list 0))
         ))
     ))
 
