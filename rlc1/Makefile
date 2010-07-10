@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-07-11 01:05:37 nineties $
+# $Id: Makefile 2010-07-11 01:08:15 nineties $
 
 AS = as
 ASFLAGS =
@@ -26,8 +26,7 @@ SOURCES = startup.rl\
 ASMSOURCES = $(patsubst %.rl,%.s,$(SOURCES))
 OBJECTS    = $(patsubst %.rl,%.o,$(SOURCES))
 
-all: 
-	cd ..; $(MAKE)
+all: rlci rlvm rlc1
 
 alloc.s  : $(RLC0) stddef.s
 main.s   : $(RLC0) stddef.s code.s
