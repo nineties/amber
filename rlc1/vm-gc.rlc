@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-07-10 01:42:04 nineties $
+; $Id: vm-gc.rlc 2010-07-10 09:21:19 nineties $
 ;
 
 (import "stdlib")
@@ -176,6 +176,16 @@
 (void* freepage)        ; pdescr of current free page
 (void* freep)    ; pointer to free memory in current free page
 (int free_words) ; size of free area in current page (in words)
+
+(void*[] @MAX_STATICS statics)
+(int num_static)
+
+(export register_static)
+(fun register_static (addr) (
+    (if (>= num_static @MAX_STATICS) ((error "ERROR: too many static objects.\n")))
+    ([]= statics num_static addr)
+    (incr num_static)
+    ))
 
 (fun mmap2 (addr size) (
     (void* ptr (syscall @SYS_MMAP2 addr size
@@ -364,6 +374,12 @@
     (scan_machine_stack)
     (scan_vm_stack)
 
+    ; move static objects
+    (for i 0 num_static (
+        (move_object ([] statics i))
+        ))
+
+    ; sweep across promoted pages with breadth-first traversing and copy their consistents.
     (while page_queue_head (
         (void* p @(PDESCR2PAGE page_queue_head))
         (void* end (+ p @PAGE_SIZE))
@@ -504,8 +520,8 @@
     (= freepage @(FIRST_PDESCR (bdescr->first current_block)))
     ))
 
-(export cleanup_blocks)
-(fun cleanup_blocks () (
+(export finish_gc)
+(fun finish_gc () (
     (for i 0 @MAX_BLOCKS (
         (if ([] block_used i) (
             (munmap 0 @BLOCK_SIZE)

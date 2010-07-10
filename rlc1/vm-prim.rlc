@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim.rlc 2010-07-10 01:48:21 nineties $
+; $Id: vm-prim.rlc 2010-07-10 10:46:01 nineties $
 ;
 
 ; primitive functions
@@ -209,6 +209,26 @@
 
 
 ; containers for internal purpose
+(fun make_cons (car cdr) (
+    (void* c (allocate_cons))
+    (set c 0 car)
+    (set c 1 cdr)
+    (return c)
+    ))
+
+(fun remove_from_list (ls elem) (
+    (if (! ls) (return 0))
+    (if (== (get ls 0) elem)
+        (
+            (return (get ls 1))
+        )
+        (
+            (set ls 1 (remove_from_list (get ls 1) elem))
+            (return ls)
+        )
+        )
+    ))
+
 (fun make_array (size) (
     (return (allocate_plain size))
     ))
@@ -254,8 +274,20 @@
     ))
 
 ; I/O functions
-(fun make_ichan (fd) ((return (make_tuple4 1 (make_array @RDBUFSZ) fd 0 0))))
-(fun make_ochan (fd) ((return (make_tuple3 1 (make_array @WRBUFSZ) fd 0))))
+(void* ichan_list 0) ; list of opened ichan
+(void* ochan_list 0) ; list of opened ochan
+
+(fun make_ichan (fd) (
+    (void* chan (make_tuple4 1 (make_array @RDBUFSZ) fd 0 0))
+    (= ichan_list (make_cons chan ichan_list))
+    (return chan)
+    ))
+
+(fun make_ochan (fd) (
+    (void* chan (make_tuple3 1 (make_array @WRBUFSZ) fd 0))
+    (= ochan_list (make_cons chan ochan_list))
+    (return chan)
+    ))
 
 (export prim_open_in)
 (fun prim_open_in (path) (
@@ -266,6 +298,7 @@
 
 (export prim_close_in)
 (fun prim_close_in (ichan) (
+    (= ichan_list (remove_from_list ichan_list ichan))
     (syscall @SYS_CLOSE (get ichan 1))
     ))
 
@@ -278,8 +311,27 @@
 
 (export prim_close_out)
 (fun prim_close_out (ochan) (
+    (= ochan_list (remove_from_list ochan_list ochan))
     (syscall @SYS_CLOSE (get ochan 1))
     ))
+
+(export init_prim)
+(fun init_prim () (
+    (register_static (address ichan_list))
+    (register_static (address ochan_list))
+    ))
+
+(export finish_prim)
+(fun finish_prim () (
+    ; close unclosed channels
+    (while ichan_list (
+        (prim_close_in (get ichan_list 0))
+        ))
+    (while ochan_list (
+        (prim_close_in (get ochan_list 0))
+        ))
+    ))
+
 ))
 
 (vtable_push)
