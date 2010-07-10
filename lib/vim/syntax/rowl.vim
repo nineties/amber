@@ -1,6 +1,6 @@
-" Language:	rowl
+" Language:	Rowl
 " Maintainer:	nineties <nineties48@gmail.com>
-" $Id: rowl.vim 2010-05-29 15:23:57 nineties $
+" $Id: rowl.vim 2010-07-10 17:45:34 nineties $
 
 if exists("b:current_syntax")
     finish
@@ -21,7 +21,7 @@ syn match rowlCharacter   /'\(\\["?\\abfnrtv0]\|[^\\\n]\)'/ contains=rowlEscape
 syn match rowlString      /"\(\\['"?\\abfnrtv0]\|[^\\\"\n]\)*"/ contains=rowlEscape
 syn keyword rowlTodo TODO FIXME NOTE XXX contained
 syn region  rowlString start=/"/ skip=/\\"/ end=/"/
-syn region  rowlComment start=/(%/ end=/%)/ contains=rowlComment,rowlTodo
+syn region  rowlComment start=/\/\// end=/$/ contains=rowlTodo
 
 syn match rowlKeyOperator ":"
 syn match rowlKeyOperator "|"

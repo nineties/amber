@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-07-10 14:51:43 nineties $
+; $Id: rowl-compile.rlc 2010-07-10 15:42:48 nineties $
 ;
 
 (import "stdlib")
@@ -87,7 +87,7 @@
         ((nil? loc) (error "undefined variable: " sym))
         ((== `arg (car loc)) (emit_insn (arg_insn (cadr loc))))
         ((== `local (car loc)) (compile_local_var loc))
-        ((== `global (car loc)) (compile_value loc))
+        ((== `value (car loc)) (compile_value loc))
         ((== `object (car loc)) (compile_object loc))
         (otherwise (error "compile_var: not implemented" loc))
         )
@@ -137,7 +137,7 @@
 (var string_decls ())
 (define compile_string_lit (str) (do
     (var strlbl (mklabel))
-    (add_var strlbl `(global string @strlbl))
+    (add_var strlbl `(value string @strlbl))
     (push string_decls `(string @strlbl @str))
     (emit_insn `(loadav (value @strlbl)))
     true
@@ -207,22 +207,6 @@
     true
     ))
 
-(define compile_global_assign (insn (_ type name) rhs) (do
-    (var load_store_op (assoc type `((char . (loadbv storebv)) (int . (loadv storewv)))))
-    (if (!= `nop insn)
-        (do
-            (emit_insn `(@(car load_store_op) (value @name)))
-            (compile_expr rhs)
-            (emit_insn insn)
-            (emit_insn `(@(cadr load_store_op) (value @name)))
-        )
-        (do
-            (compile_expr rhs)
-            (emit_insn `(@(cadr load_store_op) (value @name)))
-        )
-        )
-    ))
-
 (define compile_local_assign (insn loc rhs) (do
     (if (!= `nop insn)
         (do
@@ -247,6 +231,36 @@
         )
     ))
 
+(define compile_value_assign (insn (_ type name) rhs) (do
+    (var load_store_op (assoc type `((char . (loadbv storebv)) (int . (loadv storewv)))))
+    (if (!= `nop insn)
+        (do
+            (emit_insn `(@(car load_store_op) (value @name)))
+            (compile_expr rhs)
+            (emit_insn insn)
+            (emit_insn `(@(cadr load_store_op) (value @name)))
+        )
+        (do
+            (compile_expr rhs)
+            (emit_insn `(@(cadr load_store_op) (value @name)))
+        )
+        )
+    ))
+
+(define compile_object_assign (insn (_ name) rhs) (do
+    (if (!= `nop insn)
+        (do
+            (emit_insn `(loado (object @name)))
+            (compile_expr rhs)
+            (emit_insn insn)
+            (emit_insn `(storeo (object @name)))
+        )
+        (do
+            (compile_expr rhs)
+            (emit_insn `(storeo (object @name)))
+        ))
+    ))
+
 (define compile_assign (expr) (do
     (var insn (assoc (car expr) assignment_operator))
     (var lhs (cadr expr))
@@ -254,8 +268,9 @@
     (var loc (lookup_var lhs))
     (cond
         ((nil? loc) (error "undefined variable: " sym))
-        ((== `global (car loc)) (compile_global_assign insn loc rhs))
         ((== `local (car loc)) (compile_local_assign insn loc rhs))
+        ((== `value (car loc)) (compile_value_assign insn loc rhs))
+        ((== `object (car loc)) (compile_object_assign insn loc rhs))
         (otherwise (error "compile_assign: not implemented"))
         )
     nil
@@ -606,7 +621,7 @@
         ((string? value) `string)
         (otherwise (error "compile_value_decl: not implemented"))
         ))
-    (add_var name `(global @type @name))
+    (add_var name `(value @type @name))
     `(@type @name @value)
     ))
 
@@ -629,7 +644,7 @@
 (define compile_arraydecl ((_ type name . args)) (do
     (var length (if (int? (car args)) (car args) (length (car args))))
     (var value_list (if (cons? (car args)) (car args) (cadr args)))
-    (add_var name `(global void* @name))
+    (add_var name `(value void* @name))
     `((array @type @length) @name @value_list)
     ))
 

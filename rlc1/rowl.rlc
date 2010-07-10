@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl.rlc 2010-07-10 14:50:15 nineties $
+; $Id: rowl.rlc 2010-07-10 23:31:48 nineties $
 ;
 
 (import "rowl-compile")
@@ -145,10 +145,13 @@
 
 (compile `(
 
+(var stdin  (get_stdin))
+(var stdout (get_stdout))
+(var stderr (get_stderr))
+
 (fun main (argc argv) (
-    (var ochan (open_out "hello"))
-    (output_string ochan "Hello World!\n")
-    (close_out ochan)
+    (init_lexer "stdin" stdin)
+    (lex)
     (return 0)
     ))
 
@@ -192,11 +195,11 @@
 (array char s0next  ( 1 90  1  1 90 90 90 90 90 90 90 90 90 90 90  2 90 90 90 90))
 
 (var lexichan null)
-(var lexbuf (make_cvector 0))
+(var lexbuf null)
 (var lexbuf_end 0)
 (var token_tag @TOK_NONE)
 (var token_value 0) ; for integer and character
-(var token_buf (make_cvector 0))
+(var token_buf null)
 (var srcfile null)
 (var srcline 1)
 (var srcclmn 1)
@@ -210,6 +213,7 @@
     (= token_value 0)
     (cvector_resize token_buf 0)
     (cvector_pushback token_buf '\0')
+    return
     ))
 
 (fun look_ahead () (
@@ -241,6 +245,7 @@
 (fun unput () (
     (if unputted (error "ERROR: try to unput two or more tokens\n"))
     (= unputted 1)
+    return
     ))
 
 (fun next_state (table) (
@@ -249,6 +254,22 @@
 
 (fun accept (tag) (
     (= token_tag tag)
+    return
+    ))
+
+(fun init_lexer (fname ichan) (
+    (= srcfile fname)
+    (= srcline 1)
+    (= srcclmn 1)
+    (= token_tag @TOK_NONE)
+    (= token_value 0)
+    (= unputted 0)
+    (= lexichan ichan)
+    (= token_buf (make_cvector 0))
+    (cvector_pushback token_buf '\0')
+    (= lexbuf (make_cvector 0))
+    (= lexbuf_end 0)
+    return
     ))
 
 (fun lex () (
@@ -267,8 +288,26 @@
             (goto lex_loop)
             ))
         (1 . (return @TOK_EOF))
+        (2 . (do
+            (consume)
+            (if (== (look_ahead) @CH_SLASH) (do
+                (= state 3)
+                (goto lex_loop)
+                ))
+            (error "BUG: not implemented")
+            ))
+        (3 . (do
+            ; comment
+            (consume)
+            (while (!= (look_ahead) @CH_NL)
+                (consume)
+                )
+            (consume)
+            (goto lex_loop)
+            ))
         (default . (error "BUG: invalid state"))
         ))
+    (error "BUG: not reachable")
     ))
 
     ))
