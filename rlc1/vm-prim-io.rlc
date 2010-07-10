@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim.rlc 2010-07-10 17:40:29 nineties $
+; $Id: vm-prim-io.rlc 2010-07-11 01:21:49 nineties $
 ;
 
 ; primitive functions
@@ -32,6 +32,10 @@
 
 (var vm-prim-code `(
 
+(extern void* make_array)
+(extern void* make_tuple3)
+(extern void* make_tuple4)
+
 (fun strlen (str) (
     (int len 0)
     (while (!= (*8 str) '\0') (
@@ -39,157 +43,6 @@
         (incr len)
         ))
     (return len)
-    ))
-
-(extern int cmd_argc)
-(extern void* cmd_argv)
-(export prim_cmd_argc)
-(fun prim_cmd_argc () ((return cmd_argc)))
-(export prim_cmd_argv)
-(fun prim_cmd_argv () ((return cmd_argv)))
-
-(export prim_memset)
-(fun prim_memset (ptr val bytes) (
-    (for i 0 bytes (
-        (set8 ptr i val)
-        ))
-    ))
-
-(export prim_memcpy)
-(fun prim_memcpy (dst src bytes) (
-    (for i 0 bytes (
-        (set8 dst i (get8 src i))
-        ))
-    ))
-
-; vector of characters
-(fun make_cvector_with_capa (size capa) (
-    (void* buf (allocate_plain capa))
-    (memset buf 0 capa)
-    (void* tup (allocate_tuple 3 1))
-    (set tup 0 buf)
-    (set tup 1 size)
-    (set tup 2 capa)
-    (return tup)
-    ))
-
-(export prim_make_cvector)
-(fun prim_make_cvector (size) (
-    (if (!= size 0)
-        (return (make_cvector_with_capa size size))
-        (return (make_cvector_with_capa 0 10))
-        )
-    ))
-
-(export prim_cvector_size)
-(fun prim_cvector_size (vec) (
-    (return (get vec 1))
-    ))
-
-(export prim_cvector_ptr)
-(fun prim_cvector_ptr (vec) (
-    (return (get vec 0))
-    ))
-
-(export prim_cvector_at)
-(fun prim_cvector_at (vec idx) (
-    (return (get8 (get vec 0) idx))
-    ))
-
-(export prim_cvector_put)
-(fun prim_cvector_put (vec idx val) (
-    (set8 (get vec 0) idx val)
-    ))
-
-(export prim_cvector_reserve)
-(fun prim_cvector_reserve (vec capa) (
-    (if (< (get vec 2) capa) (do
-        (void* new_buf (allocate_plain capa))
-        (prim_memcpy new_buf (get vec 0) (get vec 1))
-        (set vec 0 new_buf)
-        (set vec 2 capa)
-        ))
-    ))
-
-(export prim_cvector_resize)
-(fun prim_cvector_resize (vec new_size) (
-    (if (> new_size (get vec 2)) (prim_cvector_reserve vec new_size))
-    (set vec 1 new_size)
-    ))
-
-(export prim_cvector_pushback)
-(fun prim_cvector_pushback (vec value) (
-    (if (== (get vec 1) (get vec 2))
-        (prim_cvector_reserve vec (* 2 (get vec 2)))
-        )
-    (int sz (get vec 1))
-    (prim_cvector_put vec sz value)
-    (set vec 1 (+ sz 1))
-    ))
-
-; containers for internal purpose
-(fun make_cons (car cdr) (
-    (void* c (allocate_cons))
-    (set c 0 car)
-    (set c 1 cdr)
-    (return c)
-    ))
-
-(fun remove_from_list (ls elem) (
-    (if (! ls) (return 0))
-    (if (== (get ls 0) elem)
-        (
-            (return (get ls 1))
-        )
-        (
-            (set ls 1 (remove_from_list (get ls 1) elem))
-            (return ls)
-        )
-        )
-    ))
-
-(fun make_array (size) (
-    (return (allocate_plain size))
-    ))
-
-(fun make_tuple1 (nboxed arg0) (
-    (void* t (allocate_tuple 1 nboxed))
-    (set t 0 arg0)
-    (return t)
-    ))
-
-(fun make_tuple2 (nboxed arg0 arg1) (
-    (void* t (allocate_tuple 2 nboxed))
-    (set t 0 arg0)
-    (set t 1 arg1)
-    (return t)
-    ))
-
-(fun make_tuple3 (nboxed arg0 arg1 arg2) (
-    (void* t (allocate_tuple 3 nboxed))
-    (set t 0 arg0)
-    (set t 1 arg1)
-    (set t 2 arg2)
-    (return t)
-    ))
-
-(fun make_tuple4 (nboxed arg0 arg1 arg2 arg3) (
-    (void* t (allocate_tuple 4 nboxed))
-    (set t 0 arg0)
-    (set t 1 arg1)
-    (set t 2 arg2)
-    (set t 3 arg3)
-    (return t)
-    ))
-
-(fun make_tuple5 (nboxed arg0 arg1 arg2 arg3 arg4) (
-    (void* t (allocate_tuple 5 nboxed))
-    (set t 0 arg0)
-    (set t 1 arg1)
-    (set t 2 arg2)
-    (set t 3 arg3)
-    (set t 4 arg4)
-    (return t)
     ))
 
 ; I/O functions
@@ -349,8 +202,8 @@
     (error msg)
     ))
 
-(export init_prim)
-(fun init_prim () (
+(export init_prim_io)
+(fun init_prim_io () (
     (= stdin  (make_ichan @STDIN_FD))
     (= stdout (make_ochan @STDOUT_FD))
     (= stderr (make_ochan @STDERR_FD))
@@ -361,8 +214,8 @@
     (register_static (address ochan_list))
     ))
 
-(export finish_prim)
-(fun finish_prim () (
+(export finish_prim_io)
+(fun finish_prim_io () (
     ; close unclosed channels
     (while ichan_list (
         (prim_close_in (get ichan_list 0))

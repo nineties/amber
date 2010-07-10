@@ -1,0 +1,123 @@
+;
+; rowl - generation 1
+; Copyright (C) 2010 nineties
+;
+; $Id: vm-prim-util.rlc 2010-07-11 01:24:11 nineties $
+;
+
+; primitive functions
+
+(import "stdlib")
+(import "vm-compile")
+
+(var vm-prim-code `(
+
+(export strlen)
+(fun strlen (str) (
+    (int len 0)
+    (while (!= (*8 str) '\0') (
+        (incr str)
+        (incr len)
+        ))
+    (return len)
+    ))
+
+(extern int cmd_argc)
+(extern void* cmd_argv)
+(export prim_cmd_argc)
+(fun prim_cmd_argc () ((return cmd_argc)))
+(export prim_cmd_argv)
+(fun prim_cmd_argv () ((return cmd_argv)))
+
+(export prim_memset)
+(fun prim_memset (ptr val bytes) (
+    (for i 0 bytes (
+        (set8 ptr i val)
+        ))
+    ))
+
+(export prim_memcpy)
+(fun prim_memcpy (dst src bytes) (
+    (for i 0 bytes (
+        (set8 dst i (get8 src i))
+        ))
+    ))
+
+; containers for internal purpose
+(export make_cons)
+(fun make_cons (car cdr) (
+    (void* c (allocate_cons))
+    (set c 0 car)
+    (set c 1 cdr)
+    (return c)
+    ))
+
+(export remove_from_list)
+(fun remove_from_list (ls elem) (
+    (if (! ls) (return 0))
+    (if (== (get ls 0) elem)
+        (
+            (return (get ls 1))
+        )
+        (
+            (set ls 1 (remove_from_list (get ls 1) elem))
+            (return ls)
+        )
+        )
+    ))
+(export make_array)
+(fun make_array (size) (
+    (return (allocate_plain size))
+    ))
+
+(export make_tuple1)
+(fun make_tuple1 (nboxed arg0) (
+    (void* t (allocate_tuple 1 nboxed))
+    (set t 0 arg0)
+    (return t)
+    ))
+
+(export make_tuple2)
+(fun make_tuple2 (nboxed arg0 arg1) (
+    (void* t (allocate_tuple 2 nboxed))
+    (set t 0 arg0)
+    (set t 1 arg1)
+    (return t)
+    ))
+
+(export make_tuple3)
+(fun make_tuple3 (nboxed arg0 arg1 arg2) (
+    (void* t (allocate_tuple 3 nboxed))
+    (set t 0 arg0)
+    (set t 1 arg1)
+    (set t 2 arg2)
+    (return t)
+    ))
+
+(export make_tuple4)
+(fun make_tuple4 (nboxed arg0 arg1 arg2 arg3) (
+    (void* t (allocate_tuple 4 nboxed))
+    (set t 0 arg0)
+    (set t 1 arg1)
+    (set t 2 arg2)
+    (set t 3 arg3)
+    (return t)
+    ))
+
+(export make_tuple5)
+(fun make_tuple5 (nboxed arg0 arg1 arg2 arg3 arg4) (
+    (void* t (allocate_tuple 5 nboxed))
+    (set t 0 arg0)
+    (set t 1 arg1)
+    (set t 2 arg2)
+    (set t 3 arg3)
+    (set t 4 arg4)
+    (return t)
+    ))
+
+
+))
+
+(vtable_push)
+(compile vm-prim-code)
+(vtable_pop)
