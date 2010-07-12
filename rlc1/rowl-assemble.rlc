@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-assemble.rlc 2010-07-11 01:04:40 nineties $
+; $Id: rowl-assemble.rlc 2010-07-12 23:03:56 nineties $
 ;
 
 (import "stdlib")
@@ -30,8 +30,11 @@
 (define insn_code (insn) (car  (insn_info insn)))
 (define insn_len  (insn) (cadr (insn_info insn)))
 
-(var label_addr_table ())
+(var assemble_mode nil)
 (var current_addr 0)
+
+; used in case of assemble_mode = executable
+(var label_addr_table ())
 (var align8_table ()) ; list of (type name value)
 (var align4_table ()) ; list of (type name value)
 (var align1_table ()) ; list of (type name value)
@@ -39,6 +42,7 @@
 
 (var object_table ())
 (var object_index 0)
+; used in case of assemble_mode = object
 
 (define type_length (ty) (assoc ty `((char . 1) (int . 4) (long . 8))))
 (define value_length (ent) (do
@@ -77,13 +81,13 @@
     (set value_area_size addr)
     ))
 
-(define get_value_addr (name) (do
+(define get_valaddr (name) (do
     (var addr (assoc name value_addr_table))
     (if (nil? addr) (error "unknown value name " name))
     addr
     ))
 
-(define get_object_index (name) (do
+(define get_objidx (name) (do
     (var idx (assoc name object_table))
     (if (nil? idx) (error "unknown object name " name))
     idx
@@ -129,20 +133,26 @@
         (otherwise (error "scan_decl: not implemented"))
         ))
 
-(define relative_address (sym) (do
-    (var label_addr (assoc sym label_addr_table))
-    (if (nil? label_addr) (error "undefined symbol: " sym))
-    (- label_addr current_addr))
-    )
+(define get_reladdr (addr sym) (do
+    (if (== assemble_mode `executable)
+        (do
+            (var label_addr (assoc sym label_addr_table))
+            (if (nil? label_addr) (error "undefined symbol: " sym))
+            (- label_addr current_addr)
+        )
+        (do
+            0
+        ))
+    ))
 
-(define put_operand (opd)
+(define put_operand (addr opd)
     (cond
-        ((== `byte (car opd))    (put_byte (cadr opd)))
-        ((== `short (car opd))   (put_short (cadr opd)))
-        ((== `long (car opd))    (put_long (cadr opd)))
-        ((== `address (car opd)) (put_short (relative_address (cadr opd))))
-        ((== `value (car opd))   (put_short (get_value_addr (cadr opd))))
-        ((== `object (car opd))  (put_short (get_object_index (cadr opd))))
+        ((== `byte (car opd))    (do (put_byte (cadr opd)) 1))
+        ((== `short (car opd))   (do (put_short (cadr opd)) 2))
+        ((== `long (car opd))    (do (put_long (cadr opd)) 4))
+        ((== `local (car opd))   (do (put_short (get_reladdr addr (cadr opd))) 2))
+        ((== `value (car opd))   (do (put_short (get_valaddr addr (cadr opd))) 2))
+        ((== `object (car opd))  (do (put_short (get_objidx addr (cadr opd))) 2))
         (otherwise (error "unknown operand: " opd))
         ))
 
@@ -151,12 +161,15 @@
         ((symbol? insn) (do (put_byte (insn_code insn)) (incr current_addr)))
         ((== `label (car insn)) ())
         ((== `tswitch_ent (car insn)) (do
-            (put_operand (cadr insn))
+            (put_operand (+ current_addr 1) (cadr insn))
             (set current_addr (+ current_addr 2))
             ))
         (otherwise (do
             (put_byte (insn_code insn))
-            (foreach opd (cdr insn) (put_operand opd))
+            (var opd_addr (+ current_addr 1))
+            (foreach opd (cdr insn) (do
+                (set opd_addr (+ opd_addr (put_operand opd_addr opd)))
+                ))
             (set current_addr (+ current_addr (insn_len insn)))
             ))
         )
@@ -191,6 +204,7 @@
         ))
 
 (define assemble (mode prog) (do
+    (set assemble_mode mode)
     (set current_addr 0)
     (foreach decl prog (scan_decl decl))
     (compute_value_addrs)
