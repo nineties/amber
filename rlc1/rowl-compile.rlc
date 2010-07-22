@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-07-12 20:26:16 nineties $
+; $Id: rowl-compile.rlc 2010-07-22 17:24:13 nineties $
 ;
 
 (import "stdlib")
@@ -468,6 +468,19 @@
     nil
     ))
 
+(define compile_local_addressof ((_ idx)) (emit_insn `(addrl (byte @idx))))
+
+(define compile_addressof ((_ sym)) (do
+    (var loc (lookup_var sym))
+    (cond
+        ((nil? loc) (error "undefined variable: " sym))
+        ((== `arg (car loc)) (error "addressof expressoin for arguments is not allowed"))
+        ((== `local (car loc)) (compile_local_addressof loc))
+        (otherwise (error "compile_var: not implemented" loc))
+        )
+    true
+    ))
+
 (define compile_unboxed_array (type len) (do
     (var elem_sz (unboxed_type_size type))
     (compile_expr `(* @elem_sz @len))
@@ -552,6 +565,7 @@
         ((string? expr) (compile_string_lit expr))
         ((symbol? expr) (compile_var expr))
         ((== `var (car expr)) (compile_local_vardecl expr))
+        ((== `address (car expr)) (compile_addressof expr))
         ((== `if (car expr)) (compile_if expr))
         ((== `while (car expr)) (compile_while expr))
         ((== `for (car expr)) (compile_for expr))
