@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-assemble.rlc 2010-07-21 23:41:23 nineties $
+; $Id: rowl-assemble.rlc 2010-07-22 23:13:36 nineties $
 ;
 
 (import "stdlib")
@@ -248,20 +248,20 @@
     ))
 
 (define emit_object_header () (do
-    (var header_size 0)
     (compute_value_addrs) ; calculate value_area_size
-    (set header_size (+ header_size value_area_size))
-    (set header_size (+
-        header_size
-        (import_symbol_table_size)
-        (export_symbol_table_size)
-        ))
-    (set header_size (+ header_size 12))
-    (set header_size (+ header_size current_addr))
-    (put_long header_size)
+    (var file_size 0)
+    (+= file_size 4)
+    (+= file_size (import_symbol_table_size))
+    (+= file_size (export_symbol_table_size))
+    (+= file_size 4)
+    (+= file_size 4)
+    (+= file_size value_area_size)
+    (+= file_size current_addr)
+    (put_long file_size)
     (emit_export_table)
     (emit_import_table)
     (put_long 0) ; XXX: temporal implementation (# of objects)
+    (put_long value_area_size)
     ))
 
 (define assemble (mode prog) (do
