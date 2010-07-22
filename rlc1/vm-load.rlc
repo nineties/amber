@@ -2,20 +2,22 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-load.rlc 2010-07-22 02:28:23 nineties $
+; $Id: vm-load.rlc 2010-07-23 00:30:14 nineties $
 ;
 
 (import "stdlib")
+(import "config")
 (import "vm-compile")
 
 ; load rowl executable program from file
 
 ; layout of executable program
-; 4bytes        : size of the file (=N)
-; 4bytes        : # of global reference objects
-; 4bytes        : total size of global value objects (=M)
-; Mbytes        : global value objects
-; (N-M-12)bytes : byte code
+; 4bytes : magic number
+; 4bytes : # of global reference objects
+; 4bytes : total size of global value objects (=N)
+; Nbytes : global value objects
+; 4bytes : length of byte codes (=M)
+; Mbytes : byte code
 
 ; system calls
 (var SYS_READ    3)
@@ -34,29 +36,23 @@
 (extern void* value_area_base)
 (extern void* object_area_base)
 
-(fun get_code (prog) (
-    (int n ([] prog 0)) ; N1
-    (+= prog (* 4 (+ n 1)))
-    (= n ([] prog 0)) ; N2
-    (+= prog (+ n 4))
-    (+= prog 4) ; skip N3
-    (return prog)
-    ))
-
 (export read_program)
 (fun read_program (path nrefp) (
     (int fd (open path))
-    (int size)
+    (int magic)
     (int nref)
     (int szval)
-    (syscall @SYS_READ fd (address size) 12)
+    (syscall @SYS_READ fd (address magic) 12)
+    (if (!= magic @EXE_MAGIC) ((error "unknown file format")))
     ([]= nrefp 0 nref)
     (void* mem (alloc_block @BLOCK_SIZE)) ; XXX: temporal implementation
-    (syscall @SYS_READ fd mem (- size 12))
+    (syscall @SYS_READ fd mem szval)
+    (int len)
+    (syscall @SYS_READ fd (address len) 4)
+    (syscall @SYS_READ fd (+ mem szval) len)
     (close fd)
     (= value_area_base mem)
     (+= mem szval)
-    (= object_area_base mem)
     (return mem)
     ))
 
