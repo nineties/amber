@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-io.rlc 2010-07-22 02:33:47 nineties $
+; $Id: vm-prim-io.rlc 2010-07-22 23:02:42 nineties $
 ;
 
 ; primitive functions
@@ -59,12 +59,14 @@
 (fun prim_get_stdout () ((return stdout)))
 (fun prim_get_stderr () ((return stderr)))
 
+; ichan = (buf, fd, beg, end)
 (fun make_ichan (fd) (
     (void* chan (make_tuple4 1 (make_array @RDBUFSZ) fd 0 0))
     (= ichan_list (make_cons chan ichan_list))
     (return chan)
     ))
 
+; ochan = (buf, fd, pos)
 (fun make_ochan (fd) (
     (void* chan (make_tuple3 1 (make_array @WRBUFSZ) fd 0))
     (= ochan_list (make_cons chan ochan_list))
@@ -114,6 +116,30 @@
     (int sz (syscall @SYS_READ (get ichan 1) (get ichan 0) @RDBUFSZ))
     (set ichan 2 0)
     (set ichan 3 sz)
+    ))
+
+(export prim_input)
+(fun prim_input (ichan size) (
+    (void* vec (prim_make_cvector size))
+    (void* vecp (prim_cvector_ptr vec))
+    (void* chanp (get ichan 0))
+    (int beg (get ichan 2))
+    (int end (get ichan 3))
+    (int bufsz (- end beg))
+    (if (<= size bufsz)
+        (
+            (prim_memcpy vecp chanp size)
+            (set ichan 2 (+ beg size))
+            (return vec)
+        )
+        (
+            (prim_memcpy vecp chanp bufsz)
+            (set ichan 2 end)
+            (-= size bufsz)
+            (int r (syscall @SYS_READ (get ichan 1) (+ vecp bufsz) size))
+            (if (< r size) ((error "input failed")))
+            (return vec)
+        ))
     ))
 
 (export prim_input_char)
@@ -187,6 +213,11 @@
         (prim_output_char ochan (get8 output_int_digits i))
         (decr i)
         ))
+    ))
+
+(export prim_read)
+(fun prim_read (size) (
+    (return (prim_input stdin size))
     ))
 
 (export prim_read_char)

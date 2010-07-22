@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: linker.rlc 2010-07-22 17:20:06 nineties $
+; $Id: linker.rlc 2010-07-22 22:48:45 nineties $
 ;
 
 (import "rowl-compile")
@@ -30,10 +30,18 @@
     (return 0)
     ))
 
+(fun read_long_check (ichan) (
+    (var val 0)
+    (if (< (input_long (address val) ichan) 0)
+        (error "invalid file format")
+        )
+    (return val)
+    ))
+
 (fun read_header (file) (
     (var ic (open_in file))
-    (var size 0)
-    (input_long (address size) ic)
+    (var size (read_long_check ic))
+    (var file (input ic (- size 4)))
     (close_in ic)
     return
     ))

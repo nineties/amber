@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-07-22 01:20:20 nineties $
+# $Id: Makefile 2010-07-22 23:23:53 nineties $
 
 AS = as
 ASFLAGS =
@@ -51,7 +51,7 @@ VMOBJECTS = vm-main.o\
 	    vm-prim-io.o\
 	    vm-prim-vector.o
 
-vm-compile.o     : stdlib.rlc vm-config.rlc
+vm-compile.o     : stdlib.rlc config.rlc
 vm-main.o        : stdlib.rlc vm-compile.rlc
 vm-eval.o        : stdlib.rlc vm-compile.rlc vm-insn.rlc vm-prim-inc.rlc
 vm-gc.o          : stdlib.rlc vm-compile.rlc
