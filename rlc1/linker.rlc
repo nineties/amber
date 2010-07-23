@@ -2,9 +2,10 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: linker.rlc 2010-07-22 22:48:45 nineties $
+; $Id: linker.rlc 2010-07-23 14:23:43 nineties $
 ;
 
+(import "config")
 (import "rowl-compile")
 
 (compile `executable `(
@@ -40,8 +41,18 @@
 
 (fun read_header (file) (
     (var ic (open_in file))
-    (var size (read_long_check ic))
-    (var file (input ic (- size 4)))
+    (var magic (read_long_check ic))
+    (if (!= magic @OBJ_MAGIC) (error "invalid file format"))
+
+    ; XXX: stub
+    (read_long_check ic)
+    (read_long_check ic)
+    (read_long_check ic)
+    (read_long_check ic)
+
+    (var len (read_long_check ic))
+    (print_int len)
+    (var code (input ic len))
     (close_in ic)
     return
     ))
