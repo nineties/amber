@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: linker.rlc 2010-07-23 14:23:43 nineties $
+; $Id: linker.rlc 2010-07-23 14:35:58 nineties $
 ;
 
 (import "config")
@@ -25,32 +25,32 @@
 
     (for i 1 argc (do
         (var file (array_get string argv 1))
-        (read_header file)
+        (load_file file)
         ))
 
     (return 0)
     ))
 
-(fun read_long_check (ichan) (
+(fun read_int_check (ichan) (
     (var val 0)
-    (if (< (input_long (address val) ichan) 0)
+    (if (< (input_int (address val) ichan) 0)
         (error "invalid file format")
         )
     (return val)
     ))
 
-(fun read_header (file) (
+(fun load_file (file) (
     (var ic (open_in file))
-    (var magic (read_long_check ic))
+    (var magic (read_int_check ic))
     (if (!= magic @OBJ_MAGIC) (error "invalid file format"))
 
     ; XXX: stub
-    (read_long_check ic)
-    (read_long_check ic)
-    (read_long_check ic)
-    (read_long_check ic)
+    (read_int_check ic)
+    (read_int_check ic)
+    (read_int_check ic)
+    (read_int_check ic)
 
-    (var len (read_long_check ic))
+    (var len (read_int_check ic))
     (print_int len)
     (var code (input ic len))
     (close_in ic)
