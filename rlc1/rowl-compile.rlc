@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-07-23 15:46:01 nineties $
+; $Id: rowl-compile.rlc 2010-07-23 16:07:55 nineties $
 ;
 
 (import "stdlib")
@@ -78,7 +78,7 @@
         ((== idx 2) `arg2)
         ((== idx 3) `arg3)
         ((== idx 4) `arg4)
-        (otherwise `(@loadl (byte @(* 4 (+ 2 idx)))))
+        (otherwise `(@loadl (byte @(arg_offs idx))))
         ))
 
 (define compile_var (sym) (do
@@ -115,7 +115,7 @@
         ((== idx 3) (emit_insn `loadl3))
         ((== idx 4) (emit_insn `loadl4))
         ((== idx 5) (emit_insn `loadl5))
-        ((< idx 256) (emit_insn `(loadl (byte @(* -4 (+ idx 1))))))
+        ((< idx 256) (emit_insn `(loadl (byte @(local_offs idx)))))
         (otherwise (error "too many local variables"))
         ))
 
@@ -207,6 +207,9 @@
     true
     ))
 
+(define arg_offs (idx) (* 4 (+ 2 idx)))
+(define local_offs (idx) (* -4 (+ 1 idx)))
+
 (define compile_local_assign (insn loc rhs) (do
     (if (!= `nop insn)
         (do
@@ -226,7 +229,7 @@
         ((== idx 3) (emit_insn `storel3))
         ((== idx 4) (emit_insn `storel4))
         ((== idx 5) (emit_insn `storel5))
-        ((< idx 256) (emit_insn `(storel (byte @idx))))
+        ((< idx 256) (emit_insn `(storel (byte @(local_offs idx)))))
         (otherwise (error "too many local variables"))
         )
     ))
@@ -462,19 +465,20 @@
         ((== idx 3) (emit_insn `storel3))
         ((== idx 4) (emit_insn `storel4))
         ((== idx 5) (emit_insn `storel5))
-        ((< idx 256) (emit_insn `(storel (byte @idx))))
+        ((< idx 256) (emit_insn `(storel (byte @(local_offs idx)))))
         (otherwise (error "too many local variables"))
         )
     nil
     ))
 
-(define compile_local_addressof ((_ idx)) (emit_insn `(addrl (byte @idx))))
+(define compile_arg_addressof   ((_ idx)) (emit_insn `(addrl (byte @(arg_offs idx)))))
+(define compile_local_addressof ((_ idx)) (emit_insn `(addrl (byte @(local_offs idx)))))
 
 (define compile_addressof ((_ sym)) (do
     (var loc (lookup_var sym))
     (cond
         ((nil? loc) (error "undefined variable: " sym))
-        ((== `arg (car loc)) (error "addressof expressoin for arguments is not allowed"))
+        ((== `arg (car loc)) (compile_arg_addressof loc))
         ((== `local (car loc)) (compile_local_addressof loc))
         (otherwise (error "compile_var: not implemented" loc))
         )
