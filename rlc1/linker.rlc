@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: linker.rlc 2010-07-23 15:29:55 nineties $
+; $Id: linker.rlc 2010-07-23 15:40:23 nineties $
 ;
 
 (import "config")
@@ -38,7 +38,7 @@
 
     ; replace addresses
 
-    (output_executable "a.rlx")
+    ;(output_executable "a.rlx")
     (return 0)
     ))
 
@@ -73,18 +73,22 @@
     return
     ))
 
+(fun output_word (ochan word) (
+    (var val word)
+    (output_bytes ochan (address val) 4)
+    ))
+
 (fun output_executable (file) (
     (var oc (open_out file))
 
-    (var word @EXE_MAGIC)
-    (output_bytes oc (address word) 4)
+    (output_word oc @EXE_MAGIC)
 
     ; XXX: stub implementation
-    (= word 0)
-    (output_int oc (address word) 4)
-    (output_int oc (address word) 4)
+    (output_word oc 0)
+    (output_word oc 0)
 
-    (output_int oc total_length)
+    (output_word oc total_length)
+    (error "hoge")
     (for i 0 (vector_size codes) (do
         (output_bytes oc (vector_at codes i) (ivector_at lengths i))
         ))
