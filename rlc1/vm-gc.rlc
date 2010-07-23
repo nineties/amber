@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-07-10 15:32:35 nineties $
+; $Id: vm-gc.rlc 2010-07-23 14:39:35 nineties $
 ;
 
 (import "stdlib")
@@ -490,6 +490,16 @@
     (for i 0 nelem (
         ([]= ptr i ([] values i))
         ))
+    (return ptr)
+    ))
+
+(export allocate_array)
+(fun allocate_array (nelem) (
+    (incr nelem)
+    (void* ptr (allocate_object nelem))
+    (memset ptr 0 (* 4 nelem))
+    @(SET_HEADER ptr TAG_ARRAY 0 nelem)
+    (+= ptr @WORD_SIZE)
     (return ptr)
     ))
 

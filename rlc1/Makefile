@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-07-22 23:23:53 nineties $
+# $Id: Makefile 2010-07-23 14:28:08 nineties $
 
 AS = as
 ASFLAGS =
@@ -49,16 +49,20 @@ VMOBJECTS = vm-main.o\
 	    vm-load.o\
 	    vm-prim-util.o\
 	    vm-prim-io.o\
-	    vm-prim-vector.o
+	    vm-prim-vector.o\
+	    vm-prim-cvector.o\
+	    vm-prim-ivector.o
 
-vm-compile.o     : stdlib.rlc config.rlc
-vm-main.o        : stdlib.rlc vm-compile.rlc
-vm-eval.o        : stdlib.rlc vm-compile.rlc vm-insn.rlc vm-prim-inc.rlc
-vm-gc.o          : stdlib.rlc vm-compile.rlc
-vm-load.o        : stdlib.rlc vm-compile.rlc
-vm-prim-util.o	 : stdlib.rlc vm-compile.rlc
-vm-prim-io.o     : stdlib.rlc vm-compile.rlc
-vm-prim-vector.o : stdlib.rlc vm-compile.rlc
+vm-compile.o      : stdlib.rlc config.rlc
+vm-main.o         : stdlib.rlc vm-compile.rlc
+vm-eval.o         : stdlib.rlc vm-compile.rlc vm-insn.rlc vm-prim-inc.rlc
+vm-gc.o           : stdlib.rlc vm-compile.rlc
+vm-load.o         : stdlib.rlc vm-compile.rlc
+vm-prim-util.o    : stdlib.rlc vm-compile.rlc
+vm-prim-io.o      : stdlib.rlc vm-compile.rlc
+vm-prim-vector.o  : stdlib.rlc vm-compile.rlc
+vm-prim-cvector.o : stdlib.rlc vm-compile.rlc
+vm-prim-ivector.o : stdlib.rlc vm-compile.rlc
 
 rlvm: $(VMOBJECTS)
 	$(LD) $^ -o $@ $(VMLDFLAGS)
