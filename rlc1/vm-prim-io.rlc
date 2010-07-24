@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-io.rlc 2010-07-24 00:08:55 nineties $
+; $Id: vm-prim-io.rlc 2010-07-24 17:37:50 nineties $
 ;
 
 ; primitive functions
@@ -120,9 +120,9 @@
 
 (export prim_input_bytes)
 (fun prim_input_bytes (ichan ptr size) (
-    (void* chanp (get ichan 0))
     (int beg (get ichan 2))
     (int end (get ichan 3))
+    (void* chanp (+ (get ichan 0) beg))
     (int bufsz (- end beg))
     (if (<= size bufsz)
         (
@@ -165,10 +165,6 @@
 
 (export prim_output_bytes)
 (fun prim_output_bytes (ochan ptr size) (
-    (debug "output_bytes")
-    (debugi ochan)
-    (debugi ptr)
-    (debugi size)
     (if (== (get ochan 1) @STDERR_FD) (
         ; Do not buffer outputs to stderr
         (syscall @SYS_WRITE @STDERR_FD ptr size)
