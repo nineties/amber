@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: linker.rlc 2010-07-24 22:12:36 nineties $
+; $Id: linker.rlc 2010-07-24 23:36:10 nineties $
 ;
 
 (import "config")
@@ -11,7 +11,7 @@
 (compile `executable `(
 
 (fun usage (prog) (
-    (print_string "USAGE: rlvm ")
+    (print_string "USAGE: rowl ")
     (print_string prog)
     (print_string " [-o OUTPUT] [FILE..]\n")
     return
@@ -23,12 +23,15 @@
 (var output null)
 
 (fun main (argc argv) (
+
+    (parse_option (address argc) argv)
+    (print_string output)
+    (print_int argc)
+
     (if (< argc 2) (do
         (usage (array_get string argv 0))
         (return 1)
         ))
-
-    (get_output_name (address argc) argv)
 
     (= codes (make_vector 0))
     (= lengths (make_ivector 0))
@@ -45,8 +48,26 @@
     (return 0)
     ))
 
-(fun get_output_name (argcp argv) (
+(fun parse_option (argcp argv) (
     (var argc (get argcp))
+    (var i 1)
+    (var j 1)
+    (while (< i argc) (do
+        (var arg (array_get string argv j))
+        (if (streq arg "-o")
+            (do
+                (= output (array_get string argv (+ j 1)))
+                (-= argc 2)
+                (+= j 2)
+            )
+            (do
+                (array_set string argv i arg)
+                (incr i)
+                (incr j)
+            ))
+        ))
+    (if (! output) (= output "a.rlx"))
+    (set argcp argc)
     return
     ))
 

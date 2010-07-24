@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-07-24 19:16:25 nineties $
+; $Id: rowl-compile.rlc 2010-07-24 22:38:59 nineties $
 ;
 
 (import "stdlib")
@@ -505,6 +505,7 @@
 
 (define compile_array_get ((_ type ary idx)) (do
     (var insn (assoc type `((char . array_get8) (int . array_get32) (string . array_get32))))
+    (if (not insn) ((error "ERROR: array_get: invalid type " type)))
     (compile_expr ary)
     (compile_expr idx)
     (emit_insn insn)
@@ -512,7 +513,8 @@
     ))
 
 (define compile_array_set ((_ type ary idx val)) (do
-    (var insn (assoc type `((int . array_set32) (char . array_set8))))
+    (var insn (assoc type `((int . array_set32) (char . array_set8) (string . array_set32))))
+    (if (not insn) ((error "ERROR: array_set: invalid type " type)))
     (compile_expr ary)
     (compile_expr idx)
     (compile_expr val)

@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-07-24 18:34:18 nineties $
+# $Id: Makefile 2010-07-24 23:35:52 nineties $
 
 AS = as
 ASFLAGS =
@@ -26,7 +26,7 @@ SOURCES = startup.rl\
 ASMSOURCES = $(patsubst %.rl,%.s,$(SOURCES))
 OBJECTS    = $(patsubst %.rl,%.o,$(SOURCES))
 
-all: rlci rlvm linker.rlx rlc1.rlo
+all: rlci rowl linker.rlx rlc1.rlo
 
 alloc.s  : $(RLC0) stddef.s
 main.s   : $(RLC0) stddef.s code.s
@@ -66,10 +66,10 @@ vm-prim-vector.o  : stdlib.rlc vm-compile.rlc
 vm-prim-cvector.o : stdlib.rlc vm-compile.rlc
 vm-prim-ivector.o : stdlib.rlc vm-compile.rlc
 
-rlvm: $(VMOBJECTS)
+rowl: $(VMOBJECTS)
 	$(LD) $^ -o $@ $(VMLDFLAGS)
 
-rlc1.rlo: rowl.rlc rlvm rlci rowl-compile.rlc rowl-assemble.rlc
+rlc1.rlo: rowl.rlc rowl rlci rowl-compile.rlc rowl-assemble.rlc
 	./rlci $< > $@
 
 linker.rlx: linker.rlc
@@ -89,4 +89,4 @@ linker.rlx: linker.rlc
 
 .PHONY: clean
 clean:
-	rm -f *.o *.s *.rlo *.rlx rlci rlvm rlc1 core
+	rm -f *.o *.s *.rlo *.rlx rlci rowl rlc1 core
