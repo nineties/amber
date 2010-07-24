@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-io.rlc 2010-07-24 18:26:06 nineties $
+; $Id: vm-prim-io.rlc 2010-07-24 23:58:02 nineties $
 ;
 
 (import "stdlib")
@@ -71,10 +71,17 @@
     (return chan)
     ))
 
+(fun open_error (path) (
+    (prim_output_string stderr "ERROR: failed to open '")
+    (prim_output_string stderr path)
+    (prim_output_string stderr "'\n")
+    (exit 1)
+    ))
+
 (export prim_open_in)
 (fun prim_open_in (path) (
     (int fd (syscall @SYS_OPEN path @O_RDONLY))
-    (if (< fd 0) ((error "ERROR: open failed\n")))
+    (if (< fd 0) ((open_error path)))
     (return (make_ichan fd))
     ))
 
@@ -87,7 +94,7 @@
 (export prim_open_out)
 (fun prim_open_out (path) (
     (int fd (syscall @SYS_OPEN path @(| O_WRONLY O_CREAT O_TRUNC) 0644))
-    (if (< fd 0) ((error "ERROR: open failed\n")))
+    (if (< fd 0) ((open_error path)))
     (return (make_ochan fd))
     ))
 
