@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-eval.rlc 2010-07-23 15:45:34 nineties $
+; $Id: vm-eval.rlc 2010-07-24 13:35:16 nineties $
 ;
 
 ; rowlVM register usage
@@ -172,13 +172,14 @@
     (asm "popl %ebx")
     ))
 
-(fun vm_extcall (idx argc argv) (
-    (for i 0 argc (
-        (int arg ([] argv (- (- argc i) 1)))
+(fun vm_extcall (idx argsz argv) (
+    (while (> argsz 0) (
+        (-= argsz 4)
+        (int arg ([] (+ argv argsz) 0))
         (asm "pushl " arg)
         ))
     (int ret (indcall ([] funtable idx)))
-    (int off (* 4 argc))
+    (int off argsz)
     (asm "addl " off ", %esp")
     (return ret)
     ))
