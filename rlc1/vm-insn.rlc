@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-07-25 22:24:01 nineties $
+; $Id: vm-insn.rlc 2010-07-25 23:52:49 nineties $
 ;
 
 (define gen_comparison1 (cmovname) `(
@@ -296,6 +296,18 @@
         (asm "addl object_area_base, %eax")
         (vmpop %ebx)
         (asm "movl %ebx, (%eax)")
+        ))
+    ; 'fun:1' 'relative address of the function:2'
+    (fun 3 @true (
+        (vmsshort 1 %eax) ; offset of address of the function
+        (asm "addl %ecx, %eax") ; compute absloute address
+        (vmpush %eax)
+        ))
+    ; 'extfun:1' 'index of the external function:2'
+    (extfun 3 @true (
+        (vmushort 1 %eax) ; index of the function
+        (asm "orl  $0x80000000, %eax") ; set flag
+        (vmpush %eax)
         ))
     ; 'call:1' 'relative address of the function:2' 'size of arguments:1'
     (call 4 @nil  (
