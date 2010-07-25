@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-07-25 22:22:59 nineties $
+# $Id: Makefile 2010-07-25 23:54:09 nineties $
 
 AS = as
 ASFLAGS =
@@ -66,13 +66,16 @@ vm-prim-vector.o  : stdlib.rlc vm-compile.rlc
 vm-prim-cvector.o : stdlib.rlc vm-compile.rlc
 vm-prim-ivector.o : stdlib.rlc vm-compile.rlc
 
+rowl-assemble.rlc: stdlib.rlc config.rlc vm-insn.rlc
+rowl-compile.rlc: stdlib.rlc rowl-assemble.rlc vm-prim-inc.rlc
+
 rowl: $(VMOBJECTS)
 	$(LD) $^ -o $@ $(VMLDFLAGS)
 
-rlc1.rlo: rowl.rlc rlci rowl-compile.rlc rowl-assemble.rlc
+rlc1.rlo: rowl.rlc rlci rowl-compile.rlc
 	./rlci $< > $@
 
-linker: linker.rlc rlci rowl-compile.rlc rowl-assemble.rlc
+linker: linker.rlc rlci rowl-compile.rlc
 	./rlci $< > $@
 
 rlc1: rowl linker rlc1.rlo
