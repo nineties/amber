@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-07-25 09:55:27 nineties $
+# $Id: Makefile 2010-07-25 12:17:43 nineties $
 
 AS = as
 ASFLAGS =
@@ -76,7 +76,7 @@ linker: linker.rlc
 	./rlci $< > $@
 
 rlc1: rowl linker rlc1.rlo
-	./rowl linker
+	./rowl linker rlc1.rlo -o rlc1
 
 .SUFFIXES:
 .SUFFIXES: .o .s .rl .rlc

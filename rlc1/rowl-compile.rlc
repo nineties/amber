@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-07-24 22:38:59 nineties $
+; $Id: rowl-compile.rlc 2010-07-25 12:35:12 nineties $
 ;
 
 (import "stdlib")
@@ -179,11 +179,12 @@
     ))
 
 (var binary_operator
-    `((+ . iadd) (- . isub) (* . imul) (/ . idiv) (% . imod) (cons . cons))
+    `((+ . iadd) (- . isub) (* . imul) (/ . idiv) (% . imod))
     )
-(var unary_operator `((- . ineg) (car . get0) (cdr . get1) ))
+(var unary_operator `((- . ineg)))
 (var assignment_operator `((= . nop) (+= . iadd) (-= . isub) (*= . imul)
     (/= . idiv) (%= . imod)))
+
 
 (define binary_operator? (op) (assoc op binary_operator))
 (define unary_operator? (op) (assoc op unary_operator))
@@ -591,6 +592,10 @@
         ((== `field_set (car expr)) (compile_field_set expr))
         ((== `get (car expr)) (compile_field_get `(field_get @(cadr expr) 0)))
         ((== `set (car expr)) (compile_field_set `(field_set @(cadr expr) 0 @(caddr expr))))
+        ((== `car (car expr)) (compile_field_get `(field_set @(cadr expr) 0)))
+        ((== `cdr (car expr)) (compile_field_get `(field_set @(cadr expr) 1)))
+        ((== `setcar (car expr)) (compile_field_set `(field_set @(cadr expr) 0 @(caddr expr))))
+        ((== `setcdr (car expr)) (compile_field_set `(field_set @(cadr expr) 1 @(caddr expr))))
         ((and (== 3 (length expr)) (binary_operator? (car expr)))
             (compile_binexpr expr))
         ((and (== 2 (length expr)) (unary_operator? (car expr)))
