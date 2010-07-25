@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-07-25 12:31:59 nineties $
+; $Id: vm-insn.rlc 2010-07-25 22:24:01 nineties $
 ;
 
 (define gen_comparison1 (cmovname) `(
@@ -235,13 +235,13 @@
     (decrl3 1 @true ((asm "decl -16(%edi)")))
     (decrl4 1 @true ((asm "decl -20(%edi)")))
     (decrl5 1 @true ((asm "decl -24(%edi)")))
-    (decrl  2 @true (
+    (decrl 2 @true (
         (vmubyte 1 %ebx) ; index
         (asm "movl %edi, %eax")
         (asm "addl %ebx, %eax")
         (asm "decl (%eax)")
         ))
-    (addrl  2 @true (
+    (addrl 2 @true (
         (vmsbyte 1 %ebx) ; index
         (asm "movl %edi, %eax")
         (asm "addl %ebx, %eax")
@@ -297,8 +297,8 @@
         (vmpop %ebx)
         (asm "movl %ebx, (%eax)")
         ))
-    (exit       1 @true ((vmpop %eax) (break)))
-    (call       4 @nil  (
+    ; 'call:1' 'relative address of the function:2' 'size of arguments:1'
+    (call 4 @nil  (
         (asm "movl %ecx, %eax")
         (asm "addl $4, %eax")
         (vmpush %eax) ; store return point
@@ -308,12 +308,13 @@
         (asm "addl %eax, %ecx")
         (vmfetch)
         ))
-    (extcall    4 @true ( ; 'extcall:1' 'index of the external function:2' 'size of arguments:1'
+    ; 'extcall:1' 'index of the external function:2' 'size of arguments:1'
+    (extcall 4 @true (
         (vmsave)
         (vmushort 1 %eax)
         (vmubyte 3 %ebx)
         (asm "pushl %esi") ; push argv
-        (asm "pushl %ebx") ; push argsz
+        (asm "pushl %ebx") ; push argsize
         (asm "pushl %eax") ; push index
         (call vm_extcall)
         (asm "addl $12, %esp")
@@ -322,7 +323,7 @@
         (asm "addl %ebx, %esi") ; remove arguments from stack
         (vmpush %eax) ; push return value
         ))
-    (return     1 @nil  (
+    (return 1 @nil  (
         (asm "movl $0, %ebx") ; return value
         (asm "movl %edi, %esi")
         (vmpop %edi) ; base pointer
@@ -332,7 +333,7 @@
         (vmpush %ebx) ; push return value
         (vmfetch)
         ))
-    (ireturn    1 @nil  (
+    (ireturn 1 @nil  (
         (asm "movl (%esi), %ebx") ; return value
         (asm "movl %edi, %esi")
         (vmpop %edi) ; base pointer
@@ -363,4 +364,5 @@
     (if_ge      3 @nil  @(gen_comparison2 "cmovge"))
     (if_lt      3 @nil  @(gen_comparison2 "cmovl"))
     (if_le      3 @nil  @(gen_comparison2 "cmovle"))
+    (exit 1 @nil ((vmpop %eax) (break)))
     ))
