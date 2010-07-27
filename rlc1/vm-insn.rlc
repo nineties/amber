@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-07-25 23:52:49 nineties $
+; $Id: vm-insn.rlc 2010-07-27 17:42:11 nineties $
 ;
 
 (define gen_comparison1 (cmovname) `(
@@ -334,6 +334,35 @@
         (vmubyte 3 %ebx) ; total size of arguments
         (asm "addl %ebx, %esi") ; remove arguments from stack
         (vmpush %eax) ; push return value
+        ))
+    ; 'vcall:1' 'size of arguments:1'
+    (vcall 2 @true (
+        (vmpop %eax) ; function
+        (if (& (register %eax) -1) ; check flag
+            ( ; external call
+                (vmsave)
+                (asm "movzwl %ax, %eax") ; function index is 2byte value
+                (vmubyte 1 %ebx)
+                (asm "pushl %esi") ; push argv
+                (asm "pushl %ebx") ; push argsize
+                (asm "pushl %eax") ; push index
+                (call vm_extcall)
+                (asm "addl $12, %esp")
+                (vmrestore)
+                (vmubyte 3 %ebx) ; total size of arguments
+                (asm "addl %ebx, %esi") ; remove arguments from stack
+                (vmpush %eax) ; push return value
+            )
+            ( ; absolute call
+                (vmpop %eax) ; absolute address of the function
+                (asm "movl %ecx, %ebx")
+                (asm "addl $4, %ebx")
+                (vmpush %ebx) ; store return point
+                (vmpush %edi) ; store base pointer
+                (asm "movl %esi, %edi") ; set base pointer
+                (asm "movl %eax, %ecx")
+                (vmfetch)
+            ))
         ))
     (return 1 @nil  (
         (asm "movl $0, %ebx") ; return value
