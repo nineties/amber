@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: linker.rlc 2010-07-25 12:19:48 nineties $
+; $Id: linker.rlc 2010-07-29 10:11:15 nineties $
 ;
 
 (import "config")
@@ -18,8 +18,12 @@
     ))
 
 (var codes null)
-(var lengths null)
-(var total_length 0)
+(var code_lens null)
+(var total_code_len 0)
+
+(var values null)
+(var value_sizes null)
+(var total_value_size 0)
 
 (var output_file null)
 
@@ -33,7 +37,9 @@
         ))
 
     (= codes (make_vector 0))
-    (= lengths (make_ivector 0))
+    (= code_lens (make_ivector 0))
+    (= values (make_vector 0))
+    (= value_sizes (make_ivector 0))
 
     ; load all files
     (for i 1 argc (do
@@ -86,20 +92,36 @@
         (error "ERROR: invalid file format (magic number mismatch)\n"))
 
     ; XXX: stub implementation
-    (read_int_check ic)
-    (read_int_check ic)
-    (read_int_check ic)
-    (read_int_check ic)
+    (load_import_table ic)
+    (load_export_table ic)
+    (var nref (read_int_check ic))
+
+    (var valuesz (read_int_check ic))
+    (+= total_value_size valuesz)
+    (var v (array char valuesz))
+    (if (< (input_bytes ic v valuesz) 0) (error "ERROR: load failed\n"))
+    (vector_pushback values v)
+    (ivector_pushback value_sizes valuesz)
 
     ; read byte codes
-    (var len (read_int_check ic))
-    (+= total_length len)
-    (var code (array char len))
-    (if (< (input_bytes ic code len) 0) (error "ERROR: load failed\n"))
+    (var codelen (read_int_check ic))
+    (+= total_code_len codelen)
+    (var code (array char codelen))
+    (if (< (input_bytes ic code codelen) 0) (error "ERROR: load failed\n"))
     (vector_pushback codes code)
-    (ivector_pushback lengths len)
+    (ivector_pushback code_lens codelen)
     (close_in ic)
     return
+    ))
+
+(fun load_import_table (ichan) (
+    ; XXX: stub implementation
+    (read_int_check ichan)
+    ))
+
+(fun load_export_table (ichan) (
+    ; XXX: stub implementation
+    (read_int_check ichan)
     ))
 
 (fun output_word (ochan word) (
@@ -116,9 +138,9 @@
     (output_word oc 0)
     (output_word oc 0)
 
-    (output_word oc total_length)
+    (output_word oc total_code_len)
     (for i 0 (vector_size codes) (do
-        (output_bytes oc (vector_at codes i) (ivector_at lengths i))
+        (output_bytes oc (vector_at codes i) (ivector_at code_lens i))
         ))
 
     (close_out oc)
