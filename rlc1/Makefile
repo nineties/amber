@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-07-30 22:51:30 nineties $
+# $Id: Makefile 2010-08-08 15:53:26 nineties $
 
 AS = as
 ASFLAGS =
@@ -72,7 +72,7 @@ rowl-compile.rlc: stdlib.rlc rowl-assemble.rlc vm-prim-inc.rlc
 rowl: $(VMOBJECTS)
 	$(LD) $^ -o $@ $(VMLDFLAGS)
 
-rlc1.rlo: rowl.rlc rlci rowl-compile.rlc
+rlc1.rlo: rlc1-main.rlc rlci rowl-compile.rlc
 	./rlci $< > $@
 
 linker: linker.rlc rlci rowl-compile.rlc
