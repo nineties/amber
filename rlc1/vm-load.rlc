@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-load.rlc 2010-07-25 09:59:08 nineties $
+; $Id: vm-load.rlc 2010-08-08 15:50:38 nineties $
 ;
 
 (import "stdlib")
@@ -39,22 +39,30 @@
 (export read_program)
 (fun read_program (path nrefp) (
     (int fd (open path))
+
+    ; Do not change the order of three variables below
     (int magic)
     (int nref)
-    (int szval)
+    (int vsize)
+
     (syscall @SYS_READ fd (address magic) 12)
     (if (!= magic @EXE_MAGIC) (
         (error "ERROR: unknown file format\n")
         ))
+
     ([]= nrefp 0 nref)
-    (void* mem (alloc_block @BLOCK_SIZE)) ; XXX: temporal implementation
-    (syscall @SYS_READ fd mem szval)
+
+    ; load global values and byte codes.
+    ; XXX: this is temporal implementation. total size can exceed BLOCK_SIZE.
+    (void* mem (alloc_block @BLOCK_SIZE))
+    (syscall @SYS_READ fd mem vsize)
+
     (int len)
     (syscall @SYS_READ fd (address len) 4)
-    (syscall @SYS_READ fd (+ mem szval) len)
+    (syscall @SYS_READ fd (+ mem vsize) len)
     (close fd)
     (= value_area_base mem)
-    (+= mem szval)
+    (+= mem vsize)
     (return mem)
     ))
 
