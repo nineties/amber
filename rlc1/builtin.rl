@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-08-08 12:36:49 nineties $
+ % $Id: builtin.rl 2010-08-08 12:57:59 nineties $
  %);
 
 include(stddef,code);
@@ -764,6 +764,21 @@ rl_put_str: (p0) {
     return nil_sym;
 };
 
+rl_assoc: (p0) {
+    allocate(3);
+    check_arity(p0, 2, "assoc");
+    x0 = car(p0);   (% key %);
+    x1 = cadr(p0);  (% list %);
+    while (x1 != nil_sym) {
+        x2 = car(x1); (% (key . val) %);
+        if (_eq(x0, car(x2))) {
+            return cdr(x2);
+        };
+        x1 = cdr(x1);
+    };
+    return nil_sym;
+};
+
 nil_sym    : NULL;
 true_sym   : NULL;
 var_sym    : NULL;
@@ -857,4 +872,5 @@ init_builtin_objects: () {
     register_prim("put_short"  , &rl_put_short);
     register_prim("put_long"   , &rl_put_long);
     register_prim("put_str"    , &rl_put_str);
+    register_prim("assoc"      , &rl_assoc);
 };
