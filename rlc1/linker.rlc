@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: linker.rlc 2010-08-08 15:37:28 nineties $
+; $Id: linker.rlc 2010-08-08 15:49:29 nineties $
 ;
 
 (import "config")
@@ -23,7 +23,8 @@
 
 (var values null)
 (var value_sizes null)
-(var total_value_size 0)
+(var total_vsize 0)
+(var total_nref 0)
 
 (var output_file null)
 
@@ -94,13 +95,14 @@
     (load_import_table ic)
     (load_export_table ic)
     (var nref (read_int_check ic))
+    (+= total_nref nref)
 
-    (var valuesz (read_int_check ic))
-    (+= total_value_size valuesz)
-    (var v (array char valuesz))
-    (if (< (input_bytes ic v valuesz) 0) (error "ERROR: load failed\n"))
+    (var vsize (read_int_check ic))
+    (+= total_vsize vsize)
+    (var v (array char vsize))
+    (if (< (input_bytes ic v vsize) 0) (error "ERROR: load failed\n"))
     (vector_pushback values v)
-    (ivector_pushback value_sizes valuesz)
+    (ivector_pushback value_sizes vsize)
 
     ; read byte codes
     (var codelen (read_int_check ic))
@@ -131,9 +133,12 @@
 
     (output_word oc @EXE_MAGIC)
 
-    ; XXX: stub implementation
-    (output_word oc 0)
-    (output_word oc 0)
+    (output_word oc total_nref)
+
+    (output_word oc total_vsize)
+    (for i 0 (vector_size values) (do
+        (output_bytes oc (vector_at values i) (ivector_at value_sizes i))
+        ))
 
     (output_word oc total_code_len)
     (for i 0 (vector_size codes) (do
