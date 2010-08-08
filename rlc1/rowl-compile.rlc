@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-08-08 15:37:06 nineties $
+; $Id: rowl-compile.rlc 2010-08-08 16:06:58 nineties $
 ;
 
 (import "stdlib")
@@ -639,6 +639,16 @@
     `(fun @name @insn_seq)
     ))
 
+; (array type name length)
+; (array type name length value_list)
+; (array type name value_list)
+(define compile_arraydecl ((_ type name . args)) (do
+    (var length (if (int? (car args)) (car args) (length (car args))))
+    (var value_list (if (cons? (car args)) (car args) (cadr args)))
+    (add_var name `(value void* @name))
+    `((array @type @length) @name @value_list)
+    ))
+
 (define compile_object_decl (name value) (do
     (add_var name `(object @name))
     (reset_insn_seq)
@@ -671,16 +681,6 @@
     (if (is_object value)
         (compile_object_decl name value)
         (compile_value_decl name value)
-    ))
-
-; (array type name length)
-; (array type name length value_list)
-; (array type name value_list)
-(define compile_arraydecl ((_ type name . args)) (do
-    (var length (if (int? (car args)) (car args) (length (car args))))
-    (var value_list (if (cons? (car args)) (car args) (cadr args)))
-    (add_var name `(value void* @name))
-    `((array @type @length) @name @value_list)
     ))
 
 (define compile_decl (decl)
