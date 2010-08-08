@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-07-12 23:09:41 nineties $
+ % $Id: builtin.rl 2010-08-08 12:36:49 nineties $
  %);
 
 include(stddef,code);
@@ -21,7 +21,7 @@ export(cons_p,sym_p,ign_p,int_p,char_p,string_p,prim_p,array_p,lambda_p,macro_p,
 export(prim_funptr);
 export(mkcons,car,cdr,cadr,caddr,length,reverse);
 export(nil_sym,true_sym,var_sym,set_sym,quote_sym,unquote_sym,if_sym,cond_sym,
-    while_sym,do_sym,lambda_sym,macro_sym,import_sym);
+    while_sym,do_sym,lambda_sym,macro_sym,foreach_sym,import_sym);
 
 (%
  % symbol object:
@@ -774,6 +774,7 @@ while_sym  : NULL;
 do_sym     : NULL;
 lambda_sym : NULL;
 macro_sym  : NULL;
+foreach_sym: NULL;
 import_sym : NULL;
 
 (% p0: name %);
@@ -800,6 +801,7 @@ init_builtin_objects: () {
     do_sym      = register_sym("do");
     lambda_sym  = register_sym("lambda");
     macro_sym   = register_sym("macro");
+    foreach_sym = register_sym("foreach");
     import_sym  = register_sym("import");
 
     register_prim("eval"       , &rl_eval);

@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: rowllib.rl 2010-07-10 00:30:59 nineties $
+ % $Id: rowllib.rl 2010-08-08 09:04:28 nineties $
  %);
 
 include(stddef);
@@ -353,13 +353,10 @@ HT_BUCKET => 4;
 prime_numbers : [
       53,         97,         193,       389,       769,
       1543,       3079,       6151,      12289,     24593,
-      49157,      98317,      196613,    393241,    786433,
-      1572869,    3145739,    6291469,   12582917,  25165843,
-      50331653,   100663319,  201326611, 402653189, 805306457,
-      1610612741, 3221225473, 4294967291
+      49157,      98317,      196613
       ];
 
-NUM_PRIME => 28;
+NUM_PRIME => 13;
 
 (% returns first prime number greater than p0 %);
 next_prime: (p0) {
@@ -371,7 +368,7 @@ next_prime: (p0) {
         };
         x0 = x0 + 1;
     };
-    return prime_numbers[NUM_PRIME-1];
+    return -1;
 };
 
 (% p0: hash func, p1: key, p2: bucket_size %);
@@ -385,6 +382,9 @@ resize_bucket: (p0, p1) {
     x0 = vec_size(p0[HT_BUCKET]); (% old size %);
     if (p1 > x0) {
         p1 = next_prime(p1);
+        if (p1 < 0) {
+            return;
+        };
         x1 = mkvec(p1); (% new bucket %);
         x2 = 0;
         while (x2 < x0) {
@@ -399,12 +399,17 @@ resize_bucket: (p0, p1) {
             x2 = x2 + 1;
         };
         p0[HT_BUCKET] = x1;
-    }
+    };
 };
 
 (% p0: hash func, p1: keyequal func, p2: getkey func, p3: size hint %);
 mkht: (p0, p1, p2, p3) {
-    return mktup5(p0, p1, p2, 0, mkvec(next_prime(p3)));
+    allocate(1);
+    x0 = next_prime(p3);
+    if (x0 < 0) {
+        x0 = prime_numbers[NUM_PRIME-1];
+    };
+    return mktup5(p0, p1, p2, 0, mkvec(x0));
 };
 
 (% p0: hashtable, p1: entry %);
