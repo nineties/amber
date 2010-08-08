@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: eval.rl 2010-07-12 23:06:36 nineties $
+ % $Id: eval.rl 2010-08-08 12:54:18 nineties $
  %);
 
 include(stddef,code);
@@ -83,6 +83,7 @@ eval_cons: (p0) {
     if (x1 == do_sym)      { return eval_do(cdr(p0)); };
     if (x1 == lambda_sym)  { return eval_lambda(cdr(p0)); };
     if (x1 == macro_sym)   { return eval_macro(cdr(p0)); };
+    if (x1 == foreach_sym) { return eval_foreach(cdr(p0)); };
     if (x1 == import_sym)  { return eval_import(cdr(p0)); };
     if (prim_p(x1) != nil_sym)   { return (prim_funptr(x1))(eval_args(cdr(p0))); };
     if (lambda_p(x1) != nil_sym) { return eval_applambda(x1, cdr(p0)); };
@@ -219,7 +220,34 @@ eval_macro: (p0) {
     return mkmacro(x0, x1);
 };
 
-(% p0: argument pattern, p1:arguments p2:lambda%);
+(% (foreach it list body) %);
+eval_foreach: (p0) {
+    allocate(4);
+    check_arity(p0, 3, "foreach");
+    scope_push();
+    x0 = car(p0);   (% it %);
+    x1 = eval_sexp(cadr(p0));  (% list %);
+    x2 = caddr(p0); (% body %);
+    x3 = mksym("last?");
+
+    assign(sym_name(x0), x0);
+    assign(sym_name(x3), x3);
+
+    while (x1 != nil_sym) {
+        sym_set(x0, car(x1));
+        if (cdr(x1) == nil_sym) {
+            sym_set(x3, true_sym);
+        } else {
+            sym_set(x3, nil_sym);
+        };
+        eval_sexp(x2);
+        x1 = cdr(x1);
+    };
+    scope_pop();
+    return nil_sym;
+};
+
+(% p0: argument pattern, p1:arguments p2:lambda %);
 match_args: (p0, p1, p2) {
     allocate(1);
     if (p0 == nil_sym) {
