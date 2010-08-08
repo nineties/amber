@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-08-08 15:33:14 nineties $
+; $Id: rowl-compile.rlc 2010-08-08 15:37:06 nineties $
 ;
 
 (import "stdlib")
@@ -59,6 +59,8 @@
 (var insn_seq ())
 (define reset_insn_seq () (set insn_seq ()))
 (define get_insn_seq () (reverse insn_seq))
+(define last_insn () (car insn_seq))
+
 (define emit_insn (insn) (push insn_seq insn))
 
 (var init_code ())
@@ -623,7 +625,13 @@
         (add_var p `(arg @pidx))
         (incr pidx)
         ))
+
     (compile_block body)
+    (if (!= (last_insn) `ireturn) (do
+        (emit_insn `imm_i0)
+        (emit_insn `ireturn)
+        ))
+
     (var insn_seq (get_insn_seq))
     (if (> num_local_var 0)
         (set insn_seq (cons `(allocate (byte @num_local_var)) insn_seq)))
