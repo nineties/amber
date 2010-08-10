@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-07-27 17:42:11 nineties $
+; $Id: vm-insn.rlc 2010-08-11 00:47:47 nineties $
 ;
 
 (define gen_comparison1 (cmovname) `(
@@ -320,23 +320,23 @@
         (asm "addl %eax, %ecx")
         (vmfetch)
         ))
-    ; 'extcall:1' 'index of the external function:2' 'size of arguments:1'
-    (extcall 4 @true (
+    ; 'primcall:1' 'index of the external function:2' 'size of arguments:1'
+    (primcall 4 @true (
         (vmsave)
         (vmushort 1 %eax)
         (vmubyte 3 %ebx)
         (asm "pushl %esi") ; push argv
         (asm "pushl %ebx") ; push argsize
         (asm "pushl %eax") ; push index
-        (call vm_extcall)
+        (call vm_primcall)
         (asm "addl $12, %esp")
         (vmrestore)
         (vmubyte 3 %ebx) ; total size of arguments
         (asm "addl %ebx, %esi") ; remove arguments from stack
         (vmpush %eax) ; push return value
         ))
-    ; 'vcall:1' 'size of arguments:1'
-    (vcall 2 @true (
+    ; 'dcall:1' 'size of arguments:1'
+    (dcall 2 @true (
         (vmpop %eax) ; function
         (if (& (register %eax) -1) ; check flag
             ( ; external call
@@ -346,7 +346,7 @@
                 (asm "pushl %esi") ; push argv
                 (asm "pushl %ebx") ; push argsize
                 (asm "pushl %eax") ; push index
-                (call vm_extcall)
+                (call vm_primcall)
                 (asm "addl $12, %esp")
                 (vmrestore)
                 (vmubyte 3 %ebx) ; total size of arguments
@@ -354,7 +354,6 @@
                 (vmpush %eax) ; push return value
             )
             ( ; absolute call
-                (vmpop %eax) ; absolute address of the function
                 (asm "movl %ecx, %ebx")
                 (asm "addl $4, %ebx")
                 (vmpush %ebx) ; store return point

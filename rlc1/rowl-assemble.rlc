@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-assemble.rlc 2010-08-07 15:42:35 nineties $
+; $Id: rowl-assemble.rlc 2010-08-11 00:58:26 nineties $
 ;
 
 (import "stdlib")
@@ -57,12 +57,9 @@
             ))
         ))
     (if (not found) (do
-        (push import_symbols `(@sym . (@type @addr)))
+        (push import_symbols `(@sym . (@type (@addr))))
         ))
     ))
-
-(define import_symbol_table_size () 4) ; XXX: stub
-(define export_symbol_table_size () 4) ; XXX: stub
 
 (define type_length (ty) (assoc ty `((char . 1) (int . 4) (long . 8))))
 (define value_length (ent) (do
@@ -158,7 +155,7 @@
 
 (define scan_decl (decl)
     (cond
-        ((== `fun (car decl))       (scan_fundecl decl))
+        ((== `function (car decl))  (scan_fundecl decl))
         ((== `int (car decl))       (scan_value_decl decl))
         ((== `char (car decl))      (scan_value_decl decl))
         ((== `string (car decl))    (scan_value_decl decl))
@@ -178,9 +175,15 @@
         ((== `byte (car opd))    (do (put_byte (cadr opd)) 1))
         ((== `short (car opd))   (do (put_short (cadr opd)) 2))
         ((== `long (car opd))    (do (put_long (cadr opd)) 4))
-        ((== `local (car opd))   (do (put_short (get_reladdr addr opd)) 2))
+        ((== `label (car opd))   (do (put_short (get_reladdr addr opd)) 2))
         ((== `value (car opd))   (do (put_short (get_valaddr addr (cadr opd))) 2))
         ((== `object (car opd))  (do (put_short (get_objidx addr (cadr opd))) 2))
+        ((== `extfun (car opd)) (do
+            (if (!= assemble_mode `object) (error "undefined symbol: " (cadr opd)))
+            (add_import_symbol `fun (cadr opd) (+ current_addr 1))
+            (put_short 0)
+            2
+            ))
         (otherwise (error "unknown operand: " opd))
         ))
 
@@ -209,7 +212,7 @@
 
 (define assemble_decl (decl)
     (cond
-        ((== `fun (car decl)) (assemble_fundecl decl))
+        ((== `function (car decl)) (assemble_fundecl decl))
         (otherwise ())
         ))
 
@@ -240,15 +243,20 @@
     (put_long 0)
     ))
 
-; XXX: stub
 (define emit_import_table () (do
-    (put_long 0)
+    (put_long (length import_symbols)) ; number of entries
+    (foreach ent import_symbols (do
+        (var name (symbol2s (car ent)))
+        (var addrs (caddr ent))
+        (put_short (+ 1 (string_len name)))
+        (put_str name)
+        (put_long (length addrs))
+        (foreach addr addrs (put_long addr))
+        ))
     ))
 
 (define emit_object_header () (do
     (put_long OBJ_MAGIC)
-    (emit_export_table)
-    (emit_import_table)
     ))
 
 (define assemble (mode prog) (do
@@ -271,5 +279,11 @@
     (set current_addr 0)
     ; generate functions
     (foreach decl prog (assemble_decl decl))
+
+    (if (== assemble_mode `object) (do
+        (emit_import_table)
+        (emit_export_table)
+        ))
+
     ))
 

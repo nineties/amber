@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-08-08 16:06:58 nineties $
+; $Id: rowl-compile.rlc 2010-08-11 00:58:23 nineties $
 ;
 
 (import "stdlib")
@@ -12,7 +12,7 @@
 (var vtable ()) ; variable table
 (define vtable_push () (set vtable (cons () vtable)))
 (define vtable_pop  () (set vtable (cdr vtable)))
-(define lookup_var_helper (sym) (do
+(define try_lookup_var (sym) (do
     (define loop (sym tab)
         (if (nil? tab) nil (do
             (var v (assoc sym (car tab)))
@@ -20,16 +20,15 @@
             )))
     (loop sym vtable)
     ))
-
-(define unboxed_type? (type) (member? type `(char int)))
-(define unboxed_type_size (type) (assoc type `((char . 1) (int . 4))))
-
 (define lookup_var (sym) (do
-    (var v (lookup_var_helper sym))
+    (var v (try_lookup_var sym))
     (if v v (do (eprintln "undefined variable : " sym) (exit 1)))
     ))
 
 (define add_var (name opd) (setcar vtable (cons `(@name . @opd) (car vtable))))
+
+(define unboxed_type? (type) (member? type `(char int)))
+(define unboxed_type_size (type) (assoc type `((char . 1) (int . 4))))
 
 (var label_id 0)
 (define mklabel () (do
@@ -70,7 +69,7 @@
     (reset_insn_seq)
     (compile_expr `(exit (main (cmd_argc) (cmd_argv))))
     (var call_main (get_insn_seq))
-    `(fun __startup__ @(append init_code call_main))
+    `(function __startup__ @(append init_code call_main))
     ))
 
 (define arg_insn (idx)
@@ -86,12 +85,12 @@
 (define compile_var (sym) (do
     (var loc (lookup_var sym))
     (cond
-        ((nil? loc) (error "undefined variable: " sym))
         ((== `arg (car loc)) (emit_insn (arg_insn (cadr loc))))
         ((== `local (car loc)) (compile_local_var loc))
         ((== `value (car loc)) (compile_value loc))
         ((== `object (car loc)) (compile_object loc))
-        (otherwise (error "compile_var: not implemented" loc))
+        ((== `fun (car loc)) (compile_fun loc))
+        (otherwise (error "compile_var: not implemented " loc))
         )
     true
     ))
@@ -120,6 +119,10 @@
         ((< idx 256) (emit_insn `(loadl (byte @(local_offs idx)))))
         (otherwise (error "too many local variables"))
         ))
+
+(define compile_fun ((_ name)) (do
+    (emit_insn `(fun (label @name)))
+    ))
 
 (define compile_int_lit (val) (do
     (cond
@@ -273,7 +276,6 @@
     (var rhs (caddr expr))
     (var loc (lookup_var lhs))
     (cond
-        ((nil? loc) (error "undefined variable: " sym))
         ((== `local (car loc)) (compile_local_assign insn loc rhs))
         ((== `value (car loc)) (compile_value_assign insn loc rhs))
         ((== `object (car loc)) (compile_object_assign insn loc rhs))
@@ -282,26 +284,46 @@
     nil
     ))
 
-(define compile_call (expr) (do
-    (var fun (car expr))
-    (var prim (assoc fun prim_table)) ; (index name)
-    (if prim
-        (compile_extcall (car prim) (cdr expr))
-        (do
-            (var args (cdr expr))
-            (var narg (length args))
-            (foreach a (reverse args) (compile_expr a))
-            (emit_insn `(call (local @fun) (byte @(* 4 narg))))
-            true
-        ))
-    ))
-
-(define compile_extcall (prim_idx argv) (do
-    (var narg (length argv))
-    (foreach a (reverse argv) (compile_expr a))
-    (emit_insn `(extcall (short @prim_idx) (byte @(* 4 narg))))
+(define compile_prim_call (idx args) (do
+    (var narg (length args))
+    (foreach a (reverse args) (compile_expr a))
+    (emit_insn `(primcall (short @idx) (byte @(* 4 narg))))
     true
     ))
+
+(define compile_localcall (fun args) (do
+    (var narg (length args))
+    (foreach a (reverse args) (compile_expr a))
+    (emit_insn `(call (label @fun) (byte @(* 4 narg))))
+    true
+    ))
+
+(define compile_extcall (fun args) (do
+    (var narg (length args))
+    (foreach a (reverse args) (compile_expr a))
+    (emit_insn `(call (extfun @fun) (byte @(* 4 narg))))
+    true
+    ))
+
+(define compile_dynamiccall (fun args) (do
+    (var narg (length args))
+    (foreach a (reverse args) (compile_expr a))
+    (compile_expr fun)
+    (emit_insn `(dcall (byte @(* 4 narg))))
+    true
+    ))
+
+(define compile_call (expr) (do
+    (var fun (car expr))
+    (var loc (try_lookup_var fun))
+    (var prim (if (nil? loc) (assoc fun prim_table) nil))
+    (cond
+        (prim (compile_prim_call (car prim) (cdr expr)))
+        ((and (cons? loc) (== `extfun (car loc))) (compile_extcall fun (cdr expr)))
+        ((and (cons? loc) (== `fun (car loc))) (compile_localcall fun (cdr expr)))
+        ((cons? loc) (compile_dynamiccall fun (cdr expr)))
+        (otherwise (compile_localcall fun (cdr expr)))
+        )))
 
 (var comparison_operator
     `((< . if_ge) (> . if_le) (<= . if_gt) (>= . if_lt) (== . if_ne) (!= . if_eq)))
@@ -318,9 +340,9 @@
     (var end_label (mklabel))
     (compile_expr lhs)
     (compile_expr rhs)
-    (emit_insn `(@insn (local @ifelse_label)))
+    (emit_insn `(@insn (label @ifelse_label)))
     (if (compile_expr ifthen) (emit_insn `drop))
-    (emit_insn `(goto (local @end_label)))
+    (emit_insn `(goto (label @end_label)))
     (emit_insn `(label @ifelse_label))
     (if (compile_expr ifelse) (emit_insn `drop))
     (emit_insn `(label @end_label))
@@ -356,9 +378,9 @@
             (var ifelse_label (mklabel))
             (var end_label (mklabel))
             (compile_expr e)
-            (emit_insn `(if_zero (local @ifelse_label)))
+            (emit_insn `(if_zero (label @ifelse_label)))
             (if (compile_expr ifthen) (emit_insn `drop))
-            (emit_insn `(goto (local @end_label)))
+            (emit_insn `(goto (label @end_label)))
             (emit_insn `(label @ifelse_label))
             (if (compile_expr ifelse) (emit_insn `drop))
             (emit_insn `(label @end_label))
@@ -431,7 +453,7 @@
     (push_break_label)
     (emit_insn `(tswitch (short @(- ncase 1))))
     (foreach l labels (do
-        (emit_insn `(tswitch_ent (local @l)))
+        (emit_insn `(tswitch_ent (label @l)))
         ))
     (foreach c cases (do
         (emit_insn `(label @(car labels)))
@@ -448,13 +470,13 @@
     ))
 
 (define compile_goto ((_ name)) (do
-    (emit_insn `(goto (local @name)))
+    (emit_insn `(goto (label @name)))
     nil
     ))
 
 (define compile_break (_) (do
     (var break_label (car break_labels))
-    (emit_insn `(goto (local @break_label)))
+    (emit_insn `(goto (label @break_label)))
     nil
     ))
 
@@ -480,7 +502,6 @@
 (define compile_addressof ((_ sym)) (do
     (var loc (lookup_var sym))
     (cond
-        ((nil? loc) (error "undefined variable: " sym))
         ((== `arg (car loc)) (compile_arg_addressof loc))
         ((== `local (car loc)) (compile_local_addressof loc))
         (otherwise (error "compile_var: not implemented" loc))
@@ -617,6 +638,7 @@
     ))
 
 (define compile_fundecl ((_ name params body)) (do
+    (add_var name `(fun @name))
     (vtable_push)
     (reset_insn_seq)
     (set num_local_var 0)
@@ -636,7 +658,7 @@
     (if (> num_local_var 0)
         (set insn_seq (cons `(allocate (byte @num_local_var)) insn_seq)))
     (vtable_pop)
-    `(fun @name @insn_seq)
+    `(function @name @insn_seq)
     ))
 
 ; (array type name length)
@@ -647,6 +669,14 @@
     (var value_list (if (cons? (car args)) (car args) (cadr args)))
     (add_var name `(value void* @name))
     `((array @type @length) @name @value_list)
+    ))
+
+(define compile_extern ((_ type name)) (do
+    (cond
+        ((== `fun type) (add_var name `(extfun @name)))
+        (otherwise (eprintln "compile_extern: not implemented"))
+        )
+    nil
     ))
 
 (define compile_object_decl (name value) (do
@@ -687,6 +717,7 @@
     (cond
         ((== `fun (car decl)) (compile_fundecl decl))
         ((== `array (car decl)) (compile_arraydecl decl))
+        ((== `extern (car decl)) (compile_extern decl))
         (otherwise (compile_vardecl decl))
         ))
 

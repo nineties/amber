@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-08-08 12:57:59 nineties $
+ % $Id: builtin.rl 2010-08-10 15:49:33 nineties $
  %);
 
 include(stddef,code);
@@ -287,9 +287,9 @@ expect: (p0, p1, p2, p3) {
     fputs(stderr, p2);
     fputs(stderr, "': ");
     fputs(stderr, p3);
-    fputs(stderr, " is required (");
+    fputs(stderr, " is required '");
     pp_sexp(stderr, p0);
-    fputs(stderr, ")\n");
+    fputs(stderr, "'\n");
     exit(1);
 };
 
