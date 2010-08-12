@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-eval.rlc 2010-08-08 17:13:19 nineties $
+; $Id: vm-eval.rlc 2010-08-11 23:10:52 nineties $
 ;
 
 ; rowlVM register usage
@@ -21,16 +21,14 @@
 
 ; instructions
 (var insn_entries ())
-(do
-    (foreach e vm_instructions (do
-        (var label (mklabel (car e)))
-        (var len (cadr e))
-        (var code (cadddr e))
-        (if (caddr e) (set code (append code `((vmsucc @len) (vmfetch)))))
-        (set insn_entries (cons `(@label @code) insn_entries))
-        ))
-    (set insn_entries (reverse insn_entries))
-)
+(foreach e vm_instructions (do
+    (var label (mklabel (car e)))
+    (var len (cadr e))
+    (var code (cadddr e))
+    (if (caddr e) (set code (append code `((vmsucc @len) (vmfetch)))))
+    (set insn_entries (cons `(@label @code) insn_entries))
+    ))
+(set insn_entries (reverse insn_entries))
 
 (define emit_vmpush ((_ val) _ _) (do
     (emit "subl" 4 `%esi)

@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-08-10 12:56:51 nineties $
+# $Id: Makefile 2010-08-12 16:47:36 nineties $
 
 AS = as
 ASFLAGS =
@@ -26,7 +26,7 @@ SOURCES = startup.rl\
 ASMSOURCES = $(patsubst %.rl,%.s,$(SOURCES))
 OBJECTS    = $(patsubst %.rl,%.o,$(SOURCES))
 
-all: rlci rowl linker rlc1 test
+all: rlci rowl linker disasm rlc1 dfuntest
 
 alloc.s  : $(RLC0) stddef.s
 main.s   : $(RLC0) stddef.s code.s
@@ -54,13 +54,11 @@ VMOBJECTS = vm-main.o\
 	    vm-prim-cvector.o\
 	    vm-prim-ivector.o
 
-RLC1OBJECTS = rlc1-main.rlo
-
 vm-compile.o      : stdlib.rlc config.rlc
 vm-main.o         : stdlib.rlc vm-compile.rlc
 vm-eval.o         : stdlib.rlc vm-compile.rlc vm-insn.rlc vm-prim-inc.rlc
 vm-gc.o           : stdlib.rlc vm-compile.rlc
-vm-load.o         : stdlib.rlc vm-compile.rlc
+vm-load.o         : stdlib.rlc config.rlc vm-compile.rlc
 vm-prim-util.o    : stdlib.rlc vm-compile.rlc
 vm-prim-io.o      : stdlib.rlc vm-compile.rlc
 vm-prim-string.o  : stdlib.rlc vm-compile.rlc
@@ -68,15 +66,22 @@ vm-prim-vector.o  : stdlib.rlc vm-compile.rlc
 vm-prim-cvector.o : stdlib.rlc vm-compile.rlc
 vm-prim-ivector.o : stdlib.rlc vm-compile.rlc
 
-rlc1-main.rlo : rlc1-main.rlc rlci rowl-compile.rlc rowl-assemble.rlc
+RLC1OBJECTS = rlc1-main.rlo
+ROWLCOMPILER = rlci rowl-compile.rlc rowl-assemble.rlc vm-prim-inc.rlc
+
+rlc1-main.rlo : $(ROWLCOMPILER)
+
 
 rowl: $(VMOBJECTS)
 	$(LD) $^ -o $@ $(VMLDFLAGS)
 
-test: test.rlc rlci rowl-compile.rlc rowl-assemble.rlc
+dfuntest: dfuntest.rlc $(ROWLCOMPILER)
 	./rlci $< > $@
 
-linker: linker.rlc rlci rowl-compile.rlc rowl-assemble.rlc
+linker: linker.rlc $(ROWLCOMPILER)
+	./rlci $< > $@
+
+disasm: disasm.rlc $(ROWLCOMPILER)
 	./rlci $< > $@
 
 rlc1: rowl linker $(RLC1OBJECTS)
@@ -99,4 +104,4 @@ rlc1: rowl linker $(RLC1OBJECTS)
 
 .PHONY: clean
 clean:
-	rm -f *.o *.s *.rlo rlci rowl linker rlc1 core
+	rm -f *.o *.s *.rlo rlci rowl linker disasm rlc1 dfuntest core

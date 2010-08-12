@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-08-11 00:47:47 nineties $
+; $Id: vm-insn.rlc 2010-08-12 13:08:06 nineties $
 ;
 
 (define gen_comparison1 (cmovname) `(
@@ -142,6 +142,16 @@
         (asm "addl %eax, %ebx")
         (asm "movl (%esi), %eax")
         (asm "movl %eax, (%ebx)")
+        ))
+    ; array nelem
+    (array 1 @true (
+        (asm "movl (%esi), %eax") ; # of elements
+        (vmsave)
+        (asm "pushl %eax")
+        (call allocate_array)
+        (asm "addl $4, %esp")
+        (vmrestore)
+        (asm "movl %eax, (%esi)")
         ))
     ; array_get ary idx
     (array_get8 1 @true (
