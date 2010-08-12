@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-io.rlc 2010-07-24 23:58:02 nineties $
+; $Id: vm-prim-io.rlc 2010-08-11 16:35:43 nineties $
 ;
 
 (import "stdlib")
@@ -232,6 +232,22 @@
         ))
     ))
 
+(char[] 8 output_hex_digits)
+(export prim_output_hex)
+(fun prim_output_hex (ochan num len) (
+    (int i 0)
+    (while (< i len) (
+        (set8 output_hex_digits i (get8 "0123456789abcdef" (% num 16)))
+        (/= num 16)
+        (+= i 1)
+        ))
+    (-= i 1)
+    (while (>= i 0) (
+        (prim_output_char ochan (get8 output_hex_digits i))
+        (-= i 1)
+        ))
+    ))
+
 (export prim_read_bytes)
 (fun prim_read_bytes (ptr size) (
     (return (prim_input_bytes stdin ptr size))
@@ -265,6 +281,11 @@
 (export prim_print_int)
 (fun prim_print_int (num) (
     (return (prim_output_int stdout num))
+    ))
+
+(export prim_print_hex)
+(fun prim_print_hex (num len) (
+    (return (prim_output_int stdout num len))
     ))
 
 (export prim_error)

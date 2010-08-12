@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-08-11 00:58:23 nineties $
+; $Id: rowl-compile.rlc 2010-08-12 15:53:08 nineties $
 ;
 
 (import "stdlib")
@@ -516,8 +516,10 @@
     true
     ))
 
-(define compile_boxed_array (type len) (do
-    (error "compile_boxed_array: not implemented")
+(define compile_boxed_array (_ len) (do
+    (compile_expr len)
+    (emit_insn `array)
+    true
     ))
 
 (define compile_array ((_ type len))
@@ -665,10 +667,29 @@
 ; (array type name length value_list)
 ; (array type name value_list)
 (define compile_arraydecl ((_ type name . args)) (do
-    (var length (if (int? (car args)) (car args) (length (car args))))
+    (var arrlen (if (int? (car args)) (car args) (length (car args))))
     (var value_list (if (cons? (car args)) (car args) (cadr args)))
-    (add_var name `(value void* @name))
-    `((array @type @length) @name @value_list)
+
+    ; XXX: temporal implementation
+    (if (and value_list (== `string type))
+        (do
+            (add_var name `(object @name))
+
+            (reset_insn_seq)
+            (compile_expr `(= @name (array string @arrlen)))
+            (var i 0)
+            (foreach s value_list (do
+                (compile_expr `(array_set string @name @i @s))
+                (+= i 1)
+            ))
+            (var insn_seq (get_insn_seq))
+            (push_init_code insn_seq)
+            `(object @name)
+        )
+        (do
+            (add_var name `(value void* @name))
+            `((array @type @arrlen) @name @value_list)
+        ))
     ))
 
 (define compile_extern ((_ type name)) (do
