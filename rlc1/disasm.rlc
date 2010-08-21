@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: disasm.rlc 2010-08-12 16:46:29 nineties $
+; $Id: disasm.rlc 2010-08-21 21:20:16 nineties $
 ;
 
 (import "config")
@@ -167,16 +167,22 @@
     (output_int oc codelen)
     (output_string oc " bytes\n")
 
-    (var code (array char codelen))
-    (read_bytes_check ic code codelen)
-
-;    (var i 0)
-;    (while (< i codelen) (do
-;        (var code (read_bytes_check ic))
-;        (output_int oc i)
-;        (output_string oc "\t: ")
-;        (newline oc)
-;        ))
+    (var i 0)
+    (while (< i codelen) (do
+        (var bytecode (read_byte_check ic))
+        (output_int oc i)
+        (output_string oc "\t: ")
+        (var name (array_get string insn_names bytecode))
+        (output_string oc name)
+        (var len (array_get char insn_lens bytecode))
+        (for j 1 len (do
+            (var opd (read_byte_check ic))
+            (output_char oc ' ')
+            (output_int oc opd)
+            ))
+        (newline oc)
+        (+= i len)
+        ))
 
     ))
 
