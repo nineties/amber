@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-08-22 20:51:32 nineties $
+; $Id: vm-insn.rlc 2010-08-22 23:32:49 nineties $
 ;
 
 (define gen_comparison1 (cmovname) `(
@@ -318,10 +318,11 @@
     (fun (short) @true (
         (vmsshort 1 %eax) ; offset of address of the function
         (asm "addl %ecx, %eax") ; compute absloute address
+        (asm "subl code_base, %eax")
         (vmpush %eax)
         ))
-    ; 'primfun:1' 'index of the external function:2'
-    (primfun (ushort) @true (
+    ; 'pfun:1' 'index of the external function:2'
+    (pfun (ushort) @true (
         (vmushort 1 %eax) ; index of the function
         (asm "orl  $0x80000000, %eax") ; set flag
         (vmpush %eax)
@@ -332,20 +333,20 @@
         (asm "addl $4, %eax")
         (vmpush %eax) ; store return point
         (vmpush %edi) ; store base pointer
-        (vmsshort 1 %eax) ; offset of address of the function
         (asm "movl %esi, %edi") ; set base pointer
+        (vmsshort 1 %eax) ; offset of address of the function
         (asm "addl %eax, %ecx")
         (vmfetch)
         ))
-    ; 'primcall:1' 'index of the external function:2' 'size of arguments:1'
-    (primcall (prim byte)  @true (
+    ; 'pcall:1' 'index of the external function:2' 'size of arguments:1'
+    (pcall (prim byte)  @true (
         (vmsave)
         (vmushort 1 %eax)
         (vmubyte 3 %ebx)
         (asm "pushl %esi") ; push argv
         (asm "pushl %ebx") ; push argsize
         (asm "pushl %eax") ; push index
-        (call vm_primcall)
+        (call vm_pcall)
         (asm "addl $12, %esp")
         (vmrestore)
         (vmubyte 3 %ebx) ; total size of arguments
@@ -353,17 +354,18 @@
         (vmpush %eax) ; push return value
         ))
     ; 'dcall:1' 'size of arguments:1'
-    (dcall (byte) @true (
-        (vmpop %eax) ; function
-        (if (& (register %eax) -1) ; check flag
-            ( ; external call
-                (vmsave)
+    (dcall (byte) @nil (
+        (asm "movl (%esi), %eax")
+        (if (< (register %eax) 0) ; check flag
+            ( ; call primitive function
+                (vmpop %eax)
                 (asm "movzwl %ax, %eax") ; function index is 2byte value
                 (vmubyte 1 %ebx)
+                (vmsave)
                 (asm "pushl %esi") ; push argv
                 (asm "pushl %ebx") ; push argsize
                 (asm "pushl %eax") ; push index
-                (call vm_primcall)
+                (call vm_pcall)
                 (asm "addl $12, %esp")
                 (vmrestore)
                 (vmubyte 3 %ebx) ; total size of arguments
@@ -372,11 +374,12 @@
             )
             ( ; absolute call
                 (asm "movl %ecx, %ebx")
-                (asm "addl $4, %ebx")
+                (asm "addl $2, %ebx")
+                (vmpop %ecx)
                 (vmpush %ebx) ; store return point
                 (vmpush %edi) ; store base pointer
                 (asm "movl %esi, %edi") ; set base pointer
-                (asm "movl %eax, %ecx")
+                (asm "addl code_base, %ecx")
                 (vmfetch)
             ))
         ))
