@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-compile.rlc 2010-08-22 23:34:50 nineties $
+; $Id: vm-compile.rlc 2010-08-22 23:44:51 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -231,10 +231,10 @@
         (emit_expr ptr `%eax nil)
         (if (!= idx 0) (do
             (pushl `%eax)
-            (emit_expr idx `%ebx nil)
+            (emit_expr idx `%ecx nil)
             (popl `%eax)
-            (emit "sall" 2 %ebx)
-            (emit "addl" %ebx %eax)
+            (emit "sall" 2 %ecx)
+            (emit "addl" %ecx %eax)
             ))
         (movl `(deref %eax 0) dst)
         ))
@@ -246,9 +246,9 @@
         (emit_expr ptr `%eax nil)
         (if (!= idx 0) (do
             (pushl `%eax)
-            (emit_expr idx `%ebx nil)
+            (emit_expr idx `%ecx nil)
             (popl `%eax)
-            (emit "addl" %ebx %eax)
+            (emit "addl" %ecx %eax)
             ))
         (movb `(deref %eax 0) dst)
         ))
@@ -260,9 +260,9 @@
         (emit_expr ptr `%eax nil)
         (if (!= idx 0) (do
             (pushl `%eax)
-            (emit_expr idx `%ebx nil)
+            (emit_expr idx `%ecx nil)
             (popl `%eax)
-            (emit "addl" %ebx %eax)
+            (emit "addl" %ecx %eax)
             ))
         (movw `(deref %eax 0) dst)
         ))
@@ -295,9 +295,9 @@
         (do
             (emit_expr lhs `%eax nil)
             (pushl `%eax)
-            (emit_expr rhs `%ebx nil)
+            (emit_expr rhs `%ecx nil)
             (popl %eax)
-            (emit insn `%ebx `%eax)
+            (emit insn `%ecx `%eax)
             (movl `%eax dst)
         )
         (do
@@ -312,10 +312,10 @@
         (do
             (emit_expr lhs `%eax nil)
             (pushl `%eax)
-            (emit_expr rhs `%ebx nil)
+            (emit_expr rhs `%ecx nil)
             (popl `%eax)
             (emit "xorl" `%edx `%edx)
-            (emit "idiv" `%ebx)
+            (emit "idiv" `%ecx)
             (movl `%eax dst)
         )
         (do
@@ -330,10 +330,10 @@
         (do
             (emit_expr lhs `%eax nil)
             (pushl `%eax)
-            (emit_expr rhs `%ebx nil)
+            (emit_expr rhs `%ecx nil)
             (popl `%eax)
             (emit "xorl" `%edx `%edx)
-            (emit "idiv" `%ebx)
+            (emit "idiv" `%ecx)
             (movl `%edx dst)
         )
         (do
@@ -362,8 +362,8 @@
     (emit_expr lhs)
     (emit_expr rhs)
     (popl `%eax)
-    (popl `%ebx)
-    (emit "cmpl" `%ebx `%eax)
+    (popl `%ecx)
+    (emit "cmpl" `%ecx `%eax)
     (emit insn `%al)
     (emit "movzbl" `%al `%eax)
     (pushl `%eax)
@@ -462,8 +462,8 @@
     (emit "sall" 2 `%eax)
     (emit "addl" `%eax `%top)
     (emit_expr e `%eax nil)
-    (popl `%ebx)
-    (movl `%eax `(deref %ebx 0))
+    (popl `%ecx)
+    (movl `%eax `(deref %ecx 0))
     (if dst (movl `%eax dst))
     (if ret (emit_return `(return) nil nil))
     ))
@@ -474,8 +474,8 @@
     (emit_expr idx `%eax nil)
     (emit "addl" `%eax `%top)
     (emit_expr e `%eax nil)
-    (popl `%ebx)
-    (emit "movb" `%al `(deref %ebx 0))
+    (popl `%ecx)
+    (emit "movb" `%al `(deref %ecx 0))
     (if dst (movl `%eax dst))
     (if ret (emit_return `(return) nil nil))
     ))
@@ -539,8 +539,8 @@
     (emit_expr (cadr expr) `%eax nil)  ; lhs
     (pushl `%eax)
     (emit_expr (caddr expr) `%eax nil) ; rhs
-    (popl `%ebx)
-    (emit "cmpl" `%eax `%ebx)
+    (popl `%ecx)
+    (emit "cmpl" `%eax `%ecx)
     (emit insn (if ifelse-lbl ifelse-lbl ifend-lbl))
     (emit_block ifthen ret)
     (if ifelse-lbl (do (if (nil? ret) (emit "jmp" ifend-lbl)) (print_label ifelse-lbl) (emit_block ifelse ret)))

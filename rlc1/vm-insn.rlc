@@ -2,25 +2,25 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-08-22 23:32:49 nineties $
+; $Id: vm-insn.rlc 2010-08-22 23:45:22 nineties $
 ;
 
 (define gen_comparison1 (cmovname) `(
     (vmpop %eax)
     (asm "cmpl %edx, %eax")
     (asm "movl $3, %eax")
-    (vmsshort 1 %ebx)
-    (asm @cmovname " %ebx, %eax")
+    (vmsshort 1 %ecx)
+    (asm @cmovname " %ecx, %eax")
     (vmsucc %eax)
     (vmfetch)))
 
 (define gen_comparison2 (cmovname) `(
     (vmpop %eax)
-    (vmpop %ebx)
-    (asm "cmpl %eax, %ebx")
+    (vmpop %ecx)
+    (asm "cmpl %eax, %ecx")
     (asm "movl $3, %eax")
-    (vmsshort 1 %ebx)
-    (asm @cmovname " %ebx, %eax")
+    (vmsshort 1 %ecx)
+    (asm @cmovname " %ecx, %eax")
     (vmsucc %eax)
     (vmfetch)))
 
@@ -31,9 +31,9 @@
     ))
 
 (define gen_field_set (idx) `(
-    (vmpop %ebx) ; value
+    (vmpop %ecx) ; value
     (vmpop %eax) ; ptr
-    (asm "movl %ebx, " @(* 4 idx) "(%eax)")
+    (asm "movl %ecx, " @(* 4 idx) "(%eax)")
     ))
 
 (define operand_len (opd) (assoc opd `((byte . 1) (short . 2) (ushort . 2) (int . 4) (prim . 2))))
@@ -58,16 +58,16 @@
     (isub      () @true ((vmbin "subl")))
     (imul      () @true ((vmpop %eax) (asm "imul (%esi), %eax") (asm "movl %eax, (%esi)")))
     (idiv      () @true (
-        (vmpop %ebx)
+        (vmpop %ecx)
         (vmpop %eax)
-        (asm "idiv %ebx")
+        (asm "idiv %ecx")
         (vmpush %eax)
         (asm "xorl %edx, %edx") ; clear zero register
         ))
     (imod       () @true (
-        (vmpop %ebx)
+        (vmpop %ecx)
         (vmpop %eax)
-        (asm "idiv %ebx")
+        (asm "idiv %ecx")
         (vmpush %edx)
         (asm "xorl %edx, %edx") ; clear zero register
         ))
@@ -83,10 +83,10 @@
         (vmsave)
         (call allocate_cons)
         (vmrestore)
-        (vmpop %ebx)
-        (asm "movl %ebx, 4(%eax)")
-        (asm "movl (%esi), %ebx")
-        (asm "movl %ebx, (%eax)")
+        (vmpop %ecx)
+        (asm "movl %ecx, 4(%eax)")
+        (asm "movl (%esi), %ecx")
+        (asm "movl %ecx, (%eax)")
         (asm "movl %eax, (%esi)")
         ))
     ; allocate plain object
@@ -130,8 +130,8 @@
     (field_get  (byte) @true (
         (vmubyte 1 %eax)
         (asm "sall $2, %eax")
-        (asm "movl (%esi), %ebx")
-        (asm "addl %ebx, %eax")
+        (asm "movl (%esi), %ecx")
+        (asm "addl %ecx, %eax")
         (asm "movl (%eax), %eax")
         (asm "movl %eax, (%esi)")
         ))
@@ -145,10 +145,10 @@
     (field_set  (byte) @true (
         (vmubyte 1 %eax) ; index
         (asm "sall $2, %eax")
-        (vmpop %ebx) ; obj
-        (asm "addl %eax, %ebx")
+        (vmpop %ecx) ; obj
+        (asm "addl %eax, %ecx")
         (asm "movl (%esi), %eax")
-        (asm "movl %eax, (%ebx)")
+        (asm "movl %eax, (%ecx)")
         ))
     ; array nelem
     (array () @true (
@@ -163,35 +163,35 @@
     ; array_get ary idx
     (array_get8 () @true (
         (vmpop %eax) ; index
-        (asm "movl (%esi), %ebx") ; array
-        (asm "addl %eax, %ebx")
-        (asm "movsbl (%ebx), %eax")
+        (asm "movl (%esi), %ecx") ; array
+        (asm "addl %eax, %ecx")
+        (asm "movsbl (%ecx), %eax")
         (asm "movl %eax, (%esi)")
         ))
     (array_get32 () @true (
         (vmpop %eax) ; index
         (asm "sall $2, %eax")
-        (asm "movl (%esi), %ebx") ; array
-        (asm "addl %eax, %ebx")
-        (asm "movl (%ebx), %eax")
+        (asm "movl (%esi), %ecx") ; array
+        (asm "addl %eax, %ecx")
+        (asm "movl (%ecx), %eax")
         (asm "movl %eax, (%esi)")
         ))
     ; array_set ary idx val
     (array_set8 () @true (
         (asm "movl 4(%esi), %eax") ; index
-        (asm "movl 8(%esi), %ebx") ; array
-        (asm "addl %eax, %ebx")
+        (asm "movl 8(%esi), %ecx") ; array
+        (asm "addl %eax, %ecx")
         (asm "movl (%esi), %eax")
-        (asm "movb %al, (%ebx)")
+        (asm "movb %al, (%ecx)")
         (asm "addl $12, %esi")
         ))
     (array_set32 () @true (
         (asm "movl 4(%esi), %eax") ; index
         (asm "sall $2, %eax")
-        (asm "movl 8(%esi), %ebx") ; array
-        (asm "addl %eax, %ebx")
+        (asm "movl 8(%esi), %ecx") ; array
+        (asm "addl %eax, %ecx")
         (asm "movl (%esi), %eax")
-        (asm "movl %eax, (%ebx)")
+        (asm "movl %eax, (%ecx)")
         (asm "addl $12, %esi")
         ))
     ; allocate stack area for local variables
@@ -214,9 +214,9 @@
     (loadl4 () @true ((asm "movl -20(%edi), %eax") (vmpush %eax)))
     (loadl5 () @true ((asm "movl -24(%edi), %eax") (vmpush %eax)))
     (loadl (byte) @true (
-        (vmsbyte 1 %ebx) ; index
+        (vmsbyte 1 %ecx) ; index
         (asm "movl %edi, %eax")
-        (asm "addl %ebx, %eax")
+        (asm "addl %ecx, %eax")
         (asm "movl (%eax), %eax")
         (vmpush %eax)
         ))
@@ -228,11 +228,11 @@
     (storel4 () @true ((vmpop %eax) (asm "movl %eax, -20(%edi)")))
     (storel5 () @true ((vmpop %eax) (asm "movl %eax, -24(%edi)")))
     (storel (byte) @true (
-        (vmsbyte 1 %ebx) ; index
+        (vmsbyte 1 %ecx) ; index
         (asm "movl %edi, %eax")
-        (asm "addl %ebx, %eax")
-        (vmpop %ebx)
-        (asm "movl %ebx, (%eax)")
+        (asm "addl %ecx, %eax")
+        (vmpop %ecx)
+        (asm "movl %ecx, (%eax)")
         ))
     (incrl0 () @true ((asm "incl -4(%edi)")))
     (incrl1 () @true ((asm "incl -8(%edi)")))
@@ -241,9 +241,9 @@
     (incrl4 () @true ((asm "incl -20(%edi)")))
     (incrl5 () @true ((asm "incl -24(%edi)")))
     (incrl (byte) @true (
-        (vmubyte 1 %ebx) ; index
+        (vmubyte 1 %ecx) ; index
         (asm "movl %edi, %eax")
-        (asm "addl %ebx, %eax")
+        (asm "addl %ecx, %eax")
         (asm "incl (%eax)")
         ))
     (decrl0 () @true ((asm "decl -4(%edi)")))
@@ -253,15 +253,15 @@
     (decrl4 () @true ((asm "decl -20(%edi)")))
     (decrl5 () @true ((asm "decl -24(%edi)")))
     (decrl (byte) @true (
-        (vmubyte 1 %ebx) ; index
+        (vmubyte 1 %ecx) ; index
         (asm "movl %edi, %eax")
-        (asm "addl %ebx, %eax")
+        (asm "addl %ecx, %eax")
         (asm "decl (%eax)")
         ))
     (addrl (byte) @true (
-        (vmsbyte 1 %ebx) ; index
+        (vmsbyte 1 %ecx) ; index
         (asm "movl %edi, %eax")
-        (asm "addl %ebx, %eax")
+        (asm "addl %ecx, %eax")
         (vmpush %eax)
         ))
     ; load byte from value area
@@ -288,15 +288,15 @@
     (storebv (ushort) @true (
         (vmushort 1 %eax)
         (asm "addl value_area_base, %eax")
-        (vmpop %ebx)
+        (vmpop %ecx)
         (asm "movb %bl, (%eax)")
         ))
     ; store word to value area
     (storewv (ushort) @true (
         (vmushort 1 %eax)
         (asm "addl value_area_base, %eax")
-        (vmpop %ebx)
-        (asm "movl %ebx, (%eax)")
+        (vmpop %ecx)
+        (asm "movl %ecx, (%eax)")
         ))
     ; load global heap object
     (loado (ushort) @true (
@@ -311,13 +311,13 @@
         (vmushort 1 %eax)
         (asm "shll $2, %eax")
         (asm "addl object_area_base, %eax")
-        (vmpop %ebx)
-        (asm "movl %ebx, (%eax)")
+        (vmpop %ecx)
+        (asm "movl %ecx, (%eax)")
         ))
     ; 'fun:1' 'relative address of the function:2'
     (fun (short) @true (
         (vmsshort 1 %eax) ; offset of address of the function
-        (asm "addl %ecx, %eax") ; compute absloute address
+        (asm "addl %ebx, %eax") ; compute absloute address
         (asm "subl code_base, %eax")
         (vmpush %eax)
         ))
@@ -329,28 +329,28 @@
         ))
     ; 'call:1' 'relative address of the function:2' 'size of arguments:1'
     (call (short byte)  @nil  (
-        (asm "movl %ecx, %eax")
+        (asm "movl %ebx, %eax")
         (asm "addl $4, %eax")
         (vmpush %eax) ; store return point
         (vmpush %edi) ; store base pointer
         (asm "movl %esi, %edi") ; set base pointer
         (vmsshort 1 %eax) ; offset of address of the function
-        (asm "addl %eax, %ecx")
+        (asm "addl %eax, %ebx")
         (vmfetch)
         ))
     ; 'pcall:1' 'index of the external function:2' 'size of arguments:1'
     (pcall (prim byte)  @true (
         (vmsave)
         (vmushort 1 %eax)
-        (vmubyte 3 %ebx)
+        (vmubyte 3 %ecx)
         (asm "pushl %esi") ; push argv
-        (asm "pushl %ebx") ; push argsize
+        (asm "pushl %ecx") ; push argsize
         (asm "pushl %eax") ; push index
         (call vm_pcall)
         (asm "addl $12, %esp")
         (vmrestore)
-        (vmubyte 3 %ebx) ; total size of arguments
-        (asm "addl %ebx, %esi") ; remove arguments from stack
+        (vmubyte 3 %ecx) ; total size of arguments
+        (asm "addl %ecx, %esi") ; remove arguments from stack
         (vmpush %eax) ; push return value
         ))
     ; 'dcall:1' 'size of arguments:1'
@@ -360,62 +360,62 @@
             ( ; call primitive function
                 (vmpop %eax)
                 (asm "movzwl %ax, %eax") ; function index is 2byte value
-                (vmubyte 1 %ebx)
+                (vmubyte 1 %ecx)
                 (vmsave)
                 (asm "pushl %esi") ; push argv
-                (asm "pushl %ebx") ; push argsize
+                (asm "pushl %ecx") ; push argsize
                 (asm "pushl %eax") ; push index
                 (call vm_pcall)
                 (asm "addl $12, %esp")
                 (vmrestore)
-                (vmubyte 3 %ebx) ; total size of arguments
-                (asm "addl %ebx, %esi") ; remove arguments from stack
+                (vmubyte 3 %ecx) ; total size of arguments
+                (asm "addl %ecx, %esi") ; remove arguments from stack
                 (vmpush %eax) ; push return value
             )
             ( ; absolute call
-                (asm "movl %ecx, %ebx")
-                (asm "addl $2, %ebx")
-                (vmpop %ecx)
-                (vmpush %ebx) ; store return point
+                (asm "movl %ebx, %ecx")
+                (asm "addl $2, %ecx")
+                (vmpop %ebx)
+                (vmpush %ecx) ; store return point
                 (vmpush %edi) ; store base pointer
                 (asm "movl %esi, %edi") ; set base pointer
-                (asm "addl code_base, %ecx")
+                (asm "addl code_base, %ebx")
                 (vmfetch)
             ))
         ))
     (return () @nil  (
-        (asm "movl $0, %ebx") ; return value
+        (asm "movl $0, %ecx") ; return value
         (asm "movl %edi, %esi")
         (vmpop %edi) ; base pointer
-        (vmpop %ecx) ; return address
-        (asm "movzbl -1(%ecx), %eax") ; total size of arguments
+        (vmpop %ebx) ; return address
+        (asm "movzbl -1(%ebx), %eax") ; total size of arguments
         (asm "addl %eax, %esi")
-        (vmpush %ebx) ; push return value
+        (vmpush %ecx) ; push return value
         (vmfetch)
         ))
     (ireturn () @nil  (
-        (asm "movl (%esi), %ebx") ; return value
+        (asm "movl (%esi), %ecx") ; return value
         (asm "movl %edi, %esi")
         (vmpop %edi) ; base pointer
-        (vmpop %ecx) ; return address
-        (asm "movzbl -1(%ecx), %eax") ; total size of arguments
+        (vmpop %ebx) ; return address
+        (asm "movzbl -1(%ebx), %eax") ; total size of arguments
         (asm "addl %eax, %esi")
-        (vmpush %ebx) ; push return value
+        (vmpush %ecx) ; push return value
         (vmfetch)
         ))
     (tswitch (ushort) @nil (
         (vmpop %eax)
-        (vmushort 1 %ebx) ; number of cases
-        (asm "cmpl %eax, %ebx")
-        (asm "cmovle %ebx, %eax")
+        (vmushort 1 %ecx) ; number of cases
+        (asm "cmpl %eax, %ecx")
+        (asm "cmovle %ecx, %eax")
         (asm "sall $1, %eax")
-        (asm "addl $3, %ecx")
-        (asm "addl %eax, %ecx")
-        (asm "movzwl (%ecx), %eax")
-        (asm "addl %eax, %ecx")
+        (asm "addl $3, %ebx")
+        (asm "addl %eax, %ebx")
+        (asm "movzwl (%ebx), %eax")
+        (asm "addl %eax, %ebx")
         (vmfetch)
         ))
-    (goto       (short) @nil ((vmsshort 1 %eax) (asm "addl %eax, %ecx") (vmfetch)))
+    (goto       (short) @nil ((vmsshort 1 %eax) (asm "addl %eax, %ebx") (vmfetch)))
     (if_zero    (short) @nil @(gen_comparison1 "cmovz"))
     (if_nonzero (short) @nil @(gen_comparison1 "cmovnz"))
     (if_eq      (short) @nil @(gen_comparison2 "cmove"))
