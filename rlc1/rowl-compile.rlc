@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-08-16 11:50:52 nineties $
+; $Id: rowl-compile.rlc 2010-08-23 01:03:58 nineties $
 ;
 
 (import "stdlib")
@@ -90,6 +90,7 @@
         ((== `value (car loc)) (compile_value loc))
         ((== `object (car loc)) (compile_object loc))
         ((== `fun (car loc)) (compile_fun loc))
+        ((== `prim (car loc)) (compile_prim loc))
         (otherwise (error "compile_var: not implemented " loc))
         )
     true
@@ -122,6 +123,10 @@
 
 (define compile_fun ((_ name)) (do
     (emit_insn `(fun (label @name)))
+    ))
+
+(define compile_prim ((_ idx)) (do
+    (emit_insn `(prim (short @idx)))
     ))
 
 (define compile_int_lit (val) (do
@@ -301,7 +306,7 @@
 (define compile_extcall (fun args) (do
     (var narg (length args))
     (foreach a (reverse args) (compile_expr a))
-    (emit_insn `(call (pfun @fun) (byte @(* 4 narg))))
+    (emit_insn `(call (extfun @fun) (byte @(* 4 narg))))
     true
     ))
 
@@ -316,13 +321,13 @@
 (define compile_call (expr) (do
     (var fun (car expr))
     (var loc (try_lookup_var fun))
-    (var prim (if (nil? loc) (assoc fun prim_table) nil))
     (cond
-        (prim (compile_prim_call (car prim) (cdr expr)))
-        ((and (cons? loc) (== `pfun (car loc))) (compile_extcall fun (cdr expr)))
-        ((and (cons? loc) (== `fun (car loc))) (compile_localcall fun (cdr expr)))
+        ((nil? loc) (compile_localcall fun (cdr expr)))
+        ((== `prim (car loc)) (compile_prim_call (cadr loc) (cdr expr)))
+        ((== `extfun (car loc)) (compile_extcall fun (cdr expr)))
+        ((== `fun (car loc)) (compile_localcall fun (cdr expr)))
         ((cons? loc) (compile_dynamiccall fun (cdr expr)))
-        (otherwise (compile_localcall fun (cdr expr)))
+        (otherwise (eprintln "compile_call: not reachable here"))
         )))
 
 (var comparison_operator
@@ -694,7 +699,7 @@
 
 (define compile_extern ((_ type name)) (do
     (cond
-        ((== `fun type) (add_var name `(pfun @name)))
+        ((== `fun type) (add_var name `(extfun @name)))
         (otherwise (eprintln "compile_extern: not implemented"))
         )
     nil
@@ -744,17 +749,23 @@
 
 (define compile_main (code) (do
     (var asm_code ())
-    (vtable_push)
+
     (foreach decl code (do
         (var asm (compile_decl decl))
         (if asm (push asm_code asm))
         ))
-    (vtable_pop)
     (append string_decls (reverse asm_code))
     ))
 
 (define compile (mode code) (do
+    (vtable_push)
+
+    ; register primitive functions
+    (foreach ent prim_table (add_var (car ent) `(prim @(cadr ent))))
+
     (var asm_code (compile_main code))
     (var init_func (gen_init_func))
+
+    (vtable_pop)
     (assemble mode (cons init_func asm_code))
     ))
