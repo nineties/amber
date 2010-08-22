@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-08-22 16:11:07 nineties $
+; $Id: vm-insn.rlc 2010-08-22 16:32:38 nineties $
 ;
 
 (define gen_comparison1 (cmovname) `(
@@ -36,7 +36,7 @@
     (asm "movl %ebx, " @(* 4 idx) "(%eax)")
     ))
 
-(define operand_len (opd) (assoc opd `((byte . 1) (short . 2) (long . 4) (prim . 2))))
+(define operand_len (opd) (assoc opd `((byte . 1) (short . 2) (int . 4) (prim . 2))))
 (define insn_length (operands) (do
     (var len 1) ; 1 for instruction code
     (foreach o operands (+= len (operand_len o)))
@@ -53,7 +53,7 @@
     (imm_i5    () @true ((vmpush $5)))
     (imm_im1   () @true ((vmpush $-1)))
     (imm_int16 (short) @true ((vmsshort 1 %eax) (vmpush %eax)))
-    (imm_int32 (long) @true ((vmlong 1 %eax) (vmpush %eax)))
+    (imm_int32 (int) @true ((vmint 1 %eax) (vmpush %eax)))
     (iadd      () @true ((vmbin "addl")))
     (isub      () @true ((vmbin "subl")))
     (imul      () @true ((vmpop %eax) (asm "imul (%esi), %eax") (asm "movl %eax, (%esi)")))
