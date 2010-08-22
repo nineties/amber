@@ -287,7 +287,7 @@
 (define compile_prim_call (idx args) (do
     (var narg (length args))
     (foreach a (reverse args) (compile_expr a))
-    (emit_insn `(primcall (short @idx) (byte @(* 4 narg))))
+    (emit_insn `(pcall (short @idx) (byte @(* 4 narg))))
     true
     ))
 
@@ -301,7 +301,7 @@
 (define compile_extcall (fun args) (do
     (var narg (length args))
     (foreach a (reverse args) (compile_expr a))
-    (emit_insn `(call (primfun @fun) (byte @(* 4 narg))))
+    (emit_insn `(call (pfun @fun) (byte @(* 4 narg))))
     true
     ))
 
@@ -319,7 +319,7 @@
     (var prim (if (nil? loc) (assoc fun prim_table) nil))
     (cond
         (prim (compile_prim_call (car prim) (cdr expr)))
-        ((and (cons? loc) (== `primfun (car loc))) (compile_extcall fun (cdr expr)))
+        ((and (cons? loc) (== `pfun (car loc))) (compile_extcall fun (cdr expr)))
         ((and (cons? loc) (== `fun (car loc))) (compile_localcall fun (cdr expr)))
         ((cons? loc) (compile_dynamiccall fun (cdr expr)))
         (otherwise (compile_localcall fun (cdr expr)))
@@ -694,7 +694,7 @@
 
 (define compile_extern ((_ type name)) (do
     (cond
-        ((== `fun type) (add_var name `(primfun @name)))
+        ((== `fun type) (add_var name `(pfun @name)))
         (otherwise (eprintln "compile_extern: not implemented"))
         )
     nil

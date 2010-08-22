@@ -2,12 +2,12 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-eval.rlc 2010-08-22 16:33:00 nineties $
+; $Id: vm-eval.rlc 2010-08-22 22:43:05 nineties $
 ;
 
 ; rowlVM register usage
-;   %eax, %ecx : general purpose register
-;   %ebx       : program counter
+;   %eax, %ebx : general purpose register
+;   %ecx       : program counter
 ;   %edx       : zero register
 ;   %esi       : stack pointer
 ;   %edi       : base pointer
@@ -128,14 +128,15 @@
 (int* stack)
 
 (export value_area_base)
-(void* value_area_base)
+(void*  value_area_base)
 (export object_area_base)
-(void* object_area_base)
+(void*  object_area_base)
+(void*  code_base)
 
 (export cmd_argc)
-(int cmd_argc)
+(int    cmd_argc)
 (export cmd_argv)
-(void* cmd_argv)
+(void*  cmd_argv)
 
 (void*[] 65536 funtable @(map caddr prim_table))
 
@@ -160,6 +161,7 @@
     (asm "movl stack_size, %eax")
     (asm "addl %eax, %esi")
     (asm "movl " insn ", %ecx")
+    (asm "movl %ecx, code_base")
     (asm "xorl %edx, %edx") ; initialize zero register
 
     ; allocate area for global reference objects
@@ -170,14 +172,13 @@
 
     (asm "movl %esi, object_area_base")
 
-
     (vmfetch)
     (vmtable insn_table @insn_entries)
     (asm "popl %esi")
     (asm "popl %ebx")
     ))
 
-(fun vm_primcall (idx argsz argv) (
+(fun vm_pcall (idx argsz argv) (
     (while (> argsz 0) (
         (-= argsz 4)
         (int arg ([] (+ argv argsz) 0))
