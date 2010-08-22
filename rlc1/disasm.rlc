@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: disasm.rlc 2010-08-22 16:41:27 nineties $
+; $Id: disasm.rlc 2010-08-22 21:04:38 nineties $
 ;
 
 (import "config")
@@ -15,11 +15,13 @@
 (var tswitch_entries ())
 
 (var print_func `(
-    (byte . (output_opd_byte oc ic))
-    (short . (output_opd_short oc ic))
-    (int . (output_opd_int oc ic))
-    (prim . (output_opd_prim oc ic))
+    (byte   . (output_opd_byte oc ic))
+    (short  . (output_opd_short oc ic))
+    (ushort . (output_opd_short oc ic))
+    (int    . (output_opd_int oc ic))
+    (prim   . (output_opd_prim oc ic))
     ))
+
 (var code 0)
 (foreach i vm_instructions (do
     (var name (symbol2s (car i)))
@@ -105,7 +107,8 @@
 
 (fun read_short_check (ichan) (
     (var val 0)
-    (read_bytes_check ichan (address val) 2)
+    (if (< (input_short (address val) ichan) 0)
+        (error "ERROR: load failed\n"))
     (return val)
     ))
 

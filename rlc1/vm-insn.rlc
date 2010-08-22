@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-08-22 16:53:23 nineties $
+; $Id: vm-insn.rlc 2010-08-22 20:51:32 nineties $
 ;
 
 (define gen_comparison1 (cmovname) `(
@@ -36,7 +36,7 @@
     (asm "movl %ebx, " @(* 4 idx) "(%eax)")
     ))
 
-(define operand_len (opd) (assoc opd `((byte . 1) (short . 2) (int . 4) (prim . 2))))
+(define operand_len (opd) (assoc opd `((byte . 1) (short . 2) (ushort . 2) (int . 4) (prim . 2))))
 (define insn_length (operands) (do
     (var len 1) ; 1 for instruction code
     (foreach o operands (+= len (operand_len o)))
@@ -265,41 +265,41 @@
         (vmpush %eax)
         ))
     ; load byte from value area
-    (loadbv (short) @true (
+    (loadbv (ushort) @true (
         (vmushort 1 %eax)
         (asm "addl value_area_base, %eax")
         (asm "movsbl (%eax), %eax")
         (vmpush %eax)
         ))
     ; load word from value area
-    (loadv (short) @true (
+    (loadv (ushort) @true (
         (vmushort 1 %eax)
         (asm "addl value_area_base, %eax")
         (asm "movl (%eax), %eax")
         (vmpush %eax)
         ))
     ; load address of array from value area
-    (loadav (short) @true (
+    (loadav (ushort) @true (
         (vmushort 1 %eax)
         (asm "addl value_area_base, %eax")
         (vmpush %eax)
         ))
     ; store byte to value area
-    (storebv (short) @true (
+    (storebv (ushort) @true (
         (vmushort 1 %eax)
         (asm "addl value_area_base, %eax")
         (vmpop %ebx)
         (asm "movb %bl, (%eax)")
         ))
     ; store word to value area
-    (storewv (short) @true (
+    (storewv (ushort) @true (
         (vmushort 1 %eax)
         (asm "addl value_area_base, %eax")
         (vmpop %ebx)
         (asm "movl %ebx, (%eax)")
         ))
     ; load global heap object
-    (loado (short) @true (
+    (loado (ushort) @true (
         (vmushort 1 %eax)
         (asm "shll $2, %eax")
         (asm "addl object_area_base, %eax")
@@ -307,7 +307,7 @@
         (vmpush %eax)
         ))
     ; store global heap object
-    (storeo (short) @true (
+    (storeo (ushort) @true (
         (vmushort 1 %eax)
         (asm "shll $2, %eax")
         (asm "addl object_area_base, %eax")
@@ -321,7 +321,7 @@
         (vmpush %eax)
         ))
     ; 'primfun:1' 'index of the external function:2'
-    (primfun (short) @true (
+    (primfun (ushort) @true (
         (vmushort 1 %eax) ; index of the function
         (asm "orl  $0x80000000, %eax") ; set flag
         (vmpush %eax)
@@ -400,7 +400,7 @@
         (vmpush %ebx) ; push return value
         (vmfetch)
         ))
-    (tswitch (short) @nil (
+    (tswitch (ushort) @nil (
         (vmpop %eax)
         (vmushort 1 %ebx) ; number of cases
         (asm "cmpl %eax, %ebx")
