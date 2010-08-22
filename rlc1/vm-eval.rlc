@@ -2,12 +2,12 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-eval.rlc 2010-08-22 22:43:05 nineties $
+; $Id: vm-eval.rlc 2010-08-22 23:41:29 nineties $
 ;
 
 ; rowlVM register usage
-;   %eax, %ebx : general purpose register
-;   %ecx       : program counter
+;   %eax, %ecx : general purpose register
+;   %ebx       : program counter
 ;   %edx       : zero register
 ;   %esi       : stack pointer
 ;   %edi       : base pointer
@@ -41,32 +41,32 @@
     ))
 
 (define emit_vmsucc ((_ len) _ _)
-    (if (== len 1) (emit "incl" `%ecx) (emit "addl" len `%ecx))
+    (if (== len 1) (emit "incl" `%ebx) (emit "addl" len `%ebx))
     )
 
 (define emit_vmfetch ((_) _ _) (do
-    (emit "movzbl" `(deref %ecx 0) `%eax)
+    (emit "movzbl" `(deref %ebx 0) `%eax)
     (emit "jmp *insn_table(,%eax,4)")
     ))
 
 (define emit_vmubyte ((_ offs reg) _ _) (do
-    (emit "movzbl" `(deref %ecx @offs) reg)
+    (emit "movzbl" `(deref %ebx @offs) reg)
     ))
 
 (define emit_vmsbyte ((_ offs reg) _ _) (do
-    (emit "movsbl" `(deref %ecx @offs) reg)
+    (emit "movsbl" `(deref %ebx @offs) reg)
     ))
 
 (define emit_vmushort ((_ offs reg) _ _) (do
-    (emit "movzwl" `(deref %ecx @offs) reg)
+    (emit "movzwl" `(deref %ebx @offs) reg)
     ))
 
 (define emit_vmsshort ((_ offs reg) _ _) (do
-    (emit "movswl" `(deref %ecx @offs) reg)
+    (emit "movswl" `(deref %ebx @offs) reg)
     ))
 
 (define emit_vmint ((_ offs reg) _ _) (do
-    (emit "movl" `(deref %ecx @offs) reg)
+    (emit "movl" `(deref %ebx @offs) reg)
     ))
 
 ; switch implementation using table jump
@@ -97,11 +97,11 @@
     ))
 
 (define emit_vmsave ((_) _ _) (do
-    (pushl `%ecx)
+    (pushl `%ebx)
     ))
 
 (define emit_vmrestore ((_) _ _) (do
-    (popl `%ecx)
+    (popl `%ebx)
     (movl 0 `%edx)
     ))
 
@@ -160,8 +160,8 @@
     (asm "movl stack, %esi")
     (asm "movl stack_size, %eax")
     (asm "addl %eax, %esi")
-    (asm "movl " insn ", %ecx")
-    (asm "movl %ecx, code_base")
+    (asm "movl " insn ", %ebx")
+    (asm "movl %ebx, code_base")
     (asm "xorl %edx, %edx") ; initialize zero register
 
     ; allocate area for global reference objects
