@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-io.rlc 2010-08-21 21:15:41 nineties $
+; $Id: vm-prim-io.rlc 2010-08-22 21:04:15 nineties $
 ;
 
 (import "stdlib")
@@ -157,6 +157,18 @@
     (return 0)
     ))
 
+(export prim_input_short)
+(fun prim_input_short (addr ichan) (
+    (fill_ichan ichan)
+    (if (< (- (get ichan 3) (get ichan 2)) 2) (
+        (return -1) ; EOF
+        ))
+    (int c (get16 (+ (get ichan 0) (get ichan 2)) 0))
+    (set addr 0 c)
+    (set ichan 2 (+ (get ichan 2) 2))
+    (return 0)
+    ))
+
 (export prim_input_int)
 (fun prim_input_int (addr ichan) (
     (fill_ichan ichan)
@@ -216,7 +228,7 @@
 (fun prim_output_int (ochan num) (
     (if (< num 0) (
         (prim_output_char ochan '-')
-        (prim_output_int (neg num))
+        (prim_output_int ochan (neg num))
         (return)
         ))
     (set8 output_int_digits 0 (+ (% num 10) '0'))
@@ -257,6 +269,11 @@
 (export prim_read_char)
 (fun prim_read_char (addr) (
     (return (prim_input_char addr stdin))
+    ))
+
+(export prim_read_short)
+(fun prim_read_short (addr) (
+    (return (prim_input_short addr stdin))
     ))
 
 (export prim_read_int)

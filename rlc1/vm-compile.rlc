@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-compile.rlc 2010-08-22 16:52:21 nineties $
+; $Id: vm-compile.rlc 2010-08-22 20:49:49 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -114,6 +114,7 @@
     (print '\n')))
 
 (define lookup_8breg (reg) (assoc reg `((%eax . %al) (%ebx . %bl) (%ecx . %cl) (%edx . %dl))))
+(define lookup_16breg (reg) (assoc reg `((%eax . %ax) (%ebx . %bx) (%ecx . %cx) (%edx . %dx))))
 (define drop (len) (emit "addl" (* 4 len) `%esp))
 (define movl  (src dst) (if (!= src dst) (emit "movl" src dst)))
 (define movb (src dst)
@@ -121,6 +122,12 @@
         ((int? src)     (emit "movb" src (lookup_8breg dst)))
         ((char? src)    (emit "movb" src (lookup_8breg dst)))
         (otherwise      (emit "movsbl" src dst))
+        ))
+(define movw (src dst)
+    (cond
+        ((int? src)     (emit "movw" src (lookup_16breg dst)))
+        ((char? src)    (emit "movw" src (lookup_16breg dst)))
+        (otherwise      (emit "movswl" src dst))
         ))
 
 (define pushl (val) (emit "pushl" val))
@@ -244,6 +251,20 @@
             (emit "addl" %ebx %eax)
             ))
         (movb `(deref %eax 0) dst)
+        ))
+    (if ret (emit_return `(return) nil nil))
+    ))
+
+(define emit_subs16 ((_ ptr idx) dst ret) (do
+    (if dst (do
+        (emit_expr ptr `%eax nil)
+        (if (!= idx 0) (do
+            (pushl `%eax)
+            (emit_expr idx `%ebx nil)
+            (popl `%eax)
+            (emit "addl" %ebx %eax)
+            ))
+        (movw `(deref %eax 0) dst)
         ))
     (if ret (emit_return `(return) nil nil))
     ))
@@ -572,9 +593,11 @@
     (byte    . @emit_def)
     (void*   . @emit_def)
     (get     . @emit_subs)
-    ([]      . @emit_subs)
     (get8    . @emit_subs8)
+    (get16   . @emit_subs16)
+    ([]      . @emit_subs)
     ([]8     . @emit_subs8)
+    ([]16    . @emit_subs16)
     (*8      . @emit_deref8)
     (neg     . @emit_unexpr)
     (+       . @emit_binexpr)
