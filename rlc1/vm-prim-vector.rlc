@@ -2,18 +2,18 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-vector.rlc 2010-08-12 12:47:29 nineties $
+; $Id: vm-prim-vector.rlc 2010-08-24 00:37:12 nineties $
 ;
 
 (import "stdlib")
 (import "vm-compile")
 
-(var vm-prim-code `(
+(define vector_code_gen (name esize alloc getter setter) `(
 
 ; vector of characters
-(fun make_vector_with_capa (size capa) (
-    (void* buf (allocate_array capa))
-    (memset buf 0 (* 4 capa))
+(fun @(s++ `make_ name `_with_capa) (size capa) (
+    (void* buf (@alloc capa))
+    (memset buf 0 (* @esize capa))
     (void* tup (allocate_tuple 3 1))
     (set tup 0 buf)
     (set tup 1 size)
@@ -21,60 +21,62 @@
     (return tup)
     ))
 
-(export prim_make_vector)
-(fun prim_make_vector (size) (
+(export @(s++ `prim_make_ name))
+(fun @(s++ `prim_make_ name) (size) (
     (if (!= size 0)
-        (return (make_vector_with_capa size size))
-        (return (make_vector_with_capa 0 10))
+        (return (@(s++ `make_ name `_with_capa) size size))
+        (return (@(s++ `make_ name `_with_capa) 0 10))
         )
     ))
 
-(export prim_vector_size)
-(fun prim_vector_size (vec) (
+(export @(s++ `prim_ name `_size))
+(fun @(s++ `prim_ name `_size) (vec) (
     (return (get vec 1))
     ))
 
-(export prim_vector_ptr)
-(fun prim_vector_ptr (vec) (
+(export @(s++ `prim_ name `_ptr))
+(fun @(s++ `prim_ name `_ptr) (vec) (
     (return (get vec 0))
     ))
 
-(export prim_vector_at)
-(fun prim_vector_at (vec idx) (
-    (return (get (get vec 0) idx))
+(export @(s++ `prim_ name `_at))
+(fun @(s++ `prim_ name `_at) (vec idx) (
+    (return (@getter (get vec 0) idx))
     ))
 
-(export prim_vector_put)
-(fun prim_vector_put (vec idx val) (
-    (set (get vec 0) idx val)
+(export @(s++ `prim_ name `_put))
+(fun @(s++ `prim_ name `_put) (vec idx val) (
+    (@setter (get vec 0) idx val)
     ))
 
-(export prim_vector_reserve)
-(fun prim_vector_reserve (vec capa) (
+(export @(s++ `prim_ name `_reserve))
+(fun @(s++ `prim_ name `_reserve) (vec capa) (
     (if (< (get vec 2) capa) (
-        (void* new_buf (allocate_array capa))
-        (prim_memcpy new_buf (get vec 0) (* 4 (get vec 1)))
+        (void* new_buf (@alloc capa))
+        (prim_memcpy new_buf (get vec 0) (* @esize (get vec 1)))
         (set vec 0 new_buf)
         (set vec 2 capa)
         ))
     ))
 
-(export prim_vector_resize)
-(fun prim_vector_resize (vec new_size) (
-    (if (> new_size (get vec 2)) (prim_vector_reserve vec new_size))
+(export @(s++ `prim_ name `_resize))
+(fun @(s++ `prim_ name `_resize) (vec new_size) (
+    (if (> new_size (get vec 2)) (@(s++ `prim_ name `_reserve) vec new_size))
     (set vec 1 new_size)
     ))
 
-(export prim_vector_pushback)
-(fun prim_vector_pushback (vec value) (
+(export @(s++ `prim_ name `_pushback))
+(fun @(s++ `prim_ name `_pushback) (vec value) (
     (if (== (get vec 1) (get vec 2)) (
-        (prim_vector_reserve vec (* 2 (get vec 2)))
+        (@(s++ `prim_ name `_reserve) vec (* 2 (get vec 2)))
         ))
     (int sz (get vec 1))
-    (prim_vector_put vec sz value)
+    (@(s++ `prim_ name `_put) vec sz value)
     (set vec 1 (+ sz 1))
     ))
 
 ))
 
-(compile vm-prim-code)
+(compile (vector_code_gen `vector 4 `allocate_array `get `set))
+(compile (vector_code_gen `ivector 4 `allocate_plain `get `set))
+(compile (vector_code_gen `cvector 1 `allocate_plain `get8 `set8))
