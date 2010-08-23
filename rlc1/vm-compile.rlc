@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-compile.rlc 2010-08-22 23:44:51 nineties $
+; $Id: vm-compile.rlc 2010-08-24 03:04:57 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -569,6 +569,19 @@
     (if ret (emit_return `(return) nil nil))
     ))
 
+(define emit_bsr ((_ expr) dst ret) (do
+    (if dst
+	(do
+	    (emit_expr expr `%eax nil)
+	    (emit "bsr" `%eax `%eax)
+	    (emit "cmovz" `%edx `%eax)
+	    (movl `%eax dst)
+	)
+	(emit_expr expr nil nil)
+	)
+    (if ret (emit_return `(return) nil nil))
+    ))
+
 (define emit_asm ((_ . args) _ ret) (do
     (print '\t')
     (foreach a args (if (symbol? a) (emit_operand (lookup_var a)) (print a)))
@@ -632,6 +645,7 @@
     (incr    . @emit_incrdecr)
     (decr    . @emit_incrdecr)
     (address . @emit_addressof)
+    (bsr     . @emit_bsr)
     (asm     . @emit_asm)
     ))
 
