@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-07-24 18:28:15 nineties $
+; $Id: vm-gc.rlc 2010-08-24 03:19:28 nineties $
 ;
 
 (import "stdlib")
@@ -478,6 +478,21 @@
     (return (+ ptr @WORD_SIZE))
     ))
 
+; array of integers
+(export allocate_iarray)
+(fun allocate_iarray (len) (
+    (incr len)
+    (void* ptr (allocate_object len))
+    @(SET_HEADER ptr TAG_PLAIN 0 len)
+    (return (+ ptr @WORD_SIZE))
+    ))
+
+; array of characters
+(export allocate_carray)
+(fun allocate_carray (bytes) (
+    (return (allocate_plain bytes))
+    ))
+
 (export allocate_tuple)
 (fun allocate_tuple (nelem nboxed) (
     (int words (+ nelem 1))
@@ -542,4 +557,6 @@
     ))
 ))
 
+(vtable_push)
 (compile vm-gc-code)
+(vtable_pop)
