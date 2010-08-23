@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: eval.rl 2010-08-08 12:54:18 nineties $
+ % $Id: eval.rl 2010-08-24 00:44:49 nineties $
  %);
 
 include(stddef,code);
@@ -58,9 +58,9 @@ check_arity: (p0, p1, p2) {
     if (length(p0) != p1) {
         fputs(stderr, "ERROR '");
         fputs(stderr, p2);
-        fputs(stderr, "': required ");
+        fputs(stderr, "': requires ");
         fputi(stderr, p1);
-        fputs(stderr, " arguments");
+        fputs(stderr, " arguments\n");
         exit(1);
     }
 };

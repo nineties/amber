@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-inc.rlc 2010-08-22 20:50:26 nineties $
+; $Id: vm-prim-inc.rlc 2010-08-24 00:53:36 nineties $
 ;
 
 ; primitive functions
@@ -14,7 +14,7 @@
         )) table)
     ))
 
-(var prim_table (assign_indices `(
+(var prim_names `(
     ; System operations
     cmd_argc cmd_argv error
     ; memory operations
@@ -28,14 +28,17 @@
     print_bytes print_char print_string print_int print_hex
     ; string operations
     strlen streq strcpy strcat
-    ; vector of characters
-    make_cvector cvector_size cvector_ptr cvector_at cvector_put
-    cvector_reserve cvector_resize cvector_pushback
-    ; vector of integers
-    make_ivector ivector_size ivector_ptr ivector_at ivector_put
-    ivector_reserve ivector_resize ivector_pushback
-    ; vector of objects
-    make_vector vector_size vector_ptr vector_at vector_put
-    vector_reserve vector_resize vector_pushback
-    )))
+    ))
 
+(define vector_names_gen (type) (do
+    (var methods (map (lambda (name) (s++ type '_' name))
+        `(size ptr at put reserve resize pushback)))
+    (push methods (s++ `make_ type))
+    methods
+    ))
+
+(set prim_names (append prim_names (vector_names_gen `vector)))
+(set prim_names (append prim_names (vector_names_gen `ivector)))
+(set prim_names (append prim_names (vector_names_gen `cvector)))
+
+(var prim_table (assign_indices prim_names))
