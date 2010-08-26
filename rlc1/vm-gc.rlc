@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-08-24 08:57:13 nineties $
+; $Id: vm-gc.rlc 2010-08-25 15:01:09 nineties $
 ;
 
 (import "stdlib")
@@ -182,7 +182,7 @@
 
 (export register_static)
 (fun register_static (addr) (
-    (if (>= num_static @MAX_STATICS) ((error "ERROR: too many static objects.\n")))
+    (if (>= num_static @MAX_STATICS) ((error "too many static objects.\n")))
     ([]= statics num_static addr)
     (incr num_static)
     ))
@@ -190,7 +190,7 @@
 (fun mmap2 (addr size) (
     (void* ptr (syscall @SYS_MMAP2 addr size
         @(| PROT_READ PROT_WRITE PROT_EXEC) @(| MAP_ANONYMOUS MAP_PRIVATE) -1 0))
-    (if (&& (<= -128 ptr) (< ptr 0))  ((error "ERROR: mmap2 failed\n")))
+    (if (&& (<= -128 ptr) (< ptr 0))  ((error "mmap2 failed\n")))
     (return ptr)
     ))
 
@@ -204,9 +204,9 @@
     (+= size @BLOCK_SIZE)
     (void* ptr (mmap2 0 size))
     (void* slop (& ptr @BLOCK_MASK))
-    (if (< (munmap ptr (- @BLOCK_SIZE slop)) 0) ((error "ERROR: munmap failed\n")))
+    (if (< (munmap ptr (- @BLOCK_SIZE slop)) 0) ((error "munmap failed\n")))
     (if (&& (> slop 0) (< (munmap (- (+ ptr size) slop) slop) 0))
-        ((error "ERROR: munmap failed\n")))
+        ((error "munmap failed\n")))
     (= ptr (- (+ ptr @BLOCK_SIZE) slop))
     ([]= block_used (>> ptr @BLOCK_SHIFT) (>> size @BLOCK_SHIFT))
     (return ptr)
@@ -215,14 +215,14 @@
 
 (fun alloc_new_block () (
     (void* addr)
-    (if (> (+ num_block 1) @MAX_BLOCKS) ((error "ERROR: too many blocks\n")))
+    (if (> (+ num_block 1) @MAX_BLOCKS) ((error "too many blocks\n")))
     (if (== next_addr 0)
         ((= addr (alloc_block @BLOCK_SIZE)))
         (
             (= addr (mmap2 next_addr @BLOCK_SIZE))
             (if (!= (& addr @BLOCK_MASK) 0)
                 (
-                    (if (< (munmap addr @BLOCK_SIZE) 0) ((error "ERROR: munmap failed\n")))
+                    (if (< (munmap addr @BLOCK_SIZE) 0) ((error "munmap failed\n")))
                     (= addr (alloc_block @BLOCK_SIZE))
                 )
                 (

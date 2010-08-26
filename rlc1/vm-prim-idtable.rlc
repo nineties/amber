@@ -1,0 +1,162 @@
+;
+; rowl - generation 1
+; Copyright (C) 2010 nineties
+;
+; $Id: vm-prim-idtable.rlc 2010-08-26 14:49:57 nineties $
+;
+
+(import "stdlib")
+(import "vm-compile")
+
+(var vm-prim-code `(
+
+; structure of objects
+;
+; idtable
+;     0 : list of local tables
+;     1 : # of identifiers
+;
+; local table
+;     0 : bucket
+;     1 : pointer to the next table
+;     2 : pointer to the first entry
+;     3 : size of the bucket
+;     4 : # of local identifiers
+;
+; table entry
+;     0 : key
+;     1 : value
+;     2 : pointer to the next entry in one bucket entry
+;     3 : pointer to the next entry in local table
+;     4 : hash
+
+(int[] 32 prime_numbers (
+    5 11 17 37 67 131 257 521 1031 2053 4099 8209 16411 32771 65537 131101
+    0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+    ))
+
+(fun make_table () (
+    (int size (get prime_numbers 0))
+    (if (! size) (
+        (error "too many local identifiers")
+        ))
+    (void* bucket (allocate_array size))
+    (memset bucket 0 (* 4 size))
+    (return (make_tuple4 2 bucket 0 size 0))
+    ))
+
+(export prim_idtable_push)
+(fun prim_idtable_push (idtable) (
+    (void* table (make_table))
+    (set table 1 (get idtable 0))
+    (set idtable 0 table)
+    ))
+
+(export prim_idtable_pop)
+(fun prim_idtable_pop (idtable) (
+    (void* table (get idtable 0))
+    (if table (
+        (bug "idtable_push/pop mismatch")
+        ))
+    (set idtable 0 (get table 1))
+    (set idtable 1 (- (get idtable 1) (get table 3)))
+    ))
+
+(export prim_make_idtable)
+(fun prim_make_idtable () (
+    (void* idtable (make_tuple2 1 0 0))
+    (prim_idtable_push idtable)
+    (return idtable)
+    ))
+
+
+(fun hash (name) (
+    (int h 0)
+    (while (*8 name) (
+        (*= h 7)
+        (+= h (*8 name))
+        (incr name)
+        ))
+    (return h)
+    ))
+
+(fun rehash (table new_size) (
+    (int old_size (get table 3))
+    (if (> new_size old_size) (
+        (int size (get prime_numbers (bsr new_size)))
+        (if (! size) (
+            (error "too many local identifiers")
+            ))
+        (void* bucket (allocate_array size))
+        (memset bucket 0 (* 4 size))
+        (void* entry (get table 2))
+        (while entry (
+            (int h (% (get entry 3) size))
+            (set entry 2 (get bucket h))
+            (set bucket h entry)
+            (= entry (get entry 3))
+            ))
+        ))
+        (set table 0 bucket)
+    ))
+
+(fun get_top_table (idtable) (
+    (void* table (get idtable 0))
+    (if (! table) (
+        (error "no local tables")
+        ))
+    (return table)
+    ))
+
+(export prim_idtable_add)
+(fun prim_idtable_add (idtable name val) (
+    (void* table (get_top_table idtable))
+    (void* bucket (get table 0))
+    (void* size (get table 3))
+    (int h (hash name))
+    (void* ent (make_tuple5 4 name val 0 0 h))
+    (%= h size)
+
+    ; add the entry to the bucket
+    (set ent 2 (get bucket h))
+    (set bucket h ent)
+
+    ; add the entry to the entry list
+    (set ent 3 (get table 2))
+    (set table 2 ent)
+
+    ; increment counters
+    (set table 4 (+ (get table 4) 1))
+    (set idtable 1 (+ (get idtable 1) 1))
+    ))
+
+(fun lookup_local_table (table name h) (
+    (int size (get table 3))
+    (void* bucket (get table 0))
+    (%= h size)
+    (void* entry (get bucket h))
+    (while entry (
+        (void* key (get entry 0))
+        (if (streq key name) ((return (get entry 1))))
+        (= entry (get entry 2))
+        ))
+    (return 0)
+    ))
+
+(export prim_idtable_find)
+(fun prim_idtable_find (idtable name) (
+    (void* table (get_top_table idtable))
+    (int h (hash name))
+    (while table (
+        (void* val (lookup_local_table table name h))
+        (if val ((return val)))
+        (= table (get table 1))
+        ))
+    (return 0)
+    ))
+
+    ))
+
+(vtable_push)
+(compile vm-prim-code)
+(vtable_pop)

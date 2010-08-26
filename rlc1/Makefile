@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-08-24 10:30:31 nineties $
+# $Id: Makefile 2010-08-25 15:04:34 nineties $
 
 AS = as
 ASFLAGS =
@@ -50,17 +50,19 @@ VMOBJECTS = vm-main.o\
 	    vm-prim-util.o\
 	    vm-prim-io.o\
 	    vm-prim-string.o\
-	    vm-prim-vector.o
+	    vm-prim-vector.o\
+	    vm-prim-idtable.o
 
-vm-compile.o        : stdlib.rlc config.rlc
-vm-main.o           : stdlib.rlc vm-compile.rlc
-vm-eval.o           : stdlib.rlc vm-compile.rlc vm-insn.rlc vm-prim-inc.rlc
-vm-gc.o             : stdlib.rlc vm-compile.rlc
-vm-load.o           : stdlib.rlc config.rlc vm-compile.rlc
-vm-prim-util.o      : stdlib.rlc vm-compile.rlc
-vm-prim-io.o        : stdlib.rlc vm-compile.rlc
-vm-prim-string.o    : stdlib.rlc vm-compile.rlc
-vm-prim-vector.o    : stdlib.rlc vm-compile.rlc
+vm-compile.o      : stdlib.rlc config.rlc
+vm-main.o         : stdlib.rlc vm-compile.rlc
+vm-eval.o         : stdlib.rlc vm-compile.rlc vm-insn.rlc vm-prim-inc.rlc
+vm-gc.o           : stdlib.rlc vm-compile.rlc
+vm-load.o         : stdlib.rlc config.rlc vm-compile.rlc
+vm-prim-util.o    : stdlib.rlc vm-compile.rlc
+vm-prim-io.o      : stdlib.rlc vm-compile.rlc
+vm-prim-string.o  : stdlib.rlc vm-compile.rlc
+vm-prim-vector.o  : stdlib.rlc vm-compile.rlc
+vm-prim-idtable.o : stdlib.rlc vm-compile.rlc
 
 RLC1OBJECTS = rlc1-main.rlo
 ROWLCOMPILER = rlci rowl-compile.rlc rowl-assemble.rlc vm-prim-inc.rlc
