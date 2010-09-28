@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-assemble.rlc 2010-08-23 00:42:30 nineties $
+; $Id: rowl-assemble.rlc 2010-09-28 13:33:48 nineties $
 ;
 
 (import "stdlib")
@@ -58,6 +58,19 @@
         ))
     (if (not found) (do
         (push import_symbols `(@sym . (@type (@addr))))
+        ))
+    ))
+
+(define add_export_symbol (type sym addr) (do
+    (var found nil)
+    (foreach e export_symbols (do
+        (if (== sym (car e)) (do
+            (setcdr e (cons (type addr) (cdr e)))
+            (set found true)
+            ))
+        ))
+    (if (not found) (do
+        (push export_symbols `(@sym . (@type (@addr))))
         ))
     ))
 
@@ -153,6 +166,9 @@
     (incr object_index)
     ))
 
+(define scan_export ((_ name)) (do
+    ))
+
 (define scan_decl (decl)
     (cond
         ((== `function (car decl))  (scan_fundecl decl))
@@ -160,6 +176,7 @@
         ((== `char (car decl))      (scan_value_decl decl))
         ((== `string (car decl))    (scan_value_decl decl))
         ((== `object (car decl))    (scan_object_decl decl))
+        ((== `export (car decl))    (scan_export decl))
         ((and (cons? (car decl)) (== `array (caar decl))) (scan_value_decl decl))
         (otherwise (error "scan_decl: not implemented"))
         ))

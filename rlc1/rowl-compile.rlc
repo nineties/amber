@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-08-24 03:00:56 nineties $
+; $Id: rowl-compile.rlc 2010-09-28 13:37:31 nineties $
 ;
 
 (import "stdlib")
@@ -738,11 +738,14 @@
         (compile_value_decl name value)
     ))
 
+(define compile_export ((_ name)) `(export @name))
+
 (define compile_decl (decl)
     (cond
         ((== `fun (car decl)) (compile_fundecl decl))
         ((== `array (car decl)) (compile_arraydecl decl))
         ((== `extern (car decl)) (compile_extern decl))
+        ((== `export (car decl)) (compile_export decl))
         (otherwise (compile_vardecl decl))
         ))
 
@@ -763,8 +766,11 @@
     (foreach ent prim_table (add_var (car ent) `(prim @(cadr ent))))
 
     (var asm_code (compile_main code))
-    (var init_func (gen_init_func))
+    (if (== mode `executable) (do
+        (var init_func (gen_init_func))
+        (set asm_code (cons init_func asm_code))
+        ))
 
     (vtable_pop)
-    (assemble mode (cons init_func asm_code))
+    (assemble mode asm_code)
     ))
