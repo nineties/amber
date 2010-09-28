@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-io.rlc 2010-08-24 03:18:59 nineties $
+; $Id: vm-prim-io.rlc 2010-09-28 15:25:46 nineties $
 ;
 
 (import "stdlib")
@@ -169,6 +169,35 @@
     (return 0)
     ))
 
+(export prim_input_string)
+(fun prim_input_string (addr ichan) (
+    (int capa 10)
+    (int idx 0)
+    (void* buf (allocate_carray capa))
+    (while 1 (
+        (int code)
+
+        (if (== idx capa) (
+            (int new_capa (* capa 2))
+            (void* new_buf (allocate_carray new_capa))
+            (prim_memcpy new_buf buf capa)
+            (= capa new_capa)
+            (= buf new_buf)
+            ))
+
+        (if (< (prim_input_char (address code) ichan) 0) (
+            (set8 buf idx 0)
+            (return buf)
+            ))
+        (set8 buf idx code)
+        (+= idx 1)
+
+        (if (== code 0) (
+            (return buf)
+            ))
+        ))
+    ))
+
 (export prim_input_int)
 (fun prim_input_int (addr ichan) (
     (fill_ichan ichan)
@@ -279,6 +308,11 @@
 (export prim_read_int)
 (fun prim_read_int (addr) (
     (return (prim_input_int addr stdin))
+    ))
+
+(export prim_read_string)
+(fun prim_read_string (addr) (
+    (return (prim_input_string addr stdin))
     ))
 
 (export prim_print_bytes)
