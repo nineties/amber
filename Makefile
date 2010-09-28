@@ -3,7 +3,7 @@
 # Copyright (C) 2009 nineties
 #
 
-# $Id: Makefile 2010-07-11 01:08:54 nineties $
+# $Id: Makefile 2010-09-28 11:38:56 nineties $
 
 all: 
 	cd rlc0; $(MAKE)
@@ -13,4 +13,3 @@ all:
 clean:
 	cd rlc0; $(MAKE) clean
 	cd rlc1; $(MAKE) clean
-	cd rlc2; $(MAKE) clean
