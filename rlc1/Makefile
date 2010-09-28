@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-08-25 15:04:34 nineties $
+# $Id: Makefile 2010-09-28 12:26:09 nineties $
 
 AS = as
 ASFLAGS =
@@ -26,7 +26,7 @@ SOURCES = startup.rl\
 ASMSOURCES = $(patsubst %.rl,%.s,$(SOURCES))
 OBJECTS    = $(patsubst %.rl,%.o,$(SOURCES))
 
-all: rlci rowl linker disasm rlc1 dfuntest
+all: rlci rowl linker disasm rlc1
 
 alloc.s  : $(RLC0) stddef.s
 main.s   : $(RLC0) stddef.s code.s
@@ -72,9 +72,6 @@ rlc1-main.rlo : $(ROWLCOMPILER)
 
 rowl: $(VMOBJECTS)
 	$(LD) $^ -o $@ $(VMLDFLAGS)
-
-dfuntest: dfuntest.rlc $(ROWLCOMPILER)
-	./rlci $< > $@
 
 linker: linker.rlc $(ROWLCOMPILER)
 	./rlci $< > $@

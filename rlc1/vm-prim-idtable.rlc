@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-idtable.rlc 2010-08-26 14:49:57 nineties $
+; $Id: vm-prim-idtable.rlc 2010-09-28 12:26:36 nineties $
 ;
 
 (import "stdlib")
@@ -42,7 +42,14 @@
         ))
     (void* bucket (allocate_array size))
     (memset bucket 0 (* 4 size))
-    (return (make_tuple4 2 bucket 0 size 0))
+    (return (make_tuple5 3 bucket 0 0 size 0))
+    ))
+
+(export prim_make_idtable)
+(fun prim_make_idtable () (
+    (void* idtable (make_tuple2 1 0 0))
+    (prim_idtable_push idtable)
+    (return idtable)
     ))
 
 (export prim_idtable_push)
@@ -59,16 +66,8 @@
         (bug "idtable_push/pop mismatch")
         ))
     (set idtable 0 (get table 1))
-    (set idtable 1 (- (get idtable 1) (get table 3)))
+    (set idtable 1 (- (get idtable 1) (get table 4)))
     ))
-
-(export prim_make_idtable)
-(fun prim_make_idtable () (
-    (void* idtable (make_tuple2 1 0 0))
-    (prim_idtable_push idtable)
-    (return idtable)
-    ))
-
 
 (fun hash (name) (
     (int h 0)
@@ -91,7 +90,7 @@
         (memset bucket 0 (* 4 size))
         (void* entry (get table 2))
         (while entry (
-            (int h (% (get entry 3) size))
+            (int h (% (get entry 4) size))
             (set entry 2 (get bucket h))
             (set bucket h entry)
             (= entry (get entry 3))
