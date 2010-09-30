@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: linker.rlc 2010-09-28 15:41:11 nineties $
+; $Id: linker.rlc 2010-09-30 19:43:13 nineties $
 ;
 
 (import "config")
@@ -21,6 +21,8 @@
 
 (var output_file null)
 
+(var import_tables null)
+
 (fun main (argc argv) (
     (parse_option (address argc) argv)
 
@@ -33,6 +35,7 @@
     (= code_lens (make_ivector 0))
     (= values (make_vector 0))
     (= value_sizes (make_ivector 0))
+    (= import_tables (make_vector 0))
 
     ; load all files
     (for i 1 argc (do
@@ -124,11 +127,26 @@
 
 (fun load_import_table (ichan) (
     (var nent (read_int_check ichan))
+    (print_string "== import table ==\n")
+    (print_string "# of entries = ")
+    (print_int nent)
+    (print_char '\n')
     (for i 0 nent (do
         ; XXX: test code
         (var name (read_string_check ichan))
         (print_string name)
+        (print_char '\n')
         (flush (get_stdout))
+        (var naddr (read_int_check ichan))
+        (print_int naddr)
+        (print_char '\n')
+        (flush (get_stdout))
+        (for j 0 naddr (do
+            (var addr (read_int_check ichan))
+            (print_int addr)
+            (print_char '\n')
+            (flush (get_stdout))
+            ))
         ))
     ))
 
