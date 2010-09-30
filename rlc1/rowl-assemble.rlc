@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-assemble.rlc 2010-09-28 16:27:52 nineties $
+; $Id: rowl-assemble.rlc 2010-09-30 20:34:17 nineties $
 ;
 
 (import "stdlib")
@@ -52,25 +52,37 @@
     (var found nil)
     (foreach e import_symbols (do
         (if (== sym (car e)) (do
-            (setcdr e (cons (type addr) (cdr e)))
+            (var info (cdr e))
+            (if (!= (car info) type)
+                (error "add_import_symbol: type mismatch '" sym "'")
+                )
+            (setcdr info (const addr (cdr info)))
             (set found true)
             ))
         ))
     (if (not found) (do
-        (push import_symbols `(@sym . (@type (@addr))))
+        (push import_symbols `(@sym . (@type @addr)))
         ))
     ))
 
-(define add_export_symbol (type sym addr) (do
+(define add_export_symbol (type sym) (do
     (var found nil)
     (foreach e export_symbols (do
-        (if (== sym (car e)) (do
-            (setcdr e (cons (type addr) (cdr e)))
-            (set found true)
-            ))
+        (if (== sym (car e)) (set found true))
         ))
     (if (not found) (do
-        (push export_symbols `(@sym . (@type (@addr))))
+        (push export_symbols `(@sym . (@type . 0)))
+        ))
+    ))
+
+(define set_export_addrs () (do
+    (foreach e export_symbols (do
+        (var sym (car e))
+        (var info (cdr e))
+        (var addr (assoc sym label_addr_table))
+        (if (nil? addr) (error "undefined export symbol: " sym))
+        (setcdr info addr)
+        (eprintln "addressof " sym " = " addr)
         ))
     ))
 
@@ -166,7 +178,8 @@
     (incr object_index)
     ))
 
-(define scan_export ((_ name)) (do
+(define scan_export ((_ type name)) (do
+    (add_export_symbol type name)
     ))
 
 (define scan_decl (decl)
@@ -257,14 +270,21 @@
 
 ; XXX: stub
 (define emit_export_table () (do
-    (put_long 0)
+    (put_long (length export_symbols))
+    (foreach ent export_symbols (do
+        (var name (symbol2s (car ent)))
+        (var addr (cddr ent))
+        (put_str name)
+        (put_long addr)
+        ))
     ))
 
 (define emit_import_table () (do
-    (put_long (length import_symbols)) ; number of entries
+    (put_long (length import_symbols))
     (foreach ent import_symbols (do
         (var name (symbol2s (car ent)))
-        (var addrs (caddr ent))
+        ; XXX: do not ignore type
+        (var addrs (cddr ent))
         (put_str name)
         (put_long (length addrs))
         (foreach addr addrs (put_long addr))
@@ -295,6 +315,8 @@
     (set current_addr 0)
     ; generate functions
     (foreach decl prog (assemble_decl decl))
+
+    (set_export_addrs)
 
     (if (== assemble_mode `object) (do
         (emit_import_table)

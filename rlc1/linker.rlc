@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: linker.rlc 2010-09-30 19:43:13 nineties $
+; $Id: linker.rlc 2010-09-30 20:38:36 nineties $
 ;
 
 (import "config")
@@ -21,7 +21,10 @@
 
 (var output_file null)
 
-(var import_tables null)
+; vector of (symbol, file index, address)
+(var relocate_symbols null)
+; vector of (symbol, file index, address)
+(var exported_symbols null)
 
 (fun main (argc argv) (
     (parse_option (address argc) argv)
@@ -35,12 +38,13 @@
     (= code_lens (make_ivector 0))
     (= values (make_vector 0))
     (= value_sizes (make_ivector 0))
-    (= import_tables (make_vector 0))
+    (= relocate_symbols (make_vector 0))
+    (= exported_symbols (make_vector 0))
 
     ; load all files
-    (for i 1 argc (do
+    (for i 1  argc (do
         (var file (array_get string argv i))
-        (load_file file)
+        (load_file (- i 1) file)
         ))
 
     ; TODO: replace addresses
@@ -94,7 +98,7 @@
     (return val)
     ))
 
-(fun load_file (file) (
+(fun load_file (index file) (
     (var ic (open_in file))
     (var magic (read_int_check ic))
     (if (!= magic @OBJ_MAGIC)
@@ -118,41 +122,49 @@
     (vector_pushback codes code)
     (ivector_pushback code_lens codelen)
 
-    ; XXX: stub implementation
-    (load_import_table ic)
-    (load_export_table ic)
+    (load_import_table index ic)
+    (load_export_table index ic)
 
     (close_in ic)
     ))
 
-(fun load_import_table (ichan) (
+(fun load_import_table (index ichan) (
     (var nent (read_int_check ichan))
-    (print_string "== import table ==\n")
-    (print_string "# of entries = ")
-    (print_int nent)
-    (print_char '\n')
     (for i 0 nent (do
-        ; XXX: test code
         (var name (read_string_check ichan))
-        (print_string name)
-        (print_char '\n')
-        (flush (get_stdout))
         (var naddr (read_int_check ichan))
-        (print_int naddr)
-        (print_char '\n')
-        (flush (get_stdout))
         (for j 0 naddr (do
             (var addr (read_int_check ichan))
+            (print_string "import: ")
+            (print_string name)
+            (print_string " index=")
+            (print_int index)
+            (print_string " addr=")
             (print_int addr)
             (print_char '\n')
-            (flush (get_stdout))
+            (vector_pushback relocate_symbols
+                (make_tuple3 1 name index addr)
+                )
             ))
         ))
     ))
 
-(fun load_export_table (ichan) (
-    ; XXX: stub implementation
-    (read_int_check ichan)
+(fun load_export_table (index ichan) (
+    (var nent (read_int_check ichan))
+    (for i 0 nent (do
+        (var name (read_string_check ichan))
+        (var addr (read_int_check ichan))
+        (print_string "export: ")
+        (print_string name)
+        (print_string " index=")
+        (print_int index)
+        (print_string " addr=")
+        (print_int addr)
+        (print_char '\n')
+        (vector_pushback exported_symbols
+            (make_tuple3 1 name index addr)
+            )
+        ))
     ))
 
 (fun output_word (ochan word) (
