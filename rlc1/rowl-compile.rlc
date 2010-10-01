@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-09-30 20:10:27 nineties $
+; $Id: rowl-compile.rlc 2010-10-01 13:06:00 nineties $
 ;
 
 (import "stdlib")
@@ -62,14 +62,14 @@
 
 (define emit_insn (insn) (push insn_seq insn))
 
-(var init_code ())
-(define push_init_code (code) (set init_code (append code init_code)))
+(var startup_code ())
+(define push_startup_code (code) (set startup_code (append code startup_code)))
 
-(define gen_init_func () (do
+(define gen_startup_func () (do
     (reset_insn_seq)
     (compile_expr `(exit (main (cmd_argc) (cmd_argv))))
     (var call_main (get_insn_seq))
-    `(function __startup__ @(append init_code call_main))
+    `(function __startup__ @(append startup_code call_main))
     ))
 
 (define arg_insn (idx)
@@ -535,7 +535,7 @@
     )
 
 (define compile_array_get ((_ type ary idx)) (do
-    (var insn (assoc type `((char . array_get8) (int . array_get32) (string . array_get32))))
+    (var insn (assoc type `((char . array_get8) (short . array_set16) (int . array_get32) (string . array_get32))))
     (if (not insn) ((error "ERROR: array_get: invalid type " type)))
     (compile_expr ary)
     (compile_expr idx)
@@ -544,7 +544,7 @@
     ))
 
 (define compile_array_set ((_ type ary idx val)) (do
-    (var insn (assoc type `((int . array_set32) (char . array_set8) (string . array_set32))))
+    (var insn (assoc type `((int . array_set32) (short . array_set16) (char . array_set8) (string . array_set32))))
     (if (not insn) ((error "ERROR: array_set: invalid type " type)))
     (compile_expr ary)
     (compile_expr idx)
@@ -687,7 +687,7 @@
                 (+= i 1)
             ))
             (var insn_seq (get_insn_seq))
-            (push_init_code insn_seq)
+            (push_startup_code insn_seq)
             `(object @name)
         )
         (do
@@ -710,7 +710,7 @@
     (compile_expr value)
     (emit_insn `(storeo (object @name)))
     (var insn_seq (get_insn_seq))
-    (push_init_code insn_seq)
+    (push_startup_code insn_seq)
     `(object @name)
     ))
 
@@ -767,8 +767,8 @@
 
     (var asm_code (compile_main code))
     (if (== mode `executable) (do
-        (var init_func (gen_init_func))
-        (set asm_code (cons init_func asm_code))
+        (var startup_func (gen_startup_func))
+        (set asm_code (cons startup_func asm_code))
         ))
 
     (vtable_pop)
