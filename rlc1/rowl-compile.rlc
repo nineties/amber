@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-10-01 13:06:00 nineties $
+; $Id: rowl-compile.rlc 2010-10-01 13:26:26 nineties $
 ;
 
 (import "stdlib")
@@ -70,6 +70,11 @@
     (compile_expr `(exit (main (cmd_argc) (cmd_argv))))
     (var call_main (get_insn_seq))
     `(function __startup__ @(append startup_code call_main))
+    ))
+
+(define gen_init_func () (do
+    (reset_insn_seq)
+    `(init @startup_code)
     ))
 
 (define arg_insn (idx)
@@ -766,10 +771,16 @@
     (foreach ent prim_table (add_var (car ent) `(prim @(cadr ent))))
 
     (var asm_code (compile_main code))
-    (if (== mode `executable) (do
-        (var startup_func (gen_startup_func))
-        (set asm_code (cons startup_func asm_code))
+    (if (== mode `executable)
+        (do
+            (var startup_func (gen_startup_func))
+            (set asm_code (cons startup_func asm_code))
+        )
+        (do
+            (var init_func (gen_init_func))
+            (set asm_code (cons init_func asm_code))
         ))
+
 
     (vtable_pop)
     (assemble mode asm_code)
