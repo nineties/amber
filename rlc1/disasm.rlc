@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: disasm.rlc 2010-10-01 22:10:36 nineties $
+; $Id: disasm.rlc 2010-10-01 23:08:45 nineties $
 ;
 
 (import "config")
@@ -95,27 +95,27 @@
 
 (fun read_bytes_check (ichan ptr size) (
     (if (< (input_bytes ichan ptr size) 0)
-        (error "load failed"))
+        (error "load failed1"))
     ))
 
 (fun read_byte_check (ichan) (
     (var val 0)
     (if (< (input_char (address val) ichan) 0)
-        (error "load failed"))
+        (error "load failed2"))
     (return val)
     ))
 
 (fun read_short_check (ichan) (
     (var val 0)
     (if (< (input_short (address val) ichan) 0)
-        (error "load failed"))
+        (error "load failed3"))
     (return val)
     ))
 
 (fun read_int_check (ichan) (
     (var val 0)
     (if (< (input_int (address val) ichan) 0)
-        (error "load failed"))
+        (error "load failed4"))
     (return val)
     ))
 
@@ -220,6 +220,27 @@
     return
     ))
 
+(fun output_init (oc ic) (
+    (var initlen (read_int_check ic))
+    (output_string oc "- init = ")
+    (output_int oc initlen)
+    (output_string oc " bytes\n")
+
+    (var i 0)
+    (while (< i initlen) (do
+        (var bytecode (read_byte_check ic))
+        (output_int oc i)
+        (output_string oc "\t: ")
+        (var name (array_get string insn_names bytecode))
+        (output_string oc name)
+        (tswitch bytecode @tswitch_entries)
+        (newline oc)
+
+        (var len (array_get char insn_lens bytecode))
+        (+= i len)
+        ))
+    ))
+
 (fun output_code (oc ic) (
     (var codelen (read_int_check ic))
     (output_string oc "- instructions = ")
@@ -233,9 +254,27 @@
         (output_string oc "\t: ")
         (var name (array_get string insn_names bytecode))
         (output_string oc name)
-        (tswitch bytecode @tswitch_entries)
-        (newline oc)
 
+        (if (streq "tswitch" name)
+            (do
+                ; output jump table
+                (newline oc)
+                (var ncases (read_short_check ic))
+                (for j 0 ncases (do
+                    (var addr (read_short_check ic))
+                    (output_string oc "\t")
+                    (output_int oc j)
+                    (output_string oc ": ")
+                    (output_int oc addr)
+                    (newline oc)
+                    (+= i 2)
+                    ))
+            )
+            (do
+                (tswitch bytecode @tswitch_entries)
+                (newline oc)
+            )
+            )
         (var len (array_get char insn_lens bytecode))
         (+= i len)
         ))
@@ -246,6 +285,7 @@
     (output_head oc file)
     (output_nref oc ic)
     (output_values oc ic)
+    (output_init oc ic)
     (output_code oc ic)
     ))
 
