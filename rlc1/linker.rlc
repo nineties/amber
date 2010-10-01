@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: linker.rlc 2010-10-01 13:15:43 nineties $
+; $Id: linker.rlc 2010-10-01 15:37:42 nineties $
 ;
 
 (import "config")
@@ -10,6 +10,11 @@
 
 (compile `executable `(
 
+(var num_files 0)
+
+(var inits null)
+(var init_lens null)
+(var total_init_len 0)
 (var codes null)
 (var code_lens null)
 (var total_code_len 0)
@@ -35,9 +40,14 @@
         (return 1)
         ))
 
+    (= num_files (- argc 1))
+
+    (= inits (make_vector 0))
+    (= init_lens (make_ivector 0))
+    (= total_init_len 0)
     (= codes (make_vector 0))
     (= code_lens (make_ivector 0))
-    (= base_addresses (make_ivector 0))
+    (= total_code_len 0)
     (= values (make_vector 0))
     (= value_sizes (make_ivector 0))
     (= relocate_symbols (make_vector 0))
@@ -49,6 +59,7 @@
         (load_file (- i 1) file)
         ))
 
+    (compute_base_addresses)
     (replace_addresses)
     (output_executable output_file)
     (return 0)
@@ -116,9 +127,14 @@
     (ivector_pushback value_sizes vsize)
 
     ; read byte codes
-    (var codelen (read_int_check ic))
-    (ivector_pushback base_addresses total_code_len)
+    (var initlen (read_int_check ic))
+    (+= total_init_len initlen)
+    (var init (array char initlen))
+    (if (< (input_bytes ic init initlen) 0) (error "load failed\n"))
+    (vector_pushback inits init)
+    (ivector_pushback init_lens initlen)
 
+    (var codelen (read_int_check ic))
     (+= total_code_len codelen)
     (var code (array char codelen))
     (if (< (input_bytes ic code codelen) 0) (error "load failed\n"))
@@ -181,6 +197,15 @@
         (if (streq sym (tuple_at ent 0)) (return ent))
         ))
     (return 0)
+    ))
+
+(fun compute_base_addresses () (
+    (= base_addresses (make_ivector num_files))
+    (var base_address total_init_len)
+    (for i 0 num_files (do
+        (ivector_put base_addresses i base_address)
+        (+= base_address (ivector_at code_lens i))
+        ))
     ))
 
 (fun replace_addresses () (
