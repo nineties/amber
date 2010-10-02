@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: linker.rlc 2010-10-01 22:11:32 nineties $
+; $Id: linker.rlc 2010-10-02 23:59:59 nineties $
 ;
 
 (import "config")
@@ -54,10 +54,13 @@
     (= exported_symbols (make_vector 0))
 
     ; load all files
+    (load_file 0 "startup.rlo")
+    (+= num_files 1)
     (for i 1  argc (do
         (var file (array_get string argv i))
-        (load_file (- i 1) file)
+        (load_file i file)
         ))
+
 
     (compute_base_addresses)
     (replace_addresses)
@@ -222,18 +225,6 @@
 
         (+= addr (ivector_at base_addresses export_index))
         (var real_operand_addr (+ operand_addr (ivector_at base_addresses import_index)))
-
-        (print_string "addr = ")
-        (print_int addr)
-        (print_string "\n")
-
-        (print_string "real_operand_addr = ")
-        (print_int real_operand_addr)
-        (print_string "\n")
-
-        (print_string "offset = ")
-        (print_int (- addr real_operand_addr))
-        (print_string "\n")
 
         (array_set
             short
