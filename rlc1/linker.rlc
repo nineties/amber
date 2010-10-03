@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: linker.rlc 2010-10-03 19:13:39 nineties $
+; $Id: linker.rlc 2010-10-03 19:35:59 nineties $
 ;
 
 (import "config")
@@ -27,9 +27,9 @@
 
 (var output_file null)
 
-; vector of (symbol, file index, address)
+; vector of (symbol, file index, type, address)
 (var relocate_symbols null)
-; vector of (symbol, file index, address)
+; vector of (symbol, file index, type, address)
 (var exported_symbols null)
 
 (fun main (argc argv) (
@@ -152,10 +152,7 @@
     (vector_pushback codes code)
     (ivector_pushback code_lens codelen)
 
-    (print_string "loading relocate tables...\n")
     (load_relocate_table index ic)
-    (print_string "loading export tabless...\n")
-    (flush (get_stdout))
     (load_export_table index ic)
 
     (close_in ic)
@@ -169,17 +166,17 @@
         (var naddr (read_int_check ichan))
         (for j 0 naddr (do
             (var addr (read_int_check ichan))
-            (print_string "import: ")
-            (print_string name)
-            (print_string " type=")
-            (print_int type)
-            (print_string " index=")
-            (print_int index)
-            (print_string " addr=")
-            (print_int addr)
-            (print_char '\n')
+            ;(print_string "import: ")
+            ;(print_string name)
+            ;(print_string " type=")
+            ;(print_int type)
+            ;(print_string " index=")
+            ;(print_int index)
+            ;(print_string " addr=")
+            ;(print_int addr)
+            ;(print_char '\n')
             (vector_pushback relocate_symbols
-                (make_tuple3 1 name index addr)
+                (make_tuple4 1 name index type addr)
                 )
             ))
         ))
@@ -191,17 +188,17 @@
         (var name (read_string_check ichan))
         (var type (read_byte_check ichan))
         (var addr (read_int_check ichan))
-        (print_string "export: ")
-        (print_string name)
-        (print_string " type=")
-        (print_int type)
-        (print_string " index=")
-        (print_int index)
-        (print_string " addr=")
-        (print_int addr)
-        (print_char '\n')
+        ;(print_string "export: ")
+        ;(print_string name)
+        ;(print_string " type=")
+        ;(print_int type)
+        ;(print_string " index=")
+        ;(print_int index)
+        ;(print_string " addr=")
+        ;(print_int addr)
+        ;(print_char '\n')
         (vector_pushback exported_symbols
-            (make_tuple3 1 name index addr)
+            (make_tuple4 1 name index type addr)
             )
         ))
     ))
@@ -214,7 +211,8 @@
 (fun lookup_symbol (sym) (
     (for i 0 (vector_size exported_symbols) (do
         (var ent (vector_at exported_symbols i))
-        (if (streq sym (tuple_at ent 0)) (return ent))
+        (if (streq sym (tuple_at ent 0))
+            (return ent))
         ))
     (return 0)
     ))
@@ -228,27 +226,51 @@
         ))
     ))
 
+(fun replace_function_address (reloc_info) (
+    (var sym (tuple_at reloc_info 0))
+    (var rfile_index (tuple_at reloc_info 1))
+    (var operand_addr (tuple_at reloc_info 3))
+    (var export_info (lookup_symbol sym))
+    (if (! export_info) (error "undefined symbol"))
+    (var efile_index (tuple_at export_info 1))
+    (var real_addr (tuple_at export_info 3))
+
+    (+= real_addr (ivector_at base_addresses efile_index))
+    (var real_operand_addr (+ operand_addr (ivector_at base_addresses rfile_index)))
+
+    (array_set
+        short
+        (+ (vector_at codes rfile_index) operand_addr)
+        0
+        (+ (- real_addr real_operand_addr) 1)
+        )
+    ))
+
+(fun replace_value_address (reloc_info) (
+    (var rfile_index (tuple_at reloc_info 1))
+    (var operand_addr (tuple_at reloc_info 3))
+    (var offset 0)
+    (for i 0 rfile_index (+= offset (ivector_at value_sizes i)))
+    (var real_addr (+ offset
+        (array_get short (+ (vector_at codes rfile_index) operand_addr) 0)))
+    (array_set
+        short
+        (+ (vector_at codes rfile_index) operand_addr)
+        0
+        real_addr
+        )
+    ))
+
 (fun replace_addresses () (
     (for i 0 (vector_size relocate_symbols) (do
-        (var ent (vector_at relocate_symbols i))
-        (var sym (tuple_at ent 0))
-        (var relocate_index (tuple_at ent 1))
-        (var operand_addr (tuple_at ent 2))
+        (var reloc_info (vector_at relocate_symbols i))
+        (var type (tuple_at reloc_info 2))
 
-        (var info (lookup_symbol sym))
-        (if (! info) (error "undefined symbol"))
-        (var export_index (tuple_at info 1))
-        (var addr (tuple_at info 2))
-
-        (+= addr (ivector_at base_addresses export_index))
-        (var real_operand_addr (+ operand_addr (ivector_at base_addresses relocate_index)))
-
-        (array_set
-            short
-            (+ (vector_at codes relocate_index) operand_addr)
-            0
-            (+ (- addr real_operand_addr) 1)
-            )
+        (if (== type @RELOC_FUN)
+            (replace_function_address reloc_info)
+        (if (== type @RELOC_VAL)
+            (replace_value_address reloc_info)
+            ))
         ))
     ))
 

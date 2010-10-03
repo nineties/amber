@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-assemble.rlc 2010-10-03 18:56:10 nineties $
+; $Id: rowl-assemble.rlc 2010-10-03 19:27:48 nineties $
 ;
 
 (import "stdlib")
@@ -124,17 +124,13 @@
     (set value_area_size addr)
     ))
 
-(define get_valaddr (addr name) (do
-    (if (== assemble_mode `executable)
-        (do
-            (var addr (assoc name value_addr_table))
-            (if (nil? addr) (error "unknown value name " name))
-            addr
+(define get_valaddr (pos name) (do
+    (var addr (assoc name value_addr_table))
+    (if (nil? addr) (error "unknown value name " name))
+    (if (== assemble_mode `object)
+        (add_relocate_symbol `value name pos)
         )
-        (do
-            (add_relocate_symbol `value name addr)
-            0
-        ))
+    addr
     ))
 
 (define get_objidx (addr name) (do
