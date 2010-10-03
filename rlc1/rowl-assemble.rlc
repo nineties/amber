@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-assemble.rlc 2010-10-01 15:32:36 nineties $
+; $Id: rowl-assemble.rlc 2010-10-03 18:56:10 nineties $
 ;
 
 (import "stdlib")
@@ -46,23 +46,23 @@
 (var object_index 0)
 
 ; used in case of assemble_mode = object
-(var import_symbols ())
+(var relocate_symbols ())
 (var export_symbols ())
 
-(define add_import_symbol (type sym addr) (do
+(define add_relocate_symbol (type sym addr) (do
     (var found nil)
-    (foreach e import_symbols (do
+    (foreach e relocate_symbols (do
         (if (== sym (car e)) (do
             (var info (cdr e))
             (if (!= (car info) type)
-                (error "add_import_symbol: type mismatch '" sym "'")
+                (error "add_relocate_symbol: type mismatch '" sym "'")
                 )
             (setcdr info (const addr (cdr info)))
             (set found true)
             ))
         ))
     (if (not found) (do
-        (push import_symbols `(@sym . (@type @addr)))
+        (push relocate_symbols `(@sym . (@type @addr)))
         ))
     ))
 
@@ -132,7 +132,7 @@
             addr
         )
         (do
-            (add_import_symbol `value name addr)
+            (add_relocate_symbol `value name addr)
             0
         ))
     ))
@@ -145,7 +145,7 @@
             idx
         )
         (do
-            (add_import_symbol `object name addr)
+            (add_relocate_symbol `object name addr)
             0
         ))
     ))
@@ -222,7 +222,7 @@
         ((== `object (car opd))  (do (put_short (get_objidx addr (cadr opd))) 2))
         ((== `extfun (car opd)) (do
             (if (!= assemble_mode `object) (error "undefined symbol: " (cadr opd)))
-            (add_import_symbol `fun (cadr opd) (+ current_addr 1))
+            (add_relocate_symbol `fun (cadr opd) (+ current_addr 1))
             (put_short 0)
             2
             ))
@@ -285,24 +285,26 @@
     (put_long EXE_MAGIC)
     ))
 
-; XXX: stub
 (define emit_export_table () (do
     (put_long (length export_symbols))
     (foreach ent export_symbols (do
         (var name (symbol2s (car ent)))
+        (var type (cadr ent))
         (var addr (cddr ent))
         (put_str name)
+        (put_byte (assoc type `((fun . @RELOC_FUN) (value . @RELOC_VAL) (object . @RELOC_OBJ))))
         (put_long addr)
         ))
     ))
 
-(define emit_import_table () (do
-    (put_long (length import_symbols))
-    (foreach ent import_symbols (do
+(define emit_relocate_table () (do
+    (put_long (length relocate_symbols))
+    (foreach ent relocate_symbols (do
         (var name (symbol2s (car ent)))
-        ; XXX: do not ignore type
+        (var type (cadr ent))
         (var addrs (cddr ent))
         (put_str name)
+        (put_byte (assoc type `((fun . @RELOC_FUN) (value . @RELOC_VAL) (object . @RELOC_OBJ))))
         (put_long (length addrs))
         (foreach addr addrs (put_long addr))
         ))
@@ -339,7 +341,7 @@
     (set_export_addrs)
 
     (if (== assemble_mode `object) (do
-        (emit_import_table)
+        (emit_relocate_table)
         (emit_export_table)
         ))
 

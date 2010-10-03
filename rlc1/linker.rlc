@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: linker.rlc 2010-10-02 23:59:59 nineties $
+; $Id: linker.rlc 2010-10-03 19:13:39 nineties $
 ;
 
 (import "config")
@@ -97,10 +97,18 @@
     (set argcp new_argc)
     ))
 
+(fun read_byte_check (ichan) (
+    (var val 0)
+    (if (< (input_char (address val) ichan) 0)
+        (error "invalid file format1")
+        )
+    (return val)
+    ))
+
 (fun read_int_check (ichan) (
     (var val 0)
     (if (< (input_int (address val) ichan) 0)
-        (error "invalid file format\n")
+        (error "invalid file format2")
         )
     (return val)
     ))
@@ -108,7 +116,7 @@
 (fun read_string_check (ichan) (
     (var val 0)
     (if (< (input_string (address val) ichan) 0)
-        (error "invalid file format\n")
+        (error "invalid file format3")
         )
     (return val)
     ))
@@ -117,7 +125,7 @@
     (var ic (open_in file))
     (var magic (read_int_check ic))
     (if (!= magic @OBJ_MAGIC)
-        (error "invalid file format (magic number mismatch)\n"))
+        (error "invalid file format (magic number mismatch)"))
 
     (var nref (read_int_check ic))
     (+= total_nref nref)
@@ -125,7 +133,7 @@
     (var vsize (read_int_check ic))
     (+= total_vsize vsize)
     (var v (array char vsize))
-    (if (< (input_bytes ic v vsize) 0) (error "load failed\n"))
+    (if (< (input_bytes ic v vsize) 0) (error "load failed"))
     (vector_pushback values v)
     (ivector_pushback value_sizes vsize)
 
@@ -133,32 +141,38 @@
     (var initlen (read_int_check ic))
     (+= total_init_len initlen)
     (var init (array char initlen))
-    (if (< (input_bytes ic init initlen) 0) (error "load failed\n"))
+    (if (< (input_bytes ic init initlen) 0) (error "load failed"))
     (vector_pushback inits init)
     (ivector_pushback init_lens initlen)
 
     (var codelen (read_int_check ic))
     (+= total_code_len codelen)
     (var code (array char codelen))
-    (if (< (input_bytes ic code codelen) 0) (error "load failed\n"))
+    (if (< (input_bytes ic code codelen) 0) (error "load failed"))
     (vector_pushback codes code)
     (ivector_pushback code_lens codelen)
 
-    (load_import_table index ic)
+    (print_string "loading relocate tables...\n")
+    (load_relocate_table index ic)
+    (print_string "loading export tabless...\n")
+    (flush (get_stdout))
     (load_export_table index ic)
 
     (close_in ic)
     ))
 
-(fun load_import_table (index ichan) (
+(fun load_relocate_table (index ichan) (
     (var nent (read_int_check ichan))
     (for i 0 nent (do
         (var name (read_string_check ichan))
+        (var type (read_byte_check ichan))
         (var naddr (read_int_check ichan))
         (for j 0 naddr (do
             (var addr (read_int_check ichan))
             (print_string "import: ")
             (print_string name)
+            (print_string " type=")
+            (print_int type)
             (print_string " index=")
             (print_int index)
             (print_string " addr=")
@@ -175,9 +189,12 @@
     (var nent (read_int_check ichan))
     (for i 0 nent (do
         (var name (read_string_check ichan))
+        (var type (read_byte_check ichan))
         (var addr (read_int_check ichan))
         (print_string "export: ")
         (print_string name)
+        (print_string " type=")
+        (print_int type)
         (print_string " index=")
         (print_int index)
         (print_string " addr=")
@@ -215,7 +232,7 @@
     (for i 0 (vector_size relocate_symbols) (do
         (var ent (vector_at relocate_symbols i))
         (var sym (tuple_at ent 0))
-        (var import_index (tuple_at ent 1))
+        (var relocate_index (tuple_at ent 1))
         (var operand_addr (tuple_at ent 2))
 
         (var info (lookup_symbol sym))
@@ -224,11 +241,11 @@
         (var addr (tuple_at info 2))
 
         (+= addr (ivector_at base_addresses export_index))
-        (var real_operand_addr (+ operand_addr (ivector_at base_addresses import_index)))
+        (var real_operand_addr (+ operand_addr (ivector_at base_addresses relocate_index)))
 
         (array_set
             short
-            (+ (vector_at codes import_index) operand_addr)
+            (+ (vector_at codes relocate_index) operand_addr)
             0
             (+ (- addr real_operand_addr) 1)
             )
