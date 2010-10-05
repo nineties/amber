@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-10-03 19:35:07 nineties $
+; $Id: rowl-compile.rlc 2010-10-06 05:57:43 nineties $
 ;
 
 (import "stdlib")
@@ -69,7 +69,7 @@
     (reset_insn_seq)
     (compile_expr `(exit (main (cmd_argc) (cmd_argv))))
     (var call_main (get_insn_seq))
-    `(function __startup__ @(append startup_code call_main))
+    `(function @nil __startup__ @(append startup_code call_main))
     ))
 
 (define gen_init_func () (do
@@ -92,23 +92,26 @@
     (cond
         ((== `arg (car loc)) (emit_insn (arg_insn (cadr loc))))
         ((== `local (car loc)) (compile_local_var loc))
-        ((== `value (car loc)) (compile_value loc))
+        ((== `value (car loc)) (compile_value loc nil))
         ((== `object (car loc)) (compile_object loc))
         ((== `fun (car loc)) (compile_fun loc))
         ((== `prim (car loc)) (compile_prim loc))
+        ((== `extvalue (car loc)) (compile_value loc true))
         (otherwise (error "compile_var: not implemented " loc))
         )
     true
     ))
 
-(define compile_value ((_ type name))
+(define compile_value ((_ type name) external) (do
+    (var opdtype (if external `extvalue `value))
     (cond
-        ((== `char type)    (emit_insn `(loadbv (value @name))))
-        ((== `int type)     (emit_insn `(loadv (value @name))))
-        ((== `void* type)   (emit_insn `(loadav (value @name))))
-        ((== `string type)  (emit_insn `(loadav (value @name))))
+        ((== `char type)    (emit_insn `(loadbv (@opdtype @name))))
+        ((== `int type)     (emit_insn `(loadv (@opdtype @name))))
+        ((== `void* type)   (emit_insn `(loadav (@opdtype @name))))
+        ((== `string type)  (emit_insn `(loadav (@opdtype @name))))
         (otherwise (error "compile_value: not implemented"))
         ))
+    )
 
 (define compile_object ((_ name)) (do
     (emit_insn `(loado (object @name)))
@@ -153,7 +156,7 @@
 (define compile_string_lit (str) (do
     (var strlbl (mklabel))
     (add_var strlbl `(value string @strlbl))
-    (push string_decls `(string @strlbl @str))
+    (push string_decls `(string @nil @strlbl @str))
     (emit_insn `(loadav (value @strlbl)))
     true
     ))
@@ -649,7 +652,7 @@
     nil
     ))
 
-(define compile_fundecl ((_ name params body)) (do
+(define compile_fundecl ((_ name params body) export) (do
     (add_var name `(fun @name))
     (vtable_push)
     (reset_insn_seq)
@@ -669,13 +672,13 @@
     (if (> num_local_var 0)
         (set insn_seq (cons `(allocate (byte @num_local_var)) insn_seq)))
     (vtable_pop)
-    `(function @name @insn_seq)
+    `(function @export @name @insn_seq)
     ))
 
 ; (array type name length)
 ; (array type name length value_list)
 ; (array type name value_list)
-(define compile_arraydecl ((_ type name . args)) (do
+(define compile_arraydecl ((_ type name . args) export) (do
     (var arrlen (if (int? (car args)) (car args) (length (car args))))
     (var value_list (if (cons? (car args)) (car args) (cadr args)))
 
@@ -693,33 +696,34 @@
             ))
             (var insn_seq (get_insn_seq))
             (push_startup_code insn_seq)
-            `(object @name)
+            `(object @export @name)
         )
         (do
             (add_var name `(value void* @name))
-            `((array @type @arrlen) @name @value_list)
+            `((array @type @arrlen) @export @name @value_list)
         ))
     ))
 
 (define compile_extern ((_ type name)) (do
     (cond
         ((== `fun type) (add_var name `(extfun @name)))
+        ((== `string type) (add_var name `(extvalue string @name)))
         (otherwise (eprintln "compile_extern: not implemented"))
         )
     nil
     ))
 
-(define compile_object_decl (name value) (do
+(define compile_object_decl (export name value) (do
     (add_var name `(object @name))
     (reset_insn_seq)
     (compile_expr value)
     (emit_insn `(storeo (object @name)))
     (var insn_seq (get_insn_seq))
     (push_startup_code insn_seq)
-    `(object @name)
+    `(object @export @name)
     ))
 
-(define compile_value_decl (name value) (do
+(define compile_value_decl (export name value) (do
     (var type (cond
         ((char? value) `char)
         ((int? value) `int)
@@ -727,7 +731,7 @@
         (otherwise (error "compile_value_decl: not implemented"))
         ))
     (add_var name `(value @type @name))
-    `(@type @name @value)
+    `(@type @export @name @value)
     ))
 
 (define is_object (value)
@@ -737,28 +741,28 @@
         (otherwise nil)
         ))
 
-(define compile_vardecl ((_ name value))
+(define compile_vardecl ((_ name value) export)
     (if (is_object value)
-        (compile_object_decl name value)
-        (compile_value_decl name value)
+        (compile_object_decl export name value)
+        (compile_value_decl export name value)
     ))
 
-(define compile_export ((_ type name)) `(export @type @name))
+(define compile_export ((_ . decl)) (compile_decl decl true))
 
-(define compile_decl (decl)
+(define compile_decl (decl export)
     (cond
-        ((== `fun (car decl)) (compile_fundecl decl))
-        ((== `array (car decl)) (compile_arraydecl decl))
+        ((== `fun (car decl)) (compile_fundecl decl export))
+        ((== `array (car decl)) (compile_arraydecl decl export))
         ((== `extern (car decl)) (compile_extern decl))
         ((== `export (car decl)) (compile_export decl))
-        (otherwise (compile_vardecl decl))
+        (otherwise (compile_vardecl decl export))
         ))
 
 (define compile_main (code) (do
     (var asm_code ())
 
     (foreach decl code (do
-        (var asm (compile_decl decl))
+        (var asm (compile_decl decl nil))
         (if asm (push asm_code asm))
         ))
     (append string_decls (reverse asm_code))

@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: linker.rlc 2010-10-03 19:35:59 nineties $
+; $Id: linker.rlc 2010-10-06 06:01:28 nineties $
 ;
 
 (import "config")
@@ -161,8 +161,11 @@
 (fun load_relocate_table (index ichan) (
     (var nent (read_int_check ichan))
     (for i 0 nent (do
-        (var name (read_string_check ichan))
         (var type (read_byte_check ichan))
+        (var name 0)
+        (if (!= type @RELOC_STATIC)
+            (= name (read_string_check ichan))
+            )
         (var naddr (read_int_check ichan))
         (for j 0 naddr (do
             (var addr (read_int_check ichan))
@@ -185,8 +188,8 @@
 (fun load_export_table (index ichan) (
     (var nent (read_int_check ichan))
     (for i 0 nent (do
-        (var name (read_string_check ichan))
         (var type (read_byte_check ichan))
+        (var name (read_string_check ichan))
         (var addr (read_int_check ichan))
         ;(print_string "export: ")
         ;(print_string name)
@@ -247,6 +250,26 @@
     ))
 
 (fun replace_value_address (reloc_info) (
+    (var sym (tuple_at reloc_info 0))
+    (var rfile_index (tuple_at reloc_info 1))
+    (var operand_addr (tuple_at reloc_info 3))
+    (var export_info (lookup_symbol sym))
+    (if (! export_info) (error "undefined symbol"))
+    (var efile_index (tuple_at export_info 1))
+
+    (var offset 0)
+    (for i 0 efile_index (+= offset (ivector_at value_sizes i)))
+    (var real_addr (+ offset (tuple_at export_info 3)))
+
+    (array_set
+        short
+        (+ (vector_at codes rfile_index) operand_addr)
+        0
+        real_addr
+        )
+    ))
+
+(fun replace_local_value_address (reloc_info) (
     (var rfile_index (tuple_at reloc_info 1))
     (var operand_addr (tuple_at reloc_info 3))
     (var offset 0)
@@ -266,11 +289,13 @@
         (var reloc_info (vector_at relocate_symbols i))
         (var type (tuple_at reloc_info 2))
 
-        (if (== type @RELOC_FUN)
+        (if (== type @RELOC_FUNCTION)
             (replace_function_address reloc_info)
-        (if (== type @RELOC_VAL)
+        (if (== type @RELOC_VALUE)
             (replace_value_address reloc_info)
-            ))
+        (if (== type @RELOC_STATIC)
+            (replace_local_value_address reloc_info)
+            )))
         ))
     ))
 
