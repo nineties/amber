@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-assemble.rlc 2010-10-03 19:27:48 nineties $
+; $Id: rowl-assemble.rlc 2010-10-06 05:59:18 nineties $
 ;
 
 (import "stdlib")
@@ -35,7 +35,6 @@
 (var current_addr 0)
 (var init_code_len 0)
 
-; used in case of assemble_mode = executable
 (var label_addr_table ())
 (var align8_table ()) ; list of (type name value)
 (var align4_table ()) ; list of (type name value)
@@ -80,10 +79,14 @@
     (foreach e export_symbols (do
         (var sym (car e))
         (var info (cdr e))
-        (var addr (assoc sym label_addr_table))
+        (var type (car info))
+        (var addr (cond
+            ((== type `fun)     (assoc sym label_addr_table))
+            ((== type `value)   (assoc sym value_addr_table))
+            (otherwise  (error "set_export_addrs: not implemented"))
+            ))
         (if (nil? addr) (error "undefined export symbol: " sym))
         (setcdr info addr)
-        (eprintln "addressof " sym " = " addr)
         ))
     ))
 
@@ -126,9 +129,9 @@
 
 (define get_valaddr (pos name) (do
     (var addr (assoc name value_addr_table))
-    (if (nil? addr) (error "unknown value name " name))
+    (if (nil? addr) (error "unknown value " name))
     (if (== assemble_mode `object)
-        (add_relocate_symbol `value name pos)
+        (add_relocate_symbol `static name pos)
         )
     addr
     ))
@@ -137,7 +140,7 @@
     (if (== assemble_mode `executable)
         (do
             (var idx (assoc name object_table))
-            (if (nil? idx) (error "unknown object name " name))
+            (if (nil? idx) (error "unknown object " name))
             idx
         )
         (do
@@ -162,15 +165,18 @@
     (set current_addr 0)
     ))
 
-(define scan_fundecl ((_ name body)) (do
+(define scan_fundecl ((_ export name body)) (do
+    (if export (add_export_symbol `fun name))
     (push label_addr_table `(@name . @current_addr))
-    (if (== name `main)
-        (add_export_symbol `fun `main)
+    (if (and (== name `main) (== assemble_mode `object))
+        (add_export_symbol fun `main)
         )
     (foreach i body (scan_insn i))
     ))
 
-(define scan_value_decl (decl) (do
+(define scan_value_decl ((type export name value)) (do
+    (if export (add_export_symbol `value name))
+    (var decl (list type name value))
     (var align (get_alignment decl))
     (cond
         ((== align 1) (push align1_table decl))
@@ -180,13 +186,14 @@
         )
     ))
 
-(define scan_object_decl ((_ name)) (do
+(define scan_object_decl ((_ export name)) (do
+    (if export (add_export_symbol `object name))
     (push object_table `(@name . @object_index))
     (incr object_index)
     ))
 
-(define scan_export ((_ type name)) (do
-    (add_export_symbol type name)
+(define scan_export ((_ name)) (do
+    (add_export_symbol name)
     ))
 
 (define scan_decl (decl)
@@ -222,6 +229,12 @@
             (put_short 0)
             2
             ))
+        ((== `extvalue (car opd)) (do
+            (if (!= assemble_mode `object) (error "undefined symbol: " (cadr opd)))
+            (add_relocate_symbol `value (cadr opd) (+ current_addr 1))
+            (put_short 0)
+            0
+            ))
         (otherwise (error "unknown operand: " opd))
         ))
 
@@ -248,7 +261,7 @@
     (foreach i body (assemble_insn i))
     ))
 
-(define assemble_fundecl ((_ name body)) (do
+(define assemble_fundecl ((_ _ name body)) (do
     (foreach i body (assemble_insn i))
     ))
 
@@ -287,8 +300,8 @@
         (var name (symbol2s (car ent)))
         (var type (cadr ent))
         (var addr (cddr ent))
+        (put_byte (assoc type `((fun . @RELOC_FUNCTION) (value . @RELOC_VALUE) (object . @RELOC_OBJECT))))
         (put_str name)
-        (put_byte (assoc type `((fun . @RELOC_FUN) (value . @RELOC_VAL) (object . @RELOC_OBJ))))
         (put_long addr)
         ))
     ))
@@ -299,8 +312,11 @@
         (var name (symbol2s (car ent)))
         (var type (cadr ent))
         (var addrs (cddr ent))
-        (put_str name)
-        (put_byte (assoc type `((fun . @RELOC_FUN) (value . @RELOC_VAL) (object . @RELOC_OBJ))))
+        (put_byte (assoc type `((fun . @RELOC_FUNCTION) (value . @RELOC_VALUE) (object . @RELOC_OBJECT)
+            (static . @RELOC_STATIC))))
+        (if (!= type `static)
+            (put_str name)
+            )
         (put_long (length addrs))
         (foreach addr addrs (put_long addr))
         ))
