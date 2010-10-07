@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: lex.rl 2010-07-10 14:18:28 nineties $
+ % $Id: lex.rl 2010-10-07 23:16:21 nineties $
  %);
 
 include(stddef, code);
@@ -479,16 +479,6 @@ label e7;
     lex_error("unterminated string literal");
 label e8;
     lex_error("invalid symbol character");
-};
-
-strhash: (p0) {
-    allocate(1);
-    x0 = 0;
-    while (rch(p0, 0) != '\0') {
-        x0 = x0 * 7 + rch(p0, 0);
-        p0 = p0 + 1;
-    };
-    return x0;
 };
 
 print_token: (p0) {
