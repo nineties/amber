@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: linker.rlc 2010-10-06 06:01:28 nineties $
+; $Id: linker.rlc 2010-10-07 15:07:04 nineties $
 ;
 
 (import "config")
@@ -12,17 +12,16 @@
 
 (var num_files 0)
 
-(var inits null)
-(var init_lens null)
-(var total_init_len 0)
 (var codes null)
+(var init_lens null)
 (var code_lens null)
-(var total_code_len 0)
-(var base_addresses null)
+(var total_init_len 0)
+(var total_len 0)
 
 (var values null)
 (var value_sizes null)
 (var total_vsize 0)
+(var nrefs null)
 (var total_nref 0)
 
 (var output_file null)
@@ -42,14 +41,16 @@
 
     (= num_files (- argc 1))
 
-    (= inits (make_vector 0))
-    (= init_lens (make_ivector 0))
     (= total_init_len 0)
+    (= init_lens (make_ivector 0))
     (= codes (make_vector 0))
     (= code_lens (make_ivector 0))
-    (= total_code_len 0)
+    (= total_len 0)
     (= values (make_vector 0))
     (= value_sizes (make_ivector 0))
+    (= total_vsize 0)
+    (= nrefs (make_ivector 0))
+    (= total_nref 0)
     (= relocate_symbols (make_vector 0))
     (= exported_symbols (make_vector 0))
 
@@ -62,7 +63,6 @@
         ))
 
 
-    (compute_base_addresses)
     (replace_addresses)
     (output_executable output_file)
     (return 0)
@@ -128,6 +128,7 @@
         (error "invalid file format (magic number mismatch)"))
 
     (var nref (read_int_check ic))
+    (ivector_pushback nrefs nref)
     (+= total_nref nref)
 
     (var vsize (read_int_check ic))
@@ -139,18 +140,17 @@
 
     ; read byte codes
     (var initlen (read_int_check ic))
-    (+= total_init_len initlen)
-    (var init (array char initlen))
-    (if (< (input_bytes ic init initlen) 0) (error "load failed"))
-    (vector_pushback inits init)
-    (ivector_pushback init_lens initlen)
-
     (var codelen (read_int_check ic))
-    (+= total_code_len codelen)
-    (var code (array char codelen))
-    (if (< (input_bytes ic code codelen) 0) (error "load failed"))
+    (var totallen (+ initlen codelen))
+
+    (var code (array char totallen))
+    (if (< (input_bytes ic code totallen) 0) (error "load failed"))
     (vector_pushback codes code)
+    (ivector_pushback init_lens initlen)
     (ivector_pushback code_lens codelen)
+    (+= total_init_len initlen)
+    (+= total_len totallen)
+
 
     (load_relocate_table index ic)
     (load_export_table index ic)
@@ -163,14 +163,14 @@
     (for i 0 nent (do
         (var type (read_byte_check ichan))
         (var name 0)
-        (if (!= type @RELOC_STATIC)
+        (if (&& (!= type @RELOC_SVALUE) (!= type @RELOC_SOBJECT))
             (= name (read_string_check ichan))
             )
         (var naddr (read_int_check ichan))
         (for j 0 naddr (do
             (var addr (read_int_check ichan))
             ;(print_string "import: ")
-            ;(print_string name)
+            ;(if name (print_string name) (print_string "<unnamed>"))
             ;(print_string " type=")
             ;(print_int type)
             ;(print_string " index=")
@@ -220,12 +220,18 @@
     (return 0)
     ))
 
-(fun compute_base_addresses () (
-    (= base_addresses (make_ivector num_files))
-    (var base_address total_init_len)
-    (for i 0 num_files (do
-        (ivector_put base_addresses i base_address)
-        (+= base_address (ivector_at code_lens i))
+(fun compute_real_address (addr idx) (
+    (var initlen (ivector_at init_lens idx))
+    (if (< addr initlen)
+        (do
+            (var offset 0)
+            (for i 0 idx (+= offset (ivector_at init_lens i)))
+            (return (+ offset addr))
+        )
+        (do
+            (var offset total_init_len)
+            (for i 0 idx (+= offset (ivector_at code_lens i)))
+            (return (- (+ offset addr) initlen))
         ))
     ))
 
@@ -238,8 +244,8 @@
     (var efile_index (tuple_at export_info 1))
     (var real_addr (tuple_at export_info 3))
 
-    (+= real_addr (ivector_at base_addresses efile_index))
-    (var real_operand_addr (+ operand_addr (ivector_at base_addresses rfile_index)))
+    (= real_addr (compute_real_address real_addr efile_index))
+    (var real_operand_addr (compute_real_address operand_addr rfile_index))
 
     (array_set
         short
@@ -269,7 +275,27 @@
         )
     ))
 
-(fun replace_local_value_address (reloc_info) (
+(fun replace_object_address (reloc_info) (
+    (var sym (tuple_at reloc_info 0))
+    (var rfile_index (tuple_at reloc_info 1))
+    (var operand_addr (tuple_at reloc_info 3))
+    (var export_info (lookup_symbol sym))
+    (if (! export_info) (error "undefined symbol"))
+    (var efile_index (tuple_at export_info 1))
+
+    (var offset 0)
+    (for i 0 efile_index (+= offset (ivector_at nrefs i)))
+    (var real_index (+ offset (tuple_at export_info 3)))
+
+    (array_set
+        short
+        (+ (vector_at codes rfile_index) operand_addr)
+        0
+        real_index
+        )
+    ))
+
+(fun replace_svalue_address (reloc_info) (
     (var rfile_index (tuple_at reloc_info 1))
     (var operand_addr (tuple_at reloc_info 3))
     (var offset 0)
@@ -284,6 +310,21 @@
         )
     ))
 
+(fun replace_sobject_address (reloc_info) (
+    (var rfile_index (tuple_at reloc_info 1))
+    (var operand_addr (tuple_at reloc_info 3))
+    (var offset 0)
+    (for i 0 rfile_index (+= offset (ivector_at nrefs i)))
+    (var real_index (+ offset
+        (array_get short (+ (vector_at codes rfile_index) operand_addr) 0)))
+    (array_set
+        short
+        (+ (vector_at codes rfile_index) operand_addr)
+        0
+        real_index
+        )
+    ))
+
 (fun replace_addresses () (
     (for i 0 (vector_size relocate_symbols) (do
         (var reloc_info (vector_at relocate_symbols i))
@@ -293,9 +334,13 @@
             (replace_function_address reloc_info)
         (if (== type @RELOC_VALUE)
             (replace_value_address reloc_info)
-        (if (== type @RELOC_STATIC)
-            (replace_local_value_address reloc_info)
-            )))
+        (if (== type @RELOC_OBJECT)
+            (replace_object_address reloc_info)
+        (if (== type @RELOC_SVALUE)
+            (replace_svalue_address reloc_info)
+        (if (== type @RELOC_SOBJECT)
+            (replace_sobject_address reloc_info)
+            )))))
         ))
     ))
 
@@ -311,9 +356,14 @@
         (output_bytes oc (vector_at values i) (ivector_at value_sizes i))
         ))
 
-    (output_word oc total_code_len)
+    (output_word oc total_len)
     (for i 0 (vector_size codes) (do
-        (output_bytes oc (vector_at codes i) (ivector_at code_lens i))
+        (output_bytes oc (vector_at codes i) (ivector_at init_lens i))
+        ))
+    (for i 0 (vector_size codes) (do
+        (var initlen (ivector_at init_lens i))
+        (var codelen (ivector_at code_lens i))
+        (output_bytes oc (+ (vector_at codes i) initlen) codelen)
         ))
 
     (close_out oc)
