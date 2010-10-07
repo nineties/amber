@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-assemble.rlc 2010-10-06 05:59:18 nineties $
+; $Id: rowl-assemble.rlc 2010-10-07 15:06:38 nineties $
 ;
 
 (import "stdlib")
@@ -83,7 +83,8 @@
         (var addr (cond
             ((== type `fun)     (assoc sym label_addr_table))
             ((== type `value)   (assoc sym value_addr_table))
-            (otherwise  (error "set_export_addrs: not implemented"))
+            ((== type `object)  (assoc sym object_table))
+            (otherwise  (error "set_export_addrs: not implemented for " type))
             ))
         (if (nil? addr) (error "undefined export symbol: " sym))
         (setcdr info addr)
@@ -131,22 +132,18 @@
     (var addr (assoc name value_addr_table))
     (if (nil? addr) (error "unknown value " name))
     (if (== assemble_mode `object)
-        (add_relocate_symbol `static name pos)
+        (add_relocate_symbol `svalue name pos)
         )
     addr
     ))
 
 (define get_objidx (addr name) (do
-    (if (== assemble_mode `executable)
-        (do
-            (var idx (assoc name object_table))
-            (if (nil? idx) (error "unknown object " name))
-            idx
+    (var idx (assoc name object_table))
+    (if (nil? idx) (error "unknown object " name))
+    (if (== assemble_mode `object)
+        (add_relocate_symbol `sobject name addr)
         )
-        (do
-            (add_relocate_symbol `object name addr)
-            0
-        ))
+    idx
     ))
 
 (define scan_insn (insn) (do
@@ -162,7 +159,6 @@
     (if (!= current_addr 0) (error "<init> must be placed first"))
     (foreach i body (scan_insn i))
     (set init_code_len current_addr)
-    (set current_addr 0)
     ))
 
 (define scan_fundecl ((_ export name body)) (do
@@ -233,7 +229,13 @@
             (if (!= assemble_mode `object) (error "undefined symbol: " (cadr opd)))
             (add_relocate_symbol `value (cadr opd) (+ current_addr 1))
             (put_short 0)
-            0
+            2
+            ))
+        ((== `extobject (car opd)) (do
+            (if (!= assemble_mode `object) (error "undefined symbol: " (cadr opd)))
+            (add_relocate_symbol `object (cadr opd) (+ current_addr 1))
+            (put_short 0)
+            2
             ))
         (otherwise (error "unknown operand: " opd))
         ))
@@ -313,8 +315,8 @@
         (var type (cadr ent))
         (var addrs (cddr ent))
         (put_byte (assoc type `((fun . @RELOC_FUNCTION) (value . @RELOC_VALUE) (object . @RELOC_OBJECT)
-            (static . @RELOC_STATIC))))
-        (if (!= type `static)
+            (svalue . @RELOC_SVALUE) (sobject . @RELOC_SOBJECT))))
+        (if (and (!= type `svalue) (!= type `sobject))
             (put_str name)
             )
         (put_long (length addrs))
@@ -345,7 +347,7 @@
     (if (== assemble_mode `object)
         (put_long init_code_len)
         )
-    (put_long current_addr) ; length of byte codes
+    (put_long (- current_addr init_code_len)) ; length of byte codes
     (set current_addr 0)
     ; generate functions
     (foreach decl prog (assemble_decl decl))

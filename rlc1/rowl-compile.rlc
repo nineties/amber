@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-10-06 05:57:43 nineties $
+; $Id: rowl-compile.rlc 2010-10-07 14:25:13 nineties $
 ;
 
 (import "stdlib")
@@ -22,7 +22,7 @@
     ))
 (define lookup_var (sym) (do
     (var v (try_lookup_var sym))
-    (if v v (do (eprintln "undefined variable : " sym) (exit 1)))
+    (if v v (error "undefined variable : " sym))
     ))
 
 (define add_var (name opd) (setcar vtable (cons `(@name . @opd) (car vtable))))
@@ -92,18 +92,18 @@
     (cond
         ((== `arg (car loc)) (emit_insn (arg_insn (cadr loc))))
         ((== `local (car loc)) (compile_local_var loc))
-        ((== `value (car loc)) (compile_value loc nil))
+        ((== `value (car loc)) (compile_value loc))
         ((== `object (car loc)) (compile_object loc))
         ((== `fun (car loc)) (compile_fun loc))
         ((== `prim (car loc)) (compile_prim loc))
-        ((== `extvalue (car loc)) (compile_value loc true))
+        ((== `extvalue (car loc)) (compile_value loc))
+        ((== `extobject (car loc)) (compile_object loc))
         (otherwise (error "compile_var: not implemented " loc))
         )
     true
     ))
 
-(define compile_value ((_ type name) external) (do
-    (var opdtype (if external `extvalue `value))
+(define compile_value ((opdtype type name)) (do
     (cond
         ((== `char type)    (emit_insn `(loadbv (@opdtype @name))))
         ((== `int type)     (emit_insn `(loadv (@opdtype @name))))
@@ -113,8 +113,8 @@
         ))
     )
 
-(define compile_object ((_ name)) (do
-    (emit_insn `(loado (object @name)))
+(define compile_object ((opdtype name)) (do
+    (emit_insn `(loado (@opdtype @name)))
     ))
 
 (define compile_local_var ((_ idx))
@@ -335,7 +335,7 @@
         ((== `extfun (car loc)) (compile_extcall fun (cdr expr)))
         ((== `fun (car loc)) (compile_localcall fun (cdr expr)))
         ((cons? loc) (compile_dynamiccall fun (cdr expr)))
-        (otherwise (eprintln "compile_call: not reachable here"))
+        (otherwise (error "compile_call: not reachable here"))
         )))
 
 (var comparison_operator
@@ -708,7 +708,8 @@
     (cond
         ((== `fun type) (add_var name `(extfun @name)))
         ((== `string type) (add_var name `(extvalue string @name)))
-        (otherwise (eprintln "compile_extern: not implemented"))
+        ((== `object type) (add_var name `(extobject @name)))
+        (otherwise (error "compile_extern: not implemented"))
         )
     nil
     ))
