@@ -2,12 +2,13 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-10-07 14:25:13 nineties $
+; $Id: rowl-compile.rlc 2010-10-08 14:04:59 nineties $
 ;
 
 (import "stdlib")
 (import "rowl-assemble")
 (import "vm-prim-inc")
+(import "config")
 
 (var vtable ()) ; variable table
 (define vtable_push () (set vtable (cons () vtable)))
@@ -704,7 +705,46 @@
         ))
     ))
 
+(define compile_import ((_ file)) (do
+    (= file (++ file ".rlo"))
+    (var ichan (open_in file))
+    (var magic (getint ichan))
+    (if (!= magic OBJ_MAGIC) (error "invalid file: " file))
+    (getint ichan) ; nref
+    (var vsize (getint ichan))
+    (upto i 1 vsize (getchar ichan)) ; values
+    (var initlen (getint ichan))
+    (var codelen (getint ichan))
+    (upto i 1 (+ initlen codelen) (getchar ichan)) ; code
+
+    ; relocate table
+    (var nent (getint ichan))
+    (upto i 1 nent (do
+        (var type (getchar ichan))
+        (if (and (!= type RELOC_SVALUE) (!= type RELOC_SOBJECT)) (getstr ichan))
+        (var naddr (getint ichan))
+        (upto j 1 naddr (getint ichan))
+        ))
+
+    ; load export table
+    (var nent (getint ichan))
+    (upto i 1 nent (do
+        (var type (getchar ichan))
+        (var name (tosym (getstr ichan)))
+        (getint ichan) ; skip addr
+        (= type (cond
+            ((== type RELOC_FUNCTION)   `fun)
+            ((== type RELOC_VALUE)      `value)
+            ((== type RELOC_OBJECT)     `object)
+            (otherwise  (error "compile_import: not reachable here"))
+            ))
+        (compile_extern `(extern @type @name))
+        ))
+    (close_in ichan)
+    ))
+
 (define compile_extern ((_ type name)) (do
+    (eprintln "extern " type " " name)
     (cond
         ((== `fun type) (add_var name `(extfun @name)))
         ((== `string type) (add_var name `(extvalue string @name)))
@@ -755,6 +795,7 @@
         ((== `fun (car decl)) (compile_fundecl decl export))
         ((== `array (car decl)) (compile_arraydecl decl export))
         ((== `extern (car decl)) (compile_extern decl))
+        ((== `import (car decl)) (compile_import decl))
         ((== `export (car decl)) (compile_export decl))
         (otherwise (compile_vardecl decl export))
         ))
