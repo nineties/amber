@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-08-10 15:49:33 nineties $
+ % $Id: builtin.rl 2010-10-08 13:57:52 nineties $
  %);
 
 include(stddef,code);
@@ -570,12 +570,69 @@ rl_eprint: (p0) {
     return nil_sym;
 };
 
-rl_getc: (p0) {
-    if (p0 != nil_sym) {
-        fputs(stderr, "ERROR 'getc': getc takes no arguments\n");
-        exit(1);
+rl_open_in: (p0) {
+    allocate(1);
+    check_arity(p0, 1, "open_in");
+    x0 = string_value(car(p0));
+    return mkint(open_in(x0));
+};
+
+rl_close_in: (p0) {
+    allocate(1);
+    check_arity(p0, 1, "close_in");
+    x0 = int_value(car(p0));
+    close_in(x0);
+    return nil_sym;
+};
+
+rl_getchar: (p0) {
+    allocate(1);
+    check_arity(p0, 1, "getchar");
+    x0 = int_value(car(p0));
+    return mkint(fgetc(x0));
+};
+
+rl_getshort: (p0) {
+    allocate(3);
+    check_arity(p0, 1, "getshort");
+    x0 = int_value(car(p0));
+    x1 = 0;
+    wch(&x1, 0, fgetc(x0));
+    x2 = fgetc(x0);
+    wch(&x1, 1, x2);
+    if (x2 < 0) {
+        wch(&x1, 2, -1);
+        wch(&x1, 3, -1);
     };
-    return mkchar(getc());
+    return mkint(x1);
+};
+
+rl_getint: (p0) {
+    allocate(2);
+    check_arity(p0, 1, "getint");
+    x0 = int_value(car(p0));
+    x1 = 0;
+    wch(&x1, 0, fgetc(x0));
+    wch(&x1, 1, fgetc(x0));
+    wch(&x1, 2, fgetc(x0));
+    wch(&x1, 3, fgetc(x0));
+    return mkint(x1);
+};
+
+getstr_buf: char [1024]; (% XXX: fixme %);
+rl_getstr: (p0) {
+    allocate(3);
+    check_arity(p0, 1, "getstr");
+    x0 = int_value(car(p0)); (% fd %);
+    x1 = 0;
+    x2 = fgetc(x0);
+    while (x2 != 0) {
+        wch(getstr_buf, x1, x2);
+        x1 = x1 + 1;
+        x2 = fgetc(x0);
+    };
+    wch(getstr_buf, x1, 0);
+    return mkstring(getstr_buf);
 };
 
 (% (array <init> <len>) %);
@@ -859,7 +916,12 @@ init_builtin_objects: () {
     register_prim("ne"         , &rl_ne);
     register_prim("print"      , &rl_print);
     register_prim("eprint"     , &rl_eprint);
-    register_prim("getc"       , &rl_getc);
+    register_prim("open_in"    , &rl_open_in);
+    register_prim("close_in"   , &rl_close_in);
+    register_prim("getchar"    , &rl_getchar);
+    register_prim("getshort"   , &rl_getshort);
+    register_prim("getint"     , &rl_getint);
+    register_prim("getstr"     , &rl_getstr);
     register_prim("syscall"    , &rl_syscall);
     register_prim("exit"       , &rl_exit);
     register_prim("char2int"   , &rl_char2int);
