@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-10-08 14:04:59 nineties $
+; $Id: rowl-compile.rlc 2010-10-08 22:21:08 nineties $
 ;
 
 (import "stdlib")
@@ -494,8 +494,9 @@
     nil
     ))
 
-(define compile_local_vardecl ((_ name val)) (do
+(define compile_local_vardecl ((_ name . valopt)) (do
     (var idx (register_local_var name))
+    (var val (if valopt (car valopt) 0))
     (compile_expr val)
     (cond
         ((== idx 0) (emit_insn `storel0))
@@ -744,7 +745,6 @@
     ))
 
 (define compile_extern ((_ type name)) (do
-    (eprintln "extern " type " " name)
     (cond
         ((== `fun type) (add_var name `(extfun @name)))
         ((== `string type) (add_var name `(extvalue string @name)))
@@ -800,9 +800,16 @@
         (otherwise (compile_vardecl decl export))
         ))
 
+(define extern_primitives () (do
+    (compile_extern `(extern object stdin))
+    (compile_extern `(extern object stdout))
+    (compile_extern `(extern object stderr))
+    ))
+
 (define compile_main (code) (do
     (var asm_code ())
 
+    (extern_primitives)
     (foreach decl code (do
         (var asm (compile_decl decl nil))
         (if asm (push asm_code asm))

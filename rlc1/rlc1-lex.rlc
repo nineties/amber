@@ -2,16 +2,17 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlc1-lex.rlc 2010-10-08 01:19:00 nineties $
+; $Id: rlc1-lex.rlc 2010-10-09 01:10:32 nineties $
 ;
 
 (import "rowl-compile")
 
 ; Regular expressions
 ;
+; comment    : #[^\n]*
 ; spaces     : [\n\r\t ]
 ; letter     : [A-Za-z_]
-; deciaml    : [0-9]+(e[0-9]+)?
+; deciaml    : 0|([1-9][0-9]*(e[0-9]+)?)
 ; binary     : 0b[01]+
 ; octal      : 0o[0-7]+
 ; hex        : 0x[0-9a-fA-F]+
@@ -27,7 +28,7 @@
 (var CH_EOF        0) ; "\0",
 (var CH_SPACES     1) ; "\t\r ",
 (var CH_NL         2) ; "\n",
-(var CH_ZERO       3) ; "0",
+(var CH_0          3) ; "0",
 (var CH_1_7        4) ; " 1 234567",
 (var CH_8_9        5) ; "89",
 (var CH_af         6) ; "af",
@@ -43,27 +44,53 @@
 (var CH_DQUOTE    16) ; "\"",
 (var CH_SLASH     17) ; "/",
 (var CH_BACKSLASH 18) ; "\\",
-(var CH_SHARP     19) ; "+=",
-(var CH_PLUSMINUS 20) ; "#",
+(var CH_SHARP     19) ; "#",
+(var CH_PLUSMINUS 20) ; "+-",
 (var CH_SYMBOL    21) ; "!$%&=^|@*:;/?<>.,~`()[]{}",
 (var CH_INVALID   22)
 
 ; === state transition diagram ===
 ;
+; error state:
+;
 ;    spaces
 ;   +---+--------------------+
 ;   v   |                    |
 ; +---+ |  EOF  +---+        |
-; | 0 +-+------>|@1 | (end)  |
+; | 0 +-+------>|@12| (end)  |
 ; +---+ |       +---+        |
 ;       |  #    +---+        | comment
-;       +------>| 2 +-+------+
-;               +---+ |
-;                 ^   |[^\n]
-;                 +---+
+;       +------>| 13+-+------+
+;       |       +---+ |
+;       |         ^   |[^\n]
+;       |         +---+
+;       | 0     +---+
+;       +------>|@14|             +---+
+;               +-+-+             v   |[01]
+;                 | b  +---+[01]+---+ |
+;                 +--->| 15+--->|@16+-+  +---+
+;                 |    +---+    +---+    v   |[0-7]
+;                 | o  +---+ [0-7]     +---+ |
+;                 +--->| 17+---------->|@18+-+  +---+
+;                 |    +---+           +---+    v   |[0-9a-fA-F]
+;                 | x  +---+ [0-9a-fA-F]      +---+ |
+;                 +--->| 19+----------------->|@20+-+
+;                      +---+                  +---+
 ;
-; error state:
 ;
+; 1 : accept token
+;
+; erro state:
+; 2 : invalid character
+; 3 : invalid decimal integer literal
+; 4 : invalid binary integer literal
+; 5 : invalid octal integer literal
+; 6 : invalid hexadecimal integer literal
+; 7 : invalid floating point literal
+; 8 : invalid escape sequence
+; 9 : unterminated character literal
+; 10: unterminated string literal
+; 11: invalid symbol character
 
 ; tokens
 (var TOK_NONE     256)
@@ -80,8 +107,8 @@
 (array char chgroup (
      0 22 22 22 22 22 22 22 22  1  2 22 22  1 22 22
     22 22 22 22 22 22 22 22 22 22 22 22 22 22 22 22
-     1 21 16 20 21 21 21 15 21 21 21 19 21 22 21 17
-     3  4  4  4  4  4  4  4  5  5 21 21 21 19 21 21
+     1 21 16 19 21 21 21 15 21 21 21 20 21 22 21 17
+     3  4  4  4  4  4  4  4  5  5 21 21 21 20 21 21
     21 13 13 13 13 13 13 14 14 14 14 14 14 14 14 14
     14 14 14 14 14 14 14 14 14 14 14 21 18 21 21 14
     21  6  7 13 13  8  6 14 14 14 14 14 14 14 12  9
@@ -96,20 +123,21 @@
     22 22 22 22 22 22 22 22 22 22 22 22 22 22 22 22
     ))
 
-;                    C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C
-;                    H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H
-;                    _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _
-;                    E  S  N  Z  1  8  a  b  e  o  r  x  n  H  O  S  D  S  B  S  P  S  I
-;                    O  P  L  E  _  _  f  :  :  :  t  :  :  E  T  Q  Q  L  A  H  L  Y  N
-;                    F  A  :  R  7  9  :  :  :  :  v  :  :  X  H  U  U  A  C  A  U  M  V
-;                    :  C  :  O  :  :  :  :  :  :  :  :  :  :  E  O  O  S  K  R  S  B  A
-;                    :  E  :  :  :  :  :  :  :  :  :  :  :  :  R  T  T  H  S  P  M  O  L
-;                    :  S  :  :  :  :  :  :  :  :  :  :  :  :  :  E  E  :  L  :  I  L  I
-;                    :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  A  :  N  :  D
-;                    :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  S  :  U  :  :
-;                    :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  H  :  S  :  :
-;                    :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :
-(array char s0next ( 1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1  2 -1 -1 -1))
+;                     C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C
+;                     H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H
+;                     _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _
+;                     E  S  N  0  1  8  a  b  e  o  r  x  n  H  O  S  D  S  B  S  P  S  I
+;                     O  P  L  :  _  _  f  :  :  :  t  :  :  E  T  Q  Q  L  A  H  L  Y  N
+;                     F  A  :  :  7  9  :  :  :  :  v  :  :  X  H  U  U  A  C  A  U  M  V
+;                     :  C  :  :  :  :  :  :  :  :  :  :  :  :  E  O  O  S  K  R  S  B  A
+;                     :  E  :  :  :  :  :  :  :  :  :  :  :  :  R  T  T  H  S  P  M  O  L
+;                     :  S  :  :  :  :  :  :  :  :  :  :  :  :  :  E  E  :  L  :  I  L  I
+;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  A  :  N  :  D
+;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  S  :  U  :  :
+;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  H  :  S  :  :
+;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :
+(array char s0next  (12  2  2 14  2  2  2  2  2  2  2  2  2  2  2  2  2  2  2 13  2  2  2))
+(array char s14next ( 1  1  1  3  3  3  3 15  3 17  3 19  3  3  3  1  1  1  1  1  1  1  2))
 
 (var lexichan null)
 (var lexbuf null)
@@ -134,19 +162,27 @@
     ))
 
 (fun look_ahead () (
+    (var c)
     (if (== lexbuf_end (cvector_size lexbuf))
-        (cvector_pushback lexbuf (input_char lexichan))
-        )
-    (var c (cvector_at lexbuf lexbuf_end))
+        (do
+            (if (< (input_char (address c) lexichan) 0)
+                (return @CH_EOF))
+            (cvector_pushback lexbuf c)
+        ))
+    (= c (cvector_at lexbuf lexbuf_end))
     (if (== c -1) (return @CH_EOF))
     (return (array_get char chgroup c))
     ))
 
 (fun consume () (
+    (var c)
     (if (== lexbuf_end (cvector_size lexbuf))
-        (cvector_pushback lexbuf (input_char lexichan))
-        )
-    (var c (cvector_at lexbuf lexbuf_end))
+        (do
+            (if (< (input_char (address c) lexichan) 0)
+                (error "unexpected EOF"))
+            (cvector_pushback lexbuf c)
+        ))
+    (= c (cvector_at lexbuf lexbuf_end))
     (incr lexbuf_end)
     (if (== c '\n') (do
         (incr srcline)
@@ -172,6 +208,20 @@
 (fun accept (tag) (
     (= token_tag tag)
     return
+    ))
+
+(fun lex_error (msg) (
+    (flush stdout)
+    (output_string stderr srcfile)
+    (output_char   stderr ':')
+    (output_int    stderr srcline)
+    (output_char   stderr ':')
+    (output_int    stderr srcclmn)
+
+    (output_string stderr ": ")
+    (output_string stderr msg)
+    (output_char   stderr '\n')
+    (exit 1)
     ))
 
 (export fun init_lexer (fname ichan) (
@@ -204,12 +254,31 @@
             (= state (next_state s0next))
             (goto lex_loop)
             ))
-        (1 . (return @TOK_EOF))
-        (2 . (do
+        (1 . (return token_tag))
+        (2  . (lex_error "invalid character"))
+        (3  . (lex_error "invalid decimal integer litera"))
+        (4  . (lex_error "invalid binary integer litera"))
+        (5  . (lex_error "invalid octal integer litera"))
+        (6  . (lex_error "invalid hexadecimal integer litera"))
+        (7  . (lex_error "invalid floating point litera"))
+        (8  . (lex_error "invalid escape sequenc"))
+        (9  . (lex_error "unterminated character litera"))
+        (10 . (lex_error "unterminated string litera"))
+        (11 . (lex_error "invalid symbol characte"))
+        (12 . (return @TOK_EOF))
+        (13 . (do
             ; comment
             (consume)
             (while (!= (look_ahead) @CH_NL) (consume))
             (consume)
+            (= state 0)
+            (goto lex_loop)
+            ))
+        (14 . (do
+            (consume)
+            (= token_value 0)
+            (accept @TOK_INT)
+            (= state (next_state s14next))
             (goto lex_loop)
             ))
         (default . (error "BUG: invalid state"))
