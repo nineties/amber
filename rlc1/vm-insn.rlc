@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-10-03 19:13:35 nineties $
+; $Id: vm-insn.rlc 2010-10-09 02:13:44 nineties $
 ;
 
 (define gen_comparison1 (cmovname) `(
@@ -56,6 +56,8 @@
     (imm_int32 (int) @true ((vmint 1 %eax) (vmpush %eax)))
     (iadd      () @true ((vmbin "addl")))
     (isub      () @true ((vmbin "subl")))
+    (iadd1 () @true ((asm "incl (%esi)")))
+    (isub1 () @true ((asm "decl (%esi)")))
     (imul      () @true ((vmpop %eax) (asm "imul (%esi), %eax") (asm "movl %eax, (%esi)")))
     (idiv      () @true (
         (vmpop %ecx)
@@ -71,8 +73,33 @@
         (vmpush %edx)
         (asm "xorl %edx, %edx") ; clear zero register
         ))
-    (iadd1 () @true ((asm "incl (%esi)")))
-    (isub1 () @true ((asm "decl (%esi)")))
+    (shl   () @true (
+        (vmpop %ecx)
+        (vmpop %eax)
+        (asm "shll %cl, %eax")
+        (vmpush %eax)
+        ))
+    (shr   () @true (
+        (vmpop %ecx)
+        (vmpop %eax)
+        (asm "shrl %cl, %eax")
+        (vmpush %eax)
+        ))
+    (sal   () @true (
+        (vmpop %ecx)
+        (vmpop %eax)
+        (asm "sall %cl, %eax")
+        (vmpush %eax)
+        ))
+    (sar   () @true (
+        (vmpop %ecx)
+        (vmpop %eax)
+        (asm "sarl %cl, %eax")
+        (vmpush %eax)
+        ))
+    (and    () @true ((vmbin "andl")))
+    (or     () @true ((vmbin "orl")))
+    (xor    () @true ((vmbin "xorl")))
     (drop  () @true ((asm "addl $4, %esi")))
     (drop2 () @true ((asm "addl $8, %esi")))
     (dup   () @true ((asm "movl (%esi), %eax") (vmpush %eax)))
