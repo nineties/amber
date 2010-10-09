@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlc1-lex.rlc 2010-10-09 01:10:32 nineties $
+; $Id: rlc1-lex.rlc 2010-10-09 11:14:04 nineties $
 ;
 
 (import "rowl-compile")
@@ -25,29 +25,30 @@
 
 ; character group
 
-(var CH_EOF        0) ; "\0",
-(var CH_SPACES     1) ; "\t\r ",
-(var CH_NL         2) ; "\n",
-(var CH_0          3) ; "0",
-(var CH_1_7        4) ; " 1 234567",
-(var CH_8_9        5) ; "89",
-(var CH_af         6) ; "af",
-(var CH_b          7) ; "b",
-(var CH_e          8) ; "e",
-(var CH_o          9) ; "o",
-(var CH_rtv       10) ; "rtv",
-(var CH_x         11) ; "x",
-(var CH_n         12) ; "n",
-(var CH_HEX       13) ; "ABCDEFabcdef",
-(var CH_OTHER     14) ; "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_",
-(var CH_SQUOTE    15) ; "'",
-(var CH_DQUOTE    16) ; "\"",
-(var CH_SLASH     17) ; "/",
-(var CH_BACKSLASH 18) ; "\\",
-(var CH_SHARP     19) ; "#",
-(var CH_PLUSMINUS 20) ; "+-",
-(var CH_SYMBOL    21) ; "!$%&=^|@*:;/?<>.,~`()[]{}",
-(var CH_INVALID   22)
+(var CH_EOF        0) ; "\0"
+(var CH_SPACES     1) ; "\t\r "
+(var CH_NL         2) ; "\n"
+(var CH_0          3) ; "0"
+(var CH_1          4) ; "1"
+(var CH_2_7        5) ; "1234567"
+(var CH_8_9        6) ; "89"
+(var CH_af         7) ; "af"
+(var CH_b          8) ; "b"
+(var CH_e          9) ; "e"
+(var CH_o         10) ; "o"
+(var CH_rtv       11) ; "rtv"
+(var CH_x         12) ; "x"
+(var CH_n         13) ; "n"
+(var CH_HEX       14) ; "ABCDEFabcdef"
+(var CH_OTHER     15) ; "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_"
+(var CH_SQUOTE    16) ; "'"
+(var CH_DQUOTE    17) ; "\""
+(var CH_SLASH     18) ; "/"
+(var CH_BACKSLASH 19) ; "\\"
+(var CH_SHARP     20) ; "#"
+(var CH_PLUSMINUS 21) ; "+-"
+(var CH_SYMBOL    22) ; "!$%&=^|@*:;/?<>.,~`()[]{}"
+(var CH_INVALID   23)
 
 ; === state transition diagram ===
 ;
@@ -59,23 +60,17 @@
 ; +---+ |  EOF  +---+        |
 ; | 0 +-+------>|@12| (end)  |
 ; +---+ |       +---+        |
-;       |  #    +---+        | comment
+;       |  #    +---+        | (comment)
 ;       +------>| 13+-+------+
 ;       |       +---+ |
 ;       |         ^   |[^\n]
 ;       |         +---+
 ;       | 0     +---+
-;       +------>|@14|             +---+
-;               +-+-+             v   |[01]
-;                 | b  +---+[01]+---+ |
-;                 +--->| 15+--->|@16+-+  +---+
-;                 |    +---+    +---+    v   |[0-7]
-;                 | o  +---+ [0-7]     +---+ |
-;                 +--->| 17+---------->|@18+-+  +---+
-;                 |    +---+           +---+    v   |[0-9a-fA-F]
-;                 | x  +---+ [0-9a-fA-F]      +---+ |
-;                 +--->| 19+----------------->|@20+-+
-;                      +---+                  +---+
+;       +------>|@14|            +---+
+;               +-+-+            v   |
+;                 | b  +---+01 +---+ |01
+;                 +--->| 15+-->|@16+-+
+;                 |    +---+   +---+
 ;
 ;
 ; 1 : accept token
@@ -105,39 +100,40 @@
 (compile `object `(
 
 (array char chgroup (
-     0 22 22 22 22 22 22 22 22  1  2 22 22  1 22 22
-    22 22 22 22 22 22 22 22 22 22 22 22 22 22 22 22
-     1 21 16 19 21 21 21 15 21 21 21 20 21 22 21 17
-     3  4  4  4  4  4  4  4  5  5 21 21 21 20 21 21
-    21 13 13 13 13 13 13 14 14 14 14 14 14 14 14 14
-    14 14 14 14 14 14 14 14 14 14 14 21 18 21 21 14
-    21  6  7 13 13  8  6 14 14 14 14 14 14 14 12  9
-    14 14 10 14 10 14 10 14 11 14 14 21 21 21 21 22
-    22 22 22 22 22 22 22 22 22 22 22 22 22 22 22 22
-    22 22 22 22 22 22 22 22 22 22 22 22 22 22 22 22
-    22 22 22 22 22 22 22 22 22 22 22 22 22 22 22 22
-    22 22 22 22 22 22 22 22 22 22 22 22 22 22 22 22
-    22 22 22 22 22 22 22 22 22 22 22 22 22 22 22 22
-    22 22 22 22 22 22 22 22 22 22 22 22 22 22 22 22
-    22 22 22 22 22 22 22 22 22 22 22 22 22 22 22 22
-    22 22 22 22 22 22 22 22 22 22 22 22 22 22 22 22
+     0 23 23 23 23 23 23 23 23  1  2 23 23  1 23 23
+    23 23 23 23 23 23 23 23 23 23 23 23 23 23 23 23
+     1 22 17 20 22 22 22 16 22 22 22 21 22 23 22 18
+     3  4  5  5  5  5  5  5  6  6 22 22 22 21 22 22
+    22 14 14 14 14 14 14 15 15 15 15 15 15 15 15 15
+    15 15 15 15 15 15 15 15 15 15 15 22 19 22 22 15
+    22  7  8 14 14  9  7 15 15 15 15 15 15 15 13 10
+    15 15 11 15 11 15 11 15 12 15 15 22 22 22 22 23
+    23 23 23 23 23 23 23 23 23 23 23 23 23 23 23 23
+    23 23 23 23 23 23 23 23 23 23 23 23 23 23 23 23
+    23 23 23 23 23 23 23 23 23 23 23 23 23 23 23 23
+    23 23 23 23 23 23 23 23 23 23 23 23 23 23 23 23
+    23 23 23 23 23 23 23 23 23 23 23 23 23 23 23 23
+    23 23 23 23 23 23 23 23 23 23 23 23 23 23 23 23
+    23 23 23 23 23 23 23 23 23 23 23 23 23 23 23 23
+    23 23 23 23 23 23 23 23 23 23 23 23 23 23 23 23
     ))
 
-;                     C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C
-;                     H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H
-;                     _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _
-;                     E  S  N  0  1  8  a  b  e  o  r  x  n  H  O  S  D  S  B  S  P  S  I
-;                     O  P  L  :  _  _  f  :  :  :  t  :  :  E  T  Q  Q  L  A  H  L  Y  N
-;                     F  A  :  :  7  9  :  :  :  :  v  :  :  X  H  U  U  A  C  A  U  M  V
-;                     :  C  :  :  :  :  :  :  :  :  :  :  :  :  E  O  O  S  K  R  S  B  A
-;                     :  E  :  :  :  :  :  :  :  :  :  :  :  :  R  T  T  H  S  P  M  O  L
-;                     :  S  :  :  :  :  :  :  :  :  :  :  :  :  :  E  E  :  L  :  I  L  I
-;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  A  :  N  :  D
-;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  S  :  U  :  :
-;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  H  :  S  :  :
-;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :
-(array char s0next  (12  2  2 14  2  2  2  2  2  2  2  2  2  2  2  2  2  2  2 13  2  2  2))
-(array char s14next ( 1  1  1  3  3  3  3 15  3 17  3 19  3  3  3  1  1  1  1  1  1  1  2))
+;                     C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C
+;                     H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H
+;                     _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _
+;                     E  S  N  0  1  2  8  a  b  e  o  r  x  n  H  O  S  D  S  B  S  P  S  I
+;                     O  P  L  :  :  _  _  f  :  :  :  t  :  :  E  T  Q  Q  L  A  H  L  Y  N
+;                     F  A  :  :  :  7  9  :  :  :  :  v  :  :  X  H  U  U  A  C  A  U  M  V
+;                     :  C  :  :  :  :  :  :  :  :  :  :  :  :  :  E  O  O  S  K  R  S  B  A
+;                     :  E  :  :  :  :  :  :  :  :  :  :  :  :  :  R  T  T  H  S  P  M  O  L
+;                     :  S  :  :  :  :  :  :  :  :  :  :  :  :  :  :  E  E  :  L  :  I  L  I
+;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  A  :  N  :  D
+;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  S  :  U  :  :
+;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  H  :  S  :  :
+;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :
+(array char s0next  (12  2  2 14  2  2  2  2  2  2  2  2  2  2  2  2  2  2  2  2 13  2  2  2))
+(array char s14next ( 1  1  1  3  3  3  3  3 15  3 16  3 17  3  3  3  1  1  1  1  1  1  1  2))
+(array char s16next ( 1  1  1 16 16  4  4  4  4  4  4  4  4  4  4  4  1  1  1  1  1  1  1  2))
 
 (var lexichan null)
 (var lexbuf null)
@@ -161,7 +157,7 @@
     return
     ))
 
-(fun look_ahead () (
+(fun lookahead () (
     (var c)
     (if (== lexbuf_end (cvector_size lexbuf))
         (do
@@ -202,7 +198,7 @@
     ))
 
 (fun next_state (table) (
-    (return (array_get char table (look_ahead)))
+    (return (array_get char table (lookahead)))
     ))
 
 (fun accept (tag) (
@@ -245,10 +241,10 @@
     (label lex_loop)
     (tswitch state (
         (0 . (do
-            (var c (look_ahead))
+            (var c (lookahead))
             (while (|| (== c @CH_SPACES) (== c @CH_NL)) (do
                 (consume)
-                (= c (look_ahead))
+                (= c (lookahead))
                 ))
             (init_token_buf)
             (= state (next_state s0next))
@@ -256,20 +252,20 @@
             ))
         (1 . (return token_tag))
         (2  . (lex_error "invalid character"))
-        (3  . (lex_error "invalid decimal integer litera"))
-        (4  . (lex_error "invalid binary integer litera"))
-        (5  . (lex_error "invalid octal integer litera"))
-        (6  . (lex_error "invalid hexadecimal integer litera"))
-        (7  . (lex_error "invalid floating point litera"))
+        (3  . (lex_error "invalid decimal integer literal"))
+        (4  . (lex_error "invalid binary integer literal"))
+        (5  . (lex_error "invalid octal integer literal"))
+        (6  . (lex_error "invalid hexadecimal integer literal"))
+        (7  . (lex_error "invalid floating point literal"))
         (8  . (lex_error "invalid escape sequenc"))
-        (9  . (lex_error "unterminated character litera"))
-        (10 . (lex_error "unterminated string litera"))
+        (9  . (lex_error "unterminated character literal"))
+        (10 . (lex_error "unterminated string literal"))
         (11 . (lex_error "invalid symbol characte"))
         (12 . (return @TOK_EOF))
         (13 . (do
             ; comment
             (consume)
-            (while (!= (look_ahead) @CH_NL) (consume))
+            (while (!= (lookahead) @CH_NL) (consume))
             (consume)
             (= state 0)
             (goto lex_loop)
@@ -279,6 +275,26 @@
             (= token_value 0)
             (accept @TOK_INT)
             (= state (next_state s14next))
+            (goto lex_loop)
+            ))
+        (15 . (do
+            (consume)
+            (= token_value 0)
+            (var c (lookahead))
+            (if (&& (!= c @CH_0) (!= c @CH_1)) (do
+                (= state 4)
+                (goto lex_loop)
+                ))
+            ; fall through
+            ))
+        (16 . (do
+            (accept @TOK_INT)
+            (var c (consume))
+            (<<= token_value 1)
+            (|= token_value (- c '0'))
+            (print_int token_value)
+            (print_char '\n')
+            (= state (next_state s16next))
             (goto lex_loop)
             ))
         (default . (error "BUG: invalid state"))

@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-10-08 02:42:17 nineties $
+# $Id: Makefile 2010-10-09 02:16:55 nineties $
 
 AS = as
 ASFLAGS =
@@ -76,10 +76,10 @@ rlc1-lex.rlo  : $(ROWLCOMPILER)
 rowl: $(VMOBJECTS)
 	$(LD) $^ -o $@ $(VMLDFLAGS)
 
-linker: linker.rlc $(ROWLCOMPILER)
+linker: linker.rlc rowl $(ROWLCOMPILER)
 	./rlci $< > $@
 
-disasm: disasm.rlc $(ROWLCOMPILER)
+disasm: disasm.rlc rowl $(ROWLCOMPILER)
 	./rlci $< > $@
 
 rlc1: rowl linker $(RLC1OBJECTS) startup.rlo
