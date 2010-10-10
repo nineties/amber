@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlc1-lex.rlc 2010-10-09 12:08:15 nineties $
+; $Id: rlc1-lex.rlc 2010-10-10 17:11:29 nineties $
 ;
 
 (import "rowl-compile")
@@ -12,11 +12,11 @@
 ; comment    : #[^\n]*
 ; spaces     : [\n\r\t ]
 ; letter     : [A-Za-z_]
-; deciaml    : 0|([1-9][0-9]*(e[0-9]+)?)
+; deciaml    : 0|([1-9][0-9]*(e[1-9][0-9]*)?)
 ; binary     : 0b[01]+
 ; octal      : 0o[0-7]+
 ; hex        : 0x[0-9a-fA-F]+
-; float      : [0-9]*\.[0-9]+(e(+|-)?[0-9]+)?
+; float      : {decimal}\.[0-9]+(e(+|-)?[0-9]+)?
 ; escape     : \\['"\\abfnrtv0]
 ; character  : \'({escape}|[^\\\'\n])\'
 ; string     : \"({escape}|[^\\\"\n]*\"
@@ -46,9 +46,10 @@
 (var CH_SLASH     18) ; "/"
 (var CH_BACKSLASH 19) ; "\\"
 (var CH_SHARP     20) ; "#"
-(var CH_PLUSMINUS 21) ; "+-"
-(var CH_SYMBOL    22) ; "!$%&=^|@*:;/?<>.,~`()[]{}"
-(var CH_INVALID   23)
+(var CH_DOT       21) ; "."
+(var CH_PLUSMINUS 22) ; "+-"
+(var CH_SYMBOL    23) ; "!$%&=^|@*:;/?<>,~`()[]{}"
+(var CH_INVALID   24)
 
 ; === state transition diagram ===
 ;
@@ -67,16 +68,29 @@
 ;       |         +---+
 ;       | 0     +---+
 ;       +------>|@14|              +---+
-;               +-+-+              v   |[01]
-;                 | b  +---+[01] +---+ |
-;                 +--->| 15+---->|@16+-+   +---+
-;                 |    +---+     +---+     v   |[0-7]
-;                 |           +---+[0-7] +---+ |
-;                 +---------->| 17+----->|@18+-+    +---+
-;                 |           +---+      +---+      v   |{hex}
-;                 |                  +---+        +---+ |
-;                 +----------------->| 19+------->|@20+-+
-;                                    +---+ {hex}  +---+
+;       |       +-+-+              v   |01
+;       |         | b  +---+01   +---+ |
+;       |         +--->| 15+---->|@16+-+   +---+
+;       |         |    +---+     +---+     v   |0-7
+;       |         | o         +---+0-7   +---+ |
+;       |         +---------->| 17+----->|@18+-+    +---+
+;       |         |           +---+      +---+      v   |{hex}
+;       |         | x                +---+        +---+ |
+;       |         +----------------->| 19+------->|@20+-+        +---+
+;       |         +-------+.         +---+ {hex}  +---+          v   |0-9
+;       | 1-9   +---+  .  |   +---+      +---+  e    +---+ 1-9 +---+ |
+;       +------>|@21+-+---+-->| 22+----->|@23+-+---->| 24+---->|@25+-+
+;               +---+ |       +---+ 0-9  +---+ |     +---+     +---+
+;                 A   |0-9                 A   |0-9
+;                 +---+                    +---+
+;
+;
+;
+;
+;
+;
+;
+;
 ;
 ; 1 : accept token
 ;
@@ -105,45 +119,50 @@
 (compile `object `(
 
 (array char chgroup (
-     0 23 23 23 23 23 23 23 23  1  2 23 23  1 23 23
-    23 23 23 23 23 23 23 23 23 23 23 23 23 23 23 23
-     1 22 17 20 22 22 22 16 22 22 22 21 22 23 22 18
-     3  4  5  5  5  5  5  5  6  6 22 22 22 21 22 22
-    22 14 14 14 14 14 14 15 15 15 15 15 15 15 15 15
-    15 15 15 15 15 15 15 15 15 15 15 22 19 22 22 15
-    22  7  8 14 14  9  7 15 15 15 15 15 15 15 13 10
-    15 15 11 15 11 15 11 15 12 15 15 22 22 22 22 23
-    23 23 23 23 23 23 23 23 23 23 23 23 23 23 23 23
-    23 23 23 23 23 23 23 23 23 23 23 23 23 23 23 23
-    23 23 23 23 23 23 23 23 23 23 23 23 23 23 23 23
-    23 23 23 23 23 23 23 23 23 23 23 23 23 23 23 23
-    23 23 23 23 23 23 23 23 23 23 23 23 23 23 23 23
-    23 23 23 23 23 23 23 23 23 23 23 23 23 23 23 23
-    23 23 23 23 23 23 23 23 23 23 23 23 23 23 23 23
-    23 23 23 23 23 23 23 23 23 23 23 23 23 23 23 23
+     0 24 24 24 24 24 24 24 24  1  2 24 24  1 24 24
+    24 24 24 24 24 24 24 24 24 24 24 24 24 24 24 24
+     1 23 17 20 23 23 23 16 23 23 23 22 23 24 21 18
+     3  4  5  5  5  5  5  5  6  6 23 23 23 22 23 23
+    23 14 14 14 14 14 14 15 15 15 15 15 15 15 15 15
+    15 15 15 15 15 15 15 15 15 15 15 23 19 23 23 15
+    23  7  8 14 14  9  7 15 15 15 15 15 15 15 13 10
+    15 15 11 15 11 15 11 15 12 15 15 23 23 23 23 24
+    24 24 24 24 24 24 24 24 24 24 24 24 24 24 24 24
+    24 24 24 24 24 24 24 24 24 24 24 24 24 24 24 24
+    24 24 24 24 24 24 24 24 24 24 24 24 24 24 24 24
+    24 24 24 24 24 24 24 24 24 24 24 24 24 24 24 24
+    24 24 24 24 24 24 24 24 24 24 24 24 24 24 24 24
+    24 24 24 24 24 24 24 24 24 24 24 24 24 24 24 24
+    24 24 24 24 24 24 24 24 24 24 24 24 24 24 24 24
+    24 24 24 24 24 24 24 24 24 24 24 24 24 24 24 24
     ))
 
-;                     C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C
-;                     H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H
-;                     _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _
-;                     E  S  N  0  1  2  8  a  b  e  o  r  x  n  H  O  S  D  S  B  S  P  S  I
-;                     O  P  L  :  :  _  _  f  :  :  :  t  :  :  E  T  Q  Q  L  A  H  L  Y  N
-;                     F  A  :  :  :  7  9  :  :  :  :  v  :  :  X  H  U  U  A  C  A  U  M  V
-;                     :  C  :  :  :  :  :  :  :  :  :  :  :  :  :  E  O  O  S  K  R  S  B  A
-;                     :  E  :  :  :  :  :  :  :  :  :  :  :  :  :  R  T  T  H  S  P  M  O  L
-;                     :  S  :  :  :  :  :  :  :  :  :  :  :  :  :  :  E  E  :  L  :  I  L  I
-;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  A  :  N  :  D
-;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  S  :  U  :  :
-;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  H  :  S  :  :
-;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :
-(array char s0next  (12  2  2 14  2  2  2  2  2  2  2  2  2  2  2  2  2  2  2  2 13  2  2  2))
-(array char s14next ( 1  1  1  3  3  3  3  3 15  3 17  3 19  3  3  3  1  1  1  1  1  1  1  2))
-(array char s16next ( 1  1  1 16 16  4  4  4  4  4  4  4  4  4  4  4  1  1  1  1  1  1  1  2))
-(array char s18next ( 1  1  1 18 18 18  5  5  5  5  5  5  5  5  5  5  1  1  1  1  1  1  1  2))
-(array char s20next ( 1  1  1 20 20 20 20 20 20 20  6  6  6  6 20  6  1  1  1  1  1  1  1  2))
+;                     C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C
+;                     H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H
+;                     _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _
+;                     E  S  N  0  1  2  8  a  b  e  o  r  x  n  H  O  S  D  S  B  S  D  P  S  I
+;                     O  P  L  :  :  _  _  f  :  :  :  t  :  :  E  T  Q  Q  L  A  H  O  L  Y  N
+;                     F  A  :  :  :  7  9  :  :  :  :  v  :  :  X  H  U  U  A  C  A  T  U  M  V
+;                     :  C  :  :  :  :  :  :  :  :  :  :  :  :  :  E  O  O  S  K  R  :  S  B  A
+;                     :  E  :  :  :  :  :  :  :  :  :  :  :  :  :  R  T  T  H  S  P  :  M  O  L
+;                     :  S  :  :  :  :  :  :  :  :  :  :  :  :  :  :  E  E  :  L  :  :  I  L  I
+;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  A  :  :  N  :  D
+;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  S  :  :  U  :  :
+;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  H  :  :  S  :  :
+;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :
+(array char s0next  (12  2  2 14 21 21 21  2  2  2  2  2  2  2  2  2  2  2  2  2 13  2  2  2  2))
+(array char s14next ( 1  1  1  3  3  3  3  3 15  3 17  3 19  3  3  3  1  1  1  1  1 22  1  1  2))
+(array char s16next ( 1  1  1 16 16  4  4  4  4  4  4  4  4  4  4  4  1  1  1  1  1  4  1  1  2))
+(array char s18next ( 1  1  1 18 18 18  5  5  5  5  5  5  5  5  5  5  1  1  1  1  1  5  1  1  2))
+(array char s20next ( 1  1  1 20 20 20 20 20 20 20  6  6  6  6 20  6  1  1  1  1  1  6  1  1  2))
+(array char s21next ( 1  1  1 21 21 21 21  3  3 22  3  3  3  3  3  3  1  1  1  1  1 22  1  1  2))
+(array char s23next ( 1  1  1 23 23 23 23  7  7 24  7  7  7  7  7  7  1  1  1  1  1  7  1  1  2))
+(array char s25next ( 1  1  1 25 25 25 25  7  7  7  7  7  7  7  7  7  1  1  1  1  1  7  1  1  2))
 
-(array char oct_grp ( 0  0  0  1  1  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0))
-(array char hex_grp ( 0  0  0  1  1  1  1  1  1  1  0  0  0  0  1  0  0  0  0  0  0  0  0  0))
+(array char grp_0_9 ( 0  0  0  1  1  1  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0))
+(array char grp_1_9 ( 0  0  0  0  1  1  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0))
+(array char grp_oct ( 0  0  0  1  1  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0))
+(array char grp_hex ( 0  0  0  1  1  1  1  1  1  1  0  0  0  0  1  0  0  0  0  0  0  0  0  0  0))
 
 (var lexichan null)
 (var lexbuf null)
@@ -156,8 +175,7 @@
 (var srcclmn 1)
 (var unputted 0)
 
-(fun is_octdigit (group) ((return (array_get char oct_grp group))))
-(fun is_hexdigit (group) ((return (array_get char hex_grp group))))
+(fun is_member_of (c group) ((return (array_get char group c))))
 
 (fun token_text () ((return (cvector_ptr token_buf))))
 (fun token_len  () ((return (- (cvector_size token_buf) 1))))
@@ -311,8 +329,7 @@
         (17 . (do
             (consume)
             (= token_value 0)
-            (var c (lookahead))
-            (if (! (is_octdigit c)) (do
+            (if (! (is_member_of grp_oct (lookahead))) (do
                 (= state 5)
                 (goto lexloop)
                 ))
@@ -329,8 +346,7 @@
         (19 . (do
             (consume)
             (= token_value 0)
-            (var c (lookahead))
-            (if (! (is_hexdigit c)) (do
+            (if (! (is_member_of grp_hex (lookahead))) (do
                 (= state 6)
                 (goto lexloop)
                 ))
@@ -347,6 +363,39 @@
                 (|= token_value (- c '0'))
                 ))
             (= state (next_state s20next))
+            (goto lexloop)
+            ))
+        (21 . (do
+            (accept @TOK_INT)
+            (= token_value (+ (* 10 token_value) (- (consume) '0')))
+            (= state (next_state s21next))
+            (goto lexloop)
+            ))
+        (22 . (do
+            (consume)
+            (if (! (is_member_of grp_0_9 (lookahead))) (do
+                (= state 7)
+                (goto lexloop)
+                ))
+            ; fall through
+            ))
+        (23 . (do
+            (consume)
+            (accept @TOK_FLOAT)
+            (= state (next_state s23next))
+            (goto lexloop)
+            ))
+        (24 . (do
+            (consume)
+            (if (! (is_member_of grp_1_9 (lookahead))) (do
+                (= state 7)
+                (goto lexloop)
+                ))
+            ; fall through
+            ))
+        (25 . (do
+            (consume)
+            (= state (next_state s25next))
             (goto lexloop)
             ))
         (default . (error "BUG: invalid state"))
