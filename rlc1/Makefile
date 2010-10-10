@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-10-09 02:16:55 nineties $
+# $Id: Makefile 2010-10-10 19:31:04 nineties $
 
 AS = as
 ASFLAGS =
@@ -70,8 +70,8 @@ RLC1OBJECTS = rlc1-main.rlo rlc1-lex.rlo
 ROWLCOMPILER = rlci rowl-compile.rlc rowl-assemble.rlc vm-prim-inc.rlc
 
 startup.rlo   : $(ROWLCOMPILER)
-rlc1-main.rlo : $(ROWLCOMPILER) rlc1-lex.rlo
-rlc1-lex.rlo  : $(ROWLCOMPILER)
+rlc1-main.rlo : $(ROWLCOMPILER) rlc1-lex.rlo rlc1-types.rlc
+rlc1-lex.rlo  : $(ROWLCOMPILER) rlc1-types.rlc
 
 rowl: $(VMOBJECTS)
 	$(LD) $^ -o $@ $(VMLDFLAGS)
