@@ -2,10 +2,11 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlc1-lex.rlc 2010-10-10 17:11:29 nineties $
+; $Id: rlc1-lex.rlc 2010-10-10 19:35:23 nineties $
 ;
 
 (import "rowl-compile")
+(import "rlc1-types")
 
 ; Regular expressions
 ;
@@ -106,16 +107,6 @@
 ; 10: unterminated string literal
 ; 11: invalid symbol character
 
-; tokens
-(var TOK_NONE     256)
-(var TOK_EOF      257)
-(var TOK_CHAR     258)
-(var TOK_INT      259)
-(var TOK_FLOAT    260)
-(var TOK_STRING   261)
-(var TOK_IDENT    262)
-(var TOK_OPERATOR 263)
-
 (compile `object `(
 
 (array char chgroup (
@@ -176,6 +167,13 @@
 (var unputted 0)
 
 (fun is_member_of (c group) ((return (array_get char group c))))
+
+(export fun print_token () (
+    (if (< token_tag 256)
+        (print_char token_tag)
+        (print_string (token_text))
+        )
+    ))
 
 (fun token_text () ((return (cvector_ptr token_buf))))
 (fun token_len  () ((return (- (cvector_size token_buf) 1))))
