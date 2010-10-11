@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-10-09 11:11:44 nineties $
+; $Id: rowl-compile.rlc 2010-10-12 00:36:31 nineties $
 ;
 
 (import "stdlib")
@@ -572,6 +572,14 @@
     true
     ))
 
+(define compile_variant ((_ tag nboxed . args)) (do
+    (var nelem (length args))
+    (set args (reverse args))
+    (foreach a args (compile_expr a))
+    (emit_insn `(variant (short @tag) (byte @nelem) (byte @nboxed)))
+    true
+    ))
+
 (define compile_field_get ((_ tup idx)) (do
     (compile_expr tup)
     (emit_insn (cond
@@ -629,6 +637,7 @@
         ((== `array_get (car expr)) (compile_array_get expr))
         ((== `array_set (car expr)) (compile_array_set expr))
         ((== `tuple (car expr)) (compile_tuple expr))
+        ((== `variant (car expr)) (compile_variant expr))
         ((== `field_get (car expr)) (compile_field_get expr))
         ((== `field_set (car expr)) (compile_field_set expr))
         ((== `get (car expr)) (compile_field_get `(field_get @(cadr expr) 0)))

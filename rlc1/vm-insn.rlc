@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-10-09 02:13:44 nineties $
+; $Id: vm-insn.rlc 2010-10-12 00:26:25 nineties $
 ;
 
 (define gen_comparison1 (cmovname) `(
@@ -145,6 +145,31 @@
         (asm "addl %eax, %esi")
         (call allocate_tuple_with_values)
         (asm "addl $12, %esp")
+        (vmrestore)
+        (vmpush %eax)
+        ))
+    ; allocate variant object
+    ; opd0 = tag (16bit)
+    ; opd1 = # of elements (8bit)
+    ; opd2 = # of boxed elements (8bit)
+    ; NB:
+    ;  - allocated memory is not be zero-cleared
+    ;  - field0 is for the tag
+    ;  - do not rewrite the tag
+    ;  - all boxed elements must be placed first
+    (variant (short byte byte) @true (
+        (vmsave)
+        (asm "pushl %esi")
+        (vmubyte 4 %eax) ; # of boxed elements
+        (asm "pushl %eax")
+        (vmubyte 3 %eax) ; # of elements
+        (asm "pushl %eax")
+        (asm "sall $2, %eax")
+        (asm "addl %eax, %esi")
+        (vmushort 1 %eax) ; tag
+        (asm "pushl %eax")
+        (call allocate_variant_with_values)
+        (asm "addl $16, %esp")
         (vmrestore)
         (vmpush %eax)
         ))

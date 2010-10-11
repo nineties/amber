@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-09-30 19:48:27 nineties $
+; $Id: vm-gc.rlc 2010-10-12 00:27:48 nineties $
 ;
 
 (import "stdlib")
@@ -129,7 +129,7 @@
 (var OBJECT_TAG_BITS 3)
 (var OBJECT_TAG_OFF (+ OBJECT_WORDS_BITS BOXED_FIELD_SIZE_BITS 1))
 
-; !!! DO NOT CHANGE THE ORDER TAGS !!!
+; !!! DO NOT CHANGE THE ORDER OF TAGS !!!
 (var TAG_PADDING 0)
 (var TAG_PLAIN   1)
 (var TAG_CONS    2)
@@ -490,6 +490,25 @@
 (fun allocate_tuple_with_values (nelem nboxed values) (
     (void* ptr (allocate_tuple nelem nboxed))
     (for i 0 nelem (
+        ([]= ptr i ([] values i))
+        ))
+    (return ptr)
+    ))
+
+(export allocate_variant)
+(fun allocate_variant (tag nelem nboxed) (
+    (int words (+ nelem 2))
+    (void* ptr (allocate_object words))
+    @(SET_HEADER ptr TAG_VARIANT nboxed words)
+    (+= ptr @WORD_SIZE)
+    ([]= ptr 0 tag)
+    (return ptr)
+    ))
+
+(export allocate_variant_with_values)
+(fun allocate_variant_with_values (tag nelem nboxed values) (
+    (void* ptr (allocate_variant tag nelem nboxed))
+    (for i 1 (+ nelem 1) (
         ([]= ptr i ([] values i))
         ))
     (return ptr)
