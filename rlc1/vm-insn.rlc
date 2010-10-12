@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-10-12 00:26:25 nineties $
+; $Id: vm-insn.rlc 2010-10-12 14:05:54 nineties $
 ;
 
 (define gen_comparison1 (cmovname) `(
@@ -290,17 +290,17 @@
         (vmpush %eax)
         ))
     ; store word to local
-    (storel0 () @true ((vmpop %eax) (asm "movl %eax, -4(%edi)")))
-    (storel1 () @true ((vmpop %eax) (asm "movl %eax, -8(%edi)")))
-    (storel2 () @true ((vmpop %eax) (asm "movl %eax, -12(%edi)")))
-    (storel3 () @true ((vmpop %eax) (asm "movl %eax, -16(%edi)")))
-    (storel4 () @true ((vmpop %eax) (asm "movl %eax, -20(%edi)")))
-    (storel5 () @true ((vmpop %eax) (asm "movl %eax, -24(%edi)")))
+    (storel0 () @true ((asm "movl (%esi), %eax") (asm "movl %eax, -4(%edi)")))
+    (storel1 () @true ((asm "movl (%esi), %eax") (asm "movl %eax, -8(%edi)")))
+    (storel2 () @true ((asm "movl (%esi), %eax") (asm "movl %eax, -12(%edi)")))
+    (storel3 () @true ((asm "movl (%esi), %eax") (asm "movl %eax, -16(%edi)")))
+    (storel4 () @true ((asm "movl (%esi), %eax") (asm "movl %eax, -20(%edi)")))
+    (storel5 () @true ((asm "movl (%esi), %eax") (asm "movl %eax, -24(%edi)")))
     (storel (byte) @true (
         (vmsbyte 1 %ecx) ; index
         (asm "movl %edi, %eax")
         (asm "addl %ecx, %eax")
-        (vmpop %ecx)
+        (asm "movl (%esi), %ecx")
         (asm "movl %ecx, (%eax)")
         ))
     (incrl0 () @true ((asm "incl -4(%edi)")))
@@ -357,14 +357,14 @@
     (storebv (ushort) @true (
         (vmushort 1 %eax)
         (asm "addl value_area_base, %eax")
-        (vmpop %ecx)
-        (asm "movb %bl, (%eax)")
+        (asm "movl (%esi), %ecx")
+        (asm "movb %cl, (%eax)")
         ))
     ; store word to value area
     (storewv (ushort) @true (
         (vmushort 1 %eax)
         (asm "addl value_area_base, %eax")
-        (vmpop %ecx)
+        (asm "movl (%esi), %ecx")
         (asm "movl %ecx, (%eax)")
         ))
     ; load global heap object
@@ -380,7 +380,7 @@
         (vmushort 1 %eax)
         (asm "shll $2, %eax")
         (asm "addl object_area_base, %eax")
-        (vmpop %ecx)
+        (asm "movl (%esi), %ecx")
         (asm "movl %ecx, (%eax)")
         ))
     ; 'fun:1' 'relative address of the function:2'
