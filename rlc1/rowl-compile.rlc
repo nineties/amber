@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-10-12 00:36:31 nineties $
+; $Id: rowl-compile.rlc 2010-10-12 14:02:49 nineties $
 ;
 
 (import "stdlib")
@@ -296,7 +296,7 @@
         ((== `object (car loc)) (compile_object_assign insn loc rhs))
         (otherwise (error "compile_assign: not implemented"))
         )
-    nil
+    true
     ))
 
 (define compile_prim_call (idx args) (do
@@ -437,7 +437,7 @@
 (define compile_for ((_ it low high body)) (do
     (var loop_label (mklabel))
     (push_break_label)
-    (compile_block `(
+    (if (compile_block `(
         (var @it @low)
         (var end @high)
         (if (< @it end) (do
@@ -447,6 +447,8 @@
             (if (< @it end) (goto @loop_label))
             ))
         ))
+        (emit_insn `drop)
+        )
     (pop_break_label)
     nil
     ))
@@ -657,11 +659,15 @@
 
 (define compile_block (block) (do
     (vtable_push)
+    (var ret nil)
     (foreach e block
-        (if (compile_expr e) (emit_insn `drop))
+        (if last?
+            (= ret (compile_expr e))
+            (if (compile_expr e) (emit_insn `drop))
+            )
         )
     (vtable_pop)
-    nil
+    ret
     ))
 
 (define compile_fundecl ((_ name params body) export) (do
@@ -675,7 +681,7 @@
         (incr pidx)
         ))
 
-    (compile_block body)
+    (if (compile_block body) (emit_insn `drop))
     (if (and (!= (last_insn) `return) (!= (last_insn) `ireturn)) (do
 	(emit_insn `return)
         ))
@@ -769,6 +775,7 @@
     (reset_insn_seq)
     (compile_expr value)
     (emit_insn `(storeo (object @name)))
+    (emit_insn `drop)
     (var insn_seq (get_insn_seq))
     (push_startup_code insn_seq)
     `(object @export @name)

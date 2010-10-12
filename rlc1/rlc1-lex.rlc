@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlc1-lex.rlc 2010-10-11 22:08:39 nineties $
+; $Id: rlc1-lex.rlc 2010-10-12 12:46:23 nineties $
 ;
 
 (import "rowl-compile")
@@ -49,8 +49,8 @@
 (var CH_SHARP     20) ; "#"
 (var CH_DOT       21) ; "."
 (var CH_PLUSMINUS 22) ; "+-"
-(var CH_SPECIAL   23) ; ";()[]{}"
-(var CH_SYMBOL    24) ; "!$%&=^|@*:/\\?<>,~`"
+(var CH_SPECIAL   23) ; ",;()[]{}"
+(var CH_SYMBOL    24) ; "!$%&=^|@*:/\\?<>~`"
 (var CH_INVALID   25)
 
 ; === state transition diagram ===
@@ -134,7 +134,7 @@
 (array char chgroup (
      0 25 25 25 25 25 25 25 25  1  2 25 25  1 25 25
     25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25
-     1 24 17 20 24 24 24 16 23 23 24 22 24 22 21 18
+     1 24 17 20 24 24 24 16 23 23 24 22 23 22 21 18
      3  4  5  5  5  5  5  5  6  6 24 23 24 24 24 24
     24 14 14 14 14 14 14 15 15 15 15 15 15 15 15 15
     15 15 15 15 15 15 15 15 15 15 15 23 19 23 24 15
@@ -200,12 +200,12 @@
 (export fun print_token () (
     (if (< token_tag 256)
         (print_char token_tag)
-        (print_string (token_text))
+        (print_string (get_token_text))
         )
     ))
 
-(fun token_text () ((return (cvector_ptr token_buf))))
-(fun token_len  () ((return (- (cvector_size token_buf) 1))))
+(export fun get_token_text () ((return (cvector_ptr token_buf))))
+(export fun get_token_len  () ((return (- (cvector_size token_buf) 1))))
 (export fun get_token_value () ((return token_value)))
 
 (array char esc2val_table (
@@ -287,7 +287,7 @@
     (output_string stderr ":")
     (output_string stderr msg)
     (output_string stderr " : ")
-    (output_string stderr (token_text))
+    (output_string stderr (get_token_text))
     (output_char   stderr '\n')
     (exit 1)
     ))
@@ -507,7 +507,7 @@
             ))
         (35 . (do
             (consume)
-            (if (idtable_find operator_table (token_text)) (do
+            (if (idtable_find operator_table (get_token_text)) (do
                 (accept @TOK_OPERATOR)
                 (store_lexer_state)
                 ))
@@ -541,7 +541,7 @@
     (= save_lexbuf_end lexbuf_end)
     (= save_srcline srcline)
     (= save_srcclmn srcclmn)
-    (= save_token_len (token_len))
+    (= save_token_len (get_token_len))
     ))
 
 (fun restore_lexer_state () (
