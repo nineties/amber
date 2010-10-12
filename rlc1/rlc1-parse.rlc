@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlc1-parse.rlc 2010-10-13 00:47:52 nineties $
+; $Id: rlc1-parse.rlc 2010-10-13 02:09:56 nineties $
 ;
 
 (import "rowl-compile")
@@ -25,7 +25,16 @@
 (fun parse_tuple (t) (
     (var es (parse_tuple_body t))
     (var nelem (list_length es))
+    (var v (allocate_variant @Tuple nelem nelem))
+    (var i 1)
+    (while es (do
+        (store object v i (car es))
+        (incr i)
+        (= es (cdr es))
+        ))
+    (return v)
     ))
+
 (fun parse_tuple_body (t) (
     (if (== t @TOK_EOF) (return 0))
     (if (== t ')') (do
@@ -41,10 +50,39 @@
         (goto parse_tuple_body_loop)
         ))
     (unput)
-    (return es)
+    (return (list_reverse es))
     ))
 
-(fun parse_list (t) ((return (make_list (parse_list_body t)))))
+(fun parse_array (t) (
+    (var es (parse_array_body t))
+    (var nelem (list_length es))
+    (var ary (array object nelem))
+    (for i 0 nelem (do
+        (array_set object ary i (car es))
+        (= es (cdr es))
+        ))
+    (return (variant @Array 1 ary nelem))
+    ))
+
+(fun parse_array_body (t) (
+    (if (== t @TOK_EOF) (return 0))
+    (if (== t ']') (do
+        (unput)
+        (return 0)
+        ))
+    (var es 0)
+    (label parse_array_body_loop)
+    (= es (cons (parse_expr t) es))
+    (= t (lex))
+    (if (== t ',') (do
+        (= t (lex))
+        (goto parse_array_body_loop)
+        ))
+    (unput)
+    (return (list_reverse es))
+    ))
+
+(fun parse_list (t) ((return (variant @List 1 (parse_list_body t)))))
 (fun parse_list_body (t) (
     (if (== t @TOK_EOF) (return 0))
     (if (== t '}') (do
@@ -77,8 +115,11 @@
         (eatchar ')' (lex))
         (return e)
         )
-;    (if (== t '[') (do
-;        )
+    (if (== t '[') (do
+        (var e (parse_array (lex)))
+        (eatchar ']' (lex))
+        (return e)
+        )
     (if (== t '{') (do
         (var e (parse_list (lex)))
         (eatchar '}' (lex))
@@ -86,11 +127,11 @@
         )
 ;    (if (== t ';') (do
 ;        )))))
-    (if (== t @TOK_CHAR) (return (make_char (get_token_value)))
-    (if (== t @TOK_INT)  (return (make_int (get_token_value)))
+    (if (== t @TOK_CHAR) (return (variant @Char 0 (get_token_value)))
+    (if (== t @TOK_INT)  (return (variant @Int 0 (get_token_value)))
     (if (== t @TOK_FLOAT) (return (make_float_from_string (get_token_text)))
-    (if (== t @TOK_STRING) (return (make_string (get_token_text)))
-        ))))))
+    (if (== t @TOK_STRING) (return (variant @String 1 (get_token_text)))
+        )))))))
     (output_string stderr "not reachable\n")
     (exit 1)
     ))
