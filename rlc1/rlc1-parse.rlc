@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlc1-parse.rlc 2010-10-12 19:51:27 nineties $
+; $Id: rlc1-parse.rlc 2010-10-13 00:47:52 nineties $
 ;
 
 (import "rowl-compile")
@@ -10,39 +10,89 @@
 
 (compile `object `(
 
+(import "rlc1-util")
 (import "rlc1-lex")
 (import "rlc1-node")
 
 (export fun parse (file) (
     (var ichan (open_in file))
     (init_lexer file ichan)
-    (var prog (parse_expr_list (lex)))
+    (var prog (parse_list (lex)))
     (close_in ichan)
     (return prog)
     ))
 
-(fun parse_expr_list (t) ((return (make_list (parse_expr_list_iter t)))))
-(fun parse_expr_list_iter (t) (
+(fun parse_tuple (t) (
+    (var es (parse_tuple_body t))
+    (var nelem (list_length es))
+    ))
+(fun parse_tuple_body (t) (
     (if (== t @TOK_EOF) (return 0))
+    (if (== t ')') (do
+        (unput)
+        (return 0)
+        ))
+    (var es 0)
+    (label parse_tuple_body_loop)
+    (= es (cons (parse_expr t) es))
+    (= t (lex))
+    (if (== t ',') (do
+        (= t (lex))
+        (goto parse_tuple_body_loop)
+        ))
+    (unput)
+    (return es)
+    ))
+
+(fun parse_list (t) ((return (make_list (parse_list_body t)))))
+(fun parse_list_body (t) (
+    (if (== t @TOK_EOF) (return 0))
+    (if (== t '}') (do
+        (unput)
+        (return 0)
+        ))
     (var e (parse_expr t))
-    (var es (parse_expr_list_iter (lex)))
-    (return (cons e es))
+    (= t (lex))
+    (if (== t ';') (do
+        (var es (parse_list_body (lex)))
+        (return (cons e es))
+        ))
+    (unput)
+    (return (cons e 0))
+    ))
+
+(fun eatchar (c t) (
+    (if (== c t) return)
+    (flush stdout)
+    (output_loc stderr)
+    (output_string stderr "expect ")
+    (output_token stderr c)
+    (output_char stderr '\n')
+    (exit 1)
     ))
 
 (fun parse_expr (t) (
-;    (if (== t '(') (do
-;        )
+    (if (== t '(') (do
+        (var e (parse_tuple (lex)))
+        (eatchar ')' (lex))
+        (return e)
+        )
 ;    (if (== t '[') (do
 ;        )
-;    (if (== t '{') (do
-;        )
+    (if (== t '{') (do
+        (var e (parse_list (lex)))
+        (eatchar '}' (lex))
+        (return e)
+        )
 ;    (if (== t ';') (do
 ;        )))))
     (if (== t @TOK_CHAR) (return (make_char (get_token_value)))
     (if (== t @TOK_INT)  (return (make_int (get_token_value)))
     (if (== t @TOK_FLOAT) (return (make_float_from_string (get_token_text)))
-        )))
-    (return 0)
+    (if (== t @TOK_STRING) (return (make_string (get_token_text)))
+        ))))))
+    (output_string stderr "not reachable\n")
+    (exit 1)
     ))
 
     ))

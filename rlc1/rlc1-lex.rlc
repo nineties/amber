@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlc1-lex.rlc 2010-10-12 12:46:23 nineties $
+; $Id: rlc1-lex.rlc 2010-10-12 22:17:58 nineties $
 ;
 
 (import "rowl-compile")
@@ -130,6 +130,8 @@
 ; 11: undefined operator
 
 (compile `object `(
+
+(import "rlc1-util")
 
 (array char chgroup (
      0 25 25 25 25 25 25 25 25  1  2 25 25  1 25 25
@@ -260,8 +262,8 @@
     (return c)
     ))
 
-(fun unput () (
-    (if unputted (error "ERROR: try to unput two or more tokens\n"))
+(export fun unput () (
+    (if unputted (error "try to unput two or more tokens\n"))
     (= unputted 1)
     return
     ))
@@ -275,16 +277,34 @@
     return
     ))
 
+(export fun output_token (ochan t) (
+    (if (== t @TOK_CHAR) (output_string ochan "character")
+    (if (== t @TOK_INT) (output_string ochan "integer")
+    (if (== t @TOK_FLOAT) (output_string ochan "floating point")
+    (if (== t @TOK_STRING) (output_string ochan "string")
+    (if (== t @TOK_IDENT) (output_string ochan "identifier")
+    (if (== t @TOK_OPERATOR) (output_string ochan "operator")
+        (do
+            (if (>= t 256) (error "BUG: output_token : not reachable"))
+            (output_char ochan ''')
+            (output_char_escape ochan t)
+            (output_char ochan ''')
+        )))))))
+    ))
+
+(export fun output_loc (ochan) (
+    (output_string ochan "")
+    (output_string ochan srcfile)
+    (output_char   ochan ':')
+    (output_int    ochan srcline)
+    (output_char   ochan ':')
+    (output_int    ochan srcclmn)
+    (output_string ochan ": ")
+    ))
+
 (fun lex_error (msg) (
     (flush stdout)
-    (output_string stderr "ERROR:")
-    (output_string stderr srcfile)
-    (output_char   stderr ':')
-    (output_int    stderr srcline)
-    (output_char   stderr ':')
-    (output_int    stderr srcclmn)
-
-    (output_string stderr ":")
+    (output_loc stderr)
     (output_string stderr msg)
     (output_string stderr " : ")
     (output_string stderr (get_token_text))
@@ -309,8 +329,12 @@
     ))
 
 (export fun lex () (
-    (var state 0)
+    (if unputted (do
+        (= unputted 0)
+        (return token_tag)
+        ))
 
+    (var state 0)
     (label lexloop)
     (tswitch state (
         (0 . (do

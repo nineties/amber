@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-10-12 19:45:42 nineties $
+; $Id: vm-gc.rlc 2010-10-13 00:56:26 nineties $
 ;
 
 (import "stdlib")
@@ -153,8 +153,8 @@
 
 (define SET_HEADER (addr tag nboxed objsz) `([]= @addr 0 @(HEADER tag nboxed objsz)))
 
-(define FORWARD_ADDR (obj) `([] @obj @WORD_SIZE))
-(define SET_FORWARD_ADDR (obj addr) `([]= @obj @WORD_SIZE @addr))
+(define FORWARD_ADDR (obj) `([] @obj 1))
+(define SET_FORWARD_ADDR (obj addr) `([]= @obj 1 @addr))
 
 (var IN_GC `(!= current_gen next_gen))
 
@@ -309,11 +309,14 @@
     ; this object is already in next generation
     (if (== @(pdescr->generation (ADDR2PDESCR obj)) next_gen) ((return)))
 
+    (-= obj @WORD_SIZE)
+
     ; this object is already copyed
     (if @(OBJECT_COPYED obj) (
         ([]= objp 0 @(FORWARD_ADDR obj))
         (return)
         ))
+
 
     (int words @(OBJECT_WORDS obj))
     (void* new_obj (allocate_object words))
@@ -324,8 +327,9 @@
     ([]= objp 0 new_obj)
     ))
 
-(fun move_fields (obj) (
-    (int tag @(OBJECT_TAG obj))
+(fun move_fields (head) (
+    (void* obj (+ head @WORD_SIZE))
+    (int tag @(OBJECT_TAG head))
     (if (<= tag @TAG_PLAIN) ((return)))
     (if (== tag @TAG_CONS) (
         (move_object (+ obj @WORD_SIZE)) ; car
@@ -333,7 +337,7 @@
         (return)
         ))
     (if (== tag @TAG_ARRAY) (
-        (int len (- @(OBJECT_WORDS obj) 1)) ; -1 for the header
+        (int len (- @(OBJECT_WORDS head) 1)) ; -1 for the header
         (+= obj @WORD_SIZE)
         (while (> len 0) (
             (move_object obj)
@@ -342,7 +346,7 @@
         (return)
         ))
     (if (== tag @TAG_TUPLE) (
-        (int len @(BOXED_FIELD_SIZE obj))
+        (int len @(BOXED_FIELD_SIZE head))
         (+= obj @WORD_SIZE) ; skip header
         (while (> len 0) (
             (move_object obj)
@@ -351,7 +355,7 @@
         (return)
         ))
     (if (== tag @TAG_VARIANT) (
-        (int len @(BOXED_FIELD_SIZE obj))
+        (int len @(BOXED_FIELD_SIZE head))
         (+= obj @WORD_SIZE) ; skip header and variant tag
         (while (> len 0) (
             (move_object obj)
@@ -484,6 +488,12 @@
     (void* ptr (allocate_object words))
     @(SET_HEADER ptr TAG_TUPLE nboxed words)
     (return (+ ptr @WORD_SIZE))
+    ))
+
+; # of elements
+(export tuple_size)
+(fun tuple_size (t) (
+    (-= t @WORD_SIZE)
     ))
 
 (export allocate_tuple_with_values)

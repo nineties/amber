@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-10-12 19:44:44 nineties $
+; $Id: rowl-compile.rlc 2010-10-13 00:48:52 nineties $
 ;
 
 (import "stdlib")
@@ -255,6 +255,21 @@
         )
     ))
 
+(define compile_arg_assign (insn loc rhs) (do
+    (if (!= `nop insn)
+        (do
+            (emit_insn (arg_insn (cadr loc)))
+            (compile_expr rhs)
+            (emit_insn insn)
+        )
+        (do
+            (compile_expr rhs)
+        )
+        )
+    (var idx (cadr loc))
+    (emit_insn `(storel (byte @(arg_offs idx))))
+    ))
+
 (define compile_value_assign (insn (_ type name) rhs) (do
     (var load_store_op (assoc type `((char . (loadbv storebv)) (int . (loadv storewv)))))
     (if (!= `nop insn)
@@ -292,6 +307,7 @@
     (var loc (lookup_var lhs))
     (cond
         ((== `local (car loc)) (compile_local_assign insn loc rhs))
+        ((== `arg (car loc)) (compile_arg_assign insn loc rhs))
         ((== `value (car loc)) (compile_value_assign insn loc rhs))
         ((== `object (car loc)) (compile_object_assign insn loc rhs))
         (otherwise (error "compile_assign: not implemented"))
