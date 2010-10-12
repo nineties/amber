@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-10-12 14:02:49 nineties $
+; $Id: rowl-compile.rlc 2010-10-12 19:44:44 nineties $
 ;
 
 (import "stdlib")
@@ -566,6 +566,13 @@
     nil
     ))
 
+(define compile_cons ((_ hd tl)) (do
+    (compile_expr hd)
+    (compile_expr tl)
+    (emit_insn `cons)
+    true
+    ))
+
 (define compile_tuple ((_ nboxed . args)) (do
     (var nelem (length args))
     (set args (reverse args))
@@ -638,6 +645,7 @@
         ((== `array (car expr)) (compile_array expr))
         ((== `array_get (car expr)) (compile_array_get expr))
         ((== `array_set (car expr)) (compile_array_set expr))
+        ((== `cons (car expr)) (compile_cons expr))
         ((== `tuple (car expr)) (compile_tuple expr))
         ((== `variant (car expr)) (compile_variant expr))
         ((== `field_get (car expr)) (compile_field_get expr))
@@ -698,7 +706,9 @@
 ; (array type name value_list)
 (define compile_arraydecl ((_ type name . args) export) (do
     (var arrlen (if (int? (car args)) (car args) (length (car args))))
-    (var value_list (if (cons? (car args)) (car args) (cadr args)))
+    (var value_list (if (cons? (car args)) (car args)
+        (if (nil? (cdr args)) nil (cadr args))
+        ))
 
     ; XXX: temporal implementation
     (if (and value_list (== `string type))

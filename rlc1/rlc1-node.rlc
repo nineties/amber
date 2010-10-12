@@ -2,13 +2,15 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlc1-node.rlc 2010-10-12 14:58:23 nineties $
+; $Id: rlc1-node.rlc 2010-10-12 19:51:05 nineties $
 ;
 
 (import "rowl-compile")
 (import "rlc1-types")
 
 (compile `object `(
+
+(import "rlc1-util")
 
 (export fun make_char (v) (
     (return (variant @Char 0 v))
@@ -33,6 +35,10 @@
         (= mantissa (+ (* 10 mantissa) (- c '0')))
         (+= idx 1)
         ))
+
+    ; remove unnecessary trailing zeros
+    (while (== (% mantissa 10) 0) (/= mantissa 10))
+
     (if (== c 'e') (do
         (var sign 1)
         (+= idx 1)
@@ -50,6 +56,61 @@
         ))
 
     (return (variant @Float 0 0 mantissa exponent))
+    ))
+
+(export fun make_list (ls) (
+    (return (variant @List 1 ls))
+    ))
+
+; Pretty Printing
+(export fun pp_node (ochan node) (
+    (var tag (field_get node 0))
+    (if (== tag @Char) (pp_char ochan node)
+    (if (== tag @Int) (pp_int ochan node)
+    (if (== tag @Float) (pp_float ochan node)
+        )))
+    ))
+
+(fun pp_char (ochan node) (
+    (var code (field_get node 1))
+    (output_char ochan ''')
+    (output_char ochan code) ; XXX: treat escaped characters
+    (output_char ochan ''')
+    ))
+
+(fun pp_int (ochan node) (
+    (var value (field_get node 1))
+    (output_int ochan value)
+    ))
+
+(array char pp_float_digits 10)
+(fun pp_float (ochan node) (
+    (var sign (field_get node 1))
+    (if sign (output_char ochan '-'))
+    (var man  (field_get node 2))
+    (array_set char pp_float_digits 0 (+ (% man 10) '0'))
+    (/= man 10)
+    (var i 0)
+    (while (!= man 0) (do
+        (incr i)
+        (array_set char pp_float_digits i (+ (% man 10) '0'))
+        (/= man 10)
+        ))
+    (output_char ochan (array_get char pp_float_digits i))
+    (output_char ochan '.')
+    (decr i)
+    (if (< i 0)
+        (output_char ochan '0')
+        (while (>= i 0) (do
+            (output_char ochan (array_get char pp_float_digits i))
+            (decr i)
+            ))
+        )
+    (var exp  (field_get node 3))
+    (if (!= exp 0) (do
+        (output_char ochan 'e')
+        (output_int ochan exp)
+        ))
     ))
 
     ))
