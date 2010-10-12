@@ -2,13 +2,36 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlc1-util.rlc 2010-10-12 19:27:18 nineties $
+; $Id: rlc1-util.rlc 2010-10-12 22:59:22 nineties $
 ;
 
 (import "rowl-compile")
 (import "rlc1-types")
 
 (compile `object `(
+
+(export fun output_char_escape (ochan t) (
+    (if (== t '\\') (do (output_char ochan '\\') (output_char ochan '\\'))
+    (if (== t '\a') (output_string ochan "\\a")
+    (if (== t '\b') (output_string ochan "\\b")
+    (if (== t '\f') (output_string ochan "\\f")
+    (if (== t '\n') (output_string ochan "\\n")
+    (if (== t '\r') (output_string ochan "\\r")
+    (if (== t '\t') (output_string ochan "\\t")
+    (if (== t '\v') (output_string ochan "\\v")
+    (if (== t '\0') (output_string ochan "\\0")
+        (output_char ochan t)
+        )))))))))
+    ))
+
+(export fun list_length (es) (
+    (var len 0)
+    (while es (do
+        (= es (cdr es))
+        (incr len)
+        ))
+    (return len)
+    ))
 
 (export fun not_reachable (name) (
     (flush stdout)

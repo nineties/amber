@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlc1-node.rlc 2010-10-12 19:51:05 nineties $
+; $Id: rlc1-node.rlc 2010-10-12 20:36:05 nineties $
 ;
 
 (import "rowl-compile")
@@ -58,23 +58,35 @@
     (return (variant @Float 0 0 mantissa exponent))
     ))
 
+(export fun make_string (str) (
+    (return (variant @String 1 (strdup str)))
+    ))
+
 (export fun make_list (ls) (
     (return (variant @List 1 ls))
     ))
 
 ; Pretty Printing
+(var indent_depth 0)
+(var indent_width 4)
+(export fun pp_prog (ochan prog) (
+    (= indent_depth 0)
+    (pp_list_body ochan (field_get prog 1))
+    ))
+
 (export fun pp_node (ochan node) (
     (var tag (field_get node 0))
     (if (== tag @Char) (pp_char ochan node)
     (if (== tag @Int) (pp_int ochan node)
     (if (== tag @Float) (pp_float ochan node)
-        )))
+    (if (== tag @List) (pp_list ochan node)
+        ))))
     ))
 
 (fun pp_char (ochan node) (
     (var code (field_get node 1))
     (output_char ochan ''')
-    (output_char ochan code) ; XXX: treat escaped characters
+    (output_char_escape ochan code)
     (output_char ochan ''')
     ))
 
@@ -110,6 +122,28 @@
     (if (!= exp 0) (do
         (output_char ochan 'e')
         (output_int ochan exp)
+        ))
+    ))
+
+(fun put_indent (ochan) (
+    (for i 0 (* indent_width indent_depth) (output_char ochan ' '))
+    ))
+
+(fun pp_list (ochan node) (
+    (var list (field_get node 1))
+    (output_string ochan "{\n")
+    (incr indent_depth)
+    (pp_list_body ochan list)
+    (decr indent_depth)
+    (output_string ochan "}")
+    ))
+
+(fun pp_list_body (ochan list) (
+    (while list (do
+        (put_indent ochan)
+        (pp_node ochan (car list))
+        (output_string ochan ";\n")
+        (= list (cdr list))
         ))
     ))
 
