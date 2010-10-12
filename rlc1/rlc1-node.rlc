@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlc1-node.rlc 2010-10-12 20:36:05 nineties $
+; $Id: rlc1-node.rlc 2010-10-13 02:10:26 nineties $
 ;
 
 (import "rowl-compile")
@@ -11,14 +11,6 @@
 (compile `object `(
 
 (import "rlc1-util")
-
-(export fun make_char (v) (
-    (return (variant @Char 0 v))
-    ))
-
-(export fun make_int (v) (
-    (return (variant @Int 0 v))
-    ))
 
 (export fun make_float_from_string (str) (
     (var mantissa 0)
@@ -58,14 +50,6 @@
     (return (variant @Float 0 0 mantissa exponent))
     ))
 
-(export fun make_string (str) (
-    (return (variant @String 1 (strdup str)))
-    ))
-
-(export fun make_list (ls) (
-    (return (variant @List 1 ls))
-    ))
-
 ; Pretty Printing
 (var indent_depth 0)
 (var indent_width 4)
@@ -80,7 +64,9 @@
     (if (== tag @Int) (pp_int ochan node)
     (if (== tag @Float) (pp_float ochan node)
     (if (== tag @List) (pp_list ochan node)
-        ))))
+    (if (== tag @Tuple) (pp_tuple ochan node)
+    (if (== tag @Array) (pp_array ochan node)
+        ))))))
     ))
 
 (fun pp_char (ochan node) (
@@ -145,6 +131,31 @@
         (output_string ochan ";\n")
         (= list (cdr list))
         ))
+    ))
+
+(fun pp_tuple (ochan node) (
+    (var size (variant_size node))
+    (output_char ochan '(')
+    (for i 1 size (do
+        (pp_node ochan (load object node i))
+        (if (< (+ i 1) size)
+            (output_string ochan ", ")
+            )
+        ))
+    (output_char ochan ')')
+    ))
+
+(fun pp_array (ochan node) (
+    (var ary (field_get node 1))
+    (var len (field_get node 2))
+    (output_char ochan '[')
+    (for i 0 len (do
+        (pp_node ochan (array_get object ary i))
+        (if (< (+ i 1) len)
+            (output_string ochan ", ")
+            )
+        ))
+    (output_char ochan ']')
     ))
 
     ))

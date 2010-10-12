@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-10-13 00:48:52 nineties $
+; $Id: rowl-compile.rlc 2010-10-13 01:21:05 nineties $
 ;
 
 (import "stdlib")
@@ -564,7 +564,10 @@
     )
 
 (define compile_array_get ((_ type ary idx)) (do
-    (var insn (assoc type `((char . array_get8) (short . array_get16) (int . array_get32) (string . array_get32))))
+    (var insn (assoc type
+        `((char . array_get8) (short . array_get16) (int . array_get32) (string . array_get32)
+          (object . array_get32)
+        )))
     (if (not insn) ((error "ERROR: array_get: invalid type " type)))
     (compile_expr ary)
     (compile_expr idx)
@@ -573,7 +576,10 @@
     ))
 
 (define compile_array_set ((_ type ary idx val)) (do
-    (var insn (assoc type `((int . array_set32) (short . array_set16) (char . array_set8) (string . array_set32))))
+    (var insn (assoc type
+        `((int . array_set32) (short . array_set16) (char . array_set8) (string . array_set32)
+          (object . array_set32)
+        )))
     (if (not insn) ((error "ERROR: array_set: invalid type " type)))
     (compile_expr ary)
     (compile_expr idx)
@@ -661,6 +667,8 @@
         ((== `array (car expr)) (compile_array expr))
         ((== `array_get (car expr)) (compile_array_get expr))
         ((== `array_set (car expr)) (compile_array_set expr))
+        ((== `load (car expr)) (compile_array_get expr))
+        ((== `store (car expr)) (compile_array_set expr))
         ((== `cons (car expr)) (compile_cons expr))
         ((== `tuple (car expr)) (compile_tuple expr))
         ((== `variant (car expr)) (compile_variant expr))
