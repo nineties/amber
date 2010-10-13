@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlc1-lex.rlc 2010-10-12 22:17:58 nineties $
+; $Id: rlc1-lex.rlc 2010-10-13 02:34:21 nineties $
 ;
 
 (import "rowl-compile")
@@ -191,6 +191,9 @@
 (var token_tag @TOK_NONE)
 (var token_value 0) ; for integer and character
 (var token_buf null)
+(var next_srcfile null)
+(var next_srcline 1)
+(var next_srcclmn 1)
 (var srcfile null)
 (var srcline 1)
 (var srcclmn 1)
@@ -252,10 +255,10 @@
     (= c (cvector_at lexbuf lexbuf_end))
     (incr lexbuf_end)
     (if (== c '\n') (do
-        (incr srcline)
-        (= srcclmn 1)
+        (incr next_srcline)
+        (= next_srcclmn 1)
         )
-        (incr srcclmn)
+        (incr next_srcclmn)
         )
     (cvector_put token_buf (- (cvector_size token_buf) 1) c)
     (cvector_pushback token_buf '\0')
@@ -313,9 +316,9 @@
     ))
 
 (export fun init_lexer (fname ichan) (
-    (= srcfile fname)
-    (= srcline 1)
-    (= srcclmn 1)
+    (= next_srcfile fname)
+    (= next_srcline 1)
+    (= next_srcclmn 1)
     (= token_tag @TOK_NONE)
     (= token_value 0)
     (= unputted 0)
@@ -333,6 +336,9 @@
         (= unputted 0)
         (return token_tag)
         ))
+    (= srcfile next_srcfile)
+    (= srcline next_srcline)
+    (= srcclmn next_srcclmn)
 
     (var state 0)
     (label lexloop)
@@ -563,15 +569,15 @@
 (var save_token_len 0)
 (fun store_lexer_state () (
     (= save_lexbuf_end lexbuf_end)
-    (= save_srcline srcline)
-    (= save_srcclmn srcclmn)
+    (= save_srcline next_srcline)
+    (= save_srcclmn next_srcclmn)
     (= save_token_len (get_token_len))
     ))
 
 (fun restore_lexer_state () (
     (= lexbuf_end save_lexbuf_end)
-    (= srcline save_srcline)
-    (= srcclmn save_srcclmn)
+    (= next_srcline save_srcline)
+    (= next_srcclmn save_srcclmn)
     (cvector_resize token_buf save_token_len)
     (cvector_pushback token_buf '\0')
     ))
