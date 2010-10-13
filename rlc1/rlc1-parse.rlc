@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlc1-parse.rlc 2010-10-13 02:09:56 nineties $
+; $Id: rlc1-parse.rlc 2010-10-14 02:26:39 nineties $
 ;
 
 (import "rowl-compile")
@@ -25,6 +25,7 @@
 (fun parse_tuple (t) (
     (var es (parse_tuple_body t))
     (var nelem (list_length es))
+    (if (== nelem 1) (return (car es)))
     (var v (allocate_variant @Tuple nelem nelem))
     (var i 1)
     (while es (do
@@ -109,31 +110,74 @@
     (exit 1)
     ))
 
+(fun syntax_error () (
+    (flush stdout)
+    (output_loc stderr)
+    (output_string stderr "syntax error\n")
+    (exit 1)
+    ))
+
 (fun parse_expr (t) (
+    (var es 0)
+    (label parse_expr_loop)
     (if (== t '(') (do
         (var e (parse_tuple (lex)))
         (eatchar ')' (lex))
-        (return e)
+        (= es (cons e es))
+        (= t (lex))
+        (goto parse_expr_loop)
         )
     (if (== t '[') (do
         (var e (parse_array (lex)))
         (eatchar ']' (lex))
-        (return e)
+        (= es (cons e es))
+        (= t (lex))
+        (goto parse_expr_loop)
         )
     (if (== t '{') (do
         (var e (parse_list (lex)))
         (eatchar '}' (lex))
-        (return e)
+        (= es (cons e es))
+        (= t (lex))
+        (goto parse_expr_loop)
         )
-;    (if (== t ';') (do
-;        )))))
-    (if (== t @TOK_CHAR) (return (variant @Char 0 (get_token_value)))
-    (if (== t @TOK_INT)  (return (variant @Int 0 (get_token_value)))
-    (if (== t @TOK_FLOAT) (return (make_float_from_string (get_token_text)))
-    (if (== t @TOK_STRING) (return (variant @String 1 (get_token_text)))
-        )))))))
-    (output_string stderr "not reachable\n")
-    (exit 1)
+    (if (== t @TOK_CHAR) (do
+        (= es (cons (variant @Char 0 (get_token_value)) es))
+        (= t (lex))
+        (goto parse_expr_loop)
+        )
+    (if (== t @TOK_INT) (do
+        (= es (cons (variant @Int 0 (get_token_value)) es))
+        (= t (lex))
+        (goto parse_expr_loop)
+        )
+    (if (== t @TOK_FLOAT) (do
+        (= es (cons (make_float_from_string (get_token_text)) es))
+        (= t (lex))
+        (goto parse_expr_loop)
+        )
+    (if (== t @TOK_STRING) (do
+        (var str (get_token_text))
+        (var len (- (get_token_len) 2)) ; -2 for double quotes
+        (var new (array char (+ len 1)))
+        (strncpy new (+ str 1) len)
+        (unescape_string new)
+        (= es (cons (variant @String 1 new) es))
+        (= t (lex))
+        (goto parse_expr_loop)
+        )
+    (if (== t @TOK_IDENT) (do
+        (= es (cons (make_symbol (get_token_text)) es))
+        (= t (lex))
+        (goto parse_expr_loop)
+        )
+        ))))))))
+
+    (unput)
+    (if (! es) (return (variant @Seq 1 0)))
+    (if (== (cdr es) 0) (return (car es)))
+    (= es (list_reverse es))
+    (return (variant @Seq 1 es))
     ))
 
     ))

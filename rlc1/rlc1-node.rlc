@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlc1-node.rlc 2010-10-13 02:10:26 nineties $
+; $Id: rlc1-node.rlc 2010-10-14 02:26:24 nineties $
 ;
 
 (import "rowl-compile")
@@ -11,6 +11,14 @@
 (compile `object `(
 
 (import "rlc1-util")
+
+(var symbol_table (make_idtable))
+
+(export fun make_symbol (str) (
+    (var symbol (idtable_find symbol_table str))
+    (if symbol (return symbol))
+    (return (variant @Symbol 1 (strdup str)))
+    ))
 
 (export fun make_float_from_string (str) (
     (var mantissa 0)
@@ -60,13 +68,21 @@
 
 (export fun pp_node (ochan node) (
     (var tag (field_get node 0))
+    (if (== tag @Symbol) (pp_symbol ochan node)
     (if (== tag @Char) (pp_char ochan node)
     (if (== tag @Int) (pp_int ochan node)
     (if (== tag @Float) (pp_float ochan node)
+    (if (== tag @String) (pp_string ochan node)
     (if (== tag @List) (pp_list ochan node)
     (if (== tag @Tuple) (pp_tuple ochan node)
     (if (== tag @Array) (pp_array ochan node)
-        ))))))
+    (if (== tag @Seq) (pp_seq ochan node)
+        )))))))))
+    ))
+
+(fun pp_symbol (ochan node) (
+    (var name (field_get node 1))
+    (output_string ochan name)
     ))
 
 (fun pp_char (ochan node) (
@@ -109,6 +125,16 @@
         (output_char ochan 'e')
         (output_int ochan exp)
         ))
+    ))
+
+(fun pp_string (ochan node) (
+    (var str (field_get node 1))
+    (var len (strlen str))
+    (output_char ochan '"')
+    (for i 0 len (do
+        (output_char_escape ochan (array_get char str i))
+        ))
+    (output_char ochan '"')
     ))
 
 (fun put_indent (ochan) (
@@ -156,6 +182,15 @@
             )
         ))
     (output_char ochan ']')
+    ))
+
+(fun pp_seq (ochan node) (
+    (var list (field_get node 1))
+    (while list (do
+        (pp_node ochan (car list))
+        (= list (cdr list))
+        (if list (output_char ochan ' '))
+        ))
     ))
 
     ))

@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlc1-util.rlc 2010-10-13 01:28:47 nineties $
+; $Id: rlc1-util.rlc 2010-10-14 02:24:56 nineties $
 ;
 
 (import "rowl-compile")
@@ -22,6 +22,36 @@
     (if (== t '\0') (output_string ochan "\\0")
         (output_char ochan t)
         )))))))))
+    ))
+
+(fun unescape_char (c) (
+    (if (== c '\\') (return '\\'))
+    (if (== c 'a') (return '\a'))
+    (if (== c 'b') (return '\b'))
+    (if (== c 'f') (return '\f'))
+    (if (== c 'n') (return '\n'))
+    (if (== c 'r') (return '\r'))
+    (if (== c 't') (return '\t'))
+    (if (== c 'v') (return '\v'))
+    (if (== c '0') (return '\0'))
+    (not_reachable "unescape_char")
+    ))
+
+(export fun unescape_string (str) (
+    (var len (strlen str))
+    (var i 0)
+    (var j 0)
+    (while (< i len) (do
+        (var c (array_get char str i))
+        (if (== c '\\') (do
+            (incr i)
+            (= c (unescape_char (array_get char str i)))
+            ))
+        (array_set char str j c)
+        (incr i)
+        (incr j)
+        ))
+    (array_set char str j 0)
     ))
 
 (export fun list_length (ls) (
