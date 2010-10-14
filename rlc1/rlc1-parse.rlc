@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlc1-parse.rlc 2010-10-14 02:26:39 nineties $
+; $Id: rlc1-parse.rlc 2010-10-14 15:44:58 nineties $
 ;
 
 (import "rowl-compile")
@@ -17,6 +17,8 @@
 (export fun parse (file) (
     (var ichan (open_in file))
     (init_lexer file ichan)
+    (add_infixl "=" 2)
+    (add_infixl "+" 3)
     (var prog (parse_list (lex)))
     (close_in ichan)
     (return prog)
@@ -44,7 +46,7 @@
         ))
     (var es 0)
     (label parse_tuple_body_loop)
-    (= es (cons (parse_expr t) es))
+    (= es (cons (parse_seq t) es))
     (= t (lex))
     (if (== t ',') (do
         (= t (lex))
@@ -73,7 +75,7 @@
         ))
     (var es 0)
     (label parse_array_body_loop)
-    (= es (cons (parse_expr t) es))
+    (= es (cons (parse_seq t) es))
     (= t (lex))
     (if (== t ',') (do
         (= t (lex))
@@ -90,7 +92,7 @@
         (unput)
         (return 0)
         ))
-    (var e (parse_expr t))
+    (var e (parse_seq t))
     (= t (lex))
     (if (== t ';') (do
         (var es (parse_list_body (lex)))
@@ -110,51 +112,53 @@
     (exit 1)
     ))
 
-(fun syntax_error () (
+(fun parse_error (msg) (
     (flush stdout)
     (output_loc stderr)
-    (output_string stderr "syntax error\n")
+    (output_string stderr "parse error : ")
+    (output_string stderr msg)
+    (output_char stderr '\n')
     (exit 1)
     ))
 
-(fun parse_expr (t) (
+(fun parse_seq (t) (
     (var es 0)
-    (label parse_expr_loop)
+    (label parse_seq_loop)
     (if (== t '(') (do
         (var e (parse_tuple (lex)))
         (eatchar ')' (lex))
         (= es (cons e es))
         (= t (lex))
-        (goto parse_expr_loop)
+        (goto parse_seq_loop)
         )
     (if (== t '[') (do
         (var e (parse_array (lex)))
         (eatchar ']' (lex))
         (= es (cons e es))
         (= t (lex))
-        (goto parse_expr_loop)
+        (goto parse_seq_loop)
         )
     (if (== t '{') (do
         (var e (parse_list (lex)))
         (eatchar '}' (lex))
         (= es (cons e es))
         (= t (lex))
-        (goto parse_expr_loop)
+        (goto parse_seq_loop)
         )
     (if (== t @TOK_CHAR) (do
         (= es (cons (variant @Char 0 (get_token_value)) es))
         (= t (lex))
-        (goto parse_expr_loop)
+        (goto parse_seq_loop)
         )
     (if (== t @TOK_INT) (do
         (= es (cons (variant @Int 0 (get_token_value)) es))
         (= t (lex))
-        (goto parse_expr_loop)
+        (goto parse_seq_loop)
         )
     (if (== t @TOK_FLOAT) (do
         (= es (cons (make_float_from_string (get_token_text)) es))
         (= t (lex))
-        (goto parse_expr_loop)
+        (goto parse_seq_loop)
         )
     (if (== t @TOK_STRING) (do
         (var str (get_token_text))
@@ -164,20 +168,77 @@
         (unescape_string new)
         (= es (cons (variant @String 1 new) es))
         (= t (lex))
-        (goto parse_expr_loop)
+        (goto parse_seq_loop)
         )
-    (if (== t @TOK_IDENT) (do
+    (if (== t @TOK_SYMBOL) (do
         (= es (cons (make_symbol (get_token_text)) es))
         (= t (lex))
-        (goto parse_expr_loop)
+        (goto parse_seq_loop)
         )
-        ))))))))
+    (if (== t @TOK_OPERATOR) (do
+        (= es (cons (get_token_value) es))
+        (= t (lex))
+        (goto parse_seq_loop)
+        )
+        )))))))))
 
     (unput)
     (if (! es) (return (variant @Seq 1 0)))
     (if (== (cdr es) 0) (return (car es)))
     (= es (list_reverse es))
     (return (variant @Seq 1 es))
+    ))
+
+(fun constr_error (name) (
+    (flush stdout)
+    (output_loc stderr)
+    (output_string stderr "parse error : '")
+    (output_string stderr name)
+    (output_string stderr "' is defined as a constructor\n")
+    (exit 1)
+    ))
+
+(fun assoc_error (name assoc) (
+    (flush stdout)
+    (output_loc stderr)
+    (output_string stderr "parse error : '")
+    (output_string stderr name)
+    (output_string stderr "' is defined as an ")
+    (output_string stderr assoc)
+    (output_string stderr " operator\n")
+    (exit 1)
+    ))
+
+(export fun add_infixl (name assoc) (
+    (var op (find_operator name))
+    (if (! op) (do
+        (add_operator name (variant @Operator 1 name 0 assoc))
+        return
+        ))
+    (if (!= (field_get op 0) @Operator) (constr_error name))
+    (if (< (field_get op 3) 0) (assoc_error name "infixr"))
+    (field_set op 3 assoc)
+    ))
+
+(export fun add_infixr (name assoc) (
+    (var op (find_operator name))
+    (if (! op) (do
+        (add_operator name (variant @Operator 1 name 0 (- assoc)))
+        return
+        ))
+    (if (!= (field_get op 0) @Operator) (constr_error name))
+    (if (> (field_get op 3) 0) (assoc_error name "infixl"))
+    (field_set op 3 assoc)
+    ))
+
+(export fun add_prefix (name assoc) (
+    (var op (find_operator name))
+    (if (! op) (do
+        (add_operator name (variant @Operator 1 name assoc 0))
+        return
+        ))
+    (if (!= (field_get op 0) @Operator) (constr_error name))
+    (field_set op 2 assoc)
     ))
 
     ))

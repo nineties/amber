@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlc1-lex.rlc 2010-10-13 02:34:21 nineties $
+; $Id: rlc1-lex.rlc 2010-10-14 15:35:01 nineties $
 ;
 
 (import "rowl-compile")
@@ -285,7 +285,7 @@
     (if (== t @TOK_INT) (output_string ochan "integer")
     (if (== t @TOK_FLOAT) (output_string ochan "floating point")
     (if (== t @TOK_STRING) (output_string ochan "string")
-    (if (== t @TOK_IDENT) (output_string ochan "identifier")
+    (if (== t @TOK_SYMBOL) (output_string ochan "symbol")
     (if (== t @TOK_OPERATOR) (output_string ochan "operator")
         (do
             (if (>= t 256) (error "BUG: output_token : not reachable"))
@@ -296,13 +296,14 @@
     ))
 
 (export fun output_loc (ochan) (
-    (output_string ochan "")
-    (output_string ochan srcfile)
-    (output_char   ochan ':')
-    (output_int    ochan srcline)
-    (output_char   ochan ':')
-    (output_int    ochan srcclmn)
-    (output_string ochan ": ")
+    (if srcfile (do
+        (output_string ochan srcfile)
+        (output_char   ochan ':')
+        (output_int    ochan srcline)
+        (output_char   ochan ':')
+        (output_int    ochan srcclmn)
+        (output_string ochan ": ")
+        ))
     ))
 
 (fun lex_error (msg) (
@@ -531,13 +532,13 @@
             ))
         (34 . (do
             (consume)
-            (accept @TOK_IDENT)
+            (accept @TOK_SYMBOL)
             (= state (next_state s34next))
             (goto lexloop)
             ))
         (35 . (do
             (consume)
-            (if (idtable_find operator_table (get_token_text)) (do
+            (if (= token_value (idtable_find operator_table (get_token_text))) (do
                 (accept @TOK_OPERATOR)
                 (store_lexer_state)
                 ))
@@ -567,11 +568,13 @@
 (var save_srcline 0)
 (var save_srcclmn 0)
 (var save_token_len 0)
+(var save_token_value 0)
 (fun store_lexer_state () (
     (= save_lexbuf_end lexbuf_end)
     (= save_srcline next_srcline)
     (= save_srcclmn next_srcclmn)
     (= save_token_len (get_token_len))
+    (= save_token_value (get_token_value))
     ))
 
 (fun restore_lexer_state () (
@@ -580,6 +583,7 @@
     (= next_srcclmn save_srcclmn)
     (cvector_resize token_buf save_token_len)
     (cvector_pushback token_buf '\0')
+    (= token_value save_token_value)
     ))
 
 (export fun push_operator_table () (
@@ -590,8 +594,12 @@
     (idtable_pop operator_table)
     ))
 
-(export fun add_operator (name) (
-    (idtable_add operator_table name 1)
+(export fun add_operator (name obj) (
+    (idtable_add operator_table name obj)
+    ))
+
+(export fun find_operator (name) (
+    (return (idtable_find operator_table name))
     ))
 
     ))
