@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlc1-lex.rlc 2010-10-14 15:35:01 nineties $
+; $Id: rlc1-lex.rlc 2010-10-15 15:49:59 nineties $
 ;
 
 (import "rowl-compile")
@@ -212,6 +212,7 @@
 (export fun get_token_text () ((return (cvector_ptr token_buf))))
 (export fun get_token_len  () ((return (- (cvector_size token_buf) 1))))
 (export fun get_token_value () ((return token_value)))
+(export fun get_loc () ((return (tuple 1 srcfile srcline srcclmn next_srcline next_srcclmn))))
 
 (array char esc2val_table (
     34 0 0 0 0 39 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
@@ -286,13 +287,15 @@
     (if (== t @TOK_FLOAT) (output_string ochan "floating point")
     (if (== t @TOK_STRING) (output_string ochan "string")
     (if (== t @TOK_SYMBOL) (output_string ochan "symbol")
-    (if (== t @TOK_OPERATOR) (output_string ochan "operator")
+    (if (== t @TOK_PREFIX) (output_string ochan "prefix operator")
+    (if (== t @TOK_POSTFIX) (output_string ochan "postfix operator")
+    (if (== t @TOK_INFIX) (output_string ochan "infix operator")
         (do
             (if (>= t 256) (error "BUG: output_token : not reachable"))
             (output_char ochan ''')
             (output_char_escape ochan t)
             (output_char ochan ''')
-        )))))))
+        )))))))))
     ))
 
 (export fun output_loc (ochan) (
@@ -317,7 +320,7 @@
     ))
 
 (export fun init_lexer (fname ichan) (
-    (= next_srcfile fname)
+    (= next_srcfile (strdup fname))
     (= next_srcline 1)
     (= next_srcclmn 1)
     (= token_tag @TOK_NONE)
@@ -332,7 +335,10 @@
     return
     ))
 
-(export fun lex () (
+(export fun lex () ((return (lex_main 0))))
+(export fun lex_infix () ((return (lex_main 1))))
+
+(fun lex_main (infix_p) (
     (if unputted (do
         (= unputted 0)
         (return token_tag)
@@ -365,7 +371,10 @@
         (9  . (lex_error "unterminated character literal"))
         (10 . (lex_error "unterminated string literal"))
         (11 . (lex_error "undefined operator"))
-        (12 . (return @TOK_EOF))
+        (12 . (do
+            (= token_tag @TOK_EOF)
+            (return @TOK_EOF)
+            ))
         (13 . (do
             ; comment
             (consume)
@@ -538,8 +547,21 @@
             ))
         (35 . (do
             (consume)
-            (if (= token_value (idtable_find operator_table (get_token_text))) (do
-                (accept @TOK_OPERATOR)
+            (var op)
+            (if (= op (idtable_find operator_table (get_token_text))) (do
+                (var optype (field_get op 0))
+                (if (== optype @OP_PREFIX) (accept @TOK_PREFIX)
+                (if (== optype @OP_POSTFIX) (accept @TOK_POSTFIX)
+                (if (== optype @OP_INFIX) (accept @TOK_INFIX)
+                (if (== optype @OP_CONSTR) (accept @TOK_CONSTR)
+                (if (== optype @OP_PREFIX_OR_INFIX) (do
+                    (if infix_p
+                        (do (accept @TOK_INFIX) (= op (field_get op 2)))
+                        (do (accept @TOK_PREFIX) (= op (field_get op 1)))
+                        )
+                    )
+                    )))))
+                (= token_value op)
                 (store_lexer_state)
                 ))
             (= state (next_state s35next))

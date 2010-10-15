@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlc1-parse.rlc 2010-10-14 15:44:58 nineties $
+; $Id: rlc1-parse.rlc 2010-10-15 16:08:33 nineties $
 ;
 
 (import "rowl-compile")
@@ -14,231 +14,227 @@
 (import "rlc1-lex")
 (import "rlc1-node")
 
+; Prog ::= Expr*
+; Expr ::= Primary
+;        | prefix Expr
+;        | Expr postfix
+;        | Expr infix Expr
+;        | Expr { , Expr }
+;        | constr<n> Expr{n}
+; Primary ::= Literal
+;           | Primary open close
+;           | Primary open Expr close
+;           | open close
+;           | open Expr close
+;           | \{ Expr* \}
+;
+; open  = ( [
+; close = ) ]
+;
+; NB:
+; - postfix operator must be unique
+
+
 (export fun parse (file) (
     (var ichan (open_in file))
     (init_lexer file ichan)
-    (add_infixl "=" 2)
-    (add_infixl "+" 3)
-    (var prog (parse_list (lex)))
+
+    ; for test
+    (add_infixl "+" 1)
+    (add_infixl "-" 1)
+    (add_infixl "*" 2)
+    (add_infixl "/" 2)
+    (add_prefix "+" 3)
+    (add_prefix "-" 3)
+
+    (var prog (parse_prog))
     (close_in ichan)
     (return prog)
     ))
 
-(fun parse_tuple (t) (
-    (var es (parse_tuple_body t))
-    (var nelem (list_length es))
-    (if (== nelem 1) (return (car es)))
-    (var v (allocate_variant @Tuple nelem nelem))
-    (var i 1)
-    (while es (do
-        (store object v i (car es))
-        (incr i)
-        (= es (cdr es))
-        ))
-    (return v)
-    ))
-
-(fun parse_tuple_body (t) (
-    (if (== t @TOK_EOF) (return 0))
-    (if (== t ')') (do
-        (unput)
-        (return 0)
-        ))
+(fun parse_prog () (
     (var es 0)
-    (label parse_tuple_body_loop)
-    (= es (cons (parse_seq t) es))
-    (= t (lex))
-    (if (== t ',') (do
-        (= t (lex))
-        (goto parse_tuple_body_loop)
+    (while 1 (do
+        (var e (parse_expr (lex)))
+        (if (! e) break)
+        (= es (cons e es))
         ))
-    (unput)
-    (return (list_reverse es))
+    (return (variant @List 1 (list_reverse es)))
     ))
 
-(fun parse_array (t) (
-    (var es (parse_array_body t))
-    (var nelem (list_length es))
-    (var ary (array object nelem))
-    (for i 0 nelem (do
-        (array_set object ary i (car es))
-        (= es (cdr es))
-        ))
-    (return (variant @Array 1 ary nelem))
-    ))
-
-(fun parse_array_body (t) (
+(fun parse_expr (t) (
     (if (== t @TOK_EOF) (return 0))
-    (if (== t ']') (do
-        (unput)
-        (return 0)
+
+    (var expr_stack 0)
+    (var op_stack 0)
+    (var next_op)
+
+    (= op_stack (cons (variant @OP_START 0) op_stack))
+    (label parse_expr_loop)
+
+    (while (== t @TOK_PREFIX) (do
+        (= op_stack (cons (get_token_value) op_stack))
+        (= t (lex))
         ))
-    (var es 0)
-    (label parse_array_body_loop)
-    (= es (cons (parse_seq t) es))
+    (var e (parse_primary t))
+    (= expr_stack (cons e expr_stack))
+
+    (= t (lex_infix))
+    (if (== t @TOK_INFIX)
+        (= next_op (get_token_value))
+        (do
+            (unput)
+            (= next_op (variant @OP_END 0))
+        )
+        )
+
+    (while 1 (do
+        (var comp (compare_associativity (car op_stack) next_op))
+        (if (== comp 0) (goto parse_expr_end)
+        (if (> comp 0) (do
+            ; reduce
+            (var op (car op_stack))
+            (= op_stack (cdr op_stack))
+            (= expr_stack (reduce op expr_stack))
+            continue
+            )
+            (do
+                (= op_stack (cons next_op op_stack))
+                break
+            )
+            ))
+        ))
+
     (= t (lex))
-    (if (== t ',') (do
-        (= t (lex))
-        (goto parse_array_body_loop)
+    (goto parse_expr_loop)
+    (label parse_expr_end)
+
+    (var len (list_length expr_stack))
+    (if (== len 0) (return 0))
+    (if (> len 1) (do
+        (flush stdout)
+        (output_loc stderr)
+        (output_string stderr "syntax error: irreducible expression\n")
+        (exit 1)
         ))
-    (unput)
-    (return (list_reverse es))
+    (return (car expr_stack))
     ))
 
-(fun parse_list (t) ((return (variant @List 1 (parse_list_body t)))))
-(fun parse_list_body (t) (
-    (if (== t @TOK_EOF) (return 0))
-    (if (== t '}') (do
-        (unput)
-        (return 0)
-        ))
-    (var e (parse_seq t))
-    (= t (lex))
-    (if (== t ';') (do
-        (var es (parse_list_body (lex)))
-        (return (cons e es))
-        ))
-    (unput)
-    (return (cons e 0))
-    ))
-
-(fun eatchar (c t) (
-    (if (== c t) return)
-    (flush stdout)
-    (output_loc stderr)
-    (output_string stderr "expect ")
-    (output_token stderr c)
-    (output_char stderr '\n')
-    (exit 1)
-    ))
-
-(fun parse_error (msg) (
-    (flush stdout)
-    (output_loc stderr)
-    (output_string stderr "parse error : ")
-    (output_string stderr msg)
-    (output_char stderr '\n')
-    (exit 1)
-    ))
-
-(fun parse_seq (t) (
-    (var es 0)
-    (label parse_seq_loop)
-    (if (== t '(') (do
-        (var e (parse_tuple (lex)))
-        (eatchar ')' (lex))
-        (= es (cons e es))
-        (= t (lex))
-        (goto parse_seq_loop)
-        )
-    (if (== t '[') (do
-        (var e (parse_array (lex)))
-        (eatchar ']' (lex))
-        (= es (cons e es))
-        (= t (lex))
-        (goto parse_seq_loop)
-        )
-    (if (== t '{') (do
-        (var e (parse_list (lex)))
-        (eatchar '}' (lex))
-        (= es (cons e es))
-        (= t (lex))
-        (goto parse_seq_loop)
-        )
-    (if (== t @TOK_CHAR) (do
-        (= es (cons (variant @Char 0 (get_token_value)) es))
-        (= t (lex))
-        (goto parse_seq_loop)
-        )
-    (if (== t @TOK_INT) (do
-        (= es (cons (variant @Int 0 (get_token_value)) es))
-        (= t (lex))
-        (goto parse_seq_loop)
-        )
-    (if (== t @TOK_FLOAT) (do
-        (= es (cons (make_float_from_string (get_token_text)) es))
-        (= t (lex))
-        (goto parse_seq_loop)
-        )
+(fun parse_primary (t) (
+    (if (== t @TOK_CHAR) (return (variant @Char 0 (get_token_value)))
+    (if (== t @TOK_INT) (return (variant @Int 0 (get_token_value)))
+    (if (== t @TOK_FLOAT) (return (make_float_from_string (get_token_text)))
     (if (== t @TOK_STRING) (do
+        ; remove double quotes
         (var str (get_token_text))
-        (var len (- (get_token_len) 2)) ; -2 for double quotes
+        (var len (- (get_token_len) 2))
         (var new (array char (+ len 1)))
         (strncpy new (+ str 1) len)
         (unescape_string new)
-        (= es (cons (variant @String 1 new) es))
-        (= t (lex))
-        (goto parse_seq_loop)
+        (return (variant @String 1 new))
         )
-    (if (== t @TOK_SYMBOL) (do
-        (= es (cons (make_symbol (get_token_text)) es))
-        (= t (lex))
-        (goto parse_seq_loop)
-        )
-    (if (== t @TOK_OPERATOR) (do
-        (= es (cons (get_token_value) es))
-        (= t (lex))
-        (goto parse_seq_loop)
-        )
-        )))))))))
+    (if (== t @TOK_SYMBOL) (return (make_symbol (get_token_text)))
+        )))))
 
-    (unput)
-    (if (! es) (return (variant @Seq 1 0)))
-    (if (== (cdr es) 0) (return (car es)))
-    (= es (list_reverse es))
-    (return (variant @Seq 1 es))
-    ))
-
-(fun constr_error (name) (
     (flush stdout)
     (output_loc stderr)
-    (output_string stderr "parse error : '")
-    (output_string stderr name)
-    (output_string stderr "' is defined as a constructor\n")
+    (output_string stderr "syntax error: primary expression required\n")
     (exit 1)
     ))
 
-(fun assoc_error (name assoc) (
+(fun associativity (op) (
+    (var type (field_get op 0))
+    (if (== type @OP_PREFIX) (return (field_get op 2))
+    (if (== type @OP_POSTFIX) (return (field_get op 2))
+    (if (== type @OP_INFIX) (return (field_get op 3))
+    (if (== type @OP_CONSTR) (return (field_get op 2))
+    (if (== type @OP_START) (return 0)
+    (if (== type @OP_END) (return 0)
+        ))))))
+    ))
+
+(fun reduce (op exprs) (
+    (var type (field_get op 0))
+    (if (== type @OP_PREFIX)
+        (return (cons (variant @Prefix 2 (field_get op 1) (car exprs)) (cdr exprs)))
+    (if (== type @OP_POSTFIX)
+        (return (cons (variant @Postfix 2 (field_get op 1) (car exprs)) (cdr exprs)))
+    (if (== type @OP_INFIX)
+        (return (cons (variant @Infix 3 (field_get op 1) (cadr exprs) (car exprs)) (cddr exprs)))
+        )))
+    ))
+
+(fun compare_associativity (lop rop) (
+    (var lassoc (associativity lop))
+    (var rassoc (associativity rop))
+    (if (!= lassoc rassoc) (return (- lassoc rassoc)))
+    (var ltype (field_get lop 0))
+    (var rtype (field_get rop 0))
+    (if (== ltype @OP_START) (return 0))
+    (if (&& (== ltype @OP_INFIX) (== rtype @OP_INFIX)) (do
+        (var is_left_l (field_get lop 2))
+        (var is_left_r (field_get rop 2))
+        (if (== is_left_l is_left_r) (if is_left_l (return 1) (return -1)))
+        ))
+    ; XXX: output locatoin
     (flush stdout)
-    (output_loc stderr)
-    (output_string stderr "parse error : '")
-    (output_string stderr name)
-    (output_string stderr "' is defined as an ")
-    (output_string stderr assoc)
-    (output_string stderr " operator\n")
+    (output_string stderr "ERROR: undecidable associativity\n")
     (exit 1)
     ))
 
-(export fun add_infixl (name assoc) (
-    (var op (find_operator name))
-    (if (! op) (do
-        (add_operator name (variant @Operator 1 name 0 assoc))
-        return
-        ))
-    (if (!= (field_get op 0) @Operator) (constr_error name))
-    (if (< (field_get op 3) 0) (assoc_error name "infixr"))
-    (field_set op 3 assoc)
-    ))
-
-(export fun add_infixr (name assoc) (
-    (var op (find_operator name))
-    (if (! op) (do
-        (add_operator name (variant @Operator 1 name 0 (- assoc)))
-        return
-        ))
-    (if (!= (field_get op 0) @Operator) (constr_error name))
-    (if (> (field_get op 3) 0) (assoc_error name "infixl"))
-    (field_set op 3 assoc)
+(fun check_assoc (name assoc) (
+    (if (> assoc 0) return)
+    (output_string stderr "ERROR: associativity of operator '")
+    (output_string stderr name)
+    (output_string stderr "' must be positive\n")
+    (exit 1)
     ))
 
 (export fun add_prefix (name assoc) (
+    (check_assoc name assoc)
     (var op (find_operator name))
-    (if (! op) (do
-        (add_operator name (variant @Operator 1 name assoc 0))
-        return
+    (var sym (make_symbol name))
+    (var prefix_op (variant @OP_PREFIX 1 sym assoc))
+    (if op (do
+        (var optype (field_get op 0))
+        (if (== optype @OP_INFIX) (do
+            (add_operator name (variant @OP_PREFIX_OR_INFIX 2 prefix_op op))
+            return
+            ))
+        (if (== optype @OP_PREFIX_OR_INFIX) (do
+            (add_operator name (variant @OP_PREFIX_OR_INFIX 2 prefix_op (field_get op 2)))
+            return
+            ))
         ))
-    (if (!= (field_get op 0) @Operator) (constr_error name))
-    (field_set op 2 assoc)
+    (add_operator name prefix_op)
+    ))
+
+(export fun add_postfix (name assoc) (
+    (check_assoc name assoc)
+    (var sym (make_symbol name))
+    (add_operator name (variant @OP_POSTFIX 1 sym assoc))
+    ))
+
+(export fun add_infixl (name assoc) ((add_infix name 1 assoc)))
+(export fun add_infixr (name assoc) ((add_infix name 0 assoc)))
+
+(fun add_infix (name is_left assoc) (
+    (check_assoc name assoc)
+    (var op (find_operator name))
+    (var sym (make_symbol name))
+    (var infix_op (variant @OP_INFIX 1 sym is_left assoc))
+    (if op (do
+        (var optype (field_get op 0))
+        (if (== optype @OP_PREFIX) (do
+            (add_operator name (variant @OP_PREFIX_OR_INFIX 2 op infix_op))
+            return
+            ))
+        (if (== optype @OP_PREFIX_OR_INFIX) (do
+            (add_operator name (variant @OP_PREFIX_OR_INFIX 2 (field_get op 1) infix_op))
+            return
+            ))
+        ))
+    (add_operator name infix_op)
     ))
 
     ))

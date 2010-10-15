@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-10-13 22:34:36 nineties $
+; $Id: rowl-compile.rlc 2010-10-15 15:06:41 nineties $
 ;
 
 (import "stdlib")
@@ -38,14 +38,19 @@
     ))
 
 (var break_labels ())
-(define push_break_label () (do
-    (var lbl (mklabel))
-    (push break_labels lbl)
+(var continue_labels ())
+(define push_loop_label () (do
+    (var blbl (mklabel))
+    (var clbl (mklabel))
+    (push break_labels blbl)
+    (push continue_labels clbl)
+    (emit_insn `(label @clbl))
     ))
-(define pop_break_label () (do
-    (var lbl (car break_labels))
+(define pop_loop_label () (do
+    (var blbl (car break_labels))
     (set break_labels (cdr break_labels))
-    (emit_insn `(label @lbl))
+    (set continue_labels (cdr continue_labels))
+    (emit_insn `(label @blbl))
     ))
 
 (var num_local_var 0)
@@ -431,9 +436,9 @@
 
 (define compile_while ((_ expr body)) (do
     (var loop_label (mklabel))
-    (push_break_label)
+    (push_loop_label)
     (compile_if `(if @expr (do (label @loop_label) @body (if @expr (goto @loop_label)))))
-    (pop_break_label)
+    (pop_loop_label)
     nil
     ))
 
@@ -452,7 +457,7 @@
 
 (define compile_for ((_ it low high body)) (do
     (var loop_label (mklabel))
-    (push_break_label)
+    (push_loop_label)
     (if (compile_block `(
         (var @it @low)
         (var end @high)
@@ -465,7 +470,7 @@
         ))
         (emit_insn `drop)
         )
-    (pop_break_label)
+    (pop_loop_label)
     nil
     ))
 
@@ -483,7 +488,7 @@
 
     (compile_expr e)
 
-    (push_break_label)
+    (push_loop_label)
     (emit_insn `(tswitch (short @(- ncase 1))))
     (foreach l labels (do
         (emit_insn `(tswitch_ent (label @l)))
@@ -493,7 +498,7 @@
         (if (compile_expr (cdr c)) (emit_insn `drop))
         (set labels (cdr labels))
         ))
-    (pop_break_label)
+    (pop_loop_label)
     nil
     ))
 
@@ -510,6 +515,12 @@
 (define compile_break (_) (do
     (var break_label (car break_labels))
     (emit_insn `(goto (label @break_label)))
+    nil
+    ))
+
+(define compile_continue (_) (do
+    (var continue_label (car continue_labels))
+    (emit_insn `(goto (label @continue_label)))
     nil
     ))
 
@@ -647,6 +658,7 @@
         ((== `null expr)   (do (emit_insn `imm_i0) true))
         ((== `return expr) (do (emit_insn `return) nil))
         ((== `break expr) (compile_break expr))
+        ((== `continue expr) (compile_continue expr))
         ((char? expr) (compile_int_lit (char2int expr)))
         ((int? expr) (compile_int_lit expr))
         ((string? expr) (compile_string_lit expr))
@@ -678,6 +690,8 @@
         ((== `set (car expr)) (compile_field_set `(field_set @(cadr expr) 0 @(caddr expr))))
         ((== `car (car expr)) (compile_field_get `(field_set @(cadr expr) 0)))
         ((== `cdr (car expr)) (compile_field_get `(field_set @(cadr expr) 1)))
+        ((== `cadr (car expr)) (compile_field_get `(field_get (field_get @(cadr expr) 1) 0)))
+        ((== `cddr (car expr)) (compile_field_get `(field_get (field_get @(cadr expr) 1) 1)))
         ((== `setcar (car expr)) (compile_field_set `(field_set @(cadr expr) 0 @(caddr expr))))
         ((== `setcdr (car expr)) (compile_field_set `(field_set @(cadr expr) 1 @(caddr expr))))
         ((and (== 3 (length expr)) (binary_operator? (car expr)))
