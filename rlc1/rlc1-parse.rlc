@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlc1-parse.rlc 2010-10-15 16:08:33 nineties $
+; $Id: rlc1-parse.rlc 2010-10-15 16:27:49 nineties $
 ;
 
 (import "rowl-compile")
@@ -40,12 +40,13 @@
     (init_lexer file ichan)
 
     ; for test
-    (add_infixl "+" 1)
-    (add_infixl "-" 1)
-    (add_infixl "*" 2)
-    (add_infixl "/" 2)
-    (add_prefix "+" 3)
-    (add_prefix "-" 3)
+    (add_postfix ";" 1)
+    (add_infixl "+" 2)
+    (add_infixl "-" 2)
+    (add_infixl "*" 3)
+    (add_infixl "/" 3)
+    (add_prefix "+" 4)
+    (add_prefix "-" 4)
 
     (var prog (parse_prog))
     (close_in ichan)
@@ -55,32 +56,35 @@
 (fun parse_prog () (
     (var es 0)
     (while 1 (do
-        (var e (parse_expr (lex)))
-        (if (! e) break)
+        (if (== (lex) @TOK_EOF) break)
+        (unput)
+        (var e (parse_expr))
         (= es (cons e es))
         ))
     (return (variant @List 1 (list_reverse es)))
     ))
 
-(fun parse_expr (t) (
-    (if (== t @TOK_EOF) (return 0))
+(fun parse_expr () (
 
     (var expr_stack 0)
     (var op_stack 0)
     (var next_op)
+    (var tok)
 
     (= op_stack (cons (variant @OP_START 0) op_stack))
-    (label parse_expr_loop)
 
-    (while (== t @TOK_PREFIX) (do
+(label parse_expr_front)
+    (= tok (lex))
+    (while (== tok @TOK_PREFIX) (do
         (= op_stack (cons (get_token_value) op_stack))
-        (= t (lex))
+        (= tok (lex))
         ))
-    (var e (parse_primary t))
+    (var e (parse_primary tok))
     (= expr_stack (cons e expr_stack))
 
-    (= t (lex_infix))
-    (if (== t @TOK_INFIX)
+(label parse_expr_infix)
+    (= tok (lex_infix))
+    (if (|| (== tok @TOK_INFIX) (== tok @TOK_POSTFIX))
         (= next_op (get_token_value))
         (do
             (unput)
@@ -105,9 +109,15 @@
             ))
         ))
 
-    (= t (lex))
-    (goto parse_expr_loop)
-    (label parse_expr_end)
+    (if (== tok @TOK_INFIX) (goto parse_expr_front)
+    (if (== tok @TOK_POSTFIX) (goto parse_expr_infix)
+        ))
+
+    (flush stdout)
+    (output_string stderr "parse_expr: not implemented\n")
+    (exit 1)
+
+(label parse_expr_end)
 
     (var len (list_length expr_stack))
     (if (== len 0) (return 0))
@@ -138,6 +148,7 @@
 
     (flush stdout)
     (output_loc stderr)
+    (output_int stderr t)
     (output_string stderr "syntax error: primary expression required\n")
     (exit 1)
     ))
