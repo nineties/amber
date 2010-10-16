@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlc1-parse.rlc 2010-10-16 20:35:53 nineties $
+; $Id: rlc1-parse.rlc 2010-10-17 02:38:59 nineties $
 ;
 
 (import "rowl-compile")
@@ -41,7 +41,6 @@
     (add_postfix ";" 1)
     (add_constr  "return" 1 2)
     (add_infixr  "=" 3)
-    (add_infixl  "," 4)
     (add_infixl  "+" 5)
     (add_infixl  "-" 5)
     (add_infixl  "*" 6)
@@ -55,14 +54,20 @@
     ))
 
 (fun parse_prog () (
-    (var es 0)
+    (var elems 0)
     (while 1 (do
         (var t (lex))
         (if (== t @TOK_EOF) break)
         (var e (parse_expr t))
-        (= es (cons e es))
+        (= elems (cons e elems))
         ))
-    (return (variant @List 1 (list_reverse es)))
+    (var prog NilSym)
+    (while elems (do
+        (= prog (variant @Cons 2 (car elems) prog))
+        (= elems (cdr elems))
+        ))
+
+    (return prog)
     ))
 
 (fun parse_expr (tok) (
@@ -156,17 +161,76 @@
             ))
         (return expr)
         )
-        ))))))
+    (if (== t '(') (return (parse_tuple (lex)))
+    (if (== t '[') (return (parse_array (lex)))
+    (if (== t '{') (return (parse_list (lex)))
+        )))))))))
 
-    (return (make_symbol "nil"))
+    (flush stdout)
+    (output_loc stderr)
+    (output_string stderr "syntax error: expression is required\n")
+    (exit 1)
     ))
 
-(fun eat (tok) (
-    (if (!= (lex) tok) (do
+(fun parse_tuple (t) (
+    (var elems 0)
+    (if (!= t ')') (do
+        (label parse_tuple_loop)
+        (var e (parse_expr t))
+        (= elems (cons e elems))
+        (= t (lex))
+        (if (== t ',') (do
+            (= t (lex))
+            (goto parse_tuple_loop)
+            ))
+        (eat t ')')
+        ))
+    (= elems (list_reverse elems))
+    (var nelem (list_length elems))
+    (return (variant @Tuple 1 elems nelem))
+    ))
+
+(fun parse_array (t) (
+    (var elems 0)
+    (if (!= t ']') (do
+        (label parse_array_loop)
+        (var e (parse_expr t))
+        (= elems (cons e elems))
+        (= t (lex))
+        (if (== t ',') (do
+            (= t (lex))
+            (goto parse_array_loop)
+            ))
+        (eat t ']')
+        ))
+    (= elems (list_reverse elems))
+    (var nelem (list_length elems))
+    (return (variant @Array 1 elems nelem))
+    ))
+
+(fun parse_list (t) (
+    (var elems 0)
+    (if (!= t '}') (do
+        (label parse_list_loop)
+        (var e (parse_expr t))
+        (= elems (cons e elems))
+        (= t (lex))
+        (if (!= t '}') (goto parse_list_loop))
+        ))
+    (var list NilSym)
+    (while elems (do
+        (= list (variant @Cons 2 (car elems) list))
+        (= elems (cdr elems))
+        ))
+    (return list)
+    ))
+
+(fun eat (tok expect) (
+    (if (!= tok expect) (do
         (flush stdout)
         (output_loc stderr)
         (output_string stderr "syntax error: expect '")
-        (output_char stderr tok)
+        (output_char stderr expect)
         (output_string stderr "'\n")
         (exit 1)
         ))
