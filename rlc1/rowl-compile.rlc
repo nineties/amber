@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-compile.rlc 2010-10-15 15:06:41 nineties $
+; $Id: rowl-compile.rlc 2010-10-17 00:13:48 nineties $
 ;
 
 (import "stdlib")
@@ -69,7 +69,7 @@
 (define emit_insn (insn) (push insn_seq insn))
 
 (var startup_code ())
-(define push_startup_code (code) (set startup_code (append code startup_code)))
+(define push_startup_code (code) (set startup_code (append startup_code code)))
 
 (define gen_startup_func () (do
     (reset_insn_seq)
@@ -80,7 +80,8 @@
 
 (define gen_init_func () (do
     (reset_insn_seq)
-    `(init @startup_code)
+    (push_startup_code `(return))
+    `(function @nil __init__ @startup_code)
     ))
 
 (define arg_insn (idx)
@@ -778,9 +779,8 @@
     (getint ichan) ; nref
     (var vsize (getint ichan))
     (upto i 1 vsize (getchar ichan)) ; values
-    (var initlen (getint ichan))
     (var codelen (getint ichan))
-    (upto i 1 (+ initlen codelen) (getchar ichan)) ; code
+    (upto i 1 codelen (getchar ichan)) ; code
 
     ; relocate table
     (var nent (getint ichan))

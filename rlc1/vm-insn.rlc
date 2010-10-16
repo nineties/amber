@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-10-14 15:17:11 nineties $
+; $Id: vm-insn.rlc 2010-10-16 23:15:59 nineties $
 ;
 
 (define gen_comparison1 (cmovname) `(
@@ -495,4 +495,18 @@
     (if_lt      (short) @nil @(gen_comparison2 "cmovl"))
     (if_le      (short) @nil @(gen_comparison2 "cmovle"))
     (exit () @nil ((vmpop %eax) (break)))
+    ))
+
+; insn-name -> (code len)
+(var vm_insn_table (do
+    (var code 0)
+    (var entries ())
+    (foreach i vm_instructions (do
+        (var name (car i))
+        (var len  (insn_length (cadr i)))
+        (push entries `(@name @code @len))
+        (incr code)
+        ))
+    (reverse entries)
+
     ))
