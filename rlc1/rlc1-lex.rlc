@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlc1-lex.rlc 2010-10-15 16:28:08 nineties $
+; $Id: rlc1-lex.rlc 2010-10-16 18:45:20 nineties $
 ;
 
 (import "rowl-compile")
@@ -136,7 +136,7 @@
 (array char chgroup (
      0 25 25 25 25 25 25 25 25  1  2 25 25  1 25 25
     25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25
-     1 24 17 20 24 24 24 16 23 23 24 22 23 22 21 18
+     1 24 17 20 24 24 24 16 23 23 24 22 24 22 21 18
      3  4  5  5  5  5  5  5  6  6 24 24 24 24 24 24
     24 14 14 14 14 14 14 15 15 15 15 15 15 15 15 15
     15 15 15 15 15 15 15 15 15 15 15 23 19 23 24 15
@@ -541,29 +541,20 @@
             ))
         (34 . (do
             (consume)
-            (accept @TOK_SYMBOL)
+            (var op (find_operator (get_token_text)))
+            (if op
+                (accept_operator op infix_p)
+                (accept @TOK_SYMBOL)
+                )
             (= state (next_state s34next))
             (goto lexloop)
             ))
         (35 . (do
             (consume)
-            (var op)
-            (if (= op (idtable_find operator_table (get_token_text))) (do
-                (var optype (field_get op 0))
-                (if (== optype @OP_PREFIX) (accept @TOK_PREFIX)
-                (if (== optype @OP_POSTFIX) (accept @TOK_POSTFIX)
-                (if (== optype @OP_INFIX) (accept @TOK_INFIX)
-                (if (== optype @OP_CONSTR) (accept @TOK_CONSTR)
-                (if (== optype @OP_PREFIX_OR_INFIX) (do
-                    (if infix_p
-                        (do (accept @TOK_INFIX) (= op (field_get op 2)))
-                        (do (accept @TOK_PREFIX) (= op (field_get op 1)))
-                        )
-                    )
-                    )))))
-                (= token_value op)
-                (store_lexer_state)
-                ))
+            (var op (find_operator (get_token_text)))
+            (if op
+                (do (accept_operator op infix_p) (store_lexer_state))
+                )
             (= state (next_state s35next))
             (goto lexloop)
             ))
@@ -606,6 +597,22 @@
     (cvector_resize token_buf save_token_len)
     (cvector_pushback token_buf '\0')
     (= token_value save_token_value)
+    ))
+
+(fun accept_operator (op infix_p) (
+    (var optype (field_get op 0))
+    (if (== optype @OP_PREFIX) (accept @TOK_PREFIX)
+    (if (== optype @OP_POSTFIX) (accept @TOK_POSTFIX)
+    (if (== optype @OP_INFIX) (accept @TOK_INFIX)
+    (if (== optype @OP_CONSTR) (accept @TOK_CONSTR)
+    (if (== optype @OP_PREFIX_OR_INFIX) (do
+        (if infix_p
+            (do (accept @TOK_INFIX) (= op (field_get op 2)))
+            (do (accept @TOK_PREFIX) (= op (field_get op 1)))
+            )
+        )
+        )))))
+    (= token_value op)
     ))
 
 (export fun push_operator_table () (

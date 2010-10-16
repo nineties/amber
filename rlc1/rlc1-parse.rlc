@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlc1-parse.rlc 2010-10-15 16:27:49 nineties $
+; $Id: rlc1-parse.rlc 2010-10-16 20:35:53 nineties $
 ;
 
 (import "rowl-compile")
@@ -28,8 +28,6 @@
 ;           | open Expr close
 ;           | \{ Expr* \}
 ;
-; open  = ( [
-; close = ) ]
 ;
 ; NB:
 ; - postfix operator must be unique
@@ -41,12 +39,15 @@
 
     ; for test
     (add_postfix ";" 1)
-    (add_infixl "+" 2)
-    (add_infixl "-" 2)
-    (add_infixl "*" 3)
-    (add_infixl "/" 3)
-    (add_prefix "+" 4)
-    (add_prefix "-" 4)
+    (add_constr  "return" 1 2)
+    (add_infixr  "=" 3)
+    (add_infixl  "," 4)
+    (add_infixl  "+" 5)
+    (add_infixl  "-" 5)
+    (add_infixl  "*" 6)
+    (add_infixl  "/" 6)
+    (add_prefix  "+" 7)
+    (add_prefix  "-" 8)
 
     (var prog (parse_prog))
     (close_in ichan)
@@ -56,25 +57,23 @@
 (fun parse_prog () (
     (var es 0)
     (while 1 (do
-        (if (== (lex) @TOK_EOF) break)
-        (unput)
-        (var e (parse_expr))
+        (var t (lex))
+        (if (== t @TOK_EOF) break)
+        (var e (parse_expr t))
         (= es (cons e es))
         ))
     (return (variant @List 1 (list_reverse es)))
     ))
 
-(fun parse_expr () (
+(fun parse_expr (tok) (
 
     (var expr_stack 0)
     (var op_stack 0)
     (var next_op)
-    (var tok)
 
     (= op_stack (cons (variant @OP_START 0) op_stack))
 
 (label parse_expr_front)
-    (= tok (lex))
     (while (== tok @TOK_PREFIX) (do
         (= op_stack (cons (get_token_value) op_stack))
         (= tok (lex))
@@ -109,7 +108,7 @@
             ))
         ))
 
-    (if (== tok @TOK_INFIX) (goto parse_expr_front)
+    (if (== tok @TOK_INFIX) (do (= tok (lex)) (goto parse_expr_front))
     (if (== tok @TOK_POSTFIX) (goto parse_expr_infix)
         ))
 
@@ -144,13 +143,33 @@
         (return (variant @String 1 new))
         )
     (if (== t @TOK_SYMBOL) (return (make_symbol (get_token_text)))
-        )))))
+    (if (== t @TOK_CONSTR) (do
+        (var op (get_token_value))
+        (var sym (field_get op 1))
+        (var arity (field_get op 2))
+        (var assoc (field_get op 3))
+        (var expr (allocate_variant @Node (+ arity 1) (+ arity 1)))
+        (field_set expr 1 sym)
+        (for i 2 (+ arity 2) (do
+            (var e (parse_expr (lex)))
+            (store object expr i e)
+            ))
+        (return expr)
+        )
+        ))))))
 
-    (flush stdout)
-    (output_loc stderr)
-    (output_int stderr t)
-    (output_string stderr "syntax error: primary expression required\n")
-    (exit 1)
+    (return (make_symbol "nil"))
+    ))
+
+(fun eat (tok) (
+    (if (!= (lex) tok) (do
+        (flush stdout)
+        (output_loc stderr)
+        (output_string stderr "syntax error: expect '")
+        (output_char stderr tok)
+        (output_string stderr "'\n")
+        (exit 1)
+        ))
     ))
 
 (fun associativity (op) (
@@ -246,6 +265,12 @@
             ))
         ))
     (add_operator name infix_op)
+    ))
+
+(fun add_constr (name maxlen assoc) (
+    (check_assoc name assoc)
+    (var sym (make_symbol name))
+    (add_operator name (variant @OP_CONSTR 1 sym maxlen assoc))
     ))
 
     ))
