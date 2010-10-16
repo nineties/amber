@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: disasm.rlc 2010-10-08 01:09:13 nineties $
+; $Id: disasm.rlc 2010-10-16 23:04:17 nineties $
 ;
 
 (import "config")
@@ -128,12 +128,14 @@
         )
 
     (var magic (read_int_check ic))
-    (if (== magic @OBJ_MAGIC)
-        (disasm_obj oc ic file)
-    (if (== magic @EXE_MAGIC)
-        (disasm_exe oc ic file)
+    (if (&& (!= magic @OBJ_MAGIC) (!= magic @EXE_MAGIC))
         (error "invalid file format\n")
-        ))
+        )
+
+    (output_head oc file)
+    (output_nref oc ic)
+    (output_values oc ic)
+    (output_code (read_int_check ic) oc ic)
 
     (close_in ic)
     (if (!= output_file 0)
@@ -279,23 +281,6 @@
         (+= i len)
         ))
 
-    ))
-
-(fun disasm_obj (oc ic file) (
-    (output_head oc file)
-    (output_nref oc ic)
-    (output_values oc ic)
-    (var initlen (read_int_check ic))
-    (var codelen (read_int_check ic))
-    (output_init initlen oc ic)
-    (output_code codelen oc ic)
-    ))
-
-(fun disasm_exe (oc ic file) (
-    (output_head oc file)
-    (output_nref oc ic)
-    (output_values oc ic)
-    (output_code (read_int_check ic) oc ic)
     ))
 
     ))

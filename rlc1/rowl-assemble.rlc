@@ -2,25 +2,12 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl-assemble.rlc 2010-10-08 00:57:18 nineties $
+; $Id: rowl-assemble.rlc 2010-10-16 23:24:44 nineties $
 ;
 
 (import "stdlib")
 (import "config")
 (import "vm-insn")
-
-; insn-name -> (code len)
-(var vm_insn_table (do
-    (var code 0)
-    (var entries ())
-    (foreach i vm_instructions (do
-        (var name (car i))
-        (var len  (insn_length (cadr i)))
-        (push entries `(@name @code @len))
-        (incr code)
-        ))
-    (reverse entries)
-    ))
 
 (define insn_head (insn) (if (cons? insn) (car insn) insn))
 (define insn_info (insn) (do
@@ -33,7 +20,6 @@
 
 (var assemble_mode nil)
 (var current_addr 0)
-(var init_code_len 0)
 
 (var label_addr_table ())
 (var align8_table ()) ; list of (type name value)
@@ -155,12 +141,6 @@
         ))
     )
 
-(define scan_init ((_ body)) (do
-    (if (!= current_addr 0) (error "<init> must be placed first"))
-    (foreach i body (scan_insn i))
-    (set init_code_len current_addr)
-    ))
-
 (define scan_fundecl ((_ export name body)) (do
     (if export (add_export_symbol `fun name))
     (push label_addr_table `(@name . @current_addr))
@@ -194,7 +174,6 @@
 
 (define scan_decl (decl)
     (cond
-        ((== `init (car decl))      (scan_init decl))
         ((== `function (car decl))  (scan_fundecl decl))
         ((== `int (car decl))       (scan_value_decl decl))
         ((== `char (car decl))      (scan_value_decl decl))
@@ -331,7 +310,6 @@
 (define assemble (mode prog) (do
     (set assemble_mode mode)
     (set current_addr 0)
-    (set init_code_len 0)
     (foreach decl prog (scan_decl decl))
     (if (== assemble_mode `executable)
         (emit_exec_header)
@@ -344,10 +322,7 @@
     (foreach v align4_table (emit_value v))
     (foreach v align1_table (emit_value v))
 
-    (if (== assemble_mode `object)
-        (put_long init_code_len)
-        )
-    (put_long (- current_addr init_code_len)) ; length of byte codes
+    (put_long current_addr) ; length of byte codes
     (set current_addr 0)
     ; generate functions
     (foreach decl prog (assemble_decl decl))
