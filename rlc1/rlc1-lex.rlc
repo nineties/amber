@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlc1-lex.rlc 2010-10-17 02:00:32 nineties $
+; $Id: rlc1-lex.rlc 2010-10-17 13:41:12 nineties $
 ;
 
 (import "rowl-compile")
@@ -132,6 +132,7 @@
 (compile `object `(
 
 (import "rlc1-util")
+(import "rlc1-node")
 
 (array char chgroup (
      0 25 25 25 25 25 25 25 25  1  2 25 25  1 25 25
@@ -615,20 +616,82 @@
     (= token_value op)
     ))
 
-(export fun push_operator_table () (
+(fun push_operator_table () (
     (idtable_push operator_table)
     ))
 
-(export fun pop_operator_table () (
+(fun pop_operator_table () (
     (idtable_pop operator_table)
     ))
 
-(export fun add_operator (name obj) (
+(fun add_operator (name obj) (
     (idtable_add operator_table name obj)
     ))
 
-(export fun find_operator (name) (
+(fun find_operator (name) (
     (return (idtable_find operator_table name))
+    ))
+
+(fun check_assoc (name assoc) (
+    (if (> assoc 0) return)
+    (output_string stderr "ERROR: associativity of operator '")
+    (output_string stderr name)
+    (output_string stderr "' must be positive\n")
+    (exit 1)
+    ))
+
+
+(export fun add_prefix (name assoc) (
+    (check_assoc name assoc)
+    (var op (find_operator name))
+    (var sym (make_symbol name))
+    (var prefix_op (variant @OP_PREFIX 1 sym assoc))
+    (if op (do
+        (var optype (field_get op 0))
+        (if (== optype @OP_INFIX) (do
+            (add_operator name (variant @OP_PREFIX_OR_INFIX 2 prefix_op op))
+            return
+            ))
+        (if (== optype @OP_PREFIX_OR_INFIX) (do
+            (add_operator name (variant @OP_PREFIX_OR_INFIX 2 prefix_op (field_get op 2)))
+            return
+            ))
+        ))
+    (add_operator name prefix_op)
+    ))
+
+(export fun add_postfix (name assoc) (
+    (check_assoc name assoc)
+    (var sym (make_symbol name))
+    (add_operator name (variant @OP_POSTFIX 1 sym assoc))
+    ))
+
+(export fun add_infixl (name assoc) ((add_infix name 1 assoc)))
+(export fun add_infixr (name assoc) ((add_infix name 0 assoc)))
+
+(fun add_infix (name is_left assoc) (
+    (check_assoc name assoc)
+    (var op (find_operator name))
+    (var sym (make_symbol name))
+    (var infix_op (variant @OP_INFIX 1 sym is_left assoc))
+    (if op (do
+        (var optype (field_get op 0))
+        (if (== optype @OP_PREFIX) (do
+            (add_operator name (variant @OP_PREFIX_OR_INFIX 2 op infix_op))
+            return
+            ))
+        (if (== optype @OP_PREFIX_OR_INFIX) (do
+            (add_operator name (variant @OP_PREFIX_OR_INFIX 2 (field_get op 1) infix_op))
+            return
+            ))
+        ))
+    (add_operator name infix_op)
+    ))
+
+(export fun add_constr (name maxlen assoc) (
+    (check_assoc name assoc)
+    (var sym (make_symbol name))
+    (add_operator name (variant @OP_CONSTR 1 sym maxlen assoc))
     ))
 
     ))
