@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlc1-parse.rlc 2010-10-17 02:38:59 nineties $
+; $Id: rlc1-parse.rlc 2010-10-17 10:06:51 nineties $
 ;
 
 (import "rowl-compile")
@@ -83,7 +83,7 @@
         (= op_stack (cons (get_token_value) op_stack))
         (= tok (lex))
         ))
-    (var e (parse_primary tok))
+    (var e (parse_secondary tok))
     (= expr_stack (cons e expr_stack))
 
 (label parse_expr_infix)
@@ -134,6 +134,26 @@
     (return (car expr_stack))
     ))
 
+(fun parse_secondary (t) (
+    (var e (parse_primary t))
+    (label parse_secondary_loop)
+    (= t (lex))
+    (if (== t '(') (do
+        (var args (parse_comma_list (lex)))
+        (eat (lex) ')')
+        (= e (variant @Call 2 e args))
+        (goto parse_secondary_loop)
+        )
+    (if (== t '[') (do
+        (var args (parse_comma_list (lex)))
+        (eat (lex) ']')
+        (= e (variant @Subscr 2 e args))
+        (goto parse_secondary_loop)
+        )))
+    (unput)
+    (return e)
+    ))
+
 (fun parse_primary (t) (
     (if (== t @TOK_CHAR) (return (variant @Char 0 (get_token_value)))
     (if (== t @TOK_INT) (return (variant @Int 0 (get_token_value)))
@@ -175,17 +195,9 @@
 (fun parse_tuple (t) (
     (var elems 0)
     (if (!= t ')') (do
-        (label parse_tuple_loop)
-        (var e (parse_expr t))
-        (= elems (cons e elems))
-        (= t (lex))
-        (if (== t ',') (do
-            (= t (lex))
-            (goto parse_tuple_loop)
-            ))
-        (eat t ')')
+        (= elems (parse_comma_list t))
+        (eat (lex) ')')
         ))
-    (= elems (list_reverse elems))
     (var nelem (list_length elems))
     (return (variant @Tuple 1 elems nelem))
     ))
@@ -193,19 +205,25 @@
 (fun parse_array (t) (
     (var elems 0)
     (if (!= t ']') (do
-        (label parse_array_loop)
-        (var e (parse_expr t))
-        (= elems (cons e elems))
-        (= t (lex))
-        (if (== t ',') (do
-            (= t (lex))
-            (goto parse_array_loop)
-            ))
-        (eat t ']')
+        (= elems (parse_comma_list t))
+        (eat (lex) ']')
         ))
-    (= elems (list_reverse elems))
     (var nelem (list_length elems))
     (return (variant @Array 1 elems nelem))
+    ))
+
+(fun parse_comma_list (t) (
+    (var elems 0)
+    (label parse_comma_list_loop)
+    (var e (parse_expr t))
+    (= elems (cons e elems))
+    (= t (lex))
+    (if (== t ',') (do
+        (= t (lex))
+        (goto parse_comma_list_loop)
+        ))
+    (unput)
+    (return (list_reverse elems))
     ))
 
 (fun parse_list (t) (
