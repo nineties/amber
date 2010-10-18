@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlc1-parse.rlc 2010-10-17 23:20:45 nineties $
+; $Id: rlc1-parse.rlc 2010-10-18 13:40:08 nineties $
 ;
 
 (import "rowl-compile")
@@ -50,13 +50,7 @@
         (var e (parse_expr t))
         (= elems (cons e elems))
         ))
-    (var prog NilSym)
-    (while elems (do
-        (= prog (variant @Cons 2 (car elems) prog))
-        (= elems (cdr elems))
-        ))
-
-    (return prog)
+    (return (variant @List 1 (list_reverse elems)))
     ))
 
 (fun parse_expr (tok) (
@@ -187,8 +181,8 @@
         (= elems (parse_comma_list t))
         (eat (lex) ')')
         ))
-    (var nelem (list_length elems))
-    (return (variant @Tuple 1 elems nelem))
+    (if (== (cdr elems) 0) (return (car elems)))
+    (return (variant @Tuple 1 elems))
     ))
 
 (fun parse_array (t) (
@@ -197,8 +191,7 @@
         (= elems (parse_comma_list t))
         (eat (lex) ']')
         ))
-    (var nelem (list_length elems))
-    (return (variant @Array 1 elems nelem))
+    (return (variant @Array 1 elems))
     ))
 
 (fun parse_comma_list (t) (
@@ -224,12 +217,7 @@
         (= t (lex))
         (if (!= t '}') (goto parse_list_loop))
         ))
-    (var list NilSym)
-    (while elems (do
-        (= list (variant @Cons 2 (car elems) list))
-        (= elems (cdr elems))
-        ))
-    (return list)
+    (return (variant @List 1 (list_reverse elems)))
     ))
 
 (fun eat (tok expect) (

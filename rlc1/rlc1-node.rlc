@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlc1-node.rlc 2010-10-17 10:53:58 nineties $
+; $Id: rlc1-node.rlc 2010-10-18 13:42:42 nineties $
 ;
 
 (import "rowl-compile")
@@ -71,27 +71,28 @@
 (var indent_width 4)
 (export fun pp_prog (ochan prog) (
     (= indent_depth 0)
-    (pp_cons_seq ochan prog)
+    (pp_list_body ochan (field_get prog 1))
     ))
 
 (export fun pp_expr (ochan node) (
     (var tag (field_get node 0))
-    ; XXX: use tswitch
-    (if (== tag @Symbol) (pp_symbol ochan node)
-    (if (== tag @Char) (pp_char ochan node)
-    (if (== tag @Int) (pp_int ochan node)
-    (if (== tag @Float) (pp_float ochan node)
-    (if (== tag @String) (pp_string ochan node)
-    (if (== tag @Cons) (pp_cons ochan node)
-    (if (== tag @Tuple) (pp_tuple ochan node)
-    (if (== tag @Array) (pp_array ochan node)
-    (if (== tag @Node) (pp_node ochan node)
-    (if (== tag @Prefix) (pp_prefix ochan node)
-    (if (== tag @Postfix) (pp_postfix ochan node)
-    (if (== tag @Infix) (pp_infix ochan node)
-    (if (== tag @Call) (pp_call ochan node)
-    (if (== tag @Subscr) (pp_subscr ochan node)
-        ))))))))))))))
+    (tswitch tag (
+    (@Symbol  . (return (pp_symbol ochan node)))
+    (@Char    . (return (pp_char ochan node)))
+    (@Int     . (return (pp_int ochan node)))
+    (@Float   . (return (pp_float ochan node)))
+    (@String  . (return (pp_string ochan node)))
+    (@List    . (return (pp_list ochan node)))
+    (@Tuple   . (return (pp_tuple ochan node)))
+    (@Array   . (return (pp_array ochan node)))
+    (@Node    . (return (pp_node ochan node)))
+    (@Prefix  . (return (pp_prefix ochan node)))
+    (@Postfix . (return (pp_postfix ochan node)))
+    (@Infix   . (return (pp_infix ochan node)))
+    (@Call    . (return (pp_call ochan node)))
+    (@Subscr  . (return (pp_subscr ochan node)))
+    (default . (error "pp_expr: not reachable"))
+        ))
     ))
 
 (fun pp_symbol (ochan node) (
@@ -155,45 +156,41 @@
     (for i 0 (* indent_width indent_depth) (output_char ochan ' '))
     ))
 
-(fun pp_cons (ochan node) (
+(fun pp_list (ochan node) (
     (output_string ochan "{\n")
-    (incr indent_depth)
-    (pp_cons_seq ochan node)
-    (decr indent_depth)
-    (output_string ochan "}")
+    (+= indent_depth 1)
+    (pp_list_body ochan (field_get node 1))
+    (-= indent_depth 1)
+    (output_char ochan '}')
     ))
 
-(fun pp_cons_seq (ochan node) (
-    (while (!= node NilSym) (do
+(fun pp_list_body (ochan list) (
+    (while list (do
         (put_indent ochan)
-        (pp_expr ochan (field_get node 1))
+        (pp_expr ochan (car list))
         (output_char ochan '\n')
-        (= node (field_get node 2))
+        (= list (cdr list))
         ))
     ))
 
 (fun pp_tuple (ochan node) (
-    (var nelem (field_get node 2))
-    (var elems (field_get node 1))
     (output_char ochan '(')
-    (for i 0 nelem (do
-        (pp_expr ochan (car elems))
-        (= elems (cdr elems))
-        (if elems (output_string ochan ", "))
-        ))
+    (pp_comma_list ochan (field_get node 1))
     (output_char ochan ')')
     ))
 
 (fun pp_array (ochan node) (
-    (var nelem (field_get node 2))
-    (var elems (field_get node 1))
     (output_char ochan '[')
-    (for i 0 nelem (do
-        (pp_expr ochan (car elems))
-        (= elems (cdr elems))
-        (if elems (output_string ochan ", "))
-        ))
+    (pp_comma_list ochan (field_get node 1))
     (output_char ochan ']')
+    ))
+
+(fun pp_comma_list (ochan list) (
+    (while list (do
+        (pp_expr ochan (car list))
+        (= list (cdr list))
+        (if list (output_string ochan ", "))
+        ))
     ))
 
 (fun pp_node (ochan node) (
@@ -211,9 +208,9 @@
 (fun pp_prefix (ochan node) (
     (var op (field_get node 1))
     (var arg (field_get node 2))
-    ; XXX: temporal implementation
-    (output_char ochan '(')
+    (output_string ochan "(pre ")
     (pp_symbol ochan op)
+    (output_char ochan ' ')
     (pp_expr ochan arg)
     (output_char ochan ')')
     ))
@@ -221,10 +218,10 @@
 (fun pp_postfix (ochan node) (
     (var op (field_get node 1))
     (var arg (field_get node 2))
-    ; XXX: temporal implementation
-    (output_char ochan '(')
-    (pp_expr ochan arg)
+    (output_string ochan "(post ")
     (pp_symbol ochan op)
+    (output_char ochan ' ')
+    (pp_expr ochan arg)
     (output_char ochan ')')
     ))
 
@@ -232,11 +229,10 @@
     (var op (field_get node 1))
     (var lhs (field_get node 2))
     (var rhs (field_get node 3))
-    ; XXX: temporal implementation
     (output_char ochan '(')
-    (pp_expr ochan lhs)
-    (output_char ochan ' ')
     (pp_symbol ochan op)
+    (output_char ochan ' ')
+    (pp_expr ochan lhs)
     (output_char ochan ' ')
     (pp_expr ochan rhs)
     (output_char ochan ')')
@@ -247,11 +243,7 @@
     (var args (field_get node 2))
     (pp_expr ochan expr)
     (output_char ochan '(')
-    (while args (do
-        (pp_expr ochan (car args))
-        (= args (cdr args))
-        (if args (output_string ochan ", "))
-        ))
+    (pp_comma_list ochan args)
     (output_char ochan ')')
     ))
 
@@ -260,11 +252,7 @@
     (var args (field_get node 2))
     (pp_expr ochan expr)
     (output_char ochan '[')
-    (while args (do
-        (pp_expr ochan (car args))
-        (= args (cdr args))
-        (if args (output_string ochan ", "))
-        ))
+    (pp_comma_list ochan args)
     (output_char ochan ']')
     ))
 
