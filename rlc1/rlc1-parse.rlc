@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlc1-parse.rlc 2010-10-18 13:40:08 nineties $
+; $Id: rlc1-parse.rlc 2010-10-19 12:05:30 nineties $
 ;
 
 (import "rowl-compile")
@@ -20,7 +20,6 @@
 ;        | prefix Expr
 ;        | Expr postfix
 ;        | Expr infix Expr
-;        | Expr { , Expr }
 ;        | constr<n> Expr{n}
 ; Primary ::= Literal
 ;           | Primary open close
@@ -141,16 +140,8 @@
     (if (== t @TOK_CHAR) (return (variant @Char 0 (get_token_value)))
     (if (== t @TOK_INT) (return (variant @Int 0 (get_token_value)))
     (if (== t @TOK_FLOAT) (return (make_float_from_string (get_token_text)))
-    (if (== t @TOK_STRING) (do
-        ; remove double quotes
-        (var str (get_token_text))
-        (var len (- (get_token_len) 2))
-        (var new (array char (+ len 1)))
-        (strncpy new (+ str 1) len)
-        (unescape_string new)
-        (return (variant @String 1 new))
-        )
-    (if (== t @TOK_SYMBOL) (return (make_symbol (get_token_text)))
+    (if (== t @TOK_STRING) (return (get_token_value))
+    (if (== t @TOK_SYMBOL) (return (get_token_value))
     (if (== t @TOK_CONSTR) (do
         (var op (get_token_value))
         (var sym (field_get op 1))
