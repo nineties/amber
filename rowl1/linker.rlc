@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: linker.rlc 2010-10-17 10:53:32 nineties $
+; $Id: linker.rlc 2010-10-19 15:30:04 nineties $
 ;
 
 (import "config")
@@ -44,19 +44,14 @@
 (fun main (argc argv) (
     (parse_option (address argc) argv)
 
-    (if (< argc 2) (do
-        (usage (array_get string argv 0))
-        (return 1)
-        ))
-
-    (= num_files argc)
+    (= num_files (+ argc 1))
     (= startup_len (+ (* num_files @call_init_len) @call_main_len))
     (= total_len startup_len)
 
     (load_file 0 "startup.rlo")
-    (for i 1  argc (do
+    (for i 0  argc (do
         (var file (array_get string argv i))
-        (load_file i file)
+        (load_file (+ i 1) file)
         ))
 
 
@@ -65,17 +60,11 @@
     (return 0)
     ))
 
-(fun usage (prog) (
-    (print_string "USAGE: rowl ")
-    (print_string prog)
-    (print_string " [-o OUTPUT] [FILE..]\n")
-    ))
-
 (fun parse_option (argcp argv) (
     (var argc (get argcp))
     (var new_argc argc)
-    (var i 1)
-    (var j 1)
+    (var i 0)
+    (var j 0)
     (while (< j argc) (do
         (var arg (array_get string argv j))
         (if (streq arg "-o")
