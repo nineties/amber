@@ -26,7 +26,7 @@ SOURCES = startup.rl\
 ASMSOURCES = $(patsubst %.rl,%.s,$(SOURCES))
 OBJECTS    = $(patsubst %.rl,%.o,$(SOURCES))
 
-all: rlci rlvm linker disasm rlc1
+all: rlci rlvm linker disasm rowl1
 
 alloc.s  : $(RLC0) stddef.s
 main.s   : $(RLC0) stddef.s code.s
@@ -68,12 +68,12 @@ vm-prim-tuple.o	  : stdlib.rlc vm-compile.rlc
 vm-prim-variant.o : stdlib.rlc vm-compile.rlc
 vm-prim-idtable.o : stdlib.rlc vm-compile.rlc
 
-RLC1OBJECTS = rlc1-main.rlo\
-	      rlc1-util.rlo\
-	      rlc1-lex.rlo\
-	      rlc1-stdlib.rlo\
-	      rlc1-parse.rlo\
-	      rlc1-node.rlo
+RLC1OBJECTS = rowl1-main.rlo\
+	      rowl1-util.rlo\
+	      rowl1-lex.rlo\
+	      rowl1-stdlib.rlo\
+	      rowl1-parse.rlo\
+	      rowl1-node.rlo
 ROWLCOMPILER = rlci\
 	       stdlib.rlc\
 	       config.rlc\
@@ -83,12 +83,12 @@ ROWLCOMPILER = rlci\
 	       vm-prim-inc.rlc
 
 startup.rlo     : $(ROWLCOMPILER)
-rlc1-main.rlo   : $(ROWLCOMPILER) rlc1-parse.rlo rlc1-types.rlc
-rlc1-util.rlo   : $(ROWLCOMPILER) rlc1-types.rlc
-rlc1-lex.rlo    : $(ROWLCOMPILER) rlc1-types.rlc rlc1-util.rlo rlc1-node.rlo
-rlc1-parse.rlo  : $(ROWLCOMPILER) rlc1-types.rlc rlc1-util.rlo rlc1-lex.rlo rlc1-node.rlo rlc1-stdlib.rlo
-rlc1-node.rlo   : $(ROWLCOMPILER) rlc1-types.rlc rlc1-util.rlo
-rlc1-stdlib.rlo : $(ROWLCOMPILER) rlc1-lex.rlo
+rowl1-main.rlo   : $(ROWLCOMPILER) rowl1-parse.rlo rowl1-types.rlc
+rowl1-util.rlo   : $(ROWLCOMPILER) rowl1-types.rlc
+rowl1-lex.rlo    : $(ROWLCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo
+rowl1-parse.rlo  : $(ROWLCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-lex.rlo rowl1-node.rlo rowl1-stdlib.rlo
+rowl1-node.rlo   : $(ROWLCOMPILER) rowl1-types.rlc rowl1-util.rlo
+rowl1-stdlib.rlo : $(ROWLCOMPILER) rowl1-lex.rlo
 
 rlvm: $(VMOBJECTS)
 	$(LD) $^ -o $@ $(VMLDFLAGS)
@@ -99,8 +99,8 @@ linker: linker.rlc rlvm $(ROWLCOMPILER)
 disasm: disasm.rlc rlvm $(ROWLCOMPILER)
 	./rlci $< > $@
 
-rlc1: rlvm linker $(RLC1OBJECTS) startup.rlo
-	./rlvm linker $(RLC1OBJECTS) -o rlc1
+rowl1: rlvm linker $(RLC1OBJECTS) startup.rlo
+	./rlvm linker $(RLC1OBJECTS) -o rowl1
 
 .SUFFIXES:
 .SUFFIXES: .o .s .rl .rlc .rlo
@@ -119,4 +119,4 @@ rlc1: rlvm linker $(RLC1OBJECTS) startup.rlo
 
 .PHONY: clean
 clean:
-	rm -f *.o *.s *.rlo rlci rlvm linker disasm rlc1 dfuntest core
+	rm -f *.o *.s *.rlo rlci rlvm linker disasm rowl1 dfuntest core
