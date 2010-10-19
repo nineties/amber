@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-10-17 13:40:46 nineties $
+# $Id: Makefile 2010-10-19 13:33:21 nineties $
 
 AS = as
 ASFLAGS =
@@ -26,7 +26,7 @@ SOURCES = startup.rl\
 ASMSOURCES = $(patsubst %.rl,%.s,$(SOURCES))
 OBJECTS    = $(patsubst %.rl,%.o,$(SOURCES))
 
-all: rlci rowl linker disasm rlc1
+all: rlci rlvm linker disasm rlc1
 
 alloc.s  : $(RLC0) stddef.s
 main.s   : $(RLC0) stddef.s code.s
@@ -78,8 +78,8 @@ ROWLCOMPILER = rlci\
 	       stdlib.rlc\
 	       config.rlc\
 	       vm-insn.rlc\
-	       rowl-compile.rlc\
-	       rowl-assemble.rlc\
+	       rlvm-compile.rlc\
+	       rlvm-assemble.rlc\
 	       vm-prim-inc.rlc
 
 startup.rlo     : $(ROWLCOMPILER)
@@ -90,17 +90,17 @@ rlc1-parse.rlo  : $(ROWLCOMPILER) rlc1-types.rlc rlc1-util.rlo rlc1-lex.rlo rlc1
 rlc1-node.rlo   : $(ROWLCOMPILER) rlc1-types.rlc rlc1-util.rlo
 rlc1-stdlib.rlo : $(ROWLCOMPILER) rlc1-lex.rlo
 
-rowl: $(VMOBJECTS)
+rlvm: $(VMOBJECTS)
 	$(LD) $^ -o $@ $(VMLDFLAGS)
 
-linker: linker.rlc rowl $(ROWLCOMPILER)
+linker: linker.rlc rlvm $(ROWLCOMPILER)
 	./rlci $< > $@
 
-disasm: disasm.rlc rowl $(ROWLCOMPILER)
+disasm: disasm.rlc rlvm $(ROWLCOMPILER)
 	./rlci $< > $@
 
-rlc1: rowl linker $(RLC1OBJECTS) startup.rlo
-	./rowl linker $(RLC1OBJECTS) -o rlc1
+rlc1: rlvm linker $(RLC1OBJECTS) startup.rlo
+	./rlvm linker $(RLC1OBJECTS) -o rlc1
 
 .SUFFIXES:
 .SUFFIXES: .o .s .rl .rlc .rlo
@@ -119,4 +119,4 @@ rlc1: rowl linker $(RLC1OBJECTS) startup.rlo
 
 .PHONY: clean
 clean:
-	rm -f *.o *.s *.rlo rlci rowl linker disasm rlc1 dfuntest core
+	rm -f *.o *.s *.rlo rlci rlvm linker disasm rlc1 dfuntest core
