@@ -3,14 +3,14 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-10-19 13:33:21 nineties $
+# $Id: Makefile 2010-10-19 14:00:54 nineties $
 
 AS = as
 ASFLAGS =
 LD = ld
 LDFLAGS = --nostdlib --entry=_start
 
-RLC0 = ../rlc0/rlc
+RLC0 = ../rowl0/rlc
 SOURCES = startup.rl\
 	  main.rl\
 	  stddef.rl\
