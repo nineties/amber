@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-10-13 01:12:03 nineties $
+; $Id: vm-gc.rlc 2010-10-20 05:38:09 nineties $
 ;
 
 (import "stdlib")
@@ -111,16 +111,14 @@
 (define blockmap->next=  (idx val)  `([]= block_map (* @BDESCR_SIZE @idx) @val))
 (define blockmap->first= (idx val)  `([]= block_map (+ (* @BDESCR_SIZE @idx) 1) @val))
 
-; structure of header field
-; MSB <- | 3 (object tag) | 1 (copyed flag) | 8 (# of boxed fieids) | 20 (object words) |
-
 ; object tag:
-; 000 : padding
-; 001 : plain type
-; 010 : cons-cell
-; 011 : array of boexed elements
-; 100 : tuple
-; 101 : variant
+;         : | 3bit  | 1bit | 8bit | 20bit |
+; padding : | 0b000 |  --  | 0    | size  |
+; plain   : | 0b001 |  --  | type | size  |
+; cons    : | 0b010 |  --  | 0    | 3     |
+; barray  : | 0b011 |  --  | #box | size  |
+; tuple   : | 0b100 |  --  | #box | size  |
+; variant : | 0b101 |  --  | #box | size  |
 
 (var OBJECT_WORDS_BITS 20)
 (var BOXED_FIELD_SIZE_BITS 8)
@@ -474,12 +472,17 @@
     ))
 
 (export allocate_plain)
-(fun allocate_plain (bytes) (
+(fun allocate_plain (type bytes) (
     (int words (/ (+ bytes 3) 4))
     (incr words)
     (void* ptr (allocate_object words))
-    @(SET_HEADER ptr TAG_PLAIN 0 words)
+    @(SET_HEADER ptr TAG_PLAIN type words)
     (return (+ ptr @WORD_SIZE))
+    ))
+
+(export allocate_string)
+(fun allocate_string (bytes) (
+    (return (allocate_plain @PLAIN_STRING bytes))
     ))
 
 (export allocate_tuple)
@@ -534,16 +537,13 @@
 ; array of integers
 (export allocate_iarray)
 (fun allocate_iarray (len) (
-    (incr len)
-    (void* ptr (allocate_object len))
-    @(SET_HEADER ptr TAG_PLAIN 0 len)
-    (return (+ ptr @WORD_SIZE))
+    (return (allocate_plain @PLAIN_OTHER (* 4 len)))
     ))
 
 ; array of characters
 (export allocate_carray)
 (fun allocate_carray (bytes) (
-    (return (allocate_plain bytes))
+    (return (allocate_plain @PLAIN_OTHER bytes))
     ))
 
 ; array of objects

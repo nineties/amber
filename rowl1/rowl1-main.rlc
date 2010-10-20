@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-main.rlc 2010-10-19 15:30:52 nineties $
+; $Id: rowl1-main.rlc 2010-10-20 02:27:46 nineties $
 ;
 
 (import "rlvm-compile")
@@ -11,17 +11,21 @@
 (compile `object `(
 
 (import "rowl1-parse")
-(import "rowl1-node")
+(import "rowl1-interp")
 
 (fun main (argc argv) (
     (if (== argc 0) (do
         (output_string stderr "not input files\n")
         (exit 1)
         ))
-    (for i 0 argc
-        (pp_prog stdout (parse (array_get string argv i)))
-        )
+    (for i 0 argc (eval_file (array_get string argv i)))
     (return 0)
+    ))
+
+(fun eval_file (file) (
+    (var prog (parse file))
+    ;(var status (call_dynamic "eval" prog))
+    (var status (interpret prog))
     ))
 
     ))
