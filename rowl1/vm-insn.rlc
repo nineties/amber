@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-10-16 23:15:59 nineties $
+; $Id: vm-insn.rlc 2010-10-20 02:42:27 nineties $
 ;
 
 (define gen_comparison1 (cmovname) `(
@@ -120,12 +120,14 @@
     ; allocate plain object
     ; arg0 = size (in bytes)
     ; NB: allocated memory is not be zero-cleared
-    (plain () @true (
+    (plain (byte) @true (
         (asm "movl (%esi), %eax")
         (vmsave)
         (asm "pushl %eax")
+        (vmubyte 1 %eax) ; type of plain
+        (asm "pushl %eax")
         (call allocate_plain)
-        (asm "addl $4, %esp")
+        (asm "addl $8, %esp")
         (vmrestore)
         (asm "movl %eax, (%esi)")
         ))
