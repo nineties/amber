@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-idtable.rlc 2010-09-30 19:57:27 nineties $
+; $Id: vm-prim-idtable.rlc 2010-10-21 17:55:20 nineties $
 ;
 
 (import "stdlib")
@@ -79,10 +79,11 @@
     (return h)
     ))
 
-(fun rehash (table new_size) (
+(fun rehash (table) (
     (int old_size (get table 3))
-    (if (> new_size old_size) (
-        (int size (get prime_numbers (bsr new_size)))
+    (int cur_size (get table 4))
+    (if (> cur_size old_size) (
+        (int size (get prime_numbers (bsr cur_size)))
         (if (! size) (
             (error "too many local identifiers")
             ))
@@ -95,8 +96,8 @@
             (set bucket h entry)
             (= entry (get entry 3))
             ))
-        ))
         (set table 0 bucket)
+        ))
     ))
 
 (fun get_top_table (idtable) (
@@ -110,8 +111,9 @@
 (export prim_idtable_add)
 (fun prim_idtable_add (idtable name val) (
     (void* table (get_top_table idtable))
+    (rehash table)
+    (int size (get table 3))
     (void* bucket (get table 0))
-    (void* size (get table 3))
     (int h (hash name))
     (void* ent (prim_make_tuple5 4 name val 0 0 h))
     (%= h size)
