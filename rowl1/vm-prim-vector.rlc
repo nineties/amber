@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-vector.rlc 2010-08-24 10:34:04 nineties $
+; $Id: vm-prim-vector.rlc 2010-10-21 20:39:24 nineties $
 ;
 
 (import "stdlib")
@@ -60,7 +60,14 @@
 
 (export @(s++ `prim_ name `_resize))
 (fun @(s++ `prim_ name `_resize) (vec new_size) (
-    (if (> new_size (get vec 2)) (@(s++ `prim_ name `_reserve) vec new_size))
+    (if (> new_size (get vec 2))
+        (
+            (@(s++ `prim_ name `_reserve) vec new_size)
+        )
+        (
+            (void* ptr (+ (get vec 0) (* @esize new_size)))
+            (prim_memset ptr 0 (* @esize (- (get vec 1) new_size)))
+        ))
     (set vec 1 new_size)
     ))
 

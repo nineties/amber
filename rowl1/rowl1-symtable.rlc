@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-symtable.rlc 2010-10-21 17:47:46 nineties $
+; $Id: rowl1-symtable.rlc 2010-10-21 22:39:28 nineties $
 ;
 
 (import "rlvm-compile")
@@ -31,7 +31,7 @@
 
 (export fun make_symtable () (
     (var size (array_get int prime_numbers 0))
-    (var table (tuple 4 (make_vector size) (make_vector 0) (make_vector 0)))
+    (var table (tuple 3 (make_vector size) (make_vector 0) (make_vector 0)))
     (symtable_push table)
     (return table)
     ))
@@ -41,6 +41,26 @@
     (vector_pushback display 0)
     ))
 
+(export fun symtable_pop (table) (
+    (var display (field_get table 2))
+    (var entries (field_get table 1))
+    (var bucket (field_get table 0))
+    (var size (vector_size bucket))
+
+    (var depth (ivector_size display))
+    (var npop  (ivector_at (- depth 1) display))
+    (ivector_resize (- depth 1) display)
+
+    (var end (vector_size entries))
+    (var begin (- end npop))
+    (while (< begin end) (do
+        (var entry (vector_at entries begin))
+        (var h (% (field_get entry 3) size))
+        (vector_put bucket h (field_get (vector_at bucket h) 2))
+        ))
+    (vector_resize entries begin)
+    ))
+
 (fun hash (sym arity) (
     (var h (field_get sym @SymbolIndex))
     (*= h 7)
@@ -48,19 +68,63 @@
     (return h)
     ))
 
+(fun rehash (table) (
+    (var old_size (vector_size (field_get table 0)))
+    (var num_ent  (vector_size (field_get table 1)))
+    (if (>= num_ent old_size) (do
+        (var new_size (array_get int prime_numbers (bsr num_ent)))
+        (if (! new_size) (error "rehash: too many entries"))
+        (var bucket (make_vector new_size))
+        (var entries (field_get table 1))
+        (for i 0 (vector_size entries) (do
+            (var entry (vector_at entries i))
+            (var h (% (field_get entry 3) new_size))
+            (field_set entry 2 (vector_at bucket h))
+            (vector_put bucket h entry)
+            ))
+        (field_set table 0 bucket)
+        ))
+    ))
+
 (export fun symtable_add (table sym arity obj) (
+    (rehash table)
+
     (var bucket (field_get table 0))
     (var entries (field_get table 1))
     (var display (field_get table 2))
-
     (var size (vector_size bucket))
     (var h (hash sym arity))
+    (var depth (ivector_size display))
+
+    (if (== depth 0) (error "symtable_add: no namespace"))
 
     (var ent (tuple 4 sym obj 0 h arity))
     (%= h size)
 
     (vector_pushback entries ent)
 
+    (field_set ent 2 (vector_at bucket h))
+    (vector_put bucket h ent)
+
+    ; increment a counter in display
+    (var n (ivector_at display (- depth 1)))
+    (ivector_put display (- depth 1) (+ n 1))
+
+    ))
+
+(export fun symtable_find (table sym arity) (
+    (var bucket (field_get table 0))
+    (var size (vector_size bucket))
+    (var h (hash sym arity))
+    (%= h size)
+    (var entry (vector_at bucket h))
+    (while entry (do
+        (var e_sym (field_get entry 0))
+        (var e_arity (field_get entry 4))
+        (if (&& (== e_sym sym) (== e_arity arity)) (return (field_get entry 1)))
+        (= entry (field_get entry 2))
+        ))
+    (return 0)
     ))
 
     ))
