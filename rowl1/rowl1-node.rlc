@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2010-10-18 13:42:42 nineties $
+; $Id: rowl1-node.rlc 2010-10-21 17:36:44 nineties $
 ;
 
 (import "rlvm-compile")
@@ -12,13 +12,21 @@
 
 (import "rowl1-util")
 
+; XXX: output precise information
+(export fun check_tag (tag obj) (
+    (if (! obj) (error "check_tag: null object"))
+    (if (!= tag (field_get obj 0)) (error "check_tag: tag mismatch"))
+    ))
+
 (var symbol_table (make_idtable))
+(var symbol_index_gen 0)
 
 (export fun make_symbol (name) (
     (var sym (idtable_find symbol_table name))
     (if sym (return sym))
     (= name (strdup name))
-    (= sym (variant @Symbol 1 name))
+    (= sym (variant @Symbol 1 name symbol_index_gen))
+    (+= symbol_index_gen 1)
     (idtable_add symbol_table name sym)
     (return sym)
     ))
@@ -91,7 +99,7 @@
     (@Infix   . (return (pp_infix ochan node)))
     (@Call    . (return (pp_call ochan node)))
     (@Subscr  . (return (pp_subscr ochan node)))
-    (default . (error "pp_expr: not reachable"))
+    (default  . (error "pp_expr: not reachable"))
         ))
     ))
 

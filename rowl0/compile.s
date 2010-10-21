@@ -3,7 +3,7 @@
  * Copyright (C) 2009 nineties
  */
 
-/* $Id: compile.s 2010-06-13 13:58:11 nineties $ */
+/* $Id: compile.s 2010-10-21 17:00:21 nineties $ */
 
 .include "defs.s"
 .include "token.s"
@@ -18,7 +18,7 @@ string_buflen: .long 0
 .text
 
 .section .rodata
-string_buffer_text: .string "_string_literal_buffer"
+string_literals_text: .string "_string_literals"
 .text
 
 _strlen_with_escape:
@@ -83,7 +83,7 @@ _push_string:
 
 _put_string_addr:
     subl    $4, %esp
-    movl    $string_buffer_text, (%esp)
+    movl    $string_literals_text, (%esp)
     call    _puts
     movl    $'+, (%esp)
     call    _putc
@@ -98,7 +98,7 @@ _gen_string_literals:
     cmpl    $0, string_buflen
     je      4f
     call    _enter_rodata_area
-    movl    $string_buffer_text, (%esp)
+    movl    $string_literals_text, (%esp)
     call    _puts
     movl    $':, (%esp)
     call    _putc
