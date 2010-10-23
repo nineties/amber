@@ -3,7 +3,7 @@
 # rowl - generation 2
 # Copyright (C) 2010 nineties
 #
-# $Id: main.rl 2010-10-23 20:30:27 nineties $
+# $Id: main.rl 2010-10-24 00:45:11 nineties $
 #
 
-print("Hello World\n")
+jit_test()

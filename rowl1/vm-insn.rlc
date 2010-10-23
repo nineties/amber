@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-10-21 20:51:38 nineties $
+; $Id: vm-insn.rlc 2010-10-24 01:03:58 nineties $
 ;
 
 (define gen_comparison1 (cmovname) `(
@@ -460,6 +460,16 @@
                 (asm "addl code_base, %ebx")
                 (vmfetch)
             ))
+        ))
+    ; 'jcall:1' 'size of arguments:1'
+    (jcall (byte) @nil (
+        (asm "movl %ebx, %ecx")
+        (asm "addl $2, %ecx")
+        (vmpop %ebx) ; pointer to the bytecode
+        (vmpush %ecx) ; store return point
+        (vmpush %edi) ; store base pointer
+        (asm "movl %esi, %edi") ; set base pointer
+        (vmfetch)
         ))
     (return () @nil  (
         (asm "movl $0, %ecx") ; return value
