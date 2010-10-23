@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlvm-compile.rlc 2010-10-21 20:49:45 nineties $
+; $Id: rlvm-compile.rlc 2010-10-24 00:56:08 nineties $
 ;
 
 (import "stdlib")
@@ -362,6 +362,13 @@
         (otherwise (error "compile_call: not reachable here"))
         )))
 
+(define compile_jitcall ((_ bytecode . args)) (do
+    (var narg (length args))
+    (foreach a (reverse args) (compile_expr a))
+    (compile_expr bytecode)
+    (emit_insn `(jcall (byte @(* 4 narg))))
+    ))
+
 (var comparison_operator
     `((< . if_ge) (> . if_le) (<= . if_gt) (>= . if_lt) (== . if_ne) (!= . if_eq)))
 (define comparison_expr? (expr) (and (cons? expr) (assoc (car expr) comparison_operator)))
@@ -695,6 +702,7 @@
         ((== `cddr (car expr)) (compile_field_get `(field_get (field_get @(cadr expr) 1) 1)))
         ((== `setcar (car expr)) (compile_field_set `(field_set @(cadr expr) 0 @(caddr expr))))
         ((== `setcdr (car expr)) (compile_field_set `(field_set @(cadr expr) 1 @(caddr expr))))
+        ((== `jitcall (car expr)) (compile_jitcall expr))
         ((and (== 3 (length expr)) (binary_operator? (car expr)))
             (compile_binexpr expr))
         ((and (== 2 (length expr)) (unary_operator? (car expr)))
