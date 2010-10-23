@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-10-21 17:37:54 nineties $
+# $Id: Makefile 2010-10-22 23:30:37 nineties $
 
 AS = as
 ASFLAGS =
@@ -85,14 +85,14 @@ ROWLCOMPILER = rlci\
 	       vm-prim-inc.rlc
 
 startup.rlo        : $(ROWLCOMPILER)
-rowl1-main.rlo     : $(ROWLCOMPILER) rowl1-parse.rlo rowl1-types.rlc rowl1-interp.rlo
+rowl1-main.rlo     : $(ROWLCOMPILER) rowl1-types.rlc rowl1-lex.rlo rowl1-parse.rlo rowl1-stdlib.rlo rowl1-interp.rlo
 rowl1-util.rlo     : $(ROWLCOMPILER) rowl1-types.rlc
 rowl1-lex.rlo      : $(ROWLCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo
 rowl1-parse.rlo    : $(ROWLCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-lex.rlo rowl1-node.rlo rowl1-stdlib.rlo
 rowl1-node.rlo     : $(ROWLCOMPILER) rowl1-types.rlc rowl1-util.rlo
-rowl1-stdlib.rlo   : $(ROWLCOMPILER) rowl1-lex.rlo
+rowl1-stdlib.rlo   : $(ROWLCOMPILER) rowl1-lex.rlo rowl1-node.rlo rowl1-interp.rlo
 rowl1-symtable.rlo : $(ROWLCOMPILER) rowl1-types.rlc
-rowl1-interp.rlo   : $(ROWLCOMPILER) rowl1-types.rlc rowl1-symtable.rlo
+rowl1-interp.rlo   : $(ROWLCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-symtable.rlo
 
 rlvm: $(VMOBJECTS)
 	$(LD) $^ -o $@ $(VMLDFLAGS)

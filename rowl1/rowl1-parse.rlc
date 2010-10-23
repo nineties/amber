@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-parse.rlc 2010-10-19 12:05:30 nineties $
+; $Id: rowl1-parse.rlc 2010-10-22 23:29:37 nineties $
 ;
 
 (import "rlvm-compile")
@@ -32,10 +32,7 @@
 ; - postfix operator must be unique
 
 
-(export fun parse (file) (
-    (var ichan (open_in file))
-    (init_lexer file ichan)
-    (init_stdlib)
+(export fun parse (ichan) (
     (var prog (parse_prog))
     (close_in ichan)
     (return prog)
@@ -121,14 +118,12 @@
     (label parse_secondary_loop)
     (= t (lex))
     (if (== t '(') (do
-        (var args (parse_comma_list (lex)))
-        (eat (lex) ')')
+        (var args (parse_comma_list (lex) ')'))
         (= e (variant @Call 2 e args))
         (goto parse_secondary_loop)
         )
     (if (== t '[') (do
-        (var args (parse_comma_list (lex)))
-        (eat (lex) ']')
+        (var args (parse_comma_list (lex) ']'))
         (= e (variant @Subscr 2 e args))
         (goto parse_secondary_loop)
         )))
@@ -167,25 +162,19 @@
     ))
 
 (fun parse_tuple (t) (
-    (var elems 0)
-    (if (!= t ')') (do
-        (= elems (parse_comma_list t))
-        (eat (lex) ')')
-        ))
+    (var elems (parse_comma_list t ')'))
     (if (== (cdr elems) 0) (return (car elems)))
     (return (variant @Tuple 1 elems))
     ))
 
 (fun parse_array (t) (
-    (var elems 0)
-    (if (!= t ']') (do
-        (= elems (parse_comma_list t))
-        (eat (lex) ']')
-        ))
+    (var elems (parse_comma_list t ']'))
     (return (variant @Array 1 elems))
     ))
 
-(fun parse_comma_list (t) (
+(fun parse_comma_list (t end) (
+    (if (== t end) (return 0))
+
     (var elems 0)
     (label parse_comma_list_loop)
     (var e (parse_expr t))
@@ -195,7 +184,7 @@
         (= t (lex))
         (goto parse_comma_list_loop)
         ))
-    (unput)
+    (eat t end)
     (return (list_reverse elems))
     ))
 

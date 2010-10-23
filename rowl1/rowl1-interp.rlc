@@ -2,32 +2,95 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2010-10-21 17:24:33 nineties $
+; $Id: rowl1-interp.rlc 2010-10-23 23:27:42 nineties $
 ;
 
 (import "rlvm-compile")
 (import "rowl1-types")
 
+; TODO: output useful informations in error reporting.
+
 (compile `object `(
 
+(import "rowl1-util")
 (import "rowl1-node")
 (import "rowl1-symtable")
 
 (var funtable (make_symtable))
+(var vartable (make_symtable))
+
+(export fun add_function (sym arity func) (
+    (symtable_add funtable sym arity func)
+    ))
 
 (export fun interpret (prog) (
-    (check_tag @List prog)
+    (check_type @List prog)
 
     (var list (field_get prog 1))
     (while list (do
-        ; temporal implementation
         (builtin_eval (car list))
         (= list (cdr list))
         ))
     ))
 
 (fun builtin_eval (expr) (
-    (var tag (field_get expr 0))
+    (if (! expr) (error "builtin_eval: null expression"))
+    (var type (node_type expr))
+    (tswitch type (
+    (@Symbol  . (return (builtin_eval_symbol expr)))
+    (@List    . (not_implemented "builtin_eval"))
+    (@Tuple   . (not_implemented "builtin_eval"))
+    (@Array   . (not_implemented "builtin_eval"))
+    (@Node    . (not_implemented "builtin_eval"))
+    (@Prefix  . (not_implemented "builtin_eval"))
+    (@Postfix . (not_implemented "builtin_eval"))
+    (@Infix   . (not_implemented "builtin_eval"))
+    (@Call    . (return (builtin_eval_call expr)))
+    (@Subscr  . (not_implemented "builtin_eval"))
+    (@Char    . (not_implemented "builtin_eval"))
+    (@Int     . (not_implemented "builtin_eval"))
+    (@Float   . (not_implemented "builtin_eval"))
+    (@String  . (return expr))
+    (default  . (not_reachable "builtin_eval"))
+        ))
+    ))
+
+(fun builtin_eval_symbol (sym) (
+    (var value (symtable_find vartable sym 0))
+    (if value (return value) (return sym))
+    ))
+
+; XXX: experimental implementation
+(fun builtin_eval_call (expr) (
+    (var func (field_get expr 1))
+    (var args (field_get expr 2))
+    (= func (builtin_eval func))
+    (if (!= (node_type func) @Symbol) (undefined expr))
+
+    (var arity 0)
+    (var argv (array object 7))
+    (while args (do
+        (array_set object argv arity (builtin_eval (car args)))
+        (= args (cdr args))
+        (+= arity 1)
+        ))
+    (var f (symtable_find funtable func arity))
+    (if (! f) (undefined expr))
+    (tswitch arity (
+    (0 . (return (f)))
+    (1 . (return (f (array_get object argv 0))))
+    (2 . (return (f (array_get object argv 0) (array_get object argv 1))))
+    (3 . (return (f (array_get object argv 0) (array_get object argv 1) (array_get object argv 2))))
+    (4 . (return (f (array_get object argv 0) (array_get object argv 1) (array_get object argv 2) (array_get object argv 3))))
+    (5 . (return (f (array_get object argv 0) (array_get object argv 1) (array_get object argv 2) (array_get object argv 3) (array_get object argv 4))))
+    (6 . (return (f (array_get object argv 0) (array_get object argv 1) (array_get object argv 2) (array_get object argv 3) (array_get object argv 4) (array_get object argv 5))))
+    (7 . (return (f (array_get object argv 0) (array_get object argv 1) (array_get object argv 2) (array_get object argv 3) (array_get object argv 4) (array_get object argv 5) (array_get object argv 6))))
+    (default . (not_implemented "builtin_eval_call"))
+        ))
+    ))
+
+(fun undefined (expr) (
+    (error "undefined function")
     ))
 
     ))
