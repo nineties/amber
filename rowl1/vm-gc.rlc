@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-10-20 05:38:09 nineties $
+; $Id: vm-gc.rlc 2010-10-22 16:11:03 nineties $
 ;
 
 (import "stdlib")
@@ -126,14 +126,6 @@
 (var OBJECT_COPYED_OFF (+ OBJECT_WORDS_BITS BOXED_FIELD_SIZE_BITS))
 (var OBJECT_TAG_BITS 3)
 (var OBJECT_TAG_OFF (+ OBJECT_WORDS_BITS BOXED_FIELD_SIZE_BITS 1))
-
-; !!! DO NOT CHANGE THE ORDER OF TAGS !!!
-(var TAG_PADDING 0)
-(var TAG_PLAIN   1)
-(var TAG_CONS    2)
-(var TAG_ARRAY   3)
-(var TAG_TUPLE   4)
-(var TAG_VARIANT 5)
 
 (define OBJECT_WORDS (addr)  `(& ([] @addr 0) @(- (<< 1 OBJECT_WORDS_BITS) 1)))
 (define OBJECT_TAG (addr)    `(>> ([] @addr 0) @OBJECT_TAG_OFF))
@@ -591,6 +583,12 @@
             (munmap 0 @BLOCK_SIZE)
             ))
         ))
+    ))
+
+(export prim_get_tag)
+(fun prim_get_tag (obj) (
+    (-= obj @WORD_SIZE)
+    (return @(OBJECT_TAG obj))
     ))
 ))
 

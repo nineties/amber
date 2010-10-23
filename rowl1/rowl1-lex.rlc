@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-lex.rlc 2010-10-19 12:07:08 nineties $
+; $Id: rowl1-lex.rlc 2010-10-23 14:29:35 nineties $
 ;
 
 (import "rlvm-compile")
@@ -579,7 +579,7 @@
         (38 . (do
             (consume)
             (var str (get_unquoted_token_text))
-            (= token_value (make_symbol str))
+            (= token_value (to_symbol str))
             (accept @TOK_SYMBOL)
             (= state 1)
             (goto lexloop)
@@ -587,14 +587,12 @@
         (39 . (do
             (consume)
             (var op (find_operator (get_token_text)))
-            (if op
-                (accept_operator op infix_p)
-                (do
-                    (accept @TOK_SYMBOL)
-                    (= token_value (make_symbol (get_token_text)))
-                )
-                )
+            (if op (accept_operator op infix_p))
             (= state (next_state s39next))
+	    (if (== state 1) (do
+		(accept @TOK_SYMBOL)
+		(= token_value (to_symbol (get_token_text)))
+		))
             (goto lexloop)
             ))
         (40 . (do
@@ -698,7 +696,7 @@
 (export fun add_prefix (name assoc) (
     (check_assoc name assoc)
     (var op (find_operator name))
-    (var sym (make_symbol name))
+    (var sym (to_symbol name))
     (var prefix_op (variant @OP_PREFIX 1 sym assoc))
     (if op (do
         (var optype (field_get op 0))
@@ -716,7 +714,7 @@
 
 (export fun add_postfix (name assoc) (
     (check_assoc name assoc)
-    (var sym (make_symbol name))
+    (var sym (to_symbol name))
     (add_operator name (variant @OP_POSTFIX 1 sym assoc))
     ))
 
@@ -726,7 +724,7 @@
 (fun add_infix (name is_left assoc) (
     (check_assoc name assoc)
     (var op (find_operator name))
-    (var sym (make_symbol name))
+    (var sym (to_symbol name))
     (var infix_op (variant @OP_INFIX 1 sym is_left assoc))
     (if op (do
         (var optype (field_get op 0))
@@ -744,7 +742,7 @@
 
 (export fun add_constr (name maxlen assoc) (
     (check_assoc name assoc)
-    (var sym (make_symbol name))
+    (var sym (to_symbol name))
     (add_operator name (variant @OP_CONSTR 1 sym maxlen assoc))
     ))
 
