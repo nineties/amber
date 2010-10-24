@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-10-22 16:11:03 nineties $
+; $Id: vm-gc.rlc 2010-10-24 14:59:33 nineties $
 ;
 
 (import "stdlib")
@@ -135,6 +135,7 @@
 
 (define BOXED_FIELD_SIZE (addr)
     `(& (>> ([] @addr 0) @BOXED_FIELD_SIZE_OFF) @(- (<< 1 BOXED_FIELD_SIZE_BITS) 1)))
+(define OBJECT_PLAIN_TAG (addr) (BOXED_FIELD_SIZE addr))
 
 (define HEADER (tag nboxed objsz)
     `(| (<< @tag @OBJECT_TAG_OFF)
@@ -590,6 +591,12 @@
     (-= obj @WORD_SIZE)
     (return @(OBJECT_TAG obj))
     ))
+(export prim_get_plain_tag)
+(fun prim_get_plain_tag (obj) (
+    (-= obj @WORD_SIZE)
+    (return @(OBJECT_PLAIN_TAG obj))
+    ))
+
 ))
 
 (vtable_push)
