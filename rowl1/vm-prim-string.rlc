@@ -2,13 +2,21 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-string.rlc 2010-10-20 02:44:04 nineties $
+; $Id: vm-prim-string.rlc 2010-10-24 14:50:14 nineties $
 ;
 
 (import "stdlib")
 (import "vm-compile")
 
 (var vm-prim-code `(
+
+(export prim_make_string)
+(fun prim_make_string (str) (
+    (int len (+ (prim_strlen str) 1))
+    (void* ptr (allocate_string len))
+    (prim_strcpy ptr str)
+    (return ptr)
+    ))
 
 (export prim_strlen)
 (fun prim_strlen (str) (
@@ -36,23 +44,23 @@
     ))
 
 (export prim_strcpy)
-(fun prim_strcpy (buf str) (
+(fun prim_strcpy (dst str) (
     (while (!= (*8 str) '\0') (
-        ([]=8 buf 0 (*8 str))
-        (incr buf)
+        ([]=8 dst 0 (*8 str))
+        (incr dst)
         (incr str)
         ))
-    ([]=8 buf 0 0)
+    ([]=8 dst 0 0)
     ))
 
 (export prim_strncpy)
-(fun prim_strncpy (buf str len) (
+(fun prim_strncpy (dst str len) (
     (for i 0 len (
-        ([]=8 buf 0 (*8 str))
-        (incr buf)
+        ([]=8 dst 0 (*8 str))
+        (incr dst)
         (incr str)
         ))
-    ([]=8 buf 0 0)
+    ([]=8 dst 0 0)
     ))
 
 (export prim_strdup)
@@ -67,10 +75,10 @@
 (fun prim_strcat (str1 str2) (
     (int len1 (prim_strlen str1))
     (int len2 (prim_strlen str2))
-    (void* buf (allocate_string (+ (+ len1 len2) 1)))
-    (prim_strcpy buf str1)
-    (prim_strcpy (+ buf len1) str2)
-    (return buf)
+    (void* dst (allocate_string (+ (+ len1 len2) 1)))
+    (prim_strcpy dst str1)
+    (prim_strcpy (+ dst len1) str2)
+    (return dst)
     ))
 
 ))
