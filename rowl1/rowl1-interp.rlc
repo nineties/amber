@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2010-10-26 23:21:29 nineties $
+; $Id: rowl1-interp.rlc 2010-10-27 00:00:35 nineties $
 ;
 
 (import "rlvm-compile")
@@ -65,7 +65,7 @@
     (var func (field_get expr @CallFunc))
     (var args (field_get expr @CallArgs))
     (= func (builtin_eval func))
-    (if (!= (node_type func) @Symbol) (undefined expr))
+    (if (!= (node_type func) @Symbol) (goto undefined_error))
 
     (var arity 0)
     (var argv (array object 7))
@@ -75,7 +75,7 @@
         (+= arity 1)
         ))
     (var f (symtable_find funtable func arity))
-    (if (! f) (undefined expr))
+    (if (! f) (goto undefined_error))
     (tswitch arity (
     (0 . (return (f)))
     (1 . (return (f (array_get object argv 0))))
@@ -87,10 +87,22 @@
     (7 . (return (f (array_get object argv 0) (array_get object argv 1) (array_get object argv 2) (array_get object argv 3) (array_get object argv 4) (array_get object argv 5) (array_get object argv 6))))
     (default . (not_implemented "builtin_eval_call"))
         ))
-    ))
 
-(fun undefined (expr) (
-    (error "undefined function")
+    (label undefined_error)
+
+    (flush stdout)
+
+    (var loc (field_get expr 1))
+    (= arity (list_length args))
+
+    (error_head stderr loc)
+    (output_string stderr "undefined function '")
+    ; XXX: func can not be a symbol
+    (output_string stderr (field_get func @SymbolName))
+    (output_string stderr "' with arity = ")
+    (output_int stderr arity)
+    (output_char stderr '\n')
+    (exit 1)
     ))
 
     ))

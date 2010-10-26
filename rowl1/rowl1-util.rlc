@@ -2,84 +2,43 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-util.rlc 2010-10-25 23:09:22 nineties $
+; $Id: rowl1-util.rlc 2010-10-27 01:00:58 nineties $
 ;
 
 (import "rlvm-compile")
 (import "rowl1-types")
 
-; location of source code
-; (Single, file, line)
-; (Multi, file, begin line, end line)
-(var Single 0)
-(var Multi  1)
-
 (compile `object `(
 
-(export fun make_loc (file line) (
-    (return (variant @Single 1 file line))
+(export fun make_loc (file begin end) (
+    (return (tuple 1 file begin end))
     ))
 
 (export fun merge_loc (loc1 loc2) (
-    (var type1 (field_get loc1 0))
-    (var type2 (field_get loc2 0))
-    (if (== type1 type2)
-        (if (== type1 @Single)
-            (return (merge_loc_single loc1 loc2))
-            (return (merge_loc_multi loc1 loc2))
-            )
-        (if (== type1 @Single)
-            (return (merge_loc_single_multi loc1 loc2))
-            (return (merge_loc_multi_single loc1 loc2))
-            ))
-    ))
-
-(fun merge_loc_single (loc1 loc2) (
-    (return (variant @Multi 1
-        (field_get loc1 1)
-        (field_get loc1 2)
-        (field_get loc2 2)
-        ))
-    ))
-(fun merge_loc_multi (loc1 loc2) (
-    (return (variant @Multi 1
-        (field_get loc1 1)
-        (field_get loc1 2)
-        (field_get loc2 3)
-        ))
-    ))
-(fun merge_loc_single_multi (loc1 loc2) (
-    (return (variant @Multi 1
-        (field_get loc1 1)
-        (field_get loc1 2)
-        (field_get loc2 3)
-        ))
-    ))
-(fun merge_loc_multi_single (loc1 loc2) (
-    (return (variant @Multi 1
-        (field_get loc1 1)
-        (field_get loc1 2)
-        (field_get loc2 2)
-        ))
+    (var begin (field_get loc1 1))
+    (var end (field_get loc2 2))
+    (if (== begin end) (return loc1))
+    (return (tuple 1 (field_get loc1 0) begin end))
     ))
 
 (export fun output_srcloc (ochan loc) (
-    (var type (field_get loc 0))
-    (output_string ochan (field_get loc 1)) ; file
+    (output_string ochan (field_get loc 0)) ; file
     (output_char ochan ':')
-    (if (== type @Single)
-        (output_int ochan (field_get loc 2))
+    (var begin (field_get loc 1))
+    (var end (field_get loc 2))
+    (if (== begin end)
+        (output_int ochan begin)
         (do
-            (output_int ochan (field_get loc 2))
+            (output_int ochan begin)
             (output_char ochan '-')
-            (output_int ochan (field_get loc 3))
+            (output_int ochan end)
         ))
     ))
 
 (export fun error_head (ochan loc) (
-    (output_char ochan '[')
+    (flush stdout)
     (output_srcloc ochan loc)
-    (output_string ochan "] ERROR: ")
+    (output_string ochan " ERROR: ")
     ))
 
 (export fun output_char_escape (ochan t) (
