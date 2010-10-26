@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlvm-compile.rlc 2010-10-26 11:47:50 nineties $
+; $Id: rlvm-compile.rlc 2010-10-26 19:54:05 nineties $
 ;
 
 (import "stdlib")
@@ -698,8 +698,10 @@
         ((== `set (car expr)) (compile_field_set `(field_set @(cadr expr) 0 @(caddr expr))))
         ((== `car (car expr)) (compile_field_get `(field_set @(cadr expr) 0)))
         ((== `cdr (car expr)) (compile_field_get `(field_set @(cadr expr) 1)))
-        ((== `cadr (car expr)) (compile_field_get `(field_get (field_get @(cadr expr) 1) 0)))
-        ((== `cddr (car expr)) (compile_field_get `(field_get (field_get @(cadr expr) 1) 1)))
+        ((== `caar (car expr)) (compile_expr `(car (car @(cadr expr)))))
+        ((== `cdar (car expr)) (compile_expr `(cdr (car @(cadr expr)))))
+        ((== `cadr (car expr)) (compile_expr `(car (cdr @(cadr expr)))))
+        ((== `cddr (car expr)) (compile_expr `(cdr (cdr @(cadr expr)))))
         ((== `setcar (car expr)) (compile_field_set `(field_set @(cadr expr) 0 @(caddr expr))))
         ((== `setcdr (car expr)) (compile_field_set `(field_set @(cadr expr) 1 @(caddr expr))))
         ((== `jitcall (car expr)) (compile_jitcall expr))
@@ -803,16 +805,17 @@
     (var nent (getint ichan))
     (upto i 1 nent (do
         (var type (getchar ichan))
-        (var str (getstr ichan))
-        (var name (tosym str))
-        (getint ichan) ; skip addr
-        (= type (cond
-            ((== type RELOC_FUNCTION)   `fun)
-            ((== type RELOC_VALUE)      `value)
-            ((== type RELOC_OBJECT)     `object)
-            (otherwise  (error "compile_import: not reachable here"))
+        (if (>= type 0) (do
+            (var name (tosym (getstr ichan)))
+            (getint ichan) ; skip addr
+            (= type (cond
+                ((== type RELOC_FUNCTION)   `fun)
+                ((== type RELOC_VALUE)      `value)
+                ((== type RELOC_OBJECT)     `object)
+                (otherwise  (error "compile_import: not reachable here" type))
+                ))
+            (compile_extern `(extern @type @name))
             ))
-        (compile_extern `(extern @type @name))
         ))
     (close_in ichan)
     ))
