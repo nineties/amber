@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-10-08 13:57:52 nineties $
+ % $Id: builtin.rl 2010-10-26 11:49:50 nineties $
  %);
 
 include(stddef,code);
@@ -69,7 +69,7 @@ append: (p0, p1) {
 };
 
 length: (p0) {
-    allocate(2);
+    allocate(1);
     x0 = 0;
     while (p0 != nil_sym) {
         p0 = cdr(p0);
@@ -666,6 +666,7 @@ rl_array_set: (p0) {
 
 (% (syscall <syscall-id> <arguments as int> %);
 rl_syscall: (p0) {
+    allocate(2);
     x0 = int_value(car(p0));
     p0 = cdr(p0);
     x1 = length(p0);

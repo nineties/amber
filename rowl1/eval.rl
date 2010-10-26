@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: eval.rl 2010-10-08 01:39:30 nineties $
+ % $Id: eval.rl 2010-10-26 11:35:55 nineties $
  %);
 
 include(stddef,code);
@@ -122,7 +122,6 @@ eval_set: (p0) {
 };
 
 eval_quote: (p0) {
-    allocate(1);
     if (cons_p(p0) != nil_sym) {
         return mkcons(eval_quote(car(p0)), eval_quote(cdr(p0)));
     };
