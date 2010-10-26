@@ -3,8 +3,8 @@
 # rowl - generation 2
 # Copyright (C) 2010 nineties
 #
-# $Id: main.rl 2010-10-24 20:53:54 nineties $
+# $Id: main.rl 2010-10-27 00:00:50 nineties $
 #
 
-print("Hello World")
-print(1)
+print("Hello World\n")
+print()

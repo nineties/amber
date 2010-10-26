@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-parse.rlc 2010-10-26 23:21:20 nineties $
+; $Id: rowl1-parse.rlc 2010-10-27 01:07:58 nineties $
 ;
 
 (import "rlvm-compile")
@@ -40,14 +40,14 @@
 
 (fun parse_prog () (
     (var elems 0)
-    (var begin (get_loc))
+    (var begin (getloc))
     (while 1 (do
         (var t (lex))
         (if (== t @TOK_EOF) break)
         (var e (parse_expr t))
         (= elems (cons e elems))
         ))
-    (var end (get_loc))
+    (var end (getloc))
     (return (variant @List 2 (merge_loc begin end) (list_reverse elems)))
     ))
 
@@ -59,30 +59,30 @@
     (var begin)
     (var end)
 
-    (= op_stack (cons (cons (variant @OP_START 0) (get_loc)) op_stack))
+    (= op_stack (cons (cons (variant @OP_START 0) (getloc)) op_stack))
 
     (label parse_expr_front)
     (while (== tok @TOK_PREFIX) (do
-        (= op_stack (cons (cons (get_token_value) (get_loc)) op_stack))
+        (= op_stack (cons (cons (get_token_value) (getloc)) op_stack))
         (= tok (lex))
         ))
-    (= begin (get_loc))
+    (= begin (getloc))
     (var e (parse_secondary tok))
-    (= end (get_loc))
+    (= end (getloc))
     (= expr_stack (cons (cons e (merge_loc begin end)) expr_stack))
 
     (label parse_expr_infix)
     (= tok (lex_infix))
     (if (|| (== tok @TOK_INFIX) (== tok @TOK_POSTFIX))
-        (= next_op (cons (get_token_value) (get_loc)))
+        (= next_op (cons (get_token_value) (getloc)))
         (do
             (unput)
-            (= next_op (cons (variant @OP_END 0) (get_loc)))
+            (= next_op (cons (variant @OP_END 0) (getloc)))
         )
         )
 
     (while 1 (do
-        (var comp (compare_associativity (caar op_stack) (car next_op)))
+        (var comp (compare_associativity (car op_stack) next_op))
         (if (== comp 0) (goto parse_expr_end)
         (if (> comp 0) (do
             ; reduce
@@ -102,8 +102,8 @@
     (if (== tok @TOK_POSTFIX) (goto parse_expr_infix)
         ))
 
-    (flush stdout)
-    (output_string stderr "parse_expr: not implemented\n")
+    (error_head stderr (getloc))
+    (output_string stderr "expect an infix or a postfix operator\n")
     (exit 1)
 
     (label parse_expr_end)
@@ -111,27 +111,26 @@
     (var len (list_length expr_stack))
     (if (== len 0) (return 0))
     (if (> len 1) (do
-        (flush stdout)
-        (output_loc stderr)
-        (output_string stderr "syntax error: irreducible expression\n")
+        (error_head stderr (getloc))
+        (output_string stderr "irreducible expression\n")
         (exit 1)
         ))
     (return (caar expr_stack))
     ))
 
 (fun parse_secondary (t) (
-    (var begin (get_loc))
+    (var begin (getloc))
     (var e (parse_primary t))
     (label parse_secondary_loop)
     (= t (lex))
     (if (== t '(') (do
         (var args (parse_comma_list (lex) ')'))
-        (= e (variant @Call 3 (merge_loc begin (get_loc)) e args))
+        (= e (variant @Call 3 (merge_loc begin (getloc)) e args))
         (goto parse_secondary_loop)
         )
     (if (== t '[') (do
         (var args (parse_comma_list (lex) ']'))
-        (= e (variant @Subscr 3 (merge_loc begin (get_loc)) e args))
+        (= e (variant @Subscr 3 (merge_loc begin (getloc)) e args))
         (goto parse_secondary_loop)
         )))
     (unput)
@@ -145,7 +144,7 @@
     (if (== t @TOK_STRING) (return (get_token_value))
     (if (== t @TOK_SYMBOL) (return (get_token_value))
     (if (== t @TOK_CONSTR) (do
-        (var begin (get_loc))
+        (var begin (getloc))
         (var op (get_token_value))
         (var sym (field_get op 1))
         (var arity (field_get op 2))
@@ -156,7 +155,7 @@
             (var e (parse_expr (lex)))
             (store object expr i e)
             ))
-        (var end (get_loc))
+        (var end (getloc))
         (field_set expr 1 (merge_loc begin end))
         (return expr)
         )
@@ -165,24 +164,23 @@
     (if (== t '{') (return (parse_list (lex)))
         )))))))))
 
-    (flush stdout)
-    (output_loc stderr)
-    (output_string stderr "syntax error: expression is required\n")
+    (error_head stderr (getloc))
+    (output_string stderr "expect a literal expression")
     (exit 1)
     ))
 
 (fun parse_tuple (t) (
-    (var begin (get_loc))
+    (var begin (getloc))
     (var elems (parse_comma_list t ')'))
     (if (== (cdr elems) 0) (return (car elems)))
-    (var end (get_loc))
+    (var end (getloc))
     (return (variant @Tuple 2 (merge_loc begin end) elems))
     ))
 
 (fun parse_array (t) (
-    (var begin (get_loc))
+    (var begin (getloc))
     (var elems (parse_comma_list t ']'))
-    (var end (get_loc))
+    (var end (getloc))
     (return (variant @Array 2 (merge_loc begin end) elems))
     ))
 
@@ -204,7 +202,7 @@
 
 (fun parse_list (t) (
     (var elems 0)
-    (var begin (get_loc))
+    (var begin (getloc))
     (if (!= t '}') (do
         (label parse_list_loop)
         (var e (parse_expr t))
@@ -212,15 +210,14 @@
         (= t (lex))
         (if (!= t '}') (goto parse_list_loop))
         ))
-    (var end (get_loc))
+    (var end (getloc))
     (return (variant @List 2 (merge_loc begin end) (list_reverse elems)))
     ))
 
 (fun eat (tok expect) (
     (if (!= tok expect) (do
-        (flush stdout)
-        (output_loc stderr)
-        (output_string stderr "syntax error: expect '")
+        (error_head stderr (getloc))
+        (output_string stderr "expect '")
         (output_char stderr expect)
         (output_string stderr "'\n")
         (exit 1)
@@ -270,7 +267,9 @@
         )))
     ))
 
-(fun compare_associativity (lop rop) (
+(fun compare_associativity (lop_info rop_info) (
+    (var lop (car lop_info))
+    (var rop (car rop_info))
     (var lassoc (associativity lop))
     (var rassoc (associativity rop))
     (if (!= lassoc rassoc) (return (- lassoc rassoc)))
@@ -282,9 +281,12 @@
         (var is_left_r (field_get rop 2))
         (if (== is_left_l is_left_r) (if is_left_l (return 1) (return -1)))
         ))
-    ; XXX: output locatoin
-    (flush stdout)
-    (output_string stderr "ERROR: undecidable associativity\n")
+    (error_head stderr (merge_loc (cdr lop_info) (cdr rop_info)))
+    (output_string stderr "ERROR: undecidable associativity ")
+    (output_string stderr (field_get (field_get lop 1) @SymbolName))
+    (output_string stderr " <-> ")
+    (output_string stderr (field_get (field_get rop 1) @SymbolName))
+    (output_char stderr '\n')
     (exit 1)
     ))
 
