@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-parse.rlc 2010-10-24 16:40:50 nineties $
+; $Id: rowl1-parse.rlc 2010-10-26 23:21:20 nineties $
 ;
 
 (import "rlvm-compile")
@@ -15,12 +15,12 @@
 (import "rowl1-node")
 (import "rowl1-stdlib")
 
-; Prog ::= Expr*
-; Expr ::= Primary
-;        | prefix Expr
-;        | Expr postfix
-;        | Expr infix Expr
-;        | constr<n> Expr{n}
+; Prog    ::= Expr*
+; Expr    ::= Primary
+;           | prefix Expr
+;           | Expr postfix
+;           | Expr infix Expr
+;           | constr<n> Expr{n}
 ; Primary ::= Literal
 ;           | Primary open close
 ;           | Primary open Expr close
@@ -40,13 +40,15 @@
 
 (fun parse_prog () (
     (var elems 0)
+    (var begin (get_loc))
     (while 1 (do
         (var t (lex))
         (if (== t @TOK_EOF) break)
         (var e (parse_expr t))
         (= elems (cons e elems))
         ))
-    (return (variant @List 1 (list_reverse elems)))
+    (var end (get_loc))
+    (return (variant @List 2 (merge_loc begin end) (list_reverse elems)))
     ))
 
 (fun parse_expr (tok) (
@@ -54,29 +56,33 @@
     (var expr_stack 0)
     (var op_stack 0)
     (var next_op)
+    (var begin)
+    (var end)
 
-    (= op_stack (cons (variant @OP_START 0) op_stack))
+    (= op_stack (cons (cons (variant @OP_START 0) (get_loc)) op_stack))
 
-(label parse_expr_front)
+    (label parse_expr_front)
     (while (== tok @TOK_PREFIX) (do
-        (= op_stack (cons (get_token_value) op_stack))
+        (= op_stack (cons (cons (get_token_value) (get_loc)) op_stack))
         (= tok (lex))
         ))
+    (= begin (get_loc))
     (var e (parse_secondary tok))
-    (= expr_stack (cons e expr_stack))
+    (= end (get_loc))
+    (= expr_stack (cons (cons e (merge_loc begin end)) expr_stack))
 
-(label parse_expr_infix)
+    (label parse_expr_infix)
     (= tok (lex_infix))
     (if (|| (== tok @TOK_INFIX) (== tok @TOK_POSTFIX))
-        (= next_op (get_token_value))
+        (= next_op (cons (get_token_value) (get_loc)))
         (do
             (unput)
-            (= next_op (variant @OP_END 0))
+            (= next_op (cons (variant @OP_END 0) (get_loc)))
         )
         )
 
     (while 1 (do
-        (var comp (compare_associativity (car op_stack) next_op))
+        (var comp (compare_associativity (caar op_stack) (car next_op)))
         (if (== comp 0) (goto parse_expr_end)
         (if (> comp 0) (do
             ; reduce
@@ -100,7 +106,7 @@
     (output_string stderr "parse_expr: not implemented\n")
     (exit 1)
 
-(label parse_expr_end)
+    (label parse_expr_end)
 
     (var len (list_length expr_stack))
     (if (== len 0) (return 0))
@@ -110,21 +116,22 @@
         (output_string stderr "syntax error: irreducible expression\n")
         (exit 1)
         ))
-    (return (car expr_stack))
+    (return (caar expr_stack))
     ))
 
 (fun parse_secondary (t) (
+    (var begin (get_loc))
     (var e (parse_primary t))
     (label parse_secondary_loop)
     (= t (lex))
     (if (== t '(') (do
         (var args (parse_comma_list (lex) ')'))
-        (= e (variant @Call 2 e args))
+        (= e (variant @Call 3 (merge_loc begin (get_loc)) e args))
         (goto parse_secondary_loop)
         )
     (if (== t '[') (do
         (var args (parse_comma_list (lex) ']'))
-        (= e (variant @Subscr 2 e args))
+        (= e (variant @Subscr 3 (merge_loc begin (get_loc)) e args))
         (goto parse_secondary_loop)
         )))
     (unput)
@@ -138,16 +145,19 @@
     (if (== t @TOK_STRING) (return (get_token_value))
     (if (== t @TOK_SYMBOL) (return (get_token_value))
     (if (== t @TOK_CONSTR) (do
+        (var begin (get_loc))
         (var op (get_token_value))
         (var sym (field_get op 1))
         (var arity (field_get op 2))
         (var assoc (field_get op 3))
-        (var expr (allocate_variant @Node (+ arity 1) (+ arity 1)))
-        (field_set expr 1 sym)
-        (for i 2 (+ arity 2) (do
+        (var expr (allocate_variant @Node (+ arity 2) (+ arity 2)))
+        (field_set expr 2 sym)
+        (for i 3 (+ arity 3) (do
             (var e (parse_expr (lex)))
             (store object expr i e)
             ))
+        (var end (get_loc))
+        (field_set expr 1 (merge_loc begin end))
         (return expr)
         )
     (if (== t '(') (return (parse_tuple (lex)))
@@ -162,14 +172,18 @@
     ))
 
 (fun parse_tuple (t) (
+    (var begin (get_loc))
     (var elems (parse_comma_list t ')'))
     (if (== (cdr elems) 0) (return (car elems)))
-    (return (variant @Tuple 1 elems))
+    (var end (get_loc))
+    (return (variant @Tuple 2 (merge_loc begin end) elems))
     ))
 
 (fun parse_array (t) (
+    (var begin (get_loc))
     (var elems (parse_comma_list t ']'))
-    (return (variant @Array 1 elems))
+    (var end (get_loc))
+    (return (variant @Array 2 (merge_loc begin end) elems))
     ))
 
 (fun parse_comma_list (t end) (
@@ -190,6 +204,7 @@
 
 (fun parse_list (t) (
     (var elems 0)
+    (var begin (get_loc))
     (if (!= t '}') (do
         (label parse_list_loop)
         (var e (parse_expr t))
@@ -197,7 +212,8 @@
         (= t (lex))
         (if (!= t '}') (goto parse_list_loop))
         ))
-    (return (variant @List 1 (list_reverse elems)))
+    (var end (get_loc))
+    (return (variant @List 2 (merge_loc begin end) (list_reverse elems)))
     ))
 
 (fun eat (tok expect) (
@@ -222,14 +238,35 @@
         ))))))
     ))
 
-(fun reduce (op exprs) (
+(fun reduce (opinfo exprs) (
+    (var op (car opinfo))
+    (var oploc (cdr opinfo))
     (var type (field_get op 0))
     (if (== type @OP_PREFIX)
-        (return (cons (variant @Prefix 2 (field_get op 1) (car exprs)) (cdr exprs)))
+        (do
+            (var arg (caar exprs))
+            (var argloc (cdar exprs))
+            (return (cons (variant @Prefix 3 (merge_loc oploc argloc)
+                (field_get op 1) arg) (cdr exprs)))
+        )
     (if (== type @OP_POSTFIX)
-        (return (cons (variant @Postfix 2 (field_get op 1) (car exprs)) (cdr exprs)))
+        (do
+            (var arg (caar exprs))
+            (var argloc (cdar exprs))
+            (return (cons (variant @Postfix 3 (merge_loc argloc oploc)
+                (field_get op 1) arg) (cdr exprs)))
+        )
     (if (== type @OP_INFIX)
-        (return (cons (variant @Infix 3 (field_get op 1) (cadr exprs) (car exprs)) (cddr exprs)))
+        (do
+            (var lhs_info (cadr exprs))
+            (var rhs_info (car exprs))
+            (var lhs (car lhs_info))
+            (var lhs_loc (cdr lhs_loc))
+            (var rhs (car rhs_info))
+            (var rhs_loc (cdr rhs_info))
+            (return (cons (variant @Infix 4 (merge_loc lhs_loc rhs_loc)
+                (field_get op 1) lhs rhs) (cddr exprs)))
+        )
         )))
     ))
 
