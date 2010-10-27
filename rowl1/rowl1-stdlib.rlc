@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-stdlib.rlc 2010-10-24 18:19:45 nineties $
+; $Id: rowl1-stdlib.rlc 2010-10-27 13:31:26 nineties $
 ;
 
 (import "rlvm-compile")
@@ -13,6 +13,7 @@
 (import "rowl1-lex")
 (import "rowl1-node")
 (import "rowl1-interp")
+(import "rowl1-jit")
 
 ; XXX: experimental implementation
 
@@ -23,9 +24,26 @@
         )
     ))
 
-(array char test_code (2 103)) ; imm_i1 ireturn
-(fun jit_test () (
-    (print_int (jitcall test_code))
+(fun jit_fib (n) (
+    (var c (make_jitcompiler))
+
+    (put_arg0 c)
+    (put_imm_i3 c)
+    (put_if_ge c 5)
+    (put_imm_i1 c)
+    (put_ireturn c)
+    (put_arg0 c)
+    (put_imm_i1 c)
+    (put_isub c)
+    (put_call c -10 4)
+    (put_arg0 c)
+    (put_imm_i2 c)
+    (put_isub c)
+    (put_call c -17 4)
+    (put_iadd c)
+    (put_ireturn c)
+
+    (return (int (jitcall (get_code c) (field_get n 0))))
     ))
 
 (export fun init_stdlib () (
@@ -51,7 +69,7 @@
 
     ; register functions
     (add_function (to_symbol "print") 1 prim_print)
-    (add_function (to_symbol "jit_test") 0 jit_test)
+    (add_function (to_symbol "jit_fib") 1 jit_fib)
 
     ))
 

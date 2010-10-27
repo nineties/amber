@@ -1,0 +1,114 @@
+;
+; rowl - generation 1
+; Copyright (C) 2010 nineties
+;
+; $Id: rowl1-jit.rlc 2010-10-27 13:15:16 nineties $
+;
+
+; -- Just in time compiler
+; (byte code (cvector), labels (ivector), replaces (list of repl info), label indx counter)
+; -- repl info
+; (pointer to the next info, index of the labels, offset of operand)
+
+(import "rlvm-compile")
+
+
+(var code-base `(
+
+(export fun make_jitcompiler () (
+    (return (tuple 3 (make_cvector 0) (make_ivector 0) 0 0))
+    ))
+
+(export fun get_code (c) (
+    (if (tuple_at c 2) (replace_labels c))
+    (return (cvector_ptr (tuple_at c 0)))
+    ))
+
+(fun get_address (c) (
+    (return (cvector_size (tuple_at c 0)))
+    ))
+
+(export fun put_byte (c v) (
+    (cvector_pushback (tuple_at c 0) v)
+    ))
+
+(export fun put_short (c v) (
+    (var vec (tuple_at c 0))
+    (cvector_pushback vec (& v 0xff))
+    (cvector_pushback vec (>> v 8))
+    ))
+
+(export fun put_int (c v) (
+    (var vec (tuple_at c 0))
+    (cvector_pushback vec (& v 0xff))
+    (cvector_pushback vec (& (>> v 8) 0xff))
+    (cvector_pushback vec (& (>> v 16) 0xff))
+    (cvector_pushback vec (& (>> v 24) 0xff))
+    ))
+
+(export fun fresh_label (c) (
+    (var n (tuple_at c 3))
+    (tuple_set c 3 (+ n 1))
+    (ivector_pushback (tuple_at c 1) -1)
+    (return n)
+    ))
+
+(export fun set_label (c v) (
+    (var addr (get_address c))
+    (ivector_put (tuple_at c 1) v addr)
+    ))
+
+(export fun put_label (c v) (
+    (var offs (get_address c))
+    (var info (tuple 1 (tuple_at c 2) v offs))
+    (tuple_set c 2 info)
+    (put_short c 0)
+    ))
+
+(fun replace_labels (c) (
+    (var repls (tuple_at c 2))
+    (var vec (tuple_at c 0))
+    (var labels (tuple_at c 1))
+    (while repls (do
+        (var label (tuple_at repls 1))
+        (var offs  (tuple_at repls 2))
+        (if (>= label (ivector_size label)) (error "undefined label"))
+        (var addr (ivector_at label label))
+        (-= addr (- offs 1))
+        (cvector_put vec offs (& addr 0xff))
+        (cvector_put vec (+ offs 1) (>> addr 8))
+        (= repls (tuple_at repls 0))
+        ))
+    (tuple_set c 2 0)
+    ))
+
+    ))
+
+(var put_func `(
+    (byte   . put_byte)
+    (short  . put_short)
+    (ushort . put_short)
+    (int    . put_int)
+    (prim   . put_prim)
+    ))
+
+(var code 0)
+(foreach i vm_instructions (do
+    (var args `(c))
+    (var body `((put_byte c @code)))
+    (var name (symbol2s (car i)))
+    (var operands (cadr i))
+    (var j 0)
+    (foreach opd operands (do
+        (var arg (tosym (++ `arg j)))
+        (push body `(@(assoc opd put_func) c @arg))
+        (push args arg)
+        (incr j)
+        ))
+    (= body (reverse body))
+    (= args (reverse args))
+    (push code-base `(export fun @(tosym (++ `put_ name)) @args @body))
+    (incr code)
+    ))
+
+(compile `object code-base)
