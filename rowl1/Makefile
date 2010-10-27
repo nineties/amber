@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-10-24 18:20:39 nineties $
+# $Id: Makefile 2010-10-27 13:36:10 nineties $
 
 AS = as
 ASFLAGS =
@@ -75,8 +75,9 @@ RLC1OBJECTS = rowl1-main.rlo\
 	      rowl1-parse.rlo\
 	      rowl1-node.rlo\
 	      rowl1-symtable.rlo\
-	      rowl1-interp.rlo
-ROWLCOMPILER = rlci\
+	      rowl1-interp.rlo\
+	      rowl1-jit.rlo
+RLVMCOMPILER = rlci\
 	       stdlib.rlc\
 	       config.rlc\
 	       vm-insn.rlc\
@@ -84,23 +85,24 @@ ROWLCOMPILER = rlci\
 	       rlvm-assemble.rlc\
 	       vm-prim-inc.rlc
 
-startup.rlo        : $(ROWLCOMPILER)
-rowl1-main.rlo     : $(ROWLCOMPILER) rowl1-types.rlc rowl1-lex.rlo rowl1-parse.rlo rowl1-stdlib.rlo rowl1-interp.rlo
-rowl1-util.rlo     : $(ROWLCOMPILER) rowl1-types.rlc
-rowl1-lex.rlo      : $(ROWLCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo
-rowl1-parse.rlo    : $(ROWLCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-lex.rlo rowl1-node.rlo rowl1-stdlib.rlo
-rowl1-node.rlo     : $(ROWLCOMPILER) rowl1-types.rlc rowl1-util.rlo
-rowl1-stdlib.rlo   : $(ROWLCOMPILER) rowl1-types.rlc rowl1-lex.rlo rowl1-node.rlo rowl1-interp.rlo
-rowl1-symtable.rlo : $(ROWLCOMPILER) rowl1-types.rlc
-rowl1-interp.rlo   : $(ROWLCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-symtable.rlo
+startup.rlo        : $(RLVMCOMPILER)
+rowl1-main.rlo     : $(RLVMCOMPILER) rowl1-types.rlc rowl1-lex.rlo rowl1-parse.rlo rowl1-stdlib.rlo rowl1-interp.rlo
+rowl1-util.rlo     : $(RLVMCOMPILER) rowl1-types.rlc
+rowl1-lex.rlo      : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo
+rowl1-parse.rlo    : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-lex.rlo rowl1-node.rlo rowl1-stdlib.rlo
+rowl1-node.rlo     : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo
+rowl1-stdlib.rlo   : $(RLVMCOMPILER) rowl1-types.rlc rowl1-lex.rlo rowl1-node.rlo rowl1-interp.rlo rowl1-jit.rlo
+rowl1-symtable.rlo : $(RLVMCOMPILER) rowl1-types.rlc
+rowl1-interp.rlo   : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-symtable.rlo
+rowl1-jit.rlo	   : $(RLVMCOMPILER)
 
 rlvm: $(VMOBJECTS)
 	$(LD) $^ -o $@ $(VMLDFLAGS)
 
-linker: linker.rlc rlvm $(ROWLCOMPILER)
+linker: linker.rlc rlvm $(RLVMCOMPILER)
 	./rlci $< > $@
 
-disasm: disasm.rlc rlvm $(ROWLCOMPILER)
+disasm: disasm.rlc rlvm $(RLVMCOMPILER)
 	./rlci $< > $@
 
 rowl1: rlvm linker $(RLC1OBJECTS) startup.rlo
