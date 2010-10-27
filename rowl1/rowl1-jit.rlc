@@ -2,10 +2,10 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-jit.rlc 2010-10-27 13:50:25 nineties $
+; $Id: rowl1-jit.rlc 2010-10-27 23:03:20 nineties $
 ;
 
-; -- Just in time compiler
+; -- Just in time assembler
 ; (byte code (cvector), labels (ivector), replaces (list of repl info), label indx counter)
 ; -- repl info
 ; (pointer to the next info, index of the labels, offset of operand)
@@ -15,8 +15,8 @@
 
 (var code-base `(
 
-(export fun make_jitcompiler () (
-    (return (tuple 3 (make_cvector 0) (make_ivector 0) 0 0))
+(export fun make_jitassembler (size_hint) (
+    (return (tuple 3 (make_cvector_with_capa 0 size_hint) (make_ivector 0) 0 0))
     ))
 
 (export fun get_code (c) (
@@ -101,14 +101,14 @@
     (var operands (cadr i))
     (var j 0)
     (foreach opd operands (do
-        (var arg (tosym (++ `arg j)))
+        (var arg (s++ `arg j))
         (push body `(@(assoc opd put_func) c @arg))
         (push args arg)
         (incr j)
         ))
     (= body (reverse body))
     (= args (reverse args))
-    (push code-base `(export fun @(tosym (++ `put_ name)) @args @body))
+    (push code-base `(export fun @(s++ `put_ name) @args @body))
     (incr code)
     ))
 

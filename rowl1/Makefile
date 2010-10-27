@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-10-27 13:36:10 nineties $
+# $Id: Makefile 2010-10-27 21:12:51 nineties $
 
 AS = as
 ASFLAGS =
@@ -125,4 +125,4 @@ rowl1: rlvm linker $(RLC1OBJECTS) startup.rlo
 
 .PHONY: clean
 clean:
-	rm -f *.o *.s *.rlo rlci rlvm linker disasm rowl1 dfuntest core
+	rm -f *.o *.s *.rlo rlci rlvm linker disasm rowl1 core
