@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-stdlib.rlc 2010-10-27 13:31:26 nineties $
+; $Id: rowl1-stdlib.rlc 2010-10-27 13:50:33 nineties $
 ;
 
 (import "rlvm-compile")
@@ -27,19 +27,24 @@
 (fun jit_fib (n) (
     (var c (make_jitcompiler))
 
+    (var ifelse (fresh_label c))
+    (var fib    (fresh_label c))
+
+    (set_label c fib)
     (put_arg0 c)
     (put_imm_i3 c)
-    (put_if_ge c 5)
+    (put_if_ge c ifelse)
     (put_imm_i1 c)
     (put_ireturn c)
+    (set_label c ifelse)
     (put_arg0 c)
     (put_imm_i1 c)
     (put_isub c)
-    (put_call c -10 4)
+    (put_call c fib 4)
     (put_arg0 c)
     (put_imm_i2 c)
     (put_isub c)
-    (put_call c -17 4)
+    (put_call c fib 4)
     (put_iadd c)
     (put_ireturn c)
 
