@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlvm-compile.rlc 2010-10-26 19:54:05 nineties $
+; $Id: rlvm-compile.rlc 2010-11-01 21:44:38 nineties $
 ;
 
 (import "stdlib")
@@ -39,14 +39,14 @@
 
 (var break_labels ())
 (var continue_labels ())
-(define push_loop_label () (do
+(define push_exit_label () (do
     (var blbl (mklabel))
     (var clbl (mklabel))
     (push break_labels blbl)
     (push continue_labels clbl)
     (emit_insn `(label @clbl))
     ))
-(define pop_loop_label () (do
+(define pop_exit_label () (do
     (var blbl (car break_labels))
     (set break_labels (cdr break_labels))
     (set continue_labels (cdr continue_labels))
@@ -444,9 +444,9 @@
 
 (define compile_while ((_ expr body)) (do
     (var loop_label (mklabel))
-    (push_loop_label)
+    (push_exit_label)
     (compile_if `(if @expr (do (label @loop_label) @body (if @expr (goto @loop_label)))))
-    (pop_loop_label)
+    (pop_exit_label)
     nil
     ))
 
@@ -465,7 +465,7 @@
 
 (define compile_for ((_ it low high body)) (do
     (var loop_label (mklabel))
-    (push_loop_label)
+    (push_exit_label)
     (if (compile_block `(
         (var @it @low)
         (var end @high)
@@ -478,7 +478,7 @@
         ))
         (emit_insn `drop)
         )
-    (pop_loop_label)
+    (pop_exit_label)
     nil
     ))
 
@@ -496,7 +496,7 @@
 
     (compile_expr e)
 
-    (push_loop_label)
+    (push_exit_label)
     (emit_insn `(tswitch (short @(- ncase 1))))
     (foreach l labels (do
         (emit_insn `(tswitch_ent (label @l)))
@@ -506,7 +506,41 @@
         (if (compile_expr (cdr c)) (emit_insn `drop))
         (set labels (cdr labels))
         ))
-    (pop_loop_label)
+    (pop_exit_label)
+    nil
+    ))
+
+(define compile_lswitch ((_ e cases)) (do
+    (var ncase (length cases))
+    (var val nil)
+    (var labels ())
+    (foreach c cases (do
+        (if last?
+            (do
+                (if (!= (car c) `default) (error "default case is missing"))
+                (+= val 1)
+            )
+            (do
+                (if (and val (>= val (car c))) (error "case values are not ascending"))
+                (= val (car c))
+            ))
+        (push labels `(@val . @(mklabel)))
+        ))
+    (= labels (reverse labels))
+
+    (compile_expr e)
+
+    (push_exit_label)
+    (emit_insn `(lswitch (short @val)))
+    (foreach l labels (do
+        (emit_insn `(lswitch_ent (long @(car l)) (label @(cdr l))))
+        ))
+    (foreach c cases (do
+        (emit_insn `(label @(cdar labels)))
+        (if (compile_expr (cdr c)) (emit_insn `drop))
+        (= labels (cdr labels))
+        ))
+    (pop_exit_label)
     nil
     ))
 
@@ -677,6 +711,7 @@
         ((== `while (car expr)) (compile_while expr))
         ((== `for (car expr)) (compile_for expr))
         ((== `tswitch (car expr)) (compile_tswitch expr))
+        ((== `lswitch (car expr)) (compile_lswitch expr))
         ((== `label (car expr)) (compile_label expr))
         ((== `goto (car expr)) (compile_goto expr))
         ((== `do (car expr)) (compile_block (cdr expr)))

@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-stdlib.rlc 2010-10-27 23:03:47 nineties $
+; $Id: rowl1-stdlib.rlc 2010-10-31 00:46:34 nineties $
 ;
 
 (import "rlvm-compile")
@@ -17,39 +17,36 @@
 
 ; XXX: experimental implementation
 
-(fun prim_print (str) (
-    (if (== (node_type str) @String)
-        (print_string str)
-        (print_int (field_get str 0))
-        )
+(fun print (str) (
+    (print_string str)
     ))
-
-(fun jit_fib (n) (
-    (var c (make_jitassembler 20))
-
-    (var ifelse (fresh_label c))
-    (var fib    (fresh_label c))
-
-    (set_label c fib)
-    (put_arg0 c)
-    (put_imm_i3 c)
-    (put_if_ge c ifelse)
-    (put_imm_i1 c)
-    (put_ireturn c)
-    (set_label c ifelse)
-    (put_arg0 c)
-    (put_imm_i1 c)
-    (put_isub c)
-    (put_call c fib 4)
-    (put_arg0 c)
-    (put_imm_i2 c)
-    (put_isub c)
-    (put_call c fib 4)
-    (put_iadd c)
-    (put_ireturn c)
-
-    (return (int (jitcall (get_code c) (get n))))
-    ))
+;
+;(fun jit_fib (n) (
+;    (var c (make_jitassembler 20))
+;
+;    (var ifelse (fresh_label c))
+;    (var fib    (fresh_label c))
+;
+;    (set_label c fib)
+;    (put_arg0 c)
+;    (put_imm_i3 c)
+;    (put_if_ge c ifelse)
+;    (put_imm_i1 c)
+;    (put_ireturn c)
+;    (set_label c ifelse)
+;    (put_arg0 c)
+;    (put_imm_i1 c)
+;    (put_isub c)
+;    (put_call c fib 4)
+;    (put_arg0 c)
+;    (put_imm_i2 c)
+;    (put_isub c)
+;    (put_call c fib 4)
+;    (put_iadd c)
+;    (put_ireturn c)
+;
+;    (return (int (jitcall (get_code c) (get n))))
+;    ))
 
 (export fun init_stdlib () (
 
@@ -73,9 +70,14 @@
     (add_prefix  "-" 9)
 
     ; register functions
-    (add_function (to_symbol "print") 1 prim_print)
-    (add_function (to_symbol "jit_fib") 1 jit_fib)
+    ;(add_function (to_symbol "print") 1 prim_print)
+    ;(add_function (to_symbol "jit_fib") 1 jit_fib)
 
+    ; test of matching
+    (add_function (to_symbol "print")
+        (cons (to_symbol "arg0") 0)
+        print
+        )
     ))
 
     ))

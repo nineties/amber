@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-10-27 21:12:51 nineties $
+# $Id: Makefile 2010-10-28 00:17:45 nineties $
 
 AS = as
 ASFLAGS =
@@ -95,6 +95,7 @@ rowl1-stdlib.rlo   : $(RLVMCOMPILER) rowl1-types.rlc rowl1-lex.rlo rowl1-node.rl
 rowl1-symtable.rlo : $(RLVMCOMPILER) rowl1-types.rlc
 rowl1-interp.rlo   : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-symtable.rlo
 rowl1-jit.rlo	   : $(RLVMCOMPILER)
+rowl1-matching.rlo : $(RLVMCOMPILER) rowl1-types.rlc
 
 rlvm: $(VMOBJECTS)
 	$(LD) $^ -o $@ $(VMLDFLAGS)
