@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-10-27 13:41:01 nineties $
+; $Id: vm-insn.rlc 2010-10-31 01:44:12 nineties $
 ;
 
 (define gen_comparison1 (cmovname) `(
@@ -491,6 +491,7 @@
         (vmpush %ecx) ; push return value
         (vmfetch)
         ))
+    ; switch (table search)
     (tswitch (ushort) @nil (
         (vmpop %eax)
         (vmushort 1 %ecx) ; number of cases
@@ -500,6 +501,25 @@
         (asm "addl $3, %ebx")
         (asm "addl %eax, %ebx")
         (asm "movzwl (%ebx), %eax")
+        (asm "addl %eax, %ebx")
+        (vmfetch)
+        ))
+    ; switch (linear search)
+    (lswitch (ushort) @nil (
+        (vmpop %eax)
+        (vmushort 1 %ecx) ; maximum value of case values
+        (asm "addl $3, %ebx")
+        (asm "1:")
+        (asm "movl (%ebx), %edx") ; case value
+        (asm "cmpl %eax, %edx")
+        (asm "je 2f")
+        (asm "cmpl %ecx, %edx")
+        (asm "je 2f")
+        (asm "addl $6, %ebx")
+        (asm "jmp 1b")
+        (asm "2:")
+        (asm "xorl %edx, %edx") ; zero clear
+        (asm "movzwl 4(%ebx), %eax")
         (asm "addl %eax, %ebx")
         (vmfetch)
         ))
