@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-jitasm.rlc 2010-11-02 10:57:33 nineties $
+; $Id: rowl1-jitasm.rlc 2010-11-02 20:07:06 nineties $
 ;
 
 ; -- Just in time assembler
@@ -21,11 +21,21 @@
 
 (export fun get_code (c) (
     (if (tuple_at c 2) (replace_labels c))
-    (return (cvector_ptr (tuple_at c 0)))
+    (return (tuple_at c 0))
+    ))
+
+(export fun get_code_ptr (c) (
+    (return (cvector_ptr (get_code c)))
     ))
 
 (fun get_address (c) (
     (return (cvector_size (tuple_at c 0)))
+    ))
+
+(export fun put_code (c cvec) (
+    (for i 0 (cvector_size cvec) (do
+        (put_byte c (cvector_at cvec i))
+        ))
     ))
 
 (export fun put_byte (c v) (

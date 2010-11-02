@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-10-28 00:17:45 nineties $
+# $Id: Makefile 2010-11-02 19:30:42 nineties $
 
 AS = as
 ASFLAGS =
@@ -76,7 +76,8 @@ RLC1OBJECTS = rowl1-main.rlo\
 	      rowl1-node.rlo\
 	      rowl1-symtable.rlo\
 	      rowl1-interp.rlo\
-	      rowl1-jitasm.rlo
+	      rowl1-jitasm.rlo\
+	      rowl1-matching.rlo
 RLVMCOMPILER = rlci\
 	       stdlib.rlc\
 	       config.rlc\
@@ -86,7 +87,7 @@ RLVMCOMPILER = rlci\
 	       vm-prim-inc.rlc
 
 startup.rlo        : $(RLVMCOMPILER)
-rowl1-main.rlo     : $(RLVMCOMPILER) rowl1-types.rlc rowl1-lex.rlo rowl1-parse.rlo rowl1-stdlib.rlo rowl1-interp.rlo
+rowl1-main.rlo     : $(RLVMCOMPILER) rowl1-types.rlc rowl1-lex.rlo rowl1-parse.rlo rowl1-stdlib.rlo rowl1-interp.rlo rowl1-matching.rlo
 rowl1-util.rlo     : $(RLVMCOMPILER) rowl1-types.rlc
 rowl1-lex.rlo      : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo
 rowl1-parse.rlo    : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-lex.rlo rowl1-node.rlo rowl1-stdlib.rlo
@@ -95,7 +96,7 @@ rowl1-stdlib.rlo   : $(RLVMCOMPILER) rowl1-types.rlc rowl1-lex.rlo rowl1-node.rl
 rowl1-symtable.rlo : $(RLVMCOMPILER) rowl1-types.rlc
 rowl1-interp.rlo   : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-symtable.rlo
 rowl1-jitasm.rlo	   : $(RLVMCOMPILER)
-rowl1-matching.rlo : $(RLVMCOMPILER) rowl1-types.rlc
+rowl1-matching.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-jitasm.rlo
 
 rlvm: $(VMOBJECTS)
 	$(LD) $^ -o $@ $(VMLDFLAGS)
