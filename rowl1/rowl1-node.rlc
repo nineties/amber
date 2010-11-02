@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2010-10-27 12:01:58 nineties $
+; $Id: rowl1-node.rlc 2010-11-02 16:58:22 nineties $
 ;
 
 (import "rlvm-compile")
@@ -12,20 +12,11 @@
 
 (import "rowl1-util")
 
-(export fun node_type (obj) (
-    (if (! obj) (error "node_type: null object"))
-    (var tag (get_tag obj))
-    (if (== tag @TAG_VARIANT) (return (field_get obj 0)))
-    (return (+ (get_plain_tag obj) @BUILTIN_TYPE_OFFSET))
-    ))
-
-; XXX: output precise information
-(export fun check_type (tag obj) (
-    (if (!= tag (node_type obj)) (error "check_type: tag mismatch"))
-    ))
-
 (var symbol_table (make_idtable))
 (var symbol_index_gen 0)
+
+; special symbols
+(export var AnySym (to_symbol "_"))
 
 (export fun to_symbol (name) (
     (var sym (idtable_find symbol_table name))
@@ -73,6 +64,18 @@
         ))
 
     (return (variant @Float 0 0 mantissa exponent))
+    ))
+
+(export fun node_type (obj) (
+    (if (! obj) (error "node_type: null object"))
+    (var tag (get_tag obj))
+    (if (== tag @TAG_VARIANT) (return (field_get obj 0)))
+    (return (+ (get_plain_tag obj) @BUILTIN_TYPE_OFFSET))
+    ))
+
+; XXX: output precise information
+(export fun check_type (tag obj) (
+    (if (!= tag (node_type obj)) (error "check_type: tag mismatch"))
     ))
 
 ; Pretty Printing

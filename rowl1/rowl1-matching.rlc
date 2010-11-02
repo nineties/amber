@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2010-11-02 10:54:27 nineties $
+; $Id: rowl1-matching.rlc 2010-11-02 20:06:01 nineties $
 ;
 
 (import "rlvm-compile")
@@ -10,14 +10,73 @@
 
 (compile `object `(
 
-; vars: list of variable indexes
-; pats: pattern matrix (given by list of list)
+(import "rowl1-util")
+(import "rowl1-node")
+(import "rowl1-jitasm")
+
+(fun print (str) (
+    (print_string str)
+    ))
+
+(export fun matching_test () (
+    (var asm (make_jitassembler 20))
+
+    (put_push asm print)
+    (put_dgoto asm)
+
+    (var print_code (get_code asm))
+
+    (= asm (make_jitassembler 20))
+    (compile_matching asm 0 (cons (cons AnySym 0) 0) (cons print_code 0))
+
+    (exit (jitcall (get_code_ptr asm) "Hello World\n"))
+    ))
+
+; pats: pattern matrix ((p11 p12 .. ) (p21 p22 ..) ..)
 ; exps: list of expressions
-(fun compile_matching (vars pats exps) (
-    (if (== vars 0) (return (car exps)))
-    (var v (car vars))
-    (var p (car pats))
-    (var pty (node_type p))
+(export fun compile_matching (asm idx pats exps) (
+    (if (== (car pats) 0) (do
+        (put_code asm (car exps))
+        return
+        ))
+    (var x (split_matrix pats)) ; (single . remain)
+    (var n (list_length (car x)))
+    (var y (list_split exps n))
+    (compile_matching_single asm idx (car x) (car y))
+    (if (cdr x)
+        (compile_matching asm idx (cdr x) (cdr y))
+        )
+    ))
+
+(fun compile_matching_single (asm idx pats exps) (
+    (var p (caar pats))
+    (if (== p AnySym) (do
+        (= pats (shift_pat pats))
+        (return (compile_matching asm (+ idx 1) pats exps))
+        ))
+    (not_implemented "compile_matching_single")
+    ))
+
+(fun split_matrix (pats) (
+    (var p (caar pats))
+    (if (== p AnySym) (return (split_any pats)))
+    (not_implemented "split_matrix")
+    ))
+
+(fun split_any (pats) (
+    (var n 1)
+    (var orig pats)
+    (= pats (cdr pats))
+    (while (&& pats (== (caar pats) AnySym)) (do
+        (= pats (cdr pats))
+        (incr n)
+        ))
+    (return (list_split orig n))
+    ))
+
+(fun shift_pat (pats) (
+    (if (== pats 0) (return 0))
+    (return (cons (cdar pats) (shift_pat (cdr pats))))
     ))
 
     ))
