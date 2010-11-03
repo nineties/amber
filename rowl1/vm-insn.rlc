@@ -2,8 +2,20 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-11-02 20:05:19 nineties $
+; $Id: vm-insn.rlc 2010-11-03 22:12:20 nineties $
 ;
+
+(define gen_field_get (idx) `(
+    (asm "movl (%esi), %eax")
+    (asm "movl " @(* 4 idx) "(%eax), %eax")
+    (asm "movl %eax, (%esi)")
+    ))
+
+(define gen_field_set (idx) `(
+    (vmpop %ecx) ; value
+    (vmpop %eax) ; ptr
+    (asm "movl %ecx, " @(* 4 idx) "(%eax)")
+    ))
 
 (define gen_comparison1 (cmovname) `(
     (vmpop %eax)
@@ -24,17 +36,10 @@
     (vmsucc %eax)
     (vmfetch)))
 
-(define gen_field_get (idx) `(
-    (asm "movl (%esi), %eax")
-    (asm "movl " @(* 4 idx) "(%eax), %eax")
-    (asm "movl %eax, (%esi)")
-    ))
-
-(define gen_field_set (idx) `(
-    (vmpop %ecx) ; value
-    (vmpop %eax) ; ptr
-    (asm "movl %ecx, " @(* 4 idx) "(%eax)")
-    ))
+;(define gen_check_plain (type) `(
+;    (vmpop %eax)
+;    (asm "movl -4(%eax), %eax")
+;    ))
 
 (define operand_len (opd) (assoc opd `((byte . 1) (short . 2) (ushort . 2) (int . 4) (prim . 2) (addr . 2))))
 (define insn_length (operands) (do
@@ -292,7 +297,7 @@
     (loadl4 () @true ((asm "movl -20(%edi), %eax") (vmpush %eax)))
     (loadl5 () @true ((asm "movl -24(%edi), %eax") (vmpush %eax)))
     (loadl (byte) @true (
-        (vmsbyte 1 %ecx) ; index
+        (vmsbyte 1 %ecx) ; offset
         (asm "movl %edi, %eax")
         (asm "addl %ecx, %eax")
         (asm "movl (%eax), %eax")
@@ -541,6 +546,7 @@
     (if_ge      (addr) @nil @(gen_comparison2 "cmovge"))
     (if_lt      (addr) @nil @(gen_comparison2 "cmovl"))
     (if_le      (addr) @nil @(gen_comparison2 "cmovle"))
+    ;(check_int  (addr) @nil @(gen_check_plain @PLAIN_INT))
     (exit () @nil ((vmpop %eax) (break)))
     ))
 

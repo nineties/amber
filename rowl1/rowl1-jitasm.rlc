@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-jitasm.rlc 2010-11-02 20:07:06 nineties $
+; $Id: rowl1-jitasm.rlc 2010-11-03 21:54:49 nineties $
 ;
 
 ; -- Just in time assembler
@@ -34,26 +34,64 @@
 
 (export fun put_code (c cvec) (
     (for i 0 (cvector_size cvec) (do
-        (put_byte c (cvector_at cvec i))
+        (emit_byte c (cvector_at cvec i))
         ))
     ))
 
-(export fun put_byte (c v) (
+(export fun put_imm_int (c value) (
+    (if (== value -1) (do
+        (put_imm_im1 c)
+        return
+        ))
+    (tswitch value (
+        (0 . (do (put_imm_i0 c) return))
+        (1 . (do (put_imm_i1 c) return))
+        (2 . (do (put_imm_i2 c) return))
+        (3 . (do (put_imm_i3 c) return))
+        (4 . (do (put_imm_i4 c) return))
+        (5 . (do (put_imm_i5 c) return))
+        (default . break)
+        ))
+    (if (&& (<= -32768 value) (<= value 32767))
+        (put_imm_int16 c value)
+        (put_imm_int32 c value)
+        )
+    ))
+
+(export fun put_arg (c idx) (
+    (tswitch idx (
+        (0 . (do (put_arg0 c) return))
+        (1 . (do (put_arg1 c) return))
+        (2 . (do (put_arg2 c) return))
+        (3 . (do (put_arg3 c) return))
+        (4 . (do (put_arg4 c) return))
+        (default . (do
+            (put_loadl c (+ (* 4 idx) 8))
+            return
+            ))
+        ))
+    ))
+
+(fun emit_byte (c v) (
     (cvector_pushback (tuple_at c 0) v)
     ))
 
-(export fun put_short (c v) (
+(fun emit_short (c v) (
     (var vec (tuple_at c 0))
     (cvector_pushback vec (& v 0xff))
     (cvector_pushback vec (>> v 8))
     ))
 
-(export fun put_int (c v) (
+(fun emit_int (c v) (
     (var vec (tuple_at c 0))
     (cvector_pushback vec (& v 0xff))
     (cvector_pushback vec (& (>> v 8) 0xff))
     (cvector_pushback vec (& (>> v 16) 0xff))
     (cvector_pushback vec (& (>> v 24) 0xff))
+    ))
+
+(fun emit_prim (c v) (
+    (emit_short c (& v 0xffff))
     ))
 
 (export fun fresh_label (c) (
@@ -68,11 +106,11 @@
     (ivector_put (tuple_at c 1) v addr)
     ))
 
-(export fun put_label (c v) (
+(export fun emit_label (c v) (
     (var offs (get_address c))
     (var info (tuple 1 (tuple_at c 2) v offs))
     (tuple_set c 2 info)
-    (put_short c 0)
+    (emit_short c 0)
     ))
 
 (fun replace_labels (c) (
@@ -95,18 +133,18 @@
     ))
 
 (var put_func `(
-    (byte   . put_byte)
-    (short  . put_short)
-    (ushort . put_short)
-    (int    . put_int)
-    (prim   . put_prim)
-    (addr   . put_label)
+    (byte   . emit_byte)
+    (short  . emit_short)
+    (ushort . emit_short)
+    (int    . emit_int)
+    (prim   . emit_prim)
+    (addr   . emit_label)
     ))
 
 (var code 0)
 (foreach i vm_instructions (do
     (var args `(c))
-    (var body `((put_byte c @code)))
+    (var body `((emit_byte c @code)))
     (var name (symbol2s (car i)))
     (var operands (cadr i))
     (var j 0)

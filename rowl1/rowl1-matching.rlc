@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2010-11-02 20:06:01 nineties $
+; $Id: rowl1-matching.rlc 2010-11-03 22:03:40 nineties $
 ;
 
 (import "rlvm-compile")
@@ -14,22 +14,31 @@
 (import "rowl1-node")
 (import "rowl1-jitasm")
 
-(fun print (str) (
+(fun printstr (str) (
     (print_string str)
+    ))
+
+(fun printint (n) (
+    (print_int (get n))
     ))
 
 (export fun matching_test () (
     (var asm (make_jitassembler 20))
 
-    (put_push asm print)
+    (put_push asm printstr)
     (put_dgoto asm)
-
-    (var print_code (get_code asm))
+    (var print_str_code (get_code asm))
 
     (= asm (make_jitassembler 20))
-    (compile_matching asm 0 (cons (cons AnySym 0) 0) (cons print_code 0))
+    (put_push asm printint)
+    (put_dgoto asm)
+    (var print_int_code (get_code asm))
 
-    (exit (jitcall (get_code_ptr asm) "Hello World\n"))
+    (= asm (make_jitassembler 20))
+    (compile_matching asm 0 (cons (cons (int 0) 0) (cons (cons AnySym 0) 0)) (cons print_int_code (cons print_str_code 0)))
+
+    ;(exit (jitcall (get_code_ptr asm) "Hello World\n"))
+    (exit (jitcall (get_code_ptr asm) (int 0)))
     ))
 
 ; pats: pattern matrix ((p11 p12 .. ) (p21 p22 ..) ..)
@@ -52,7 +61,21 @@
     (var p (caar pats))
     (if (== p AnySym) (do
         (= pats (shift_pat pats))
-        (return (compile_matching asm (+ idx 1) pats exps))
+        (compile_matching asm (+ idx 1) pats exps)
+        return
+        ))
+    (var pty (node_type p))
+    (if (== pty @Int) (do
+        (var value (get p))
+        (var endif (fresh_label asm))
+        (put_arg asm idx)
+        (put_field_get0 asm)
+        (put_imm_int asm value)
+        (put_if_ne asm endif)
+        (= pats (shift_pat pats))
+        (compile_matching asm (+ idx 1) pats exps)
+        (set_label asm endif)
+        return
         ))
     (not_implemented "compile_matching_single")
     ))
@@ -60,6 +83,8 @@
 (fun split_matrix (pats) (
     (var p (caar pats))
     (if (== p AnySym) (return (split_any pats)))
+    (var pty (node_type p))
+    (if (== pty @Int) (return (split_int (get p) pats)))
     (not_implemented "split_matrix")
     ))
 
@@ -68,6 +93,17 @@
     (var orig pats)
     (= pats (cdr pats))
     (while (&& pats (== (caar pats) AnySym)) (do
+        (= pats (cdr pats))
+        (incr n)
+        ))
+    (return (list_split orig n))
+    ))
+
+(fun split_int (v pats) (
+    (var n 1)
+    (var orig pats)
+    (= pats (cdr pats))
+    (while (&& pats (&& (== (node_type (caar pats)) @Int) (== v (get (caar pats))))) (do
         (= pats (cdr pats))
         (incr n)
         ))

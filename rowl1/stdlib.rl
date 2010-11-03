@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: stdlib.rl 2010-08-11 16:33:54 nineties $
+ % $Id: stdlib.rl 2010-11-03 23:30:21 nineties $
  %);
 
 include(stddef);
@@ -233,6 +233,10 @@ fputi: (p0, p1) {
     allocate(1);
 
     if (p1 < 0) {
+        if (-p1 < 0) {
+            fputs(p0, "-2147483648");
+            return;
+        };
 	fputc(p0, '-');
         fputi(p0, -p1);
         return;
