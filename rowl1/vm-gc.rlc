@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-10-24 16:41:52 nineties $
+; $Id: vm-gc.rlc 2010-11-03 23:33:08 nineties $
 ;
 
 (import "stdlib")
@@ -112,36 +112,22 @@
 (define blockmap->first= (idx val)  `([]= block_map (+ (* @BDESCR_SIZE @idx) 1) @val))
 
 ; object tag:
-;         : | 3bit  | 1bit | 8bit | 20bit |
-; padding : | 0b000 |  --  | 0    | size  |
-; plain   : | 0b001 |  --  | type | size  |
-; cons    : | 0b010 |  --  | 0    | 3     |
-; barray  : | 0b011 |  --  | #box | size  |
-; tuple   : | 0b100 |  --  | #box | size  |
-; variant : | 0b101 |  --  | #box | size  |
+;         : | 1bit | 20bit | 8bit | 3bit  |
+; padding : |  --  |  size |    0 | 0b000 |
+; plain   : |  --  |  size | type | 0b001 |
+; cons    : |  --  |     3 |    0 | 0b010 |
+; barray  : |  --  |  size | #box | 0b011 |
+; tuple   : |  --  |  size | #box | 0b100 |
+; variant : |  --  |  size | #box | 0b101 |
 
-(var OBJECT_WORDS_BITS 20)
-(var BOXED_FIELD_SIZE_BITS 8)
-(var BOXED_FIELD_SIZE_OFF OBJECT_WORDS_BITS)
-(var OBJECT_COPYED_OFF (+ OBJECT_WORDS_BITS BOXED_FIELD_SIZE_BITS))
-(var OBJECT_TAG_BITS 3)
-(var OBJECT_TAG_OFF (+ OBJECT_WORDS_BITS BOXED_FIELD_SIZE_BITS 1))
-
-(define OBJECT_WORDS (addr)  `(& ([] @addr 0) @(- (<< 1 OBJECT_WORDS_BITS) 1)))
-(define OBJECT_TAG (addr)    `(>> ([] @addr 0) @OBJECT_TAG_OFF))
-
-(define OBJECT_COPYED (addr) `(& (>> ([] @addr 0) @OBJECT_COPYED_OFF) 1))
-(define OBJECT_SETCOPYED (addr) `([]= @addr 0 (| ([] @addr 0) @(<< 1 OBJECT_TAG_OFF))))
-
-(define BOXED_FIELD_SIZE (addr)
-    `(& (>> ([] @addr 0) @BOXED_FIELD_SIZE_OFF) @(- (<< 1 BOXED_FIELD_SIZE_BITS) 1)))
+(define OBJECT_WORDS (addr)  `(& (>> ([] @addr 0) 11) @(- (<< 1 20) 1)))
+(define OBJECT_TAG (addr)    `(& ([] @addr 0) @(- (<< 1 3) 1)))
+(define OBJECT_COPYED (addr) `(< ([] @addr 0) 0))
+(define OBJECT_SETCOPYED (addr) `([]= @addr 0 (| ([] @addr 0) @(<< 1 31))))
+(define BOXED_FIELD_SIZE (addr) `(& (>> ([] @addr 0) 3) @(- (<< 1 8) 1)))
 (define OBJECT_PLAIN_TAG (addr) (BOXED_FIELD_SIZE addr))
 
-(define HEADER (tag nboxed objsz)
-    `(| (<< @tag @OBJECT_TAG_OFF)
-     (| (<< @nboxed @BOXED_FIELD_SIZE_OFF)
-        @objsz)))
-
+(define HEADER (tag nboxed objsz) `(| (<< @objsz 11) (| (<< @nboxed 3) @tag)))
 (define SET_HEADER (addr tag nboxed objsz) `([]= @addr 0 @(HEADER tag nboxed objsz)))
 
 (define FORWARD_ADDR (obj) `([] @obj 1))
