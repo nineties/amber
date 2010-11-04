@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2010-11-03 22:03:40 nineties $
+; $Id: rowl1-matching.rlc 2010-11-04 10:16:33 nineties $
 ;
 
 (import "rlvm-compile")
@@ -29,16 +29,27 @@
     (put_dgoto asm)
     (var print_str_code (get_code asm))
 
-    (= asm (make_jitassembler 20))
-    (put_push asm printint)
-    (put_dgoto asm)
-    (var print_int_code (get_code asm))
+    (= asm (make_jitassembler 2))
+    (put_arg0 asm)
+    (put_ireturn asm)
+    (var identity (get_code asm))
 
     (= asm (make_jitassembler 20))
-    (compile_matching asm 0 (cons (cons (int 0) 0) (cons (cons AnySym 0) 0)) (cons print_int_code (cons print_str_code 0)))
+    (compile_matching asm 0
+        (cons (cons (int 0) 0)
+        (cons (cons (int 1) 0)
+        (cons (cons AnySym 0)
+        0)))
+        (cons identity
+        (cons identity
+        (cons print_str_code
+        0)))
+        )
 
-    ;(exit (jitcall (get_code_ptr asm) "Hello World\n"))
-    (exit (jitcall (get_code_ptr asm) (int 0)))
+    (var ret (jitcall (get_code_ptr asm) (int 1)))
+    (print_string "result = ")
+    (print_int (get ret))
+    (print_char '\n')
     ))
 
 ; pats: pattern matrix ((p11 p12 .. ) (p21 p22 ..) ..)
@@ -68,6 +79,8 @@
     (if (== pty @Int) (do
         (var value (get p))
         (var endif (fresh_label asm))
+        (put_arg asm idx)
+        (put_check_int asm endif)
         (put_arg asm idx)
         (put_field_get0 asm)
         (put_imm_int asm value)
