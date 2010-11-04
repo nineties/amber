@@ -2,19 +2,20 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2010-10-31 00:46:41 nineties $
+; $Id: rowl1-interp.rlc 2010-11-04 11:34:56 nineties $
 ;
 
 (import "rlvm-compile")
 (import "rowl1-types")
 
-; TODO: output useful informations in error reporting.
+; XXX: experimental implementation
 
 (compile `object `(
 
 (import "rowl1-util")
 (import "rowl1-node")
 (import "rowl1-symtable")
+(import "rowl1-compile")
 
 (var funtable (make_symtable))
 (var vartable (make_symtable))
@@ -45,7 +46,7 @@
     (@Node    . (not_implemented "builtin_eval"))
     (@Prefix  . (not_implemented "builtin_eval"))
     (@Postfix . (not_implemented "builtin_eval"))
-    (@Infix   . (not_implemented "builtin_eval"))
+    (@Infix   . (return (builtin_eval_infix expr)))
     (@Call    . (return (builtin_eval_call expr)))
     (@Subscr  . (not_implemented "builtin_eval"))
     (@Char    . (return expr))
@@ -61,7 +62,31 @@
     (if value (return value) (return sym))
     ))
 
-; XXX: experimental implementation
+(fun builtin_eval_infix (expr) (
+    (var op (field_get expr @InfixOp))
+    (if (== op (to_symbol ":")) (return (builtin_eval_decl expr)))
+
+    (undefined_expression (field_get expr 1))
+    ))
+
+(fun builtin_eval_decl (expr) (
+    (if (== (node_type (field_get expr @InfixLhs)) @Call)
+        (return (builtin_eval_fundecl expr))
+        )
+    (undefined_expression (field_get expr 1))
+    ))
+
+(fun builtin_eval_fundecl (expr) (
+    (var lhs (field_get expr @InfixLhs))
+    (var rhs (field_get expr @InfixRhs))
+    (var name (field_get lhs @CallFunc))
+    (var args (field_get lhs @CallArgs))
+    (if (!= (node_type name) @Symbol) (undefined_expression (field_get expr 1)))
+
+    (var ret (compile_function name args rhs)) ; (argpat . body)
+    ;(add_function name (car ret) (cdr ret))
+    ))
+
 (fun builtin_eval_call (expr) (
     (var func (field_get expr @CallFunc))
     (var args (field_get expr @CallArgs))
@@ -94,8 +119,6 @@
     (flush stdout)
 
     (var loc (field_get expr 1))
-    (= arity (list_length args))
-
     (error_head stderr loc)
     (output_string stderr "undefined function '")
     ; XXX: func can not be a symbol
@@ -103,6 +126,13 @@
     (output_string stderr "' with arity = ")
     (output_int stderr arity)
     (output_char stderr '\n')
+    (exit 1)
+    ))
+
+(fun undefined_expression (loc) (
+    (flush stdout)
+    (error_head stderr loc)
+    (output_string stderr "undefined expression\n")
     (exit 1)
     ))
 

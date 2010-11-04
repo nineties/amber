@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-parse.rlc 2010-10-27 01:07:58 nineties $
+; $Id: rowl1-parse.rlc 2010-11-04 11:41:38 nineties $
 ;
 
 (import "rlvm-compile")
@@ -68,7 +68,7 @@
         ))
     (= begin (getloc))
     (var e (parse_secondary tok))
-    (= end (getloc))
+    (= end (getprevloc))
     (= expr_stack (cons (cons e (merge_loc begin end)) expr_stack))
 
     (label parse_expr_infix)
@@ -243,26 +243,32 @@
         (do
             (var arg (caar exprs))
             (var argloc (cdar exprs))
-            (return (cons (variant @Prefix 3 (merge_loc oploc argloc)
-                (field_get op 1) arg) (cdr exprs)))
+            (var loc (merge_loc oploc argloc))
+            (return (cons (cons (variant @Prefix 3 loc
+                (field_get op 1) arg) loc)
+                (cdr exprs)))
         )
     (if (== type @OP_POSTFIX)
         (do
             (var arg (caar exprs))
             (var argloc (cdar exprs))
-            (return (cons (variant @Postfix 3 (merge_loc argloc oploc)
-                (field_get op 1) arg) (cdr exprs)))
+            (var loc (merge_loc argloc oploc))
+            (return (cons (cons (variant @Postfix 3 loc
+                (field_get op 1) arg) loc)
+                (cdr exprs)))
         )
     (if (== type @OP_INFIX)
         (do
             (var lhs_info (cadr exprs))
             (var rhs_info (car exprs))
             (var lhs (car lhs_info))
-            (var lhs_loc (cdr lhs_loc))
+            (var lhs_loc (cdr lhs_info))
             (var rhs (car rhs_info))
             (var rhs_loc (cdr rhs_info))
-            (return (cons (variant @Infix 4 (merge_loc lhs_loc rhs_loc)
-                (field_get op 1) lhs rhs) (cddr exprs)))
+            (var loc (merge_loc lhs_loc rhs_loc))
+            (return (cons (cons (variant @Infix 4 loc
+                (field_get op 1) lhs rhs) loc)
+                (cddr exprs)))
         )
         )))
     ))
