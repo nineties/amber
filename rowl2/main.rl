@@ -3,7 +3,11 @@
 # rowl - generation 2
 # Copyright (C) 2010 nineties
 #
-# $Id: main.rl 2010-11-04 11:27:36 nineties $
+# $Id: main.rl 2010-11-05 00:11:50 nineties $
 #
 
-fib(0): 0
+f(0): 0
+f(1): 1
+
+print_int(f(0))
+print_int(f(1))

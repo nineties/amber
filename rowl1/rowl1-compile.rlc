@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2010-11-04 11:40:57 nineties $
+; $Id: rowl1-compile.rlc 2010-11-05 00:02:19 nineties $
 ;
 
 (import "rlvm-compile")
@@ -16,16 +16,19 @@
 (import "rowl1-assemble")
 
 (export fun compile_function (name args body) (
-    (output_string stderr "compile: ")
-    (output_string stderr (field_get name @SymbolName))
-    (output_string stderr " ...\n")
+    (var asm (make_assembler))
+    (var tbl (make_symtable))
 
-    (var asm (make_assembler 0))
+    ;(= args (setup_args tbl args))
+
     ; experimental implementation
-    (return (compile_expression asm body))
+    (compile_expression asm body @TRUE)
+    (var code (get_code asm))
+
+    (return (cons args (get_code asm)))
     ))
 
-(fun compile_expression (asm expr) (
+(fun compile_expression (asm expr ret) (
     (var ty (node_type expr))
     (tswitch ty (
     (@Symbol  . (not_implemented "compile_expression"))
@@ -39,10 +42,36 @@
     (@Call    . (not_implemented "compile_expression"))
     (@Subscr  . (not_implemented "compile_expression"))
     (@Char    . (not_implemented "compile_expression"))
-    (@Int     . (not_implemented "compile_expression"))
+    (@Int     . (do
+        (put_imm_int asm (get expr))
+        (put_pcall asm int 4)
+        (if ret (put_ireturn asm))
+        break
+        ))
     (@Float   . (not_implemented "compile_expression"))
     (@String  . (not_implemented "compile_expression"))
     (default . (not_reachable "compile_expression"))
+        ))
+    ))
+
+(export fun compile_simple_call (arity func ret) (
+    (var asm (make_assembler))
+    (var n arity)
+    (while (> n 0) (do
+        (decr n)
+        (put_arg asm n)
+        ))
+    (if @(IS_PRIM func)
+        (do
+            (put_pcall asm @(PRIM_IDX func) (* 4 arity))
+            (if ret (put_ireturn asm))
+            (return (get_code asm))
+        )
+        (do
+            (put_push asm func)
+            (put_dcall asm (* 4 arity))
+            (if ret (put_ireturn asm))
+            (return (get_code asm))
         ))
     ))
 
