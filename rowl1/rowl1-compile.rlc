@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2010-11-05 00:02:19 nineties $
+; $Id: rowl1-compile.rlc 2010-11-05 03:22:21 nineties $
 ;
 
 (import "rlvm-compile")
@@ -17,8 +17,8 @@
 
 (export fun compile_function (name args body) (
     (var asm (make_assembler))
-    (var tbl (make_symtable))
 
+    ;(var tbl (make_symtable))
     ;(= args (setup_args tbl args))
 
     ; experimental implementation
@@ -28,10 +28,15 @@
     (return (cons args (get_code asm)))
     ))
 
+(extern fun lookup_func)
 (fun compile_expression (asm expr ret) (
     (var ty (node_type expr))
     (tswitch ty (
-    (@Symbol  . (not_implemented "compile_expression"))
+    (@Symbol  . (do
+        (put_push asm expr)
+        (if ret (put_ireturn asm))
+        break
+        ))
     (@List    . (not_implemented "compile_expression"))
     (@Tuple   . (not_implemented "compile_expression"))
     (@Array   . (not_implemented "compile_expression"))
@@ -39,17 +44,38 @@
     (@Prefix  . (not_implemented "compile_expression"))
     (@Postfix . (not_implemented "compile_expression"))
     (@Infix   . (not_implemented "compile_expression"))
-    (@Call    . (not_implemented "compile_expression"))
+    (@Call    . (do
+        (var args (field_get expr @CallArgs))
+        (= args (list_reverse args))
+        (var arity 0)
+        (while args (do
+            (compile_expression asm (car args) @FALSE)
+            (= args (cdr args))
+            (incr arity)
+            ))
+        (put_imm_int asm arity)
+        (compile_expression asm (field_get expr @CallFunc) @FALSE)
+        (put_push asm lookup_func)
+        (put_dcall asm 8)
+        (put_jcall asm (* 4 arity))
+        (if ret (put_ireturn asm))
+        break
+        ))
     (@Subscr  . (not_implemented "compile_expression"))
-    (@Char    . (not_implemented "compile_expression"))
+    (@Char    . (do
+        (put_imm_int asm (get expr))
+        (put_pcall asm char 4)
+        (if ret (put_ireturn asm))
+        break
+        ))
     (@Int     . (do
         (put_imm_int asm (get expr))
         (put_pcall asm int 4)
         (if ret (put_ireturn asm))
         break
         ))
-    (@Float   . (not_implemented "compile_expression"))
-    (@String  . (not_implemented "compile_expression"))
+    (@Float  . (not_implemented "compile_expression"))
+    (@String . (not_implemented "compile_expression"))
     (default . (not_reachable "compile_expression"))
         ))
     ))
