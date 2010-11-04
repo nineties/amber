@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2010-11-05 00:07:35 nineties $
+; $Id: rowl1-interp.rlc 2010-11-05 03:21:33 nineties $
 ;
 
 (import "rlvm-compile")
@@ -97,6 +97,19 @@
 
     (var ret (compile_function name args rhs)) ; (argpat . body)
     (add_function name (car ret) (cdr ret))
+    ))
+
+(export fun lookup_func (sym arity) (
+    (check_type "lookup_func" @Symbol sym)
+    (var f (symtable_find funtable sym arity))
+    (if (! f) (do
+        (output_string stderr "ERROR: undefined function '")
+        (output_string stderr (field_get sym @SymbolName))
+        (output_string stderr "'\n")
+        (exit 1)
+        ))
+    (= f (compile_matching f))
+    (return (tuple_at f 0))
     ))
 
 (fun builtin_eval_call (expr) (
