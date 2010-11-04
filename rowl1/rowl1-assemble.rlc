@@ -2,11 +2,12 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-assemble.rlc 2010-11-03 21:54:49 nineties $
+; $Id: rowl1-assemble.rlc 2010-11-04 23:32:34 nineties $
 ;
 
 ; -- Just in time assembler
-; (byte code (cvector), labels (ivector), replaces (list of repl info), label indx counter)
+; (byte code (cvector), labels (ivector), replaces (list of repl info),
+;  objects to be GCed (vector),  label indx counter)
 ; -- repl info
 ; (pointer to the next info, index of the labels, offset of operand)
 
@@ -15,26 +16,29 @@
 
 (var code-base `(
 
-(export fun make_assembler (size_hint) (
-    (return (tuple 3 (make_cvector_with_capa 0 size_hint) (make_ivector 0) 0 0))
+(export fun make_assembler () (
+    (return (tuple 3 (make_cvector 0) (make_ivector 0) 0 (make_vector 0) 0))
     ))
 
 (export fun get_code (c) (
     (if (tuple_at c 2) (replace_labels c))
-    (return (tuple_at c 0))
-    ))
-
-(export fun get_code_ptr (c) (
-    (return (cvector_ptr (get_code c)))
+    (var code (tuple_at c 0))
+    (var objs (tuple_at c 3))
+    (if (> (vector_size objs) 0)
+        (return (tuple 2 (cvector_raw code) (vector_raw objs) (cvector_size code)))
+        (return (tuple 1 (cvector_raw code) 0 (cvector_size code)))
+        )
     ))
 
 (fun get_address (c) (
     (return (cvector_size (tuple_at c 0)))
     ))
 
-(export fun put_code (c cvec) (
-    (for i 0 (cvector_size cvec) (do
-        (emit_byte c (cvector_at cvec i))
+(export fun put_code (c code) (
+    (var seq (tuple_at code 0))
+    (var len (tuple_at code 2))
+    (for i 0 len (do
+        (emit_byte c (array_get char seq i))
         ))
     ))
 
@@ -72,11 +76,11 @@
         ))
     ))
 
-(fun emit_byte (c v) (
+(export fun emit_byte (c v) (
     (cvector_pushback (tuple_at c 0) v)
     ))
 
-(fun emit_short (c v) (
+(export fun emit_short (c v) (
     (var vec (tuple_at c 0))
     (cvector_pushback vec (& v 0xff))
     (cvector_pushback vec (>> v 8))
@@ -94,9 +98,14 @@
     (emit_short c (& v 0xffff))
     ))
 
+(fun emit_object (c obj) (
+    (emit_int c obj)
+    (vector_pushback (tuple_at c 3) obj)
+    ))
+
 (export fun fresh_label (c) (
-    (var n (tuple_at c 3))
-    (tuple_set c 3 (+ n 1))
+    (var n (tuple_at c 4))
+    (tuple_set c 4 (+ n 1))
     (ivector_pushback (tuple_at c 1) -1)
     (return n)
     ))
@@ -138,6 +147,7 @@
     (ushort . emit_short)
     (int    . emit_int)
     (prim   . emit_prim)
+    (object . emit_object)
     (addr   . emit_label)
     ))
 

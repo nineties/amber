@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2010-11-04 10:16:33 nineties $
+; $Id: rowl1-matching.rlc 2010-11-04 23:30:50 nineties $
 ;
 
 (import "rlvm-compile")
@@ -14,65 +14,32 @@
 (import "rowl1-node")
 (import "rowl1-assemble")
 
-(fun printstr (str) (
-    (print_string str)
+; pattern matrix (((p11 p12 .. ) . e1) ((p21 p22 ..) . e2) ..)
+
+(export fun compile_matching (pats) (
+    (var asm (make_assembler 10))
+    (compile_matching_main asm 0 pats)
+    (return (get_code asm))
     ))
 
-(fun printint (n) (
-    (print_int (get n))
-    ))
-
-(export fun matching_test () (
-    (var asm (make_assembler 20))
-
-    (put_push asm printstr)
-    (put_dgoto asm)
-    (var print_str_code (get_code asm))
-
-    (= asm (make_assembler 2))
-    (put_arg0 asm)
-    (put_ireturn asm)
-    (var identity (get_code asm))
-
-    (= asm (make_assembler 20))
-    (compile_matching asm 0
-        (cons (cons (int 0) 0)
-        (cons (cons (int 1) 0)
-        (cons (cons AnySym 0)
-        0)))
-        (cons identity
-        (cons identity
-        (cons print_str_code
-        0)))
-        )
-
-    (var ret (jitcall (get_code_ptr asm) (int 1)))
-    (print_string "result = ")
-    (print_int (get ret))
-    (print_char '\n')
-    ))
-
-; pats: pattern matrix ((p11 p12 .. ) (p21 p22 ..) ..)
-; exps: list of expressions
-(export fun compile_matching (asm idx pats exps) (
-    (if (== (car pats) 0) (do
-        (put_code asm (car exps))
+(fun compile_matching_main (asm idx pats) (
+    (if (== (caar pats) 0) (do
+        (put_code asm (cdar pats))
         return
         ))
     (var x (split_matrix pats)) ; (single . remain)
     (var n (list_length (car x)))
-    (var y (list_split exps n))
-    (compile_matching_single asm idx (car x) (car y))
+    (compile_matching_single asm idx (car x))
     (if (cdr x)
-        (compile_matching asm idx (cdr x) (cdr y))
+        (compile_matching_main asm idx (cdr x))
         )
     ))
 
-(fun compile_matching_single (asm idx pats exps) (
-    (var p (caar pats))
+(fun compile_matching_single (asm idx pats) (
+    (var p (caaar pats))
     (if (== p AnySym) (do
         (= pats (shift_pat pats))
-        (compile_matching asm (+ idx 1) pats exps)
+        (compile_matching_main asm (+ idx 1) pats)
         return
         ))
     (var pty (node_type p))
@@ -86,7 +53,7 @@
         (put_imm_int asm value)
         (put_if_ne asm endif)
         (= pats (shift_pat pats))
-        (compile_matching asm (+ idx 1) pats exps)
+        (compile_matching_main asm (+ idx 1) pats)
         (set_label asm endif)
         return
         ))
@@ -94,7 +61,7 @@
     ))
 
 (fun split_matrix (pats) (
-    (var p (caar pats))
+    (var p (caaar pats))
     (if (== p AnySym) (return (split_any pats)))
     (var pty (node_type p))
     (if (== pty @Int) (return (split_int (get p) pats)))
@@ -105,7 +72,7 @@
     (var n 1)
     (var orig pats)
     (= pats (cdr pats))
-    (while (&& pats (== (caar pats) AnySym)) (do
+    (while (&& pats (== (caaar pats) AnySym)) (do
         (= pats (cdr pats))
         (incr n)
         ))
@@ -116,7 +83,7 @@
     (var n 1)
     (var orig pats)
     (= pats (cdr pats))
-    (while (&& pats (&& (== (node_type (caar pats)) @Int) (== v (get (caar pats))))) (do
+    (while (&& pats (&& (== (node_type (caaar pats)) @Int) (== v (get (caaar pats))))) (do
         (= pats (cdr pats))
         (incr n)
         ))
@@ -125,7 +92,7 @@
 
 (fun shift_pat (pats) (
     (if (== pats 0) (return 0))
-    (return (cons (cdar pats) (shift_pat (cdr pats))))
+    (return (cons (cons (cdaar pats) (cdar pats)) (shift_pat (cdr pats))))
     ))
 
     ))

@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2010-11-04 11:34:56 nineties $
+; $Id: rowl1-interp.rlc 2010-11-05 00:07:35 nineties $
 ;
 
 (import "rlvm-compile")
@@ -16,17 +16,29 @@
 (import "rowl1-node")
 (import "rowl1-symtable")
 (import "rowl1-compile")
+(import "rowl1-matching")
 
 (var funtable (make_symtable))
 (var vartable (make_symtable))
 
-(export fun add_function (sym pats func) (
-    (var arity (list_length pats))
-    (symtable_add funtable sym arity func)
+(export fun add_function (sym args code) (
+    (var arity (list_length args))
+    (var ent (symtable_find funtable sym arity))
+    (symtable_add funtable sym arity (cons (cons args code) ent))
+    ))
+
+(export fun add_simple_function (sym arity func) (
+    (var code (compile_simple_call arity func @TRUE))
+    (var pats 0)
+    (while (> arity 0) (do
+        (= pats (cons AnySym pats))
+        (decr arity)
+        ))
+    (add_function sym pats code)
     ))
 
 (export fun interpret (prog) (
-    (check_type @List prog)
+    (check_type "interpret" @List prog)
 
     (var list (field_get prog @ListValues))
     (while list (do
@@ -84,7 +96,7 @@
     (if (!= (node_type name) @Symbol) (undefined_expression (field_get expr 1)))
 
     (var ret (compile_function name args rhs)) ; (argpat . body)
-    ;(add_function name (car ret) (cdr ret))
+    (add_function name (car ret) (cdr ret))
     ))
 
 (fun builtin_eval_call (expr) (
@@ -100,17 +112,22 @@
         (= args (cdr args))
         (+= arity 1)
         ))
+
     (var f (symtable_find funtable func arity))
     (if (! f) (goto undefined_error))
+
+    (= f (compile_matching f))
+    (= f (tuple_at f 0))
+
     (tswitch arity (
-    (0 . (return (f)))
-    (1 . (return (f (array_get object argv 0))))
-    (2 . (return (f (array_get object argv 0) (array_get object argv 1))))
-    (3 . (return (f (array_get object argv 0) (array_get object argv 1) (array_get object argv 2))))
-    (4 . (return (f (array_get object argv 0) (array_get object argv 1) (array_get object argv 2) (array_get object argv 3))))
-    (5 . (return (f (array_get object argv 0) (array_get object argv 1) (array_get object argv 2) (array_get object argv 3) (array_get object argv 4))))
-    (6 . (return (f (array_get object argv 0) (array_get object argv 1) (array_get object argv 2) (array_get object argv 3) (array_get object argv 4) (array_get object argv 5))))
-    (7 . (return (f (array_get object argv 0) (array_get object argv 1) (array_get object argv 2) (array_get object argv 3) (array_get object argv 4) (array_get object argv 5) (array_get object argv 6))))
+    (0 . (return (jitcall f)))
+    (1 . (return (jitcall f (array_get object argv 0))))
+    (2 . (return (jitcall f (array_get object argv 0) (array_get object argv 1))))
+    (3 . (return (jitcall f (array_get object argv 0) (array_get object argv 1) (array_get object argv 2))))
+    (4 . (return (jitcall f (array_get object argv 0) (array_get object argv 1) (array_get object argv 2) (array_get object argv 3))))
+    (5 . (return (jitcall f (array_get object argv 0) (array_get object argv 1) (array_get object argv 2) (array_get object argv 3) (array_get object argv 4))))
+    (6 . (return (jitcall f (array_get object argv 0) (array_get object argv 1) (array_get object argv 2) (array_get object argv 3) (array_get object argv 4) (array_get object argv 5))))
+    (7 . (return (jitcall f (array_get object argv 0) (array_get object argv 1) (array_get object argv 2) (array_get object argv 3) (array_get object argv 4) (array_get object argv 5) (array_get object argv 6))))
     (default . (not_implemented "builtin_eval_call"))
         ))
 
