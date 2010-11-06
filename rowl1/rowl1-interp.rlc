@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2010-11-05 03:21:33 nineties $
+; $Id: rowl1-interp.rlc 2010-11-06 23:30:08 nineties $
 ;
 
 (import "rlvm-compile")
@@ -21,10 +21,21 @@
 (var funtable (make_symtable))
 (var vartable (make_symtable))
 
-(export fun add_function (sym args code) (
+(export fun add_global_function (sym args code) (
     (var arity (list_length args))
     (var ent (symtable_find funtable sym arity))
-    (symtable_add funtable sym arity (cons (cons args code) ent))
+    (if ent
+        (do
+            (var pats (cons (cons args code) (cdr ent)))
+            (setcdr ent pats)
+            (setcar ent (compile_matching pats))
+        )
+        (do
+            (var pats (cons (cons args code) 0))
+            (symtable_add funtable sym arity (cons (compile_matching pats) pats))
+            (register_symbol sym GlobalFunctionSym)
+        )
+        )
     ))
 
 (export fun add_simple_function (sym arity func) (
@@ -34,7 +45,7 @@
         (= pats (cons AnySym pats))
         (decr arity)
         ))
-    (add_function sym pats code)
+    (add_global_function sym pats code)
     ))
 
 (export fun interpret (prog) (
@@ -95,8 +106,8 @@
     (var args (field_get lhs @CallArgs))
     (if (!= (node_type name) @Symbol) (undefined_expression (field_get expr 1)))
 
-    (var ret (compile_function name args rhs)) ; (argpat . body)
-    (add_function name (car ret) (cdr ret))
+    (var ret (compile_global_function (field_get expr 1) name args rhs)) ; (argpat . body)
+    (add_global_function name (car ret) (cdr ret))
     ))
 
 (export fun lookup_func (sym arity) (
@@ -108,8 +119,7 @@
         (output_string stderr "'\n")
         (exit 1)
         ))
-    (= f (compile_matching f))
-    (return (tuple_at f 0))
+    (return (tuple_at (car f) 0))
     ))
 
 (fun builtin_eval_call (expr) (
@@ -129,8 +139,7 @@
     (var f (symtable_find funtable func arity))
     (if (! f) (goto undefined_error))
 
-    (= f (compile_matching f))
-    (= f (tuple_at f 0))
+    (= f (tuple_at (car f) 0))
 
     (tswitch arity (
     (0 . (return (jitcall f)))
