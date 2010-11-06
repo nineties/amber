@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2010-11-05 03:22:21 nineties $
+; $Id: rowl1-compile.rlc 2010-11-06 23:40:04 nineties $
 ;
 
 (import "rlvm-compile")
@@ -15,17 +15,53 @@
 (import "rowl1-symtable")
 (import "rowl1-assemble")
 
-(export fun compile_function (name args body) (
+(var vartable (make_symtable))
+
+(export fun register_symbol (sym type) (
+    (if (== (symtable_find vartable sym 0) type) return)
+    (symtable_add vartable sym 0 type)
+    ))
+
+(export fun compile_global_function (loc name args body) (
+
+    (register_symbol name GlobalFunctionSym)
+    (symtable_push vartable)
+
     (var asm (make_assembler))
+    (= args (setup_args loc args))
 
-    ;(var tbl (make_symtable))
-    ;(= args (setup_args tbl args))
-
-    ; experimental implementation
     (compile_expression asm body @TRUE)
-    (var code (get_code asm))
 
+    (symtable_pop vartable)
     (return (cons args (get_code asm)))
+    ))
+
+(fun make_arg (loc idx) (
+    (return (variant @Node 3 loc ArgumentSym (int idx)))
+    ))
+
+(fun setup_args (loc args) (
+    (var ret args)
+    (var idx 0)
+    (while args (do
+        (var arg (car args))
+        (var type (node_type arg))
+        (if (== type @Int) (do
+            (= args (cdr args))
+            (incr idx)
+            continue
+            ))
+        (if (== type @Symbol) (do
+            (symtable_add vartable arg 0 (make_arg loc idx))
+            (setcar args AnySym)
+            (= args (cdr args))
+            (incr idx)
+            continue
+            ))
+        (error_head stderr loc)
+        (output_string stderr "ERROR: invalid argument pattern\n")
+        ))
+    (return ret)
     ))
 
 (extern fun lookup_func)
@@ -33,9 +69,27 @@
     (var ty (node_type expr))
     (tswitch ty (
     (@Symbol  . (do
-        (put_push asm expr)
-        (if ret (put_ireturn asm))
-        break
+        (var v (symtable_find vartable expr 0))
+        (if (! v) (do
+            (output_string stderr "ERROR: undefined variable: ")
+            (output_string stderr (field_get expr @SymbolName))
+            (output_char stderr '\n')
+            (exit 1)
+            ))
+        (if (== v GlobalFunctionSym) (do
+            (put_push asm expr)
+            (if ret (put_ireturn asm))
+            break
+            ))
+        (if (== (node_type v) @Node) (do
+            (var constr (field_get v 2))
+            (if (== constr ArgumentSym) (do
+                (put_arg asm (get (field_get v 3)))
+                (if ret (put_ireturn asm))
+                break
+                ))
+            ))
+        (not_reachable "compile_expression")
         ))
     (@List    . (not_implemented "compile_expression"))
     (@Tuple   . (not_implemented "compile_expression"))
@@ -43,22 +97,15 @@
     (@Node    . (not_implemented "compile_expression"))
     (@Prefix  . (not_implemented "compile_expression"))
     (@Postfix . (not_implemented "compile_expression"))
-    (@Infix   . (not_implemented "compile_expression"))
+    (@Infix   . (do
+        (var op (field_get expr @InfixOp))
+        (var lhs (field_get expr @InfixLhs))
+        (var rhs (field_get expr @InfixRhs))
+        (compile_call asm op (cons lhs (cons rhs 0)) ret)
+        break
+        ))
     (@Call    . (do
-        (var args (field_get expr @CallArgs))
-        (= args (list_reverse args))
-        (var arity 0)
-        (while args (do
-            (compile_expression asm (car args) @FALSE)
-            (= args (cdr args))
-            (incr arity)
-            ))
-        (put_imm_int asm arity)
-        (compile_expression asm (field_get expr @CallFunc) @FALSE)
-        (put_push asm lookup_func)
-        (put_dcall asm 8)
-        (put_jcall asm (* 4 arity))
-        (if ret (put_ireturn asm))
+        (compile_call asm (field_get expr @CallFunc) (field_get expr @CallArgs) ret)
         break
         ))
     (@Subscr  . (not_implemented "compile_expression"))
@@ -75,9 +122,29 @@
         break
         ))
     (@Float  . (not_implemented "compile_expression"))
-    (@String . (not_implemented "compile_expression"))
+    (@String . (do
+        (put_push asm expr)
+        (if ret (put_ireturn asm))
+        break
+        ))
     (default . (not_reachable "compile_expression"))
         ))
+    ))
+
+(fun compile_call (asm fun args ret) (
+    (= args (list_reverse args))
+    (var arity 0)
+    (while args (do
+        (compile_expression asm (car args) @FALSE)
+        (= args (cdr args))
+        (incr arity)
+        ))
+    (put_imm_int asm arity)
+    (compile_expression asm fun @FALSE)
+    (put_push asm lookup_func)
+    (put_dcall asm 8)
+    (put_jcall asm (* 4 arity))
+    (if ret (put_ireturn asm))
     ))
 
 (export fun compile_simple_call (arity func ret) (
