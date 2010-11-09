@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-11-03 23:33:08 nineties $
+; $Id: vm-gc.rlc 2010-11-09 12:31:38 nineties $
 ;
 
 (import "stdlib")
@@ -28,10 +28,10 @@
 
 ; block and page management
 ;
-; |<----------------------- 1 Mbyte ---------------------->|
-; |..padding..|pd0|pd1|....|pdN-1|page0|page1|.....|pageN-1|
+; |<---------------------- 1 Mbyte -------------------------->|
+; | space |pd0|pd1|....|pdN-1| space |page0|page1|....|pageN-1|
 
-; structure of page descriptor. It's size must be 4-word.
+; structure of page descriptor. It's size must be 2-words.
 ;
 ; 1 bit : joined flag (1 if the page is joined with previous page)
 ; 31 bit : generation (ID number of generation to which this page belongs)
@@ -43,7 +43,7 @@
 
 (define pdescr->joined=1    (addr)  `([]= @addr 0 (| ([] @addr 0) 1)))
 (define pdescr->joined=0    (addr)  `([]= @addr 0 (& ([] @addr 0) @(~ 1))))
-(define pdescr->generation= (addr val) `([]= @addr 0 (| (<< @val 1) ([] @addr 0))))
+(define pdescr->generation= (addr val) `([]= @addr 0 (| (<< @val 1) (& ([] @addr 0) 1))))
 (define pdescr->next=       (addr val)  `([]= @addr 1 @val))
 
 ; structure of block descriptor.
@@ -59,6 +59,7 @@
 (var PDESCR_SHIFT   3)  ; PDESCR_SIZE = 2^PDESCR_SHIFT
 (var BDESCR_SIZE    8)
 (var BDESCR_SHIFT   3)  ; BDESCR_SIZE = 2^BDESCR_SHIFT
+(var BDESCR_WORD    (>> BDESCR_SIZE WORD_SHIFT))
 
 (var BLOCK_MASK (- BLOCK_SIZE 1))
 
@@ -106,10 +107,10 @@
 (define BDESCR2BLOCK (bdescr) `(<< (- @bdescr block_map) @(- BLOCK_SHIFT BDESCR_SHIFT)))
 
 (define blockmap[] (idx)    `(+ block_map (* @BDESCR_SIZE @idx)))
-(define blockmap->next  (idx)       `([] block_map (* @BDESCR_SIZE @idx)))
-(define blockmap->first (idx)       `([] block_map (+ (* @BDESCR_SIZE @idx) 1)))
-(define blockmap->next=  (idx val)  `([]= block_map (* @BDESCR_SIZE @idx) @val))
-(define blockmap->first= (idx val)  `([]= block_map (+ (* @BDESCR_SIZE @idx) 1) @val))
+(define blockmap->next  (idx)       `([] block_map (* @BDESCR_WORD @idx)))
+(define blockmap->first (idx)       `([] block_map (+ (* @BDESCR_WORD @idx) 1)))
+(define blockmap->next=  (idx val)  `([]= block_map (* @BDESCR_WORD @idx) @val))
+(define blockmap->first= (idx val)  `([]= block_map (+ (* @BDESCR_WORD @idx) 1) @val))
 
 ; object tag:
 ;         : | 1bit | 20bit | 8bit | 3bit  |
@@ -139,6 +140,8 @@
 
 (extern void* stack)
 (extern int stack_size)
+(extern void* gobject_area_base)
+(extern int num_gobject)
 
 (byte[] @(* BDESCR_SIZE MAX_BLOCKS) block_map)
 (int stack_base)    ; address of stack bottom
@@ -299,6 +302,7 @@
     (void* new_obj (allocate_object words))
     (copy_object new_obj obj words)
 
+    (+= new_obj @WORD_SIZE)
     @(SET_FORWARD_ADDR obj new_obj)
     @(OBJECT_SETCOPYED obj)
     ([]= objp 0 new_obj)
@@ -309,38 +313,39 @@
     (int tag @(OBJECT_TAG head))
     (if (<= tag @TAG_PLAIN) ((return)))
     (if (== tag @TAG_CONS) (
-        (move_object (+ obj @WORD_SIZE)) ; car
-        (move_object (+ obj @(* 2 WORD_SIZE))) ; cons
+        (move_object obj) ; car
+        (move_object (+ obj @WORD_SIZE)) ; cons
         (return)
         ))
     (if (== tag @TAG_ARRAY) (
         (int len (- @(OBJECT_WORDS head) 1)) ; -1 for the header
-        (+= obj @WORD_SIZE)
         (while (> len 0) (
             (move_object obj)
             (+= obj @WORD_SIZE)
+            (decr len)
             ))
         (return)
         ))
     (if (== tag @TAG_TUPLE) (
         (int len @(BOXED_FIELD_SIZE head))
-        (+= obj @WORD_SIZE) ; skip header
         (while (> len 0) (
             (move_object obj)
             (+= obj @WORD_SIZE)
+            (decr len)
             ))
         (return)
         ))
     (if (== tag @TAG_VARIANT) (
         (int len @(BOXED_FIELD_SIZE head))
-        (+= obj @WORD_SIZE) ; skip header and variant tag
+        (+= obj @WORD_SIZE) ; skip variant tag
         (while (> len 0) (
             (move_object obj)
             (+= obj @WORD_SIZE)
+            (decr len)
             ))
         (return)
         ))
-    (error "not reachable")
+    (error "move_fields: not reachable")
     ))
 
 (fun garbage_collect () (
@@ -357,9 +362,18 @@
     (scan_machine_stack)
     (scan_vm_stack)
 
-    ; move static objects
+    ; move registered objects
     (for i 0 num_static (
         (move_object ([] statics i))
+        ))
+
+    ; move global heap objects
+    (void* o gobject_area_base)
+    (int n num_gobject)
+    (while (> n 0) (
+        (move_object o)
+        (+= o @WORD_SIZE)
+        (decr n)
         ))
 
     ; sweep across promoted pages with breadth-first traversing and copy their consistents.
@@ -395,35 +409,41 @@
     ))
 
 (fun allocate_page (npages) (
-    (int free 0)
-    (int allpages (* @PAGES_PER_BLOCK num_block))
+    (if (> npages @PAGES_PER_BLOCK) (
+        (error "allocate_page: try to allocate too many pages\n")
+        ))
+
     (void* firstpage 0)
     (label retry)
+    (int allpages (* @PAGES_PER_BLOCK num_block))
+    (int free 0)
     (while allpages (
         (decr allpages)
         (if (&& (!= @(pdescr->generation freepage) current_gen)
                 (!= @(pdescr->generation freepage) next_gen))
             (
-            (if (== free 0) ((= firstpage freepage)))
-            (incr free)
-            (if (== free npages) (
-                (= freep @(PDESCR2PAGE firstpage))
-                (= free_words (<< npages @PAGE_WORDS_SHIFT))
-                (= freepage (nextpage freepage))
-                @(pdescr->generation= firstpage next_gen)
-                @(pdescr->joined=0 firstpage)
-                (if @IN_GC ((enqueue_page firstpage)))
-                (decr npages)
-                (while npages (
-                    (+= firstpage @PDESCR_SIZE)
+                (if (== free 0) ((= firstpage freepage)))
+                (incr free)
+                (if (== free npages) (
+                    (= freep @(PDESCR2PAGE firstpage))
+                    (= free_words (<< npages @PAGE_WORDS_SHIFT))
+                    (= freepage (nextpage freepage))
                     @(pdescr->generation= firstpage next_gen)
-                    @(pdescr->joined=1 firstpage)
+                    @(pdescr->joined=0 firstpage)
+                    (if @IN_GC ((enqueue_page firstpage)))
                     (decr npages)
+                    (while npages (
+                        (+= firstpage @PDESCR_SIZE)
+                        @(pdescr->generation= firstpage next_gen)
+                        @(pdescr->joined=1 firstpage)
+                        (decr npages)
+                        ))
+                    (return)
                     ))
-                (return)
-                ))
             )
-            ((= free 0))
+            (
+                (= free 0)
+            )
             )
         (= freepage (nextpage freepage))
         (if @(IS_FIRST_PDESCR freepage) ((= free 0)))
@@ -438,7 +458,7 @@
         (allocate_page (>> (- (+ words @PAGE_WORDS) 1) @PAGE_WORDS_SHIFT))
         ))
     (void* obj freep)
-    (if (< words @PAGE_WORDS) ((-= free_words words)) ((= free_words 0)))
+    (if (<= words @PAGE_WORDS) ((-= free_words words)) ((= free_words 0)))
     (+= freep (* @WORD_SIZE words))
     (return obj)
     ))
@@ -452,8 +472,9 @@
 
 (export allocate_plain)
 (fun allocate_plain (type bytes) (
+    (if (== bytes 0) ((incr bytes)))
     (int words (/ (+ bytes 3) 4))
-    (incr words)
+    (incr words) ; for header
     (void* ptr (allocate_object words))
     @(SET_HEADER ptr TAG_PLAIN type words)
     (return (+ ptr @WORD_SIZE))
@@ -523,10 +544,10 @@
 ; array of objects
 (export allocate_array)
 (fun allocate_array (nelem) (
-    (incr nelem)
-    (void* ptr (allocate_object nelem))
-    (memset ptr 0 (* 4 nelem))
-    @(SET_HEADER ptr TAG_ARRAY 0 nelem)
+    (int size (+ nelem 1))
+    (void* ptr (allocate_object size))
+    (memset ptr 0 (* 4 size))
+    @(SET_HEADER ptr TAG_ARRAY 0 size)
     (+= ptr @WORD_SIZE)
     (return ptr)
     ))
@@ -575,6 +596,9 @@
 (export prim_get_plain_tag)
 (fun prim_get_plain_tag (obj) (
     (-= obj @WORD_SIZE)
+    (if (!= @(OBJECT_TAG obj) @TAG_PLAIN) (
+        (error "get_plain_tag: given object is not a plain object\n")
+        ))
     (return @(OBJECT_PLAIN_TAG obj))
     ))
 

@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-eval.rlc 2010-10-19 14:30:06 nineties $
+; $Id: vm-eval.rlc 2010-11-09 12:32:35 nineties $
 ;
 
 ; rowlVM register usage
@@ -129,8 +129,10 @@
 
 (export value_area_base)
 (void*  value_area_base)
-(export object_area_base)
-(void*  object_area_base)
+(export gobject_area_base)
+(void*  gobject_area_base)
+(export num_gobject)
+(int    num_gobject)
 (void*  code_base)
 
 (export cmd_argc)
@@ -155,6 +157,8 @@
     (= cmd_argc argc)
     (= cmd_argv argv)
 
+    (= num_gobject nref)
+
     (asm "pushl %ebx")
     (asm "pushl %esi")
     (asm "movl stack, %esi")
@@ -170,7 +174,7 @@
     (asm "subl %eax, %esi")
     (asm "movl %esi, %edi") ; set base pointer
 
-    (asm "movl %esi, object_area_base")
+    (asm "movl %esi, gobject_area_base")
 
     (vmfetch)
     (vmtable insn_table @insn_entries)
