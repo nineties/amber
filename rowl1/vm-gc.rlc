@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-11-09 12:31:38 nineties $
+; $Id: vm-gc.rlc 2010-11-09 22:00:23 nineties $
 ;
 
 (import "stdlib")
@@ -113,13 +113,14 @@
 (define blockmap->first= (idx val)  `([]= block_map (+ (* @BDESCR_WORD @idx) 1) @val))
 
 ; object tag:
-;         : | 1bit | 20bit | 8bit | 3bit  |
-; padding : |  --  |  size |    0 | 0b000 |
-; plain   : |  --  |  size | type | 0b001 |
-; cons    : |  --  |     3 |    0 | 0b010 |
-; barray  : |  --  |  size | #box | 0b011 |
-; tuple   : |  --  |  size | #box | 0b100 |
-; variant : |  --  |  size | #box | 0b101 |
+;          : | 1bit | 20bit | 8bit | 3bit  |
+; padding  : |  --  |  size |    0 | 0b000 |
+; plain    : |  --  |  size | type | 0b001 |
+; cons     : |  --  |     3 |    0 | 0b010 |
+; barray   : |  --  |  size | #box | 0b011 |
+; tuple    : |  --  |  size | #box | 0b100 |
+; variant  : |  --  |  size | #box | 0b101 |
+; bytecode : |  --  |     5 |    0 | 0b110 |
 
 (define OBJECT_WORDS (addr)  `(& (>> ([] @addr 0) 11) @(- (<< 1 20) 1)))
 (define OBJECT_TAG (addr)    `(& ([] @addr 0) @(- (<< 1 3) 1)))
@@ -345,6 +346,16 @@
             ))
         (return)
         ))
+    (if (== tag @TAG_BYTECODE) (
+        (void* code ([] obj 0))
+        (void* reloc ([] obj 2))
+        (int n ([] obj 3))
+        (for i 0 n (
+            (int offs ([] reloc i))
+            (move_object (+ code offs))
+            ))
+        (return)
+        ))
     (error "move_fields: not reachable")
     ))
 
@@ -504,8 +515,8 @@
     (return ptr)
     ))
 
-(export allocate_variant)
-(fun allocate_variant (tag nelem nboxed) (
+(export prim_allocate_variant)
+(fun prim_allocate_variant (tag nelem nboxed) (
     (int words (+ nelem 2))
     (void* ptr (allocate_object words))
     @(SET_HEADER ptr TAG_VARIANT nboxed words)
@@ -514,15 +525,15 @@
     (return ptr)
     ))
 
-(export variant_size)
-(fun variant_size (v) (
+(export prim_variant_size)
+(fun prim_variant_size (v) (
     (-= v @WORD_SIZE)
     (return (- @(OBJECT_WORDS v) 1))
     ))
 
 (export allocate_variant_with_values)
 (fun allocate_variant_with_values (tag nelem nboxed values) (
-    (void* ptr (allocate_variant tag nelem nboxed))
+    (void* ptr (prim_allocate_variant tag nelem nboxed))
     (for i 0 nelem (
         ([]= ptr (+ i 1) ([] values i))
         ))
@@ -551,6 +562,39 @@
     (+= ptr @WORD_SIZE)
     (return ptr)
     ))
+
+; bytecode
+(export prim_bytecode)
+(fun prim_bytecode (code len indices nidx) (
+    (void* ptr (allocate_object 5))
+    @(SET_HEADER ptr TAG_BYTECODE 0 5)
+    (+= ptr @WORD_SIZE)
+    ([]= ptr 0 code)
+    ([]= ptr 1 len)
+    ([]= ptr 2 indices)
+    ([]= ptr 3 nidx)
+    (return ptr)
+    ))
+
+(export prim_bytecode_ptr)
+(fun prim_bytecode_ptr (obj) (
+    (return ([] obj 0))
+    ))
+
+(export prim_get_tag)
+(fun prim_get_tag (obj) (
+    (-= obj @WORD_SIZE)
+    (return @(OBJECT_TAG obj))
+    ))
+(export prim_get_plain_tag)
+(fun prim_get_plain_tag (obj) (
+    (-= obj @WORD_SIZE)
+    (if (!= @(OBJECT_TAG obj) @TAG_PLAIN) (
+        (error "get_plain_tag: given object is not a plain object\n")
+        ))
+    (return @(OBJECT_PLAIN_TAG obj))
+    ))
+
 
 (fun init_pdescrs (block_addr) (
     (void* page @(FIRST_PAGE block_addr))
@@ -586,20 +630,6 @@
             (munmap 0 @BLOCK_SIZE)
             ))
         ))
-    ))
-
-(export prim_get_tag)
-(fun prim_get_tag (obj) (
-    (-= obj @WORD_SIZE)
-    (return @(OBJECT_TAG obj))
-    ))
-(export prim_get_plain_tag)
-(fun prim_get_plain_tag (obj) (
-    (-= obj @WORD_SIZE)
-    (if (!= @(OBJECT_TAG obj) @TAG_PLAIN) (
-        (error "get_plain_tag: given object is not a plain object\n")
-        ))
-    (return @(OBJECT_PLAIN_TAG obj))
     ))
 
 ))

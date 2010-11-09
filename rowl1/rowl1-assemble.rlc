@@ -2,12 +2,12 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-assemble.rlc 2010-11-04 23:32:34 nineties $
+; $Id: rowl1-assemble.rlc 2010-11-09 22:01:56 nineties $
 ;
 
 ; -- Just in time assembler
 ; (byte code (cvector), labels (ivector), replaces (list of repl info),
-;  objects to be GCed (vector),  label indx counter)
+;  indices objects to be GCed (ivector),  label indx counter)
 ; -- repl info
 ; (pointer to the next info, index of the labels, offset of operand)
 
@@ -17,16 +17,16 @@
 (var code-base `(
 
 (export fun make_assembler () (
-    (return (tuple 3 (make_cvector 0) (make_ivector 0) 0 (make_vector 0) 0))
+    (return (tuple 4 (make_cvector 0) (make_ivector 0) 0 (make_ivector 0) 0))
     ))
 
 (export fun get_code (c) (
     (if (tuple_at c 2) (replace_labels c))
     (var code (tuple_at c 0))
     (var objs (tuple_at c 3))
-    (if (> (vector_size objs) 0)
-        (return (tuple 2 (cvector_raw code) (vector_raw objs) (cvector_size code)))
-        (return (tuple 1 (cvector_raw code) 0 (cvector_size code)))
+    (if (> (ivector_size objs) 0)
+        (return (bytecode (cvector_raw code) (cvector_size code) (ivector_raw objs) (ivector_size objs)))
+        (return (bytecode (cvector_raw code) (cvector_size code) 0 0))
         )
     ))
 
@@ -35,10 +35,21 @@
     ))
 
 (export fun put_code (c code) (
+    ; setup object indices
+    (var offs (cvector_size (tuple_at c 0)))
+    (var ivec (tuple_at c 3))
+    (var iarr (tuple_at code 2))
+    (var nidx (tuple_at code 3))
+    (for i 0 nidx (do
+        (ivector_pushback ivec (+ offs (array_get int iarr i)))
+        ))
+
+    ; copy bytecode
     (var seq (tuple_at code 0))
-    (var len (tuple_at code 2))
+    (var len (tuple_at code 1))
+    (var cvec (tuple_at c 0))
     (for i 0 len (do
-        (emit_byte c (array_get char seq i))
+        (cvector_pushback cvec (array_get char seq i))
         ))
     ))
 
@@ -70,7 +81,7 @@
         (3 . (do (put_arg3 c) return))
         (4 . (do (put_arg4 c) return))
         (default . (do
-            (put_loadl c (+ (* 4 idx) 8))
+            (put_loadl c (* 4 (+ 2 idx)))
             return
             ))
         ))
@@ -99,8 +110,9 @@
     ))
 
 (fun emit_object (c obj) (
+    (var offs (cvector_size (tuple_at c 0)))
+    (ivector_pushback (tuple_at c 3) offs)
     (emit_int c obj)
-    (vector_pushback (tuple_at c 3) obj)
     ))
 
 (export fun fresh_label (c) (
