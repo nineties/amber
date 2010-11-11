@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlvm-compile.rlc 2010-11-05 02:46:18 nineties $
+; $Id: rlvm-compile.rlc 2010-11-11 20:42:11 nineties $
 ;
 
 (import "stdlib")
@@ -746,6 +746,8 @@
         ((== `cddr (car expr)) (compile_expr `(cdr (cdr @(cadr expr)))))
         ((== `setcar (car expr)) (compile_field_set `(field_set @(cadr expr) 0 @(caddr expr))))
         ((== `setcdr (car expr)) (compile_field_set `(field_set @(cadr expr) 1 @(caddr expr))))
+        ((== `box (car expr)) (compile_expr `(+ (<< @(cadr expr) 1) 1)))
+        ((== `unbox (car expr)) (compile_expr `(>> @(cadr expr) 1)))
         ((== `jitcall (car expr)) (compile_jitcall expr))
         ((and (== 3 (length expr)) (binary_operator? (car expr)))
             (compile_binexpr expr))

@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2010-11-06 21:20:28 nineties $
+; $Id: rowl1-node.rlc 2010-11-11 20:46:39 nineties $
 ;
 
 (import "rlvm-compile")
@@ -71,6 +71,7 @@
 
 (export fun node_type (obj) (
     (if (! obj) (error "node_type: null object"))
+    (if (& obj 1) (return @Int))
     (var tag (get_tag obj))
     (if (== tag @TAG_VARIANT) (return (field_get obj 0)))
     (return (+ (get_plain_tag obj) @BUILTIN_TYPE_OFFSET))
@@ -105,7 +106,6 @@
     (@Infix   . (return (pp_infix ochan node)))
     (@Call    . (return (pp_call ochan node)))
     (@Subscr  . (return (pp_subscr ochan node)))
-    (@Char    . (return (pp_char ochan node)))
     (@Int     . (return (pp_int ochan node)))
     (@Float   . (return (pp_float ochan node)))
     (@String  . (return (pp_string ochan node)))
@@ -116,13 +116,6 @@
 (fun pp_symbol (ochan node) (
     (var name (field_get node 1))
     (output_string ochan name)
-    ))
-
-(fun pp_char (ochan node) (
-    (var code (field_get node 1))
-    (output_char ochan ''')
-    (output_char_escape ochan code)
-    (output_char ochan ''')
     ))
 
 (fun pp_int (ochan node) (

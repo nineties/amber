@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2010-11-11 16:45:53 nineties $
+; $Id: rowl1-matching.rlc 2010-11-11 20:52:27 nineties $
 ;
 
 (import "rlvm-compile")
@@ -53,16 +53,17 @@
         ))
     (var pty (node_type p))
     (if (== pty @Int) (do
-        (var value (get p))
         (var endif (fresh_label asm))
+
         (put_arg asm idx)
         (put_check_int asm endif)
         (put_arg asm idx)
-        (put_field_get0 asm)
-        (put_imm_int asm value)
+        (put_imm_int asm p)
         (put_if_ne asm endif)
+
         (= pats (shift_pat pats))
         (compile_matching_main asm (+ idx 1) pats)
+
         (set_label asm endif)
         return
         ))
@@ -73,7 +74,7 @@
     (var p (caaar pats))
     (if (== p AnySym) (return (split_any pats)))
     (var pty (node_type p))
-    (if (== pty @Int) (return (split_int (get p) pats)))
+    (if (== pty @Int) (return (split_int (unbox p) pats)))
     (not_implemented "split_matrix")
     ))
 
@@ -92,7 +93,7 @@
     (var n 1)
     (var orig pats)
     (= pats (cdr pats))
-    (while (&& pats (&& (== (node_type (caaar pats)) @Int) (== v (get (caaar pats))))) (do
+    (while (&& pats (&& (== (node_type (caaar pats)) @Int) (== v (unbox (caaar pats))))) (do
         (= pats (cdr pats))
         (incr n)
         ))
