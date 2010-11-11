@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2010-11-10 08:38:23 nineties $
+; $Id: rowl1-compile.rlc 2010-11-11 16:01:08 nineties $
 ;
 
 (import "rlvm-compile")
@@ -139,11 +139,21 @@
         (= args (cdr args))
         (incr arity)
         ))
-    (put_imm_int asm arity)
-    (compile_expression asm fun @FALSE)
-    (put_imm_int32 asm lookup_func)
-    (put_dcall asm 8)
-    (put_jcall asm (* 4 arity))
+
+    (if (== (node_type fun) @Symbol)
+        (do
+            (var ent (lookup_func fun arity))
+            (put_push asm ent)
+            (put_jcall asm (* 4 arity))
+        )
+        (do
+            (put_imm_int asm arity)
+            (compile_expression asm fun @FALSE)
+            (put_imm_int32 asm lookup_func)
+            (put_dcall asm 8)
+            (put_jcall asm (* 4 arity))
+        ))
+
     (if ret (put_ireturn asm))
     ))
 
