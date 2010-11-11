@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-assemble.rlc 2010-11-10 13:51:54 nineties $
+; $Id: rowl1-assemble.rlc 2010-11-11 16:50:00 nineties $
 ;
 
 ; -- Just in time assembler
@@ -13,7 +13,6 @@
 
 (import "rlvm-compile")
 
-(eprintln vm_insn_table)
 (var code-base `(
 
 (export fun make_assembler () (
@@ -28,6 +27,17 @@
         (return (bytecode (cvector_raw code) (cvector_size code)
                         (ivector_raw indices) (ivector_size indices)))
         (return (bytecode (cvector_raw code) (cvector_size code) 0 0))
+        )
+    ))
+
+(export fun set_code (b c) (
+    (if (tuple_at c 2) (replace_labels c))
+    (var code (tuple_at c 0))
+    (var indices (tuple_at c 3))
+    (if (> (ivector_size indices) 0)
+        (bytecode_set b (cvector_raw code) (cvector_size code)
+                        (ivector_raw indices) (ivector_size indices))
+        (bytecode_set b (cvector_raw code) (cvector_size code) 0 0)
         )
     ))
 

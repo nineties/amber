@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2010-11-09 21:53:14 nineties $
+; $Id: rowl1-interp.rlc 2010-11-11 16:51:39 nineties $
 ;
 
 (import "rlvm-compile")
@@ -28,17 +28,17 @@
         (do
             (var pats (cons (cons args code) (cdr ent)))
             (setcdr ent pats)
-            (setcar ent (compile_matching pats))
+            (setcar ent (compile_matching (car ent) pats))
         )
         (do
             (var pats (cons (cons args code) 0))
-            (symtable_add funtable sym arity (cons (compile_matching pats) pats))
+            (symtable_add funtable sym arity (cons (compile_matching 0 pats) pats))
             (register_symbol sym GlobalFunctionSym)
         )
         )
     ))
 
-(export fun add_simple_function (sym arity func) (
+(export fun add_simple_global_function (sym arity func) (
     (var code (compile_simple_call arity func @TRUE))
     (var pats 0)
     (while (> arity 0) (do
@@ -114,16 +114,11 @@
     (check_type "lookup_func" @Symbol sym)
     (var f (symtable_find funtable sym arity))
     (if (! f) (do
-        ; XXX: output location info
-        (flush stdout)
-        (output_string stderr "ERROR: undefined function '")
-        (output_string stderr (field_get sym @SymbolName))
-        (output_string stderr "' with arity = ")
-        (output_int stderr arity)
-        (output_char stderr '\n')
-        (exit 1)
+        (var ent (cons (bytecode 0 0 0 0) 0)) ; XXX: register error handler here
+        (symtable_add funtable sym arity ent)
+        (return (car ent))
         ))
-    (return (bytecode_ptr (car f)))
+    (return (car f))
     ))
 
 (fun builtin_eval_call (expr) (
