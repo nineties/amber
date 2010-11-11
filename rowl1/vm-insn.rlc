@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-11-11 16:42:05 nineties $
+; $Id: vm-insn.rlc 2010-11-11 20:36:33 nineties $
 ;
 
 (define gen_field_get (idx) `(
@@ -40,12 +40,12 @@
 
 (define gen_check_plain (type) `(
     (vmpop %eax)
+    (vmsshort 1 %ecx)
     (asm "movl -4(%eax), %eax")
     ; XXX: should not hardcode the layout of an object header.
     (asm "andl $" @(- (<< 1 11) 1) ", %eax")
     (asm "cmpl $" @(| (<< type 3) TAG_PLAIN) ", %eax")
     (asm "movl $3, %eax")
-    (vmsshort 1 %ecx)
     (asm "cmovne %ecx, %eax")
     (vmsucc %eax)
     (vmfetch)
@@ -556,8 +556,15 @@
     (if_ge      (addr) @nil @(gen_comparison2 "cmovge"))
     (if_lt      (addr) @nil @(gen_comparison2 "cmovl"))
     (if_le      (addr) @nil @(gen_comparison2 "cmovle"))
-    (check_char   (addr) @nil @(gen_check_plain PLAIN_CHAR))
-    (check_int    (addr) @nil @(gen_check_plain PLAIN_INT))
+    (check_int    (addr) @nil (
+        (vmpop %eax)
+        (vmsshort 1 %ecx)
+        (asm "andl $1, %eax")
+        (asm "movl $3, %eax")
+        (asm "cmovz %ecx, %eax")
+        (vmsucc %eax)
+        (vmfetch)
+        ))
     (check_float  (addr) @nil @(gen_check_plain PLAIN_FLOAT))
     (check_string (addr) @nil @(gen_check_plain PLAIN_STRING))
     (exit () @nil ((vmpop %eax) (break)))

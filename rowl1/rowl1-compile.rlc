@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2010-11-11 16:01:08 nineties $
+; $Id: rowl1-compile.rlc 2010-11-11 20:45:42 nineties $
 ;
 
 (import "rlvm-compile")
@@ -37,7 +37,7 @@
     ))
 
 (fun make_arg (loc idx) (
-    (return (variant @Node 3 loc ArgumentSym (int idx)))
+    (return (variant @Node 3 loc ArgumentSym (box idx)))
     ))
 
 (fun setup_args (loc args) (
@@ -84,7 +84,7 @@
         (if (== (node_type v) @Node) (do
             (var constr (field_get v 2))
             (if (== constr ArgumentSym) (do
-                (put_arg asm (get (field_get v 3)))
+                (put_arg asm (unbox (field_get v 3)))
                 (if ret (put_ireturn asm))
                 break
                 ))
@@ -109,15 +109,8 @@
         break
         ))
     (@Subscr  . (not_implemented "compile_expression"))
-    (@Char    . (do
-        (put_imm_int asm (get expr))
-        (put_pcall asm char 4)
-        (if ret (put_ireturn asm))
-        break
-        ))
     (@Int     . (do
-        (put_imm_int asm (get expr))
-        (put_pcall asm int 4)
+        (put_imm_int asm expr)
         (if ret (put_ireturn asm))
         break
         ))
