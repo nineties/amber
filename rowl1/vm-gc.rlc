@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-11-09 22:00:23 nineties $
+; $Id: vm-gc.rlc 2010-11-11 11:32:32 nineties $
 ;
 
 (import "stdlib")
@@ -157,6 +157,7 @@
 (void* freepage)        ; pdescr of current free page
 (void* freep)    ; pointer to free memory in current free page
 (int free_words) ; size of free area in current page (in words)
+(int num_allocated_pages 0) ; number of allocated pages
 
 (void*[] @MAX_STATICS statics)
 (int num_static)
@@ -236,15 +237,18 @@
     (if (== @(pdescr->generation pd) current_gen) (
         (void* p pd)
         (void* end @(END_PDESCR (ADDR2BLOCK addr)))
+        (+= num_allocated_pages 1)
 
         (+= p @PDESCR_SIZE)
         (while (&& (< p end) @(pdescr->joined p)) (
             @(pdescr->generation= p next_gen)
             (+= p @PDESCR_SIZE)
+            (+= num_allocated_pages 1)
             ))
         (while @(pdescr->joined pd) (
             @(pdescr->generation= pd next_gen)
-            (-= p @PDESCR_SIZE)
+            (-= pd @PDESCR_SIZE)
+            (+= num_allocated_pages 1)
             ))
         @(pdescr->generation= pd next_gen)
         (enqueue_page pd)
@@ -347,6 +351,8 @@
         (return)
         ))
     (if (== tag @TAG_BYTECODE) (
+        (move_object obj) ; bytecode
+        (move_object (+ obj @(* 2 WORD_SIZE))) ; indices
         (void* code ([] obj 0))
         (void* reloc ([] obj 2))
         (int n ([] obj 3))
@@ -368,6 +374,7 @@
     (= next_gen @(ADVANCE_GENERATION current_gen))
     (= page_queue_head 0)
     (= page_queue_tail 0)
+    (= num_allocated_pages 0)
 
     ; promote all pages which are refered from machine stack and vm-stack
     (scan_machine_stack)
@@ -420,11 +427,16 @@
     ))
 
 (fun allocate_page (npages) (
+    (void* firstpage 0)
+
     (if (> npages @PAGES_PER_BLOCK) (
         (error "allocate_page: try to allocate too many pages\n")
         ))
 
-    (void* firstpage 0)
+    (if (> num_allocated_pages (* @(>> PAGES_PER_BLOCK 1) num_block)) (
+        (garbage_collect)
+        ))
+
     (label retry)
     (int allpages (* @PAGES_PER_BLOCK num_block))
     (int free 0)
@@ -436,6 +448,7 @@
                 (if (== free 0) ((= firstpage freepage)))
                 (incr free)
                 (if (== free npages) (
+                    (+= num_allocated_pages npages)
                     (= freep @(PDESCR2PAGE firstpage))
                     (= free_words (<< npages @PAGE_WORDS_SHIFT))
                     (= freepage (nextpage freepage))
