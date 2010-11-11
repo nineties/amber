@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2010-11-11 20:52:27 nineties $
+; $Id: rowl1-matching.rlc 2010-11-12 00:11:25 nineties $
 ;
 
 (import "rlvm-compile")
@@ -22,6 +22,9 @@
 
     (var asm (make_assembler 10))
     (compile_matching_main asm 0 pats)
+
+    ; XXX: put error handler here
+
     (if bytecode
         (do
             (set_code bytecode asm)
@@ -37,7 +40,6 @@
         return
         ))
     (var x (split_matrix pats)) ; (single . remain)
-    (var n (list_length (car x)))
     (compile_matching_single asm idx (car x))
     (if (cdr x)
         (compile_matching_main asm idx (cdr x))
@@ -53,21 +55,64 @@
         ))
     (var pty (node_type p))
     (if (== pty @Int) (do
-        (var endif (fresh_label asm))
+        (= pats (sort_int_pat pats))
 
+        (var not_int (fresh_label asm))
         (put_arg asm idx)
-        (put_check_int asm endif)
-        (put_arg asm idx)
-        (put_imm_int asm p)
-        (put_if_ne asm endif)
+        (put_check_int asm not_int)
 
-        (= pats (shift_pat pats))
-        (compile_matching_main asm (+ idx 1) pats)
+        (while pats (do
+            (var next (fresh_label asm))
+            (var ret (collect_same_int_pat pats))
+            (var pat (car ret))
 
-        (set_label asm endif)
+            (put_arg asm idx)
+            (put_imm_int asm (caaar pat))
+            (put_if_ne asm next)
+
+            (= pat (shift_pat pat))
+            (compile_matching_main asm (+ idx 1) pat)
+            (set_label asm next)
+
+            (= pats (cdr ret))
+            ))
+
+        (set_label asm not_int)
         return
         ))
     (not_implemented "compile_matching_single")
+    ))
+
+; XXX: temporal implementation by bubble sort
+(fun sort_int_pat (pats) (
+    (if (! pats) (return 0))
+    (if (! (cdr pats)) (return pats))
+    (var a (caaar pats))
+    (var b (caaadr pats))
+    (if (<= a b)
+        (do
+            (setcdr pats (sort_int_pat (cdr pats)))
+            (return pats)
+        )
+        (do
+            (var t (car pats))
+            (setcar pats (cadr pats))
+            (setcar (cdr pats) t)
+            (setcdr pats (sort_int_pat (cdr pats)))
+            (return pats)
+        ))
+    ))
+
+(fun collect_same_int_pat (pats) (
+    (var n 1)
+    (var orig pats)
+    (var val (caaar pats))
+    (= pats (cdr pats))
+    (while (&& pats (== (caaar pats) val)) (do
+        (= pats (cdr pats))
+        (incr n)
+        ))
+    (return (list_split orig n))
     ))
 
 (fun split_matrix (pats) (
@@ -93,7 +138,7 @@
     (var n 1)
     (var orig pats)
     (= pats (cdr pats))
-    (while (&& pats (&& (== (node_type (caaar pats)) @Int) (== v (unbox (caaar pats))))) (do
+    (while (&& pats (== (node_type (caaar pats)) @Int)) (do
         (= pats (cdr pats))
         (incr n)
         ))
