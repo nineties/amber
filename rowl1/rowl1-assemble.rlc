@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-assemble.rlc 2010-11-11 16:50:00 nineties $
+; $Id: rowl1-assemble.rlc 2010-11-14 05:09:58 nineties $
 ;
 
 ; -- Just in time assembler
@@ -108,7 +108,7 @@
     (cvector_pushback vec (>> v 8))
     ))
 
-(fun emit_int (c v) (
+(export fun emit_int (c v) (
     (var vec (tuple_at c 0))
     (cvector_pushback vec (& v 0xff))
     (cvector_pushback vec (& (>> v 8) 0xff))
@@ -140,7 +140,21 @@
 
 (export fun emit_label (c v) (
     (var offs (get_address c))
-    (var info (tuple 1 (tuple_at c 2) v offs))
+    (var info (tuple 1 (tuple_at c 2) v offs (- offs 1)))
+    (tuple_set c 2 info)
+    (emit_short c 0)
+    ))
+
+(export fun emit_tswitch_label (c v) (
+    (var offs (get_address c))
+    (var info (tuple 1 (tuple_at c 2) v offs offs))
+    (tuple_set c 2 info)
+    (emit_short c 0)
+    ))
+
+(export fun emit_lswitch_label (c v) (
+    (var offs (get_address c))
+    (var info (tuple 1 (tuple_at c 2) v offs (- offs 4)))
     (tuple_set c 2 info)
     (emit_short c 0)
     ))
@@ -151,12 +165,13 @@
     (var labels (tuple_at c 1))
     (while repls (do
         (var label (tuple_at repls 1))
-        (var offs  (tuple_at repls 2))
+        (var pos   (tuple_at repls 2))
+        (var offs  (tuple_at repls 3))
         (if (>= label (ivector_size labels)) (error "undefined label"))
         (var addr (ivector_at labels label))
-        (-= addr (- offs 1))
-        (cvector_put vec offs (& addr 0xff))
-        (cvector_put vec (+ offs 1) (>> addr 8))
+        (-= addr offs)
+        (cvector_put vec pos (& addr 0xff))
+        (cvector_put vec (+ pos 1) (>> addr 8))
         (= repls (tuple_at repls 0))
         ))
     (tuple_set c 2 0)
