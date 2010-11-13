@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2010-11-12 00:11:25 nineties $
+; $Id: rowl1-matching.rlc 2010-11-14 05:11:29 nineties $
 ;
 
 (import "rlvm-compile")
@@ -55,52 +55,151 @@
         ))
     (var pty (node_type p))
     (if (== pty @Int) (do
-        (= pats (sort_int_pat pats))
-
         (var not_int (fresh_label asm))
         (put_arg asm idx)
         (put_check_int asm not_int)
-
-        (while pats (do
-            (var next (fresh_label asm))
-            (var ret (collect_same_int_pat pats))
-            (var pat (car ret))
-
-            (put_arg asm idx)
-            (put_imm_int asm (caaar pat))
-            (put_if_ne asm next)
-
-            (= pat (shift_pat pat))
-            (compile_matching_main asm (+ idx 1) pat)
-            (set_label asm next)
-
-            (= pats (cdr ret))
-            ))
-
+        (compile_matching_intlit asm idx pats)
         (set_label asm not_int)
         return
         ))
     (not_implemented "compile_matching_single")
     ))
 
-; XXX: temporal implementation by bubble sort
-(fun sort_int_pat (pats) (
-    (if (! pats) (return 0))
-    (if (! (cdr pats)) (return pats))
-    (var a (caaar pats))
-    (var b (caaadr pats))
-    (if (<= a b)
-        (do
-            (setcdr pats (sort_int_pat (cdr pats)))
-            (return pats)
+(fun compile_matching_intlit (asm idx pats) (
+    (= pats (sort_int_pat pats))
+    (var r (scan_int_cases pats))
+    (var continues (unbox (car r)))
+    (var cases (cdr r))
+
+    (if continues
+        (compile_matching_intlit_tswitch asm idx pats cases)
+        (compile_matching_intlit_lswitch asm idx pats cases)
         )
-        (do
-            (var t (car pats))
-            (setcar pats (cadr pats))
-            (setcar (cdr pats) t)
-            (setcdr pats (sort_int_pat (cdr pats)))
-            (return pats)
+    ))
+
+(fun compile_matching_intlit_tswitch (asm idx pats cases) (
+    (var ncases (list_length cases))
+    (var end_lbl (fresh_label asm))
+    (var case_lbls (array int ncases))
+    (for i 0 ncases
+        (array_set int case_lbls i (fresh_label asm))
+        )
+
+    (put_arg asm idx)
+
+    ; unbox
+    (put_imm_i1 asm)
+    (put_sar asm)
+
+    (put_tswitch asm ncases)
+    (for i 0 ncases
+        (emit_tswitch_label asm (array_get int case_lbls i))
+        )
+    (emit_tswitch_label asm end_lbl)
+    (for i 0 ncases (do
+        (var n (unbox (cdar cases)))
+        (var r (list_split pats n))
+        (= pats (cdr r))
+        (set_label asm (array_get int case_lbls i))
+        (compile_matching_main asm (+ idx 1) (shift_pat (car r)))
+        (= cases (cdr cases))
         ))
+    (set_label asm end_lbl)
+    ))
+
+(fun compile_matching_intlit_lswitch (asm idx pats cases) (
+    (var ncases 0)
+    (var max (caar cases))
+    (var cases_copy cases)
+    (while cases_copy (do
+        (incr ncases)
+        (if (< max (caar cases_copy))
+            (= max (caar cases_copy))
+            )
+        (= cases_copy (cdr cases_copy))
+        ))
+    (= max (+ (unbox max) 1))
+
+    (var end_lbl (fresh_label asm))
+    (var case_lbls (array int ncases))
+    (for i 0 ncases
+        (array_set int case_lbls i (fresh_label asm))
+        )
+
+    (put_arg asm idx)
+
+    ; unbox
+    (put_imm_i1 asm)
+    (put_sar asm)
+
+    (put_lswitch asm max)
+    (= cases_copy cases)
+    (for i 0 ncases (do
+        (emit_int asm (unbox (caar cases_copy)))
+        (emit_lswitch_label asm (array_get int case_lbls i))
+        (= cases_copy (cdr cases_copy))
+        ))
+    (emit_int asm max)
+    (emit_lswitch_label asm end_lbl)
+    (for i 0 ncases (do
+        (var n (unbox (cdar cases)))
+        (var r (list_split pats n))
+        (= pats (cdr r))
+        (set_label asm (array_get int case_lbls i))
+        (compile_matching_main asm (+ idx 1) (shift_pat (car r)))
+        (= cases (cdr cases))
+        ))
+    (set_label asm end_lbl)
+    ))
+
+(fun sort_int_pat (pats) (
+    (var ret 0)
+    (while pats (do
+        (var p (car pats))
+        (= pats (cdr pats))
+
+        (var v (caar p))
+        (= ret (insert_int_pat p ret))
+        ))
+    (return ret)
+    ))
+
+(fun insert_int_pat (p ls) (
+    (if (! ls) (return (cons p 0)))
+    (var a (caar p))
+    (var b (caaar ls))
+    (if (<= a b)
+        (return (cons p ls))
+        (return (cons (car ls) (insert_int_pat p (cdr ls))))
+        )
+    ))
+
+(fun scan_int_cases (pats) (
+    (var p (caaar pats))
+    (var ret 0)
+    (var num 0)
+    (var continues @FALSE)
+    (if (== (unbox p) 0) (do
+        (= continues @TRUE)
+        ))
+    (while pats (do
+        (if (== p (caaar pats))
+            (do
+                (incr num)
+                (= pats (cdr pats))
+            )
+            (do
+                (if (!= (+ p 2) (caaar pats))
+                    (= continues @FALSE)
+                    )
+                (= ret (cons (cons p (box num)) ret))
+                (= p (caaar pats))
+                (= num 1)
+                (= pats (cdr pats))
+            ))
+        ))
+    (= ret (cons (cons p (box num)) ret))
+    (return (cons (box continues) (list_reverse ret)))
     ))
 
 (fun collect_same_int_pat (pats) (
