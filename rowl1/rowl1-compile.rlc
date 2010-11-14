@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2010-11-14 15:33:11 nineties $
+; $Id: rowl1-compile.rlc 2010-11-14 16:01:27 nineties $
 ;
 
 (import "rlvm-compile")
@@ -126,7 +126,7 @@
         ))
     ))
 
-(fun compile_call (asm fun args ret) (
+(export fun compile_call (asm fun args ret) (
     (= args (list_reverse args))
     (var arity 0)
     (while args (do
@@ -152,24 +152,25 @@
     (if ret (put_ireturn asm))
     ))
 
-(export fun compile_simple_call (arity func ret) (
-    (var asm (make_assembler))
+(export fun compile_simple_function (asm arity func ret) (
     (var n arity)
     (while (> n 0) (do
         (decr n)
         (put_arg asm n)
         ))
+    (compile_simple_call asm arity func ret)
+    ))
+
+(export fun compile_simple_call (asm arity func ret) (
     (if @(IS_PRIM func)
         (do
             (put_pcall asm @(PRIM_IDX func) (* 4 arity))
             (if ret (put_ireturn asm))
-            (return (get_code asm))
         )
         (do
             (put_imm_int32 asm func)
             (put_dcall asm (* 4 arity))
             (if ret (put_ireturn asm))
-            (return (get_code asm))
         ))
     ))
 

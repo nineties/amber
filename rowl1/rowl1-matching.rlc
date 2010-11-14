@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2010-11-14 15:30:43 nineties $
+; $Id: rowl1-matching.rlc 2010-11-14 16:05:33 nineties $
 ;
 
 (import "rlvm-compile")
@@ -13,9 +13,11 @@
 (import "rowl1-util")
 (import "rowl1-node")
 (import "rowl1-assemble")
+(import "rowl1-compile")
 
 ; pattern matrix (((p11 p12 .. ) . e1) ((p21 p22 ..) . e2) ..)
 
+(extern fun matching_error)
 (export fun compile_matching (bytecode pats) (
     ; we need to clone 'pats' here because compile_matching_main() will rearrange it.
     (= pats (list_clone pats))
@@ -23,7 +25,7 @@
     (var asm (make_assembler 10))
     (compile_matching_main asm 0 pats)
 
-    ; XXX: put error handler here
+    (compile_simple_call asm 0 matching_error @FALSE)
 
     (set_code bytecode asm)
     (return bytecode)
@@ -55,6 +57,9 @@
         (put_check_int asm not_int)
         (compile_matching_intlit asm idx pats)
         (set_label asm not_int)
+
+        (compile_simple_call asm 0 matching_error @FALSE)
+
         return
         ))
     (not_implemented "compile_matching_single")
@@ -259,6 +264,12 @@
 
     (set_code (car ent) asm)
     (return (car ent))
+    ))
+
+(export fun matching_error () (
+    ; XXX: output useful info
+    (output_string stderr "ERROR: no pattern matches to ..\n")
+    (exit 1)
     ))
 
     ))
