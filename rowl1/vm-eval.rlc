@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-eval.rlc 2010-11-09 12:32:35 nineties $
+; $Id: vm-eval.rlc 2010-11-14 11:45:07 nineties $
 ;
 
 ; rowlVM register usage
@@ -31,6 +31,10 @@
 (set insn_entries (reverse insn_entries))
 
 (define emit_vmpush ((_ val) _ _) (do
+    (emit "cmpl %esi, stack")
+    (emit "jne 1f")
+    (emit "call stack_over_flow")
+    (emit "1:")
     (emit "subl" 4 `%esi)
     (movl val `(deref %esi 0))
     ))
@@ -192,6 +196,10 @@
     (int off argsz)
     (asm "addl " off ", %esp")
     (return ret)
+    ))
+
+(fun stack_over_flow () (
+    (error "stack over flow\n")
     ))
 ))
 
