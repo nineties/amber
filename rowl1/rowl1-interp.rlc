@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2010-11-11 20:39:07 nineties $
+; $Id: rowl1-interp.rlc 2010-11-14 15:30:53 nineties $
 ;
 
 (import "rlvm-compile")
@@ -28,11 +28,13 @@
         (do
             (var pats (cons (cons args code) (cdr ent)))
             (setcdr ent pats)
-            (setcar ent (compile_matching (car ent) pats))
+            (setcar ent (compile_matching_hook ent arity))
         )
         (do
             (var pats (cons (cons args code) 0))
-            (symtable_add funtable sym arity (cons (compile_matching 0 pats) pats))
+            (var ent  (cons (bytecode 0 0 0 0) pats))
+            (setcar ent (compile_matching_hook ent arity))
+            (symtable_add funtable sym arity ent)
             (register_symbol sym GlobalFunctionSym)
         )
         )

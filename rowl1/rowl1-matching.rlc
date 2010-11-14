@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2010-11-14 05:11:29 nineties $
+; $Id: rowl1-matching.rlc 2010-11-14 15:30:43 nineties $
 ;
 
 (import "rlvm-compile")
@@ -25,13 +25,8 @@
 
     ; XXX: put error handler here
 
-    (if bytecode
-        (do
-            (set_code bytecode asm)
-            (return bytecode)
-        )
-        (return (get_code asm))
-        )
+    (set_code bytecode asm)
+    (return bytecode)
     ))
 
 (fun compile_matching_main (asm idx pats) (
@@ -247,6 +242,23 @@
 (fun shift_pat (pats) (
     (if (== pats 0) (return 0))
     (return (cons (cons (cdaar pats) (cdar pats)) (shift_pat (cdr pats))))
+    ))
+
+(export fun compile_matching_hook (ent arity) (
+    (var asm (make_assembler 10))
+
+    (put_push asm (cdr ent))
+    (put_push asm (car ent))
+    (put_imm_int32 asm compile_matching)
+    (put_dcall asm 8)
+    (put_dup asm)
+    (put_push asm ent)
+    (put_swap asm)
+    (put_field_set0 asm)
+    (put_jjump asm)
+
+    (set_code (car ent) asm)
+    (return (car ent))
     ))
 
     ))
