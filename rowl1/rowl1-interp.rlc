@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2010-11-14 15:30:53 nineties $
+; $Id: rowl1-interp.rlc 2010-11-14 16:00:52 nineties $
 ;
 
 (import "rlvm-compile")
@@ -15,6 +15,7 @@
 (import "rowl1-util")
 (import "rowl1-node")
 (import "rowl1-symtable")
+(import "rowl1-assemble")
 (import "rowl1-compile")
 (import "rowl1-matching")
 
@@ -41,7 +42,9 @@
     ))
 
 (export fun add_simple_global_function (sym arity func) (
-    (var code (compile_simple_call arity func @TRUE))
+    (var asm (make_assembler 10))
+    (compile_simple_function asm arity func @TRUE)
+    (var code (get_code asm))
     (var pats 0)
     (while (> arity 0) (do
         (= pats (cons AnySym pats))
@@ -115,7 +118,7 @@
     (check_type "lookup_func" @Symbol sym)
     (var f (symtable_find funtable sym arity))
     (if (! f) (do
-        (var ent (cons (bytecode 0 0 0 0) 0)) ; XXX: register error handler here
+        (var ent (cons (gen_no_declaration_error sym) 0))
         (symtable_add funtable sym arity ent)
         (return (car ent))
         ))
@@ -155,6 +158,19 @@
     (error_head stderr loc)
     (output_string stderr "undefined expression\n")
     (exit 1)
+    ))
+
+(fun no_declaration_error (name) (
+    (output_string stderr "ERROR: no declaration of ")
+    (output_string stderr name)
+    (exit 1)
+    ))
+
+(fun gen_no_declaration_error (sym) (
+    (var asm (make_assembler 10))
+    (put_push asm (field_get sym @SymbolName))
+    (compile_simple_call asm 1 no_declaration_error @FALSE)
+    (return (get_code asm))
     ))
 
     ))
