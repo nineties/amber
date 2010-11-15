@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2010-11-14 16:00:52 nineties $
+; $Id: rowl1-interp.rlc 2010-11-16 00:00:51 nineties $
 ;
 
 (import "rlvm-compile")
@@ -22,26 +22,27 @@
 (var funtable (make_symtable))
 (var vartable (make_symtable))
 
-(export fun add_global_function (sym args code) (
+(export fun add_function (sym args code) (
+    (var depth (symtable_depth funtable))
     (var arity (list_length args))
     (var ent (symtable_find funtable sym arity))
-    (if ent
+    (if (&& ent (== depth (field_get ent 2)))
         (do
             (var pats (cons (cons args code) (cdr ent)))
-            (setcdr ent pats)
-            (setcar ent (compile_matching_hook ent arity))
+            (field_set ent 1 pats)
+            (field_set ent 0 (compile_matching_hook ent arity))
         )
         (do
             (var pats (cons (cons args code) 0))
-            (var ent  (cons (bytecode 0 0 0 0) pats))
-            (setcar ent (compile_matching_hook ent arity))
+            (var ent  (tuple 2 (bytecode 0 0 0 0) pats depth))
+            (field_set ent 0 (compile_matching_hook ent arity))
             (symtable_add funtable sym arity ent)
             (register_symbol sym GlobalFunctionSym)
         )
         )
     ))
 
-(export fun add_simple_global_function (sym arity func) (
+(export fun add_builtin_function (sym arity func) (
     (var asm (make_assembler 10))
     (compile_simple_function asm arity func @TRUE)
     (var code (get_code asm))
@@ -50,7 +51,7 @@
         (= pats (cons AnySym pats))
         (decr arity)
         ))
-    (add_global_function sym pats code)
+    (add_function sym pats code)
     ))
 
 (export fun interpret (prog) (
@@ -68,7 +69,7 @@
     (var type (node_type expr))
     (tswitch type (
     (@Symbol  . (return (builtin_eval_symbol expr)))
-    (@List    . (not_implemented "builtin_eval"))
+    (@List    . (return (builtin_eval_list expr)))
     (@Tuple   . (not_implemented "builtin_eval"))
     (@Array   . (not_implemented "builtin_eval"))
     (@Node    . (not_implemented "builtin_eval"))
@@ -87,6 +88,17 @@
 (fun builtin_eval_symbol (sym) (
     (var value (symtable_find vartable sym 0))
     (if value (return value) (return sym))
+    ))
+
+(fun builtin_eval_list (expr) (
+    (var list (field_get expr @ListValues))
+    (symtable_push funtable)
+    (while list (do
+        (setcar list (builtin_eval (car list)))
+        (= list (cdr list))
+        ))
+    (symtable_pop funtable)
+    (return expr)
     ))
 
 (fun builtin_eval_infix (expr) (
@@ -111,18 +123,17 @@
     (if (!= (node_type name) @Symbol) (undefined_expression (field_get expr 1)))
 
     (var ret (compile_global_function (field_get expr 1) name args rhs)) ; (argpat . body)
-    (add_global_function name (car ret) (cdr ret))
+    (add_function name (car ret) (cdr ret))
     ))
 
 (export fun lookup_func (sym arity) (
     (check_type "lookup_func" @Symbol sym)
-    (var f (symtable_find funtable sym arity))
-    (if (! f) (do
-        (var ent (cons (gen_no_declaration_error sym) 0))
+    (var ent (symtable_find funtable sym arity))
+    (if (! ent) (do
+        (= ent (tuple 2 (gen_no_declaration_error sym) 0 (symtable_depth funtable)))
         (symtable_add funtable sym arity ent)
-        (return (car ent))
         ))
-    (return (car f))
+    (return (field_get ent 0))
     ))
 
 (fun builtin_eval_call (expr) (
@@ -161,6 +172,7 @@
     ))
 
 (fun no_declaration_error (name) (
+    (flush stdout)
     (output_string stderr "ERROR: no declaration of ")
     (output_string stderr name)
     (exit 1)
