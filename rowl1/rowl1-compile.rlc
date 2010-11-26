@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2010-11-14 16:01:27 nineties $
+; $Id: rowl1-compile.rlc 2010-11-26 21:26:24 nineties $
 ;
 
 (import "rlvm-compile")
@@ -22,7 +22,7 @@
     (symtable_add vartable sym 0 type)
     ))
 
-(export fun compile_global_function (loc name args body) (
+(export fun compile_function (loc name args body) (
 
     (register_symbol name GlobalFunctionSym)
     (symtable_push vartable)
@@ -37,7 +37,17 @@
     ))
 
 (fun make_arg (loc idx) (
-    (return (variant @Node 3 loc ArgumentSym (box idx)))
+    (return (variant @Node 3 loc ArgumentC (box idx)))
+    ))
+
+(fun make_type_pat (loc node) (
+    (if (== node IntType)
+        (return (variant @Node 3 loc TypePatC node))
+        )
+    (error_head stderr loc)
+    (output_string stderr "invalid type pattern\n")
+    ; XXX: output node
+    (exit 1)
     ))
 
 (fun setup_args (loc args) (
@@ -58,6 +68,17 @@
             (incr idx)
             continue
             ))
+        (if (&& (== type @Infix) (== TypeAnnotOp (field_get arg @InfixOp))) (do
+            (var type (field_get arg @InfixRhs))
+            (= arg (field_get arg @InfixLhs))
+            (if (== (node_type arg) @Symbol) (do
+                (symtable_add vartable arg 0 (make_arg loc idx))
+                (setcar args (make_type_pat loc type))
+                (= args (cdr args))
+                (incr idx)
+                continue
+                ))
+            ))
         (error_head stderr loc)
         (output_string stderr "invalid argument pattern\n")
         ; XXX: output arg
@@ -67,7 +88,7 @@
     ))
 
 (extern fun lookup_func)
-(fun compile_expression (asm expr ret) (
+(export fun compile_expression (asm expr ret) (
     (var ty (node_type expr))
     (tswitch ty (
     (@Symbol  . (do
@@ -85,7 +106,7 @@
             ))
         (if (== (node_type v) @Node) (do
             (var constr (field_get v 2))
-            (if (== constr ArgumentSym) (do
+            (if (== constr ArgumentC) (do
                 (put_arg asm (unbox (field_get v 3)))
                 (if ret (put_ireturn asm))
                 break

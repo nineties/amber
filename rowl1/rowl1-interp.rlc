@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2010-11-16 00:00:51 nineties $
+; $Id: rowl1-interp.rlc 2010-11-26 05:31:52 nineties $
 ;
 
 (import "rlvm-compile")
@@ -103,7 +103,11 @@
 
 (fun builtin_eval_infix (expr) (
     (var op (field_get expr @InfixOp))
-    (if (== op (to_symbol ":")) (return (builtin_eval_decl expr)))
+    (if (== op DeclOp) (return (builtin_eval_decl expr)))
+
+    (var asm (make_assembler 10))
+    (compile_expression asm expr @TRUE)
+    (return (jitcall (get_code asm)))
 
     (undefined_expression (field_get expr 1))
     ))
@@ -122,7 +126,7 @@
     (var args (field_get lhs @CallArgs))
     (if (!= (node_type name) @Symbol) (undefined_expression (field_get expr 1)))
 
-    (var ret (compile_global_function (field_get expr 1) name args rhs)) ; (argpat . body)
+    (var ret (compile_function (field_get expr 1) name args rhs)) ; (argpat . body)
     (add_function name (car ret) (cdr ret))
     ))
 

@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2010-11-11 20:46:39 nineties $
+; $Id: rowl1-node.rlc 2010-11-26 21:19:30 nineties $
 ;
 
 (import "rlvm-compile")
@@ -19,7 +19,13 @@
 (export var AnySym (to_symbol "_"))
 (export var GlobalFunctionSym (to_symbol "%global-function"))
 (export var LocalFunctionSym (to_symbol "%local-function"))
-(export var ArgumentSym (to_symbol "%argument"))
+(export var ArgumentC (to_symbol "%argument"))
+(export var TypePatC (to_symbol "%type-pattern"))
+
+(export var IntType (to_symbol "Int"))
+
+(export var DeclOp (to_symbol ":"))
+(export var TypeAnnotOp (to_symbol "!"))
 
 (export fun to_symbol (name) (
     (var sym (idtable_find symbol_table name))
@@ -32,41 +38,7 @@
     ))
 
 (export fun make_float_from_string (str) (
-    (var mantissa 0)
-    (var exponent 0)
-    (var idx 0)
-    (var c '\0')
-    (while (!= (= c (array_get char str idx)) '.') (do
-        (= mantissa (+ (* 10 mantissa) (- c '0')))
-        (if (>= mantissa 10) (+= exponent 1))
-        (+= idx 1)
-        ))
-    (+= idx 1)
-    (while (&& (= c (array_get char str idx)) (!= c 'e')) (do
-        (= mantissa (+ (* 10 mantissa) (- c '0')))
-        (+= idx 1)
-        ))
-
-    ; remove unnecessary trailing zeros
-    (while (== (% mantissa 10) 0) (/= mantissa 10))
-
-    (if (== c 'e') (do
-        (var sign 1)
-        (+= idx 1)
-        (= c (array_get char str idx))
-        (if (== c '+') (+= idx 1)
-        (if (== c '-') (do (+= idx 1) (= sign -1))
-            ))
-        (var e 0)
-        (while (= c (array_get char str idx)) (do
-            (= e (+ (* 10 e) (- c '0')))
-            (+= idx 1)
-            ))
-        (if (< sign 0) (*= e -1))
-        (+= exponent e)
-        ))
-
-    (return (variant @Float 0 0 mantissa exponent))
+    (error "floating-point literals are not supported yet")
     ))
 
 (export fun node_type (obj) (
