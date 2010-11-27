@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-lex.rlc 2010-11-04 23:18:53 nineties $
+; $Id: rowl1-lex.rlc 2010-11-27 17:31:22 nineties $
 ;
 
 (import "rlvm-compile")
@@ -517,10 +517,13 @@
             (goto lexloop)
             ))
         (29 . (do
-            (= token_value (consume))
-            (accept @TOK_CHAR)
+            (consume)
             (if (== (lookahead) @CH_SQUOTE) (do
                 (consume)
+                (accept @TOK_CHAR)
+                (var str (get_unquoted_token_text))
+                (unescape_string str)
+                (= token_value (string str))
                 (= state 1)
                 (goto lexloop)
                 ))
@@ -533,10 +536,13 @@
             (goto lexloop)
             ))
         (31 . (do
-            (= token_value (esc2val (consume)))
-            (accept @TOK_CHAR)
+            (consume)
             (if (== (lookahead) @CH_SQUOTE) (do
                 (consume)
+                (accept @TOK_CHAR)
+                (var str (get_unquoted_token_text))
+                (unescape_string str)
+                (= token_value (string str))
                 (= state 1)
                 (goto lexloop)
                 ))
