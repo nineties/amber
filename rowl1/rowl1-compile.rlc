@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2010-11-27 14:30:17 nineties $
+; $Id: rowl1-compile.rlc 2010-12-01 21:53:22 nineties $
 ;
 
 (import "rlvm-compile")
@@ -37,11 +37,11 @@
     ))
 
 (fun make_arg (loc idx) (
-    (return (variant @Node 3 loc ArgumentC (box idx)))
+    (return (variant @Node 3 loc Argument (box idx)))
     ))
 
-(fun make_type_pat (loc node) (
-    (return (variant @Node 3 loc TypePatC node))
+(export fun make_type_pat (loc node) (
+    (return (variant @Node 3 loc TypePat node))
     ))
 
 (fun setup_args (loc args) (
@@ -57,22 +57,22 @@
             ))
         (if (== type @Symbol) (do
             (symtable_add vartable arg 0 (make_arg loc idx))
-            (setcar args AnySym)
+            (setcar args Any)
             (= args (cdr args))
             (incr idx)
             continue
             ))
-        (if (&& (== type @Infix) (== TypeAnnotOp (field_get arg @InfixOp))) (do
-            (var type (field_get arg @InfixRhs))
-            (= arg (field_get arg @InfixLhs))
-            (if (== (node_type arg) @Symbol) (do
-                (symtable_add vartable arg 0 (make_arg loc idx))
-                (setcar args (make_type_pat loc type))
-                (= args (cdr args))
-                (incr idx)
-                continue
-                ))
-            ))
+        ;(if (&& (== type @Infix) (== TypeAnnotOp (field_get arg @InfixOp))) (do
+        ;    (var type (field_get arg @InfixRhs))
+        ;    (= arg (field_get arg @InfixLhs))
+        ;    (if (== (node_type arg) @Symbol) (do
+        ;        (symtable_add vartable arg 0 (make_arg loc idx))
+        ;        (setcar args (make_type_pat loc type))
+        ;        (= args (cdr args))
+        ;        (incr idx)
+        ;        continue
+        ;        ))
+        ;    ))
         (error_head stderr loc)
         (output_string stderr "invalid argument pattern\n")
         ; XXX: output arg
@@ -100,7 +100,7 @@
             ))
         (if (== (node_type v) @Node) (do
             (var constr (field_get v 2))
-            (if (== constr ArgumentC) (do
+            (if (== constr Argument) (do
                 (put_arg asm (unbox (field_get v 3)))
                 (if ret (put_ireturn asm))
                 break
@@ -108,19 +108,12 @@
             ))
         (not_reachable "compile_expression")
         ))
-    (@List    . (not_implemented "compile_expression"))
+    (@Block    . (not_implemented "compile_expression"))
     (@Tuple   . (not_implemented "compile_expression"))
-    (@Array   . (not_implemented "compile_expression"))
+    (@List   . (not_implemented "compile_expression"))
     (@Node    . (not_implemented "compile_expression"))
     (@Prefix  . (not_implemented "compile_expression"))
     (@Postfix . (not_implemented "compile_expression"))
-    (@Infix   . (do
-        (var op (field_get expr @InfixOp))
-        (var lhs (field_get expr @InfixLhs))
-        (var rhs (field_get expr @InfixRhs))
-        (compile_call asm op (cons lhs (cons rhs 0)) ret)
-        break
-        ))
     (@Call    . (do
         (compile_call asm (field_get expr @CallFunc) (field_get expr @CallArgs) ret)
         break

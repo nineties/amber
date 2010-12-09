@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2010-11-27 14:26:58 nineties $
+; $Id: rowl1-node.rlc 2010-12-09 18:02:49 nineties $
 ;
 
 (import "rlvm-compile")
@@ -15,31 +15,33 @@
 (var symbol_table (make_idtable))
 (var symbol_index_gen 0)
 
-; special symbols
-(export var AnySym (to_symbol "_"))
-(export var GlobalFunctionSym (to_symbol "%global-function"))
-(export var LocalFunctionSym (to_symbol "%local-function"))
-(export var ArgumentC (to_symbol "%argument"))
-(export var TypePatC (to_symbol "%type-pattern"))
+; builtin expression headers and types
+(export var Int     (to_sym "Int"))
+(export var String  (to_sym "String"))
+(export var Tuple   (to_sym "Tuple"))
+(export var List    (to_sym "List"))
+(export var Block   (to_sym "Block"))
+(export var Apply   (to_sym "Apply"))
+(export var Subscr  (to_sym "Subscr"))
+(export var Located (to_sym "Located"))
+(export var Loc     (to_sym "Loc"))
 
-(export var IntType (to_symbol "Int"))
-(export var StringType (to_symbol "String"))
+; operators
+(export var Infix   (to_sym "infix"))
+(export var Prefix  (to_sym "prefix"))
+(export var Postfix (to_sym "postfix"))
+(export var Constr  (to_sym "constr"))
+(export var Left    (to_sym "left"))
+(export var Right   (to_sym "right"))
 
-(export var DeclOp (to_symbol ":"))
-(export var TypeAnnotOp (to_symbol "!"))
-
-(export fun to_symbol (name) (
+(export fun to_sym (name) (
     (var sym (idtable_find symbol_table name))
     (if sym (return sym))
     (= name (strdup name))
-    (= sym (variant @Symbol 1 name symbol_index_gen))
+    (= sym (variant @Symbol 2 name 0 symbol_index_gen))
     (+= symbol_index_gen 1)
     (idtable_add symbol_table name sym)
     (return sym)
-    ))
-
-(export fun make_float_from_string (str) (
-    (error "floating-point literals are not supported yet")
     ))
 
 (export fun node_type (obj) (
@@ -59,185 +61,162 @@
         ))
     ))
 
-; Pretty Printing
-(var indent_depth 0)
-(var indent_width 4)
-(export fun pp_prog (ochan prog) (
-    (= indent_depth 0)
-    (pp_list_body ochan (field_get prog 1))
+(export fun make_float_from_string (str) (
+    (error "floating-point literals are not supported yet")
     ))
 
-(export fun pp_expr (ochan node) (
+(export var builtin_loc (make_loc "<builtin>" 0 0))
+
+(export fun make_loc (file begin end) (
+    (return (make_expr Loc (list3 file (box begin) (box end))))
+    ))
+
+(fun loc_file  (loc) ((return (car (field_get loc @ExprArgs)))))
+(fun loc_begin (loc) ((return (unbox (cadr (field_get loc @ExprArgs))))))
+(fun loc_end   (loc) ((return (unbox (caddr (field_get loc @ExprArgs))))))
+
+(export fun merge_loc (loc1 loc2) (
+    (var begin (loc_begin loc1))
+    (var end   (loc_end loc2))
+    (if (== begin end) (return loc1))
+    (return (make_loc (loc_file loc1) begin end))
+    ))
+
+(export fun output_loc (ochan loc) (
+    (output_string ochan (loc_file loc))
+    (output_char ochan ':')
+    (var begin (loc_begin loc))
+    (var end   (loc_end loc))
+    (if (== begin end)
+        (output_int ochan begin)
+        (do
+            (output_int ochan begin)
+            (output_char ochan '-')
+            (output_int ochan end)
+        ))
+    (output_char ochan ' ')
+    ))
+
+(export fun make_expr (head args) (
+    (return (variant @Expr 2 head args))
+    ))
+
+(export fun make_located (loc expr) (
+    (return (make_expr Located (list2 loc expr)))
+    ))
+
+(export fun pretty_print (ochan node) (
     (tswitch (node_type node) (
-    (@Symbol  . (return (pp_symbol ochan node)))
-    (@List    . (return (pp_list ochan node)))
-    (@Tuple   . (return (pp_tuple ochan node)))
-    (@Array   . (return (pp_array ochan node)))
-    (@Node    . (return (pp_node ochan node)))
-    (@Prefix  . (return (pp_prefix ochan node)))
-    (@Postfix . (return (pp_postfix ochan node)))
-    (@Infix   . (return (pp_infix ochan node)))
-    (@Call    . (return (pp_call ochan node)))
-    (@Subscr  . (return (pp_subscr ochan node)))
-    (@Int     . (return (pp_int ochan node)))
-    (@Float   . (return (pp_float ochan node)))
-    (@String  . (return (pp_string ochan node)))
-    (default  . (error "pp_expr: not reachable"))
+        (@Symbol . (return (pp_symbol ochan node)))
+        (@Expr   . (return (pp_expr ochan node)))
+        (@Int    . (return (pp_int ochan node)))
+        (@Float  . (return (pp_float ochan node)))
+        (@String . (return (pp_string ochan node)))
+        (default . (not_reachable "pretty_print"))
         ))
     ))
 
 (fun pp_symbol (ochan node) (
-    (var name (field_get node 1))
-    (output_string ochan name)
+    (output_string ochan (field_get node @SymbolName))
     ))
 
-(fun pp_int (ochan node) (
-    (var value (field_get node 1))
-    (output_int ochan value)
-    ))
+(fun pp_expr (ochan node) (
+    (var head (field_get node @ExprHead))
+    (var args (field_get node @ExprArgs))
 
-(array char pp_float_digits 10)
-(fun pp_float (ochan node) (
-    (var sign (field_get node 1))
-    (if sign (output_char ochan '-'))
-    (var man  (field_get node 2))
-    (array_set char pp_float_digits 0 (+ (% man 10) '0'))
-    (/= man 10)
-    (var i 0)
-    (while (!= man 0) (do
-        (incr i)
-        (array_set char pp_float_digits i (+ (% man 10) '0'))
-        (/= man 10)
+    (if (== head Tuple) (return (pp_tuple ochan args)))
+    (if (== head List)  (return (pp_list ochan args)))
+    (if (== head Block)   (return (pp_block ochan args)))
+    (if (== head Apply)  (return (pp_apply ochan args)))
+    (if (== head Subscr) (return (pp_subscr ochan args)))
+
+    (output_string ochan (field_get head @SymbolName))
+    (output_char ochan '(')
+    (while args (do
+        (pretty_print ochan (car args))
+        (= args (cdr args))
+        (if args (output_string ochan ", "))
         ))
-    (output_char ochan (array_get char pp_float_digits i))
-    (output_char ochan '.')
-    (decr i)
-    (if (< i 0)
-        (output_char ochan '0')
-        (while (>= i 0) (do
-            (output_char ochan (array_get char pp_float_digits i))
-            (decr i)
-            ))
-        )
-    (var exp  (field_get node 3))
-    (if (!= exp 0) (do
-        (output_char ochan 'e')
-        (output_int ochan exp)
+    (output_char ochan ')')
+    ))
+
+(fun pp_tuple (ochan args) (
+    (output_char ochan '(')
+    (while args (do
+        (pretty_print ochan (car args))
+        (= args (cdr args))
+        (if args (output_string ochan ", "))
         ))
+    (output_char ochan ')')
     ))
 
-(fun pp_string (ochan node) (
-    (var str (field_get node 1))
-    (var len (strlen str))
-    (output_char ochan '"')
-    (for i 0 len (do
-        (output_char_escape ochan (array_get char str i))
+(fun pp_list (ochan args) (
+    (output_char ochan '[')
+    (while args (do
+        (pretty_print ochan (car args))
+        (= args (cdr args))
+        (if args (output_string ochan ", "))
         ))
-    (output_char ochan '"')
+    (output_char ochan ']')
     ))
 
-(fun put_indent (ochan) (
-    (for i 0 (* indent_width indent_depth) (output_char ochan ' '))
-    ))
+(var indent 0)
+(fun incr_indent () ((+= indent 4)))
+(fun decr_indent () ((-= indent 4)))
 
-(fun pp_list (ochan node) (
+(fun pp_block (ochan args) (
     (output_string ochan "{\n")
-    (+= indent_depth 1)
-    (pp_list_body ochan (field_get node @ListValues))
-    (-= indent_depth 1)
+    (incr_indent)
+    (while args (do
+        (for i 0 indent (output_char ochan ' '))
+        (pretty_print ochan (car args))
+        (output_char ochan '\n')
+        (= args (cdr args))
+        ))
+    (decr_indent)
     (output_char ochan '}')
     ))
 
-(fun pp_list_body (ochan list) (
-    (while list (do
-        (put_indent ochan)
-        (pp_expr ochan (car list))
-        (output_char ochan '\n')
-        (= list (cdr list))
-        ))
-    ))
-
-(fun pp_tuple (ochan node) (
+(fun pp_apply (ochan args) (
+    (pretty_print ochan (car args))
+    (= args (cdr args))
     (output_char ochan '(')
-    (pp_comma_list ochan (field_get node @TupleValues))
+    (while args (do
+        (pretty_print ochan (car args))
+        (= args (cdr args))
+        (if args (output_string ochan ", "))
+        ))
     (output_char ochan ')')
     ))
 
-(fun pp_array (ochan node) (
+(fun pp_subscr (ochan args) (
+    (pretty_print ochan (car args))
+    (= args (cdr args))
     (output_char ochan '[')
-    (pp_comma_list ochan (field_get node @ArrayValues))
+    (while args (do
+        (pretty_print ochan (car args))
+        (= args (cdr args))
+        (if args (output_string ochan ", "))
+        ))
     (output_char ochan ']')
     ))
 
-(fun pp_comma_list (ochan list) (
-    (while list (do
-        (pp_expr ochan (car list))
-        (= list (cdr list))
-        (if list (output_string ochan ", "))
+(fun pp_int (ochan node) (
+    (output_int ochan (unbox node))
+    ))
+
+(fun pp_float (ochan node) (
+    (not_implemented "pp_float")
+    ))
+
+(fun pp_string (ochan node) (
+    (output_char ochan '"')
+    (var i 0)
+    (while (array_get char node i) (do
+        (output_char_escape ochan (array_get char node i))
+        (incr i)
         ))
-    ))
-
-(fun pp_node (ochan node) (
-    (var sym (field_get node @NodeConstr))
-    (var size (variant_size node))
-    (output_char ochan '(')
-    (pp_symbol ochan sym)
-    (for i @NodeArgsOff size (do
-        (output_char ochan ' ')
-        (pp_expr ochan (load object node i))
-        ))
-    (output_char ochan ')')
-    ))
-
-(fun pp_prefix (ochan node) (
-    (var op (field_get node 1))
-    (var arg (field_get node 2))
-    (output_string ochan "(pre ")
-    (pp_symbol ochan op)
-    (output_char ochan ' ')
-    (pp_expr ochan arg)
-    (output_char ochan ')')
-    ))
-
-(fun pp_postfix (ochan node) (
-    (var op (field_get node 1))
-    (var arg (field_get node 2))
-    (output_string ochan "(post ")
-    (pp_symbol ochan op)
-    (output_char ochan ' ')
-    (pp_expr ochan arg)
-    (output_char ochan ')')
-    ))
-
-(fun pp_infix (ochan node) (
-    (var op (field_get node 1))
-    (var lhs (field_get node 2))
-    (var rhs (field_get node 3))
-    (output_char ochan '(')
-    (pp_symbol ochan op)
-    (output_char ochan ' ')
-    (pp_expr ochan lhs)
-    (output_char ochan ' ')
-    (pp_expr ochan rhs)
-    (output_char ochan ')')
-    ))
-
-(fun pp_call (ochan node) (
-    (var expr (field_get node 1))
-    (var args (field_get node 2))
-    (pp_expr ochan expr)
-    (output_char ochan '(')
-    (pp_comma_list ochan args)
-    (output_char ochan ')')
-    ))
-
-(fun pp_subscr (ochan node) (
-    (var expr (field_get node 1))
-    (var args (field_get node 2))
-    (pp_expr ochan expr)
-    (output_char ochan '[')
-    (pp_comma_list ochan args)
-    (output_char ochan ']')
+    (output_char ochan '"')
     ))
 
     ))

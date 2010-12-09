@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-stdlib.rlc 2010-11-26 05:32:07 nineties $
+; $Id: rowl1-stdlib.rlc 2010-12-06 08:10:16 nineties $
 ;
 
 (import "rlvm-compile")
@@ -10,10 +10,10 @@
 
 (compile `object `(
 
-(import "rowl1-lex")
 (import "rowl1-node")
-(import "rowl1-interp")
-(import "rowl1-assemble")
+(import "rowl1-lex")
+;(import "rowl1-interp")
+;(import "rowl1-assemble")
 
 (fun builtin_print_int (n) (
     (check_type "print_int" @Int n)
@@ -25,25 +25,16 @@
     (print_string n)
     ))
 
-; XXX: temporal implementation
-(fun builtin_add (a b) (
-    (return (+ (- a 1) b))
-    ))
+(fun builtin_iadd (a b) ((return (+ (- a 1) b))))
+(fun builtin_sub (a b)  ((return (+ (- a b) 1))))
+(fun builtin_imul (a b) ((return (box (* (unbox a) (unbox b))))))
+(fun builtin_idiv (a b) ((return (box (/ (unbox a) (unbox b))))))
+(fun builtin_mod (a b)  ((return (box (% (unbox a) (unbox b))))))
 
-(fun builtin_sub (a b) (
-    (return (+ (- a b) 1))
-    ))
-
-(fun builtin_mul (a b) (
-    (return (box (* (unbox a) (unbox b))))
-    ))
-
-(fun builtin_div (a b) (
-    (return (box (/ (unbox a) (unbox b))))
-    ))
-
-(fun builtin_mod (a b) (
-    (return (box (% (unbox a) (unbox b))))
+(fun builtin_infixr (op assoc) (
+    (print_string op)
+    (print_char '\n')
+    (add_infixr op assoc)
     ))
 
 (export fun init_stdlib () (
@@ -69,12 +60,14 @@
     (add_prefix  "-" 10)
     (add_infixr  "!" 11)
 
-    (add_builtin_function (to_symbol "print_string") 1 builtin_print_string)
-    (add_builtin_function (to_symbol "print_int") 1 builtin_print_int)
-    (add_builtin_function (to_symbol "+") 2 builtin_add)
-    (add_builtin_function (to_symbol "-") 2 builtin_sub)
-    (add_builtin_function (to_symbol "*") 2 builtin_mul)
-    (add_builtin_function (to_symbol "/") 2 builtin_div)
+    ;(add_builtin_function1 (to_sym "print") String builtin_print_string)
+    ;(add_builtin_function1 (to_sym "print") Int builtin_print_int)
+    ;(add_builtin_function2 (to_sym "+") Int Int builtin_iadd)
+    ;(add_builtin_function2 (to_sym "-") Int Int builtin_sub)
+    ;(add_builtin_function2 (to_sym "*") Int Int builtin_imul)
+    ;(add_builtin_function2 (to_sym "/") Int Int builtin_idiv)
+
+    ;(add_builtin_function2 (to_sym "infixr") String Int builtin_infixr)
     ))
 
     ))

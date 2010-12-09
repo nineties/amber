@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-main.rlc 2010-11-04 16:34:40 nineties $
+; $Id: rowl1-main.rlc 2010-12-09 17:19:27 nineties $
 ;
 
 (import "rlvm-compile")
@@ -10,10 +10,11 @@
 
 (compile `object `(
 
+(import "rowl1-node")
 (import "rowl1-lex")
-(import "rowl1-parse")
 (import "rowl1-stdlib")
-(import "rowl1-interp")
+;(import "rowl1-interp")
+(import "rowl1-parse")
 
 (fun main (argc argv) (
     (if (== argc 0) (do
@@ -28,8 +29,14 @@
     (var ichan (open_in file))
     (init_lexer file ichan)
     (init_stdlib)
-    (var prog (parse ichan))
-    (var status (interpret prog))
+    (while 1 (do
+	(var e (parse ichan))
+	(if (! e) break)
+	(pretty_print stdout e)
+	(output_char stdout '\n')
+	))
+    ;(var status (interpret ichan))
+    (close_in ichan)
     ))
 
     ))

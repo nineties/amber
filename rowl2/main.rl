@@ -3,16 +3,29 @@
 # rowl - generation 2
 # Copyright (C) 2010 nineties
 #
-# $Id: main.rl 2010-11-27 15:32:52 nineties $
+# $Id: main.rl 2010-12-09 18:47:47 nineties $
 #
-
-fib(n!Int): fib(n-1) + fib(n-2)
-fib(0): 0
-fib(1): 1
-
-print(o!Int): print_int(o)
-print(o!String): print_string(o)
-
-
-print("Hello World\n")
-print(fib(22))
+1
+"Hello World"
+hoge
+tree(3)
+tree(1, 2,
+    tree(2, 3)
+    )
+a[]
+a[1]
+a[2,3,4]
+f(1)(2)
+fun([1,2])
+    (3)
+fun([1,2])
+(3)
+{
+    1
+    2
+    3
+    fun([1,2])
+	(3)
+    fun([1,2])
+    (3, 2)
+}

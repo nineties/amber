@@ -45,7 +45,7 @@
 
 (fun compile_matching_single (asm idx pats) (
     (var p (caaar pats))
-    (if (== p AnySym) (do
+    (if (== p Any) (do
         (= pats (shift_pat pats))
         (compile_matching_main asm (+ idx 1) pats)
         return
@@ -61,7 +61,7 @@
         ))
     (if (== pty @Node) (do
         (= pty (field_get p @NodeConstr))
-        (if (== pty TypePatC) (do
+        (if (== pty TypePat) (do
             (var ty (field_get p 3))
             (var check_failed (fresh_label asm))
             (put_arg asm idx)
@@ -238,12 +238,12 @@
 
 (fun split_matrix (pats) (
     (var p (caaar pats))
-    (if (== p AnySym) (return (split_any pats)))
+    (if (== p Any) (return (split_any pats)))
     (var pty (node_type p))
     (if (== pty @Int) (return (split_int (unbox p) pats)))
     (if (== pty @Node) (do
         (= pty (field_get p @NodeConstr))
-        (if (== pty TypePatC) (return (split_type_pat pty pats)))
+        (if (== pty TypePat) (return (split_type_pat pty pats)))
         ))
     (not_implemented "split_matrix")
     ))
@@ -252,7 +252,7 @@
     (var n 1)
     (var orig pats)
     (= pats (cdr pats))
-    (while (&& pats (== (caaar pats) AnySym)) (do
+    (while (&& pats (== (caaar pats) Any)) (do
         (= pats (cdr pats))
         (incr n)
         ))
@@ -273,7 +273,7 @@
 (fun is_type_pat (ty node) (
     (if (!= (node_type node) @Node) (return @FALSE))
     (var constr (field_get node @NodeConstr))
-    (if (!= constr TypePatC) (return @FALSE))
+    (if (!= constr TypePat) (return @FALSE))
     (if (== (field_get node 3) ty)
         (return @TRUE)
         (return @FALSE)
