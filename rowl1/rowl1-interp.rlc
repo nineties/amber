@@ -2,13 +2,11 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2010-12-02 00:47:12 nineties $
+; $Id: rowl1-interp.rlc 2010-12-10 04:01:31 nineties $
 ;
 
 (import "rlvm-compile")
 (import "rowl1-types")
-
-; XXX: experimental implementation
 
 (compile `object `(
 
@@ -38,54 +36,44 @@
             (var ent  (tuple 2 (bytecode 0 0 0 0) pats depth))
             (field_set ent 0 (compile_matching_hook ent arity))
             (symtable_add funtable sym arity ent)
-            (register_symbol sym GlobalFunctionSym)
+            (register_symbol sym (to_sym "%function"))
         )
         )
     ))
 
-(export fun add_builtin_function1 (sym type func) (
-    (var asm (make_assembler 10))
+(export fun add_builtin_function1 (sym pat func) (
+    (var asm (make_assembler))
     (compile_simple_function asm 1 func @TRUE)
     (var code (get_code asm))
-    (var pats (cons (make_type_pat builtin_loc type) 0))
-    (add_function sym pats code)
+    (add_function sym (list1 pat) code)
     ))
 
-(export fun add_builtin_function2 (sym type1 type2 func) (
-    (var asm (make_assembler 10))
+(export fun add_builtin_function2 (sym pat1 pat2 func) (
+    (var asm (make_assembler))
     (compile_simple_function asm 2 func @TRUE)
     (var code (get_code asm))
-    (var pats (cons (make_type_pat builtin_loc type1)
-              (cons (make_type_pat builtin_loc type2)
-              0)))
-    (add_function sym pats code)
+    (add_function sym (list2 pat1 pat2) code)
     ))
 
 (export fun interpret (ichan) (
     (while 1 (do
         (var e (parse ichan))
         (if (! e) break)
-        (builtin_eval e)
+        (call_eval no_loc e)
         ))
     ))
 
-(fun builtin_eval (expr) (
+(fun call_eval (loc expr) (
+    (var f (lookup_func eval-sym 2))
+    (jitcall f loc expr)
+    ))
+
+(export fun builtin_eval (loc expr) (
     (if (! expr) (error "builtin_eval: null expression"))
-    (var type (node_type expr))
-    (tswitch type (
-    (@Symbol  . (return (builtin_eval_symbol expr)))
-    (@Block    . (return (builtin_eval_list expr)))
-    (@Tuple   . (not_implemented "builtin_eval"))
-    (@List   . (not_implemented "builtin_eval"))
-    (@Node    . (not_implemented "builtin_eval"))
-    (@Prefix  . (not_implemented "builtin_eval"))
-    (@Postfix . (not_implemented "builtin_eval"))
-    (@Call    . (return (builtin_eval_call expr)))
-    (@Subscr  . (not_implemented "builtin_eval"))
-    (@Int     . (return expr))
-    (@Float   . (return expr))
-    (@String  . (return expr))
-    (default  . (not_reachable "builtin_eval"))
+    (tswitch (node_type expr) (
+        (@SymbolE . (return (builtin_eval_symbol loc expr)))
+        (@Expr    . (return (builtin_eval_expr loc expr)))
+        (default  . (return expr))
         ))
     ))
 
@@ -94,30 +82,19 @@
     (if value (return value) (return sym))
     ))
 
-(fun builtin_eval_list (expr) (
-    (var list (field_get expr @BlockValues))
-    (symtable_push funtable)
-    (while list (do
-        (setcar list (builtin_eval (car list)))
-        (= list (cdr list))
-        ))
-    (symtable_pop funtable)
-    (return expr)
+(fun builtin_eval_expr (loc expr) (
+    (var head (field_get expr @ExprHead))
+    (var args (field_get expr @ExprArgs))
+
+    ; XXX: temporal implementation. should use pattern maching functionality.
+    (if (== head Located) (return (builtin_eval (car args) (cadr args))))
+
+    (print_string (field_get head @SymbolName))
+    (print_char '\n')
+    (not_reachable "builtin_eval_expr")
     ))
 
-;(fun builtin_eval_fundecl (expr) (
-;    (var lhs (field_get expr @InfixLhs))
-;    (var rhs (field_get expr @InfixRhs))
-;    (var name (field_get lhs @CallFunc))
-;    (var args (field_get lhs @CallArgs))
-;    (if (!= (node_type name) @Symbol) (undefined_expression (field_get expr 1)))
-;
-;    (var ret (compile_function (field_get expr 1) name args rhs)) ; (argpat . body)
-;    (add_function name (car ret) (cdr ret))
-;    ))
-
 (export fun lookup_func (sym arity) (
-    (check_type "lookup_func" @Symbol sym)
     (var ent (symtable_find funtable sym arity))
     (if (! ent) (do
         (= ent (tuple 2 (gen_no_declaration_error sym) 0 (symtable_depth funtable)))
@@ -126,41 +103,13 @@
     (return (field_get ent 0))
     ))
 
-(fun builtin_eval_call (expr) (
-    (var func (field_get expr @CallFunc))
-    (var args (field_get expr @CallArgs))
-    (= func (builtin_eval func))
-
-    (var arity 0)
-    (var argv (array object 7))
-    (while args (do
-        (array_set object argv arity (builtin_eval (car args)))
-        (= args (cdr args))
-        (+= arity 1)
-        ))
-
-    (var f (lookup_func func arity))
-
-    (tswitch arity (
-    (0 . (return (jitcall f)))
-    (1 . (return (jitcall f (array_get object argv 0))))
-    (2 . (return (jitcall f (array_get object argv 0) (array_get object argv 1))))
-    (3 . (return (jitcall f (array_get object argv 0) (array_get object argv 1) (array_get object argv 2))))
-    (4 . (return (jitcall f (array_get object argv 0) (array_get object argv 1) (array_get object argv 2) (array_get object argv 3))))
-    (5 . (return (jitcall f (array_get object argv 0) (array_get object argv 1) (array_get object argv 2) (array_get object argv 3) (array_get object argv 4))))
-    (6 . (return (jitcall f (array_get object argv 0) (array_get object argv 1) (array_get object argv 2) (array_get object argv 3) (array_get object argv 4) (array_get object argv 5))))
-    (7 . (return (jitcall f (array_get object argv 0) (array_get object argv 1) (array_get object argv 2) (array_get object argv 3) (array_get object argv 4) (array_get object argv 5) (array_get object argv 6))))
-    (default . (not_implemented "builtin_eval_call"))
-        ))
-    ))
-
-(fun undefined_expression (loc) (
-    (flush stdout)
-    (error_head stderr loc)
-    (output_string stderr "undefined expression\n")
-    (exit 1)
-    ))
-
+;(fun undefined_expression (loc) (
+;    (flush stdout)
+;    (error_head stderr loc)
+;    (output_string stderr "undefined expression\n")
+;    (exit 1)
+;    ))
+;
 (fun no_declaration_error (name) (
     (flush stdout)
     (output_string stderr "ERROR: no declaration of ")
@@ -169,7 +118,7 @@
     ))
 
 (fun gen_no_declaration_error (sym) (
-    (var asm (make_assembler 10))
+    (var asm (make_assembler))
     (put_push asm (field_get sym @SymbolName))
     (compile_simple_call asm 1 no_declaration_error @FALSE)
     (return (get_code asm))

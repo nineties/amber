@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2010-12-09 18:02:49 nineties $
+; $Id: rowl1-node.rlc 2010-12-09 23:09:25 nineties $
 ;
 
 (import "rlvm-compile")
@@ -16,29 +16,31 @@
 (var symbol_index_gen 0)
 
 ; builtin expression headers and types
-(export var Int     (to_sym "Int"))
-(export var String  (to_sym "String"))
-(export var Tuple   (to_sym "Tuple"))
-(export var List    (to_sym "List"))
-(export var Block   (to_sym "Block"))
-(export var Apply   (to_sym "Apply"))
-(export var Subscr  (to_sym "Subscr"))
-(export var Located (to_sym "Located"))
-(export var Loc     (to_sym "Loc"))
-
-; operators
-(export var Infix   (to_sym "infix"))
-(export var Prefix  (to_sym "prefix"))
-(export var Postfix (to_sym "postfix"))
-(export var Constr  (to_sym "constr"))
-(export var Left    (to_sym "left"))
-(export var Right   (to_sym "right"))
+(export var DontCare    (to_sym "_"))
+(export var Symbol      (to_sym "Symbol"))
+(export var Int         (to_sym "Int"))
+(export var Float       (to_sym "Float"))
+(export var String      (to_sym "String"))
+(export var Tuple       (to_sym "Tuple"))
+(export var List        (to_sym "List"))
+(export var Block       (to_sym "Block"))
+(export var Apply       (to_sym "Apply"))
+(export var Subscr      (to_sym "Subscr"))
+(export var Located     (to_sym "Located"))
+(export var Loc         (to_sym "Loc"))
+(export var Infix       (to_sym "Infix"))
+(export var Prefix      (to_sym "Prefix"))
+(export var Postfix     (to_sym "Postfix"))
+(export var Constructor (to_sym "Constructor"))
+(export var Left        (to_sym "Left"))
+(export var Right       (to_sym "Right"))
+(export var eval-sym    (to_sym "eval"))
 
 (export fun to_sym (name) (
     (var sym (idtable_find symbol_table name))
     (if sym (return sym))
     (= name (strdup name))
-    (= sym (variant @Symbol 2 name 0 symbol_index_gen))
+    (= sym (variant @SymbolE 2 name 0 symbol_index_gen))
     (+= symbol_index_gen 1)
     (idtable_add symbol_table name sym)
     (return sym)
@@ -46,7 +48,7 @@
 
 (export fun node_type (obj) (
     (if (! obj) (error "node_type: null object"))
-    (if (& obj 1) (return @Int))
+    (if (& obj 1) (return @IntE))
     (var tag (get_tag obj))
     (if (== tag @TAG_VARIANT) (return (field_get obj 0)))
     (return (+ (get_plain_tag obj) @BUILTIN_TYPE_OFFSET))
@@ -66,6 +68,7 @@
     ))
 
 (export var builtin_loc (make_loc "<builtin>" 0 0))
+(export var no_loc (make_loc "<unknown>" 0 0))
 
 (export fun make_loc (file begin end) (
     (return (make_expr Loc (list3 file (box begin) (box end))))
@@ -97,6 +100,32 @@
     (output_char ochan ' ')
     ))
 
+(export fun expr_head (node) (
+    (tswitch (node_type node) (
+        (@SymbolE . (return Symbol))
+        (@Expr    . (return (field_get node @ExprHead)))
+        (@IntE    . (return Int))
+        (@FloatE  . (return Float))
+        (@StringE . (return String))
+        (default  . (not_reachable "pretty_print"))
+        ))
+    ))
+
+(export fun expr_args (node) (
+    (if (!= (node_type node) @Expr) (return 0))
+    (return (field_get node @ExprArgs))
+    ))
+
+(export fun expr_arg (node idx) (
+    (var args (expr_args node))
+    (while (> idx 0) (do
+        (if (! args) (not_reachable "expr_arg"))
+        (= args (cdr args))
+        (decr idx)
+        ))
+    (return (car args))
+    ))
+
 (export fun make_expr (head args) (
     (return (variant @Expr 2 head args))
     ))
@@ -107,12 +136,12 @@
 
 (export fun pretty_print (ochan node) (
     (tswitch (node_type node) (
-        (@Symbol . (return (pp_symbol ochan node)))
-        (@Expr   . (return (pp_expr ochan node)))
-        (@Int    . (return (pp_int ochan node)))
-        (@Float  . (return (pp_float ochan node)))
-        (@String . (return (pp_string ochan node)))
-        (default . (not_reachable "pretty_print"))
+        (@SymbolE . (return (pp_symbol ochan node)))
+        (@Expr    . (return (pp_expr ochan node)))
+        (@IntE    . (return (pp_int ochan node)))
+        (@FloatE  . (return (pp_float ochan node)))
+        (@StringE . (return (pp_string ochan node)))
+        (default  . (not_reachable "pretty_print"))
         ))
     ))
 
@@ -129,6 +158,7 @@
     (if (== head Block)   (return (pp_block ochan args)))
     (if (== head Apply)  (return (pp_apply ochan args)))
     (if (== head Subscr) (return (pp_subscr ochan args)))
+    (if (== head Located) (return (pretty_print ochan (expr_arg node 1))))
 
     (output_string ochan (field_get head @SymbolName))
     (output_char ochan '(')
