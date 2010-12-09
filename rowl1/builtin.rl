@@ -2,7 +2,7 @@
  % rowl - generation 1
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-10-26 11:49:50 nineties $
+ % $Id: builtin.rl 2010-12-10 03:07:24 nineties $
  %);
 
 include(stddef,code);
@@ -534,6 +534,7 @@ _eq: (p0, p1) {
     if (p0[0] == NODE_SYMBOL) { return streq(sym_name(p0), sym_name(p1)); };
     if (p0[0] == NODE_INT)    { return int_value(p0) == int_value(p1); };
     if (p0[0] == NODE_CHAR)   { return char_value(p0) == char_value(p1); };
+    if (p0[0] == NODE_STRING) { return streq(string_value(p0), string_value(p1)); };
     if (p0[0] == NODE_PRIM)   { return prim_funptr(p0) == prim_funptr(p1); };
     return FALSE;
 };
@@ -611,7 +612,6 @@ rl_getint: (p0) {
     allocate(2);
     check_arity(p0, 1, "getint");
     x0 = int_value(car(p0));
-    x1 = 0;
     wch(&x1, 0, fgetc(x0));
     wch(&x1, 1, fgetc(x0));
     wch(&x1, 2, fgetc(x0));
