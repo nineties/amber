@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2010-11-26 05:31:52 nineties $
+; $Id: rowl1-interp.rlc 2010-12-02 00:47:12 nineties $
 ;
 
 (import "rlvm-compile")
@@ -14,6 +14,7 @@
 
 (import "rowl1-util")
 (import "rowl1-node")
+(import "rowl1-parse")
 (import "rowl1-symtable")
 (import "rowl1-assemble")
 (import "rowl1-compile")
@@ -42,25 +43,29 @@
         )
     ))
 
-(export fun add_builtin_function (sym arity func) (
+(export fun add_builtin_function1 (sym type func) (
     (var asm (make_assembler 10))
-    (compile_simple_function asm arity func @TRUE)
+    (compile_simple_function asm 1 func @TRUE)
     (var code (get_code asm))
-    (var pats 0)
-    (while (> arity 0) (do
-        (= pats (cons AnySym pats))
-        (decr arity)
-        ))
+    (var pats (cons (make_type_pat builtin_loc type) 0))
     (add_function sym pats code)
     ))
 
-(export fun interpret (prog) (
-    (check_type "interpret" @List prog)
+(export fun add_builtin_function2 (sym type1 type2 func) (
+    (var asm (make_assembler 10))
+    (compile_simple_function asm 2 func @TRUE)
+    (var code (get_code asm))
+    (var pats (cons (make_type_pat builtin_loc type1)
+              (cons (make_type_pat builtin_loc type2)
+              0)))
+    (add_function sym pats code)
+    ))
 
-    (var list (field_get prog @ListValues))
-    (while list (do
-        (builtin_eval (car list))
-        (= list (cdr list))
+(export fun interpret (ichan) (
+    (while 1 (do
+        (var e (parse ichan))
+        (if (! e) break)
+        (builtin_eval e)
         ))
     ))
 
@@ -69,13 +74,12 @@
     (var type (node_type expr))
     (tswitch type (
     (@Symbol  . (return (builtin_eval_symbol expr)))
-    (@List    . (return (builtin_eval_list expr)))
+    (@Block    . (return (builtin_eval_list expr)))
     (@Tuple   . (not_implemented "builtin_eval"))
-    (@Array   . (not_implemented "builtin_eval"))
+    (@List   . (not_implemented "builtin_eval"))
     (@Node    . (not_implemented "builtin_eval"))
     (@Prefix  . (not_implemented "builtin_eval"))
     (@Postfix . (not_implemented "builtin_eval"))
-    (@Infix   . (return (builtin_eval_infix expr)))
     (@Call    . (return (builtin_eval_call expr)))
     (@Subscr  . (not_implemented "builtin_eval"))
     (@Int     . (return expr))
@@ -91,7 +95,7 @@
     ))
 
 (fun builtin_eval_list (expr) (
-    (var list (field_get expr @ListValues))
+    (var list (field_get expr @BlockValues))
     (symtable_push funtable)
     (while list (do
         (setcar list (builtin_eval (car list)))
@@ -101,34 +105,16 @@
     (return expr)
     ))
 
-(fun builtin_eval_infix (expr) (
-    (var op (field_get expr @InfixOp))
-    (if (== op DeclOp) (return (builtin_eval_decl expr)))
-
-    (var asm (make_assembler 10))
-    (compile_expression asm expr @TRUE)
-    (return (jitcall (get_code asm)))
-
-    (undefined_expression (field_get expr 1))
-    ))
-
-(fun builtin_eval_decl (expr) (
-    (if (== (node_type (field_get expr @InfixLhs)) @Call)
-        (return (builtin_eval_fundecl expr))
-        )
-    (undefined_expression (field_get expr 1))
-    ))
-
-(fun builtin_eval_fundecl (expr) (
-    (var lhs (field_get expr @InfixLhs))
-    (var rhs (field_get expr @InfixRhs))
-    (var name (field_get lhs @CallFunc))
-    (var args (field_get lhs @CallArgs))
-    (if (!= (node_type name) @Symbol) (undefined_expression (field_get expr 1)))
-
-    (var ret (compile_function (field_get expr 1) name args rhs)) ; (argpat . body)
-    (add_function name (car ret) (cdr ret))
-    ))
+;(fun builtin_eval_fundecl (expr) (
+;    (var lhs (field_get expr @InfixLhs))
+;    (var rhs (field_get expr @InfixRhs))
+;    (var name (field_get lhs @CallFunc))
+;    (var args (field_get lhs @CallArgs))
+;    (if (!= (node_type name) @Symbol) (undefined_expression (field_get expr 1)))
+;
+;    (var ret (compile_function (field_get expr 1) name args rhs)) ; (argpat . body)
+;    (add_function name (car ret) (cdr ret))
+;    ))
 
 (export fun lookup_func (sym arity) (
     (check_type "lookup_func" @Symbol sym)

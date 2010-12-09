@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-lex.rlc 2010-11-27 17:31:22 nineties $
+; $Id: rowl1-lex.rlc 2010-12-09 18:45:00 nineties $
 ;
 
 (import "rlvm-compile")
@@ -178,7 +178,7 @@
 ;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  S  :  :  U  :  :  :
 ;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  H  :  :  S  :  :  :
 ;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :
-(array char s0next  (13  2  2 15 22 22 22 39 39 39 39 39 39 39 39 39 28 32 35 40 40 14 40 40 42 40 2))
+(array char s0next  (13  2  2 15 22 22 22 39 39 39 39 39 39 39 39 39 28 32 35 40 40  2 40 40 42 40 2))
 (array char s15next ( 1  1  1  3  3  3  3  3 16  3 18  3 20  3  3  3  1  1  1  1  1  1 23  1  1  1 2))
 (array char s17next ( 1  1  1 17 17  4  4  4  4  4  4  4  4  4  4  4  1  1  1  1  1  1  4  1  1  1 2))
 (array char s19next ( 1  1  1 19 19 19  5  5  5  5  5  5  5  5  5  5  1  1  1  1  1  1  5  1  1  1 2))
@@ -207,29 +207,31 @@
 (var token_tag @TOK_NONE)
 (var token_value 0) ; for integer and character
 (var token_buf null)
-(var next_srcfile null)
-(var next_srcline 1)
-(var next_srcclmn 1)
 (var srcfile null)
 (var srcline 1)
 (var srcclmn 1)
+(var next_srcfile null)
+(var next_srcline 1)
+(var next_srcclmn 1)
+(var prev_srcfile null)
+(var prev_srcline 1)
+(var prev_srcclmn 1)
+(var newline 1)
 (var unputted 0)
 (var operator_table null)
 
 (fun is_member_of (c group) ((return (array_get char group c))))
 
-(export fun print_token () (
-    (if (< token_tag 256)
-        (print_char token_tag)
-        (print_string (get_token_text))
-        )
-    ))
-
 (export fun get_token_text () ((return (cvector_raw token_buf))))
 (export fun get_token_len  () ((return (- (cvector_size token_buf) 1))))
 (export fun get_token_value () ((return token_value)))
-(export fun getloc () ((return (make_loc next_srcfile next_srcline next_srcline))))
-(export fun getprevloc () ((return (make_loc srcfile srcline srcline))))
+(export fun get_clmn () ((return srcclmn)))
+(export fun get_loc () (
+    (if unputted
+	(return (make_loc prev_srcfile prev_srcline prev_srcline))
+	(return (make_loc srcfile srcline srcline))
+	)
+    ))
 
 (array char esc2val_table (
     34 0 0 0 0 39 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
@@ -262,7 +264,7 @@
     (return (array_get char chgroup c))
     ))
 
-(fun consume () (
+(fun read_char () (
     (var c)
     (if (== lexbuf_end (cvector_size lexbuf))
         (do
@@ -272,15 +274,29 @@
         ))
     (= c (cvector_at lexbuf lexbuf_end))
     (incr lexbuf_end)
-    (if (== c '\n') (do
-        (incr next_srcline)
-        (= next_srcclmn 1)
+    (if (== c '\n')
+	(do
+	    (incr next_srcline)
+	    (= next_srcclmn 1)
+	    (= newline @TRUE)
         )
-        (incr next_srcclmn)
+	(do
+	    (incr next_srcclmn)
+	    (if (!= c ' ') (= newline @FALSE))
+	)
         )
+    (return c)
+    ))
+
+(fun consume () (
+    (var c (read_char))
     (cvector_put token_buf (- (cvector_size token_buf) 1) c)
     (cvector_pushback token_buf '\0')
     (return c)
+    ))
+
+(fun ignore () (
+    (read_char)
     ))
 
 (export fun unput () (
@@ -349,19 +365,32 @@
     (= lexbuf (make_cvector 0))
     (= lexbuf_end 0)
     (= operator_table (make_idtable))
+
+    (skip_spaces)
+
     return
     ))
 
-(export fun lex () ((return (lex_main 0))))
-(export fun lex_infix () ((return (lex_main 1))))
+(export fun lex () ((return (lex_main 0 0))))
+(export fun lex_sub (offs)   ((return (lex_main 0 offs))))
+(export fun lex_infix (offs) ((return (lex_main 1 offs))))
 
-(fun lex_main (infix_p) (
+(fun lex_main (infix_p offs) (
     (if unputted (do
         (= unputted 0)
         (var op (find_operator (get_token_text)))
         (if op (accept_operator op infix_p))
         (return token_tag)
         ))
+
+    (if (&& newline (<= next_srcclmn offs)) (do
+	(accept @TOK_END)
+	(return @TOK_END)
+	))
+
+    (= prev_srcfile srcfile)
+    (= prev_srcline srcline)
+    (= prev_srcclmn srcclmn)
     (= srcfile next_srcfile)
     (= srcline next_srcline)
     (= srcclmn next_srcclmn)
@@ -370,16 +399,14 @@
     (label lexloop)
     (tswitch state (
         (0 . (do
-            (var c (lookahead))
-            (while (|| (== c @CH_SPACES) (== c @CH_NL)) (do
-                (consume)
-                (= c (lookahead))
-                ))
             (init_token_buf)
             (= state (next_state s0next))
             (goto lexloop)
             ))
-        (1  . (return token_tag))
+        (1  . (do
+	    (skip_spaces)
+	    (return token_tag)
+	    ))
         (2  . (lex_error "invalid character"))
         (3  . (lex_error "invalid decimal integer literal"))
         (4  . (lex_error "invalid binary integer literal"))
@@ -396,12 +423,7 @@
             (return @TOK_EOF)
             ))
         (14 . (do
-            ; comment
-            (consume)
-            (while (!= (lookahead) @CH_NL) (consume))
-            (consume)
-            (= state 0)
-            (goto lexloop)
+	    (not_reachable "lex_main")
             ))
         (15 . (do
             (consume)
@@ -586,7 +608,7 @@
         (38 . (do
             (consume)
             (var str (get_unquoted_token_text))
-            (= token_value (to_symbol str))
+            (= token_value (to_sym str))
             (accept @TOK_SYMBOL)
             (= state 1)
             (goto lexloop)
@@ -598,7 +620,7 @@
             (= state (next_state s39next))
 	    (if (== state 1) (do
 		(accept @TOK_SYMBOL)
-		(= token_value (to_symbol (get_token_text)))
+		(= token_value (to_sym (get_token_text)))
 		))
             (goto lexloop)
             ))
@@ -628,6 +650,26 @@
         (default . (error "BUG: invalid state"))
         ))
     (error "BUG: not reachable")
+    ))
+
+(fun skip_spaces () (
+    (var c (lookahead))
+    (while 1 (do
+	(if (== c @CH_SHARP) (do
+	    (ignore)
+	    (while (!= (lookahead) @CH_NL) (ignore))
+	    (ignore)
+	    )
+	(if (|| (== c @CH_SPACES) (== c @CH_NL)) (do
+	    (while (|| (== c @CH_SPACES) (== c @CH_NL)) (do
+		(ignore)
+		(= c (lookahead))
+		))
+	    )
+	    break
+	    ))
+	(= c (lookahead))
+	))
     ))
 
 (var save_lexbuf_end 0)
@@ -684,8 +726,8 @@
     (idtable_pop operator_table)
     ))
 
-(fun add_operator (name obj) (
-    (idtable_add operator_table name obj)
+(fun add_operator (name sym) (
+    (idtable_add operator_table name sym)
     ))
 
 (fun find_operator (name) (
@@ -703,7 +745,7 @@
 (export fun add_prefix (name assoc) (
     (check_assoc name assoc)
     (var op (find_operator name))
-    (var sym (to_symbol name))
+    (var sym (to_sym name))
     (var prefix_op (variant @OP_PREFIX 1 sym assoc))
     (if op (do
         (var optype (field_get op 0))
@@ -721,7 +763,7 @@
 
 (export fun add_postfix (name assoc) (
     (check_assoc name assoc)
-    (var sym (to_symbol name))
+    (var sym (to_sym name))
     (add_operator name (variant @OP_POSTFIX 1 sym assoc))
     ))
 
@@ -729,9 +771,10 @@
 (export fun add_infixr (name assoc) ((add_infix name 0 assoc)))
 
 (fun add_infix (name is_left assoc) (
+    ; XXX: check validity of the format of the name
     (check_assoc name assoc)
     (var op (find_operator name))
-    (var sym (to_symbol name))
+    (var sym (to_sym name))
     (var infix_op (variant @OP_INFIX 1 sym is_left assoc))
     (if op (do
         (var optype (field_get op 0))
@@ -749,7 +792,8 @@
 
 (export fun add_constr (name maxlen assoc) (
     (check_assoc name assoc)
-    (var sym (to_symbol name))
+    (var sym (to_sym name))
+    (field_set sym @SymbolOp (make_expr Constr (list2 (box maxlen) (box assoc))))
     (add_operator name (variant @OP_CONSTR 1 sym maxlen assoc))
     ))
 
