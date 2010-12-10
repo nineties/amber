@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2010-12-10 03:32:16 nineties $
+; $Id: rowl1-matching.rlc 2010-12-10 09:16:17 nineties $
 ;
 
 (import "rlvm-compile")
@@ -17,7 +17,7 @@
 
 ; pattern matrix (((p11 p12 .. ) . e1) ((p21 p22 ..) . e2) ..)
 
-(var typepat (to_sym "%type-pattern"))
+(var headpat (to_sym "%head-pattern"))
 
 (extern fun matching_error)
 (export fun compile_matching (bytecode pats) (
@@ -63,11 +63,11 @@
         ))
     (if (== pty @Expr) (do
         (= pty (field_get p @ExprHead))
-        (if (== pty typepat) (do
+        (if (== pty headpat) (do
             (var ty (expr_arg p 0))
             (var check_failed (fresh_label asm))
             (put_arg asm idx)
-            (compile_type_check asm ty check_failed)
+            (compile_check_head asm ty check_failed)
             (= pats (shift_pat pats))
             (compile_matching_main asm (+ idx 1) pats)
             (set_label asm check_failed)
@@ -77,7 +77,7 @@
     (not_implemented "compile_matching_single")
     ))
 
-(fun compile_type_check (asm ty exit_lbl) (
+(fun compile_check_head (asm ty exit_lbl) (
     (if (== ty Int) (do
         (put_check_int asm exit_lbl)
         return
@@ -86,7 +86,13 @@
         (put_check_string asm exit_lbl)
         return
         ))
-    (not_implemented "compile_type_check")
+
+    (if (!= (node_type ty) @SymbolE) (not_reachable "compile_check_head"))
+
+    (put_imm_int32 asm expr_head)
+    (put_dcall asm 4)
+    (put_push asm ty)
+    (put_if_ne asm exit_lbl)
     ))
 
 (fun compile_matching_intlit (asm idx pats) (
@@ -245,7 +251,7 @@
     (if (== pty @Int) (return (split_int (unbox p) pats)))
     (if (== pty @Expr) (do
         (= pty (field_get p @ExprHead))
-        (if (== pty typepat) (return (split_type_pat pty pats)))
+        (if (== pty headpat) (return (split_type_pat pty pats)))
         ))
     (not_implemented "split_matrix")
     ))
@@ -275,7 +281,7 @@
 (fun is_type_pat (ty node) (
     (if (!= (node_type node) @Expr) (return @FALSE))
     (var constr (field_get node @ExprHead))
-    (if (!= constr typepat) (return @FALSE))
+    (if (!= constr headpat) (return @FALSE))
     (if (== (expr_arg node 0) ty)
         (return @TRUE)
         (return @FALSE)
