@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2010-12-10 04:01:31 nineties $
+; $Id: rowl1-interp.rlc 2010-12-10 16:09:46 nineties $
 ;
 
 (import "rlvm-compile")
@@ -41,10 +41,18 @@
         )
     ))
 
+(fun setup_pat (pat) (
+    (if pat
+        (return (make_headpat pat))
+        (return DontCare)
+        )
+    ))
+
 (export fun add_builtin_function1 (sym pat func) (
     (var asm (make_assembler))
     (compile_simple_function asm 1 func @TRUE)
     (var code (get_code asm))
+    (= pat (setup_pat pat))
     (add_function sym (list1 pat) code)
     ))
 
@@ -52,6 +60,8 @@
     (var asm (make_assembler))
     (compile_simple_function asm 2 func @TRUE)
     (var code (get_code asm))
+    (= pat1 (setup_pat pat1))
+    (= pat2 (setup_pat pat2))
     (add_function sym (list2 pat1 pat2) code)
     ))
 
@@ -66,6 +76,49 @@
 (fun call_eval (loc expr) (
     (var f (lookup_func eval-sym 2))
     (jitcall f loc expr)
+    ))
+
+(export fun lookup_func (sym arity) (
+    (var ent (symtable_find funtable sym arity))
+    (if (! ent) (do
+        (= ent (tuple 2 (gen_construction sym arity) 0 (symtable_depth funtable)))
+        (symtable_add funtable sym arity ent)
+        ))
+    (return (field_get ent 0))
+    ))
+
+;(fun undefined_expression (loc) (
+;    (flush stdout)
+;    (error_head stderr loc)
+;    (output_string stderr "undefined expression\n")
+;    (exit 1)
+;    ))
+;
+;(fun no_declaration_error (name) (
+;    (flush stdout)
+;    (output_string stderr "ERROR: no declaration of ")
+;    (output_string stderr name)
+;    (exit 1)
+;    ))
+;
+;(fun gen_no_declaration_error (sym) (
+;    (var asm (make_assembler))
+;    (put_push asm (field_get sym @SymbolName))
+;    (compile_simple_call asm 1 no_declaration_error @FALSE)
+;    (return (get_code asm))
+;    ))
+
+(fun gen_construction (sym arity) (
+    (var asm (make_assembler))
+    (put_imm_int32 asm 0) ; nil
+    (while (> arity 0) (do
+        (decr arity)
+        (put_arg asm arity)
+        (put_cons asm)
+        ))
+    (put_push asm sym) ; head
+    (compile_simple_call asm 2 make_expr @TRUE)
+    (return (get_code asm))
     ))
 
 (export fun builtin_eval (loc expr) (
@@ -83,45 +136,19 @@
     ))
 
 (fun builtin_eval_expr (loc expr) (
-    (var head (field_get expr @ExprHead))
-    (var args (field_get expr @ExprArgs))
-
-    ; XXX: temporal implementation. should use pattern maching functionality.
-    (if (== head Located) (return (builtin_eval (car args) (cadr args))))
-
-    (print_string (field_get head @SymbolName))
-    (print_char '\n')
-    (not_reachable "builtin_eval_expr")
-    ))
-
-(export fun lookup_func (sym arity) (
-    (var ent (symtable_find funtable sym arity))
-    (if (! ent) (do
-        (= ent (tuple 2 (gen_no_declaration_error sym) 0 (symtable_depth funtable)))
-        (symtable_add funtable sym arity ent)
-        ))
-    (return (field_get ent 0))
-    ))
-
-;(fun undefined_expression (loc) (
-;    (flush stdout)
-;    (error_head stderr loc)
-;    (output_string stderr "undefined expression\n")
-;    (exit 1)
-;    ))
-;
-(fun no_declaration_error (name) (
-    (flush stdout)
-    (output_string stderr "ERROR: no declaration of ")
-    (output_string stderr name)
-    (exit 1)
-    ))
-
-(fun gen_no_declaration_error (sym) (
     (var asm (make_assembler))
-    (put_push asm (field_get sym @SymbolName))
-    (compile_simple_call asm 1 no_declaration_error @FALSE)
-    (return (get_code asm))
+    (compile_expression asm expr @TRUE)
+    (return (jitcall (get_code asm)))
+    ))
+
+(export fun builtin_eval_located (loc expr) (
+    (var args (field_get expr @ExprArgs))
+    (return (call_eval (expr_arg expr 0) (expr_arg expr 1)))
+    ))
+
+(export fun builtin_pretty_print (loc expr) (
+    (pretty_print stdout expr)
+    (output_char stdout '\n')
     ))
 
     ))

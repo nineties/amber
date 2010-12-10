@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2010-12-10 03:30:40 nineties $
+; $Id: rowl1-compile.rlc 2010-12-10 15:49:08 nineties $
 ;
 
 (import "rlvm-compile")
@@ -17,7 +17,7 @@
 
 (var function (to_sym "%function"))
 (var argument (to_sym "%argument"))
-(var typepat (to_sym "%type-pattern"))
+(var headpat (to_sym "%head-pattern"))
 
 (var vartable (make_symtable))
 
@@ -44,8 +44,8 @@
     (return (make_expr argument (cons (box idx) 0)))
     ))
 
-(export fun make_type_pat (type) (
-    (return (make_expr typepat (cons type 0)))
+(export fun make_headpat (type) (
+    (return (make_expr headpat (cons type 0)))
     ))
 
 (fun setup_args (loc args) (
@@ -71,7 +71,7 @@
         ;    (= arg (field_get arg @InfixLhs))
         ;    (if (== (node_type arg) @SymbolE) (do
         ;        (symtable_add vartable arg 0 (make_arg idx))
-        ;        (setcar args (make_type_pat loc type))
+        ;        (setcar args (make_headpat loc type))
         ;        (= args (cdr args))
         ;        (incr idx)
         ;        continue
@@ -92,10 +92,9 @@
     (@SymbolE  . (do
         (var v (symtable_find vartable expr 0))
         (if (! v) (do
-            (output_string stderr "ERROR: undefined variable: ")
-            (output_string stderr (field_get expr @SymbolName))
-            (output_char stderr '\n')
-            (exit 1)
+            (put_push asm expr)
+            (if ret (put_ireturn asm))
+            break
             ))
         (if (== v function) (do
             (put_push asm expr)
@@ -112,28 +111,21 @@
             ))
         (not_reachable "compile_expression")
         ))
-    ;(@Block    . (not_implemented "compile_expression"))
-    ;(@Tuple   . (not_implemented "compile_expression"))
-    ;(@List   . (not_implemented "compile_expression"))
-    ;(@Node    . (not_implemented "compile_expression"))
-    ;(@Prefix  . (not_implemented "compile_expression"))
-    ;(@Postfix . (not_implemented "compile_expression"))
-    ;(@Call    . (do
-    ;    (compile_call asm (field_get expr @CallFunc) (field_get expr @CallArgs) ret)
-    ;    break
-    ;    ))
-    ;(@Subscr  . (not_implemented "compile_expression"))
-    ;(@Int     . (do
-    ;    (put_imm_int asm expr)
-    ;    (if ret (put_ireturn asm))
-    ;    break
-    ;    ))
-    ;(@Float  . (not_implemented "compile_expression"))
-    ;(@String . (do
-    ;    (put_push asm expr)
-    ;    (if ret (put_ireturn asm))
-    ;    break
-    ;    ))
+    (@Expr . (do
+        (compile_call asm (expr_head expr) (expr_args expr) ret)
+        break
+        ))
+    (@IntE . (do
+        (put_imm_int asm expr)
+        (if ret (put_ireturn asm))
+        break
+        ))
+    (@FloatE  . (not_implemented "compile_expression"))
+    (@StringE . (do
+        (put_push asm expr)
+        (if ret (put_ireturn asm))
+        break
+        ))
     (default . (not_reachable "compile_expression"))
         ))
     ))
