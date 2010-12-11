@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-parse.rlc 2010-12-09 18:47:01 nineties $
+; $Id: rowl1-parse.rlc 2010-12-11 19:45:37 nineties $
 ;
 
 (import "rlvm-compile")
@@ -43,8 +43,6 @@
     (var expr_stack 0)
     (var op_stack 0)
     (var next_op)
-    (var begin)
-    (var end)
 
     (= op_stack (cons (cons (variant @OP_START 0) (get_loc)) op_stack))
 
@@ -53,10 +51,8 @@
         (= op_stack (cons (cons (get_token_value) (get_loc)) op_stack))
         (= tok (lex_sub offs))
         ))
-    (= begin (get_loc))
     (var e (parse_secondary tok offs))
-    (= end (get_loc))
-    (= expr_stack (cons (cons e (merge_loc begin end)) expr_stack))
+    (= expr_stack (cons e expr_stack))
 
     (label parse_expr_infix)
     (= tok (lex_infix offs))
@@ -102,7 +98,7 @@
         (output_string stderr "irreducible expression\n")
         (exit 1)
         ))
-    (return (caar expr_stack))
+    (return (car expr_stack))
     ))
 
 (fun parse_secondary (t offs) (
@@ -244,19 +240,14 @@
     ;            (field_get op 1) arg) loc)
     ;            (cdr exprs)))
     ;    )
-    ;(if (== type @OP_INFIX)
-    ;    (do
-    ;        (var lhs_info (cadr exprs))
-    ;        (var rhs_info (car exprs))
-    ;        (var lhs (car lhs_info))
-    ;        (var lhs_loc (cdr lhs_info))
-    ;        (var rhs (car rhs_info))
-    ;        (var rhs_loc (cdr rhs_info))
-    ;        (var loc (merge_loc lhs_loc rhs_loc))
-    ;        (var expr (variant @Call 3 loc (field_get op 1) (cons lhs (cons rhs 0))))
-    ;        (return (cons (cons expr loc) (cddr exprs)))
-    ;    )
-    ;    )))
+    (if (== type @OP_INFIX)
+        (do
+            (var lhs (cadr exprs))
+            (var rhs (car exprs))
+            (var expr (make_expr (field_get op 1) (cons lhs (cons rhs 0))))
+            (return (cons expr (cddr exprs)))
+        )
+        );))
     ))
 
 (fun compare_associativity (lop_info rop_info) (
@@ -275,9 +266,9 @@
         ))
     (output_loc stderr (merge_loc (cdr lop_info) (cdr rop_info)))
     (output_string stderr "undetermined associativity ")
-    (output_string stderr (field_get (field_get lop 1) @SymbolName))
+    (output_symbol stderr (field_get lop 1))
     (output_string stderr " <-> ")
-    (output_string stderr (field_get (field_get rop 1) @SymbolName))
+    (output_symbol stderr (field_get rop 1))
     (output_char stderr '\n')
     (exit 1)
     ))

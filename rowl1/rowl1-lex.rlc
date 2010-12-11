@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-lex.rlc 2010-12-09 22:11:05 nineties $
+; $Id: rowl1-lex.rlc 2010-12-11 18:09:35 nineties $
 ;
 
 (import "rlvm-compile")
@@ -331,20 +331,16 @@
         )))))))))
     ))
 
-(fun output_loc (ochan) (
-    (if srcfile (do
-        (output_string ochan srcfile)
-        (output_char   ochan ':')
-        (output_int    ochan srcline)
-        (output_char   ochan ':')
-        (output_int    ochan srcclmn)
-        (output_string ochan ": ")
-        ))
-    ))
-
 (fun lex_error (msg) (
     (flush stdout)
-    (output_loc stderr)
+    (if srcfile (do
+        (output_string stderr srcfile)
+        (output_char   stderr ':')
+        (output_int    stderr srcline)
+        (output_char   stderr ':')
+        (output_int    stderr srcclmn)
+        (output_string stderr ": ")
+        ))
     (output_string stderr msg)
     (output_string stderr ": ")
     (output_string stderr (get_token_text))
@@ -767,15 +763,14 @@
     (add_operator name (variant @OP_POSTFIX 1 sym assoc))
     ))
 
-(export fun add_infixl (name assoc) ((add_infix name 1 assoc)))
-(export fun add_infixr (name assoc) ((add_infix name 0 assoc)))
+(export fun add_infixl (name head assoc) ((add_infix name head @TRUE assoc)))
+(export fun add_infixr (name head assoc) ((add_infix name head @FALSE assoc)))
 
-(fun add_infix (name is_left assoc) (
+(fun add_infix (name head is_left assoc) (
     ; XXX: check validity of the format of the name
     (check_assoc name assoc)
+    (var infix_op (variant @OP_INFIX 1 head is_left assoc))
     (var op (find_operator name))
-    (var sym (to_sym name))
-    (var infix_op (variant @OP_INFIX 1 sym is_left assoc))
     (if op (do
         (var optype (field_get op 0))
         (if (== optype @OP_PREFIX) (do
@@ -791,10 +786,10 @@
     ))
 
 (export fun add_constr (name maxlen assoc) (
-    (check_assoc name assoc)
-    (var sym (to_sym name))
-    (field_set sym @SymbolEOp (make_expr Constructor (list2 (box maxlen) (box assoc))))
-    (add_operator name (variant @OP_CONSTR 1 sym maxlen assoc))
+    ;(check_assoc name assoc)
+    ;(var sym (to_sym name))
+    ;(field_set sym @SymbolEOp (make_expr Constructor (list2 (box maxlen) (box assoc))))
+    ;(add_operator name (variant @OP_CONSTR 1 sym maxlen assoc))
     ))
 
     ))
