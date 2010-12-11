@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2010-12-09 23:09:25 nineties $
+; $Id: rowl1-node.rlc 2010-12-11 19:45:49 nineties $
 ;
 
 (import "rlvm-compile")
@@ -28,12 +28,10 @@
 (export var Subscr      (to_sym "Subscr"))
 (export var Located     (to_sym "Located"))
 (export var Loc         (to_sym "Loc"))
-(export var Infix       (to_sym "Infix"))
 (export var Prefix      (to_sym "Prefix"))
 (export var Postfix     (to_sym "Postfix"))
-(export var Constructor (to_sym "Constructor"))
-(export var Left        (to_sym "Left"))
-(export var Right       (to_sym "Right"))
+(export var InfixL      (to_sym "InfixL"))
+(export var InfixR      (to_sym "InfixR"))
 (export var eval-sym    (to_sym "eval"))
 
 (export fun to_sym (name) (
@@ -100,6 +98,14 @@
     (output_char ochan ' ')
     ))
 
+(extern object current_loc)
+(export fun output_error (ochan) (
+    (flush stdout)
+    (output_char ochan '\n')
+    (output_loc ochan current_loc)
+    (output_string ochan "ERROR: ")
+    ))
+
 (export fun expr_head (node) (
     (tswitch (node_type node) (
         (@SymbolE . (return Symbol))
@@ -111,19 +117,44 @@
         ))
     ))
 
-(export fun expr_args (node) (
-    (if (!= (node_type node) @Expr) (return 0))
-    (return (field_get node @ExprArgs))
+(export fun expr_args (expr) (
+    (if (!= (node_type expr) @Expr) (return 0))
+    (return (field_get expr @ExprArgs))
     ))
 
-(export fun expr_arg (node idx) (
-    (var args (expr_args node))
+(export fun expr_arg (expr idx) (
+    (var args (expr_args expr))
     (while (> idx 0) (do
+        (if (! args) (do
+            (output_error stderr)
+            (output_string stderr "`")
+            (pretty_print_abbrev stderr expr)
+            (output_string stderr "' does not have ")
+            (output_ordinal stderr (+ idx 1))
+            (output_string stderr " parameter\n")
+            (exit 1)
+            ))
         (if (! args) (not_reachable "expr_arg"))
         (= args (cdr args))
         (decr idx)
         ))
     (return (car args))
+    ))
+
+(export fun expr_arg_check (expr type idx) (
+    (var arg (expr_arg expr idx))
+    (if (!= (node_type arg) type) (do
+        (output_error stderr)
+        (output_string stderr "the ")
+        (output_ordinal stderr (+ idx 1))
+        (output_string stderr " parameter of `")
+        (pretty_print_abbrev stderr expr)
+        (output_string stderr "' must be ")
+        (output_primitive_type stderr type)
+        (output_string stderr "\n")
+        (exit 1)
+        ))
+    (return arg)
     ))
 
 (export fun make_expr (head args) (
@@ -134,9 +165,34 @@
     (return (make_expr Located (list2 loc expr)))
     ))
 
+(export fun output_symbol (ochan sym) (
+    (output_string ochan (field_get sym @SymbolName))
+    ))
+
+(fun output_ordinal (ochan idx) (
+    (output_int ochan idx)
+    (if (== (/ idx 10) 1) (return (output_string ochan "th")))
+    (var r (% idx 10))
+    (if (== r 1) (return (output_string ochan "st")))
+    (if (== r 2) (return (output_string ochan "nd")))
+    (if (== r 3) (return (output_string ochan "rd")))
+    (output_string ochan "th")
+    ))
+
+(fun output_primitive_type (ochan type) (
+    (tswitch type (
+        (@SymbolE . (return (output_string ochan "Symbol")))
+        (@Expr    . (not_reachable "output_primitive_type"))
+        (@IntE    . (return (output_string ochan "Int")))
+        (@FloatE  . (return (output_string ochan "Float")))
+        (@StringE . (return (output_string ochan "String")))
+        (default  . (not_reachable "output_primitive_type"))
+        ))
+    ))
+
 (export fun pretty_print (ochan node) (
     (tswitch (node_type node) (
-        (@SymbolE . (return (pp_symbol ochan node)))
+        (@SymbolE . (return (output_symbol ochan node)))
         (@Expr    . (return (pp_expr ochan node)))
         (@IntE    . (return (pp_int ochan node)))
         (@FloatE  . (return (pp_float ochan node)))
@@ -145,8 +201,13 @@
         ))
     ))
 
-(fun pp_symbol (ochan node) (
-    (output_string ochan (field_get node @SymbolName))
+(export fun pretty_print_abbrev (ochan expr) (
+    (if (== (node_type expr) @Expr) (do
+        (output_symbol ochan (expr_head expr))
+        (output_string ochan "(...)")
+        return
+        ))
+    (pretty_print ochan expr)
     ))
 
 (fun pp_expr (ochan node) (
@@ -160,7 +221,7 @@
     (if (== head Subscr) (return (pp_subscr ochan args)))
     (if (== head Located) (return (pretty_print ochan (expr_arg node 1))))
 
-    (output_string ochan (field_get head @SymbolName))
+    (output_symbol ochan head)
     (output_char ochan '(')
     (while args (do
         (pretty_print ochan (car args))

@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-stdlib.rlc 2010-12-10 16:03:38 nineties $
+; $Id: rowl1-stdlib.rlc 2010-12-11 18:39:34 nineties $
 ;
 
 (import "rlvm-compile")
@@ -11,7 +11,6 @@
 (compile `object `(
 
 (import "rowl1-node")
-(import "rowl1-lex")
 (import "rowl1-interp")
 (import "rowl1-compile")
 
@@ -35,12 +34,6 @@
 (fun builtin_imul (a b) ((return (box (* (unbox a) (unbox b))))))
 (fun builtin_idiv (a b) ((return (box (/ (unbox a) (unbox b))))))
 (fun builtin_mod (a b)  ((return (box (% (unbox a) (unbox b))))))
-
-(fun builtin_infixr (op assoc) (
-    (print_string op)
-    (print_char '\n')
-    (add_infixr op assoc)
-    ))
 
 (export fun init_stdlib (parse_only) (
 
@@ -66,24 +59,27 @@
     ;(add_infixr  "!" 11)
 
     ;(add_builtin_function2 (to_sym "infixr") String Int builtin_infixr)
+
     (if parse_only
         (add_functions_pp)
         (add_functions_std)
         )
+
+    (add_builtin_function1 eval-sym (to_sym "define_operator") builtin_eval_define_operator)
     ))
 
 (fun add_functions_std () (
-    (add_builtin_function2 eval-sym 0 0 builtin_eval)
-    (add_builtin_function2 eval-sym 0 Located builtin_eval_located)
+    (add_builtin_function1 eval-sym 0 builtin_eval)
+    (add_builtin_function1 eval-sym Located builtin_eval_located)
 
-    (add_builtin_function1 (to_sym "pprint") 0 builtin_pretty_print)
+    (add_builtin_function1 (to_sym "pretty_print") 0 builtin_pretty_print)
     (add_builtin_function1 (to_sym "print") String builtin_print_string)
     (add_builtin_function1 (to_sym "print") Int builtin_print_int)
 
-    (add_builtin_function2 (to_sym "+") Int Int builtin_iadd)
-    (add_builtin_function2 (to_sym "-") Int Int builtin_sub)
-    (add_builtin_function2 (to_sym "*") Int Int builtin_imul)
-    (add_builtin_function2 (to_sym "/") Int Int builtin_idiv)
+    (add_builtin_function2 (to_sym "Plus") Int Int builtin_iadd)
+    (add_builtin_function2 (to_sym "Minus") Int Int builtin_sub)
+    (add_builtin_function2 (to_sym "Times") Int Int builtin_imul)
+    (add_builtin_function2 (to_sym "Divide") Int Int builtin_idiv)
     ))
 
 (fun add_functions_pp () (

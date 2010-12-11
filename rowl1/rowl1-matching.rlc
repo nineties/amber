@@ -1,8 +1,8 @@
-;
+;1
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2010-12-10 09:16:17 nineties $
+; $Id: rowl1-matching.rlc 2010-12-11 19:42:27 nineties $
 ;
 
 (import "rlvm-compile")
@@ -19,15 +19,13 @@
 
 (var headpat (to_sym "%head-pattern"))
 
-(extern fun matching_error)
-(export fun compile_matching (bytecode pats) (
+(fun compile_matching (bytecode head pats) (
     ; we need to clone 'pats' here because compile_matching_main() will rearrange it.
     (= pats (list_clone pats))
 
     (var asm (make_assembler 10))
     (compile_matching_main asm 0 pats)
-
-    (compile_simple_call asm 0 matching_error @FALSE)
+    (compile_matching_error asm head (list_length (caar pats)))
 
     (set_code bytecode asm)
     (return bytecode)
@@ -307,8 +305,9 @@
 (export fun compile_matching_hook (ent arity) (
     (var asm (make_assembler 10))
 
-    (put_push asm (cdr ent))
-    (put_push asm (car ent))
+    (put_push asm (field_get ent 2))
+    (put_push asm (field_get ent 1))
+    (put_push asm (field_get ent 0))
     (put_imm_int32 asm compile_matching)
     (put_dcall asm 8)
     (put_dup asm)
@@ -318,14 +317,25 @@
     (put_jjump asm)
 
     (set_code (car ent) asm)
-    (return (car ent))
     ))
 
-(export fun matching_error () (
-    ; XXX: output useful info
-    (flush stdout)
-    (output_string stderr "ERROR: no pattern matches to ..\n")
+(fun matching_error (head args) (
+    (output_error stderr)
+    (output_string stderr "no declaration matchines to ")
+    (pretty_print stderr (make_expr head args))
+    (output_string stderr "\n")
     (exit 1)
+    ))
+
+(fun compile_matching_error (asm head arity) (
+    (put_imm_int32 asm 0) ; nil
+    (while (> arity 0) (do
+        (decr arity)
+        (put_arg asm arity)
+        (put_cons asm)
+        ))
+    (put_push asm head)
+    (compile_simple_call asm 2 matching_error @FALSE)
     ))
 
     ))

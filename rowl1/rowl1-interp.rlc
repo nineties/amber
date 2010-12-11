@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2010-12-10 16:09:46 nineties $
+; $Id: rowl1-interp.rlc 2010-12-11 19:44:06 nineties $
 ;
 
 (import "rlvm-compile")
@@ -25,16 +25,15 @@
     (var depth (symtable_depth funtable))
     (var arity (list_length args))
     (var ent (symtable_find funtable sym arity))
-    (if (&& ent (== depth (field_get ent 2)))
+    (if (&& ent (== depth (field_get ent 3)))
         (do
-            (var pats (cons (cons args code) (cdr ent)))
-            (field_set ent 1 pats)
-            (field_set ent 0 (compile_matching_hook ent arity))
+            (field_set ent 2 (cons (cons args code) (field_get ent 2)))
+            (compile_matching_hook ent arity)
         )
         (do
             (var pats (cons (cons args code) 0))
-            (var ent  (tuple 2 (bytecode 0 0 0 0) pats depth))
-            (field_set ent 0 (compile_matching_hook ent arity))
+            (var ent  (tuple 3 (bytecode 0 0 0 0) sym pats depth))
+            (compile_matching_hook ent arity)
             (symtable_add funtable sym arity ent)
             (register_symbol sym (to_sym "%function"))
         )
@@ -65,85 +64,97 @@
     (add_function sym (list2 pat1 pat2) code)
     ))
 
+(export fun add_builtin_function3 (sym pat1 pat2 pat3 func) (
+    (var asm (make_assembler))
+    (compile_simple_function asm 3 func @TRUE)
+    (var code (get_code asm))
+    (= pat1 (setup_pat pat1))
+    (= pat2 (setup_pat pat2))
+    (= pat3 (setup_pat pat3))
+    (add_function sym (list3 pat1 pat2 pat3) code)
+    ))
+
+(export fun add_builtin_function4 (sym pat1 pat2 pat3 pat4 func) (
+    (var asm (make_assembler))
+    (compile_simple_function asm 4 func @TRUE)
+    (var code (get_code asm))
+    (= pat1 (setup_pat pat1))
+    (= pat2 (setup_pat pat2))
+    (= pat3 (setup_pat pat3))
+    (= pat4 (setup_pat pat4))
+    (add_function sym (list4 pat1 pat2 pat3 pat4) code)
+    ))
+
+(export var current_loc null)
 (export fun interpret (ichan) (
+    (= current_loc no_loc)
     (while 1 (do
         (var e (parse ichan))
         (if (! e) break)
-        (call_eval no_loc e)
+        (call_eval e)
         ))
     ))
 
-(fun call_eval (loc expr) (
-    (var f (lookup_func eval-sym 2))
-    (jitcall f loc expr)
+(fun call_eval (expr) (
+    (var f (lookup_func eval-sym 1))
+    (jitcall f expr)
     ))
 
 (export fun lookup_func (sym arity) (
     (var ent (symtable_find funtable sym arity))
     (if (! ent) (do
-        (= ent (tuple 2 (gen_construction sym arity) 0 (symtable_depth funtable)))
+        (= ent (tuple 3 (undeclared_error_hook sym arity) (to_sym "undeclared_error") 0
+            (symtable_depth funtable)))
         (symtable_add funtable sym arity ent)
         ))
     (return (field_get ent 0))
     ))
 
-;(fun undefined_expression (loc) (
-;    (flush stdout)
-;    (error_head stderr loc)
-;    (output_string stderr "undefined expression\n")
-;    (exit 1)
-;    ))
-;
-;(fun no_declaration_error (name) (
-;    (flush stdout)
-;    (output_string stderr "ERROR: no declaration of ")
-;    (output_string stderr name)
-;    (exit 1)
-;    ))
-;
-;(fun gen_no_declaration_error (sym) (
-;    (var asm (make_assembler))
-;    (put_push asm (field_get sym @SymbolName))
-;    (compile_simple_call asm 1 no_declaration_error @FALSE)
-;    (return (get_code asm))
-;    ))
+(fun undeclared_error (sym arity) (
+    (output_error stderr)
+    (output_string stderr "undeclared function `")
+    (output_symbol stderr sym)
+    (output_string stderr "' whose arity is ")
+    (output_int stderr (unbox arity))
+    (output_string stderr "\n")
+    (exit 1)
+    ))
 
-(fun gen_construction (sym arity) (
+(fun undeclared_error_hook (sym arity) (
     (var asm (make_assembler))
-    (put_imm_int32 asm 0) ; nil
-    (while (> arity 0) (do
-        (decr arity)
-        (put_arg asm arity)
-        (put_cons asm)
-        ))
-    (put_push asm sym) ; head
-    (compile_simple_call asm 2 make_expr @TRUE)
+    (put_push asm (box arity))
+    (put_push asm sym)
+    (compile_simple_call asm 2 undeclared_error @TRUE)
     (return (get_code asm))
     ))
 
-(export fun builtin_eval (loc expr) (
-    (if (! expr) (error "builtin_eval: null expression"))
-    (tswitch (node_type expr) (
-        (@SymbolE . (return (builtin_eval_symbol loc expr)))
-        (@Expr    . (return (builtin_eval_expr loc expr)))
-        (default  . (return expr))
-        ))
-    ))
-
-(fun builtin_eval_symbol (sym) (
-    (var value (symtable_find vartable sym 0))
-    (if value (return value) (return sym))
-    ))
-
-(fun builtin_eval_expr (loc expr) (
+(export fun builtin_eval (expr) (
     (var asm (make_assembler))
     (compile_expression asm expr @TRUE)
     (return (jitcall (get_code asm)))
     ))
 
-(export fun builtin_eval_located (loc expr) (
+(export fun builtin_eval_located (expr) (
     (var args (field_get expr @ExprArgs))
-    (return (call_eval (expr_arg expr 0) (expr_arg expr 1)))
+    (var save_loc current_loc)
+    (= current_loc (expr_arg expr 0))
+    (var ret (call_eval (expr_arg expr 1)))
+    (= current_loc save_loc)
+    (return ret)
+    ))
+
+(extern fun add_infixl)
+(export fun builtin_eval_define_operator (expr) (
+    (var repr (expr_arg_check expr @StringE 0))
+    (var head (expr_arg_check expr @SymbolE 1))
+    (var type (expr_arg_check expr @SymbolE 2))
+    (var assoc (unbox (expr_arg_check expr @IntE 3)))
+    (if (== type InfixL) (return (add_infixl repr head assoc)))
+    (output_error stderr)
+    (output_string stderr "invalid operator type `")
+    (pretty_print stderr type)
+    (output_string stderr "'\n")
+    (exit 1)
     ))
 
 (export fun builtin_pretty_print (loc expr) (
