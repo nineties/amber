@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-stdlib.rlc 2010-12-11 18:39:34 nineties $
+; $Id: rowl1-stdlib.rlc 2010-12-15 01:42:34 nineties $
 ;
 
 (import "rlvm-compile")
@@ -30,60 +30,41 @@
     ))
 
 (fun builtin_iadd (a b) ((return (+ (- a 1) b))))
-(fun builtin_sub (a b)  ((return (+ (- a b) 1))))
+(fun builtin_isub (a b)  ((return (+ (- a b) 1))))
 (fun builtin_imul (a b) ((return (box (* (unbox a) (unbox b))))))
 (fun builtin_idiv (a b) ((return (box (/ (unbox a) (unbox b))))))
 (fun builtin_mod (a b)  ((return (box (% (unbox a) (unbox b))))))
+(fun builtin_iuplus (a) ((return a)))
+(fun builtin_iuminus (a) ((return (box (- (unbox a))))))
 
 (export fun init_stdlib (parse_only) (
-
-    ; add operators
-    ;(add_postfix ";" 1)
-    ;(add_constr  "def" 2 2)
-    ;(add_constr  "return" 1 3)
-    ;(add_constr  "if" 2 4)
-    ;(add_infixr  ":" 5)
-    ;(add_infixr  "=" 6)
-    ;(add_infixl  "<" 7)
-    ;(add_infixl  ">" 7)
-    ;(add_infixl  "<=" 7)
-    ;(add_infixl  ">=" 7)
-    ;(add_infixl  "==" 7)
-    ;(add_infixl  "!=" 7)
-    ;(add_infixl  "+" 8)
-    ;(add_infixl  "-" 8)
-    ;(add_infixl  "*" 9)
-    ;(add_infixl  "/" 9)
-    ;(add_prefix  "+" 10)
-    ;(add_prefix  "-" 10)
-    ;(add_infixr  "!" 11)
-
-    ;(add_builtin_function2 (to_sym "infixr") String Int builtin_infixr)
-
     (if parse_only
         (add_functions_pp)
         (add_functions_std)
         )
-
-    (add_builtin_function1 eval-sym (to_sym "define_operator") builtin_eval_define_operator)
     ))
 
 (fun add_functions_std () (
-    (add_builtin_function1 eval-sym 0 builtin_eval)
-    (add_builtin_function1 eval-sym Located builtin_eval_located)
-
     (add_builtin_function1 (to_sym "pretty_print") 0 builtin_pretty_print)
     (add_builtin_function1 (to_sym "print") String builtin_print_string)
     (add_builtin_function1 (to_sym "print") Int builtin_print_int)
 
     (add_builtin_function2 (to_sym "Plus") Int Int builtin_iadd)
-    (add_builtin_function2 (to_sym "Minus") Int Int builtin_sub)
+    (add_builtin_function2 (to_sym "Minus") Int Int builtin_isub)
     (add_builtin_function2 (to_sym "Times") Int Int builtin_imul)
     (add_builtin_function2 (to_sym "Divide") Int Int builtin_idiv)
+    (add_builtin_function1 (to_sym "UnaryPlus") Int builtin_iuplus)
+    (add_builtin_function1 (to_sym "UnaryMinus") Int builtin_iuminus)
+
+    (add_builtin_function1 eval-sym 0 builtin_eval)
+    (add_builtin_function1 eval-sym Located builtin_eval_located)
+    (add_builtin_function1 eval-sym (to_sym "syntax_sugar") builtin_eval_syntax_sugar)
     ))
 
 (fun add_functions_pp () (
-    (add_builtin_function2 eval-sym 0 0 builtin_pretty_print)
+    (add_builtin_function1 eval-sym 0 builtin_pretty_print)
+    (add_builtin_function1 eval-sym Located builtin_eval_located)
+    (add_builtin_function1 eval-sym (to_sym "syntax_sugar") builtin_eval_syntax_sugar_pp)
     ))
 
     ))

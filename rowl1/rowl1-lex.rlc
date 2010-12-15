@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-lex.rlc 2010-12-11 18:09:35 nineties $
+; $Id: rowl1-lex.rlc 2010-12-14 23:00:57 nineties $
 ;
 
 (import "rlvm-compile")
@@ -611,12 +611,15 @@
             ))
         (39 . (do
             (consume)
-            (var op (find_operator (get_token_text)))
-            (if op (accept_operator op infix_p))
             (= state (next_state s39next))
 	    (if (== state 1) (do
-		(accept @TOK_SYMBOL)
-		(= token_value (to_sym (get_token_text)))
+                (var op (find_operator (get_token_text)))
+                (if op
+                    (accept_operator op infix_p)
+                    (do
+                        (accept @TOK_SYMBOL)
+                        (= token_value (to_sym (get_token_text)))
+                    ))
 		))
             (goto lexloop)
             ))
@@ -624,8 +627,10 @@
             (consume)
             (var op (find_operator (get_token_text)))
             (if op
-                (do (accept_operator op infix_p) (store_lexer_state))
-                )
+                (do
+                    (accept_operator op infix_p)
+                    (store_lexer_state)
+                ))
             (= state (next_state s40next))
             (goto lexloop)
             ))
@@ -704,13 +709,14 @@
     (if (== optype @OP_POSTFIX) (accept @TOK_POSTFIX)
     (if (== optype @OP_INFIX) (accept @TOK_INFIX)
     (if (== optype @OP_CONSTR) (accept @TOK_CONSTR)
+    (if (== optype @OP_COMMAND) (accept @TOK_COMMAND)
     (if (== optype @OP_PREFIX_OR_INFIX) (do
         (if infix_p
             (do (accept @TOK_INFIX) (= op (field_get op 2)))
             (do (accept @TOK_PREFIX) (= op (field_get op 1)))
             )
         )
-        )))))
+        ))))))
     (= token_value op)
     ))
 
@@ -722,8 +728,8 @@
     (idtable_pop operator_table)
     ))
 
-(fun add_operator (name sym) (
-    (idtable_add operator_table name sym)
+(fun add_operator (name op) (
+    (idtable_add operator_table name op)
     ))
 
 (fun find_operator (name) (
@@ -731,65 +737,158 @@
     ))
 
 (fun check_assoc (name assoc) (
-    (if (> assoc 0) return)
-    (output_string stderr "ERROR: associativity of operator '")
+    (if (&& (> assoc 0) (<= assoc @ASSOC_MAX)) return)
+    (output_error stderr)
+    (output_string stderr "associativity of operator `")
     (output_string stderr name)
-    (output_string stderr "' must be positive\n")
+    (output_string stderr "' must be 1 to ")
+    (output_int stderr @ASSOC_MAX)
+    (output_string stderr "\n")
     (exit 1)
     ))
 
-(export fun add_prefix (name assoc) (
+(fun is_idhead (c) (
+    (var group (array_get char chgroup c))
+    (if (== group @CH_af) (return @TRUE))
+    (if (== group @CH_b) (return @TRUE))
+    (if (== group @CH_e) (return @TRUE))
+    (if (== group @CH_o) (return @TRUE))
+    (if (== group @CH_rtv) (return @TRUE))
+    (if (== group @CH_x) (return @TRUE))
+    (if (== group @CH_n) (return @TRUE))
+    (if (== group @CH_HEX) (return @TRUE))
+    (if (== group @CH_OTHER) (return @TRUE))
+    (return @FALSE)
+    ))
+
+(fun is_idletter (c) (
+    (var group (array_get char chgroup c))
+    (if (== group @CH_0) (return @TRUE))
+    (if (== group @CH_1) (return @TRUE))
+    (if (== group @CH_2_7) (return @TRUE))
+    (if (== group @CH_8_9) (return @TRUE))
+    (if (== group @CH_af) (return @TRUE))
+    (if (== group @CH_b) (return @TRUE))
+    (if (== group @CH_e) (return @TRUE))
+    (if (== group @CH_o) (return @TRUE))
+    (if (== group @CH_rtv) (return @TRUE))
+    (if (== group @CH_x) (return @TRUE))
+    (if (== group @CH_n) (return @TRUE))
+    (if (== group @CH_HEX) (return @TRUE))
+    (if (== group @CH_OTHER) (return @TRUE))
+    (return @FALSE)
+    ))
+
+(fun is_opchar (c) (
+    (var group (array_get char chgroup c))
+    (if (== group @CH_SLASH) (return @TRUE))
+    (if (== group @CH_BACKSLASH) (return @TRUE))
+    (if (== group @CH_DOT) (return @TRUE))
+    (if (== group @CH_PLUSMINUS) (return @TRUE))
+    (if (== group @CH_OPCHAR) (return @TRUE))
+    (return @FALSE)
+    ))
+
+(fun check_operator_format (name) (
+    (var i 0)
+    (var c (array_get char name 0))
+    (if (is_idhead c) (do
+        (incr i)
+        (while 1 (do
+            (= c (array_get char name i))
+            (if (! c) return)
+            (if (! (is_idletter c)) break)
+            (incr i)
+            ))
+        )
+    (if (is_opchar c) (do
+        (incr i)
+        (while 1 (do
+            (= c (array_get char name i))
+            (if (! c) return)
+            (if (! (is_opchar c)) break)
+            (incr i)
+            ))
+        )))
+    (output_error stderr)
+    (output_string stderr "invalid string for operator, \"")
+    (output_string_escape stderr name)
+    (output_string stderr "\"\n")
+    (exit 1)
+    ))
+
+(export fun add_prefix (head op) (
+    (var name (expr_arg_check op @StringE 0))
+    (var assoc (unbox (expr_arg_check op @IntE 1)))
+    (check_operator_format name)
     (check_assoc name assoc)
+    (register_operator head op)
     (var op (find_operator name))
-    (var sym (to_sym name))
-    (var prefix_op (variant @OP_PREFIX 1 sym assoc))
+    (var prefix_op (variant @OP_PREFIX 1 head assoc))
     (if op (do
         (var optype (field_get op 0))
         (if (== optype @OP_INFIX) (do
             (add_operator name (variant @OP_PREFIX_OR_INFIX 2 prefix_op op))
-            return
+            (return Nil)
             ))
         (if (== optype @OP_PREFIX_OR_INFIX) (do
             (add_operator name (variant @OP_PREFIX_OR_INFIX 2 prefix_op (field_get op 2)))
-            return
+            (return Nil)
             ))
         ))
     (add_operator name prefix_op)
+    (return Nil)
     ))
 
-(export fun add_postfix (name assoc) (
+(export fun add_postfix (head op) (
+    (var name (expr_arg_check op @StringE 0))
+    (var assoc (unbox (expr_arg_check op @IntE 1)))
+    (check_operator_format name)
     (check_assoc name assoc)
-    (var sym (to_sym name))
-    (add_operator name (variant @OP_POSTFIX 1 sym assoc))
+    (register_operator head op)
+    (add_operator name (variant @OP_POSTFIX 1 head assoc))
     ))
 
-(export fun add_infixl (name head assoc) ((add_infix name head @TRUE assoc)))
-(export fun add_infixr (name head assoc) ((add_infix name head @FALSE assoc)))
-
-(fun add_infix (name head is_left assoc) (
-    ; XXX: check validity of the format of the name
+(export fun add_infix (head op) (
+    (var type (expr_head op))
+    (var name (expr_arg_check op @StringE 0))
+    (var assoc (unbox (expr_arg_check op @IntE 1)))
+    (check_operator_format name)
     (check_assoc name assoc)
+    (register_operator head op)
+    (var is_left)
+    (if (== type InfixL) (= is_left @TRUE) (= is_left @FALSE))
     (var infix_op (variant @OP_INFIX 1 head is_left assoc))
     (var op (find_operator name))
     (if op (do
         (var optype (field_get op 0))
         (if (== optype @OP_PREFIX) (do
             (add_operator name (variant @OP_PREFIX_OR_INFIX 2 op infix_op))
-            return
+            (return Nil)
             ))
         (if (== optype @OP_PREFIX_OR_INFIX) (do
             (add_operator name (variant @OP_PREFIX_OR_INFIX 2 (field_get op 1) infix_op))
-            return
+            (return Nil)
             ))
         ))
     (add_operator name infix_op)
+    (return Nil)
     ))
 
-(export fun add_constr (name maxlen assoc) (
-    ;(check_assoc name assoc)
-    ;(var sym (to_sym name))
-    ;(field_set sym @SymbolEOp (make_expr Constructor (list2 (box maxlen) (box assoc))))
-    ;(add_operator name (variant @OP_CONSTR 1 sym maxlen assoc))
+(export fun add_constr (head op) (
+    (var name (expr_arg_check op @StringE 0))
+    (check_operator_format name)
+    (register_operator head op)
+    (add_operator name (variant @OP_CONSTR 1 head))
+    (return Nil)
+    ))
+
+(export fun add_command (head op) (
+    (var name (expr_arg_check op @StringE 0))
+    (check_operator_format name)
+    (register_operator head op)
+    (add_operator name (variant @OP_COMMAND 1 head))
+    (return Nil)
     ))
 
     ))

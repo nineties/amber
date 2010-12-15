@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2010-12-11 19:45:49 nineties $
+; $Id: rowl1-node.rlc 2010-12-15 16:04:14 nineties $
 ;
 
 (import "rlvm-compile")
@@ -11,12 +11,15 @@
 (compile `object `(
 
 (import "rowl1-util")
+(import "rowl1-symtable")
 
 (var symbol_table (make_idtable))
 (var symbol_index_gen 0)
+(var operator_table (make_symtable))
 
 ; builtin expression headers and types
 (export var DontCare    (to_sym "_"))
+(export var Nil		(to_sym "nil"))
 (export var Symbol      (to_sym "Symbol"))
 (export var Int         (to_sym "Int"))
 (export var Float       (to_sym "Float"))
@@ -32,13 +35,15 @@
 (export var Postfix     (to_sym "Postfix"))
 (export var InfixL      (to_sym "InfixL"))
 (export var InfixR      (to_sym "InfixR"))
+(export var Constr      (to_sym "Constr"))
+(export var Command     (to_sym "Command"))
 (export var eval-sym    (to_sym "eval"))
 
 (export fun to_sym (name) (
     (var sym (idtable_find symbol_table name))
     (if sym (return sym))
     (= name (strdup name))
-    (= sym (variant @SymbolE 2 name 0 symbol_index_gen))
+    (= sym (variant @SymbolE 1 name symbol_index_gen))
     (+= symbol_index_gen 1)
     (idtable_add symbol_table name sym)
     (return sym)
@@ -163,6 +168,10 @@
 
 (export fun make_located (loc expr) (
     (return (make_expr Located (list2 loc expr)))
+    ))
+
+(export fun register_operator (head op) (
+    (symtable_add operator_table head 0 op)
     ))
 
 (export fun output_symbol (ochan sym) (

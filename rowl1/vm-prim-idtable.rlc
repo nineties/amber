@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-idtable.rlc 2010-11-08 19:45:24 nineties $
+; $Id: vm-prim-idtable.rlc 2010-12-15 16:05:44 nineties $
 ;
 
 (import "stdlib")
@@ -19,16 +19,15 @@
 ; local table
 ;     0 : bucket
 ;     1 : pointer to the next table
-;     2 : pointer to the first entry
+;     2 : vector of entries
 ;     3 : size of the bucket
 ;     4 : # of local identifiers
 ;
 ; table entry
 ;     0 : key
 ;     1 : value
-;     2 : pointer to the next entry in one bucket entry
-;     3 : pointer to the next entry in local table
-;     4 : hash
+;     2 : pointer to the next entry
+;     3 : hash
 
 (int[] 32 prime_numbers (
     5 11 17 37 67 131 257 521 1031 2053 4099 8209 16411 32771 65537 131101
@@ -41,7 +40,7 @@
         (error "too many local identifiers")
         ))
     (void* bucket (allocate_array size))
-    (return (prim_make_tuple5 3 bucket 0 0 size 0))
+    (return (prim_make_tuple5 3 bucket 0 (prim_make_vector 0) size 0))
     ))
 
 (export prim_make_idtable)
@@ -87,12 +86,12 @@
             (error "too many local identifiers")
             ))
         (void* bucket (allocate_array size))
-        (void* entry (get table 2))
-        (while entry (
-            (int h (% (get entry 4) size))
+        (void* entries (get table 2))
+        (for i 0 (prim_vector_size entries) (
+            (void* entry (prim_vector_at entries i))
+            (int h (% (get entry 3) size))
             (set entry 2 (get bucket h))
             (set bucket h entry)
-            (= entry (get entry 3))
             ))
         (set table 0 bucket)
         (set table 3 size)
@@ -114,16 +113,15 @@
     (int size (get table 3))
     (void* bucket (get table 0))
     (int h (hash name))
-    (void* ent (prim_make_tuple5 4 name val 0 0 h))
+    (void* ent (prim_make_tuple5 3 name val 0 h))
     (%= h size)
 
     ; add the entry to the bucket
     (set ent 2 (get bucket h))
     (set bucket h ent)
 
-    ; add the entry to the entry list
-    (set ent 3 (get table 2))
-    (set table 2 ent)
+    ; add the entry to the vector of entries
+    (prim_vector_pushback (get table 2) ent)
 
     ; increment counters
     (set table 4 (+ (get table 4) 1))
