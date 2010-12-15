@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2010-12-11 19:44:06 nineties $
+; $Id: rowl1-interp.rlc 2010-12-15 16:05:25 nineties $
 ;
 
 (import "rlvm-compile")
@@ -143,23 +143,44 @@
     (return ret)
     ))
 
-(extern fun add_infixl)
-(export fun builtin_eval_define_operator (expr) (
-    (var repr (expr_arg_check expr @StringE 0))
-    (var head (expr_arg_check expr @SymbolE 1))
-    (var type (expr_arg_check expr @SymbolE 2))
-    (var assoc (unbox (expr_arg_check expr @IntE 3)))
-    (if (== type InfixL) (return (add_infixl repr head assoc)))
+(extern fun add_infix)
+(extern fun add_prefix)
+(extern fun add_postfix)
+(extern fun add_constr)
+(extern fun add_command)
+(export fun builtin_eval_syntax_sugar (expr) (
+    (var head (expr_arg_check expr @SymbolE 0))
+    (var op   (expr_arg expr 1))
+    (if (== (node_type op) @Expr) (do
+        (var type (expr_head op))
+        (if (|| (== type InfixL) (== type InfixR))
+            (return (add_infix head op))
+        (if (== type Prefix)
+            (return (add_prefix head op))
+        (if (== type Postfix)
+            (return (add_postfix head op))
+        (if (== type Constr)
+            (return (add_constr head op))
+        (if (== type Command)
+            (return (add_command head op)))))))
+        ))
     (output_error stderr)
-    (output_string stderr "invalid operator type `")
-    (pretty_print stderr type)
+    (output_string stderr "invalid syntax specifier `")
+    (pretty_print stderr op)
     (output_string stderr "'\n")
     (exit 1)
     ))
 
-(export fun builtin_pretty_print (loc expr) (
+(export fun builtin_pretty_print (expr) (
     (pretty_print stdout expr)
     (output_char stdout '\n')
+    (return Nil)
+    ))
+
+(export fun builtin_eval_syntax_sugar_pp (expr) (
+    (pretty_print stdout expr)
+    (output_char stdout '\n')
+    (return (builtin_eval_syntax_sugar expr))
     ))
 
     ))
