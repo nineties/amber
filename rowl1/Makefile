@@ -3,9 +3,10 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-12-16 17:26:02 nineties $
+# $Id: Makefile 2010-12-17 00:02:42 nineties $
 
-ROWL0DIR = ../rowl0
+TOPDIR = ..
+ROWL0DIR = $(TOPDIR)/rowl0
 BINDIR = /usr/bin
 LIBDIR = /usr/lib
 
@@ -96,7 +97,7 @@ RLVMCOMPILER = rlci\
 	       vm-prim-inc.rlc
 
 startup.rlo        : $(RLVMCOMPILER)
-rowl1-main.rlo     : $(RLVMCOMPILER) rowl1-types.rlc rowl1-node.rlo rowl1-lex.rlo rowl1-stdlib.rlo rowl1-interp.rlo
+rowl1-main.rlo     : $(RLVMCOMPILER) rowl1-types.rlc rowl1-node.rlo rowl1-stdlib.rlo rowl1-parse.rlo rowl1-interp.rlo
 rowl1-util.rlo     : $(RLVMCOMPILER) rowl1-types.rlc
 rowl1-lex.rlo      : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo
 rowl1-parse.rlo    : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-lex.rlo rowl1-node.rlo
@@ -138,6 +139,9 @@ rowl1: rlvm linker $(RLC1OBJECTS) startup.rlo
 .PHONY: clean
 clean:
 	rm -f *.o *.s *.rlo rlci rlvm linker disasm rowl1 core
+
+install:
+	cd $(TOPDIR); $(MAKE) install
 
 install_binaries: rlvm rowl
 	mkdir -p $(BINDIR)

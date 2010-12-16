@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-lex.rlc 2010-12-15 22:14:02 nineties $
+; $Id: rowl1-lex.rlc 2010-12-17 00:05:18 nineties $
 ;
 
 (import "rlvm-compile")
@@ -218,7 +218,8 @@
 (var prev_srcclmn 1)
 (var newline 1)
 (var unputted 0)
-(var operator_table null)
+(var operator_table (make_idtable))
+(var lexer_stack null)
 
 (fun is_member_of (c group) ((return (array_get char group c))))
 
@@ -360,11 +361,33 @@
     (cvector_pushback token_buf '\0')
     (= lexbuf (make_cvector 0))
     (= lexbuf_end 0)
-    (= operator_table (make_idtable))
 
     (skip_spaces)
+    ))
 
-    return
+; XXX: not good design. should implement reentrant lexer
+(export fun push_lexer (fname ichan) (
+    (var state (tuple 3 next_srcfile lexichan lexbuf next_srcline next_srcclmn lexbuf_end))
+    (= lexer_stack (cons state lexer_stack))
+    (= next_srcfile (strdup fname))
+    (= next_srcline 1)
+    (= next_srcclmn 1)
+    (= lexichan ichan)
+    (= lexbuf (make_cvector 0))
+    (= lexbuf_end 0)
+
+    (skip_spaces)
+    ))
+
+(export fun pop_lexer () (
+    (var state (car lexer_stack))
+    (= lexer_stack (cdr lexer_stack))
+    (= next_srcfile (tuple_at state 0))
+    (= next_srcline (tuple_at state 3))
+    (= next_srcclmn (tuple_at state 4))
+    (= lexichan     (tuple_at state 1))
+    (= lexbuf       (tuple_at state 2))
+    (= lexbuf_end   (tuple_at state 5))
     ))
 
 (export fun lex () ((return (lex_main 0 0))))
