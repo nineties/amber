@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-main.rlc 2010-10-19 14:26:49 nineties $
+; $Id: vm-main.rlc 2010-12-16 12:46:28 nineties $
 ;
 
 (import "stdlib")
@@ -120,6 +120,7 @@
 (fun _start (p) (
     (int   argc ([] (- (address p) 4) 0))
     (void* argv (address p))
+    (void* env  (+ argv (* (+ argc 1) 4)))
 
     (if (< argc 2) ((error "USAGE: rlvm FILENAME")))
 
@@ -132,7 +133,7 @@
     (int nref)
     (void* code (read_program ([] argv 1) (address nref)))
 
-    (int ret (vm_eval argc argv code nref))
+    (int ret (vm_eval argc argv env code nref))
     (exit ret)
     ))
 
