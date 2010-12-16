@@ -3,14 +3,19 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2010-12-12 08:50:26 nineties $
+# $Id: Makefile 2010-12-16 17:26:02 nineties $
+
+ROWL0DIR = ../rowl0
+BINDIR = /usr/bin
+LIBDIR = /usr/lib
 
 AS = as
 ASFLAGS =
 LD = ld
 LDFLAGS = --nostdlib --entry=_start
 
-RLC0 = ../rowl0/rlc
+RLC0 = $(ROWL0DIR)/rlc
+
 SOURCES = startup.rl\
 	  main.rl\
 	  stddef.rl\
@@ -26,17 +31,21 @@ SOURCES = startup.rl\
 ASMSOURCES = $(patsubst %.rl,%.s,$(SOURCES))
 OBJECTS    = $(patsubst %.rl,%.o,$(SOURCES))
 
-all: rlci rlvm linker disasm rowl1
+all: rlvm linker disasm rowl1
 
-alloc.s  : $(RLC0) stddef.s
-main.s   : $(RLC0) stddef.s code.s
-rowllib.s: $(RLC0) stddef.s
-stdlib.s : $(RLC0) stddef.s
-builtin.s: $(RLC0) stddef.s code.s
-pprint.s : $(RLC0) stddef.s code.s
-lex.s    : $(RLC0) stddef.s token.s
-parse.s  : $(RLC0) stddef.s token.s code.s
-eval.s   : $(RLC0) stddef.s code.s
+startup.s : $(RLC0)
+main.s    : $(RLC0) stddef.s code.s
+stdlib.s  : $(RLC0) stddef.s
+alloc.s   : $(RLC0) stddef.s
+rowllib.s : $(RLC0) stddef.s
+builtin.s : $(RLC0) stddef.s code.s
+pprint.s  : $(RLC0) stddef.s code.s
+lex.s     : $(RLC0) stddef.s token.s
+parse.s   : $(RLC0) stddef.s token.s code.s
+eval.s    : $(RLC0) stddef.s code.s
+
+$(RLC0):
+	cd $(ROWL0DIR); $(MAKE)
 
 rlci: $(OBJECTS)
 	$(LD) $(OBJECTS) -o $@ $(LDFLAGS)
@@ -54,17 +63,17 @@ VMOBJECTS = vm-main.o\
 	    vm-prim-tuple.o\
 	    vm-prim-idtable.o
 
-vm-compile.o      : stdlib.rlc config.rlc
-vm-main.o         : stdlib.rlc vm-compile.rlc
-vm-eval.o         : stdlib.rlc vm-compile.rlc vm-insn.rlc vm-prim-inc.rlc
-vm-gc.o           : stdlib.rlc vm-compile.rlc
-vm-load.o         : stdlib.rlc config.rlc vm-compile.rlc
-vm-prim-util.o    : stdlib.rlc vm-compile.rlc
-vm-prim-io.o      : stdlib.rlc vm-compile.rlc
-vm-prim-string.o  : stdlib.rlc vm-compile.rlc
-vm-prim-vector.o  : stdlib.rlc vm-compile.rlc
-vm-prim-tuple.o	  : stdlib.rlc vm-compile.rlc
-vm-prim-idtable.o : stdlib.rlc vm-compile.rlc
+vm-compile.o      : rlci stdlib.rlc config.rlc
+vm-main.o         : rlci stdlib.rlc vm-compile.rlc
+vm-eval.o         : rlci stdlib.rlc vm-compile.rlc vm-insn.rlc vm-prim-inc.rlc
+vm-gc.o           : rlci stdlib.rlc vm-compile.rlc
+vm-load.o         : rlci stdlib.rlc config.rlc vm-compile.rlc
+vm-prim-util.o    : rlci stdlib.rlc vm-compile.rlc
+vm-prim-io.o      : rlci stdlib.rlc vm-compile.rlc
+vm-prim-string.o  : rlci stdlib.rlc vm-compile.rlc
+vm-prim-vector.o  : rlci stdlib.rlc vm-compile.rlc
+vm-prim-tuple.o	  : rlci stdlib.rlc vm-compile.rlc
+vm-prim-idtable.o : rlci stdlib.rlc vm-compile.rlc
 
 RLC1OBJECTS = rowl1-main.rlo\
 	      rowl1-util.rlo\
@@ -102,10 +111,10 @@ rowl1-matching.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.r
 rlvm: $(VMOBJECTS)
 	$(LD) $^ -o $@ $(VMLDFLAGS)
 
-linker: linker.rlc rlvm $(RLVMCOMPILER)
+linker: linker.rlc $(RLVMCOMPILER)
 	./rlci $< > $@
 
-disasm: disasm.rlc rlvm $(RLVMCOMPILER)
+disasm: disasm.rlc $(RLVMCOMPILER)
 	./rlci $< > $@
 
 rowl1: rlvm linker $(RLC1OBJECTS) startup.rlo
@@ -129,3 +138,11 @@ rowl1: rlvm linker $(RLC1OBJECTS) startup.rlo
 .PHONY: clean
 clean:
 	rm -f *.o *.s *.rlo rlci rlvm linker disasm rowl1 core
+
+install_binaries: rlvm rowl
+	mkdir -p $(BINDIR)
+	cp $^ $(BINDIR)
+
+install_libraries: rowl1
+	mkdir -p $(LIBDIR)/rowl/bin
+	cp $^ $(LIBDIR)/rowl/bin
