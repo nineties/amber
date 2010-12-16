@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-lex.rlc 2010-12-14 23:00:57 nineties $
+; $Id: rowl1-lex.rlc 2010-12-15 22:14:02 nineties $
 ;
 
 (import "rlvm-compile")
@@ -374,7 +374,7 @@
 (fun lex_main (infix_p offs) (
     (if unputted (do
         (= unputted 0)
-        (var op (find_operator (get_token_text)))
+        (var op (lookup_operator_token (get_token_text)))
         (if op (accept_operator op infix_p))
         (return token_tag)
         ))
@@ -613,7 +613,7 @@
             (consume)
             (= state (next_state s39next))
 	    (if (== state 1) (do
-                (var op (find_operator (get_token_text)))
+                (var op (lookup_operator_token (get_token_text)))
                 (if op
                     (accept_operator op infix_p)
                     (do
@@ -625,7 +625,7 @@
             ))
         (40 . (do
             (consume)
-            (var op (find_operator (get_token_text)))
+            (var op (lookup_operator_token (get_token_text)))
             (if op
                 (do
                     (accept_operator op infix_p)
@@ -732,16 +732,18 @@
     (idtable_add operator_table name op)
     ))
 
-(fun find_operator (name) (
+(fun lookup_operator_token (name) (
     (return (idtable_find operator_table name))
     ))
 
 (fun check_assoc (name assoc) (
-    (if (&& (> assoc 0) (<= assoc @ASSOC_MAX)) return)
+    (if (&& (> assoc @ASSOC_SECONDARY) (< assoc @ASSOC_MAX)) return)
     (output_error stderr)
     (output_string stderr "associativity of operator `")
     (output_string stderr name)
-    (output_string stderr "' must be 1 to ")
+    (output_string stderr "' must be ")
+    (output_int stderr @ASSOC_SECONDARY)
+    (output_string stderr " to ")
     (output_int stderr @ASSOC_MAX)
     (output_string stderr "\n")
     (exit 1)
@@ -823,7 +825,7 @@
     (check_operator_format name)
     (check_assoc name assoc)
     (register_operator head op)
-    (var op (find_operator name))
+    (var op (lookup_operator_token name))
     (var prefix_op (variant @OP_PREFIX 1 head assoc))
     (if op (do
         (var optype (field_get op 0))
@@ -859,7 +861,7 @@
     (var is_left)
     (if (== type InfixL) (= is_left @TRUE) (= is_left @FALSE))
     (var infix_op (variant @OP_INFIX 1 head is_left assoc))
-    (var op (find_operator name))
+    (var op (lookup_operator_token name))
     (if op (do
         (var optype (field_get op 0))
         (if (== optype @OP_PREFIX) (do

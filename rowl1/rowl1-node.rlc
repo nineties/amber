@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2010-12-15 16:04:14 nineties $
+; $Id: rowl1-node.rlc 2010-12-15 22:14:20 nineties $
 ;
 
 (import "rlvm-compile")
@@ -118,7 +118,7 @@
         (@IntE    . (return Int))
         (@FloatE  . (return Float))
         (@StringE . (return String))
-        (default  . (not_reachable "pretty_print"))
+        (default  . (not_reachable "expr_head"))
         ))
     ))
 
@@ -162,6 +162,11 @@
     (return arg)
     ))
 
+(export fun expr_arg_int (expr idx) (
+    (var v (expr_arg_check expr @IntE idx))
+    (return (unbox v))
+    ))
+
 (export fun make_expr (head args) (
     (return (variant @Expr 2 head args))
     ))
@@ -172,6 +177,11 @@
 
 (export fun register_operator (head op) (
     (symtable_add operator_table head 0 op)
+    ))
+
+(fun find_operator (head) (
+    (return (symtable_find operator_table head 0))
+
     ))
 
 (export fun output_symbol (ochan sym) (
@@ -200,9 +210,13 @@
     ))
 
 (export fun pretty_print (ochan node) (
+    (pretty_print_main ochan node @ASSOC_MAX)
+    ))
+
+(fun pretty_print_main (ochan node assoc) (
     (tswitch (node_type node) (
         (@SymbolE . (return (output_symbol ochan node)))
-        (@Expr    . (return (pp_expr ochan node)))
+        (@Expr    . (return (pp_expr ochan node assoc)))
         (@IntE    . (return (pp_int ochan node)))
         (@FloatE  . (return (pp_float ochan node)))
         (@StringE . (return (pp_string ochan node)))
@@ -219,17 +233,19 @@
     (pretty_print ochan expr)
     ))
 
-(fun pp_expr (ochan node) (
+(fun pp_expr (ochan node assoc) (
     (var head (field_get node @ExprHead))
     (var args (field_get node @ExprArgs))
 
     (if (== head Tuple) (return (pp_tuple ochan args)))
     (if (== head List)  (return (pp_list ochan args)))
     (if (== head Block)   (return (pp_block ochan args)))
-    (if (== head Apply)  (return (pp_apply ochan args)))
-    (if (== head Subscr) (return (pp_subscr ochan args)))
-    (if (== head Located) (return (pretty_print ochan (expr_arg node 1))))
+    (if (== head Apply)  (return (pp_apply ochan args assoc)))
+    (if (== head Subscr) (return (pp_subscr ochan args assoc)))
+    (if (== head Located) (return (pretty_print_main ochan (expr_arg node 1) assoc)))
 
+    (var op (find_operator head))
+    (if op (return (pp_operational_form ochan op args assoc)))
     (output_symbol ochan head)
     (output_char ochan '(')
     (while args (do
@@ -238,6 +254,80 @@
         (if args (output_string ochan ", "))
         ))
     (output_char ochan ')')
+    ))
+
+(fun pp_operational_form (ochan op args assoc) (
+    (var ophead (expr_head op))
+    (if (== ophead Prefix) (return (pp_prefix ochan op args assoc)))
+    (if (== ophead Postfix) (return (pp_postfix ochan op args assoc)))
+    (if (== ophead InfixL) (return (pp_infix ochan op args @TRUE assoc)))
+    (if (== ophead InfixR) (return (pp_infix ochan op args @FALSE assoc)))
+    (if (== ophead Constr) (return (pp_constr ochan op args)))
+    (if (== ophead Command) (return (pp_command ochan op args)))
+    (not_reachable "pp_operational_form")
+    ))
+
+(fun is_sign_operator (name) (
+    (var c (array_get char name 0))
+    (if (&& (<= 'a' c) (<= c 'z')) (return @FALSE))
+    (if (&& (<= 'A' c) (<= c 'Z')) (return @FALSE))
+    (if (== c '_') (return @FALSE))
+    (return @TRUE)
+    ))
+
+(fun pp_prefix (ochan op args outer_assoc) (
+    (var repr (expr_arg op 0))
+    (var assoc (expr_arg_int op 1))
+    (if (> assoc outer_assoc) (output_char ochan '('))
+    (output_string ochan repr)
+    (if (! (is_sign_operator repr)) (output_char ochan ' '))
+    (pretty_print_main ochan (car args) assoc)
+    (if (> assoc outer_assoc) (output_char ochan ')'))
+    ))
+
+(fun pp_postfix (ochan op args outer_assoc) (
+    (var repr (expr_arg op 0))
+    (var assoc (expr_arg_int op 1))
+    (if (> assoc outer_assoc) (output_char ochan '('))
+    (pretty_print_main ochan (car args) assoc)
+    (if (! (is_sign_operator repr)) (output_char ochan ' '))
+    (output_string ochan repr)
+    (if (> assoc outer_assoc) (output_char ochan ')'))
+    ))
+
+(fun pp_infix (ochan op args is_left outer_assoc) (
+    (var repr (expr_arg op 0))
+    (var assoc (expr_arg_int op 1))
+    (var need_space @FALSE)
+    (if (> assoc outer_assoc) (output_char ochan '('))
+    (if (! (is_sign_operator repr)) (= need_space @TRUE))
+    (pretty_print_main ochan (car args) assoc)
+    (if need_space (output_char ochan ' '))
+    (output_string ochan repr)
+    (if need_space (output_char ochan ' '))
+    (pretty_print_main ochan (cadr args) assoc)
+    (if (> assoc outer_assoc) (output_char ochan ')'))
+    ))
+
+(fun pp_constr (ochan op args) (
+    (var repr (expr_arg op 0))
+    (output_string ochan repr)
+    (if (&& args (! (is_sign_operator repr))) (output_char ochan ' '))
+    (while args (do
+        (var e (car args))
+        (pretty_print_main ochan e @ASSOC_PRIMARY)
+        (= args (cdr args))
+        (if args (output_char ochan ' '))
+        ))
+    ))
+
+(fun pp_command (ochan op args) (
+    (var repr (expr_arg op 0))
+    (output_string ochan repr)
+    (if args (do
+        (if (! (is_sign_operator repr)) (output_char ochan ' '))
+        (pretty_print ochan (car args))
+        ))
     ))
 
 (fun pp_tuple (ochan args) (
@@ -277,8 +367,9 @@
     (output_char ochan '}')
     ))
 
-(fun pp_apply (ochan args) (
-    (pretty_print ochan (car args))
+(fun pp_apply (ochan args assoc) (
+    (if (< assoc @ASSOC_SECONDARY) (output_char ochan '('))
+    (pretty_print_main ochan (car args) @ASSOC_SECONDARY)
     (= args (cdr args))
     (output_char ochan '(')
     (while args (do
@@ -287,10 +378,12 @@
         (if args (output_string ochan ", "))
         ))
     (output_char ochan ')')
+    (if (< assoc @ASSOC_SECONDARY) (output_char ochan ')'))
     ))
 
-(fun pp_subscr (ochan args) (
-    (pretty_print ochan (car args))
+(fun pp_subscr (ochan args assoc) (
+    (if (< assoc @ASSOC_SECONDARY) (output_char ochan '('))
+    (pretty_print_main ochan (car args) @ASSOC_SECONDARY)
     (= args (cdr args))
     (output_char ochan '[')
     (while args (do
@@ -299,6 +392,7 @@
         (if args (output_string ochan ", "))
         ))
     (output_char ochan ']')
+    (if (< assoc @ASSOC_SECONDARY) (output_char ochan ')'))
     ))
 
 (fun pp_int (ochan node) (

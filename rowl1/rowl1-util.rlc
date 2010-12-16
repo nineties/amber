@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-util.rlc 2010-12-12 18:53:00 nineties $
+; $Id: rowl1-util.rlc 2010-12-16 13:37:14 nineties $
 ;
 
 (import "rlvm-compile")
@@ -125,6 +125,30 @@
     (var tl (cdr ls))
     (setcdr ls 0)
     (return (cons hd tl))
+    ))
+
+(fun is_prefix (pre str) (
+    (var i 0)
+    (while 1 (do
+        (var a (array_get char pre i))
+        (if (! a) (return @TRUE))
+        (var b (array_get char str i))
+        (if (!= a b) (return @FALSE))
+        (incr i)
+        ))
+    ))
+
+(export fun get_env (name) (
+    (var envp (environ))
+    (var i 0)
+    (while 1 (do
+        (var ent (array_get string envp i))
+        (if (! ent) (return 0))
+        (if (is_prefix name ent) (do
+            (return (strdup (+ ent (+ (strlen name) 1))))
+            ))
+        (incr i)
+        ))
     ))
 
 (export fun not_reachable (name) (

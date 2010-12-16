@@ -2,7 +2,7 @@
 ; rowl - generation 1
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-eval.rlc 2010-11-14 11:45:07 nineties $
+; $Id: vm-eval.rlc 2010-12-16 12:47:31 nineties $
 ;
 
 ; rowlVM register usage
@@ -143,6 +143,8 @@
 (int    cmd_argc)
 (export cmd_argv)
 (void*  cmd_argv)
+(export environ)
+(void*  environ)
 
 (void*[] 65536 funtable @(map caddr prim_table))
 
@@ -153,13 +155,14 @@
     ))
 
 (export vm_eval)
-(fun vm_eval (argc argv insn nref) (
+(fun vm_eval (argc argv env insn nref) (
 
     (-= argc 2)
-    (+= argv 8)
+    (+= argv 8) ; sizeof(void*) * 2
 
     (= cmd_argc argc)
     (= cmd_argv argv)
+    (= environ env)
 
     (= num_gobject nref)
 
