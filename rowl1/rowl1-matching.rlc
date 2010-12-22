@@ -1,8 +1,8 @@
 ;1
-; rowl - generation 1
+; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2010-12-11 19:42:27 nineties $
+; $Id: rowl1-matching.rlc 2010-12-22 22:12:14 nineties $
 ;
 
 (import "rlvm-compile")
@@ -16,8 +16,6 @@
 (import "rowl1-compile")
 
 ; pattern matrix (((p11 p12 .. ) . e1) ((p21 p22 ..) . e2) ..)
-
-(var headpat (to_sym "%head-pattern"))
 
 (fun compile_matching (bytecode head pats) (
     ; we need to clone 'pats' here because compile_matching_main() will rearrange it.
@@ -45,37 +43,43 @@
 
 (fun compile_matching_single (asm idx pats) (
     (var p (caaar pats))
-    (if (== p DontCare) (do
+    (var hd (expr_head p))
+    (if (== hd Symbol) (do
         (= pats (shift_pat pats))
         (compile_matching_main asm (+ idx 1) pats)
         return
         ))
-    (var pty (node_type p))
-    (if (== pty @Int) (do
-        (var not_int (fresh_label asm))
+    (if (== hd Int) (do
+        (var check_failed (fresh_label asm))
         (put_arg asm idx)
-        (put_check_int asm not_int)
+        (put_check_int asm check_failed)
         (compile_matching_intlit asm idx pats)
-        (set_label asm not_int)
+        (set_label asm check_failed)
         return
         ))
-    (if (== pty @Expr) (do
-        (= pty (field_get p @ExprHead))
-        (if (== pty headpat) (do
-            (var ty (expr_arg p 0))
-            (var check_failed (fresh_label asm))
-            (put_arg asm idx)
-            (compile_check_head asm ty check_failed)
-            (= pats (shift_pat pats))
-            (compile_matching_main asm (+ idx 1) pats)
-            (set_label asm check_failed)
-            return
-            ))
+    (if (== hd String) (do
+        (var check_failed (fresh_label asm))
+        (put_arg asm idx)
+        (compile_matching_string_lit asm p check_failed)
+        (= pats (shift_pat pats))
+        (compile_matching_main asm (+ idx 1) pats)
+        (set_label asm check_failed)
+        return
+        ))
+    (if (== hd HeadP) (do
+        (var pat (expr_arg_symbol p 0))
+        (var check_failed (fresh_label asm))
+        (put_arg asm idx)
+        (compile_match_head asm pat check_failed)
+        (= pats (shift_pat pats))
+        (compile_matching_main asm (+ idx 1) pats)
+        (set_label asm check_failed)
+        return
         ))
     (not_implemented "compile_matching_single")
     ))
 
-(fun compile_check_head (asm ty exit_lbl) (
+(fun compile_match_head (asm ty exit_lbl) (
     (if (== ty Int) (do
         (put_check_int asm exit_lbl)
         return
@@ -84,8 +88,6 @@
         (put_check_string asm exit_lbl)
         return
         ))
-
-    (if (!= (node_type ty) @SymbolE) (not_reachable "compile_check_head"))
 
     (put_imm_int32 asm expr_head)
     (put_dcall asm 4)
@@ -156,7 +158,7 @@
 
     (put_arg asm idx)
 
-    ; unbox
+    ; unbox arg
     (put_imm_i1 asm)
     (put_sar asm)
 
@@ -242,15 +244,19 @@
     (return (list_split orig n))
     ))
 
+(fun compile_matching_string_lit (asm str exit_lbl) (
+    (put_push asm str)
+    (compile_simple_call asm 2 streq @FALSE)
+    (put_if_zero asm exit_lbl)
+    ))
+
 (fun split_matrix (pats) (
     (var p (caaar pats))
-    (if (== p DontCare) (return (split_any pats)))
-    (var pty (node_type p))
-    (if (== pty @Int) (return (split_int (unbox p) pats)))
-    (if (== pty @Expr) (do
-        (= pty (field_get p @ExprHead))
-        (if (== pty headpat) (return (split_type_pat pty pats)))
-        ))
+    (var hd (expr_head p))
+    (if (== hd Symbol) (return (split_any pats)))
+    (if (== hd Int) (return (split_int pats)))
+    (if (== hd String) (return (split_string pats)))
+    (if (== hd HeadP) (return (split_head_pat (expr_arg_symbol p 0) pats)))
     (not_implemented "split_matrix")
     ))
 
@@ -265,7 +271,7 @@
     (return (list_split orig n))
     ))
 
-(fun split_int (v pats) (
+(fun split_int (pats) (
     (var n 1)
     (var orig pats)
     (= pats (cdr pats))
@@ -276,21 +282,33 @@
     (return (list_split orig n))
     ))
 
-(fun is_type_pat (ty node) (
-    (if (!= (node_type node) @Expr) (return @FALSE))
-    (var constr (field_get node @ExprHead))
-    (if (!= constr headpat) (return @FALSE))
-    (if (== (expr_arg node 0) ty)
+(fun split_string (pats) (
+    (var n 1)
+    (var orig pats)
+    (var str (caaar pats))
+    (= pats (cdr pats))
+    (while pats (do
+        (var nd (caaar pats))
+        (if (&& (== (node_type nd) @StringE) (streq str nd)) break)
+        (= pats (cdr pats))
+        (incr n)
+        ))
+    (return (list_split orig n))
+    ))
+
+(fun match_head (ty node) (
+    (var hd (expr_head node))
+    (if (&& (== hd HeadP) (== (expr_arg_symbol node 0) ty))
         (return @TRUE)
         (return @FALSE)
         )
     ))
 
-(fun split_type_pat (ty pats) (
+(fun split_head_pat (ty pats) (
     (var n 1)
     (var orig pats)
     (= pats (cdr pats))
-    (while (&& pats (is_type_pat ty (caaar pats))) (do
+    (while (&& pats (match_head ty (caaar pats))) (do
         (= pats (cdr pats))
         (incr n)
         ))
@@ -321,7 +339,7 @@
 
 (fun matching_error (head args) (
     (output_error stderr)
-    (output_string stderr "no declaration matchines to ")
+    (output_string stderr "no definition matchines to ")
     (pretty_print stderr (make_expr head args))
     (output_string stderr "\n")
     (exit 1)

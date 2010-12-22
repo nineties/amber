@@ -1,5 +1,5 @@
 (%
- % rowl - generation 1
+ % rowl - 1st generation
  % Copyright (C) 2010 nineties
  %
  % $Id: pprint.rl 2010-07-12 23:07:56 nineties $

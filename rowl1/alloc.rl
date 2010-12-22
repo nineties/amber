@@ -1,5 +1,5 @@
 (%
- % rowl - generation 1
+ % rowl - 1st generation
  % Copyright (C) 2010 nineties
  % 
  % $Id: alloc.rl 2010-08-17 22:45:58 nineties $

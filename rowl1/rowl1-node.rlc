@@ -1,8 +1,8 @@
 ;
-; rowl - generation 1
+; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2010-12-15 22:14:20 nineties $
+; $Id: rowl1-node.rlc 2010-12-22 03:06:09 nineties $
 ;
 
 (import "rlvm-compile")
@@ -37,7 +37,9 @@
 (export var InfixR      (to_sym "InfixR"))
 (export var Constr      (to_sym "Constr"))
 (export var Command     (to_sym "Command"))
+(export var HeadP	(to_sym "HeadP"))
 (export var eval-sym    (to_sym "eval"))
+(export var rewrite-sym (to_sym "rewrite"))
 
 (export fun to_sym (name) (
     (var sym (idtable_find symbol_table name))
@@ -55,6 +57,13 @@
     (var tag (get_tag obj))
     (if (== tag @TAG_VARIANT) (return (field_get obj 0)))
     (return (+ (get_plain_tag obj) @BUILTIN_TYPE_OFFSET))
+    ))
+
+(export fun is_atom (expr) (
+    (if (== (node_type expr) @Expr)
+	(return @FALSE)
+	(return @TRUE)
+	)
     ))
 
 ; XXX: output precise information
@@ -123,7 +132,7 @@
     ))
 
 (export fun expr_args (expr) (
-    (if (!= (node_type expr) @Expr) (return 0))
+    (if (is_atom expr) (return (cons expr 0)))
     (return (field_get expr @ExprArgs))
     ))
 
@@ -146,7 +155,7 @@
     (return (car args))
     ))
 
-(export fun expr_arg_check (expr type idx) (
+(fun expr_arg_check (expr type idx) (
     (var arg (expr_arg expr idx))
     (if (!= (node_type arg) type) (do
         (output_error stderr)
@@ -165,6 +174,34 @@
 (export fun expr_arg_int (expr idx) (
     (var v (expr_arg_check expr @IntE idx))
     (return (unbox v))
+    ))
+
+(export fun expr_arg_symbol (expr idx) (
+    (return (expr_arg_check expr @SymbolE idx))
+    ))
+
+(export fun expr_arg_string (expr idx) (
+    (return (expr_arg_check expr @StringE idx))
+    ))
+
+(export fun expr_arg_head (expr head idx) (
+    (var arg (expr_arg expr idx))
+    (if (!= (expr_head arg) head) (do
+        (output_error stderr)
+        (output_string stderr "the head of ")
+        (output_ordinal stderr (+ idx 1))
+        (output_string stderr " parameter of `")
+	(pretty_print_abbrev stderr expr)
+	(output_string stderr "' must be `")
+	(pretty_print stderr head)
+        (output_string stderr "'\n")
+        (exit 1)
+	))
+    (return arg)
+    ))
+
+(export fun expr_size (expr) (
+    (return (list_length (expr_args expr)))
     ))
 
 (export fun make_expr (head args) (

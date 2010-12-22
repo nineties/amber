@@ -1,8 +1,8 @@
 ;
-; rowl - generation 1
+; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2010-12-11 19:43:53 nineties $
+; $Id: rowl1-compile.rlc 2010-12-22 10:02:00 nineties $
 ;
 
 (import "rlvm-compile")
@@ -17,7 +17,6 @@
 
 (var function (to_sym "%function"))
 (var argument (to_sym "%argument"))
-(var headpat (to_sym "%head-pattern"))
 
 (var vartable (make_symtable))
 
@@ -26,13 +25,13 @@
     (symtable_add vartable sym 0 type)
     ))
 
-(export fun compile_function (loc name args body) (
+(export fun compile_function (name args body) (
 
     (register_symbol name function)
     (symtable_push vartable)
 
     (var asm (make_assembler))
-    (= args (setup_args loc args))
+    (= args (setup_args args))
 
     (compile_expression asm body @TRUE)
 
@@ -44,42 +43,36 @@
     (return (make_expr argument (cons (box idx) 0)))
     ))
 
-(export fun make_headpat (type) (
-    (return (make_expr headpat (cons type 0)))
-    ))
-
-(fun setup_args (loc args) (
+(fun setup_args (args) (
     (var ret args)
     (var idx 0)
     (while args (do
         (var arg (car args))
-        (var type (node_type arg))
-        (if (== type @IntE) (do
+	(var argpat (expr_head arg))
+	(if (|| (== argpat Int) (== argpat String)) (do
             (= args (cdr args))
             (incr idx)
             continue
             ))
-        (if (== type @SymbolE) (do
+	(if (== argpat Symbol) (do
             (symtable_add vartable arg 0 (make_arg idx))
             (setcar args DontCare)
             (= args (cdr args))
             (incr idx)
             continue
             ))
-        ;(if (&& (== type @Infix) (== TypeAnnotOp (field_get arg @InfixOp))) (do
-        ;    (var type (field_get arg @InfixRhs))
-        ;    (= arg (field_get arg @InfixLhs))
-        ;    (if (== (node_type arg) @SymbolE) (do
-        ;        (symtable_add vartable arg 0 (make_arg idx))
-        ;        (setcar args (make_headpat loc type))
-        ;        (= args (cdr args))
-        ;        (incr idx)
-        ;        continue
-        ;        ))
-        ;    ))
-        ;(error_head stderr loc)
-        (output_string stderr "invalid argument pattern\n")
-        ; XXX: output arg
+	(if (== argpat HeadP) (do
+	    (var head (expr_arg_symbol arg 0))
+	    (= arg (expr_arg arg 1))
+	    (symtable_add vartable arg 0 (make_arg idx))
+	    (= args (cdr args))
+	    (incr idx)
+	    continue
+	    ))
+	(output_error stderr)
+        (output_string stderr "invalid argument pattern `")
+	(pretty_print stderr arg)
+	(output_string stderr "'\n")
         (exit 1)
         ))
     (return ret)
