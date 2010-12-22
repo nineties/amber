@@ -1,5 +1,5 @@
 (%
- % rowl - generation 1
+ % rowl - 1st generation
  % Copyright (C) 2010 nineties
  %
  % $Id: code.rl 2010-06-02 09:20:21 nineties $

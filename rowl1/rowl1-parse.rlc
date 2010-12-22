@@ -1,8 +1,8 @@
 ;
-; rowl - generation 1
+; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-parse.rlc 2010-12-17 00:07:36 nineties $
+; $Id: rowl1-parse.rlc 2010-12-22 02:13:33 nineties $
 ;
 
 (import "rlvm-compile")
@@ -32,6 +32,11 @@
 ; NB:
 ; - postfix operator must be unique
 
+(extern fun rewrite_expr)
+(fun make_expr_rewrite (head args) (
+    (return (rewrite_expr (make_expr head args)))
+    ))
+
 (export fun init_parser (file ichan) (
     (init_lexer file ichan)
     ))
@@ -59,8 +64,8 @@
         (var head (field_get op 1))
         (= tok (lex_sub offs))
         (if (== tok @TOK_END)
-            (return (make_expr head 0))
-            (return (make_expr head (cons (parse_expr tok offs) 0)))
+            (return (make_expr_rewrite head 0))
+            (return (make_expr_rewrite head (cons (parse_expr tok offs) 0)))
             )
         ))
     (return (parse_expr tok offs))
@@ -135,14 +140,19 @@
     (if (== t '(') (do
         (var args (parse_comma_list (lex) ')'))
         (if (== (node_type e) @SymbolE)
-            (= e (make_expr e args))
-            (= e (make_expr Apply (cons e args)))
-            )
+            (= e (make_expr_rewrite e args))
+	    (do
+		(output_string stderr "hoge\n")
+		(pretty_print stdout e)
+		(print_char '\n')
+		(output_string stderr "hoge\n")
+		(= e (make_expr_rewrite Apply (cons e args)))
+            ))
         (goto parse_secondary_loop)
         )
     (if (== t '[') (do
         (var args (parse_comma_list (lex) ']'))
-        (= e (make_expr Subscr (cons e args)))
+        (= e (make_expr_rewrite Subscr (cons e args)))
         (goto parse_secondary_loop)
         )))
     (unput)
@@ -153,11 +163,11 @@
 (fun try_parse_primary (t) ((return (parse_primary_main t @FALSE))))
 
 (fun parse_primary_main (t error) (
-    (if (== t @TOK_CHAR) (return (get_token_value))
-    (if (== t @TOK_INT) (return (box (get_token_value)))
-    (if (== t @TOK_FLOAT) (return (make_float_from_string (get_token_text)))
-    (if (== t @TOK_STRING) (return (get_token_value))
-    (if (== t @TOK_SYMBOL) (return (get_token_value))
+    (if (== t @TOK_CHAR)   (return (rewrite_expr (get_token_value)))
+    (if (== t @TOK_INT)    (return (rewrite_expr (box (get_token_value))))
+    (if (== t @TOK_FLOAT)  (return (rewrite_expr (make_float_from_string (get_token_text))))
+    (if (== t @TOK_STRING) (return (rewrite_expr (get_token_value)))
+    (if (== t @TOK_SYMBOL) (return (rewrite_expr (get_token_value)))
     (if (== t @TOK_CONSTR) (do
         (var op (get_token_value))
         (var head (field_get op 1))
@@ -168,7 +178,7 @@
             (if (! e) break)
             (= args (cons e args))
             ))
-        (return (make_expr head (list_reverse args)))
+        (return (make_expr_rewrite head (list_reverse args)))
         )
     (if (== t '(') (return (parse_tuple (lex)))
     (if (== t '[') (return (parse_list (lex)))
@@ -188,12 +198,12 @@
 (fun parse_tuple (t) (
     (var elems (parse_comma_list t ')'))
     (if (&& elems (== (cdr elems) 0)) (return (car elems)))
-    (return (make_expr Tuple elems))
+    (return (make_expr_rewrite Tuple elems))
     ))
 
 (fun parse_list (t) (
     (var elems (parse_comma_list t ']'))
-    (return (make_expr List elems))
+    (return (make_expr_rewrite List elems))
     ))
 
 (fun parse_comma_list (t end) (
@@ -225,7 +235,7 @@
         (= t (lex))
         (if (!= t '}') (goto parse_block_loop))
         ))
-    (return (make_expr Block (list_reverse elems)))
+    (return (make_expr_rewrite Block (list_reverse elems)))
     ))
 
 (fun eat (tok expect) (
@@ -255,14 +265,14 @@
     (if (|| (== type @OP_PREFIX) (== type @OP_POSTFIX))
         (do
             (var arg (car exprs))
-            (var expr (make_expr (field_get op 1) (cons arg 0)))
+            (var expr (make_expr_rewrite (field_get op 1) (cons arg 0)))
             (return (cons expr (cdr exprs)))
         )
     (if (== type @OP_INFIX)
         (do
             (var lhs (cadr exprs))
             (var rhs (car exprs))
-            (var expr (make_expr (field_get op 1) (cons lhs (cons rhs 0))))
+            (var expr (make_expr_rewrite (field_get op 1) (cons lhs (cons rhs 0))))
             (return (cons expr (cddr exprs)))
         )
         ))

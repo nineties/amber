@@ -1,8 +1,8 @@
 ;
-; rowl - generation 1
+; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2010-12-17 00:22:34 nineties $
+; $Id: rowl1-interp.rlc 2010-12-22 22:13:50 nineties $
 ;
 
 (import "rlvm-compile")
@@ -42,7 +42,7 @@
 
 (fun setup_pat (pat) (
     (if pat
-        (return (make_headpat pat))
+	(return (make_expr HeadP (cons pat (cons DontCare 0))))
         (return DontCare)
         )
     ))
@@ -97,22 +97,22 @@
 
 (fun call_eval (expr) (
     (var f (lookup_func eval-sym 1))
-    (jitcall f expr)
+    (return (jitcall f expr))
     ))
 
 (export fun lookup_func (sym arity) (
     (var ent (symtable_find funtable sym arity))
     (if (! ent) (do
-        (= ent (tuple 3 (undeclared_error_hook sym arity) (to_sym "undeclared_error") 0
+        (= ent (tuple 3 (undefined_error_hook sym arity) (to_sym "undefined_error") 0
             (symtable_depth funtable)))
         (symtable_add funtable sym arity ent)
         ))
     (return (field_get ent 0))
     ))
 
-(fun undeclared_error (sym arity) (
+(fun undefined_error (sym arity) (
     (output_error stderr)
-    (output_string stderr "undeclared function `")
+    (output_string stderr "no definition of `")
     (output_symbol stderr sym)
     (output_string stderr "' whose arity is ")
     (output_int stderr (unbox arity))
@@ -120,11 +120,11 @@
     (exit 1)
     ))
 
-(fun undeclared_error_hook (sym arity) (
+(fun undefined_error_hook (sym arity) (
     (var asm (make_assembler))
     (put_push asm (box arity))
     (put_push asm sym)
-    (compile_simple_call asm 2 undeclared_error @TRUE)
+    (compile_simple_call asm 2 undefined_error @TRUE)
     (return (get_code asm))
     ))
 
@@ -149,7 +149,7 @@
 (extern fun add_constr)
 (extern fun add_command)
 (export fun builtin_eval_syntax_sugar (expr) (
-    (var head (expr_arg_check expr @SymbolE 0))
+    (var head (expr_arg_symbol expr 0))
     (var op   (expr_arg expr 1))
     (if (== (node_type op) @Expr) (do
         (var type (expr_head op))
@@ -172,7 +172,7 @@
     ))
 
 (export fun builtin_import (expr) (
-    (var file (expr_arg_check expr @StringE 0))
+    (var file (expr_arg_string expr 0))
     ; XXX: should not hard code the path of libraries
     (var script_path (build_path "/usr/lib/rowl/" file ".rl"))
     (if (! (file_exists script_path)) (do
@@ -200,6 +200,38 @@
     (pretty_print stdout expr)
     (output_char stdout '\n')
     (return (builtin_eval_syntax_sugar expr))
+    ))
+
+(fun check_arg_size (name size expr) (
+    (if (!= (expr_size expr) size) (do
+	(output_error stderr)
+	(output_string stderr name)
+	(output_string stderr " requires just ")
+	(output_int stderr size)
+	(output_string stderr " argument")
+	(if (> size 1) (output_char stderr 's'))
+	(output_char stderr '\n')
+	(exit 1)
+	))
+    ))
+
+(export fun rewrite_expr (expr) (
+    (var f (lookup_func rewrite-sym 1))
+    (return (jitcall f expr))
+    ))
+
+(export fun builtin_rewrite (expr) (
+    (return expr)
+    ))
+
+(export fun builtin_define_function (expr) (
+    (check_arg_size "__define_function" 3 expr)
+    (var sym (expr_arg_symbol expr 0))
+    (var args (expr_arg_head expr List 1))
+    (var body (expr_arg expr 2))
+    (var compiled (compile_function sym (expr_args args) body))
+    (add_function sym (car compiled) (cdr compiled))
+    (return Nil)
     ))
 
     ))
