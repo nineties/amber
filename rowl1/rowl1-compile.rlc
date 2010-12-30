@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2010-12-22 10:02:00 nineties $
+; $Id: rowl1-compile.rlc 2010-12-30 20:12:49 nineties $
 ;
 
 (import "rlvm-compile")
@@ -17,6 +17,7 @@
 
 (var function (to_sym "%function"))
 (var argument (to_sym "%argument"))
+(var getnth   (to_sym "%getnth"))
 
 (var vartable (make_symtable))
 
@@ -40,49 +41,59 @@
     ))
 
 (fun make_arg (idx) (
-    (return (make_expr argument (cons (box idx) 0)))
+    (return (make_expr argument (list1 (box idx))))
+    ))
+
+(fun make_nth (obj idx) (
+    (return (make_expr getnth (list2 obj (box idx))))
     ))
 
 (fun setup_args (args) (
-    (var ret args)
+    (var orig args)
     (var idx 0)
     (while args (do
-        (var arg (car args))
-	(var argpat (expr_head arg))
-	(if (|| (== argpat Int) (== argpat String)) (do
-            (= args (cdr args))
-            (incr idx)
-            continue
-            ))
-	(if (== argpat Symbol) (do
-            (symtable_add vartable arg 0 (make_arg idx))
-            (setcar args DontCare)
-            (= args (cdr args))
-            (incr idx)
-            continue
-            ))
-	(if (== argpat HeadP) (do
-	    (var head (expr_arg_symbol arg 0))
-	    (= arg (expr_arg arg 1))
-	    (symtable_add vartable arg 0 (make_arg idx))
-	    (= args (cdr args))
-	    (incr idx)
-	    continue
-	    ))
-	(output_error stderr)
-        (output_string stderr "invalid argument pattern `")
-	(pretty_print stderr arg)
-	(output_string stderr "'\n")
-        (exit 1)
+        (setup_arg (make_arg idx) (car args))
+        (= args (cdr args))
+        (+= idx 1)
         ))
-    (return ret)
+    (return orig)
+    ))
+
+(fun setup_arg (obj arg) (
+    (var argty (expr_head arg))
+    (if (|| (== argty Int) (== argty String))
+        return
+        )
+    (if (== argty Symbol) (do
+        (symtable_add vartable arg 0 obj)
+        return
+        ))
+    (if (== argty HeadP) (do
+        (var head (expr_arg_symbol arg 0))
+        (var v (expr_arg_symbol arg 1))
+        (symtable_add vartable v 0 obj)
+        return
+        ))
+    (if (== argty List) (do
+        (var idx 0)
+        (while arg (do
+            (setup_arg (make_nth obj idx) (car arg))
+            (= arg (cdr arg))
+            (incr idx)
+            ))
+        return
+        ))
+    (output_error stderr)
+    (output_string stderr "invalid argument pattern `")
+    (pretty_print_abbrev stderr arg)
+    (output_string stderr "'\n")
+    (exit 1)
     ))
 
 (extern fun lookup_func)
 (export fun compile_expression (asm expr ret) (
-    (var ty (node_type expr))
-    (tswitch ty (
-    (@SymbolE  . (do
+    (var hd (expr_head expr))
+    (if (== hd Symbol) (do
         (var v (symtable_find vartable expr 0))
         (if (! v) (do
             (output_error stderr)
@@ -94,34 +105,46 @@
         (if (== v function) (do
             (put_push asm expr)
             (if ret (put_ireturn asm))
-            break
+            return
             ))
-        (if (== (node_type v) @Expr) (do
-	    (var head (field_get v @ExprHead))
-            (if (== head argument) (do
-		(put_arg asm (unbox (expr_arg v 0)))
-                (if ret (put_ireturn asm))
-                break
-                ))
-            ))
-        (not_reachable "compile_expression")
+        (compile_operand asm v)
+        (if ret (put_ireturn asm))
+        return
         ))
-    (@Expr . (do
-        (compile_call asm (expr_head expr) (expr_args expr) ret)
-        break
-        ))
-    (@IntE . (do
+    (if (== hd Int) (do
         (put_imm_int asm expr)
         (if ret (put_ireturn asm))
-        break
+        return
         ))
-    (@FloatE  . (not_implemented "compile_expression"))
-    (@StringE . (do
+    (if (== hd String) (do
         (put_push asm expr)
         (if ret (put_ireturn asm))
-        break
+        return
         ))
-    (default . (not_reachable "compile_expression"))
+    (if (== hd List) (do
+        (if (== expr 0)
+            (put_imm_i0 asm)
+            (do
+                (compile_expression asm (cdr expr) @FALSE)
+                (compile_expression asm (car expr) @FALSE)
+                (put_cons asm)
+            ))
+        (if ret (put_ireturn asm))
+        return
+        ))
+    (compile_call asm hd (expr_args expr) ret)
+    ))
+
+(fun compile_operand (asm desc) (
+    (var ty (expr_head desc))
+    (if (== ty argument) (do
+        (put_arg asm (expr_arg_int desc 0))
+        return
+        ))
+    (if (== ty getnth) (do
+        (compile_operand asm (expr_arg desc 0))
+        (put_nth asm (expr_arg_int desc 1))
+        return
         ))
     ))
 
