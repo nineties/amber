@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2010-12-22 22:12:14 nineties $
+; $Id: rowl1-matching.rlc 2010-12-30 19:13:54 nineties $
 ;
 
 (import "rlvm-compile")
@@ -71,6 +71,16 @@
         (var check_failed (fresh_label asm))
         (put_arg asm idx)
         (compile_match_head asm pat check_failed)
+        (= pats (shift_pat pats))
+        (compile_matching_main asm (+ idx 1) pats)
+        (set_label asm check_failed)
+        return
+        ))
+    (if (== hd List) (do
+        (var len (list_length p))
+        (var check_failed (fresh_label asm))
+        (put_arg asm idx)
+        (put_check_list asm check_failed len)
         (= pats (shift_pat pats))
         (compile_matching_main asm (+ idx 1) pats)
         (set_label asm check_failed)
@@ -187,8 +197,6 @@
     (while pats (do
         (var p (car pats))
         (= pats (cdr pats))
-
-        (var v (caar p))
         (= ret (insert_int_pat p ret))
         ))
     (return ret)
@@ -257,6 +265,7 @@
     (if (== hd Int) (return (split_int pats)))
     (if (== hd String) (return (split_string pats)))
     (if (== hd HeadP) (return (split_head_pat (expr_arg_symbol p 0) pats)))
+    (if (== hd List) (return (split_list pats)))
     (not_implemented "split_matrix")
     ))
 
@@ -289,7 +298,7 @@
     (= pats (cdr pats))
     (while pats (do
         (var nd (caaar pats))
-        (if (&& (== (node_type nd) @StringE) (streq str nd)) break)
+        (if (|| (!= (node_type nd) @StringE) (! (streq str nd))) break)
         (= pats (cdr pats))
         (incr n)
         ))
@@ -313,6 +322,45 @@
         (incr n)
         ))
     (return (list_split orig n))
+    ))
+
+(fun split_list (pats) (
+    (= pats (sort_list_pat pats))
+    (var n 1)
+    (var orig pats)
+    (var len (list_length (caaar pats)))
+    (= pats (cdr pats))
+    (while pats (do
+        (var nd (caaar pats))
+        (if (|| (!= (expr_head nd) List) (!= (list_length nd) len)) break)
+        (= pats (cdr pats))
+        (incr n)
+        ))
+    (return (list_split orig n))
+    ))
+
+(fun sort_list_pat (pats) (
+    (var ret 0)
+    (while pats (do
+        (var p (car pats))
+        (= pats (cdr pats))
+        (= ret (insert_list_pat p ret))
+        ))
+    (return ret)
+    ))
+
+(fun insert_list_pat (p pats) (
+    (if (! pats) (return (cons p 0)))
+    (var a (caar p))
+    (var b (caaar pats))
+    (if (!= (expr_head a) List) (return (cons (car pats) (insert_list_pat p (cdr pats)))))
+    (if (!= (expr_head b) List) (return (cons p pats)))
+    (var alen (list_length a))
+    (var blen (list_length b))
+    (if (<= alen blen)
+        (return (cons p pats))
+        (return (cons (car pats) (insert_list_pat p (cdr pats))))
+        )
     ))
 
 (fun shift_pat (pats) (

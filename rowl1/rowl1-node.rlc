@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2010-12-22 03:06:09 nineties $
+; $Id: rowl1-node.rlc 2010-12-24 14:13:19 nineties $
 ;
 
 (import "rlvm-compile")
@@ -52,15 +52,16 @@
     ))
 
 (export fun node_type (obj) (
-    (if (! obj) (error "node_type: null object"))
+    (if (! obj) (return @ListE))
     (if (& obj 1) (return @IntE))
     (var tag (get_tag obj))
     (if (== tag @TAG_VARIANT) (return (field_get obj 0)))
+    (if (== tag @TAG_CONS) (return @ListE))
     (return (+ (get_plain_tag obj) @BUILTIN_TYPE_OFFSET))
     ))
 
-(export fun is_atom (expr) (
-    (if (== (node_type expr) @Expr)
+(fun is_atom (ty) (
+    (if (|| (== ty @Expr) (== ty @ListE))
 	(return @FALSE)
 	(return @TRUE)
 	)
@@ -124,6 +125,7 @@
     (tswitch (node_type node) (
         (@SymbolE . (return Symbol))
         (@Expr    . (return (field_get node @ExprHead)))
+        (@ListE   . (return List))
         (@IntE    . (return Int))
         (@FloatE  . (return Float))
         (@StringE . (return String))
@@ -132,7 +134,9 @@
     ))
 
 (export fun expr_args (expr) (
-    (if (is_atom expr) (return (cons expr 0)))
+    (var ty (node_type expr))
+    (if (is_atom ty) (return (cons expr 0)))
+    (if (== ty @ListE) (return expr))
     (return (field_get expr @ExprArgs))
     ))
 
@@ -239,6 +243,7 @@
     (tswitch type (
         (@SymbolE . (return (output_string ochan "Symbol")))
         (@Expr    . (not_reachable "output_primitive_type"))
+        (@ListE   . (not_reachable "output_primitive_type"))
         (@IntE    . (return (output_string ochan "Int")))
         (@FloatE  . (return (output_string ochan "Float")))
         (@StringE . (return (output_string ochan "String")))
@@ -254,6 +259,7 @@
     (tswitch (node_type node) (
         (@SymbolE . (return (output_symbol ochan node)))
         (@Expr    . (return (pp_expr ochan node assoc)))
+        (@ListE   . (return (pp_list ochan node)))
         (@IntE    . (return (pp_int ochan node)))
         (@FloatE  . (return (pp_float ochan node)))
         (@StringE . (return (pp_string ochan node)))
@@ -275,7 +281,6 @@
     (var args (field_get node @ExprArgs))
 
     (if (== head Tuple) (return (pp_tuple ochan args)))
-    (if (== head List)  (return (pp_list ochan args)))
     (if (== head Block)   (return (pp_block ochan args)))
     (if (== head Apply)  (return (pp_apply ochan args assoc)))
     (if (== head Subscr) (return (pp_subscr ochan args assoc)))
