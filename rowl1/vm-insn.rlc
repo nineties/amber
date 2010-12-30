@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2010-12-30 20:09:40 nineties $
+; $Id: vm-insn.rlc 2010-12-31 00:36:44 nineties $
 ;
 
 (define gen_field_get (idx) `(
@@ -39,21 +39,21 @@
     ))
 
 (define gen_check_plain (type) `(
-    (asm "movl (%esi), %eax")
+    (vmpop %eax)
     (asm "test $1, %eax")
     (asm "jnz 1f")
+    (asm "cmpl $0, %eax")
+    (asm "je 1f")
     (asm "movl -4(%eax), %eax")
     ; XXX: should not hardcode the layout of object header.
     (asm "andl $" @(- (<< 1 11) 1) ", %eax")
     (asm "cmpl $" @(| (<< type 3) TAG_PLAIN) ", %eax")
     (asm "je 2f")
     (asm "1:")
-    (asm "addl $4, %esi")
     (vmsshort 1 %ecx)
     (vmsucc %ecx)
     (vmfetch)
     (asm "2:")
-    (asm "addl $4, %esi")
     (vmsucc 3)
     (vmfetch)
     ))

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2010-12-30 19:13:54 nineties $
+; $Id: rowl1-matching.rlc 2010-12-31 00:36:09 nineties $
 ;
 
 (import "rlvm-compile")
@@ -18,71 +18,92 @@
 ; pattern matrix (((p11 p12 .. ) . e1) ((p21 p22 ..) . e2) ..)
 
 (fun compile_matching (bytecode head pats) (
+    (var asm (make_assembler 10))
+
     ; we need to clone 'pats' here because compile_matching_main() will rearrange it.
     (= pats (list_clone pats))
 
-    (var asm (make_assembler 10))
-    (compile_matching_main asm 0 pats)
+    (var args 0)
+    (var idx (list_length (caar pats)))
+    (while (> idx 0) (do
+        (decr idx)
+        (= args (cons (make_arg idx) args))
+        ))
+
+    (compile_matching_main asm args pats)
     (compile_matching_error asm head (list_length (caar pats)))
 
     (set_code bytecode asm)
     (return bytecode)
     ))
 
-(fun compile_matching_main (asm idx pats) (
+(fun compile_matching_main (asm args pats) (
     (if (== (caar pats) 0) (do
         (put_code asm (cdar pats))
         return
         ))
     (var x (split_matrix pats)) ; (single . remain)
-    (compile_matching_single asm idx (car x))
+    (compile_matching_single asm args (car x))
     (if (cdr x)
-        (compile_matching_main asm idx (cdr x))
+        (compile_matching_main asm args (cdr x))
         )
     ))
 
-(fun compile_matching_single (asm idx pats) (
+(fun compile_matching_single (asm args pats) (
     (var p (caaar pats))
     (var hd (expr_head p))
     (if (== hd Symbol) (do
         (= pats (shift_pat pats))
-        (compile_matching_main asm (+ idx 1) pats)
+        (compile_matching_main asm (cdr args)  pats)
         return
         ))
     (if (== hd Int) (do
         (var check_failed (fresh_label asm))
-        (put_arg asm idx)
+        (compile_operand asm (car args))
         (put_check_int asm check_failed)
-        (compile_matching_intlit asm idx pats)
+        (compile_matching_intlit asm args pats)
         (set_label asm check_failed)
         return
         ))
     (if (== hd String) (do
         (var check_failed (fresh_label asm))
-        (put_arg asm idx)
+        (compile_operand asm (car args))
+        (put_check_string asm check_failed)
+        (compile_operand asm (car args))
         (compile_matching_string_lit asm p check_failed)
         (= pats (shift_pat pats))
-        (compile_matching_main asm (+ idx 1) pats)
+        (compile_matching_main asm (cdr args) pats)
         (set_label asm check_failed)
         return
         ))
     (if (== hd HeadP) (do
         (var pat (expr_arg_symbol p 0))
         (var check_failed (fresh_label asm))
-        (put_arg asm idx)
+        (compile_operand asm (car args))
         (compile_match_head asm pat check_failed)
         (= pats (shift_pat pats))
-        (compile_matching_main asm (+ idx 1) pats)
+        (compile_matching_main asm (cdr args) pats)
         (set_label asm check_failed)
         return
         ))
     (if (== hd List) (do
         (var len (list_length p))
         (var check_failed (fresh_label asm))
-        (put_arg asm idx)
+        (compile_operand asm (car args))
         (put_check_list asm check_failed len)
-        (= pats (shift_pat pats))
-        (compile_matching_main asm (+ idx 1) pats)
+
+        ; flatten list pattern
+        (= pats (expand_list_pat pats))
+
+        ; add list elements to args
+        (var ls (car args))
+        (= args (cdr args))
+        (while (> len 0) (do
+            (decr len)
+            (= args (cons (make_nth ls len) args))
+            ))
+
+        (compile_matching_main asm args pats)
         (set_label asm check_failed)
         return
         ))
@@ -105,19 +126,19 @@
     (put_if_ne asm exit_lbl)
     ))
 
-(fun compile_matching_intlit (asm idx pats) (
+(fun compile_matching_intlit (asm args pats) (
     (= pats (sort_int_pat pats))
     (var r (scan_int_cases pats))
     (var continues (unbox (car r)))
     (var cases (cdr r))
 
     (if continues
-        (compile_matching_intlit_tswitch asm idx pats cases)
-        (compile_matching_intlit_lswitch asm idx pats cases)
+        (compile_matching_intlit_tswitch asm args pats cases)
+        (compile_matching_intlit_lswitch asm args pats cases)
         )
     ))
 
-(fun compile_matching_intlit_tswitch (asm idx pats cases) (
+(fun compile_matching_intlit_tswitch (asm args pats cases) (
     (var ncases (list_length cases))
     (var end_lbl (fresh_label asm))
     (var case_lbls (array int ncases))
@@ -125,7 +146,7 @@
         (array_set int case_lbls i (fresh_label asm))
         )
 
-    (put_arg asm idx)
+    (compile_operand asm (car args))
 
     ; unbox
     (put_imm_i1 asm)
@@ -141,13 +162,13 @@
         (var r (list_split pats n))
         (= pats (cdr r))
         (set_label asm (array_get int case_lbls i))
-        (compile_matching_main asm (+ idx 1) (shift_pat (car r)))
+        (compile_matching_main asm (cdr args) (shift_pat (car r)))
         (= cases (cdr cases))
         ))
     (set_label asm end_lbl)
     ))
 
-(fun compile_matching_intlit_lswitch (asm idx pats cases) (
+(fun compile_matching_intlit_lswitch (asm args pats cases) (
     (var ncases 0)
     (var max (caar cases))
     (var cases_copy cases)
@@ -166,7 +187,7 @@
         (array_set int case_lbls i (fresh_label asm))
         )
 
-    (put_arg asm idx)
+    (compile_operand asm (car args))
 
     ; unbox arg
     (put_imm_i1 asm)
@@ -186,7 +207,7 @@
         (var r (list_split pats n))
         (= pats (cdr r))
         (set_label asm (array_get int case_lbls i))
-        (compile_matching_main asm (+ idx 1) (shift_pat (car r)))
+        (compile_matching_main asm (cdr args) (shift_pat (car r)))
         (= cases (cdr cases))
         ))
     (set_label asm end_lbl)
@@ -366,6 +387,12 @@
 (fun shift_pat (pats) (
     (if (== pats 0) (return 0))
     (return (cons (cons (cdaar pats) (cdar pats)) (shift_pat (cdr pats))))
+    ))
+
+(fun expand_list_pat (pats) (
+    (if (== pats 0) (return 0))
+    (return (cons (cons (list_append (caaar pats) (cdaar pats)) (cdar pats))
+        (expand_list_pat (cdr pats))))
     ))
 
 (export fun compile_matching_hook (ent arity) (
