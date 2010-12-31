@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2010-12-30 22:55:26 nineties $
+; $Id: rowl1-compile.rlc 2010-12-31 12:52:09 nineties $
 ;
 
 (import "rlvm-compile")
@@ -132,7 +132,16 @@
         (if ret (put_ireturn asm))
         return
         ))
-    (compile_call asm hd (expr_args expr) ret)
+    (if (== hd Apply) (do
+        (compile_call asm (expr_arg expr 0) (expr_arg expr 1) ret)
+        (if ret (put_ireturn asm))
+        return
+        ))
+    (output_error stderr)
+    (output_string stderr "compile_expression(")
+    (pretty_print_abbrev stderr expr)
+    (output_string stderr ") is not implemented\n")
+    (exit 1)
     ))
 
 (export fun compile_operand (asm desc) (
