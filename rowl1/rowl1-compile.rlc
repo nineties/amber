@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2010-12-31 12:52:09 nineties $
+; $Id: rowl1-compile.rlc 2011-01-01 13:23:17 nineties $
 ;
 
 (import "rlvm-compile")
@@ -17,7 +17,8 @@
 
 (var function (to_sym "%function"))
 (var argument (to_sym "%argument"))
-(var getnth   (to_sym "%getnth"))
+(var list_get   (to_sym "%list_get"))
+(var expr_get   (to_sym "%expr_get"))
 
 (var vartable (make_symtable))
 
@@ -44,8 +45,12 @@
     (return (make_expr argument (list1 (box idx))))
     ))
 
-(export fun make_nth (obj idx) (
-    (return (make_expr getnth (list2 obj (box idx))))
+(export fun make_list_get (obj idx) (
+    (return (make_expr list_get (list2 obj (box idx))))
+    ))
+
+(export fun make_expr_get (obj idx) (
+    (return (make_expr expr_get (list2 obj (box idx))))
     ))
 
 (fun setup_args (args) (
@@ -77,17 +82,19 @@
     (if (== argty List) (do
         (var idx 0)
         (while arg (do
-            (setup_arg (make_nth obj idx) (car arg))
+            (setup_arg (make_list_get obj idx) (car arg))
             (= arg (cdr arg))
             (incr idx)
             ))
         return
         ))
-    (output_error stderr)
-    (output_string stderr "invalid argument pattern `")
-    (pretty_print_abbrev stderr arg)
-    (output_string stderr "'\n")
-    (exit 1)
+    (var idx 0)
+    (var args (expr_args arg))
+    (while args (do
+        (setup_arg (make_expr_get obj idx) (car args))
+        (= args (cdr args))
+        (incr idx)
+        ))
     ))
 
 (extern fun lookup_func)
@@ -102,25 +109,15 @@
             (output_string stderr "'\n")
             (exit 1)
             ))
-        (if (== v function) (do
+        (if (== v function)
             (put_push asm expr)
-            (if ret (put_ireturn asm))
-            return
-            ))
-        (compile_operand asm v)
-        (if ret (put_ireturn asm))
-        return
-        ))
-    (if (== hd Int) (do
+            (compile_operand asm v)
+            )
+        )
+    (if (== hd Int)
         (put_imm_int asm expr)
-        (if ret (put_ireturn asm))
-        return
-        ))
-    (if (== hd String) (do
+    (if (== hd String)
         (put_push asm expr)
-        (if ret (put_ireturn asm))
-        return
-        ))
     (if (== hd List) (do
         (if (== expr 0)
             (put_imm_i0 asm)
@@ -129,19 +126,19 @@
                 (compile_expression asm (car expr) @FALSE)
                 (put_cons asm)
             ))
-        (if ret (put_ireturn asm))
-        return
-        ))
-    (if (== hd Apply) (do
+        )
+    (if (== hd Apply)
         (compile_call asm (expr_arg expr 0) (expr_arg expr 1) ret)
-        (if ret (put_ireturn asm))
-        return
-        ))
-    (output_error stderr)
-    (output_string stderr "compile_expression(")
-    (pretty_print_abbrev stderr expr)
-    (output_string stderr ") is not implemented\n")
-    (exit 1)
+    (if (== hd Quote)
+        (compile_quote asm (expr_arg expr 0))
+        (do
+            (output_error stderr)
+            (output_string stderr "compile_expression(")
+            (pretty_print_abbrev stderr expr)
+            (output_string stderr ") is not implemented\n")
+            (exit 1)
+        )))))))
+    (if ret (put_ireturn asm))
     ))
 
 (export fun compile_operand (asm desc) (
@@ -150,11 +147,18 @@
         (put_arg asm (expr_arg_int desc 0))
         return
         ))
-    (if (== ty getnth) (do
+    (if (== ty list_get) (do
         (compile_operand asm (expr_arg desc 0))
-        (put_nth asm (expr_arg_int desc 1))
+        (put_list_get asm (expr_arg_int desc 1))
         return
         ))
+    (if (== ty expr_get) (do
+        (compile_operand asm (expr_arg desc 0))
+        (put_field_get2 asm)
+        (put_list_get asm (expr_arg_int desc 1))
+        return
+        ))
+    (not_reachable "compile_operand")
     ))
 
 (export fun compile_call (asm fun args ret) (
@@ -203,6 +207,33 @@
             (put_dcall asm (* 4 arity))
             (if ret (put_ireturn asm))
         ))
+    ))
+
+(fun compile_quote (asm expr) (
+    (var hd (expr_head expr))
+    (if (== hd Symbol)
+        (put_push asm expr)
+    (if (== hd Int)
+        (put_imm_int asm expr)
+    (if (== hd String)
+        (put_push asm expr)
+    (if (== hd List)
+        (if (! expr)
+            (put_imm_int asm 0)
+            (do
+                (compile_quote asm (cdr expr))
+                (compile_quote asm (car expr))
+                (put_cons asm)
+            )
+        )
+    (if (== hd Unquote)
+        (compile_expression asm (expr_arg expr 0) @FALSE)
+        (do
+            (compile_quote asm (expr_args expr))
+            (put_push asm (expr_head expr))
+            (compile_simple_call asm 2 make_expr @FALSE)
+        )
+        )))))
     ))
 
     ))

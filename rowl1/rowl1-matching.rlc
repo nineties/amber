@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2010-12-31 00:36:09 nineties $
+; $Id: rowl1-matching.rlc 2011-01-01 13:15:30 nineties $
 ;
 
 (import "rlvm-compile")
@@ -42,7 +42,7 @@
         (put_code asm (cdar pats))
         return
         ))
-    (var x (split_matrix pats)) ; (single . remain)
+    (var x (spliat_pattern_matrix pats)) ; (single . remain)
     (compile_matching_single asm args (car x))
     (if (cdr x)
         (compile_matching_main asm args (cdr x))
@@ -100,14 +100,34 @@
         (= args (cdr args))
         (while (> len 0) (do
             (decr len)
-            (= args (cons (make_nth ls len) args))
+            (= args (cons (make_list_get ls len) args))
             ))
 
         (compile_matching_main asm args pats)
         (set_label asm check_failed)
         return
         ))
-    (not_implemented "compile_matching_single")
+    (var check_failed (fresh_label asm))
+    (var size (expr_size p))
+    (compile_operand asm (car args))
+    (compile_match_head asm hd check_failed)
+    (compile_operand asm (car args))
+    (put_field_get2 asm)
+    (put_check_list asm check_failed size)
+
+    ; flattern expression pattern
+    (= pats (expand_composite_pat pats))
+
+    ; add list elements to args
+    (var expr (car args))
+    (= args (cdr args))
+    (while (> size 0) (do
+        (decr size)
+        (= args (cons (make_expr_get expr size) args))
+        ))
+
+    (compile_matching_main asm args pats)
+    (set_label asm check_failed)
     ))
 
 (fun compile_match_head (asm ty exit_lbl) (
@@ -279,15 +299,15 @@
     (put_if_zero asm exit_lbl)
     ))
 
-(fun split_matrix (pats) (
+(fun spliat_pattern_matrix (pats) (
     (var p (caaar pats))
     (var hd (expr_head p))
     (if (== hd Symbol) (return (split_any pats)))
-    (if (== hd Int) (return (split_int pats)))
-    (if (== hd String) (return (split_string pats)))
+    (if (== hd Int) (return (split_int_pat pats)))
+    (if (== hd String) (return (split_string_pat pats)))
     (if (== hd HeadP) (return (split_head_pat (expr_arg_symbol p 0) pats)))
-    (if (== hd List) (return (split_list pats)))
-    (not_implemented "split_matrix")
+    (if (== hd List) (return (split_list_pat pats)))
+    (return (split_composite_pat pats))
     ))
 
 (fun split_any (pats) (
@@ -301,7 +321,7 @@
     (return (list_split orig n))
     ))
 
-(fun split_int (pats) (
+(fun split_int_pat (pats) (
     (var n 1)
     (var orig pats)
     (= pats (cdr pats))
@@ -312,7 +332,7 @@
     (return (list_split orig n))
     ))
 
-(fun split_string (pats) (
+(fun split_string_pat (pats) (
     (var n 1)
     (var orig pats)
     (var str (caaar pats))
@@ -345,7 +365,7 @@
     (return (list_split orig n))
     ))
 
-(fun split_list (pats) (
+(fun split_list_pat (pats) (
     (= pats (sort_list_pat pats))
     (var n 1)
     (var orig pats)
@@ -384,6 +404,22 @@
         )
     ))
 
+(fun split_composite_pat (pats) (
+    (var n 1)
+    (var orig pats)
+    (var p (caaar pats))
+    (var hd (expr_head p))
+    (var size (expr_size p))
+    (= pats (cdr pats))
+    (while pats (do
+        (var nd (caaar pats))
+        (if (|| (!= (expr_head nd) hd) (!= (expr_size nd) size)) break)
+        (= pats (cdr pats))
+        (incr n)
+        ))
+    (return (list_split orig n))
+    ))
+
 (fun shift_pat (pats) (
     (if (== pats 0) (return 0))
     (return (cons (cons (cdaar pats) (cdar pats)) (shift_pat (cdr pats))))
@@ -392,6 +428,12 @@
 (fun expand_list_pat (pats) (
     (if (== pats 0) (return 0))
     (return (cons (cons (list_append (caaar pats) (cdaar pats)) (cdar pats))
+        (expand_list_pat (cdr pats))))
+    ))
+
+(fun expand_composite_pat (pats) (
+    (if (== pats 0) (return 0))
+    (return (cons (cons (list_append (expr_args (caaar pats)) (cdaar pats)) (cdar pats))
         (expand_list_pat (cdr pats))))
     ))
 

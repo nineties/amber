@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2010-12-31 13:00:13 nineties $
+; $Id: rowl1-node.rlc 2011-01-01 13:18:30 nineties $
 ;
 
 (import "rlvm-compile")
@@ -38,10 +38,12 @@
 (export var Constr      (to_sym "Constr"))
 (export var Command     (to_sym "Command"))
 (export var HeadP	(to_sym "HeadP"))
-(export var eval_sym    (to_sym "__eval"))
-(export var rewrite_sym (to_sym "__rewrite"))
-(export var define_function_sym  (to_sym "__define_function"))
-(export var define_syntax_sym (to_sym "__define_syntax"))
+(export var Eval        (to_sym "Eval"))
+(export var Rewrite     (to_sym "Rewrite"))
+(export var Quote       (to_sym "Quote"))
+(export var Unquote     (to_sym "Unquote"))
+(export var DefineFunction (to_sym "DefineFunction"))
+(export var DefineSyntax   (to_sym "DefineSyntax"))
 
 (export fun to_sym (name) (
     (var sym (idtable_find symbol_table name))
@@ -152,7 +154,7 @@
         (if (! args) (do
             (output_error stderr)
             (output_string stderr "`")
-            (pretty_print_abbrev stderr expr)
+            (pretty_print stderr expr)
             (output_string stderr "' does not have ")
             (output_ordinal stderr (+ idx 1))
             (output_string stderr " parameter\n")
@@ -172,7 +174,7 @@
         (output_string stderr "the ")
         (output_ordinal stderr (+ idx 1))
         (output_string stderr " parameter of `")
-        (pretty_print_abbrev stderr expr)
+        (pretty_print stderr expr)
         (output_string stderr "' must be ")
         (output_type stderr type)
         (output_string stderr "\n")
@@ -205,7 +207,7 @@
         (output_string stderr "the head of ")
         (output_ordinal stderr (+ idx 1))
         (output_string stderr " parameter of `")
-	(pretty_print_abbrev stderr expr)
+	(pretty_print stderr expr)
 	(output_string stderr "' must be `")
 	(pretty_print stderr head)
         (output_string stderr "'\n")
@@ -277,35 +279,59 @@
         ))
     ))
 
-(export fun pretty_print_abbrev (ochan expr) (
-    (if (== (node_type expr) @Expr) (do
-        (output_symbol ochan (expr_head expr))
-        (output_string ochan "(...)")
+(export fun pretty_print_abbrev (ochan node) (
+    (if (!= (node_type node) @Expr)
+        (return (pretty_print ochan node))
+        )
+    (var head (expr_head node))
+    (var op (find_operator head))
+    (if (! op) (do
+        (output_symbol ochan head)
+        (output_string ochan "{...}")
         return
         ))
-    (pretty_print ochan expr)
+    (var ophead (expr_head op))
+    (if (|| (== ophead Prefix) (|| (== ophead Constr) (== ophead Command))) (do
+        (output_string ochan (expr_arg op 0))
+        (output_string ochan " ...")
+        return
+        ))
+    (if (== ophead Postfix) (do
+        (output_string ochan "... ")
+        (output_string ochan (expr_arg op 0))
+        return
+        ))
+    (if (|| (== ophead InfixL) (== ophead InfixR)) (do
+        (output_string ochan "... ")
+        (output_string ochan (expr_arg op 0))
+        (output_string ochan " ...")
+        return
+        ))
+    (not_reachable "pretty_print_abbrev")
     ))
 
 (fun pp_expr (ochan node assoc) (
-    (var head (field_get node @ExprHead))
-    (var args (field_get node @ExprArgs))
+    (var head (expr_head node))
+    (var args (expr_args node))
 
     (if (== head Tuple) (return (pp_tuple ochan args)))
     (if (== head Block)   (return (pp_block ochan args)))
-    (if (== head Apply)  (return (pp_apply ochan args assoc)))
-    (if (== head Subscr) (return (pp_subscr ochan args assoc)))
+    (if (&& (== head Apply) (== (node_type (cadr args)) @ListE))
+        (return (pp_apply ochan args assoc)))
+    (if (&& (== head Subscr) (== (node_type (cadr args)) @ListE))
+        (return (pp_subscr ochan args assoc)))
     (if (== head Located) (return (pretty_print_main ochan (expr_arg node 1) assoc)))
 
     (var op (find_operator head))
     (if op (return (pp_operational_form ochan op args assoc)))
     (output_symbol ochan head)
-    (output_char ochan '(')
+    (output_char ochan '{')
     (while args (do
         (pretty_print ochan (car args))
         (= args (cdr args))
         (if args (output_string ochan ", "))
         ))
-    (output_char ochan ')')
+    (output_char ochan '}')
     ))
 
 (fun pp_operational_form (ochan op args assoc) (
@@ -422,7 +448,7 @@
 (fun pp_apply (ochan args assoc) (
     (if (< assoc @ASSOC_SECONDARY) (output_char ochan '('))
     (pretty_print_main ochan (car args) @ASSOC_SECONDARY)
-    (= args (cdr args))
+    (= args (cadr args))
     (output_char ochan '(')
     (while args (do
         (pretty_print ochan (car args))
@@ -436,7 +462,7 @@
 (fun pp_subscr (ochan args assoc) (
     (if (< assoc @ASSOC_SECONDARY) (output_char ochan '('))
     (pretty_print_main ochan (car args) @ASSOC_SECONDARY)
-    (= args (cdr args))
+    (= args (cadr args))
     (output_char ochan '[')
     (while args (do
         (pretty_print ochan (car args))
