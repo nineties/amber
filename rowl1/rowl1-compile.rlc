@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2011-01-01 13:23:17 nineties $
+; $Id: rowl1-compile.rlc 2011-01-02 07:12:40 nineties $
 ;
 
 (import "rlvm-compile")
@@ -66,7 +66,7 @@
 
 (fun setup_arg (obj arg) (
     (var argty (expr_head arg))
-    (if (|| (== argty Int) (== argty String))
+    (if (|| (== argty Int) (|| (== argty String) (== argty SymbolP)))
         return
         )
     (if (== argty Symbol) (do
@@ -74,8 +74,8 @@
         return
         ))
     (if (== argty HeadP) (do
-        (var head (expr_arg_symbol arg 0))
-        (var v (expr_arg_symbol arg 1))
+        (var head (expr_arg_symbol arg 1))
+        (var v (expr_arg_symbol arg 0))
         (symtable_add vartable v 0 obj)
         return
         ))
@@ -133,9 +133,9 @@
         (compile_quote asm (expr_arg expr 0))
         (do
             (output_error stderr)
-            (output_string stderr "compile_expression(")
-            (pretty_print_abbrev stderr expr)
-            (output_string stderr ") is not implemented\n")
+            (output_string stderr "meaning of the expression '")
+            (pretty_print stderr expr)
+            (output_string stderr "' is not defined\n")
             (exit 1)
         )))))))
     (if ret (put_ireturn asm))

@@ -1,24 +1,32 @@
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.rl 2010-12-22 12:51:23 nineties $
+# $Id: syntax.rl 2011-01-02 10:11:18 nineties $
 
 # Syntax definition of rowl language
 
-#builtin_rewrite(infixl(head, repr, assoc), syntax_sugar(head, InfixL(repr, assoc)))
-#builtin_rewrite(infixr(head, repr, assoc), syntax_sugar(head, InfixR(repr, assoc)))
-#builtin_rewrite(prefix(head, repr, assoc), syntax_sugar(head, Prefix(repr, assoc)))
-#builtin_rewrite(postfix(head, repr, assoc), syntax_sugar(head, Postfix(repr, assoc)))
-#builtin_rewrite(constr(head, repr), syntax_sugar(head, Constr(repr)))
-#builtin_rewrite(command(head, repr), syntax_sugar(head, COmmand(repr)))
-#
-#infixl(MatchHead,    "!",  3)
-#prefix(UnaryPlus,    "+",  4)
-#prefix(UnaryMinus,   "-",  4)
-#prefix(Not,          "!",  4)
+DefineSyntax{RewriteExpr, InfixR{"=>", 20}}
+DefineSyntax{Unquote, Prefix{"$", 3}}
+DefineSyntax{Quote, Prefix{"!", 3}}
+DefineSyntax{HeadP, InfixL{"@", 4}}
+DefineSyntax{SymbolP, Prefix{"`", 3}}
+DefineSyntax{DefineExpr, InfixR{":", 18}}
+
+DefineFunction{Rewrite(x => y), !DefineFunction{Rewrite($x), !$y}}
+
+Apply{f@Symbol, args@List}: body => DefineFunction{Apply{$f, $args}, $body}
+`infixl(head@Symbol, repr@String, assoc@Int) => DefineSyntax{$head, InfixL{$repr, $assoc}}
+`infixr(head@Symbol, repr@String, assoc@Int) => DefineSyntax{$head, InfixR{$repr, $assoc}}
+`prefix(head@Symbol, repr@String, assoc@Int) => DefineSyntax{$head, Prefix{$repr, $assoc}}
+`postfix(head@Symbol, repr@String, assoc@Int) => DefineSyntax{$head, Postfix{$repr, $assoc}}
+`constr(head@Symbol, repr@String) => DefineSyntax{$head, Constr{$repr}}
+`command(head@Symbol, repr@String) => DefineSyntax{$head, Command{$repr}}
+
+#prefix(UnaryPlus,    "+",  5)
+#prefix(UnaryMinus,   "-",  5)
 #infixl(Times,        "*",  6)
 #infixl(Divide,       "/",  6)
 #infixl(Mod,          "%",  6)
-#infixl(Plus,         "+",  7)
+infixl(Plus,         "+",  7)
 #infixl(Minus,        "-",  7)
 #infixl(Less,         "<",  9)
 #infixl(Greater,      ">",  9)
@@ -37,7 +45,6 @@
 #infixr(TimesAssign,  "*=", 17)
 #infixr(DivideAssign, "/=", 17)
 #infixr(ModAssign,    "%=", 17)
-#infixr(Decl,         ":",  18)
 #constr(If,           "if")
 #constr(While,        "while")
 #constr(For,          "for")
