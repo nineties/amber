@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-parse.rlc 2010-12-31 13:01:47 nineties $
+; $Id: rowl1-parse.rlc 2011-01-02 13:09:30 nineties $
 ;
 
 (import "rlvm-compile")
@@ -83,8 +83,15 @@
         (= op_stack (cons (cons (get_token_value) (get_loc)) op_stack))
         (= tok (lex_sub offs))
         ))
-    (var e (parse_secondary tok offs))
+    (var e (parse_primary tok))
+    (while (&& op_stack (< (associativity (caar op_stack)) @ASSOC_SECONDARY)) (do
+        (var op (caar op_stack))
+        (= e (make_expr_rewrite (field_get op 1) (list1 e)))
+        (= op_stack (cdr op_stack))
+        ))
+    (= e (parse_secondary e offs))
     (= expr_stack (cons e expr_stack))
+
 
     (label parse_expr_infix)
     (= tok (lex_infix offs))
@@ -133,10 +140,9 @@
     (return (car expr_stack))
     ))
 
-(fun parse_secondary (t offs) (
-    (var e (parse_primary t))
+(fun parse_secondary (e offs) (
     (label parse_secondary_loop)
-    (= t (lex_sub offs))
+    (var t (lex_sub offs))
     (if (== t '(') (do
         (var args (parse_comma_list (lex) ')'))
         (= e (make_expr_rewrite Apply (list2 e args)))
