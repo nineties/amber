@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-lex.rlc 2010-12-31 16:27:20 nineties $
+; $Id: rowl1-lex.rlc 2011-01-02 07:10:19 nineties $
 ;
 
 (import "rlvm-compile")
@@ -44,15 +44,14 @@
 (var CH_OTHER     15) ; "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_"
 (var CH_SQUOTE    16) ; "'"
 (var CH_DQUOTE    17) ; "\""
-(var CH_BQUOTE    18) ; "`"
-(var CH_SLASH     19) ; "/"
-(var CH_BACKSLASH 20) ; "\\"
-(var CH_SHARP     21) ; "#"
-(var CH_DOT       22) ; "."
-(var CH_PLUSMINUS 23) ; "+-"
-(var CH_SPECIAL   24) ; ",()[]{}"
-(var CH_OPCHAR    25) ; "!$%&=^|@*:;/\\?<>~"
-(var CH_INVALID   26)
+(var CH_SLASH     18) ; "/"
+(var CH_BACKSLASH 19) ; "\\"
+(var CH_SHARP     20) ; "#"
+(var CH_DOT       21) ; "."
+(var CH_PLUSMINUS 22) ; "+-"
+(var CH_SPECIAL   23) ; ",()[]{}"
+(var CH_OPCHAR    24) ; "!$%&=^|@*:;/\\?<>~`"
+(var CH_INVALID   25)
 
 ; === state transition diagram ===
 ;
@@ -99,28 +98,18 @@
 ;       |         |'"\\abfnrtv0+---+
 ;       |         +------------+ 33|
 ;       |                      +---+
-;       | `     +---+{letter}  +---+                `  +---+
-;       +------>| 35+--------->| 36+-+--------------+->|@38|
-;       |       +-+-+          +-+-+ |              |  +---+
-;       |         |              A   |{letter}|[0-9]|
-;       |         |{opchar}      +---+              |
-;       |         |    +---+                        |
-;       |         +--->| 37+-+----------------------+
-;       |              +---+ |
-;       |                A   |{opchar}
-;       |                +---+
 ;       |{letter}+---+
-;       +------->|@39+-+
+;       +------->|@35+-+
 ;       |        +---+ |{letter}|[0-9]
 ;       |          A   |
 ;       |          +---+
 ;       |{opchar}+---+           +---+
-;       +------->| 40+-+-------->|@41|
+;       +------->| 36+-+-------->|@37|
 ;       |        +---+ |         +---+
 ;       |          A   |{opchar}
 ;       |          +---+
 ;       |{special} +---+
-;       +--------->|@42|
+;       +--------->|@38|
 ;                  +---+
 ;
 ;
@@ -147,59 +136,56 @@
 (import "rowl1-node")
 
 (array char chgroup (
-     0 26 26 26 26 26 26 26 26  1  2 26 26  1 26 26
-    26 26 26 26 26 26 26 26 26 26 26 26 26 26 26 26
-     1 25 17 21 25 25 25 16 24 24 25 23 24 23 22 19
-     3  4  5  5  5  5  5  5  6  6 25 25 25 25 25 25
-    25 14 14 14 14 14 14 15 15 15 15 15 15 15 15 15
-    15 15 15 15 15 15 15 15 15 15 15 24 20 24 25 15
-    18  7  8 14 14  9  7 15 15 15 15 15 15 15 13 10
-    15 15 11 15 11 15 11 15 12 15 15 24 25 24 25 26
-    26 26 26 26 26 26 26 26 26 26 26 26 26 26 26 26
-    26 26 26 26 26 26 26 26 26 26 26 26 26 26 26 26
-    26 26 26 26 26 26 26 26 26 26 26 26 26 26 26 26
-    26 26 26 26 26 26 26 26 26 26 26 26 26 26 26 26
-    26 26 26 26 26 26 26 26 26 26 26 26 26 26 26 26
-    26 26 26 26 26 26 26 26 26 26 26 26 26 26 26 26
-    26 26 26 26 26 26 26 26 26 26 26 26 26 26 26 26
-    26 26 26 26 26 26 26 26 26 26 26 26 26 26 26 26
+     0 25 25 25 25 25 25 25 25  1  2 25 25  1 25 25
+    25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25
+     1 24 17 20 24 24 24 16 23 23 24 22 23 22 21 18
+     3  4  5  5  5  5  5  5  6  6 24 24 24 24 24 24
+    24 14 14 14 14 14 14 15 15 15 15 15 15 15 15 15
+    15 15 15 15 15 15 15 15 15 15 15 23 19 23 24 15
+    24  7  8 14 14  9  7 15 15 15 15 15 15 15 13 10
+    15 15 11 15 11 15 11 15 12 15 15 23 24 23 24 25
+    25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25
+    25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25
+    25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25
+    25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25
+    25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25
+    25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25
+    25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25
+    25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25
     ))
 
-;                     C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C
-;                     H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H
-;                     _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _
-;                     E  S  N  0  1  2  8  a  b  e  o  r  x  n  H  O  S  D  B  S  B  S  D  P  S  O  I
-;                     O  P  L  :  :  _  _  f  :  :  :  t  :  :  E  T  Q  Q  Q  L  A  H  O  L  P  P  N
-;                     F  A  :  :  :  7  9  :  :  :  :  v  :  :  X  H  U  U  U  A  C  A  T  U  E  C  V
-;                     :  C  :  :  :  :  :  :  :  :  :  :  :  :  :  E  O  O  O  S  K  R  :  S  C  H  A
-;                     :  E  :  :  :  :  :  :  :  :  :  :  :  :  :  R  T  T  T  H  S  P  :  M  I  A  L
-;                     :  S  :  :  :  :  :  :  :  :  :  :  :  :  :  :  E  E  E  :  L  :  :  I  A  R  I
-;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  A  :  :  N  L  :  D
-;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  S  :  :  U  :  :  :
-;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  H  :  :  S  :  :  :
-;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :
-(array char s0next  (13  2  2 15 22 22 22 39 39 39 39 39 39 39 39 39 28 32 35 40 40  2 40 40 42 40 2))
-(array char s15next ( 1  1  1  3  3  3  3  3 16  3 18  3 20  3  3  3  1  1  1  1  1  1 23  1  1  1 2))
-(array char s17next ( 1  1  1 17 17  4  4  4  4  4  4  4  4  4  4  4  1  1  1  1  1  1  4  1  1  1 2))
-(array char s19next ( 1  1  1 19 19 19  5  5  5  5  5  5  5  5  5  5  1  1  1  1  1  1  5  1  1  1 2))
-(array char s21next ( 1  1  1 21 21 21 21 21 21 21  6  6  6  6 21  6  1  1  1  1  1  1  6  1  1  1 2))
-(array char s22next ( 1  1  1 22 22 22 22  3  3 23  3  3  3  3  3  3  1  1  1  1  1  1 23  1  1  1 2))
-(array char s24next ( 1  1  1 24 24 24 24  7  7 25  7  7  7  7  7  7  1  1  1  1  1  1  7  1  1  1 2))
-(array char s27next ( 1  1  1 27 27 27 27  7  7  7  7  7  7  7  7  7  1  1  1  1  1  1  7  1  1  1 2))
-(array char s28next ( 9 29  9 29 29 29 29 29 29 29 29 29 29 29 29 29 29 29 29 29 30 29 29 29 29 29 2))
-(array char s30next ( 8  8  8 31  8  8  8 31 31  8  8 31  8 31  8  8 31 31  8  8 31  8  8  8  8  8 2))
-(array char s32next (10 32 10 32 32 32 32 32 32 32 32 32 32 32 32 32 32 34 32 32 33 32 32 32 32 32 2))
-(array char s33next ( 8  8  8 32  8  8  8 32 32  8  8 32  8 32  8  8 32 32  8  8 32  8  8  8  8  8 2))
-(array char s35next (11 11 11 11 11 11 11 36 36 36 36 36 36 36 36 36 11 11 11 37 37 11 37 37 11 37 2))
-(array char s36next (11 11 11 36 36 36 36 36 36 36 36 36 36 36 36 36 11 11 38 11 11 11 11 11 11 11 2))
-(array char s37next (11 11 11 11 11 11 11 11 11 11 11 11 11 11 11 11 11 11 38 37 37 11 37 37 11 37 2))
-(array char s39next ( 1  1  1 39 39 39 39 39 39 39 39 39 39 39 39 39  1  1  1  1  1  1  1  1  1  1 2))
-(array char s40next (41 41 41 41 41 41 41 41 41 41 41 41 41 41 41 41 41 41 41 40 40 41 40 40 41 40 2))
+;                     C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C
+;                     H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H  H
+;                     _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _
+;                     E  S  N  0  1  2  8  a  b  e  o  r  x  n  H  O  S  D  S  B  S  D  P  S  O  I
+;                     O  P  L  :  :  _  _  f  :  :  :  t  :  :  E  T  Q  Q  L  A  H  O  L  P  P  N
+;                     F  A  :  :  :  7  9  :  :  :  :  v  :  :  X  H  U  U  A  C  A  T  U  E  C  V
+;                     :  C  :  :  :  :  :  :  :  :  :  :  :  :  :  E  O  O  S  K  R  :  S  C  H  A
+;                     :  E  :  :  :  :  :  :  :  :  :  :  :  :  :  R  T  T  H  S  P  :  M  I  A  L
+;                     :  S  :  :  :  :  :  :  :  :  :  :  :  :  :  :  E  E  :  L  :  :  I  A  R  I
+;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  A  :  :  N  L  :  D
+;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  S  :  :  U  :  :  :
+;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  H  :  :  S  :  :  :
+;                     :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :  :
+(array char s0next  (13  2  2 15 22 22 22 35 35 35 35 35 35 35 35 35 28 32 36 36  2 36 36 38 36 2))
+(array char s15next ( 1  1  1  3  3  3  3  3 16  3 18  3 20  3  3  3  1  1  1  1  1 23  1  1  1 2))
+(array char s17next ( 1  1  1 17 17  4  4  4  4  4  4  4  4  4  4  4  1  1  1  1  1  4  1  1  1 2))
+(array char s19next ( 1  1  1 19 19 19  5  5  5  5  5  5  5  5  5  5  1  1  1  1  1  5  1  1  1 2))
+(array char s21next ( 1  1  1 21 21 21 21 21 21 21  6  6  6  6 21  6  1  1  1  1  1  6  1  1  1 2))
+(array char s22next ( 1  1  1 22 22 22 22  3  3 23  3  3  3  3  3  3  1  1  1  1  1 23  1  1  1 2))
+(array char s24next ( 1  1  1 24 24 24 24  7  7 25  7  7  7  7  7  7  1  1  1  1  1  7  1  1  1 2))
+(array char s27next ( 1  1  1 27 27 27 27  7  7  7  7  7  7  7  7  7  1  1  1  1  1  7  1  1  1 2))
+(array char s28next ( 9 29  9 29 29 29 29 29 29 29 29 29 29 29 29 29 29 29 29 30 29 29 29 29 29 2))
+(array char s30next ( 8  8  8 31  8  8  8 31 31  8  8 31  8 31  8  8 31 31  8 31  8  8  8  8  8 2))
+(array char s32next (10 32 10 32 32 32 32 32 32 32 32 32 32 32 32 32 32 34 32 33 32 32 32 32 32 2))
+(array char s33next ( 8  8  8 32  8  8  8 32 32  8  8 32  8 32  8  8 32 32  8 32  8  8  8  8  8 2))
+(array char s35next ( 1  1  1 35 35 35 35 35 35 35 35 35 35 35 35 35  1  1  1  1  1  1  1  1  1 2))
+(array char s36next (37 37 37 37 37 37 37 37 37 37 37 37 37 37 37 37 37 37 36 36 37 36 36 37 36 2))
 
-(array char grp_0_9 ( 0  0  0  1  1  1  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0))
-(array char grp_1_9 ( 0  0  0  0  1  1  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0))
-(array char grp_oct ( 0  0  0  1  1  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0))
-(array char grp_hex ( 0  0  0  1  1  1  1  1  1  1  0  0  0  0  1  0  0  0  0  0  0  0  0  0  0  0))
+(array char grp_0_9 ( 0  0  0  1  1  1  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0))
+(array char grp_1_9 ( 0  0  0  0  1  1  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0))
+(array char grp_oct ( 0  0  0  1  1  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0))
+(array char grp_hex ( 0  0  0  1  1  1  1  1  1  1  0  0  0  0  1  0  0  0  0  0  0  0  0  0  0))
 
 (var lexichan null)
 (var lexbuf null)
@@ -612,29 +598,6 @@
         (35 . (do
             (consume)
             (= state (next_state s35next))
-            (goto lexloop)
-            ))
-        (36 . (do
-            (consume)
-            (= state (next_state s36next))
-            (goto lexloop)
-            ))
-        (37 . (do
-            (consume)
-            (= state (next_state s37next))
-            (goto lexloop)
-            ))
-        (38 . (do
-            (consume)
-            (var str (get_unquoted_token_text))
-            (= token_value (to_sym str))
-            (accept @TOK_SYMBOL)
-            (= state 1)
-            (goto lexloop)
-            ))
-        (39 . (do
-            (consume)
-            (= state (next_state s39next))
 	    (if (== state 1) (do
                 (var op (lookup_operator_token (get_token_text)))
                 (if op
@@ -646,7 +609,7 @@
 		))
             (goto lexloop)
             ))
-        (40 . (do
+        (36 . (do
             (consume)
             (var op (lookup_operator_token (get_token_text)))
             (if op
@@ -654,10 +617,10 @@
                     (accept_operator op infix_p)
                     (store_lexer_state)
                 ))
-            (= state (next_state s40next))
+            (= state (next_state s36next))
             (goto lexloop)
             ))
-        (41 . (do
+        (37 . (do
             (if (== token_tag @TOK_NONE) (do
                 (= state 12)
                 (goto lexloop)
@@ -666,7 +629,7 @@
             (= state 1)
             (goto lexloop)
             ))
-        (42 . (do
+        (38 . (do
             (accept (consume))
             (= state 1)
             (goto lexloop)

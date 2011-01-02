@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2011-01-01 13:18:30 nineties $
+; $Id: rowl1-node.rlc 2011-01-02 07:13:17 nineties $
 ;
 
 (import "rlvm-compile")
@@ -19,7 +19,7 @@
 
 ; builtin expression headers and types
 (export var DontCare    (to_sym "_"))
-(export var Nil		(to_sym "nil"))
+(export var Nil         (to_sym "nil"))
 (export var Symbol      (to_sym "Symbol"))
 (export var Int         (to_sym "Int"))
 (export var Float       (to_sym "Float"))
@@ -37,7 +37,8 @@
 (export var InfixR      (to_sym "InfixR"))
 (export var Constr      (to_sym "Constr"))
 (export var Command     (to_sym "Command"))
-(export var HeadP	(to_sym "HeadP"))
+(export var HeadP       (to_sym "HeadP"))
+(export var SymbolP     (to_sym "SymbolP"))
 (export var Eval        (to_sym "Eval"))
 (export var Rewrite     (to_sym "Rewrite"))
 (export var Quote       (to_sym "Quote"))
@@ -70,9 +71,9 @@
 
 (fun is_atom (ty) (
     (if (|| (== ty @Expr) (== ty @ListE))
-	(return @FALSE)
-	(return @TRUE)
-	)
+        (return @FALSE)
+        (return @TRUE)
+        )
     ))
 
 ; XXX: output precise information
@@ -207,12 +208,12 @@
         (output_string stderr "the head of ")
         (output_ordinal stderr (+ idx 1))
         (output_string stderr " parameter of `")
-	(pretty_print stderr expr)
-	(output_string stderr "' must be `")
-	(pretty_print stderr head)
+        (pretty_print stderr expr)
+        (output_string stderr "' must be `")
+        (pretty_print stderr head)
         (output_string stderr "'\n")
         (exit 1)
-	))
+        ))
     (return arg)
     ))
 
@@ -279,37 +280,6 @@
         ))
     ))
 
-(export fun pretty_print_abbrev (ochan node) (
-    (if (!= (node_type node) @Expr)
-        (return (pretty_print ochan node))
-        )
-    (var head (expr_head node))
-    (var op (find_operator head))
-    (if (! op) (do
-        (output_symbol ochan head)
-        (output_string ochan "{...}")
-        return
-        ))
-    (var ophead (expr_head op))
-    (if (|| (== ophead Prefix) (|| (== ophead Constr) (== ophead Command))) (do
-        (output_string ochan (expr_arg op 0))
-        (output_string ochan " ...")
-        return
-        ))
-    (if (== ophead Postfix) (do
-        (output_string ochan "... ")
-        (output_string ochan (expr_arg op 0))
-        return
-        ))
-    (if (|| (== ophead InfixL) (== ophead InfixR)) (do
-        (output_string ochan "... ")
-        (output_string ochan (expr_arg op 0))
-        (output_string ochan " ...")
-        return
-        ))
-    (not_reachable "pretty_print_abbrev")
-    ))
-
 (fun pp_expr (ochan node assoc) (
     (var head (expr_head node))
     (var args (expr_args node))
@@ -336,11 +306,11 @@
 
 (fun pp_operational_form (ochan op args assoc) (
     (var ophead (expr_head op))
-    (if (== ophead Prefix) (return (pp_prefix ochan op args assoc)))
+    (if (== ophead Prefix)  (return (pp_prefix ochan op args assoc)))
     (if (== ophead Postfix) (return (pp_postfix ochan op args assoc)))
-    (if (== ophead InfixL) (return (pp_infix ochan op args @TRUE assoc)))
-    (if (== ophead InfixR) (return (pp_infix ochan op args @FALSE assoc)))
-    (if (== ophead Constr) (return (pp_constr ochan op args)))
+    (if (== ophead InfixL)  (return (pp_infix ochan op args @TRUE assoc)))
+    (if (== ophead InfixR)  (return (pp_infix ochan op args @FALSE assoc)))
+    (if (== ophead Constr)  (return (pp_constr ochan op args)))
     (if (== ophead Command) (return (pp_command ochan op args)))
     (not_reachable "pp_operational_form")
     ))
