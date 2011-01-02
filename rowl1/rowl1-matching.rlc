@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2011-01-02 09:37:15 nineties $
+; $Id: rowl1-matching.rlc 2011-01-02 13:15:35 nineties $
 ;
 
 (import "rlvm-compile")
@@ -80,14 +80,13 @@
         (var pat (expr_arg_symbol p 1))
         (var check_failed (fresh_label asm))
         (compile_operand asm (car args))
-        (compile_match_head asm pat check_failed)
+        (compile_same_head_pat asm pat check_failed)
         (= pats (shift_pat pats))
         (compile_matching_main asm (cdr args) pats)
         (set_label asm check_failed)
         return
         ))
     (if (== hd SymbolP) (do
-        (pretty_print stderr p)
         (var sym (expr_arg_symbol p 0))
         (var check_failed (fresh_label asm))
         (compile_operand asm (car args))
@@ -124,7 +123,7 @@
     (var size (expr_size p))
     (compile_operand asm (car args))
 
-    (compile_match_head asm hd check_failed)
+    (compile_same_head_pat asm hd check_failed)
     (compile_operand asm (car args))
     (put_field_get2 asm)
     (put_check_list asm check_failed size)
@@ -144,7 +143,7 @@
     (set_label asm check_failed)
     ))
 
-(fun compile_match_head (asm ty exit_lbl) (
+(fun compile_same_head_pat (asm ty exit_lbl) (
     (if (== ty Int) (do
         (put_check_int asm exit_lbl)
         return
@@ -320,6 +319,7 @@
     (if (== hd Int) (return (split_int_pat pats)))
     (if (== hd String) (return (split_string_pat pats)))
     (if (== hd HeadP) (return (split_head_pat (expr_arg_symbol p 1) pats)))
+    (if (== hd SymbolP) (return (split_symbol_pat (expr_arg_symbol p 0) pats)))
     (if (== hd List) (return (split_list_pat pats)))
     (return (split_composite_pat pats))
     ))
@@ -360,19 +360,38 @@
     (return (list_split orig n))
     ))
 
-(fun match_head (ty node) (
+(fun same_head_pat (hd node) (
     (var hd (expr_head node))
-    (if (&& (== hd HeadP) (== (expr_arg_symbol node 1) ty))
+    (if (&& (== hd HeadP) (== (expr_arg_symbol node 1) hd))
         (return @TRUE)
         (return @FALSE)
         )
     ))
 
-(fun split_head_pat (ty pats) (
+(fun split_head_pat (hd pats) (
     (var n 1)
     (var orig pats)
     (= pats (cdr pats))
-    (while (&& pats (match_head ty (caaar pats))) (do
+    (while (&& pats (same_head_pat hd (caaar pats))) (do
+        (= pats (cdr pats))
+        (incr n)
+        ))
+    (return (list_split orig n))
+    ))
+
+(fun same_symbol_pat (sym node) (
+    (var hd (expr_head node))
+    (if (&& (== hd SymbolP) (== (expr_arg_symbol node 0) sym))
+        (return @TRUE)
+        (return @FALSE)
+        )
+    ))
+
+(fun split_symbol_pat (sym pats) (
+    (var n 1)
+    (var orig pats)
+    (= pats (cdr pats))
+    (while (&& pats (same_symbol_pat sym (caaar pats))) (do
         (= pats (cdr pats))
         (incr n)
         ))
