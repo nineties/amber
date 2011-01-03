@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2011-01-02 10:11:40 nineties $
+; $Id: rowl1-interp.rlc 2011-01-04 07:35:42 nineties $
 ;
 
 (import "rlvm-compile")
@@ -91,7 +91,7 @@
     (while 1 (do
         (var e (parse))
         (if (! e) break)
-        (call_eval e)
+        (call_eval (rewrite_expr e))
         ))
     ))
 
@@ -219,9 +219,29 @@
 	))
     ))
 
-(export fun rewrite_expr (expr) (
+(fun rewrite_expr (expr) (
+    (var ty (node_type expr))
+    (if (== ty @Expr) (do
+        (var args (expr_args expr))
+        (while args (do
+            (setcar args (rewrite_expr (car args)))
+            (= args (cdr args))
+            ))
+        )
+    (if (== ty @ListE) (do
+        (var vals expr)
+        (while vals (do
+            (setcar vals (rewrite_expr (car vals)))
+            (= vals (cdr vals))
+            ))
+        )))
     (var f (lookup_func Rewrite 1))
-    (return (jitcall f expr))
+    (var e (jitcall f expr))
+    (while (!= e expr) (do
+        (= expr e)
+        (= e (jitcall f expr))
+        ))
+    (return e)
     ))
 
 (export fun builtin_rewrite (expr) (
