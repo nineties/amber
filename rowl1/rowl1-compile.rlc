@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2011-01-02 07:12:40 nineties $
+; $Id: rowl1-compile.rlc 2011-01-10 14:43:25 nineties $
 ;
 
 (import "rlvm-compile")
@@ -97,9 +97,14 @@
         ))
     ))
 
+(extern fun set_loc)
 (extern fun lookup_func)
 (export fun compile_expression (asm expr ret) (
     (var hd (expr_head expr))
+    (if (== hd Located) (do
+        (set_loc (expr_arg expr 0))
+        (compile_expression asm (expr_arg expr 1) @FALSE)
+        )
     (if (== hd Symbol) (do
         (var v (symtable_find vartable expr 0))
         (if (! v) (do
@@ -131,13 +136,17 @@
         (compile_call asm (expr_arg expr 0) (expr_arg expr 1) ret)
     (if (== hd Quote)
         (compile_quote asm (expr_arg expr 0))
+    (if (== hd Block)
+        (compile_block asm (expr_args expr))
+    (if (== hd If)
+        (compile_if asm (expr_arg expr 0) (expr_arg expr 1))
         (do
             (output_error stderr)
-            (output_string stderr "meaning of the expression '")
+            (output_string stderr "unknown expression '")
             (pretty_print stderr expr)
-            (output_string stderr "' is not defined\n")
+            (output_string stderr "'\n")
             (exit 1)
-        )))))))
+        ))))))))))
     (if ret (put_ireturn asm))
     ))
 
@@ -161,7 +170,7 @@
     (not_reachable "compile_operand")
     ))
 
-(export fun compile_call (asm fun args ret) (
+(fun compile_call (asm fun args) (
     (= args (list_reverse args))
     (var arity 0)
     (while args (do
@@ -183,29 +192,26 @@
             (put_dcall asm 8)
             (put_jcall asm (* 4 arity))
         ))
-
-    (if ret (put_ireturn asm))
     ))
 
-(export fun compile_simple_function (asm arity func ret) (
+(export fun compile_simple_function (asm arity func) (
     (var n arity)
     (while (> n 0) (do
         (decr n)
         (put_arg asm n)
         ))
-    (compile_simple_call asm arity func ret)
+    (compile_simple_call asm arity func)
+    (put_ireturn asm)
     ))
 
-(export fun compile_simple_call (asm arity func ret) (
+(export fun compile_simple_call (asm arity func) (
     (if @(IS_PRIM func)
         (do
             (put_pcall asm @(PRIM_IDX func) (* 4 arity))
-            (if ret (put_ireturn asm))
         )
         (do
             (put_imm_int32 asm func)
             (put_dcall asm (* 4 arity))
-            (if ret (put_ireturn asm))
         ))
     ))
 
@@ -231,9 +237,27 @@
         (do
             (compile_quote asm (expr_args expr))
             (put_push asm (expr_head expr))
-            (compile_simple_call asm 2 make_expr @FALSE)
+            (compile_simple_call asm 2 make_expr)
         )
         )))))
+    ))
+
+(fun compile_block (asm exprs) (
+    (while exprs (do
+        (compile_expression asm (car exprs))
+        (= exprs (cdr exprs))
+        (if exprs (put_drop asm)) ; drop values except the last one
+        ))
+    ))
+
+(fun compile_if (asm cnd body) (
+    (var exit_lbl (fresh_label asm))
+    (put_nil asm)
+    (compile_expression asm cnd)
+    (put_if_one asm exit_lbl)
+    (put_drop asm)
+    (compile_expression asm body)
+    (set_label asm exit_lbl)
     ))
 
     ))

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2011-01-04 07:35:42 nineties $
+; $Id: rowl1-interp.rlc 2011-01-10 14:59:40 nineties $
 ;
 
 (import "rlvm-compile")
@@ -86,6 +86,10 @@
     ))
 
 (export var current_loc null)
+(export fun set_loc (loc) (
+    (= current_loc loc)
+    ))
+
 (export fun interpret () (
     (= current_loc no_loc)
     (while 1 (do
@@ -129,7 +133,8 @@
     (var asm (make_assembler))
     (put_push asm (box arity))
     (put_push asm sym)
-    (compile_simple_call asm 2 undefined_error @TRUE)
+    (compile_simple_call asm 2 undefined_error)
+    (put_ireturn asm)
     (return (get_code asm))
     ))
 
@@ -140,11 +145,8 @@
     ))
 
 (export fun builtin_eval_located (expr) (
-    (var args (field_get expr @ExprArgs))
-    (var save_loc current_loc)
-    (= current_loc (expr_arg expr 0))
+    (set_loc (expr_arg expr 0))
     (var ret (call_eval (expr_arg expr 1)))
-    (= current_loc save_loc)
     (return ret)
     ))
 
