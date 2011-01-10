@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2011-01-10 14:43:25 nineties $
+; $Id: rowl1-compile.rlc 2011-01-10 16:15:40 nineties $
 ;
 
 (import "rlvm-compile")
@@ -140,13 +140,15 @@
         (compile_block asm (expr_args expr))
     (if (== hd If)
         (compile_if asm (expr_arg expr 0) (expr_arg expr 1))
+    (if (== hd While)
+        (compile_while asm (expr_arg expr 0) (expr_arg expr 1))
         (do
             (output_error stderr)
             (output_string stderr "unknown expression '")
             (pretty_print stderr expr)
             (output_string stderr "'\n")
             (exit 1)
-        ))))))))))
+        )))))))))))
     (if ret (put_ireturn asm))
     ))
 
@@ -244,7 +246,7 @@
 
 (fun compile_block (asm exprs) (
     (while exprs (do
-        (compile_expression asm (car exprs))
+        (compile_expression asm (car exprs) @FALSE)
         (= exprs (cdr exprs))
         (if exprs (put_drop asm)) ; drop values except the last one
         ))
@@ -253,10 +255,31 @@
 (fun compile_if (asm cnd body) (
     (var exit_lbl (fresh_label asm))
     (put_nil asm)
-    (compile_expression asm cnd)
-    (put_if_one asm exit_lbl)
+    (compile_expression asm cnd @FALSE)
+    (put_if_false asm exit_lbl)
     (put_drop asm)
-    (compile_expression asm body)
+    (compile_expression asm body @FALSE)
+    (set_label asm exit_lbl)
+    ))
+
+; while (c) body
+; =>
+; if (not c) goto exit
+; label head
+; body
+; if (c) goto head
+; label exit
+(fun compile_while (asm cnd body) (
+    (var exit_lbl (fresh_label asm))
+    (var head_lbl (fresh_label asm))
+    (put_nil asm)
+    (compile_expression asm cnd @FALSE)
+    (put_if_false asm exit_lbl)
+    (set_label asm head_lbl)
+    (put_drop asm)
+    (compile_expression asm body @FALSE)
+    (compile_expression asm cnd @FALSE)
+    (put_if_true asm head_lbl)
     (set_label asm exit_lbl)
     ))
 
