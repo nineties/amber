@@ -1,6 +1,6 @@
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.rl 2011-01-04 07:36:08 nineties $
+# $Id: syntax.rl 2011-01-10 23:26:46 nineties $
 
 # Syntax definition of rowl language
 
@@ -14,6 +14,8 @@ DefineSyntax{DefineExpr, InfixR{":", 18}}
 DefineFunction{Rewrite(x => y), !DefineFunction{Rewrite($x), $y}}
 
 Apply{f@Symbol, args@List}: body => !DefineFunction{Apply{$f, $args}, $body}
+x@Symbol: value => !DefineVariable{$x, $value}
+
 `infixl(head@Symbol, repr@String, assoc@Int)  => !DefineSyntax{$head, InfixL{$repr, $assoc}}
 `infixr(head@Symbol, repr@String, assoc@Int)  => !DefineSyntax{$head, InfixR{$repr, $assoc}}
 `prefix(head@Symbol, repr@String, assoc@Int)  => !DefineSyntax{$head, Prefix{$repr, $assoc}}

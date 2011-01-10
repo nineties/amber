@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2011-01-10 14:59:40 nineties $
+; $Id: rowl1-interp.rlc 2011-01-11 01:28:05 nineties $
 ;
 
 (import "rlvm-compile")
@@ -19,7 +19,7 @@
 (import "rowl1-matching")
 
 (var funtable (make_symtable))
-(var vartable (make_symtable))
+(var vartable (make_symtable)) ; (value, location of its definition)
 
 (export fun add_function (sym args code) (
     (var depth (symtable_depth funtable))
@@ -259,6 +259,39 @@
     (var compiled (compile_function sym args body))
     (add_function sym (car compiled) (cdr compiled))
     (return Nil)
+    ))
+
+(export fun builtin_define_global_variable (expr) (
+    (check_arg_size (symbol_name DefineVariable) 2 expr)
+    (var lhs (expr_arg_symbol expr 0))
+    (var val (expr_arg expr 1))
+    (var info (symtable_find vartable lhs 0))
+    (if info (do
+        (output_error stderr)
+        (output_string stderr "variable `")
+        (pretty_print stderr lhs)
+        (output_string stderr "' is already defined at ")
+        (output_loc stderr (expr_arg info 1))
+        (output_char stderr '\n')
+        (exit 1)
+        ))
+    (var loc current_loc)
+    (= val (builtin_eval val))
+    (= info (list2 val loc))
+    (symtable_add vartable lhs 0 info)
+    (return val)
+    ))
+
+(export fun find_global_variable (sym) (
+    (var info (symtable_find vartable sym 0))
+    (if (! info) (do
+        (output_error stderr)
+        (output_string stderr "undefined variable `")
+        (pretty_print stderr sym)
+        (output_string stderr "'\n")
+        (exit 1)
+        ))
+    (return info)
     ))
 
     ))
