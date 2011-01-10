@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2011-01-10 16:15:40 nineties $
+; $Id: rowl1-compile.rlc 2011-01-11 01:36:22 nineties $
 ;
 
 (import "rlvm-compile")
@@ -17,8 +17,8 @@
 
 (var function (to_sym "%function"))
 (var argument (to_sym "%argument"))
-(var list_get   (to_sym "%list_get"))
-(var expr_get   (to_sym "%expr_get"))
+(var list_get (to_sym "%list_get"))
+(var expr_get (to_sym "%expr_get"))
 
 (var vartable (make_symtable))
 
@@ -99,6 +99,7 @@
 
 (extern fun set_loc)
 (extern fun lookup_func)
+(extern fun find_global_variable)
 (export fun compile_expression (asm expr ret) (
     (var hd (expr_head expr))
     (if (== hd Located) (do
@@ -107,17 +108,16 @@
         )
     (if (== hd Symbol) (do
         (var v (symtable_find vartable expr 0))
-        (if (! v) (do
-            (output_error stderr)
-            (output_string stderr "undefined variable `")
-            (output_symbol stderr expr)
-            (output_string stderr "'\n")
-            (exit 1)
+        (if v
+            (if (== v function)
+                (put_push asm expr)
+                (compile_operand asm v)
+                )
+            (do
+                (= v (find_global_variable expr))
+                (put_push asm v)
+                (put_car asm)
             ))
-        (if (== v function)
-            (put_push asm expr)
-            (compile_operand asm v)
-            )
         )
     (if (== hd Int)
         (put_imm_int asm expr)
