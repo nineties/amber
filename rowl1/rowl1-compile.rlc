@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2011-01-12 21:07:42 nineties $
+; $Id: rowl1-compile.rlc 2011-01-12 23:33:36 nineties $
 ;
 
 (import "rlvm-compile")
@@ -15,29 +15,15 @@
 (import "rowl1-symtable")
 (import "rowl1-assemble")
 
-(var function (to_sym "%function"))
 (var argument (to_sym "%argument"))
 (var list_at (to_sym "%list_at"))
 (var expr_at (to_sym "%expr_at"))
 
-(var vartable (make_symtable))
-
-(export fun register_symbol (sym type) (
-    (if (== (symtable_find vartable sym 0) type) return)
-    (symtable_add vartable sym 0 type)
-    ))
-
 (export fun compile_function (name args body) (
-
-    (register_symbol name function)
-    (symtable_push vartable)
-
+    (var table (make_symtable))
     (var asm (make_assembler))
-    (= args (setup_args args))
-
-    (compile_expression asm body @TRUE)
-
-    (symtable_pop vartable)
+    (= args (setup_args table args))
+    (compile_expression asm table body @TRUE)
     (return (cons args (get_code asm)))
     ))
 
@@ -53,36 +39,36 @@
     (return (make_expr expr_at (list2 obj (box idx))))
     ))
 
-(fun setup_args (args) (
+(fun setup_args (table args) (
     (var orig args)
     (var idx 0)
     (while args (do
-        (setup_arg (make_arg idx) (car args))
+        (setup_arg table (make_arg idx) (car args))
         (= args (cdr args))
         (+= idx 1)
         ))
     (return orig)
     ))
 
-(fun setup_arg (obj arg) (
+(fun setup_arg (table obj arg) (
     (var argty (expr_head arg))
     (if (|| (== argty Int) (|| (== argty String) (== argty SymbolP)))
         return
         )
     (if (== argty Symbol) (do
-        (symtable_add vartable arg 0 obj)
+        (symtable_add table arg 0 obj)
         return
         ))
     (if (== argty HeadP) (do
         (var head (expr_arg_symbol arg 1))
         (var v (expr_arg_symbol arg 0))
-        (symtable_add vartable v 0 obj)
+        (symtable_add table v 0 obj)
         return
         ))
     (if (== argty List) (do
         (var idx 0)
         (while arg (do
-            (setup_arg (make_list_at obj idx) (car arg))
+            (setup_arg table (make_list_at obj idx) (car arg))
             (= arg (cdr arg))
             (incr idx)
             ))
@@ -91,7 +77,7 @@
     (var idx 0)
     (var args (expr_args arg))
     (while args (do
-        (setup_arg (make_expr_at obj idx) (car args))
+        (setup_arg table (make_expr_at obj idx) (car args))
         (= args (cdr args))
         (incr idx)
         ))
@@ -99,23 +85,19 @@
 
 (extern fun set_loc)
 (extern fun lookup_func)
-(extern fun find_global_variable)
-(export fun compile_expression (asm expr ret) (
+(extern fun find_variable)
+(export fun compile_expression (asm table expr ret) (
     (var hd (expr_head expr))
     (if (== hd Located) (do
         (set_loc (expr_arg expr 0))
-        (compile_expression asm (expr_arg expr 1) @FALSE)
+        (compile_expression asm table (expr_arg expr 1) @FALSE)
         )
     (if (== hd Symbol) (do
-        (var v (symtable_find vartable expr 0))
+        (var v (symtable_find table expr 0))
         (if v
-            (if (== v function)
-                (put_push asm expr)
-                (compile_operand asm v)
-                )
+            (compile_operand asm v)
             (do
-                (= v (find_global_variable expr))
-                (put_push asm v)
+                (put_push asm (find_variable expr))
                 (put_car asm)
             ))
         )
@@ -127,23 +109,23 @@
         (if (== expr 0)
             (put_imm_i0 asm)
             (do
-                (compile_expression asm (cdr expr) @FALSE)
-                (compile_expression asm (car expr) @FALSE)
+                (compile_expression asm table (cdr expr) @FALSE)
+                (compile_expression asm table (car expr) @FALSE)
                 (put_cons asm)
             ))
         )
     (if (== hd Apply)
-        (compile_call asm (expr_arg expr 0) (expr_arg expr 1) ret)
+        (compile_call asm table (expr_arg expr 0) (expr_arg expr 1) ret)
     (if (== hd Quote)
-        (compile_quote asm (expr_arg expr 0))
+        (compile_quote asm table (expr_arg expr 0))
     (if (== hd Block)
-        (compile_block asm (expr_args expr))
+        (compile_block asm table (expr_args expr))
     (if (== hd If)
-        (compile_if asm (expr_arg expr 0) (expr_arg expr 1))
+        (compile_if asm table (expr_arg expr 0) (expr_arg expr 1))
     (if (== hd While)
-        (compile_while asm (expr_arg expr 0) (expr_arg expr 1))
+        (compile_while asm table (expr_arg expr 0) (expr_arg expr 1))
     (if (== hd DefineVariable)
-        (compile_defvar asm (expr_arg_symbol expr 0) (expr_arg expr 1))
+        (compile_defvar asm table (expr_arg_symbol expr 0) (expr_arg expr 1))
         (do
             (output_error stderr)
             (output_string stderr "unknown expression '")
@@ -174,11 +156,11 @@
     (not_reachable "compile_operand")
     ))
 
-(fun compile_call (asm fun args) (
+(fun compile_call (asm table fun args) (
     (= args (list_reverse args))
     (var arity 0)
     (while args (do
-        (compile_expression asm (car args) @FALSE)
+        (compile_expression asm table (car args) @FALSE)
         (= args (cdr args))
         (incr arity)
         ))
@@ -191,7 +173,7 @@
         )
         (do
             (put_imm_int asm arity)
-            (compile_expression asm fun @FALSE)
+            (compile_expression asm table fun @FALSE)
             (put_imm_int32 asm lookup_func)
             (put_dcall asm 8)
             (put_jcall asm (* 4 arity))
@@ -219,7 +201,7 @@
         ))
     ))
 
-(fun compile_quote (asm expr) (
+(fun compile_quote (asm table expr) (
     (var hd (expr_head expr))
     (if (== hd Symbol)
         (put_push asm expr)
@@ -231,36 +213,36 @@
         (if (! expr)
             (put_imm_int asm 0)
             (do
-                (compile_quote asm (cdr expr))
-                (compile_quote asm (car expr))
+                (compile_quote asm table (cdr expr))
+                (compile_quote asm table (car expr))
                 (put_cons asm)
             )
         )
     (if (== hd Unquote)
-        (compile_expression asm (expr_arg expr 0) @FALSE)
+        (compile_expression asm table (expr_arg expr 0) @FALSE)
         (do
-            (compile_quote asm (expr_args expr))
+            (compile_quote asm table (expr_args expr))
             (put_push asm (expr_head expr))
             (compile_simple_call asm 2 make_expr)
         )
         )))))
     ))
 
-(fun compile_block (asm exprs) (
+(fun compile_block (asm table exprs) (
     (while exprs (do
-        (compile_expression asm (car exprs) @FALSE)
+        (compile_expression asm table (car exprs) @FALSE)
         (= exprs (cdr exprs))
         (if exprs (put_drop asm)) ; drop values except the last one
         ))
     ))
 
-(fun compile_if (asm cnd body) (
+(fun compile_if (asm table cnd body) (
     (var exit_lbl (fresh_label asm))
     (put_nil asm)
-    (compile_expression asm cnd @FALSE)
+    (compile_expression asm table cnd @FALSE)
     (put_if_false asm exit_lbl)
     (put_drop asm)
-    (compile_expression asm body @FALSE)
+    (compile_expression asm table body @FALSE)
     (set_label asm exit_lbl)
     ))
 
@@ -271,21 +253,21 @@
 ; body
 ; if (c) goto head
 ; label exit
-(fun compile_while (asm cnd body) (
+(fun compile_while (asm table cnd body) (
     (var exit_lbl (fresh_label asm))
     (var head_lbl (fresh_label asm))
     (put_nil asm)
-    (compile_expression asm cnd @FALSE)
+    (compile_expression asm table cnd @FALSE)
     (put_if_false asm exit_lbl)
     (set_label asm head_lbl)
     (put_drop asm)
-    (compile_expression asm body @FALSE)
-    (compile_expression asm cnd @FALSE)
+    (compile_expression asm table body @FALSE)
+    (compile_expression asm table cnd @FALSE)
     (put_if_true asm head_lbl)
     (set_label asm exit_lbl)
     ))
 
-(fun compile_defvar (asm sym val) (
+(fun compile_defvar (asm table sym val) (
     (not_implemented "compile_defvar")
     ))
 
