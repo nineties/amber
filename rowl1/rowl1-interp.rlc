@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2011-01-12 22:52:16 nineties $
+; $Id: rowl1-interp.rlc 2011-01-12 23:28:30 nineties $
 ;
 
 (import "rlvm-compile")
@@ -18,32 +18,35 @@
 (import "rowl1-compile")
 (import "rowl1-matching")
 
-(var funtable (make_symtable))
+(export var current_loc null)
+(export fun set_loc (loc) (
+    (= current_loc loc)
+    ))
+
 (var vartable (make_symtable)) ; (value, location of its definition)
 
 (export fun add_function (sym args code) (
     (var arity (list_length args))
-    (var ent (symtable_find_local funtable sym arity))
+    (var ent (symtable_find_local vartable sym arity))
     (if ent (do
-        (var pats (cons (list2 args code) (expr_arg ent 1)))
-        (expr_arg_set ent 1 pats)
-        (compile_matching_hook ent sym arity)
+        (var pats (cons (list2 args code) (expr_arg (car ent) 1)))
+        (expr_arg_set (car ent) 1 pats)
+        (compile_matching_hook (car ent) sym arity)
         return
         ))
-    (var ent (symtable_find funtable sym arity))
+    (var ent (symtable_find vartable sym arity))
     (if ent
         (do
-            (var pats (cons (list2 args code) (expr_arg ent 1)))
-            (= ent (make_expr Function (list2 (bytecode 0 0 0 0) pats)))
-            (compile_matching_hook ent sym arity)
+            (var pats (cons (list2 args code) (expr_arg (car ent) 1)))
+            (setcar ent (make_expr Function (list2 (bytecode 0 0 0 0) pats)))
+            (compile_matching_hook (car ent) sym arity)
         )
         (do
             (var pats (list1 (list2 args code)))
-            (= ent (make_expr Function (list2 (bytecode 0 0 0 0) pats)))
-            (compile_matching_hook ent sym arity)
+            (= ent (list2 (make_expr Function (list2 (bytecode 0 0 0 0) pats)) current_loc))
+            (compile_matching_hook (car ent) sym arity)
         ))
-    (register_symbol sym (to_sym "%function"))
-    (symtable_add funtable sym arity ent)
+    (symtable_add vartable sym arity ent)
     ))
 
 (fun setup_pat (pat) (
@@ -91,11 +94,6 @@
     (add_function sym (list4 pat1 pat2 pat3 pat4) code)
     ))
 
-(export var current_loc null)
-(export fun set_loc (loc) (
-    (= current_loc loc)
-    ))
-
 (export fun interpret () (
     (= current_loc no_loc)
     (while 1 (do
@@ -116,12 +114,12 @@
     ))
 
 (export fun lookup_func (sym arity) (
-    (var ent (symtable_find funtable sym arity))
+    (var ent (symtable_find vartable sym arity))
     (if (! ent) (do
-        (= ent (make_expr Function (list2 (undefined_error_hook sym arity) 0)))
-        (symtable_add funtable sym arity ent)
+        (= ent (list2 (make_expr Function (list2 (undefined_error_hook sym arity) 0)) current_loc))
+        (symtable_add vartable sym arity ent)
         ))
-    (return (expr_arg ent 0))
+    (return (expr_arg (car ent) 0))
     ))
 
 (fun undefined_error (sym arity) (
@@ -145,7 +143,7 @@
 
 (export fun builtin_eval (expr) (
     (var asm (make_assembler))
-    (compile_expression asm expr @TRUE)
+    (compile_expression asm (make_symtable) expr @TRUE)
     (return (jitcall (get_code asm)))
     ))
 
@@ -270,7 +268,7 @@
     (check_arg_size (symbol_name DefineVariable) 2 expr)
     (var lhs (expr_arg_symbol expr 0))
     (var val (expr_arg expr 1))
-    (var info (symtable_find vartable lhs 0))
+    (var info (symtable_find vartable lhs -1))
     (if info (do
         (output_error stderr)
         (output_string stderr "variable `")
@@ -283,12 +281,12 @@
     (var loc current_loc)
     (= val (builtin_eval val))
     (= info (list2 val loc))
-    (symtable_add vartable lhs 0 info)
+    (symtable_add vartable lhs -1 info)
     (return val)
     ))
 
-(export fun find_global_variable (sym) (
-    (var info (symtable_find vartable sym 0))
+(export fun find_variable (sym) (
+    (var info (symtable_find vartable sym -1))
     (if (! info) (do
         (output_error stderr)
         (output_string stderr "undefined variable `")
