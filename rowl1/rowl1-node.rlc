@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2011-01-11 00:25:13 nineties $
+; $Id: rowl1-node.rlc 2011-01-12 22:23:29 nineties $
 ;
 
 (import "rlvm-compile")
@@ -45,6 +45,7 @@
 (export var Unquote     (to_sym "Unquote"))
 (export var If          (to_sym "If"))
 (export var While       (to_sym "While"))
+(export var Function    (to_sym "Function")) ; Function{code, defs}
 (export var DefineSyntax   (to_sym "DefineSyntax"))
 (export var DefineFunction (to_sym "DefineFunction"))
 (export var DefineVariable (to_sym "DefineVariable"))
@@ -67,9 +68,11 @@
     (if (! obj) (return @ListE))
     (if (& obj 1) (return @IntE))
     (var tag (get_tag obj))
+    (if (== tag @TAG_PLAIN) (return (+ (get_plain_tag obj) @BUILTIN_TYPE_OFFSET)))
     (if (== tag @TAG_VARIANT) (return (field_get obj 0)))
     (if (== tag @TAG_CONS) (return @ListE))
-    (return (+ (get_plain_tag obj) @BUILTIN_TYPE_OFFSET))
+    (output_int stderr tag)
+    (not_reachable "node_type")
     ))
 
 (fun is_atom (ty) (
@@ -218,6 +221,24 @@
         (exit 1)
         ))
     (return arg)
+    ))
+
+(export fun expr_arg_set (expr idx val) (
+    (var args (expr_args expr))
+    (while (> idx 0) (do
+        (if (! args) (do
+            (output_error stderr)
+            (output_string stderr "`")
+            (pretty_print stderr expr)
+            (output_string stderr "' does not have ")
+            (output_ordinal stderr (+ idx 1))
+            (output_string stderr " parameter\n")
+            (exit 1)
+            ))
+        (= args (cdr args))
+        (decr idx)
+        ))
+    (setcar args val)
     ))
 
 (export fun expr_size (expr) (

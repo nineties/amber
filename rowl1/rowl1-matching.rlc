@@ -1,8 +1,8 @@
-;1
+;
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2011-01-10 14:38:13 nineties $
+; $Id: rowl1-matching.rlc 2011-01-12 22:35:08 nineties $
 ;
 
 (import "rlvm-compile")
@@ -17,7 +17,9 @@
 
 ; pattern matrix (((p11 p12 .. ) . e1) ((p21 p22 ..) . e2) ..)
 
-(fun compile_matching (bytecode head pats) (
+(fun compile_matching (sym funobj) (
+    (var bytecode (expr_arg funobj 0))
+    (var pats (expr_arg funobj 1))
     (var asm (make_assembler 10))
 
     ; we need to clone 'pats' here because compile_matching_main() will rearrange it.
@@ -31,7 +33,7 @@
         ))
 
     (compile_matching_main asm args pats)
-    (compile_matching_error asm head (list_length (caar pats)))
+    (compile_matching_error asm sym (list_length (caar pats)))
 
     (set_code bytecode asm)
     (return bytecode)
@@ -39,7 +41,7 @@
 
 (fun compile_matching_main (asm args pats) (
     (if (== (caar pats) 0) (do
-        (put_code asm (cdar pats))
+        (put_code asm (list_at (car pats) 1))
         return
         ))
     (var x (split_pattern_matrix pats)) ; (single . remain)
@@ -111,7 +113,7 @@
         (= args (cdr args))
         (while (> len 0) (do
             (decr len)
-            (= args (cons (make_list_get ls len) args))
+            (= args (cons (make_list_at ls len) args))
             ))
 
         (compile_matching_main asm args pats)
@@ -136,7 +138,7 @@
     (= args (cdr args))
     (while (> size 0) (do
         (decr size)
-        (= args (cons (make_expr_get expr size) args))
+        (= args (cons (make_expr_at expr size) args))
         ))
 
     (compile_matching_main asm args pats)
@@ -470,21 +472,21 @@
         (expand_composite_pat (cdr pats))))
     ))
 
-(export fun compile_matching_hook (ent arity) (
+(export fun compile_matching_hook (ent sym arity) (
     (var asm (make_assembler 10))
 
-    (put_push asm (field_get ent 2))
-    (put_push asm (field_get ent 1))
-    (put_push asm (field_get ent 0))
+    (put_push asm ent)
+    (put_push asm sym)
     (put_imm_int32 asm compile_matching)
     (put_dcall asm 8)
     (put_dup asm)
     (put_push asm ent)
+    (put_expr_args asm)
     (put_swap asm)
-    (put_field_set0 asm)
+    (put_setcar asm)
     (put_jjump asm)
 
-    (set_code (car ent) asm)
+    (set_code (expr_arg ent 0) asm)
     ))
 
 (fun matching_error (head args) (

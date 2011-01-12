@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2011-01-11 01:28:05 nineties $
+; $Id: rowl1-interp.rlc 2011-01-12 22:52:16 nineties $
 ;
 
 (import "rlvm-compile")
@@ -22,22 +22,28 @@
 (var vartable (make_symtable)) ; (value, location of its definition)
 
 (export fun add_function (sym args code) (
-    (var depth (symtable_depth funtable))
     (var arity (list_length args))
+    (var ent (symtable_find_local funtable sym arity))
+    (if ent (do
+        (var pats (cons (list2 args code) (expr_arg ent 1)))
+        (expr_arg_set ent 1 pats)
+        (compile_matching_hook ent sym arity)
+        return
+        ))
     (var ent (symtable_find funtable sym arity))
-    (if (&& ent (== depth (field_get ent 3)))
+    (if ent
         (do
-            (field_set ent 2 (cons (cons args code) (field_get ent 2)))
-            (compile_matching_hook ent arity)
+            (var pats (cons (list2 args code) (expr_arg ent 1)))
+            (= ent (make_expr Function (list2 (bytecode 0 0 0 0) pats)))
+            (compile_matching_hook ent sym arity)
         )
         (do
-            (var pats (cons (cons args code) 0))
-            (var ent  (tuple 3 (bytecode 0 0 0 0) sym pats depth))
-            (compile_matching_hook ent arity)
-            (symtable_add funtable sym arity ent)
-            (register_symbol sym (to_sym "%function"))
-        )
-        )
+            (var pats (list1 (list2 args code)))
+            (= ent (make_expr Function (list2 (bytecode 0 0 0 0) pats)))
+            (compile_matching_hook ent sym arity)
+        ))
+    (register_symbol sym (to_sym "%function"))
+    (symtable_add funtable sym arity ent)
     ))
 
 (fun setup_pat (pat) (
@@ -112,11 +118,10 @@
 (export fun lookup_func (sym arity) (
     (var ent (symtable_find funtable sym arity))
     (if (! ent) (do
-        (= ent (tuple 3 (undefined_error_hook sym arity) (to_sym "undefined_error") 0
-            (symtable_depth funtable)))
+        (= ent (make_expr Function (list2 (undefined_error_hook sym arity) 0)))
         (symtable_add funtable sym arity ent)
         ))
-    (return (field_get ent 0))
+    (return (expr_arg ent 0))
     ))
 
 (fun undefined_error (sym arity) (
