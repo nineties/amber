@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-assemble.rlc 2011-01-11 01:31:21 nineties $
+; $Id: rowl1-assemble.rlc 2011-01-12 21:11:09 nineties $
 ;
 
 ; -- Just in time assembler
@@ -12,6 +12,7 @@
 ; (pointer to the next info, index of the labels, offset of operand)
 
 (import "rlvm-compile")
+(import "rowl1-types")
 
 (var code-base `(
 
@@ -49,6 +50,11 @@
 (export fun put_nil (c) ((put_imm_i0 c)))
 (export fun put_car (c) ((put_field_get0 c)))
 (export fun put_cdr (c) ((put_field_get1 c)))
+(export fun put_setcar (c) ((put_field_set0 c)))
+(export fun put_setcdr (c) ((put_field_set1 c)))
+
+(export fun put_expr_head (c) ((put_field_get c @ExprHead)))
+(export fun put_expr_args (c code) ((put_field_get c @ExprArgs)))
 
 (export fun put_code (c code) (
     ; setup object indices
@@ -98,6 +104,36 @@
         (4 . (do (put_arg4 c) return))
         (default . (do
             (put_loadl c (* 4 (+ 2 idx)))
+            return
+            ))
+        ))
+    ))
+
+(export fun put_field_get (c idx) (
+    (tswitch idx (
+        (0 . (do (put_field_get0 c) return))
+        (1 . (do (put_field_get1 c) return))
+        (2 . (do (put_field_get2 c) return))
+        (3 . (do (put_field_get3 c) return))
+        (4 . (do (put_field_get4 c) return))
+        (5 . (do (put_field_get5 c) return))
+        (default . (do
+            (put_field_get c idx)
+            return
+            ))
+        ))
+    ))
+
+(export fun put_field_set (c idx) (
+    (tswitch idx (
+        (0 . (do (put_field_set0 c) return))
+        (1 . (do (put_field_set1 c) return))
+        (2 . (do (put_field_set2 c) return))
+        (3 . (do (put_field_set3 c) return))
+        (4 . (do (put_field_set4 c) return))
+        (5 . (do (put_field_set5 c) return))
+        (default . (do
+            (put_field_set c idx)
             return
             ))
         ))

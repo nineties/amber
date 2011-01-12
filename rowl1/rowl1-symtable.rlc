@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-symtable.rlc 2011-01-02 16:46:03 nineties $
+; $Id: rowl1-symtable.rlc 2011-01-12 19:54:01 nineties $
 ;
 
 (import "rlvm-compile")
@@ -23,6 +23,7 @@
 ;   2 : pointer to the next entry
 ;   3 : hash
 ;   4 : arity
+;   5 : name space id
 
 (array int prime_numbers (
     5 11 17 37 67 131 257 521 1031 2053 4099 8209 16411 32771 65537 131101
@@ -104,7 +105,7 @@
 
     (if (== depth 0) (error "symtable_add: no namespace"))
 
-    (var ent (tuple 4 sym obj 0 h arity))
+    (var ent (tuple 3 sym obj 0 h arity depth))
     (%= h size)
 
     (vector_pushback entries ent)
@@ -115,7 +116,27 @@
     ; increment a counter in display
     (var n (ivector_at display (- depth 1)))
     (ivector_put display (- depth 1) (+ n 1))
+    ))
 
+(export fun symtable_find_local (table sym arity) (
+    (var bucket (field_get table 0))
+    (var display (field_get table 2))
+    (var size (vector_size bucket))
+    (var depth (ivector_size display))
+    (var h (hash sym arity))
+    (%= h size)
+    (var entry (vector_at bucket h))
+    (while entry (do
+        (var e_sym (field_get entry 0))
+        (var e_arity (field_get entry 4))
+        (var e_depth (field_get entry 5))
+        (if (< e_depth depth) (return 0))
+        (if (&& (== e_sym sym) (== e_arity arity))
+            (return (field_get entry 1))
+            )
+        (= entry (field_get entry 2))
+        ))
+    (return 0)
     ))
 
 (export fun symtable_find (table sym arity) (
