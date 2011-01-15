@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlvm-compile.rlc 2010-12-10 16:09:15 nineties $
+; $Id: rlvm-compile.rlc 2011-01-15 23:00:22 nineties $
 ;
 
 (import "stdlib")
@@ -684,8 +684,8 @@
     ))
 
 (define compile_field_set ((_ tup idx val)) (do
-    (compile_expr tup)
     (compile_expr val)
+    (compile_expr tup)
     (emit_insn (cond
         ((== idx 0) `field_set0)
         ((== idx 1) `field_set1)
@@ -736,8 +736,8 @@
         ((== `field_set (car expr)) (compile_field_set expr))
         ((== `get (car expr)) (compile_field_get `(field_get @(cadr expr) 0)))
         ((== `set (car expr)) (compile_field_set `(field_set @(cadr expr) 0 @(caddr expr))))
-        ((== `car (car expr)) (compile_field_get `(field_set @(cadr expr) 0)))
-        ((== `cdr (car expr)) (compile_field_get `(field_set @(cadr expr) 1)))
+        ((== `car (car expr)) (compile_field_get `(field_get @(cadr expr) 0)))
+        ((== `cdr (car expr)) (compile_field_get `(field_get @(cadr expr) 1)))
         ((== `caar (car expr)) (compile_expr `(car (car @(cadr expr)))))
         ((== `caadr (car expr)) (compile_expr `(car (car (cdr @(cadr expr))))))
         ((== `caaar (car expr)) (compile_expr `(car (car (car @(cadr expr))))))

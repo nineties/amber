@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2011-01-15 22:03:58 nineties $
+; $Id: rowl1-compile.rlc 2011-01-15 23:27:20 nineties $
 ;
 
 (import "rlvm-compile")
@@ -149,9 +149,11 @@
 
 (extern fun set_loc)
 (extern fun lookup_func)
-(extern fun find_variable)
+(extern fun find_global_variable)
 (export fun compile (asm env expr ret) (
     (var hd (expr_head expr))
+
+    ; XXX: This inefficient code is a temporal implementation.
     (if (== hd Located) (do
         (set_loc (expr_arg expr 0))
         (compile asm env (expr_arg expr 1) @FALSE)
@@ -161,7 +163,7 @@
         (if v
             (compile_operand asm v)
             (do
-                (put_push asm (find_variable expr))
+                (put_push asm (find_global_variable expr))
                 (put_car asm)
             ))
         )
@@ -190,13 +192,15 @@
         (compile_while asm env (expr_arg expr 0) (expr_arg expr 1))
     (if (== hd DefineVariable)
         (compile_defvar asm env (expr_arg_symbol expr 0) (expr_arg expr 1))
+    (if (== hd Assign)
+        (compile_assign asm env Nil (expr_arg expr 0) (expr_arg expr 1))
         (do
             (output_error stderr)
             (output_string stderr "unknown expression '")
             (pretty_print stderr expr)
             (output_string stderr "'\n")
             (exit 1)
-        ))))))))))))
+        )))))))))))))
     (if ret (put_ireturn asm))
     ))
 
@@ -341,6 +345,45 @@
     (var idx (add_local_variable env sym))
     (compile asm env val @FALSE)
     (put_storel asm idx)
+    ))
+
+(fun compile_assign (asm env op lhs rhs) (
+    (var hd (expr_head lhs))
+    (var (== hd Symbol) (do
+        (var v (symtable_find (tuple_at env 0) lhs 0))
+        (if v
+            (compile_local_assign asm env op v lhs rhs)
+            (compile_global_assign asm env op (find_global_variable lhs) lhs rhs)
+            )
+        return
+        ))
+    (not_implemented "compile_assign")
+    ))
+
+(fun compile_local_assign (asm env op loc sym val) (
+    (var vty (expr_head loc))
+    (if (== vty variable) (do
+        (compile asm env val @FALSE)
+        (put_storel asm (expr_arg_int loc 0))
+        return
+        ))
+    (if (== vty argument) (do
+        (compile asm env val @FALSE)
+        (put_store_arg asm (expr_arg_int loc 0))
+        return
+        ))
+    (output_error stderr)
+    (pretty_print stderr sym)
+    (output_string stderr " is not lvalue\n")
+    (exit 1)
+    ))
+
+(fun compile_global_assign (asm env op info sym val) (
+    (pretty_print stderr (car info))
+    (output_char stderr '\n')
+    (compile asm env val @FALSE)
+    (put_push asm info)
+    (put_setcar asm)
     ))
 
     ))
