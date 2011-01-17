@@ -3,16 +3,16 @@
 # rowl - 2nd generation
 # Copyright (C) 2010 nineties
 #
-# $Id: main.rl 2011-01-16 00:33:16 nineties $
+# $Id: main.rl 2011-01-18 03:03:29 nineties $
 
-fib(n@Int): fib(n-2) + fib(n-1)
-fib(1): 1
-fib(2): 1
-
-x: fib(20)
-print(x)
-{
-    x: 6
-    print(x)
+sum: 0
+n: 1
+while (n < 1000) {
+    if (n%3 == 0) {
+        sum += n
+    } else if (n%5 == 0) {
+        sum += n
+    }
+    n += 1
 }
-print(x)
+print(sum)

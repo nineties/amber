@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-stdlib.rlc 2011-01-10 23:28:22 nineties $
+; $Id: rowl1-stdlib.rlc 2011-01-17 13:58:06 nineties $
 ;
 
 (import "rlvm-compile")
@@ -41,15 +41,21 @@
     (return Nil)
     ))
 
+(fun builtin_iuplus (a) ((return a)))
+(fun builtin_iuminus (a) ((return (box (- (unbox a))))))
+(fun builtin_not (a) (
+    (if (== a (box 0))
+        (return (box 1))
+        (return (box 0))
+        )
+    ))
 (fun builtin_iadd (a b) ((return (+ (- a 1) b))))
 (fun builtin_isub (a b) ((return (+ (- a b) 1))))
 (fun builtin_imul (a b) ((return (box (* (unbox a) (unbox b))))))
 (fun builtin_idiv (a b) ((return (box (/ (unbox a) (unbox b))))))
 (fun builtin_mod (a b)  ((return (box (% (unbox a) (unbox b))))))
-(fun builtin_iuplus (a) ((return a)))
-(fun builtin_iuminus (a) ((return (box (- (unbox a))))))
-
-(fun builtin_strcat (a b) ((return (strcat a b))))
+(fun builtin_iless (a b) ((if (< a b) (return (box 1)) (return (box 0)))))
+(fun builtin_ieq (a b)   ((if (== a b) (return (box 1)) (return (box 0)))))
 
 (export fun init_stdlib (parse_only) (
     (if parse_only
@@ -64,13 +70,16 @@
     (add_builtin_function1 (to_sym "print") Int builtin_print_int)
     (add_builtin_function1 (to_sym "print") List builtin_print_list)
 
+    (add_builtin_function1 (to_sym "builtin_unaryplus") Int builtin_iuplus)
+    (add_builtin_function1 (to_sym "builtin_unaryminus") Int builtin_iuminus)
+    (add_builtin_function1 (to_sym "builtin_not") Int builtin_not)
     (add_builtin_function2 (to_sym "builtin_plus") Int Int builtin_iadd)
     (add_builtin_function2 (to_sym "builtin_minus") Int Int builtin_isub)
     (add_builtin_function2 (to_sym "builtin_times") Int Int builtin_imul)
     (add_builtin_function2 (to_sym "builtin_divide") Int Int builtin_idiv)
-    (add_builtin_function1 (to_sym "builtin_unaryplus") Int builtin_iuplus)
-    (add_builtin_function1 (to_sym "builtin_unaryminus") Int builtin_iuminus)
-    (add_builtin_function2 (to_sym "builtin_strcat") String String builtin_strcat)
+    (add_builtin_function2 (to_sym "builtin_mod") Int Int builtin_mod)
+    (add_builtin_function2 (to_sym "builtin_less") Int Int builtin_iless)
+    (add_builtin_function2 (to_sym "builtin_equal") Int Int builtin_ieq)
 
     (add_builtin_function1 Eval 0 builtin_eval)
     (add_builtin_function1 Eval Located builtin_eval_located)

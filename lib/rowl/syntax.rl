@@ -1,6 +1,6 @@
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.rl 2011-01-10 23:26:46 nineties $
+# $Id: syntax.rl 2011-01-17 15:07:15 nineties $
 
 # Syntax definition of rowl language
 
@@ -11,20 +11,21 @@ DefineSyntax{HeadP, InfixL{"@", 4}}
 DefineSyntax{SymbolP, Prefix{"`", 2}}
 DefineSyntax{DefineExpr, InfixR{":", 18}}
 
-DefineFunction{Rewrite(x => y), !DefineFunction{Rewrite($x), $y}}
+DefineFunction{Rewrite(x => y), !DefineFunction{Rewrite($x), !$y}}
 
-Apply{f@Symbol, args@List}: body => !DefineFunction{Apply{$f, $args}, $body}
-x@Symbol: value => !DefineVariable{$x, $value}
+Apply{f@Symbol, args@List}: body => DefineFunction{Apply{$f, $args}, $body}
+x@Symbol: value => DefineVariable{$x, $value}
 
-`infixl(head@Symbol, repr@String, assoc@Int)  => !DefineSyntax{$head, InfixL{$repr, $assoc}}
-`infixr(head@Symbol, repr@String, assoc@Int)  => !DefineSyntax{$head, InfixR{$repr, $assoc}}
-`prefix(head@Symbol, repr@String, assoc@Int)  => !DefineSyntax{$head, Prefix{$repr, $assoc}}
-`postfix(head@Symbol, repr@String, assoc@Int) => !DefineSyntax{$head, Postfix{$repr, $assoc}}
-`constr(head@Symbol, repr@String)             => !DefineSyntax{$head, Constr{$repr}}
-`command(head@Symbol, repr@String)            => !DefineSyntax{$head, Command{$repr}}
+`infixl(head@Symbol, repr@String, assoc@Int)  => DefineSyntax{$head, InfixL{$repr, $assoc}}
+`infixr(head@Symbol, repr@String, assoc@Int)  => DefineSyntax{$head, InfixR{$repr, $assoc}}
+`prefix(head@Symbol, repr@String, assoc@Int)  => DefineSyntax{$head, Prefix{$repr, $assoc}}
+`postfix(head@Symbol, repr@String, assoc@Int) => DefineSyntax{$head, Postfix{$repr, $assoc}}
+`constr(head@Symbol, repr@String)             => DefineSyntax{$head, Constr{$repr}}
+`command(head@Symbol, repr@String)            => DefineSyntax{$head, Command{$repr}}
 
 prefix(UnaryPlus,    "+",  5)
 prefix(UnaryMinus,   "-",  5)
+prefix(Not,          "not",5)
 infixl(Times,        "*",  6)
 infixl(Divide,       "/",  6)
 infixl(Mod,          "%",  6)
@@ -53,10 +54,16 @@ constr(For,          "for")
 command(Return,      "return")
 infixl(Else,         "else", 19)
 
-UnaryPlus{x}  => !builtin_unaryplus($x)
-UnaryMinus{x} => !builtin_unaryminus($x)
-Plus{x, y}    => !builtin_plus($x, $y)
-Minus{x, y}   => !builtin_minus($x, $y)
-Times{x, y}   => !builtin_times($x, $y)
-Divide{x, y}  => !builtin_divide($x, $y)
-Mod{x, y}     => !builtin_mod($x, $y)
++x     => builtin_unaryplus($x)
+-x     => builtin_unaryminus($x)
+not x  => builtin_not($x)
+x + y  => builtin_plus($x, $y)
+x - y  => builtin_minus($x, $y)
+x * y  => builtin_times($x, $y)
+x / y  => builtin_divide($x, $y)
+x % y  => builtin_mod($x, $y)
+x < y  => builtin_less($x, $y)
+x > y  => $y < $x
+x <= y => not($y < $x)
+x >= y => not($x < $y)
+x == y => builtin_equal($x, $y)

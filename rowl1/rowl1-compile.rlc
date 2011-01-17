@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2011-01-16 00:32:54 nineties $
+; $Id: rowl1-compile.rlc 2011-01-18 03:06:52 nineties $
 ;
 
 (import "rlvm-compile")
@@ -173,7 +173,7 @@
         (put_push asm expr)
     (if (== hd List) (do
         (if (== expr 0)
-            (put_imm_i0 asm)
+            (put_nil asm)
             (do
                 (compile asm env (cdr expr) @FALSE)
                 (compile asm env (car expr) @FALSE)
@@ -187,7 +187,14 @@
     (if (== hd Block)
         (compile_block asm env (expr_args expr))
     (if (== hd If)
-        (compile_if asm env (expr_arg expr 0) (expr_arg expr 1))
+        (compile_ifelse asm env (expr_arg expr 0) (expr_arg expr 1) Nil)
+    (if (&& (== hd Else) (== (expr_head (expr_arg expr 0)) If)) (do
+        (var lhs (expr_arg expr 0))
+        (var cnd (expr_arg lhs 0))
+        (var ifthen (expr_arg lhs 1))
+        (var ifelse (expr_arg expr 1))
+        (compile_ifelse asm env cnd ifthen ifelse)
+        )
     (if (== hd While)
         (compile_while asm env (expr_arg expr 0) (expr_arg expr 1))
     (if (== hd DefineVariable)
@@ -210,7 +217,7 @@
             (pretty_print stderr expr)
             (output_string stderr "'\n")
             (exit 1)
-        ))))))))))))))))))
+        )))))))))))))))))))
     (if ret (put_ireturn asm))
     ))
 
@@ -320,13 +327,15 @@
     (symtable_pop (tuple_at env 0))
     ))
 
-(fun compile_if (asm env cnd body) (
+(fun compile_ifelse (asm env cnd ifthen ifelse) (
+    (var else_lbl (fresh_label asm))
     (var exit_lbl (fresh_label asm))
-    (put_nil asm)
     (compile asm env cnd @FALSE)
-    (put_if_false asm exit_lbl)
-    (put_drop asm)
-    (compile asm env body @FALSE)
+    (put_if_false asm else_lbl)
+    (compile asm env ifthen @FALSE)
+    (put_goto asm exit_lbl)
+    (set_label asm else_lbl)
+    (compile asm env ifelse @FALSE)
     (set_label asm exit_lbl)
     ))
 
