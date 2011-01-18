@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2011-01-18 03:06:52 nineties $
+; $Id: rowl1-compile.rlc 2011-01-19 02:13:37 nineties $
 ;
 
 (import "rlvm-compile")
@@ -188,7 +188,7 @@
         (compile_block asm env (expr_args expr))
     (if (== hd If)
         (compile_ifelse asm env (expr_arg expr 0) (expr_arg expr 1) Nil)
-    (if (&& (== hd Else) (== (expr_head (expr_arg expr 0)) If)) (do
+    (if (&& (== hd IfElse) (== (expr_head (expr_arg expr 0)) If)) (do
         (var lhs (expr_arg expr 0))
         (var cnd (expr_arg lhs 0))
         (var ifthen (expr_arg lhs 1))
@@ -328,6 +328,10 @@
     ))
 
 (fun compile_ifelse (asm env cnd ifthen ifelse) (
+    (var cnd_hd (expr_head cnd))
+    (if (== cnd_hd LogicalOr) (return (compile_ifelse_or asm env cnd ifthen ifelse)))
+    (if (== cnd_hd LogicalAnd) (return (compile_ifelse_and asm env cnd ifthen ifelse)))
+    (if (== cnd_hd Not) (return (compile_ifelse asm env (expr_arg cnd 0) ifelse ifthen)))
     (var else_lbl (fresh_label asm))
     (var exit_lbl (fresh_label asm))
     (compile asm env cnd @FALSE)
@@ -337,6 +341,68 @@
     (set_label asm else_lbl)
     (compile asm env ifelse @FALSE)
     (set_label asm exit_lbl)
+    ))
+
+(fun compile_ifelse_or (asm env cnd ifthen ifelse) (
+    (var ifthen_lbl (fresh_label asm))
+    (var exit_lbl   (fresh_label asm))
+    (exit_if_true asm env (expr_arg cnd 0) ifthen_lbl)
+    (exit_if_true asm env (expr_arg cnd 1) ifthen_lbl)
+    (compile asm env ifelse @FALSE)
+    (put_goto asm exit_lbl)
+    (set_label asm ifthen_lbl)
+    (compile asm env ifthen @FALSE)
+    (set_label asm exit_lbl)
+    ))
+
+(fun compile_ifelse_and (asm env cnd ifthen ifelse) (
+    (var ifelse_lbl (fresh_label asm))
+    (var exit_lbl   (fresh_label asm))
+    (exit_if_false asm env (expr_arg cnd 0) ifelse_lbl)
+    (exit_if_false asm env (expr_arg cnd 1) ifelse_lbl)
+    (compile asm env ifthen @FALSE)
+    (put_goto asm exit_lbl)
+    (set_label asm ifelse_lbl)
+    (compile asm env ifelse @FALSE)
+    (set_label asm exit_lbl)
+    ))
+
+(fun exit_if_true (asm env expr exit) (
+    (var hd (expr_head expr))
+    (if (== hd Not) (return (exit_if_false asm env (expr_arg expr 0) exit)))
+    (if (== hd LogicalOr) (do
+        (exit_if_true asm env (expr_arg expr 0) exit)
+        (exit_if_true asm env (expr_arg expr 1) exit)
+        return
+        ))
+    (if (== hd LogicalAnd) (do
+        (var fail (fresh_label))
+        (exit_if_false asm env (expr_arg expr 0) fail)
+        (exit_if_true asm env (expr_arg env 1) exit)
+        (set_label asm fail)
+        return
+        ))
+    (compile asm env expr @FALSE)
+    (put_if_true asm exit)
+    ))
+
+(fun exit_if_false (asm env expr exit) (
+    (var hd (expr_head expr))
+    (if (== hd Not) (return (exit_if_true asm env (expr_arg expr 0) exit)))
+    (if (== hd LogicalOr) (do
+        (var fail (fresh_label))
+        (exit_if_true asm env (expr_arg expr 0) fail)
+        (exit_if_false asm env (expr_arg expr 1) exit)
+        (set_label asm fail)
+        return
+        ))
+    (if (== hd LogicalAnd) (do
+        (exit_if_false asm env (expr_arg expr 0) exit)
+        (exit_if_false asm env (expr_arg env 1) exit)
+        return
+        ))
+    (compile asm env expr @FALSE)
+    (put_if_false asm exit)
     ))
 
 ; while (c) body

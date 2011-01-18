@@ -1,6 +1,6 @@
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.rl 2011-01-17 15:07:15 nineties $
+# $Id: syntax.rl 2011-01-19 01:58:37 nineties $
 
 # Syntax definition of rowl language
 
@@ -40,8 +40,8 @@ infixl(NotEqual,     "!=", 10)
 infixl(And,          "&",  11)
 infixl(Xor,          "^",  12)
 infixl(Or,           "|",  13)
-infixl(LogicalAnd,   "&&", 14)
-infixl(LogicalOr,    "||", 15)
+infixl(LogicalAnd,   "and", 14)
+infixl(LogicalOr,    "or", 15)
 infixr(Assign,       "=",  17)
 infixr(PlusAssign,   "+=", 17)
 infixr(MinusAssign,  "-=", 17)
@@ -52,7 +52,7 @@ constr(If,           "if")
 constr(While,        "while")
 constr(For,          "for")
 command(Return,      "return")
-infixl(Else,         "else", 19)
+infixl(IfElse,       "else", 19)
 
 +x     => builtin_unaryplus($x)
 -x     => builtin_unaryminus($x)
