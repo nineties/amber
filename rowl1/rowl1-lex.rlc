@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-lex.rlc 2011-01-02 13:10:18 nineties $
+; $Id: rowl1-lex.rlc 2011-04-08 12:01:04 nineties $
 ;
 
 (import "rlvm-compile")
@@ -207,6 +207,8 @@
 (var operator_table (make_idtable))
 (var lexer_stack null)
 
+(extern value shell_mode)
+
 (fun is_member_of (c group) ((return (array_get char group c))))
 
 (export fun get_token_text () ((return (cvector_raw token_buf))))
@@ -347,8 +349,6 @@
     (cvector_pushback token_buf '\0')
     (= lexbuf (make_cvector 0))
     (= lexbuf_end 0)
-
-    (skip_spaces)
     ))
 
 ; XXX: not good design. should implement reentrant lexer
@@ -361,8 +361,6 @@
     (= lexichan ichan)
     (= lexbuf (make_cvector 0))
     (= lexbuf_end 0)
-
-    (skip_spaces)
     ))
 
 (export fun pop_lexer () (
@@ -388,6 +386,8 @@
         (return token_tag)
         ))
 
+    (skip_spaces)
+
     (if (&& newline (<= next_srcclmn offs)) (do
 	(accept @TOK_END)
 	(return @TOK_END)
@@ -409,7 +409,6 @@
             (goto lexloop)
             ))
         (1  . (do
-	    (skip_spaces)
 	    (return token_tag)
 	    ))
         (2  . (lex_error "invalid character"))
