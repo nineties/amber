@@ -79,7 +79,7 @@ vm-prim-idtable.o : rlci stdlib.rlc vm-compile.rlc
 RLC1OBJECTS = rowl1-main.rlo\
 	      rowl1-util.rlo\
 	      rowl1-lex.rlo\
-	      rowl1-stdlib.rlo\
+	      rowl1-builtin.rlo\
 	      rowl1-parse.rlo\
 	      rowl1-node.rlo\
 	      rowl1-symtable.rlo\
@@ -97,12 +97,12 @@ RLVMCOMPILER = rlci\
 	       vm-prim-inc.rlc
 
 startup.rlo        : $(RLVMCOMPILER)
-rowl1-main.rlo     : $(RLVMCOMPILER) rowl1-types.rlc rowl1-node.rlo rowl1-stdlib.rlo rowl1-parse.rlo rowl1-interp.rlo
+rowl1-main.rlo     : $(RLVMCOMPILER) rowl1-types.rlc rowl1-node.rlo rowl1-builtin.rlo rowl1-parse.rlo rowl1-interp.rlo
 rowl1-util.rlo     : $(RLVMCOMPILER) rowl1-types.rlc
 rowl1-lex.rlo      : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo
 rowl1-parse.rlo    : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-lex.rlo rowl1-node.rlo
 rowl1-node.rlo     : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-symtable.rlo
-rowl1-stdlib.rlo   : $(RLVMCOMPILER) rowl1-types.rlc rowl1-node.rlo rowl1-interp.rlo rowl1-compile.rlo
+rowl1-builtin.rlo   : $(RLVMCOMPILER) rowl1-types.rlc rowl1-node.rlo rowl1-interp.rlo rowl1-compile.rlo
 rowl1-symtable.rlo : $(RLVMCOMPILER) rowl1-types.rlc
 rowl1-interp.rlo   : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-parse.rlo rowl1-symtable.rlo rowl1-assemble.rlo rowl1-compile.rlo rowl1-matching.rlo
 rowl1-assemble.rlo : $(RLVMCOMPILER) rowl1-types.rlc
