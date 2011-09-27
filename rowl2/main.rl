@@ -3,6 +3,6 @@
 # rowl - 2nd generation
 # Copyright (C) 2010 nineties
 #
-# $Id: main.rl 2011-05-28 04:20:17 nineties $
+# $Id: main.rl 2011-09-27 17:43:10 nineties $
 
-print("Hello World!\n")
+pretty_print(1+2)

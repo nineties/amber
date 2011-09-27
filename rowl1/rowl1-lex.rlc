@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-lex.rlc 2011-05-27 22:52:55 nineties $
+; $Id: rowl1-lex.rlc 2011-09-26 13:24:20 nineties $
 ;
 
 (import "rlvm-compile")
@@ -351,7 +351,7 @@
 
 ; XXX: not good design. should implement reentrant lexer
 (export fun push_lexer (fname ichan) (
-    (var state (tuple 3 next_srcfile lexichan lexbuf next_srcline next_srcclmn lexbuf_end))
+    (var state (struct 3 next_srcfile lexichan lexbuf next_srcline next_srcclmn lexbuf_end))
     (= lexer_stack (cons state lexer_stack))
     (= next_srcfile (strdup fname))
     (= next_srcline 1)
@@ -364,12 +364,12 @@
 (export fun pop_lexer () (
     (var state (car lexer_stack))
     (= lexer_stack (cdr lexer_stack))
-    (= next_srcfile (tuple_at state 0))
-    (= next_srcline (tuple_at state 3))
-    (= next_srcclmn (tuple_at state 4))
-    (= lexichan     (tuple_at state 1))
-    (= lexbuf       (tuple_at state 2))
-    (= lexbuf_end   (tuple_at state 5))
+    (= next_srcfile (struct_at state 0))
+    (= next_srcline (struct_at state 3))
+    (= next_srcclmn (struct_at state 4))
+    (= lexichan     (struct_at state 1))
+    (= lexbuf       (struct_at state 2))
+    (= lexbuf_end   (struct_at state 5))
     ))
 
 (export fun lex () ((return (lex_main 0 0))))
@@ -814,15 +814,15 @@
         (var optype (field_get op 0))
         (if (== optype @OP_INFIX) (do
             (add_operator name (variant @OP_PREFIX_OR_INFIX 2 prefix_op op))
-            (return Nil)
+            return
             ))
         (if (== optype @OP_PREFIX_OR_INFIX) (do
             (add_operator name (variant @OP_PREFIX_OR_INFIX 2 prefix_op (field_get op 2)))
-            (return Nil)
+            return
             ))
         ))
     (add_operator name prefix_op)
-    (return Nil)
+    return
     ))
 
 (export fun add_postfix (head op) (
@@ -849,15 +849,14 @@
         (var optype (field_get op 0))
         (if (== optype @OP_PREFIX) (do
             (add_operator name (variant @OP_PREFIX_OR_INFIX 2 op infix_op))
-            (return Nil)
+            return
             ))
         (if (== optype @OP_PREFIX_OR_INFIX) (do
             (add_operator name (variant @OP_PREFIX_OR_INFIX 2 (field_get op 1) infix_op))
-            (return Nil)
+            return
             ))
         ))
     (add_operator name infix_op)
-    (return Nil)
     ))
 
 (export fun add_constr (head op) (
@@ -865,7 +864,7 @@
     (check_operator_format name)
     (register_operator head op)
     (add_operator name (variant @OP_CONSTR 1 head))
-    (return Nil)
+    return
     ))
 
 (export fun add_command (head op) (
@@ -873,7 +872,7 @@
     (check_operator_format name)
     (register_operator head op)
     (add_operator name (variant @OP_COMMAND 1 head))
-    (return Nil)
+    return
     ))
 
     ))

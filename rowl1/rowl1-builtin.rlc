@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-builtin.rlc 2011-05-28 04:30:10 nineties $
+; $Id: rowl1-builtin.rlc 2011-09-26 16:44:36 nineties $
 ;
 
 (import "rlvm-compile")
@@ -14,15 +14,15 @@
 (import "rowl1-interp")
 (import "rowl1-compile")
 
+(fun builtin_read_char () (
+    (var c)
+    (read_char (address c))
+    (return (box c))
+    ))
+
 (fun builtin_pretty_print (n) (
     (pretty_print stdout n)
     (output_char stdout '\n')
-    (return Nil)
-    ))
-
-(fun builtin_print_int (n) (
-    (check_type "print_int" @IntE n)
-    (print_int (unbox n))
     (return Nil)
     ))
 
@@ -32,17 +32,10 @@
     (return Nil)
     ))
 
-(fun builtin_print_list (n) (
-    (var print_sym (to_sym "print"))
-    (while n (do
-        (call1 print_sym (car n))
-        (= n (cdr n))
-        ))
+(fun builtin_print_int (n) (
+    (check_type "print_int" @IntE n)
+    (print_int (unbox n))
     (return Nil)
-    ))
-
-(fun builtin_strcat (s1 s2) (
-    (return (strcat s1 s2))
     ))
 
 (fun builtin_iuplus (a) ((return a)))
@@ -61,45 +54,42 @@
 (fun builtin_iless (a b) ((if (< a b) (return (box 1)) (return (box 0)))))
 (fun builtin_ieq (a b)   ((if (== a b) (return (box 1)) (return (box 0)))))
 
-(export fun init_stdlib (parse_only) (
+(export fun init_stdlib (env parse_only) (
     (if parse_only
-        (add_functions_pp)
-        (add_functions_std)
+        (add_functions_pp env)
+        (add_functions_std env)
         )
     ))
 
-(fun add_functions_std () (
-    (add_builtin_function1 (to_sym "pretty_print") 0 builtin_pretty_print)
-    (add_builtin_function1 (to_sym "print") String builtin_print_string)
-    (add_builtin_function1 (to_sym "print") Int builtin_print_int)
-    (add_builtin_function1 (to_sym "print") List builtin_print_list)
-    (add_builtin_function2 (to_sym "strcat") String String builtin_strcat)
+(fun add_functions_std (env) (
+    ;(var IntP (headP Int))
+    ;(var StringP (headP String))
 
-    (add_builtin_function1 (to_sym "builtin_unaryplus") Int builtin_iuplus)
-    (add_builtin_function1 (to_sym "builtin_unaryminus") Int builtin_iuminus)
-    (add_builtin_function1 (to_sym "builtin_not") Int builtin_not)
-    (add_builtin_function2 (to_sym "builtin_plus") Int Int builtin_iadd)
-    (add_builtin_function2 (to_sym "builtin_minus") Int Int builtin_isub)
-    (add_builtin_function2 (to_sym "builtin_times") Int Int builtin_imul)
-    (add_builtin_function2 (to_sym "builtin_divide") Int Int builtin_idiv)
-    (add_builtin_function2 (to_sym "builtin_mod") Int Int builtin_mod)
-    (add_builtin_function2 (to_sym "builtin_less") Int Int builtin_iless)
-    (add_builtin_function2 (to_sym "builtin_equal") Int Int builtin_ieq)
+    ;(add_builtin_function0 (to_sym "read_char") builtin_read_char)
+    ;(add_builtin_function1 (to_sym "pretty_print") DontCare builtin_pretty_print)
+    ;(add_builtin_function1 (to_sym "print") StringP builtin_print_string)
+    ;(add_builtin_function1 (to_sym "print") IntP builtin_print_int)
 
-    (add_builtin_function1 Eval 0 builtin_eval)
-    (add_builtin_function1 Eval Located builtin_eval_located)
-    (add_builtin_function1 Eval DefineSyntax builtin_eval_syntax_sugar)
-    (add_builtin_function1 Eval (to_sym "builtin_import") builtin_import)
-    (add_builtin_function1 Rewrite 0 builtin_rewrite)
-    (add_builtin_function1 Eval DefineFunction builtin_define_function)
-    (add_builtin_function1 Eval DefineVariable builtin_define_global_variable)
+    ;(add_builtin_function1 (to_sym "builtin_unaryplus") IntP builtin_iuplus)
+    ;(add_builtin_function1 (to_sym "builtin_unaryminus") IntP builtin_iuminus)
+    ;(add_builtin_function1 (to_sym "builtin_not") IntP builtin_not)
+    ;(add_builtin_function2 (to_sym "builtin_plus") IntP IntP builtin_iadd)
+    ;(add_builtin_function2 (to_sym "builtin_minus") IntP IntP builtin_isub)
+    ;(add_builtin_function2 (to_sym "builtin_times") IntP IntP builtin_imul)
+    ;(add_builtin_function2 (to_sym "builtin_divide") IntP IntP builtin_idiv)
+    ;(add_builtin_function2 (to_sym "builtin_mod") IntP IntP builtin_mod)
+    ;(add_builtin_function2 (to_sym "builtin_less") IntP IntP builtin_iless)
+    ;(add_builtin_function2 (to_sym "builtin_equal") IntP IntP builtin_ieq)
+
+    ;(add_builtin_function2 Compile DontCare (headP Located) compile_located)
+    ;(add_builtin_function2 Compile genv (headP DefineSyntax) gcompile_define_syntax)
+    ;(add_builtin_function2 Compile genv (headP DefineFunction) gcompile_define_function)
+    ;(add_builtin_function2 Compile genv (headP DefineVariable) gcompile_define_variable)
+
+    (setup_builtin_compilers env)
     ))
 
-(fun add_functions_pp () (
-    (add_builtin_function1 Eval 0 builtin_pretty_print)
-    (add_builtin_function1 Eval Located builtin_eval_located)
-    (add_builtin_function1 Eval (to_sym "syntax_sugar") builtin_eval_syntax_sugar_pp)
-    (add_builtin_function1 Eval (to_sym "builtin_import") builtin_import)
+(fun add_functions_pp (env) (
     ))
 
     ))

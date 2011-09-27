@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2011-01-19 02:13:06 nineties $
+; $Id: rowl1-node.rlc 2011-09-27 16:04:41 nineties $
 ;
 
 (import "rlvm-compile")
@@ -13,9 +13,9 @@
 (import "rowl1-util")
 (import "rowl1-symtable")
 
+; symbol table (symbols are globally unique)
 (var symbol_table (make_idtable))
 (var symbol_index_gen 0)
-(var operator_table (make_symtable))
 
 ; builtin expression headers and types
 (export var Nil         0)
@@ -24,8 +24,8 @@
 (export var Int         (to_sym "Int"))
 (export var Float       (to_sym "Float"))
 (export var String      (to_sym "String"))
-(export var Tuple       (to_sym "Tuple"))
 (export var List        (to_sym "List"))
+(export var Eval        (to_sym "Eval"))
 (export var Block       (to_sym "Block"))
 (export var Apply       (to_sym "Apply"))
 (export var Subscr      (to_sym "Subscr"))
@@ -39,17 +39,13 @@
 (export var Command     (to_sym "Command"))
 (export var HeadP       (to_sym "HeadP"))
 (export var SymbolP     (to_sym "SymbolP"))
-(export var Eval        (to_sym "Eval"))
-(export var Rewrite     (to_sym "Rewrite"))
+(export var Compile     (to_sym "Compile"))
 (export var Quote       (to_sym "Quote"))
 (export var Unquote     (to_sym "Unquote"))
 (export var If          (to_sym "If"))
 (export var IfElse      (to_sym "IfElse"))
 (export var While       (to_sym "While"))
 (export var Function    (to_sym "Function")) ; Function{code, defs}
-(export var DefineSyntax   (to_sym "DefineSyntax"))
-(export var DefineFunction (to_sym "DefineFunction"))
-(export var DefineVariable (to_sym "DefineVariable"))
 (export var Plus        (to_sym "Plus"))
 (export var Minus       (to_sym "Minus"))
 (export var Times       (to_sym "Times"))
@@ -64,6 +60,16 @@
 (export var Not             (to_sym "Not"))
 (export var LogicalOr       (to_sym "LogicalOr"))
 (export var LogicalAnd      (to_sym "LogicalAnd"))
+
+(export var DefineSyntax   (to_sym "DefineSyntax"))
+(export var DefineFunction (to_sym "DefineFunction"))
+(export var AppendFunction (to_sym "AppendFunction"))
+(export var DefineVariable (to_sym "DefineVariable"))
+(export var Assembler   (to_sym "Assembler"))
+(export var Environment (to_sym "Environment"))
+(export var Bytecode    (to_sym "Bytecode"))
+(export var Tuple       (to_sym "Tuple"))
+(export var Builtin     (to_sym "Builtin"))
 
 (export fun to_sym (name) (
     (var sym (idtable_find symbol_table name))
@@ -83,15 +89,15 @@
     (if (! obj) (return @ListE))
     (if (& obj 1) (return @IntE))
     (var tag (get_tag obj))
-    (if (== tag @TAG_PLAIN) (return (+ (get_plain_tag obj) @BUILTIN_TYPE_OFFSET)))
+    (if (== tag @TAG_PSTRUCT) (return (+ (get_pstruct_tag obj) @PLAIN_TYPE_OFFSET)))
     (if (== tag @TAG_VARIANT) (return (field_get obj 0)))
     (if (== tag @TAG_CONS) (return @ListE))
-    (output_int stderr tag)
-    (not_reachable "node_type")
+    (if (== tag @TAG_BYTECODE) (return @BytecodeE))
+    (return @BuiltinE)
     ))
 
 (fun is_atom (ty) (
-    (if (|| (== ty @Expr) (== ty @ListE))
+    (if (|| (== ty @ExprE) (== ty @ListE))
         (return @FALSE)
         (return @TRUE)
         )
@@ -114,7 +120,6 @@
     (error "floating-point literals are not supported yet")
     ))
 
-(export var builtin_loc (make_loc "<builtin>" 0 0))
 (export var no_loc (make_loc "<unknown>" 0 0))
 
 (export fun make_loc (file begin end) (
@@ -150,20 +155,23 @@
 (extern object current_loc)
 (export fun output_error (ochan) (
     (flush stdout)
-    (output_char ochan '\n')
     (output_loc ochan current_loc)
     (output_string ochan "ERROR: ")
     ))
 
 (export fun expr_head (node) (
     (tswitch (node_type node) (
-        (@SymbolE . (return Symbol))
-        (@Expr    . (return (field_get node @ExprHead)))
-        (@ListE   . (return List))
-        (@IntE    . (return Int))
-        (@FloatE  . (return Float))
-        (@StringE . (return String))
-        (default  . (not_reachable "expr_head"))
+        (@SymbolE      . (return Symbol))
+        (@ExprE        . (return (field_get node @ExprHead)))
+        (@ListE        . (return List))
+        (@AssemblerE   . (return Assembler))
+        (@EnvironmentE . (return Environment))
+        (@BytecodeE    . (return Bytecode))
+        (@IntE         . (return Int))
+        (@FloatE       . (return Float))
+        (@StringE      . (return String))
+        (@BuiltinE     . (return Builtin))
+        (default       . (not_reachable "expr_head"))
         ))
     ))
 
@@ -265,12 +273,27 @@
     ))
 
 (export fun make_expr (head args) (
-    (return (variant @Expr 2 head args))
+    (return (variant @ExprE 2 head args))
     ))
 
 (export fun make_located (loc expr) (
     (return (make_expr Located (list2 loc expr)))
     ))
+
+; patterns
+(export fun headP (sym) (
+    (return (make_expr HeadP (list2 DontCare sym)))
+    ))
+
+(export fun symbolP (sym) (
+    (return (make_expr SymbolP (list1 sym)))
+    ))
+
+(export fun output_symbol (ochan sym) (
+    (output_string ochan (field_get sym @SymbolName))
+    ))
+
+(var operator_table (make_symtable))
 
 (export fun register_operator (head op) (
     (symtable_add operator_table head 0 op)
@@ -281,10 +304,7 @@
 
     ))
 
-(export fun output_symbol (ochan sym) (
-    (output_string ochan (field_get sym @SymbolName))
-    ))
-
+; printing functions
 (fun output_ordinal (ochan idx) (
     (output_int ochan idx)
     (if (== (/ idx 10) 1) (return (output_string ochan "th")))
@@ -297,13 +317,17 @@
 
 (fun output_type (ochan type) (
     (tswitch type (
-        (@SymbolE . (return (output_string ochan "Symbol")))
-        (@Expr    . (return (output_string ochan "composite expression")))
-        (@ListE   . (return (output_string ochan "List")))
-        (@IntE    . (return (output_string ochan "Int")))
-        (@FloatE  . (return (output_string ochan "Float")))
-        (@StringE . (return (output_string ochan "String")))
-        (default  . (not_reachable "output_type"))
+        (@SymbolE      . (return (output_string ochan "Symbol")))
+        (@ExprE        . (return (output_string ochan "composite expression")))
+        (@ListE        . (return (output_string ochan "List")))
+        (@AssemblerE   . (return (output_string ochan "Assembler")))
+        (@EnvironmentE . (return (output_string ochan "Environment")))
+        (@BytecodeE    . (return (output_string ochan "Bytecode")))
+        (@IntE         . (return (output_string ochan "Int")))
+        (@FloatE       . (return (output_string ochan "Float")))
+        (@StringE      . (return (output_string ochan "String")))
+        (@BuiltinE     . (return (output_string ochan "Builtin")))
+        (default       . (not_reachable "output_type"))
         ))
     ))
 
@@ -313,13 +337,17 @@
 
 (fun pretty_print_main (ochan node assoc) (
     (tswitch (node_type node) (
-        (@SymbolE . (return (output_symbol ochan node)))
-        (@Expr    . (return (pp_expr ochan node assoc)))
-        (@ListE   . (return (pp_list ochan node)))
-        (@IntE    . (return (pp_int ochan node)))
-        (@FloatE  . (return (pp_float ochan node)))
-        (@StringE . (return (pp_string ochan node)))
-        (default  . (not_reachable "pretty_print"))
+        (@SymbolE      . (return (output_symbol ochan node)))
+        (@ExprE        . (return (pp_expr ochan node assoc)))
+        (@ListE        . (return (pp_list ochan node)))
+        (@AssemblerE   . (return (pp_assembler ochan node)))
+        (@EnvironmentE . (return (pp_environment ochan node)))
+        (@BytecodeE    . (return (pp_bytecode ochan node)))
+        (@IntE         . (return (pp_int ochan node)))
+        (@FloatE       . (return (pp_float ochan node)))
+        (@StringE      . (return (pp_string ochan node)))
+        (@BuiltinE     . (return (pp_builtin ochan node)))
+        (default       . (not_reachable "pretty_print"))
         ))
     ))
 
@@ -327,7 +355,6 @@
     (var head (expr_head node))
     (var args (expr_args node))
 
-    (if (== head Tuple) (return (pp_tuple ochan args)))
     (if (== head Block)   (return (pp_block ochan args)))
     (if (&& (== head Apply) (== (node_type (cadr args)) @ListE))
         (return (pp_apply ochan args assoc)))
@@ -421,16 +448,6 @@
         ))
     ))
 
-(fun pp_tuple (ochan args) (
-    (output_char ochan '(')
-    (while args (do
-        (pretty_print ochan (car args))
-        (= args (cdr args))
-        (if args (output_string ochan ", "))
-        ))
-    (output_char ochan ')')
-    ))
-
 (fun pp_list (ochan args) (
     (output_char ochan '[')
     (while args (do
@@ -439,6 +456,24 @@
         (if args (output_string ochan ", "))
         ))
     (output_char ochan ']')
+    ))
+
+(fun pp_assembler (ochan expr) (
+    (output_string ochan "<#assembler:0x")
+    (output_hex ochan expr 8)
+    (output_char ochan '>')
+    ))
+
+(fun pp_environment (ochan expr) (
+    (output_string ochan "<#environment:0x")
+    (output_hex ochan expr 8)
+    (output_char ochan '>')
+    ))
+
+(fun pp_bytecode (ochan expr) (
+    (output_string ochan "<#bytecode:0x")
+    (output_hex ochan expr 8)
+    (output_char ochan '>')
     ))
 
 (var indent 0)
@@ -502,6 +537,12 @@
         (incr i)
         ))
     (output_char ochan '"')
+    ))
+
+(fun pp_builtin (ochan node) (
+    (output_string ochan "builtin<0x")
+    (output_hex ochan node 8)
+    (output_char ochan '>')
     ))
 
     ))

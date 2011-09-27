@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlvm-compile.rlc 2011-01-18 03:19:33 nineties $
+; $Id: rlvm-compile.rlc 2011-06-14 09:07:03 nineties $
 ;
 
 (import "stdlib")
@@ -367,7 +367,7 @@
         (otherwise (error "compile_call: not reachable here"))
         )))
 
-(define compile_jitcall ((_ bytecode . args)) (do
+(define compile_byterun ((_ bytecode . args)) (do
     (var narg (length args))
     (foreach a (reverse args) (compile_expr a))
     (compile_expr bytecode)
@@ -653,11 +653,11 @@
     true
     ))
 
-(define compile_tuple ((_ nboxed . args)) (do
+(define compile_struct ((_ nboxed . args)) (do
     (var nelem (length args))
     (set args (reverse args))
     (foreach a args (compile_expr a))
-    (emit_insn `(tuple (byte @nelem) (byte @nboxed)))
+    (emit_insn `(struct (byte @nelem) (byte @nboxed)))
     true
     ))
 
@@ -730,7 +730,7 @@
         ((== `load (car expr)) (compile_array_get expr))
         ((== `store (car expr)) (compile_array_set expr))
         ((== `cons (car expr)) (compile_cons expr))
-        ((== `tuple (car expr)) (compile_tuple expr))
+        ((== `struct (car expr)) (compile_struct expr))
         ((== `variant (car expr)) (compile_variant expr))
         ((== `field_get (car expr)) (compile_field_get expr))
         ((== `field_set (car expr)) (compile_field_set expr))
@@ -751,7 +751,7 @@
         ((== `setcdr (car expr)) (compile_field_set `(field_set @(cadr expr) 1 @(caddr expr))))
         ((== `box (car expr)) (compile_expr `(+ (<< @(cadr expr) 1) 1)))
         ((== `unbox (car expr)) (compile_expr `(>> @(cadr expr) 1)))
-        ((== `jitcall (car expr)) (compile_jitcall expr))
+        ((== `byterun (car expr)) (compile_byterun expr))
         ((and (== 3 (length expr)) (binary_operator? (car expr)))
             (compile_binexpr expr))
         ((and (== 2 (length expr)) (unary_operator? (car expr)))

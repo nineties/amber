@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: linker.rlc 2010-11-12 22:40:37 nineties $
+; $Id: linker.rlc 2011-09-26 16:56:12 nineties $
 ;
 
 (import "config")
@@ -152,7 +152,7 @@
         (for j 0 naddr (do
             (var addr (read_int_check ichan))
             (vector_pushback relocate_symbols
-                (make_tuple4 1 name index type addr)
+                (make_struct4 1 name index type addr)
                 )
             ))
         ))
@@ -165,7 +165,7 @@
         (var name (read_string_check ichan))
         (var addr (read_int_check ichan))
         (vector_pushback exported_symbols
-            (make_tuple4 1 name index type addr)
+            (make_struct4 1 name index type addr)
             )
         ))
     ))
@@ -178,7 +178,7 @@
 (fun lookup_symbol (sym) (
     (for i 0 (vector_size exported_symbols) (do
         (var ent (vector_at exported_symbols i))
-        (if (streq sym (tuple_at ent 0))
+        (if (streq sym (struct_at ent 0))
             (return ent))
         ))
     (return 0)
@@ -191,13 +191,13 @@
     ))
 
 (fun replace_function_address (reloc_info) (
-    (var sym (tuple_at reloc_info 0))
-    (var rfile_index (tuple_at reloc_info 1))
-    (var operand_addr (tuple_at reloc_info 3))
+    (var sym (struct_at reloc_info 0))
+    (var rfile_index (struct_at reloc_info 1))
+    (var operand_addr (struct_at reloc_info 3))
     (var export_info (lookup_symbol sym))
     (if (! export_info) (error "undefined symbol"))
-    (var efile_index (tuple_at export_info 1))
-    (var real_addr (tuple_at export_info 3))
+    (var efile_index (struct_at export_info 1))
+    (var real_addr (struct_at export_info 3))
 
     (= real_addr (compute_real_address real_addr efile_index))
     (var real_operand_addr (compute_real_address operand_addr rfile_index))
@@ -211,16 +211,16 @@
     ))
 
 (fun replace_value_address (reloc_info) (
-    (var sym (tuple_at reloc_info 0))
-    (var rfile_index (tuple_at reloc_info 1))
-    (var operand_addr (tuple_at reloc_info 3))
+    (var sym (struct_at reloc_info 0))
+    (var rfile_index (struct_at reloc_info 1))
+    (var operand_addr (struct_at reloc_info 3))
     (var export_info (lookup_symbol sym))
     (if (! export_info) (error "undefined symbol"))
-    (var efile_index (tuple_at export_info 1))
+    (var efile_index (struct_at export_info 1))
 
     (var offset 0)
     (for i 0 efile_index (+= offset (ivector_at value_sizes i)))
-    (var real_addr (+ offset (tuple_at export_info 3)))
+    (var real_addr (+ offset (struct_at export_info 3)))
 
     (array_set
         short
@@ -231,16 +231,16 @@
     ))
 
 (fun replace_object_address (reloc_info) (
-    (var sym (tuple_at reloc_info 0))
-    (var rfile_index (tuple_at reloc_info 1))
-    (var operand_addr (tuple_at reloc_info 3))
+    (var sym (struct_at reloc_info 0))
+    (var rfile_index (struct_at reloc_info 1))
+    (var operand_addr (struct_at reloc_info 3))
     (var export_info (lookup_symbol sym))
     (if (! export_info) (error "undefined symbol"))
-    (var efile_index (tuple_at export_info 1))
+    (var efile_index (struct_at export_info 1))
 
     (var offset 0)
     (for i 0 efile_index (+= offset (ivector_at nrefs i)))
-    (var real_index (+ offset (tuple_at export_info 3)))
+    (var real_index (+ offset (struct_at export_info 3)))
 
     (array_set
         short
@@ -251,8 +251,8 @@
     ))
 
 (fun replace_svalue_address (reloc_info) (
-    (var rfile_index (tuple_at reloc_info 1))
-    (var operand_addr (tuple_at reloc_info 3))
+    (var rfile_index (struct_at reloc_info 1))
+    (var operand_addr (struct_at reloc_info 3))
     (var offset 0)
     (for i 0 rfile_index (+= offset (ivector_at value_sizes i)))
     (var real_addr (+ offset
@@ -266,8 +266,8 @@
     ))
 
 (fun replace_sobject_address (reloc_info) (
-    (var rfile_index (tuple_at reloc_info 1))
-    (var operand_addr (tuple_at reloc_info 3))
+    (var rfile_index (struct_at reloc_info 1))
+    (var operand_addr (struct_at reloc_info 3))
     (var offset 0)
     (for i 0 rfile_index (+= offset (ivector_at nrefs i)))
     (var real_index (+ offset
@@ -283,7 +283,7 @@
 (fun replace_addresses () (
     (for i 0 (vector_size relocate_symbols) (do
         (var reloc_info (vector_at relocate_symbols i))
-        (var type (tuple_at reloc_info 2))
+        (var type (struct_at reloc_info 2))
 
         (if (== type @RELOC_FUNCTION)
             (replace_function_address reloc_info)
@@ -302,8 +302,8 @@
 (fun lookup_main () (
     (var main_info (lookup_symbol "main"))
     (if (! main_info) (error "undefined symbol main"))
-    (var file_index (tuple_at main_info 1))
-    (var real_addr (tuple_at main_info 3))
+    (var file_index (struct_at main_info 1))
+    (var real_addr (struct_at main_info 3))
     (= real_addr (compute_real_address real_addr file_index))
     (return real_addr)
     ))
