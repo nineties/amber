@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2011-01-15 22:54:45 nineties $
+; $Id: vm-insn.rlc 2011-09-27 00:13:36 nineties $
 ;
 
 (define gen_field_get (idx) `(
@@ -38,7 +38,7 @@
     (vmfetch)
     ))
 
-(define gen_check_plain (type) `(
+(define gen_check_pstruct (type) `(
     (vmpop %eax)
     (asm "test $1, %eax")
     (asm "jnz 1f")
@@ -47,7 +47,7 @@
     (asm "movl -4(%eax), %eax")
     ; XXX: should not hardcode the layout of object header.
     (asm "andl $" @(- (<< 1 11) 1) ", %eax")
-    (asm "cmpl $" @(| (<< type 3) TAG_PLAIN) ", %eax")
+    (asm "cmpl $" @(| (<< type 3) TAG_PSTRUCT) ", %eax")
     (asm "je 2f")
     (asm "1:")
     (vmsshort 1 %ecx)
@@ -173,7 +173,7 @@
         (asm "pushl %eax")
         (vmubyte 1 %eax) ; type of plain
         (asm "pushl %eax")
-        (call allocate_plain)
+        (call allocate_pstruct)
         (asm "addl $8, %esp")
         (vmrestore)
         (asm "movl %eax, (%esi)")
@@ -184,7 +184,7 @@
     ; NB:
     ;  - allocated memory is not be zero-cleared
     ;  - all boxed elements must be placed first
-    (tuple (byte byte) @true (
+    (struct (byte byte) @true (
         (vmsave)
         (asm "pushl %esi")
         (vmubyte 2 %eax) ; # of boxed elements
@@ -193,7 +193,7 @@
         (asm "pushl %eax")
         (asm "sall $2, %eax")
         (asm "addl %eax, %esi")
-        (call allocate_tuple_with_values)
+        (call allocate_struct_with_values)
         (asm "addl $12, %esp")
         (vmrestore)
         (vmpush %eax)
@@ -587,7 +587,7 @@
     (if_ge      (addr) @nil @(gen_comparison2 "cmovge"))
     (if_lt      (addr) @nil @(gen_comparison2 "cmovl"))
     (if_le      (addr) @nil @(gen_comparison2 "cmovle"))
-    (if_true  (addr) @nil (
+    (if_true (addr) @nil (
         (vmpop %eax)
         (asm "cmpl $1, %eax")
         (asm "movl $3, %eax")
@@ -596,7 +596,7 @@
         (vmsucc %eax)
         (vmfetch)
         ))
-    (if_false     (addr) @nil (
+    (if_false (addr) @nil (
         (vmpop %eax)
         (asm "cmpl $1, %eax")
         (asm "movl $3, %eax")
@@ -614,7 +614,7 @@
         (vmsucc %eax)
         (vmfetch)
         ))
-    (check_string (addr) @nil @(gen_check_plain PLAIN_STRING))
+    (check_string (addr) @nil @(gen_check_pstruct PLAIN_STRING))
     (check_list (addr int) @nil (
         ; XXX: should not hardcode the layouer of object header.
         (vmpop %eax)

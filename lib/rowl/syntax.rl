@@ -1,17 +1,17 @@
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.rl 2011-01-19 01:58:37 nineties $
+# $Id: syntax.rl 2011-09-27 17:45:04 nineties $
 
 # Syntax definition of rowl language
 
-DefineSyntax{RewriteExpr, InfixR{"=>", 20}}
+DefineSyntax{Rewrite, InfixR{"=>", 20}}
 DefineSyntax{Unquote, Prefix{"$", 3}}
 DefineSyntax{Quote, Prefix{"!", 3}}
 DefineSyntax{HeadP, InfixL{"@", 4}}
 DefineSyntax{SymbolP, Prefix{"`", 2}}
 DefineSyntax{DefineExpr, InfixR{":", 18}}
 
-DefineFunction{Rewrite(x => y), !DefineFunction{Rewrite($x), !$y}}
+DefineFunction{Compile(_, _, x => y), Eval{AppendFunction{Compile(out, env, $x), Compile(out, env, !$y)}}}
 
 Apply{f@Symbol, args@List}: body => DefineFunction{Apply{$f, $args}, $body}
 x@Symbol: value => DefineVariable{$x, $value}
@@ -53,17 +53,3 @@ constr(While,        "while")
 constr(For,          "for")
 command(Return,      "return")
 infixl(IfElse,       "else", 19)
-
-+x     => builtin_unaryplus($x)
--x     => builtin_unaryminus($x)
-not x  => builtin_not($x)
-x + y  => builtin_plus($x, $y)
-x - y  => builtin_minus($x, $y)
-x * y  => builtin_times($x, $y)
-x / y  => builtin_divide($x, $y)
-x % y  => builtin_mod($x, $y)
-x < y  => builtin_less($x, $y)
-x > y  => $y < $x
-x <= y => not($y < $x)
-x >= y => not($x < $y)
-x == y => builtin_equal($x, $y)

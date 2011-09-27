@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-assemble.rlc 2011-01-15 22:50:30 nineties $
+; $Id: rowl1-assemble.rlc 2011-09-26 15:06:29 nineties $
 ;
 
 ; -- Just in time assembler
@@ -17,13 +17,13 @@
 (var code-base `(
 
 (export fun make_assembler () (
-    (return (tuple 4 (make_cvector 0) (make_ivector 0) 0 (make_ivector 0) 0))
+    (return (variant @AssemblerE 4 (make_cvector 0) (make_ivector 0) 0 (make_ivector 0) 0))
     ))
 
 (export fun get_code (c) (
-    (if (tuple_at c 2) (replace_labels c))
-    (var code (tuple_at c 0))
-    (var indices (tuple_at c 3))
+    (if (field_get c 3) (replace_labels c))
+    (var code (field_get c 1))
+    (var indices (field_get c 4))
     (if (> (ivector_size indices) 0)
         (return (bytecode (cvector_raw code) (cvector_size code)
                         (ivector_raw indices) (ivector_size indices)))
@@ -32,9 +32,9 @@
     ))
 
 (export fun set_code (b c) (
-    (if (tuple_at c 2) (replace_labels c))
-    (var code (tuple_at c 0))
-    (var indices (tuple_at c 3))
+    (if (field_get c 3) (replace_labels c))
+    (var code (field_get c 1))
+    (var indices (field_get c 4))
     (if (> (ivector_size indices) 0)
         (bytecode_set b (cvector_raw code) (cvector_size code)
                         (ivector_raw indices) (ivector_size indices))
@@ -43,7 +43,7 @@
     ))
 
 (fun get_address (c) (
-    (return (cvector_size (tuple_at c 0)))
+    (return (cvector_size (field_get c 1)))
     ))
 
 ; aliases
@@ -58,18 +58,18 @@
 
 (export fun put_code (c code) (
     ; setup object indices
-    (var offs (cvector_size (tuple_at c 0)))
-    (var ivec (tuple_at c 3))
-    (var iarr (tuple_at code 2))
-    (var nidx (tuple_at code 3))
+    (var offs (cvector_size (field_get c 1)))
+    (var ivec (field_get c 4))
+    (var iarr (field_get code 2))
+    (var nidx (field_get code 3))
     (for i 0 nidx (do
         (ivector_pushback ivec (+ offs (array_get int iarr i)))
         ))
 
     ; copy bytecode
-    (var seq (tuple_at code 0))
-    (var len (tuple_at code 1))
-    (var cvec (tuple_at c 0))
+    (var seq (field_get code 0))
+    (var len (field_get code 1))
+    (var cvec (field_get c 1))
     (for i 0 len (do
         (cvector_pushback cvec (array_get char seq i))
         ))
@@ -174,17 +174,17 @@
     ))
 
 (export fun emit_byte (c v) (
-    (cvector_pushback (tuple_at c 0) v)
+    (cvector_pushback (field_get c 1) v)
     ))
 
 (export fun emit_short (c v) (
-    (var vec (tuple_at c 0))
+    (var vec (field_get c 1))
     (cvector_pushback vec (& v 0xff))
     (cvector_pushback vec (>> v 8))
     ))
 
 (export fun emit_int (c v) (
-    (var vec (tuple_at c 0))
+    (var vec (field_get c 1))
     (cvector_pushback vec (& v 0xff))
     (cvector_pushback vec (& (>> v 8) 0xff))
     (cvector_pushback vec (& (>> v 16) 0xff))
@@ -196,60 +196,60 @@
     ))
 
 (fun emit_object (c obj) (
-    (var offs (cvector_size (tuple_at c 0)))
-    (ivector_pushback (tuple_at c 3) offs)
+    (var offs (cvector_size (field_get c 1)))
+    (ivector_pushback (field_get c 4) offs)
     (emit_int c obj)
     ))
 
 (export fun fresh_label (c) (
-    (var n (tuple_at c 4))
-    (tuple_set c 4 (+ n 1))
-    (ivector_pushback (tuple_at c 1) -1)
+    (var n (field_get c 5))
+    (field_set c 5 (+ n 1))
+    (ivector_pushback (field_get c 2) -1)
     (return n)
     ))
 
 (export fun set_label (c v) (
     (var addr (get_address c))
-    (ivector_put (tuple_at c 1) v addr)
+    (ivector_put (field_get c 2) v addr)
     ))
 
 (export fun emit_label (c v) (
     (var offs (get_address c))
-    (var info (tuple 1 (tuple_at c 2) v offs (- offs 1)))
-    (tuple_set c 2 info)
+    (var info (struct 1 (field_get c 3) v offs (- offs 1)))
+    (field_set c 3 info)
     (emit_short c 0)
     ))
 
 (export fun emit_tswitch_label (c v) (
     (var offs (get_address c))
-    (var info (tuple 1 (tuple_at c 2) v offs offs))
-    (tuple_set c 2 info)
+    (var info (struct 1 (field_get c 3) v offs offs))
+    (field_set c 3 info)
     (emit_short c 0)
     ))
 
 (export fun emit_lswitch_label (c v) (
     (var offs (get_address c))
-    (var info (tuple 1 (tuple_at c 2) v offs (- offs 4)))
-    (tuple_set c 2 info)
+    (var info (struct 1 (field_get c 3) v offs (- offs 4)))
+    (field_set c 3 info)
     (emit_short c 0)
     ))
 
 (fun replace_labels (c) (
-    (var repls (tuple_at c 2))
-    (var vec (tuple_at c 0))
-    (var labels (tuple_at c 1))
+    (var repls (field_get c 3))
+    (var vec (field_get c 1))
+    (var labels (field_get c 2))
     (while repls (do
-        (var label (tuple_at repls 1))
-        (var pos   (tuple_at repls 2))
-        (var offs  (tuple_at repls 3))
+        (var label (field_get repls 1))
+        (var pos   (field_get repls 2))
+        (var offs  (field_get repls 3))
         (if (>= label (ivector_size labels)) (error "undefined label"))
         (var addr (ivector_at labels label))
         (-= addr offs)
         (cvector_put vec pos (& addr 0xff))
         (cvector_put vec (+ pos 1) (>> addr 8))
-        (= repls (tuple_at repls 0))
+        (= repls (field_get repls 0))
         ))
-    (tuple_set c 2 0)
+    (field_set c 3 0)
     ))
 
     ))

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2010-12-06 02:47:55 nineties $
+; $Id: vm-gc.rlc 2011-09-25 16:26:05 nineties $
 ;
 
 (import "stdlib")
@@ -117,10 +117,10 @@
 ; object tag:
 ;          : | 1bit | 20bit | 8bit | 3bit  |
 ; padding  : |  --  |  size |    0 | 0b000 |
-; plain    : |  --  |  size | type | 0b001 |
+; pstruct  : |  --  |  size | type | 0b001 |
 ; cons     : |  --  |     3 |    0 | 0b010 |
-; array    : |  --  |  size | #box | 0b011 |
-; tuple    : |  --  |  size | #box | 0b100 |
+; sequence : |  --  |  size | type | 0b011 |
+; struct   : |  --  |  size | #box | 0b100 |
 ; variant  : |  --  |  size | #box | 0b101 |
 ; bytecode : |  --  |     5 |    0 | 0b110 |
 
@@ -318,13 +318,13 @@
 (fun move_fields (head) (
     (void* obj (+ head @WORD_SIZE))
     (int tag @(OBJECT_TAG head))
-    (if (<= tag @TAG_PLAIN) ((return)))
+    (if (<= tag @TAG_PSTRUCT) ((return)))
     (if (== tag @TAG_CONS) (
         (move_object obj) ; car
         (move_object (+ obj @WORD_SIZE)) ; cons
         (return)
         ))
-    (if (== tag @TAG_ARRAY) (
+    (if (== tag @TAG_SEQUENCE) (
         (int len (- @(OBJECT_WORDS head) 1)) ; -1 for the header
         (while (> len 0) (
             (move_object obj)
@@ -333,7 +333,7 @@
             ))
         (return)
         ))
-    (if (== tag @TAG_TUPLE) (
+    (if (== tag @TAG_STRUCT) (
         (int len @(BOXED_FIELD_SIZE head))
         (while (> len 0) (
             (move_object obj)
@@ -496,34 +496,34 @@
     (return (+ ptr @WORD_SIZE))
     ))
 
-(export allocate_plain)
-(fun allocate_plain (type bytes) (
+(export allocate_pstruct)
+(fun allocate_pstruct (type bytes) (
     (if (== bytes 0) ((incr bytes)))
     (int words (/ (+ bytes 3) 4))
     (incr words) ; for header
     (void* ptr (allocate_object words))
-    @(SET_HEADER ptr TAG_PLAIN type words)
+    @(SET_HEADER ptr TAG_PSTRUCT type words)
     (return (+ ptr @WORD_SIZE))
     ))
 
-(export allocate_tuple)
-(fun allocate_tuple (nelem nboxed) (
+(export allocate_struct)
+(fun allocate_struct (nelem nboxed) (
     (int words (+ nelem 1))
     (void* ptr (allocate_object words))
-    @(SET_HEADER ptr TAG_TUPLE nboxed words)
+    @(SET_HEADER ptr TAG_STRUCT nboxed words)
     (return (+ ptr @WORD_SIZE))
     ))
 
 ; # of elements
-(export tuple_size)
-(fun tuple_size (t) (
+(export struct_size)
+(fun struct_size (t) (
     (-= t @WORD_SIZE)
     (return (- @(OBJECT_WORDS t) 1))
     ))
 
-(export allocate_tuple_with_values)
-(fun allocate_tuple_with_values (nelem nboxed values) (
-    (void* ptr (allocate_tuple nelem nboxed))
+(export allocate_struct_with_values)
+(fun allocate_struct_with_values (nelem nboxed values) (
+    (void* ptr (allocate_struct nelem nboxed))
     (for i 0 nelem (
         ([]= ptr i ([] values i))
         ))
@@ -558,24 +558,34 @@
 ; array of integers
 (export allocate_iarray)
 (fun allocate_iarray (len) (
-    (return (allocate_plain @PLAIN_OTHER (* 4 len)))
+    (return (allocate_pstruct @PLAIN_OTHER (* 4 len)))
     ))
 
 ; array of characters
 (export allocate_carray)
 (fun allocate_carray (bytes) (
-    (return (allocate_plain @PLAIN_OTHER bytes))
+    (return (allocate_pstruct @PLAIN_OTHER bytes))
     ))
 
-; array of objects
-(export allocate_array)
-(fun allocate_array (nelem) (
+; sequence of boxed objects
+(export allocate_sequence)
+(fun allocate_sequence (type nelem) (
     (int size (+ nelem 1))
     (void* ptr (allocate_object size))
     (memset ptr 0 (* 4 size))
-    @(SET_HEADER ptr TAG_ARRAY 0 size)
+    @(SET_HEADER ptr TAG_SEQUENCE type size)
     (+= ptr @WORD_SIZE)
     (return ptr)
+    ))
+
+(export allocate_array)
+(fun allocate_array (nelem) (
+    (return (allocate_sequence @SEQ_ARRAY nelem))
+    ))
+
+(export allocate_tuple)
+(fun allocate_tuple (nelem) (
+    (return (allocate_tuple @SEQ_TUPLE nelem))
     ))
 
 ; bytecode
@@ -609,15 +619,15 @@
     (-= obj @WORD_SIZE)
     (return @(OBJECT_TAG obj))
     ))
-(export prim_get_plain_tag)
-(fun prim_get_plain_tag (obj) (
+
+(export prim_get_pstruct_tag)
+(fun prim_get_pstruct_tag (obj) (
     (-= obj @WORD_SIZE)
-    (if (!= @(OBJECT_TAG obj) @TAG_PLAIN) (
-        (error "get_plain_tag: given object is not a plain object\n")
+    (if (!= @(OBJECT_TAG obj) @TAG_PSTRUCT) (
+        (error "get_pstruct_tag: given object is not a plain object\n")
         ))
     (return @(OBJECT_PLAIN_TAG obj))
     ))
-
 
 (fun init_pdescrs (block_addr) (
     (void* page @(FIRST_PAGE block_addr))
