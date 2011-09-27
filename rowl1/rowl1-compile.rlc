@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2011-09-27 17:45:15 nineties $
+; $Id: rowl1-compile.rlc 2011-09-27 23:01:21 nineties $
 ;
 
 (import "rlvm-compile")
@@ -26,6 +26,14 @@
         (make_symtable) ; function and variable table
         0 ; local variable count
 	))
+    ))
+
+(export fun clone_env (env) (
+    (var tbl (get_vartable env))
+    (return (variant @EnvironmentE 1
+        (symtable_clone tbl)
+        (field_get env 2)
+        ))
     ))
 
 (fun get_vartable (env) (
@@ -322,15 +330,37 @@
         ))
     ))
 
+(fun compile_define_global_variable (sym val) (
+    (var tbl (get_vartable exec_env))
+    (check_redefinition tbl sym)
+    (var ent (make_gvar val))
+    (symtable_add tbl sym -1 ent)
+    ))
+
 (fun compile_define_variable (asm env expr) (
     (output_string stderr "define variable:")
     (output_int stderr (symtable_depth (get_vartable env)))
     (output_char stderr '\n')
-
     (check_arg_size (symbol_name DefineVariable) 2 expr)
     (var sym (expr_arg_symbol expr 0))
     (var val (expr_arg expr 1))
     (var tbl (get_vartable env))
+    (if (is_global_env env)
+        (do
+            (compile asm env val)
+            (put_push asm sym)
+            (compile_simple_call asm 2 compile_define_global_variable)
+        )
+        (do
+            (check_redefinition tbl sym)
+            (var idx (new_lvar_index env))
+            (compile asm env val)
+            (put_storel asm idx)
+            (symtable_add tbl sym -1 (make_lvar idx))
+        ))
+    ))
+
+(fun check_redefinition (tbl sym) (
     (var info (symtable_find tbl sym -1))
     (if info (do
         (output_error stderr)
@@ -340,19 +370,6 @@
         (output_loc stderr (var_loc info))
         (output_char stderr '\n')
         (exit 1)
-        ))
-    (if (is_global_env env)
-        (do
-            ; global variables are stored to vtable
-            (= val (eval val))
-            (= info (make_gvar val))
-            (symtable_add tbl sym -1 info)
-        )
-        (do
-            (var idx (new_lvar_index env))
-            (compile asm env val)
-            (put_storel asm idx)
-            (symtable_add tbl sym -1 (make_lvar idx))
         ))
     ))
 
