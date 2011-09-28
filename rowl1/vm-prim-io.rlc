@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-io.rlc 2011-06-14 09:16:58 nineties $
+; $Id: vm-prim-io.rlc 2011-09-28 16:54:25 nineties $
 ;
 
 (import "stdlib")
@@ -184,13 +184,13 @@
 (fun prim_input_string (addr ichan) (
     (int capa 10)
     (int idx 0)
-    (void* buf (allocate_carray capa))
+    (void* buf (prim_allocate_string capa))
     (while 1 (
         (int code)
 
         (if (== idx capa) (
             (int new_capa (* capa 2))
-            (void* new_buf (allocate_carray new_capa))
+            (void* new_buf (prim_allocate_string new_capa))
             (prim_memcpy new_buf buf capa)
             (= capa new_capa)
             (= buf new_buf)
@@ -204,7 +204,38 @@
         (set8 buf idx code)
         (+= idx 1)
 
-        (if (== code 0) (
+        (if (== code '\0') (
+            (set addr 0 buf)
+            (return 0)
+            ))
+        ))
+    ))
+
+(export prim_input_line)
+(fun prim_input_line (addr ichan) (
+    (int capa 10)
+    (int idx 0)
+    (void* buf (prim_allocate_string capa))
+    (while 1 (
+        (int code)
+
+        (if (== idx capa) (
+            (int new_capa (* capa 2))
+            (void* new_buf (prim_allocate_string new_capa))
+            (prim_memcpy new_buf buf capa)
+            (= capa new_capa)
+            (= buf new_buf)
+            ))
+
+        (if (< (prim_input_char (address code) ichan) 0) (
+            (set8 buf idx 0)
+            (set addr 0 buf)
+            (return 0)
+            ))
+        (set8 buf idx code)
+        (+= idx 1)
+
+        (if (|| (== code '\n') (== code '\0')) (
             (set addr 0 buf)
             (return 0)
             ))
@@ -326,6 +357,11 @@
 (export prim_read_string)
 (fun prim_read_string (addr) (
     (return (prim_input_string addr stdin))
+    ))
+
+(export prim_read_line)
+(fun prim_read_line (addr) (
+    (return (prim_input_line addr stdin))
     ))
 
 (export prim_print_bytes)
