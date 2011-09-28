@@ -1,6 +1,6 @@
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.rl 2011-09-27 17:45:04 nineties $
+# $Id: syntax.rl 2011-09-28 13:54:40 nineties $
 
 # Syntax definition of rowl language
 
@@ -31,10 +31,10 @@ infixl(Divide,       "/",  6)
 infixl(Mod,          "%",  6)
 infixl(Plus,         "+",  7)
 infixl(Minus,        "-",  7)
-infixl(Less,         "<",  9)
-infixl(Greater,      ">",  9)
-infixl(LessThan,     "<=", 9)
-infixl(GreaterThan,  ">=", 9)
+infixl(LessThan,     "<",  9)
+infixl(GreaterThan,  ">",  9)
+infixl(LessEqual,    "<=", 9)
+infixl(GreaterEqual, ">=", 9)
 infixl(Equal,        "==", 10)
 infixl(NotEqual,     "!=", 10)
 infixl(And,          "&",  11)
