@@ -1,0 +1,76 @@
+;
+; rowl - 1st generation
+; Copyright (C) 2010 nineties
+;
+; $Id: rowl1-io.rlc 2011-09-28 16:55:16 nineties $
+;
+
+(import "rlvm-compile")
+(import "rowl1-types")
+
+(compile `object `(
+
+(import "rowl1-node")
+(import "rowl1-compile")
+
+(fun io_pretty_print (obj) (
+    (pretty_print stdout obj)
+    (output_char stdout '\n')
+    (return Nil)
+    ))
+
+(fun eof_error () (
+    (output_error stderr)
+    (output_string stderr "End of file\n")
+    (exit 1)
+    ))
+
+; single character is represented as a string of one character
+(fun io_read_char () (
+    (var c)
+    (if (< (read_char (address c)) 0) (eof_error))
+    (var s (allocate_string 1))
+    (strncpy s (address c) 1)
+    (return s)
+    ))
+
+(fun io_read_string () (
+    (var s)
+    (if (< (read_string (address s)) 0) (eof_error))
+    (return s)
+    ))
+
+(fun io_read_line () (
+    (var s)
+    (if (< (read_line (address s)) 0) (eof_error))
+    (return s)
+    ))
+
+(fun io_read_int () (
+    (var n)
+    (if (< (read_int (address n)) 0) (eof_error))
+    (return (box n))
+    ))
+
+(fun io_print_string (s) (
+    (print_string s)
+    (return Nil)
+    ))
+
+(fun io_print_int (n) (
+    (print_int (unbox n))
+    (return Nil)
+    ))
+
+(export fun setup_io (env) (
+    (var tbl (get_vartable env))
+    (add_builtin_function1 tbl (to_sym "pretty_print") DontCare io_pretty_print)
+    (add_builtin_function0 tbl (to_sym "read_char") io_read_char)
+    (add_builtin_function0 tbl (to_sym "read_string") io_read_string)
+    (add_builtin_function0 tbl (to_sym "read_line") io_read_line)
+    (add_builtin_function0 tbl (to_sym "read_int") io_read_int)
+    (add_builtin_function1 tbl (to_sym "print") (headP Int) io_print_int)
+    (add_builtin_function1 tbl (to_sym "print") (headP String) io_print_string)
+    ))
+
+    ))

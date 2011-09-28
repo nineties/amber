@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-main.rlc 2011-09-27 15:36:04 nineties $
+; $Id: rowl1-main.rlc 2011-09-28 15:29:17 nineties $
 ;
 
 (import "rlvm-compile")
@@ -14,8 +14,6 @@
 (import "rowl1-builtin")
 (import "rowl1-parse")
 (import "rowl1-interp")
-
-(var parse_only @FALSE)
 
 (fun main (argc argv) (
     (parse_option (address argc) argv)
@@ -34,16 +32,9 @@
     (var j 0)
     (while (< j argc) (do
         (var arg (array_get string argv j))
-        (if (streq arg "--parse") (do
-            (= parse_only @TRUE)
-            (-= new_argc 1)
-            (incr j)
-            )
-            (do
-                (array_set string argv i arg)
-                (incr i)
-                (incr j)
-            ))
+        (array_set string argv i arg)
+        (incr i)
+        (incr j)
         ))
     (set argcp new_argc)
     ))
@@ -52,7 +43,7 @@
 (fun eval_file (file) (
     (var env (make_env)) ; global environment
     (var ichan (open_in file))
-    (init_stdlib env parse_only)
+    (init_stdlib env)
     (init_parser file ichan)
     (import_module env "rowl/syntax")
     (interpret env)
