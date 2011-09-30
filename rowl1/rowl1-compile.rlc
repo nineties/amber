@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2011-09-28 14:07:53 nineties $
+; $Id: rowl1-compile.rlc 2011-09-30 22:14:49 nineties $
 ;
 
 (import "rlvm-compile")
@@ -78,24 +78,15 @@
     (output_string stderr "no definition of `")
     (output_symbol stderr sym)
     (output_string stderr "' whose arity is ")
-    (output_int stderr (unbox arity))
+    (output_int stderr arity)
     (output_string stderr "\n")
     (exit 1)
-    ))
-
-(fun gen_undefined_error (sym arity) (
-    (var asm (make_assembler))
-    (put_push asm (box arity))
-    (put_push asm sym)
-    (compile_simple_call asm 2 undefined_error)
-    (return (get_code asm))
     ))
 
 (fun lookup_func (tbl sym arity) (
     (var ent (symtable_find tbl sym arity))
     (if (! ent) (do
-        (= ent (list2 (make_expr Function (list2 (gen_undefined_error sym arity) 0)) current_loc))
-        (symtable_add tbl sym arity ent)
+        (undefined_error sym arity)
         ))
     (return (expr_arg (car ent) 0))
     ))
@@ -159,62 +150,56 @@
     (exit 1)
     ))
 
-(fun compile_define_function_main (lhs body) (
-    (push_env exec_env)
-    (var sym (expr_arg_symbol lhs 0))
-    (var args (expr_arg_list lhs 1))
-    (= args (setup_args exec_env args))
-    (var asm_body (make_assembler))
-    (reset_lvar_index exec_env)
-    (var count (+ (count_lvar args) (count_lvar body)))
-    (put_allocate asm_body count)
-    (compile_simple_call asm_body 0 push_exec_env)
-    (put_drop asm_body)
-    (compile asm_body exec_env body)
-    (compile_simple_call asm_body 0 pop_exec_env)
-    (put_drop asm_body)
-    (put_ireturn asm_body)
-    (pop_env exec_env)
-
-    (add_function (get_vartable exec_env) sym args (get_code asm_body))
-    ))
-
 (fun compile_define_function (asm env expr) (
     (check_arg_size (symbol_name DefineFunction) 2 expr)
     (var lhs (expr_arg expr 0))
     (var body (expr_arg expr 1))
-    (put_push asm body)
-    (put_push asm lhs)
-    (compile_simple_call asm 2 compile_define_function_main)
-    ))
-
-(fun compile_append_function_main (lhs body) (
-    (push_env exec_env)
     (var sym (expr_arg_symbol lhs 0))
     (var args (expr_arg_list lhs 1))
-    (= args (setup_args exec_env args))
     (var asm_body (make_assembler))
-    (reset_lvar_index exec_env)
-    (var count (+ (count_lvar args) (count_lvar body)))
-    (put_allocate asm_body count)
-    (compile_simple_call asm_body 0 push_exec_env)
-    (put_drop asm_body)
-    (compile asm_body exec_env body)
-    (compile_simple_call asm_body 0 pop_exec_env)
-    (put_drop asm_body)
-    (put_ireturn asm_body)
-    (pop_env exec_env)
+    (var code (bytecode 0 0 0 0))
 
-    (append_function (get_vartable exec_env) sym args (get_code asm_body))
+    (reset_lvar_index env)
+    (= args (setup_args env args))
+    (var count (+ (count_lvar args) (count_lvar body)))
+    (var ent (add_function (get_vartable env) sym args code))
+
+    (push_env env)
+    (put_allocate asm_body count)
+    (compile asm_body env body)
+    (put_ireturn asm_body)
+    (pop_env env)
+
+    (set_code code asm_body)
+    (function_updated sym (list_length args) ent)
+
+    (put_nil asm)
     ))
 
 (fun compile_append_function (asm env expr) (
     (check_arg_size (symbol_name DefineFunction) 2 expr)
     (var lhs (expr_arg expr 0))
     (var body (expr_arg expr 1))
-    (put_push asm body)
-    (put_push asm lhs)
-    (compile_simple_call asm 2 compile_append_function_main)
+    (var sym (expr_arg_symbol lhs 0))
+    (var args (expr_arg_list lhs 1))
+    (var asm_body (make_assembler))
+    (var code (bytecode 0 0 0 0))
+
+    (reset_lvar_index env)
+    (= args (setup_args env args))
+    (var count (+ (count_lvar args) (count_lvar body)))
+    (var ent (append_function (get_vartable env) sym args code))
+
+    (push_env env)
+    (put_allocate asm_body count)
+    (compile asm_body env body)
+    (put_ireturn asm_body)
+    (pop_env env)
+
+    (set_code code asm_body)
+    (function_updated sym (list_length args) ent)
+
+    (put_nil asm)
     ))
 
 (fun setup_args (env args) (
@@ -439,11 +424,7 @@
             (put_jcall asm (* 4 arity))
         )
         (do
-            (put_imm_int asm arity)
-            (compile asm env fun)
-            (put_imm_int32 asm lookup_func)
-            (put_dcall asm 8)
-            (put_jcall asm (* 4 arity))
+            (not_implemented "compile_apply")
         ))
     ))
 
@@ -748,14 +729,14 @@
     ))
 
 (extern fun compile_matching_hook)
-(export fun add_function (tbl sym args code) (
+(fun add_function (tbl sym args code) (
     (var arity (list_length args))
     (var ent (symtable_find_local tbl sym arity))
     (if ent (do
         (var pats (cons (list2 args code) (expr_arg (car ent) 1)))
         (expr_arg_set (car ent) 1 pats)
         (compile_matching_hook (car ent) sym arity)
-        return
+        (return ent)
         ))
     (var ent (symtable_find tbl sym arity))
     (if ent
@@ -770,9 +751,10 @@
             (compile_matching_hook (car ent) sym arity)
         ))
     (symtable_add tbl sym arity ent)
+    (return ent)
     ))
 
-(export fun append_function (tbl sym args code) (
+(fun append_function (tbl sym args code) (
     (var arity (list_length args))
     (var ent (symtable_find tbl sym arity))
     (if ent
@@ -780,6 +762,7 @@
             (var pats (cons (list2 args code) (expr_arg (car ent) 1)))
             (expr_arg_set (car ent) 1 pats)
             (compile_matching_hook (car ent) sym arity)
+            (return ent)
         )
         (do
             (output_error stderr)
@@ -790,6 +773,10 @@
             (output_string stderr "\n")
             (exit 1)
         ))
+    ))
+
+(fun function_updated (sym arity ent) (
+    (compile_matching_hook (car ent) sym arity)
     ))
 
 (export fun add_builtin_function0 (tbl sym func) (
