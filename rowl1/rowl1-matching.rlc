@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2011-09-30 21:07:25 nineties $
+; $Id: rowl1-matching.rlc 2011-10-03 18:44:42 nineties $
 ;
 
 (import "rlvm-compile")
@@ -22,8 +22,7 @@
     (var pats (expr_arg funobj 1))
     (var asm (make_assembler))
 
-    ; we need to clone 'pats' here because compile_matching_main() will rearrange it.
-    (= pats (list_clone pats))
+    (= pats (prepare_pats pats))
 
     (var args 0)
     (var idx (list_length (caar pats)))
@@ -37,6 +36,68 @@
 
     (set_code bytecode asm)
     (return bytecode)
+    ))
+
+(fun prepare_pats (pats) (
+    (if (== pats 0) (return 0))
+    (return (cons
+        (cons
+            (unquote_pat_list (caar pats))
+            (cdar pats)
+            )
+        (prepare_pats (cdr pats))
+        ))
+    ))
+
+(fun unquote_pat (pat) (
+    (var hd (expr_head pat))
+    (if (|| (== hd Symbol) (|| (== hd Int) (== hd String)))
+        (return pat)
+        )
+    (if (== hd List)
+        (return (unquote_pat_list pat))
+        )
+    (if (== hd Quote)
+        (return (unquote_pat_sub (expr_arg pat 0)))
+        )
+    (var args (expr_args pat))
+    (return (make_expr hd (unquote_pat_list args)))
+    ))
+
+(fun unquote_pat_list (pat) (
+    (var ret 0)
+    (while pat (do
+        (= ret (cons (unquote_pat (car pat)) ret))
+        (= pat (cdr pat))
+        ))
+    (return (list_reverse ret))
+    ))
+
+(fun unquote_pat_sub (pat) (
+    (var hd (expr_head pat))
+    (if (== hd Symbol)
+        (return (make_expr SymbolP (list1 pat)))
+        )
+    (if (|| (== hd Int) (== hd String))
+        (return pat)
+        )
+    (if (== hd Unquote)
+        (return (unquote_pat (expr_arg pat 0)))
+        )
+    (if (== hd List)
+        (return (unquote_pat_sub_list pat))
+        )
+    (var args (expr_args pat))
+    (return (make_expr hd (unquote_pat_sub_list args)))
+    ))
+
+(fun unquote_pat_sub_list (pat) (
+    (var ret 0)
+    (while pat (do
+        (= ret (cons (unquote_pat_sub (car pat)) ret))
+        (= pat (cdr pat))
+        ))
+    (return (list_reverse ret))
     ))
 
 (fun compile_matching_main (asm args pats) (
