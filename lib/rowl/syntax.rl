@@ -1,17 +1,16 @@
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.rl 2011-10-03 12:18:48 nineties $
+# $Id: syntax.rl 2011-10-03 18:47:00 nineties $
 
 # Syntax definition of rowl language
 
 DefineSyntax{Rewrite, InfixR{"=>", 20}}
 DefineSyntax{Unquote, Prefix{"$", 3}}
-DefineSyntax{Quote, Prefix{"!", 3}}
+DefineSyntax{Quote, Prefix{"`", 2}}
 DefineSyntax{HeadP, InfixL{"@", 4}}
-DefineSyntax{SymbolP, Prefix{"`", 2}}
 DefineSyntax{DefineExpr, InfixR{":", 19}}
 
-DefineFunction{Compile(_, _, x => y), Eval{AppendFunction{Compile(out, env, $x), Compile(out, env, !$y)}}}
+DefineFunction{Compile(_, _, x => y), Eval{AppendFunction{Compile(out, env, $x), Compile(out, env, `$y)}}}
 
 Apply{f@Symbol, args@List}: body => DefineFunction{Apply{$f, $args}, $body}
 x@Symbol: value => DefineVariable{$x, $value}
