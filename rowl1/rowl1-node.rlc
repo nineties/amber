@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2011-09-30 22:10:54 nineties $
+; $Id: rowl1-node.rlc 2011-10-03 12:13:13 nineties $
 ;
 
 (import "rlvm-compile")
@@ -47,14 +47,18 @@
 (export var Quote       (to_sym "Quote"))
 (export var Unquote     (to_sym "Unquote"))
 (export var If          (to_sym "If"))
-(export var IfElse      (to_sym "IfElse"))
+(export var Else        (to_sym "Else"))
 (export var While       (to_sym "While"))
-(export var Function    (to_sym "Function")) ; Function{code, defs}
+(export var Not         (to_sym "Not"))
+(export var LogicalAnd  (to_sym "LogicalAnd"))
+(export var LogicalOr   (to_sym "LogicalOr"))
 
 (export var DefineSyntax   (to_sym "DefineSyntax"))
 (export var DefineFunction (to_sym "DefineFunction"))
 (export var AppendFunction (to_sym "AppendFunction"))
 (export var DefineVariable (to_sym "DefineVariable"))
+
+(export var Function       (to_sym "Function")) ; Function{code, defs}
 (export var Assembler      (to_sym "Assembler"))
 (export var Environment    (to_sym "Environment"))
 (export var Bytecode       (to_sym "Bytecode"))
@@ -533,6 +537,35 @@
     (output_string ochan "<#Builtin:0x")
     (output_hex ochan node 8)
     (output_char ochan '>')
+    ))
+
+(export fun pretty_print_full (ochan node) (
+    (tswitch (node_type node) (
+        (@SymbolE      . (return (output_symbol ochan node)))
+        (@ExprE        . (return (pp_expr_full ochan node)))
+        (@ListE        . (return (pp_expr_full ochan node)))
+        (@AssemblerE   . (return (pp_assembler ochan node)))
+        (@EnvironmentE . (return (pp_environment ochan node)))
+        (@BytecodeE    . (return (pp_bytecode ochan node)))
+        (@IntE         . (return (pp_int ochan node)))
+        (@FloatE       . (return (pp_float ochan node)))
+        (@StringE      . (return (pp_string ochan node)))
+        (@BuiltinE     . (return (pp_builtin ochan node)))
+        (default       . (not_reachable "pretty_print"))
+        ))
+    ))
+
+(fun pp_expr_full (ochan node) (
+    (var hd (expr_head node))
+    (var args (expr_args node))
+    (output_symbol ochan hd)
+    (output_char ochan '{')
+    (while args (do
+        (pretty_print_full ochan (car args))
+        (= args (cdr args))
+        (if args (output_string ochan ", "))
+        ))
+    (output_char ochan '}')
     ))
 
     ))

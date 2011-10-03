@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-assemble.rlc 2011-09-26 15:06:29 nineties $
+; $Id: rowl1-assemble.rlc 2011-10-03 10:48:08 nineties $
 ;
 
 ; -- Just in time assembler
@@ -14,7 +14,42 @@
 (import "rlvm-compile")
 (import "rowl1-types")
 
+(var insn_name_values ())
+(var insn_len_values ())
+(var tswitch_entries ())
+
+(var print_func `(
+    (byte   . (do (output_opd_byte ochan ptr i) (+= i 1)))
+    (short  . (do (output_opd_short ochan ptr i) (+= i 2)))
+    (ushort . (do (output_opd_short ochan ptr i) (+= i 2)))
+    (int    . (do (output_opd_int ochan ptr i) (+= i 4)))
+    (prim   . (do (output_opd_prim ochan ptr i) (+= i 2)))
+    (addr   . (do (output_opd_short ochan ptr i) (+= i 2)))
+    (object . (do (output_opd_object ochan ptr i) (+= i 4)))
+    ))
+
+(var code 0)
+(foreach i vm_instructions (do
+    (var name (symbol2s (car i)))
+    (push insn_name_values name)
+    (var operands (cadr i))
+    (if operands
+        (push tswitch_entries
+            `(@code . (do (do . @(map (lambda (o) (assoc o print_func)) operands)) break)))
+        (push tswitch_entries
+            `(@code . break))
+            )
+    (incr code)
+    ))
+(set insn_name_values (reverse insn_name_values))
+
+(push tswitch_entries `(default . nop))
+(set tswitch_entries (reverse tswitch_entries))
+
+(var prim_name_values (map (lambda (ent) (symbol2s (car ent))) prim_table))
+
 (var code-base `(
+(import "rowl1-node")
 
 (export fun make_assembler () (
     (return (variant @AssemblerE 4 (make_cvector 0) (make_ivector 0) 0 (make_ivector 0) 0))
@@ -250,6 +285,77 @@
         (= repls (field_get repls 0))
         ))
     (field_set c 3 0)
+    ))
+
+; Disassembler (for debug)
+
+(array string insn_names @insn_name_values)
+(array string prim_names @prim_name_values)
+
+(export fun print_bytecode (ochan code) (
+    (output_string ochan "bytecode<0x")
+    (output_hex ochan code 8)
+    (output_string ochan ">\n")
+    (var size (bytecode_size code))
+    (var ptr (bytecode_ptr code))
+    (var i 0)
+    (while (< i size) (do
+        (var byte (array_get char (+ ptr i) 0))
+        (output_int ochan i)
+        (output_string ochan "\t: ")
+        (var name (array_get string insn_names byte))
+        (output_string ochan name)
+        (+= i 1)
+        (if (streq "tswitch" name)
+            (do
+                ; output jump table
+                (var ncases (array_get short (+ ptr i) 0))
+                (output_char ochan ' ')
+                (output_int ochan ncases)
+                (output_char ochan '\n')
+                (for j 0 (+ ncases 1) (do
+                    (+= i 2)
+                    (var addr (array_get short (+ ptr i) 0))
+                    (output_string ochan "\t")
+                    (output_int ochan j)
+                    (output_string ochan ": ")
+                    (output_int ochan addr)
+                    (output_char ochan '\n')
+                    (+= i 2)
+                    ))
+            )
+            (do
+                (tswitch byte @tswitch_entries)
+                (output_char ochan '\n')
+            )
+            )
+        ))
+    ))
+
+(fun output_opd_byte (ochan ptr i) (
+    (output_char ochan ' ')
+    (output_int ochan (array_get char (+ ptr i) 0))
+    ))
+
+(fun output_opd_short (ochan ptr i) (
+    (output_char ochan ' ')
+    (output_int ochan (array_get short (+ ptr i) 0))
+    ))
+
+(fun output_opd_int (ochan ptr i) (
+    (output_char ochan ' ')
+    (output_int ochan (array_get int (+ ptr i) 0))
+    ))
+
+(fun output_opd_object (ochan ptr i) (
+    (output_char ochan ' ')
+    (pretty_print ochan (array_get int (+ ptr i) 0))
+    ))
+
+(fun output_opd_prim (ochan ptr i) (
+    (var id (array_get short (+ ptr i) 0))
+    (output_char ochan ' ')
+    (output_string ochan (array_get string prim_names id))
     ))
 
     ))

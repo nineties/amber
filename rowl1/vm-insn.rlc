@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2011-09-27 00:13:36 nineties $
+; $Id: vm-insn.rlc 2011-10-02 13:40:24 nineties $
 ;
 
 (define gen_field_get (idx) `(
@@ -587,24 +587,6 @@
     (if_ge      (addr) @nil @(gen_comparison2 "cmovge"))
     (if_lt      (addr) @nil @(gen_comparison2 "cmovl"))
     (if_le      (addr) @nil @(gen_comparison2 "cmovle"))
-    (if_true (addr) @nil (
-        (vmpop %eax)
-        (asm "cmpl $1, %eax")
-        (asm "movl $3, %eax")
-        (vmsshort 1 %ecx)
-        (asm "cmovne %ecx, %eax")
-        (vmsucc %eax)
-        (vmfetch)
-        ))
-    (if_false (addr) @nil (
-        (vmpop %eax)
-        (asm "cmpl $1, %eax")
-        (asm "movl $3, %eax")
-        (vmsshort 1 %ecx)
-        (asm "cmove %ecx, %eax")
-        (vmsucc %eax)
-        (vmfetch)
-        ))
     (check_int  (addr) @nil (
         (vmpop %eax)
         (vmsshort 1 %ecx)
@@ -616,30 +598,30 @@
         ))
     (check_string (addr) @nil @(gen_check_pstruct PLAIN_STRING))
     (check_list (addr int) @nil (
-        ; XXX: should not hardcode the layouer of object header.
+        ; XXX: should not hardcode the layout of object header.
         (vmpop %eax)
         (vmint 3 %ecx)
         (asm "0:")
         (asm "cmpl $0, %eax")
         (asm "je 1f")
-        (asm "test $1, %eax")
+        (asm "test $1, %eax") ; if 1 & %eax != 0 then %eax is a boxed integer.
         (asm "jnz 3f")
-        (asm "movl -4(%eax), %edx")
+        (asm "movl -4(%eax), %edx") ; %edx <- header of %eax
         (asm "andl $7, %edx")
         (asm "cmpl $" @TAG_CONS ", %edx")
         (asm "jne 3f")
-        (asm "movl 4(%eax), %eax")
+        (asm "movl 4(%eax), %eax") ; %eax <- cdr %eax
         (asm "decl %ecx")
         (asm "jmp 0b")
         (asm "1:")
         (asm "cmpl $0, %ecx")
         (asm "je 2f")
-        (asm "3:")
+        (asm "3:") ; here, %eax is not a list of length %ecx.
         (asm "xorl %edx, %edx")
         (vmsshort 1 %ecx)
         (vmsucc %ecx)
         (vmfetch)
-        (asm "2:")
+        (asm "2:") ; here, %eax is.
         (asm "xorl %edx, %edx")
         (vmsucc 7)
         (vmfetch)

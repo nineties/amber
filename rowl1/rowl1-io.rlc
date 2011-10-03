@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-io.rlc 2011-09-28 16:55:16 nineties $
+; $Id: rowl1-io.rlc 2011-10-03 12:11:08 nineties $
 ;
 
 (import "rlvm-compile")
@@ -15,6 +15,12 @@
 
 (fun io_pretty_print (obj) (
     (pretty_print stdout obj)
+    (output_char stdout '\n')
+    (return Nil)
+    ))
+
+(fun io_pretty_print_full (obj flag) (
+    (pretty_print_full stdout obj)
     (output_char stdout '\n')
     (return Nil)
     ))
@@ -65,6 +71,8 @@
 (export fun setup_io (env) (
     (var tbl (get_vartable env))
     (add_builtin_function1 tbl (to_sym "pretty_print") DontCare io_pretty_print)
+    (add_builtin_function2 tbl (to_sym "pretty_print") DontCare (symbolP (to_sym "fullform"))
+        io_pretty_print_full)
     (add_builtin_function0 tbl (to_sym "read_char") io_read_char)
     (add_builtin_function0 tbl (to_sym "read_string") io_read_string)
     (add_builtin_function0 tbl (to_sym "read_line") io_read_line)
