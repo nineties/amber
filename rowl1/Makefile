@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2011-09-28 15:26:44 nineties $
+# $Id: Makefile 2011-10-02 14:23:39 nineties $
 
 TOPDIR = ..
 ROWL0DIR = $(TOPDIR)/rowl0
@@ -107,7 +107,7 @@ rowl1-node.rlo     : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-symtab
 rowl1-builtin.rlo   : $(RLVMCOMPILER) rowl1-types.rlc rowl1-node.rlo rowl1-interp.rlo rowl1-compile.rlo
 rowl1-symtable.rlo : $(RLVMCOMPILER) rowl1-types.rlc
 rowl1-interp.rlo   : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-parse.rlo rowl1-symtable.rlo rowl1-assemble.rlo rowl1-compile.rlo rowl1-matching.rlo
-rowl1-assemble.rlo : $(RLVMCOMPILER) rowl1-types.rlc
+rowl1-assemble.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-node.rlo
 rowl1-compile.rlo  : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-symtable.rlo rowl1-assemble.rlo
 rowl1-matching.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-assemble.rlo rowl1-compile.rlo
 rowl1-numeric.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-compile.rlo

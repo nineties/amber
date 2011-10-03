@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2011-09-30 22:14:49 nineties $
+; $Id: rowl1-compile.rlc 2011-10-03 11:59:15 nineties $
 ;
 
 (import "rlvm-compile")
@@ -124,8 +124,7 @@
 (extern fun add_constr)
 (extern fun add_command)
 (fun compile_define_syntax (asm env expr) (
-    (check_arg_size (symbol_name DefineSyntax) 2 expr)
-    (var head (expr_arg_symbol expr 0))
+    (var head (expr_arg expr 0))
     (var op   (expr_arg expr 1))
 
     (do_nothing asm)
@@ -151,10 +150,9 @@
     ))
 
 (fun compile_define_function (asm env expr) (
-    (check_arg_size (symbol_name DefineFunction) 2 expr)
     (var lhs (expr_arg expr 0))
     (var body (expr_arg expr 1))
-    (var sym (expr_arg_symbol lhs 0))
+    (var sym (expr_arg lhs 0))
     (var args (expr_arg_list lhs 1))
     (var asm_body (make_assembler))
     (var code (bytecode 0 0 0 0))
@@ -177,10 +175,9 @@
     ))
 
 (fun compile_append_function (asm env expr) (
-    (check_arg_size (symbol_name DefineFunction) 2 expr)
     (var lhs (expr_arg expr 0))
     (var body (expr_arg expr 1))
-    (var sym (expr_arg_symbol lhs 0))
+    (var sym (expr_arg lhs 0))
     (var args (expr_arg_list lhs 1))
     (var asm_body (make_assembler))
     (var code (bytecode 0 0 0 0))
@@ -323,9 +320,6 @@
     ))
 
 (fun compile_define_variable (asm env expr) (
-    (output_string stderr "define variable:")
-    (output_int stderr (symtable_depth (get_vartable env)))
-    (output_char stderr '\n')
     (check_arg_size (symbol_name DefineVariable) 2 expr)
     (var sym (expr_arg_symbol expr 0))
     (var val (expr_arg expr 1))
@@ -438,7 +432,7 @@
         (put_push asm expr)
     (if (== hd List)
         (if (! expr)
-            (put_imm_int asm 0)
+            (put_push asm 0)
             (do
                 (compile_quote_main asm env (cdr expr))
                 (compile_quote_main asm env (car expr))
@@ -494,25 +488,154 @@
     (put_jcall asm 8)
     ))
 
+(fun compile_block (asm env expr) (
+    (var exprs (expr_args expr))
+    (push_env env)
+    (while exprs (do
+        (compile asm env (car exprs))
+        (= exprs (cdr exprs))
+        (if exprs (put_drop asm)) ; drop values except the last one
+        ))
+    (pop_env env)
+    ))
+
+(fun put_if_true (asm lbl) (
+    (put_if_eq asm lbl)
+    ))
+
+(fun put_if_false (asm lbl) (
+    (put_push asm false)
+    (put_if_eq asm lbl)
+    ))
+
+(fun compile_if (asm env expr) (
+    (compile_ifelse_main asm env (expr_arg expr 0) (expr_arg expr 1) Nil)
+    ))
+
+(fun compile_ifelse (asm env expr) (
+    (var lhs (expr_arg expr 0))
+    (compile_ifelse_main asm env (expr_arg lhs 0) (expr_arg lhs 1) (expr_arg expr 1))
+    ))
+
+(fun compile_ifelse_main (asm env cnd ifthen ifelse) (
+    (var cnd_hd (expr_head cnd))
+    (var size (expr_size cnd))
+    (if (&& (== cnd_hd Not) (== size 1))
+        (return (compile_ifelse_main asm env (expr_arg cnd 0) ifelse ifthen))
+        )
+    (if (&& (== cnd_hd LogicalAnd) (== size 2))
+        (return (compile_ifelse_and asm env cnd ifthen ifelse))
+        )
+    (if (&& (== cnd_hd LogicalOr) (== size 2))
+        (return (compile_ifelse_or asm env cnd ifthen ifelse))
+        )
+    (if (== ifthen Nil)
+        (if (== ifelse Nil)
+            (do
+                (compile asm env cnd)
+            )
+            (do
+                (var exit_lbl (fresh_label asm))
+                (compile asm env cnd)
+                (put_if_true asm exit_lbl)
+                (compile asm env ifelse)
+                (set_label asm exit_lbl)
+            ))
+        (if (== ifelse Nil)
+            (do
+                (var exit_lbl (fresh_label asm))
+                (compile asm env cnd)
+                (put_if_false asm exit_lbl)
+                (compile asm env ifthen)
+                (set_label asm exit_lbl)
+            )
+            (do
+                (var else_lbl (fresh_label asm))
+                (var exit_lbl (fresh_label asm))
+                (compile asm env cnd)
+                (put_if_false asm else_lbl)
+                (compile asm env ifthen)
+                (put_goto asm exit_lbl)
+                (set_label asm else_lbl)
+                (compile asm env ifelse)
+                (set_label asm exit_lbl)
+            ))
+        )
+    ))
+
+(fun compile_ifelse_and (asm env cnd ifthen ifelse) (
+    (var ifelse_lbl (fresh_label asm))
+    (var exit_lbl   (fresh_label asm))
+    (exit_if_false asm env (expr_arg cnd 0) ifelse_lbl)
+    (exit_if_false asm env (expr_arg cnd 1) ifelse_lbl)
+    (compile asm env ifthen)
+    (put_goto asm exit_lbl)
+    (set_label asm ifelse_lbl)
+    (compile asm env ifelse)
+    (set_label asm exit_lbl)
+    ))
+
+(fun compile_ifelse_or (asm env cnd ifthen ifelse) (
+    (var ifthen_lbl (fresh_label asm))
+    (var exit_lbl   (fresh_label asm))
+    (exit_if_true asm env (expr_arg cnd 0) ifthen_lbl)
+    (exit_if_true asm env (expr_arg cnd 1) ifthen_lbl)
+    (compile asm env ifelse)
+    (put_goto asm exit_lbl)
+    (set_label asm ifthen_lbl)
+    (compile asm env ifthen)
+    (set_label asm exit_lbl)
+    ))
+
+(fun exit_if_true (asm env expr exit) (
+    (var hd (expr_head expr))
+    (var size (expr_size expr))
+    (if (&& (== hd Not) (== size 1))
+        (return (exit_if_false asm env (expr_arg expr 0) exit))
+        )
+    (if (&& (== hd LogicalOr) (== size 2)) (do
+        (exit_if_true asm env (expr_arg expr 0) exit)
+        (exit_if_true asm env (expr_arg expr 1) exit)
+        return
+        ))
+    (if (&& (== hd LogicalAnd) (== size 2)) (do
+        (var fail (fresh_label asm))
+        (exit_if_false asm env (expr_arg expr 0) fail)
+        (exit_if_true asm env (expr_arg env 1) exit)
+        (set_label asm fail)
+        return
+        ))
+    (compile asm env expr)
+    (put_if_true asm exit)
+    ))
+
+(fun exit_if_false (asm env expr exit) (
+    (var hd (expr_head expr))
+    (var size (expr_size expr))
+    (if (&& (== hd Not) (== size 1))
+        (return (exit_if_true asm env (expr_arg expr 0) exit))
+        )
+    (if (&& (== hd LogicalOr) (== size 2)) (do
+        (var fail (fresh_label asm))
+        (exit_if_true asm env (expr_arg expr 0) fail)
+        (exit_if_false asm env (expr_arg expr 1) exit)
+        (set_label asm fail)
+        return
+        ))
+    (if (&& (== hd LogicalAnd) (== size 2)) (do
+        (exit_if_false asm env (expr_arg expr 0) exit)
+        (exit_if_false asm env (expr_arg env 1) exit)
+        return
+        ))
+    (compile asm env expr)
+    (put_if_false asm exit)
+    ))
 
 ;;;;;;;;;; obsolete
 
 
 (fun compile__ (asm env expr) (
     ;(var hd (expr_head expr))
-    ;(if (== hd Quote)
-    ;    (compile_quote asm env (expr_arg expr 0))
-    ;(if (== hd Block)
-    ;    (compile_block asm env (expr_args expr))
-    ;(if (== hd If)
-    ;    (compile_ifelse asm env (expr_arg expr 0) (expr_arg expr 1) Nil)
-    ;(if (&& (== hd IfElse) (== (expr_head (expr_arg expr 0)) If)) (do
-    ;    (var lhs (expr_arg expr 0))
-    ;    (var cnd (expr_arg lhs 0))
-    ;    (var ifthen (expr_arg lhs 1))
-    ;    (var ifelse (expr_arg expr 1))
-    ;    (compile_ifelse asm env cnd ifthen ifelse)
-    ;    )
     ;(if (== hd While)
     ;    (compile_while asm env (expr_arg expr 0) (expr_arg expr 1))
     ;(if (== hd Assign)
@@ -581,93 +704,6 @@
         ))
     ))
 
-(fun compile_block (asm env exprs) (
-    (symtable_push (struct_at env 0))
-    (while exprs (do
-        (compile asm env (car exprs))
-        (= exprs (cdr exprs))
-        (if exprs (put_drop asm)) ; drop values except the last one
-        ))
-    (symtable_pop (struct_at env 0))
-    ))
-
-(fun compile_ifelse (asm env cnd ifthen ifelse) (
-    ;(var cnd_hd (expr_head cnd))
-    ;(if (== cnd_hd LogicalOr) (return (compile_ifelse_or asm env cnd ifthen ifelse)))
-    ;(if (== cnd_hd LogicalAnd) (return (compile_ifelse_and asm env cnd ifthen ifelse)))
-    ;(if (== cnd_hd Not) (return (compile_ifelse asm env (expr_arg cnd 0) ifelse ifthen)))
-    ;(var else_lbl (fresh_label asm))
-    ;(var exit_lbl (fresh_label asm))
-    ;(compile asm env cnd)
-    ;(put_if_false asm else_lbl)
-    ;(compile asm env ifthen)
-    ;(put_goto asm exit_lbl)
-    ;(set_label asm else_lbl)
-    ;(compile asm env ifelse)
-    ;(set_label asm exit_lbl)
-    ))
-
-(fun compile_ifelse_or (asm env cnd ifthen ifelse) (
-    (var ifthen_lbl (fresh_label asm))
-    (var exit_lbl   (fresh_label asm))
-    (exit_if_true asm env (expr_arg cnd 0) ifthen_lbl)
-    (exit_if_true asm env (expr_arg cnd 1) ifthen_lbl)
-    (compile asm env ifelse)
-    (put_goto asm exit_lbl)
-    (set_label asm ifthen_lbl)
-    (compile asm env ifthen)
-    (set_label asm exit_lbl)
-    ))
-
-(fun compile_ifelse_and (asm env cnd ifthen ifelse) (
-    (var ifelse_lbl (fresh_label asm))
-    (var exit_lbl   (fresh_label asm))
-    (exit_if_false asm env (expr_arg cnd 0) ifelse_lbl)
-    (exit_if_false asm env (expr_arg cnd 1) ifelse_lbl)
-    (compile asm env ifthen)
-    (put_goto asm exit_lbl)
-    (set_label asm ifelse_lbl)
-    (compile asm env ifelse)
-    (set_label asm exit_lbl)
-    ))
-
-(fun exit_if_true (asm env expr exit) (
-    ;(var hd (expr_head expr))
-    ;(if (== hd Not) (return (exit_if_false asm env (expr_arg expr 0) exit)))
-    ;(if (== hd LogicalOr) (do
-    ;    (exit_if_true asm env (expr_arg expr 0) exit)
-    ;    (exit_if_true asm env (expr_arg expr 1) exit)
-    ;    return
-    ;    ))
-    ;(if (== hd LogicalAnd) (do
-    ;    (var fail (fresh_label))
-    ;    (exit_if_false asm env (expr_arg expr 0) fail)
-    ;    (exit_if_true asm env (expr_arg env 1) exit)
-    ;    (set_label asm fail)
-    ;    return
-    ;    ))
-    ;(compile asm env expr)
-    ;(put_if_true asm exit)
-    ))
-
-(fun exit_if_false (asm env expr exit) (
-    ;(var hd (expr_head expr))
-    ;(if (== hd Not) (return (exit_if_true asm env (expr_arg expr 0) exit)))
-    ;(if (== hd LogicalOr) (do
-    ;    (var fail (fresh_label))
-    ;    (exit_if_true asm env (expr_arg expr 0) fail)
-    ;    (exit_if_false asm env (expr_arg expr 1) exit)
-    ;    (set_label asm fail)
-    ;    return
-    ;    ))
-    ;(if (== hd LogicalAnd) (do
-    ;    (exit_if_false asm env (expr_arg expr 0) exit)
-    ;    (exit_if_false asm env (expr_arg env 1) exit)
-    ;    return
-    ;    ))
-    ;(compile asm env expr)
-    ;(put_if_false asm exit)
-    ))
 
 ; while (c) body
 ; =>
@@ -816,18 +852,29 @@
 
 (export fun setup_builtin_compilers (env) (
     (var tbl (get_vartable env))
-    (add_compiler tbl (headP Located) compile_located)
-    (add_compiler tbl (headP DefineSyntax) compile_define_syntax)
-    (add_compiler tbl (headP DefineFunction) compile_define_function)
-    (add_compiler tbl (headP AppendFunction) compile_append_function)
-    (add_compiler tbl (headP DefineVariable) compile_define_variable)
-    (add_compiler tbl (headP Eval) compile_eval)
+    (var symT (headP Symbol))
+    (var listT (headP List))
+    (var intT (headP Int))
+    (var stringT (headP String))
+    (var locT (make_expr Loc (list3 stringT intT intT)))
+    (add_compiler tbl (make_expr Located (list2 locT DontCare)) compile_located)
+    (add_compiler tbl (make_expr DefineSyntax (list2 symT DontCare)) compile_define_syntax)
+    (add_compiler tbl (make_expr DefineFunction
+        (list2 (make_expr Apply (list2 symT listT)) DontCare)) compile_define_function)
+    (add_compiler tbl (make_expr AppendFunction
+        (list2 (make_expr Apply (list2 symT listT)) DontCare)) compile_append_function)
+    (add_compiler tbl (make_expr DefineVariable (list2 symT DontCare)) compile_define_variable)
+    (add_compiler tbl (make_expr Eval (list1 DontCare)) compile_eval)
     (add_compiler tbl (headP Symbol) compile_var)
-    (add_compiler tbl (headP Apply) compile_apply)
-    (add_compiler tbl (headP Quote) compile_quote)
+    (add_compiler tbl (make_expr Apply (list2 DontCare listT)) compile_apply)
+    (add_compiler tbl (make_expr Quote (list1 DontCare)) compile_quote)
     (add_compiler tbl (headP Int) compile_int)
     (add_compiler tbl (headP String) compile_string)
     (add_compiler tbl (headP List) compile_list)
+    (add_compiler tbl (headP Block) compile_block)
+    (add_compiler tbl (make_expr If (list2 DontCare DontCare)) compile_if)
+    (add_compiler tbl (make_expr Else (list2
+        (make_expr If (list2 DontCare DontCare)) DontCare)) compile_ifelse)
     ))
 
 (export fun add_compiler (tbl pat func) (

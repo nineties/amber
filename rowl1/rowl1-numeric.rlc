@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-numeric.rlc 2011-09-28 15:22:31 nineties $
+; $Id: rowl1-numeric.rlc 2011-10-01 13:04:50 nineties $
 ;
 
 (import "rlvm-compile")
@@ -15,7 +15,6 @@
 
 (fun compile_uplus (asm env expr)  ((compile_unary asm env expr "UnaryPlus")))
 (fun compile_uminus (asm env expr) ((compile_unary asm env expr "UnaryMinus")))
-(fun compile_not (asm env expr)    ((compile_unary asm env expr "Not")))
 (fun compile_times (asm env expr)  ((compile_binary asm env expr "Times")))
 (fun compile_divide (asm env expr) ((compile_binary asm env expr "Divide")))
 (fun compile_mod (asm env expr)    ((compile_binary asm env expr "Mod")))
@@ -34,24 +33,26 @@
     (return (+ (- x) 2))
     ))
 
-(fun not (x) (
-    (if (== x false)  ; box 0 = 1
-        (return true) ; box 1 = 3
-        (return false)
-        )
-    ))
-
 (fun int_times (x y) (
     (return (box (* (unbox x) (unbox y))))
     ))
 
+(fun nonzero_check (x) (
+    (if (== x 1) ; box(0) == 1
+        (do
+            (output_error stderr)
+            (output_string stderr "division by zero\n")
+            (exit 1)
+        ))
+    ))
+
 (fun int_divide (x y) (
-    ; XXX: check division by 0
+    (nonzero_check y)
     (return (box (/ (unbox x) (unbox y))))
     ))
 
 (fun int_mod (x y) (
-    ; XXX: check division by 0
+    (nonzero_check y)
     (return (box (% (unbox x) (unbox y))))
     ))
 
@@ -73,7 +74,6 @@
     ; compilers
     (add_compiler tbl (headP (to_sym "UnaryPlus")) compile_uplus)
     (add_compiler tbl (headP (to_sym "UnaryMinus")) compile_uminus)
-    (add_compiler tbl (headP (to_sym "Not")) compile_not)
     (add_compiler tbl (headP (to_sym "Times")) compile_times)
     (add_compiler tbl (headP (to_sym "Divide")) compile_divide)
     (add_compiler tbl (headP (to_sym "Mod")) compile_mod)
@@ -88,7 +88,6 @@
     (var IntT (headP Int))
     (add_builtin_function1 tbl (to_sym "UnaryPlus") Int int_uplus)
     (add_builtin_function1 tbl (to_sym "UnaryMinus") Int int_uminus)
-    (add_builtin_function1 tbl (to_sym "Not") DontCare not)
     (add_builtin_function2 tbl (to_sym "Times") Int Int int_times)
     (add_builtin_function2 tbl (to_sym "Divide") Int Int int_divide)
     (add_builtin_function2 tbl (to_sym "Mod") Int Int int_mod)

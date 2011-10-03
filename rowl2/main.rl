@@ -3,6 +3,8 @@
 # rowl - 2nd generation
 # Copyright (C) 2010 nineties
 #
-# $Id: main.rl 2011-09-28 16:56:38 nineties $
+# $Id: main.rl 2011-10-03 12:24:11 nineties $
 
-print(read_line())
+fib(n): if (n < 3) 1 else fib(n-1) + fib(n-2)
+
+print(fib(36))

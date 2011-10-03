@@ -1,6 +1,6 @@
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.rl 2011-09-28 13:54:40 nineties $
+# $Id: syntax.rl 2011-10-03 12:18:48 nineties $
 
 # Syntax definition of rowl language
 
@@ -9,7 +9,7 @@ DefineSyntax{Unquote, Prefix{"$", 3}}
 DefineSyntax{Quote, Prefix{"!", 3}}
 DefineSyntax{HeadP, InfixL{"@", 4}}
 DefineSyntax{SymbolP, Prefix{"`", 2}}
-DefineSyntax{DefineExpr, InfixR{":", 18}}
+DefineSyntax{DefineExpr, InfixR{":", 19}}
 
 DefineFunction{Compile(_, _, x => y), Eval{AppendFunction{Compile(out, env, $x), Compile(out, env, !$y)}}}
 
@@ -52,4 +52,4 @@ constr(If,           "if")
 constr(While,        "while")
 constr(For,          "for")
 command(Return,      "return")
-infixl(IfElse,       "else", 19)
+infixl(Else,         "else", 18)
