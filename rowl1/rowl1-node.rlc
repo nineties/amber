@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2011-10-05 00:56:34 nineties $
+; $Id: rowl1-node.rlc 2011-10-05 04:03:09 nineties $
 ;
 
 (import "rlvm-compile")
@@ -65,8 +65,11 @@
 (export var Environment (to_builtin_sym "Environment"))
 (export var Bytecode    (to_builtin_sym "Bytecode"))
 (export var Builtin     (to_builtin_sym "Builtin"))
+(export var InputFileStream (to_builtin_sym "InputFileStream"))
+(export var OutputFileStream (to_builtin_sym "OutputFileStream"))
 
-(fun to_builtin_sym (name) (
+
+(export fun to_builtin_sym (name) (
     (var sym (idtable_find symbol_table name))
     (if sym (return sym))
     (= name (strdup name))
@@ -173,17 +176,19 @@
 
 (export fun expr_head (node) (
     (tswitch (node_type node) (
-        (@SymbolE      . (return Symbol))
-        (@ExprE        . (return (field_get node @ExprHead)))
-        (@ListE        . (return List))
-        (@AssemblerE   . (return Assembler))
-        (@EnvironmentE . (return Environment))
-        (@BytecodeE    . (return Bytecode))
-        (@IntE         . (return Int))
-        (@FloatE       . (return Float))
-        (@StringE      . (return String))
-        (@BuiltinE     . (return Builtin))
-        (default       . (not_reachable "expr_head"))
+        (@SymbolE           . (return Symbol))
+        (@ExprE             . (return (field_get node @ExprHead)))
+        (@ListE             . (return List))
+        (@AssemblerE        . (return Assembler))
+        (@EnvironmentE      . (return Environment))
+        (@BytecodeE         . (return Bytecode))
+        (@InputFileStreamE  . (return InputFileStream))
+        (@OutputFileStreamE . (return OutputFileStream))
+        (@IntE              . (return Int))
+        (@FloatE            . (return Float))
+        (@StringE           . (return String))
+        (@BuiltinE          . (return Builtin))
+        (default            . (not_reachable "expr_head"))
         ))
     ))
 
@@ -340,17 +345,19 @@
 
 (fun output_type (ochan type) (
     (tswitch type (
-        (@SymbolE      . (return (output_string ochan "Symbol")))
-        (@ExprE        . (return (output_string ochan "composite expression")))
-        (@ListE        . (return (output_string ochan "List")))
-        (@AssemblerE   . (return (output_string ochan "Assembler")))
-        (@EnvironmentE . (return (output_string ochan "Environment")))
-        (@BytecodeE    . (return (output_string ochan "Bytecode")))
-        (@IntE         . (return (output_string ochan "Int")))
-        (@FloatE       . (return (output_string ochan "Float")))
-        (@StringE      . (return (output_string ochan "String")))
-        (@BuiltinE     . (return (output_string ochan "Builtin")))
-        (default       . (not_reachable "output_type"))
+        (@SymbolE           . (return (output_string ochan "Symbol")))
+        (@ExprE             . (return (output_string ochan "composite expression")))
+        (@ListE             . (return (output_string ochan "List")))
+        (@AssemblerE        . (return (output_string ochan "Assembler")))
+        (@EnvironmentE      . (return (output_string ochan "Environment")))
+        (@BytecodeE         . (return (output_string ochan "Bytecode")))
+        (@InputFileStreamE  . (return (output_string ochan "InputFileStream")))
+        (@OutputFileStreamE . (return (output_string ochan "OutputFileStream")))
+        (@IntE              . (return (output_string ochan "Int")))
+        (@FloatE            . (return (output_string ochan "Float")))
+        (@StringE           . (return (output_string ochan "String")))
+        (@BuiltinE          . (return (output_string ochan "Builtin")))
+        (default            . (not_reachable "output_type"))
         ))
     ))
 
@@ -360,17 +367,19 @@
 
 (fun pretty_print_main (ochan node assoc) (
     (tswitch (node_type node) (
-        (@SymbolE      . (return (output_symbol ochan node)))
-        (@ExprE        . (return (pp_expr ochan node assoc)))
-        (@ListE        . (return (pp_list ochan node)))
-        (@AssemblerE   . (return (pp_assembler ochan node)))
-        (@EnvironmentE . (return (pp_environment ochan node)))
-        (@BytecodeE    . (return (pp_bytecode ochan node)))
-        (@IntE         . (return (pp_int ochan node)))
-        (@FloatE       . (return (pp_float ochan node)))
-        (@StringE      . (return (pp_string ochan node)))
-        (@BuiltinE     . (return (pp_builtin ochan node)))
-        (default       . (not_reachable "pretty_print"))
+        (@SymbolE           . (return (output_symbol ochan node)))
+        (@ExprE             . (return (pp_expr ochan node assoc)))
+        (@ListE             . (return (pp_list ochan node)))
+        (@AssemblerE        . (return (pp_assembler ochan node)))
+        (@EnvironmentE      . (return (pp_environment ochan node)))
+        (@BytecodeE         . (return (pp_bytecode ochan node)))
+        (@InputFileStreamE  . (return (pp_file_stream ochan node)))
+        (@OutputFileStreamE . (return (pp_file_stream ochan node)))
+        (@IntE              . (return (pp_int ochan node)))
+        (@FloatE            . (return (pp_float ochan node)))
+        (@StringE           . (return (pp_string ochan node)))
+        (@BuiltinE          . (return (pp_builtin ochan node)))
+        (default            . (not_reachable "pretty_print"))
         ))
     ))
 
@@ -499,6 +508,15 @@
     (output_char ochan '>')
     ))
 
+(fun pp_file_stream (ochan node) (
+    (if (== (node_type node) @InputFileStreamE)
+        (output_string ochan "<#InputFileStream:")
+        (output_string ochan "<#OutputFileStream:")
+        )
+    (pretty_print ochan (field_get node 2))
+    (output_char ochan '>')
+    ))
+
 (var indent 0)
 (fun incr_indent () ((+= indent 4)))
 (fun decr_indent () ((-= indent 4)))
@@ -570,17 +588,19 @@
 
 (export fun pretty_print_full (ochan node) (
     (tswitch (node_type node) (
-        (@SymbolE      . (return (output_symbol ochan node)))
-        (@ExprE        . (return (pp_expr_full ochan node)))
-        (@ListE        . (return (pp_expr_full ochan node)))
-        (@AssemblerE   . (return (pp_assembler ochan node)))
-        (@EnvironmentE . (return (pp_environment ochan node)))
-        (@BytecodeE    . (return (pp_bytecode ochan node)))
-        (@IntE         . (return (pp_int ochan node)))
-        (@FloatE       . (return (pp_float ochan node)))
-        (@StringE      . (return (pp_string ochan node)))
-        (@BuiltinE     . (return (pp_builtin ochan node)))
-        (default       . (not_reachable "pretty_print"))
+        (@SymbolE           . (return (output_symbol ochan node)))
+        (@ExprE             . (return (pp_expr_full ochan node)))
+        (@ListE             . (return (pp_expr_full ochan node)))
+        (@AssemblerE        . (return (pp_assembler ochan node)))
+        (@EnvironmentE      . (return (pp_environment ochan node)))
+        (@BytecodeE         . (return (pp_bytecode ochan node)))
+        (@InputFileStreamE  . (return (pp_file_stream ochan node)))
+        (@OutputFileStreamE . (return (pp_file_stream ochan node)))
+        (@IntE              . (return (pp_int ochan node)))
+        (@FloatE            . (return (pp_float ochan node)))
+        (@StringE           . (return (pp_string ochan node)))
+        (@BuiltinE          . (return (pp_builtin ochan node)))
+        (default            . (not_reachable "pretty_print"))
         ))
     ))
 

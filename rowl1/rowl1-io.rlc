@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-io.rlc 2011-10-05 01:00:33 nineties $
+; $Id: rowl1-io.rlc 2011-10-05 04:26:28 nineties $
 ;
 
 (import "rlvm-compile")
@@ -13,10 +13,54 @@
 (import "rowl1-node")
 (import "rowl1-compile")
 
+(fun make_ifstream (path in) (
+    (return (variant @InputFileStreamE 2 path in))
+    ))
+
+(fun io_open_in (path) (
+    (return (make_ifstream path (open_in path)))
+    ))
+
+(fun close_in (st) (
+    (close_in (field_get st 2))
+    ))
+
+(fun make_ofstream (path out) (
+    (return (variant @OutputFileStreamE 2 path out))
+    ))
+
+(fun io_open_out (path) (
+    (return (make_ofstream path (open_out path)))
+    ))
+
+(fun close_out (st) (
+    (close_out (field_get st 2))
+    ))
+
+(fun io_print (f s) (
+    (pretty_print (field_get f 2) s)
+    (return Nil)
+    ))
+
+(fun io_print_str (f s) (
+    (output_string (field_get f 2) s)
+    (return Nil)
+    ))
+
+(fun io_print_int (f n) (
+    (output_int (field_get f 2) (unbox n))
+    (return Nil)
+    ))
+
+(fun io_print_full (f flag obj) (
+    (pretty_print_full (field_get f 2) obj)
+    (return Nil)
+    ))
+
 ; single character is represented as a string of one character
-(fun io_read_char () (
+(fun io_read_char (io) (
     (var c)
-    (if (< (read_char (address c)) 0)
+    (if (< (input_char (address c) (field_get io 2)) 0)
         (return (to_sym "eof"))
         )
     (var s (allocate_string 1))
@@ -24,65 +68,51 @@
     (return s)
     ))
 
-(fun io_read_string () (
+(fun io_read_string (io) (
     (var s)
-    (if (< (read_string (address s)) 0)
+    (if (< (input_string (address s) (field_get io 2)) 0)
         (return (to_sym "eof"))
         )
     (return s)
     ))
 
-(fun io_read_line () (
+(fun io_read_line (io) (
     (var s)
-    (if (< (read_line (address s)) 0)
+    (if (< (input_line (address s) (field_get io 2)) 0)
         (return (to_sym "eof"))
         )
     (return s)
     ))
 
-(fun io_read_int () (
+(fun io_read_int (io) (
     (var n)
-    (if (< (read_int (address n)) 0)
+    (if (< (input_int (address n) (field_get io 2)) 0)
         (return (to_sym "eof"))
         )
     (return (box n))
     ))
 
-(fun io_print (s) (
-    (pretty_print stdout s)
-    (return Nil)
-    ))
-
-(fun io_print_str (s) (
-    (print_string s)
-    (return Nil)
-    ))
-
-(fun io_print_int (n) (
-    (print_int (unbox n))
-    (return Nil)
-    ))
-
-(fun io_print_full (s) (
-    (pretty_print_full stdout s)
-    (return Nil)
-    ))
-
 (export fun setup_io (env) (
     (var tbl (get_vartable env))
 
-    (add_global_variable tbl (to_sym "stdin") stdin)
-    (add_global_variable tbl (to_sym "stdout") stdout)
-    (add_global_variable tbl (to_sym "stderr") stderr)
+    (add_global_variable tbl (to_sym "stdin") (make_ifstream (string "stdin") stdin))
+    (add_global_variable tbl (to_sym "stdout") (make_ofstream (string "stdout") stdout))
+    (add_global_variable tbl (to_sym "stderr") (make_ofstream (string "stderr") stderr))
 
-    (add_builtin_function1 tbl (to_sym "print") DontCare io_print)
-    (add_builtin_function1 tbl (to_sym "print") (headP String) io_print_str)
-    (add_builtin_function1 tbl (to_sym "print") (headP Int) io_print_int)
-    (add_builtin_function2 tbl (to_sym "print") DontCare (symbolP (to_sym "fullform")) io_print_full)
-    (add_builtin_function0 tbl (to_sym "read_char") io_read_char)
-    (add_builtin_function0 tbl (to_sym "read_string") io_read_string)
-    (add_builtin_function0 tbl (to_sym "read_line") io_read_line)
-    (add_builtin_function0 tbl (to_sym "read_int") io_read_int)
+    ; file IO
+    (add_builtin_function1 tbl (to_sym "open_in") (headP String) io_open_in)
+    (add_builtin_function1 tbl (to_sym "open_out") (headP String) io_open_out)
+    (add_builtin_function1 tbl (to_sym "close") (headP InputFileStream) close_in)
+    (add_builtin_function1 tbl (to_sym "close") (headP OutputFileStream) close_out)
+    (add_builtin_function2 tbl (to_sym "print") (headP OutputFileStream) DontCare io_print)
+    (add_builtin_function2 tbl (to_sym "print") (headP OutputFileStream) (headP String) io_print_str)
+    (add_builtin_function2 tbl (to_sym "print") (headP OutputFileStream) (headP Int) io_print_int)
+    (add_builtin_function3 tbl (to_sym "print") (headP OutputFileStream)
+        (symbolP (to_sym "fullform")) DontCare io_print_full)
+    (add_builtin_function1 tbl (to_sym "read_char") (headP InputFileStream) io_read_char)
+    (add_builtin_function1 tbl (to_sym "read_string") (headP InputFileStream) io_read_string)
+    (add_builtin_function1 tbl (to_sym "read_line") (headP InputFileStream) io_read_line)
+    (add_builtin_function1 tbl (to_sym "read_int") (headP InputFileStream) io_read_int)
     ))
 
     ))
