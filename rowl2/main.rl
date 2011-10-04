@@ -3,7 +3,7 @@
 # rowl - 2nd generation
 # Copyright (C) 2010 nineties
 #
-# $Id: main.rl 2011-10-04 14:16:17 nineties $
+# $Id: main.rl 2011-10-04 17:02:48 nineties $
 
 fib(n): {
     a0:0
@@ -17,5 +17,4 @@ fib(n): {
     return a1
 }
 
-print(fib(36))
-print('\n')
+puts(fib(36))

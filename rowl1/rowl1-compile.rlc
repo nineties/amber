@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2011-10-04 14:16:51 nineties $
+; $Id: rowl1-compile.rlc 2011-10-04 19:27:09 nineties $
 ;
 
 (import "rlvm-compile")
@@ -323,7 +323,7 @@
     (var ty (expr_head info))
     (if (== ty GlobalVariable) (do
         (put_push asm (expr_args info))
-        (put_setcar asm)
+        (put_car asm)
         return
         ))
     (if (== ty LocalVariable) (do
@@ -663,6 +663,7 @@
     (if (== vty GlobalVariable) (do
         (put_push asm (expr_args v))
         (put_setcar asm)
+        return
         )
     (if (== vty LocalVariable) (do
         (put_store_lvar asm (expr_arg_int v 0))
@@ -681,6 +682,32 @@
 (fun compile_return (asm env expr) (
     (compile asm env (expr_arg expr 0))
     (put_ireturn asm)
+    ))
+
+(fun compile_eq (asm env expr) (
+    (var else_lbl (fresh_label asm))
+    (var exit_lbl (fresh_label asm))
+    (compile asm env (expr_arg expr 1))
+    (compile asm env (expr_arg expr 0))
+    (put_if_eq asm else_lbl)
+    (put_push asm false)
+    (put_goto asm exit_lbl)
+    (set_label asm else_lbl)
+    (put_push asm true)
+    (set_label asm exit_lbl)
+    ))
+
+(fun compile_ne (asm env expr) (
+    (var else_lbl (fresh_label asm))
+    (var exit_lbl (fresh_label asm))
+    (compile asm env (expr_arg expr 1))
+    (compile asm env (expr_arg expr 0))
+    (put_if_ne asm else_lbl)
+    (put_push asm false)
+    (put_goto asm exit_lbl)
+    (set_label asm else_lbl)
+    (put_push asm true)
+    (set_label asm exit_lbl)
     ))
 
 (export fun compile_simple_function (asm arity func) (
@@ -823,6 +850,8 @@
     (add_compiler tbl (make_expr (to_sym "DivideAssign") (list2 symT DontCare)) compile_divide_assign)
     (add_compiler tbl (make_expr (to_sym "ModAssign") (list2 symT DontCare)) compile_mod_assign)
     (add_compiler tbl (make_expr (to_sym "Return") (list1 DontCare)) compile_return)
+    (add_compiler tbl (make_expr (to_sym "Equal") (list2 DontCare DontCare)) compile_eq)
+    (add_compiler tbl (make_expr (to_sym "NotEqual") (list2 DontCare DontCare)) compile_ne)
     ))
 
 (export fun add_compiler (tbl pat func) (
