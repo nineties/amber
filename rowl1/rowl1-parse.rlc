@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-parse.rlc 2011-01-19 01:55:50 nineties $
+; $Id: rowl1-parse.rlc 2011-10-05 00:43:55 nineties $
 ;
 
 (import "rlvm-compile")
@@ -59,8 +59,8 @@
         (var head (field_get op 1))
         (= tok (lex_sub offs))
         (if (== tok @TOK_END)
-            (return (make_expr head 0))
-            (return (make_expr head (cons (parse_expr tok offs) 0)))
+            (return (make_expr_user head 0))
+            (return (make_expr_user head (cons (parse_expr tok offs) 0)))
             )
         ))
     (return (parse_expr tok offs))
@@ -81,7 +81,7 @@
     (var e (parse_primary tok))
     (while (&& op_stack (< (associativity (caar op_stack)) @ASSOC_SECONDARY)) (do
         (var op (caar op_stack))
-        (= e (make_expr (field_get op 1) (list1 e)))
+        (= e (make_expr_user (field_get op 1) (list1 e)))
         (= op_stack (cdr op_stack))
         ))
     (= e (parse_secondary e offs))
@@ -140,19 +140,19 @@
     (var t (lex_sub offs))
     (if (== t '(') (do
         (var args (parse_comma_list (lex) ')'))
-        (= e (make_expr Apply (list2 e args)))
+        (= e (make_expr_user Apply (list2 e args)))
         (goto parse_secondary_loop)
         )
     (if (== t '[') (do
         (var args (parse_comma_list (lex) ']'))
-        (= e (make_expr Subscr (list2 e args)))
+        (= e (make_expr_user Subscr (list2 e args)))
         (goto parse_secondary_loop)
         )))
     (if (&& (== t '{') (== (node_type e) @SymbolE)) (do
         (var args (parse_comma_list (lex) '}'))
         (if (== e List)
             (return args)
-            (return (make_expr e args))
+            (return (make_expr_user e args))
             )
         ))
     (unput)
@@ -178,7 +178,7 @@
             (if (! e) break)
             (= args (cons e args))
             ))
-        (return (make_expr head (list_reverse args)))
+        (return (make_expr_user head (list_reverse args)))
         )
     (if (== t '(') (return (parse_tuple (lex)))
     (if (== t '[') (return (parse_list (lex)))
@@ -198,7 +198,7 @@
 (fun parse_tuple (t) (
     (var elems (parse_comma_list t ')'))
     (if (&& elems (== (cdr elems) 0)) (return (car elems)))
-    (return (make_expr Tuple elems))
+    (return (make_expr_user Tuple elems))
     ))
 
 (fun parse_list (t) (
@@ -235,7 +235,7 @@
         (= t (lex))
         (if (!= t '}') (goto parse_block_loop))
         ))
-    (return (make_expr Block (list_reverse elems)))
+    (return (make_expr_user Block (list_reverse elems)))
     ))
 
 (fun eat (tok expect) (
@@ -267,14 +267,14 @@
     (if (|| (== type @OP_PREFIX) (== type @OP_POSTFIX))
         (do
             (var arg (car exprs))
-            (var expr (make_expr (field_get op 1) (cons arg 0)))
+            (var expr (make_expr_user (field_get op 1) (cons arg 0)))
             (return (cons expr (cdr exprs)))
         )
     (if (== type @OP_INFIX)
         (do
             (var lhs (cadr exprs))
             (var rhs (car exprs))
-            (var expr (make_expr (field_get op 1) (cons lhs (cons rhs 0))))
+            (var expr (make_expr_user (field_get op 1) (cons lhs (cons rhs 0))))
             (return (cons expr (cddr exprs)))
         )
         ))
