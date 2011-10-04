@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-assemble.rlc 2011-10-03 10:48:08 nineties $
+; $Id: rowl1-assemble.rlc 2011-10-04 14:06:56 nineties $
 ;
 
 ; -- Just in time assembler
@@ -77,7 +77,7 @@
         )
     ))
 
-(fun get_address (c) (
+(export fun get_address (c) (
     (return (cvector_size (field_get c 1)))
     ))
 
@@ -145,10 +145,10 @@
     ))
 
 (export fun put_store_arg (c idx) (
-    (put_loadl c (* 4 (+ 2 idx)))
+    (put_storel c (* 4 (+ 2 idx)))
     ))
 
-(export fun put_storel (c idx) (
+(export fun put_store_lvar (c idx) (
     (tswitch idx (
         (0 . (do (put_storel0 c) return))
         (1 . (do (put_storel1 c) return))
@@ -163,7 +163,7 @@
         ))
     ))
 
-(export fun put_loadl (c idx) (
+(export fun put_load_lvar (c idx) (
     (tswitch idx (
         (0 . (do (put_loadl0 c) return))
         (1 . (do (put_loadl1 c) return))
@@ -208,11 +208,11 @@
         ))
     ))
 
-(export fun emit_byte (c v) (
+(fun emit_byte (c v) (
     (cvector_pushback (field_get c 1) v)
     ))
 
-(export fun emit_short (c v) (
+(fun emit_short (c v) (
     (var vec (field_get c 1))
     (cvector_pushback vec (& v 0xff))
     (cvector_pushback vec (>> v 8))
@@ -234,6 +234,25 @@
     (var offs (cvector_size (field_get c 1)))
     (ivector_pushback (field_get c 4) offs)
     (emit_int c obj)
+    ))
+
+(export fun put_operand_byte (c addr v) (
+    (var vec (field_get c 1))
+    (cvector_put vec addr (& v 0xff))
+    ))
+
+(export fun put_operand_short (c addr v) (
+    (var vec (field_get c 1))
+    (cvector_put vec addr (& v 0xff))
+    (cvector_put vec (+ addr 1) (& (>> v 8) 0xff))
+    ))
+
+(export fun put_operand_int (c addr v) (
+    (var vec (field_get c 1))
+    (cvector_put vec addr (& v 0xff))
+    (cvector_put vec (+ addr 1) (& (>> v 8) 0xff))
+    (cvector_put vec (+ addr 2) (& (>> v 16) 0xff))
+    (cvector_put vec (+ addr 3) (& (>> v 24) 0xff))
     ))
 
 (export fun fresh_label (c) (
