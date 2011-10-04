@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2011-10-03 17:24:38 nineties $
+; $Id: rowl1-compile.rlc 2011-10-04 14:16:51 nineties $
 ;
 
 (import "rlvm-compile")
@@ -44,6 +44,10 @@
     (var idx (field_get env 2))
     (field_set env 2 (+ idx 1))
     (return idx)
+    ))
+
+(fun get_lvar_num (env) (
+    (return (field_get env 2))
     ))
 
 (fun reset_lvar_index (env) (
@@ -157,15 +161,17 @@
     (var asm_body (make_assembler))
     (var code (bytecode 0 0 0 0))
 
-    (reset_lvar_index env)
-    (= args (setup_args env args))
-    (var count (+ (count_lvar args) (count_lvar body)))
     (var ent (add_function (get_vartable env) sym args code))
 
+    (reset_lvar_index env)
     (push_env env)
-    (put_allocate asm_body count)
+    (= args (setup_args env args))
+
+    (var cnt_addr (get_address asm_body))
+    (put_allocate asm_body 0)
     (compile asm_body env body)
     (put_ireturn asm_body)
+    (put_operand_byte asm_body (+ cnt_addr 1) (get_lvar_num env))
     (pop_env env)
 
     (set_code code asm_body)
@@ -182,15 +188,17 @@
     (var asm_body (make_assembler))
     (var code (bytecode 0 0 0 0))
 
-    (reset_lvar_index env)
-    (= args (setup_args env args))
-    (var count (+ (count_lvar args) (count_lvar body)))
     (var ent (append_function (get_vartable env) sym args code))
 
+    (reset_lvar_index env)
     (push_env env)
-    (put_allocate asm_body count)
+    (= args (setup_args env args))
+
+    (var cnt_addr (get_address asm_body))
+    (put_allocate asm_body 0)
     (compile asm_body env body)
     (put_ireturn asm_body)
+    (put_operand_byte asm_body (+ cnt_addr 1) (get_lvar_num env))
     (pop_env env)
 
     (set_code code asm_body)
@@ -248,6 +256,10 @@
     ))
 
 (fun var_loc (info) (
+    (var hd (expr_head info))
+    (if (|| (== hd ListAt) (== hd ExprAt))
+        (return (var_loc (expr_arg info 0)))
+        )
     (return (expr_arg info 1))
     ))
 
@@ -256,7 +268,7 @@
     ))
 
 (export fun make_arg (idx) (
-    (return (make_expr Argument (list1 (box idx))))
+    (return (make_expr Argument (list2 (box idx) current_loc)))
     ))
 
 (export fun make_list_at (obj idx) (
@@ -265,51 +277,6 @@
 
 (export fun make_expr_at (obj idx) (
     (return (make_expr ExprAt (list2 obj (box idx))))
-    ))
-
-(fun count_lvar (expr) (
-    (if (|| (is_atom_type expr) (! expr)) (return 0))
-    (var hd (expr_head expr))
-    (var args (expr_args expr))
-    (var count 0)
-    (if (!= hd Quote)
-        (do
-            (while args (do
-                (+= count (count_lvar (car args)))
-                (= args (cdr args))
-                ))
-            (if (== hd DefineVariable) (return (+ 1 count)))
-            (return count)
-        )
-        (do
-            (while args (do
-                (+= count (count_lvar_quote (car args)))
-                (= args (cdr args))
-                ))
-            (return count)
-        ))
-    ))
-
-(fun count_lvar_quote (expr) (
-    (if (|| (is_atom_type expr) (! expr)) (return 0))
-    (var hd (expr_head expr))
-    (var args (expr_args expr))
-    (var count 0)
-    (if (== hd Unquote)
-        (do
-            (while args (do
-                (+= count (count_lvar (car args)))
-                (= args (cdr args))
-                ))
-            (return count)
-        )
-        (do
-            (while args (do
-                (+= count (count_lvar_quote (car args)))
-                (= args (cdr args))
-                ))
-            (return count)
-        ))
     ))
 
 (fun compile_define_global_variable (sym val) (
@@ -334,7 +301,7 @@
             (check_redefinition tbl sym)
             (var idx (new_lvar_index env))
             (compile asm env val)
-            (put_storel asm idx)
+            (put_store_lvar asm idx)
             (symtable_add tbl sym -1 (make_lvar idx))
         ))
     ))
@@ -360,7 +327,7 @@
         return
         ))
     (if (== ty LocalVariable) (do
-        (put_loadl asm (expr_arg_int info 0))
+        (put_load_lvar asm (expr_arg_int info 0))
         return
         ))
     (if (== ty Argument) (do
@@ -500,6 +467,7 @@
     ))
 
 (fun put_if_true (asm lbl) (
+    (put_push asm true)
     (put_if_eq asm lbl)
     ))
 
@@ -631,56 +599,88 @@
     (put_if_false asm exit)
     ))
 
-;;;;;;;;;; obsolete
-
-
-(fun compile__ (asm env expr) (
-    ;(var hd (expr_head expr))
-    ;(if (== hd While)
-    ;    (compile_while asm env (expr_arg expr 0) (expr_arg expr 1))
-    ;(if (== hd Assign)
-    ;    (compile_assign asm env Nil (expr_arg expr 0) (expr_arg expr 1))
-    ;(if (== hd PlusAssign)
-    ;    (compile_assign asm env Plus (expr_arg expr 0) (expr_arg expr 1))
-    ;(if (== hd MinusAssign)
-    ;    (compile_assign asm env Minus (expr_arg expr 0) (expr_arg expr 1))
-    ;(if (== hd TimesAssign)
-    ;    (compile_assign asm env Times (expr_arg expr 0) (expr_arg expr 1))
-    ;(if (== hd DivideAssign)
-    ;    (compile_assign asm env Divide (expr_arg expr 0) (expr_arg expr 1))
-    ;(if (== hd ModAssign)
-    ;    (compile_assign asm env Mod (expr_arg expr 0) (expr_arg expr 1))
-    ;    (do
-    ;        (output_error stderr)
-    ;        (output_string stderr "unknown expression '")
-    ;        (pretty_print stderr expr)
-    ;        (output_string stderr "'\n")
-    ;        (exit 1)
-    ;    )))))))))))))))
+; translate
+;
+;   While{cnd, body}
+;
+; to
+;
+;   if (not c) goto exit
+; head:
+;   body
+;   if (c) goto head
+; exit:
+;
+(fun compile_while (asm env expr) (
+    (var cnd (expr_arg expr 0))
+    (var body (expr_arg expr 1))
+    (var exit_lbl (fresh_label asm))
+    (var head_lbl (fresh_label asm))
+    (compile asm env cnd)
+    (put_if_false asm exit_lbl)
+    (set_label asm head_lbl)
+    (compile asm env body)
+    (put_drop asm)
+    (compile asm env cnd)
+    (put_if_true asm head_lbl)
+    (set_label asm exit_lbl)
+    (put_nil asm)
     ))
 
-(fun compile_call (asm env fun args) (
-    (= args (list_reverse args))
-    (var arity 0)
-    (while args (do
-        (compile asm env (car args))
-        (= args (cdr args))
-        (incr arity)
-        ))
+(fun compile_assign (asm env expr) (
+    (compile_assign_main asm env Nil (expr_arg expr 0) (expr_arg expr 1))
+    ))
+(fun compile_plus_assign (asm env expr) (
+    (compile_assign_main asm env (to_sym "Plus") (expr_arg expr 0) (expr_arg expr 1))
+    ))
+(fun compile_minus_assign (asm env expr) (
+    (compile_assign_main asm env (to_sym "Minus") (expr_arg expr 0) (expr_arg expr 1))
+    ))
+(fun compile_times_assign (asm env expr) (
+    (compile_assign_main asm env (to_sym "Times") (expr_arg expr 0) (expr_arg expr 1))
+    ))
+(fun compile_divide_assign (asm env expr) (
+    (compile_assign_main asm env (to_sym "Divide") (expr_arg expr 0) (expr_arg expr 1))
+    ))
+(fun compile_mod_assign (asm env expr) (
+    (compile_assign_main asm env (to_sym "Mod") (expr_arg expr 0) (expr_arg expr 1))
+    ))
 
-    (if (== (node_type fun) @SymbolE)
-        (do
-            (var code (lookup_func fun arity))
-            (put_push asm code)
-            (put_jcall asm (* 4 arity))
+(fun compile_assign_main (asm env op lhs rhs) (
+    (if (== op Nil)
+        (compile asm env rhs)
+        (compile asm env (make_expr op (list2 lhs rhs)))
         )
-        (do
-            (put_imm_int asm arity)
-            (compile asm env fun)
-            (put_imm_int32 asm lookup_func)
-            (put_dcall asm 8)
-            (put_jcall asm (* 4 arity))
+    (var v (symtable_find (get_vartable env) lhs -1))
+    (if (== v 0) (do
+        (output_error stderr)
+        (output_string stderr "undefined variable `")
+        (pretty_print stderr lhs)
+        (output_string stderr "'\n")
+        (exit 1)
         ))
+    (var vty (expr_head v))
+    (if (== vty GlobalVariable) (do
+        (put_push asm (expr_args v))
+        (put_setcar asm)
+        )
+    (if (== vty LocalVariable) (do
+        (put_store_lvar asm (expr_arg_int v 0))
+        return
+        )
+    (if (== vty Argument) (do
+        (put_store_arg asm (expr_arg_int v 0))
+        return
+        ))))
+    (output_error stderr)
+    (pretty_print stderr lhs)
+    (output_string stderr " is not lvalue\n")
+    (exit 1)
+    ))
+
+(fun compile_return (asm env expr) (
+    (compile asm env (expr_arg expr 0))
+    (put_ireturn asm)
     ))
 
 (export fun compile_simple_function (asm arity func) (
@@ -702,66 +702,6 @@
             (put_imm_int32 asm func)
             (put_dcall asm (* 4 arity))
         ))
-    ))
-
-
-; while (c) body
-; =>
-; if (not c) goto exit
-; label head
-; body
-; if (c) goto head
-; label exit
-(fun compile_while (asm env cnd body) (
-    (var exit_lbl (fresh_label asm))
-    (var head_lbl (fresh_label asm))
-    (put_nil asm)
-    (compile asm env cnd)
-    (put_if_false asm exit_lbl)
-    (set_label asm head_lbl)
-    (put_drop asm)
-    (compile asm env body)
-    (compile asm env cnd)
-    (put_if_true asm head_lbl)
-    (set_label asm exit_lbl)
-    ))
-
-(fun compile_assign (asm env op lhs rhs) (
-    (var hd (expr_head lhs))
-    (if (== op Nil)
-        (compile asm env rhs)
-        (compile asm env (make_expr op (list2 lhs rhs)))
-        )
-    (if (== hd Symbol) (do
-        (var v (symtable_find (struct_at env 0) lhs -1))
-        (if v
-            (compile_local_assign asm env op v lhs)
-            ;(compile_global_assign asm env op (find_global_variable lhs) lhs)
-            )
-        return
-        ))
-    (not_implemented "compile_assign")
-    ))
-
-(fun compile_local_assign (asm env op loc sym) (
-    (var vty (expr_head loc))
-    ;(if (== vty variable) (do
-    ;    (put_storel asm (expr_arg_int loc 0))
-    ;    return
-    ;    ))
-    ;(if (== vty argument) (do
-    ;    (put_store_arg asm (expr_arg_int loc 0))
-    ;    return
-    ;    ))
-    (output_error stderr)
-    (pretty_print stderr sym)
-    (output_string stderr " is not lvalue\n")
-    (exit 1)
-    ))
-
-(fun compile_global_assign (asm env op info sym) (
-    (put_push asm info)
-    (put_setcar asm)
     ))
 
 (extern fun compile_matching_hook)
@@ -875,6 +815,14 @@
     (add_compiler tbl (make_expr If (list2 DontCare DontCare)) compile_if)
     (add_compiler tbl (make_expr Else (list2
         (make_expr If (list2 DontCare DontCare)) DontCare)) compile_ifelse)
+    (add_compiler tbl (make_expr While (list2 DontCare DontCare)) compile_while)
+    (add_compiler tbl (make_expr (to_sym "Assign") (list2 symT DontCare)) compile_assign)
+    (add_compiler tbl (make_expr (to_sym "PlusAssign") (list2 symT DontCare)) compile_plus_assign)
+    (add_compiler tbl (make_expr (to_sym "MinusAssign") (list2 symT DontCare)) compile_minus_assign)
+    (add_compiler tbl (make_expr (to_sym "TimesAssign") (list2 symT DontCare)) compile_times_assign)
+    (add_compiler tbl (make_expr (to_sym "DivideAssign") (list2 symT DontCare)) compile_divide_assign)
+    (add_compiler tbl (make_expr (to_sym "ModAssign") (list2 symT DontCare)) compile_mod_assign)
+    (add_compiler tbl (make_expr (to_sym "Return") (list1 DontCare)) compile_return)
     ))
 
 (export fun add_compiler (tbl pat func) (
