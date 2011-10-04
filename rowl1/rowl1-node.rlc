@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2011-10-03 23:23:06 nineties $
+; $Id: rowl1-node.rlc 2011-10-05 00:56:34 nineties $
 ;
 
 (import "rlvm-compile")
@@ -16,6 +16,7 @@
 ; symbol table (symbols are globally unique)
 (var symbol_table (make_idtable))
 (var symbol_index_gen 0)
+(var builtin_symbol_index_gen -1)
 
 ; builtin expression headers and types
 (export var Nil         0)
@@ -24,11 +25,12 @@
 (export var true        (to_sym "true"))
 (export var false       (to_sym "false"))
 
-(export var Symbol      (to_sym "Symbol"))
-(export var Int         (to_sym "Int"))
-(export var Float       (to_sym "Float"))
-(export var String      (to_sym "String"))
-(export var List        (to_sym "List"))
+(export var Symbol      (to_builtin_sym "Symbol"))
+(export var Int         (to_builtin_sym "Int"))
+(export var Float       (to_builtin_sym "Float"))
+(export var String      (to_builtin_sym "String"))
+(export var List        (to_builtin_sym "List"))
+(export var Tuple       (to_sym "Tuple"))
 (export var Eval        (to_sym "Eval"))
 (export var Block       (to_sym "Block"))
 (export var Apply       (to_sym "Apply"))
@@ -58,12 +60,21 @@
 (export var AppendFunction (to_sym "AppendFunction"))
 (export var DefineVariable (to_sym "DefineVariable"))
 
-(export var Function       (to_sym "Function")) ; Function{code, defs}
-(export var Assembler      (to_sym "Assembler"))
-(export var Environment    (to_sym "Environment"))
-(export var Bytecode       (to_sym "Bytecode"))
-(export var Tuple          (to_sym "Tuple"))
-(export var Builtin        (to_sym "Builtin"))
+(export var Function    (to_sym "Function")) ; Function{code, defs}
+(export var Assembler   (to_builtin_sym "Assembler"))
+(export var Environment (to_builtin_sym "Environment"))
+(export var Bytecode    (to_builtin_sym "Bytecode"))
+(export var Builtin     (to_builtin_sym "Builtin"))
+
+(fun to_builtin_sym (name) (
+    (var sym (idtable_find symbol_table name))
+    (if sym (return sym))
+    (= name (strdup name))
+    (= sym (variant @SymbolE 1 name builtin_symbol_index_gen))
+    (-= builtin_symbol_index_gen 1)
+    (idtable_add symbol_table name sym)
+    (return sym)
+    ))
 
 (export fun to_sym (name) (
     (var sym (idtable_find symbol_table name))
@@ -73,6 +84,13 @@
     (+= symbol_index_gen 1)
     (idtable_add symbol_table name sym)
     (return sym)
+    ))
+
+(fun is_builtin_sym (sym) (
+    (if (< (field_get sym 2) 0)
+        (return @TRUE)
+        (return @FALSE)
+        )
     ))
 
 (export fun symbol_name (sym) (
@@ -267,6 +285,17 @@
     ))
 
 (export fun make_expr (head args) (
+    (return (variant @ExprE 2 head args))
+    ))
+
+(export fun make_expr_user (head args) (
+    (if (is_builtin_sym head) (do
+        (output_error stderr)
+        (output_string stderr "can not create builtin object: ")
+        (pretty_print stderr head)
+        (output_string stderr "{..}\n")
+        (exit 1)
+        ))
     (return (variant @ExprE 2 head args))
     ))
 

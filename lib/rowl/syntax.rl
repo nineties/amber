@@ -1,6 +1,6 @@
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.rl 2011-10-03 18:47:00 nineties $
+# $Id: syntax.rl 2011-10-04 21:08:56 nineties $
 
 # Syntax definition of rowl language
 
@@ -52,3 +52,6 @@ constr(While,        "while")
 constr(For,          "for")
 command(Return,      "return")
 infixl(Else,         "else", 18)
+
+true: `true
+false: `false
