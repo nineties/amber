@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-io.rlc 2011-10-03 12:11:08 nineties $
+; $Id: rowl1-io.rlc 2011-10-04 19:13:34 nineties $
 ;
 
 (import "rlvm-compile")
@@ -13,28 +13,12 @@
 (import "rowl1-node")
 (import "rowl1-compile")
 
-(fun io_pretty_print (obj) (
-    (pretty_print stdout obj)
-    (output_char stdout '\n')
-    (return Nil)
-    ))
-
-(fun io_pretty_print_full (obj flag) (
-    (pretty_print_full stdout obj)
-    (output_char stdout '\n')
-    (return Nil)
-    ))
-
-(fun eof_error () (
-    (output_error stderr)
-    (output_string stderr "End of file\n")
-    (exit 1)
-    ))
-
 ; single character is represented as a string of one character
 (fun io_read_char () (
     (var c)
-    (if (< (read_char (address c)) 0) (eof_error))
+    (if (< (read_char (address c)) 0)
+        (return (to_sym "eof"))
+        )
     (var s (allocate_string 1))
     (strncpy s (address c) 1)
     (return s)
@@ -42,23 +26,34 @@
 
 (fun io_read_string () (
     (var s)
-    (if (< (read_string (address s)) 0) (eof_error))
+    (if (< (read_string (address s)) 0)
+        (return (to_sym "eof"))
+        )
     (return s)
     ))
 
 (fun io_read_line () (
     (var s)
-    (if (< (read_line (address s)) 0) (eof_error))
+    (if (< (read_line (address s)) 0)
+        (return (to_sym "eof"))
+        )
     (return s)
     ))
 
 (fun io_read_int () (
     (var n)
-    (if (< (read_int (address n)) 0) (eof_error))
+    (if (< (read_int (address n)) 0)
+        (return (to_sym "eof"))
+        )
     (return (box n))
     ))
 
-(fun io_print_string (s) (
+(fun io_print (s) (
+    (pretty_print stdout s)
+    (return Nil)
+    ))
+
+(fun io_print_str (s) (
     (print_string s)
     (return Nil)
     ))
@@ -68,17 +63,21 @@
     (return Nil)
     ))
 
+(fun io_print_full (s) (
+    (pretty_print_full stdout s)
+    (return Nil)
+    ))
+
 (export fun setup_io (env) (
     (var tbl (get_vartable env))
-    (add_builtin_function1 tbl (to_sym "pretty_print") DontCare io_pretty_print)
-    (add_builtin_function2 tbl (to_sym "pretty_print") DontCare (symbolP (to_sym "fullform"))
-        io_pretty_print_full)
+    (add_builtin_function1 tbl (to_sym "print") DontCare io_print)
+    (add_builtin_function1 tbl (to_sym "print") (headP String) io_print_str)
+    (add_builtin_function1 tbl (to_sym "print") (headP Int) io_print_int)
+    (add_builtin_function2 tbl (to_sym "print") DontCare (symbolP (to_sym "fullform")) io_print_full)
     (add_builtin_function0 tbl (to_sym "read_char") io_read_char)
     (add_builtin_function0 tbl (to_sym "read_string") io_read_string)
     (add_builtin_function0 tbl (to_sym "read_line") io_read_line)
     (add_builtin_function0 tbl (to_sym "read_int") io_read_int)
-    (add_builtin_function1 tbl (to_sym "print") (headP Int) io_print_int)
-    (add_builtin_function1 tbl (to_sym "print") (headP String) io_print_string)
     ))
 
     ))
