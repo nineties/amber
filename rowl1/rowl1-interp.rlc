@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2011-10-04 11:06:34 nineties $
+; $Id: rowl1-interp.rlc 2011-10-05 16:05:11 nineties $
 ;
 
 (import "rlvm-compile")
@@ -30,10 +30,6 @@
 
 (export fun pop_exec_env () (
     (pop_env exec_env)
-    ))
-
-(export fun init_interpreter () (
-    (= current_loc no_loc)
     ))
 
 (export fun interpret (env) (
@@ -69,5 +65,17 @@
     (close_in ichan)
     (return Nil)
     ))
+
+(fun compile_eval (asm env expr) (
+    (compile_quote_main asm env (expr_arg expr 0))
+    (compile_simple_call asm 1 eval)
+    ))
+
+(export fun setup_interpreter (env) (
+    (= current_loc no_loc)
+    (var tbl (get_vartable env))
+    (add_compiler tbl (make_expr Eval (list1 DontCare)) compile_eval)
+    ))
+
 
     ))

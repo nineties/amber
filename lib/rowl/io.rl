@@ -1,6 +1,6 @@
 # Copyright (C) 2010 nineties
 #
-# $Id: io.rl 2011-10-05 04:25:39 nineties $
+# $Id: io.rl 2011-10-05 14:50:54 nineties $
 
 print(obj): print(stdout, obj)
 print(`fullform, obj): print(stdout, `fullform, obj)
@@ -17,6 +17,6 @@ puts(obj): {
 
 puts(io, obj): {
     print(io, obj)
-    print('\n')
+    print(io, '\n')
 }
 
