@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2011-10-04 22:53:20 nineties $
+; $Id: rowl1-compile.rlc 2011-10-05 16:04:31 nineties $
 ;
 
 (import "rlvm-compile")
@@ -75,7 +75,6 @@
 (extern fun set_loc)
 (extern fun push_exec_env)
 (extern fun pop_exec_env)
-(extern fun eval)
 
 (fun undefined_error (sym arity) (
     (output_error stderr)
@@ -348,11 +347,6 @@
     (not_reachable "compile_operand")
     ))
 
-(fun compile_eval (asm env expr) (
-    (compile_quote_main asm env (expr_arg expr 0))
-    (compile_simple_call asm 1 eval)
-    ))
-
 (fun compile_var (asm env expr) (
     (var v (symtable_find (get_vartable env 0) expr -1))
     (if v
@@ -389,7 +383,7 @@
         ))
     ))
 
-(fun compile_quote_main (asm env expr) (
+(export fun compile_quote_main (asm env expr) (
     (var hd (expr_head expr))
     (if (== hd Symbol)
         (put_push asm expr)
@@ -837,7 +831,6 @@
     (add_compiler tbl (make_expr AppendFunction
         (list2 (make_expr Apply (list2 symT listT)) DontCare)) compile_append_function)
     (add_compiler tbl (make_expr DefineVariable (list2 symT DontCare)) compile_define_variable)
-    (add_compiler tbl (make_expr Eval (list1 DontCare)) compile_eval)
     (add_compiler tbl (headP Symbol) compile_var)
     (add_compiler tbl (make_expr Apply (list2 DontCare listT)) compile_apply)
     (add_compiler tbl (make_expr Quote (list1 (make_expr Quote (list1 (make_expr Unquote (list1 DontCare)))))) compile_quote)

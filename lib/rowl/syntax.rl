@@ -1,12 +1,12 @@
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.rl 2011-10-04 21:08:56 nineties $
+# $Id: syntax.rl 2011-10-05 16:05:27 nineties $
 
 # Syntax definition of rowl language
 
 DefineSyntax{Rewrite, InfixR{"=>", 20}}
 DefineSyntax{Unquote, Prefix{"$", 3}}
-DefineSyntax{Quote, Prefix{"`", 2}}
+DefineSyntax{Quote, Prefix{"`", 3}}
 DefineSyntax{HeadP, InfixL{"@", 4}}
 DefineSyntax{DefineExpr, InfixR{":", 19}}
 
@@ -15,12 +15,12 @@ DefineFunction{Compile(_, _, x => y), Eval{AppendFunction{Compile(out, env, $x),
 Apply{f@Symbol, args@List}: body => DefineFunction{Apply{$f, $args}, $body}
 x@Symbol: value => DefineVariable{$x, $value}
 
-`infixl(head@Symbol, repr@String, assoc@Int)  => DefineSyntax{$head, InfixL{$repr, $assoc}}
-`infixr(head@Symbol, repr@String, assoc@Int)  => DefineSyntax{$head, InfixR{$repr, $assoc}}
-`prefix(head@Symbol, repr@String, assoc@Int)  => DefineSyntax{$head, Prefix{$repr, $assoc}}
-`postfix(head@Symbol, repr@String, assoc@Int) => DefineSyntax{$head, Postfix{$repr, $assoc}}
-`constr(head@Symbol, repr@String)             => DefineSyntax{$head, Constr{$repr}}
-`command(head@Symbol, repr@String)            => DefineSyntax{$head, Command{$repr}}
+(`infixl)(head@Symbol, repr@String, assoc@Int)  => DefineSyntax{$head, InfixL{$repr, $assoc}}
+(`infixr)(head@Symbol, repr@String, assoc@Int)  => DefineSyntax{$head, InfixR{$repr, $assoc}}
+(`prefix)(head@Symbol, repr@String, assoc@Int)  => DefineSyntax{$head, Prefix{$repr, $assoc}}
+(`postfix)(head@Symbol, repr@String, assoc@Int) => DefineSyntax{$head, Postfix{$repr, $assoc}}
+(`constr)(head@Symbol, repr@String)             => DefineSyntax{$head, Constr{$repr}}
+(`command)(head@Symbol, repr@String)            => DefineSyntax{$head, Command{$repr}}
 
 prefix(UnaryPlus,    "+",  5)
 prefix(UnaryMinus,   "-",  5)
@@ -52,6 +52,7 @@ constr(While,        "while")
 constr(For,          "for")
 command(Return,      "return")
 infixl(Else,         "else", 18)
+command(Import, "import")
 
 true: `true
 false: `false
