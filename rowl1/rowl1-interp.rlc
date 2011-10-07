@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2011-10-05 16:05:11 nineties $
+; $Id: rowl1-interp.rlc 2011-10-07 04:11:41 nineties $
 ;
 
 (import "rlvm-compile")
@@ -24,21 +24,31 @@
 
 (export var exec_env null)
 
+(export fun init_exec_env () (
+    (= exec_env (make_env))
+    ))
 (export fun push_exec_env () (
     (push_env exec_env)
     ))
-
 (export fun pop_exec_env () (
     (pop_env exec_env)
     ))
 
-(export fun interpret (env) (
-    (= exec_env env)
+(export fun interpret () (
     (while 1 (do
         (var e (parse))
         (if (! e) break)
+        (output_string stderr "eval:")
+        (pretty_print stderr e)
+        (output_char stderr '\n')
+        (output_string stderr "end\n")
         (eval e)
         ))
+    ))
+
+(var import_dirs 0)
+(export fun add_import_dir (path) (
+    (= import_dirs (cons path import_dirs))
     ))
 
 (export fun eval (expr) (
@@ -48,33 +58,71 @@
     (byterun (get_code asm))
     ))
 
-(export fun import_module (env file) (
-    ; XXX: should not hard code the path of libraries
-    (var script_path (build_path "/usr/lib/rowl/" file ".rl"))
-    (if (! (file_exists script_path)) (do
-        (output_error stderr)
-        (output_string stderr "package `")
-        (output_string stderr file)
-        (output_string stderr "' was not found\n")
-        (exit 1)
-        ))
-    (var ichan (open_in script_path))
-    (push_parser script_path ichan)
-    (interpret env)
-    (pop_parser)
-    (close_in ichan)
-    (return Nil)
-    ))
-
 (fun compile_eval (asm env expr) (
     (compile_quote_main asm env (expr_arg expr 0))
     (compile_simple_call asm 1 eval)
     ))
 
-(export fun setup_interpreter (env) (
+(export fun import_module_direct (orig path) (
+    (output_string stderr "hoge\n")
+    (var dir import_dirs)
+    (while dir (do
+        (var fullpath (build_path (car dir) path ".rl"))
+        (output_string stderr fullpath)
+        (output_char stderr '\n')
+        (if (file_exists fullpath) (do
+            (var ichan (open_in fullpath))
+            (output_string stderr "foo\n")
+            (push_parser fullpath ichan)
+            (output_string stderr "bar\n")
+            (interpret)
+            (output_string stderr "baz\n")
+            (pop_parser)
+            (output_string stderr "piyo\n")
+            (close_in ichan)
+            (return Nil)
+            ))
+        (= dir (cdr dir))
+        ))
+    (output_error stderr)
+    (output_string stderr "module `")
+    (if orig
+        (pretty_print stderr orig)
+        (output_string stderr path)
+        )
+    (output_string stderr "' was not found\n")
+    (exit 1)
+    ))
+
+(fun import_module (arg) (
+    (import_module_direct arg (construct_path arg))
+    ))
+
+(fun construct_path (arg) (
+    (var hd (expr_head arg))
+    (if (== hd String) (return arg)
+    (if (== hd Symbol) (return (symbol_name arg))
+    (if (&& (== hd (to_sym "Dot")) (== (expr_size arg) 2))
+        (return (strcat (strcat (construct_path (expr_arg arg 0)) "/")
+            (construct_path (expr_arg arg 1))))
+            )))
+    (output_error stderr)
+    (output_string stderr "invalid module: ")
+    (pretty_print stderr arg)
+    (output_char stderr '\n')
+    (exit 1)
+    ))
+
+(fun compile_import (asm env expr) (
+    (compile_quote_main asm env (expr_arg expr 0))
+    (compile_simple_call asm 1 import_module )
+    ))
+
+(export fun setup_interpreter () (
     (= current_loc no_loc)
-    (var tbl (get_vartable env))
+    (var tbl (get_vartable exec_env))
     (add_compiler tbl (make_expr Eval (list1 DontCare)) compile_eval)
+    (add_compiler tbl (make_expr (to_sym "Import") (list1 DontCare)) compile_import)
     ))
 
 
