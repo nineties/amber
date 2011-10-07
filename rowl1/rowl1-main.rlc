@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-main.rlc 2011-10-05 16:04:52 nineties $
+; $Id: rowl1-main.rlc 2011-10-07 03:47:05 nineties $
 ;
 
 (import "rlvm-compile")
@@ -40,13 +40,15 @@
 
 (extern fun make_env)
 (fun eval_file (file) (
-    (var env (make_env)) ; global environment
     (var ichan (open_in file))
-    (init_stdlib env)
+    (init_exec_env)
+    (init_stdlib)
     (init_parser file ichan)
-    (import_module env "rowl/syntax")
-    (import_module env "rowl/io")
-    (interpret env)
+    (add_import_dir "/usr/lib/rowl/")
+    (add_import_dir "./")
+    (import_module_direct Nil "rowl/syntax")
+    (import_module_direct Nil "rowl/io")
+    (interpret)
     (close_in ichan)
     ))
 
@@ -54,11 +56,11 @@
 (extern fun setup_numeric)
 (extern fun setup_io)
 
-(fun init_stdlib (env) (
-    (setup_interpreter env)
-    (setup_builtin_compilers env)
-    (setup_numeric env)
-    (setup_io env)
+(fun init_stdlib () (
+    (setup_interpreter)
+    (setup_builtin_compilers)
+    (setup_numeric)
+    (setup_io)
     ))
 
     ))
