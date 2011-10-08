@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2011-10-07 04:11:41 nineties $
+; $Id: rowl1-interp.rlc 2011-10-09 02:34:12 nineties $
 ;
 
 (import "rlvm-compile")
@@ -38,10 +38,6 @@
     (while 1 (do
         (var e (parse))
         (if (! e) break)
-        (output_string stderr "eval:")
-        (pretty_print stderr e)
-        (output_char stderr '\n')
-        (output_string stderr "end\n")
         (eval e)
         ))
     ))
@@ -64,22 +60,26 @@
     ))
 
 (export fun import_module_direct (orig path) (
-    (output_string stderr "hoge\n")
     (var dir import_dirs)
     (while dir (do
         (var fullpath (build_path (car dir) path ".rl"))
-        (output_string stderr fullpath)
-        (output_char stderr '\n')
         (if (file_exists fullpath) (do
+            (if (is_already_imported exec_env fullpath)
+                (return Nil)
+                )
+            (add_imported_module exec_env fullpath)
+
             (var ichan (open_in fullpath))
-            (output_string stderr "foo\n")
+            (var fd (open "."))
+            (chdir (get_directory fullpath))
+
             (push_parser fullpath ichan)
-            (output_string stderr "bar\n")
             (interpret)
-            (output_string stderr "baz\n")
             (pop_parser)
-            (output_string stderr "piyo\n")
+
+            (fchdir fd)
             (close_in ichan)
+
             (return Nil)
             ))
         (= dir (cdr dir))

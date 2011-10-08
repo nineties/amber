@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-util.rlc 2011-01-12 22:31:26 nineties $
+; $Id: rowl1-util.rlc 2011-10-09 02:26:27 nineties $
 ;
 
 (import "rlvm-compile")
@@ -173,6 +173,22 @@
     (strcpy (+ path prefix_len) name)
     (strcpy (+ path (+ prefix_len name_len)) ext)
     (return path)
+    ))
+
+(export fun get_directory (path) (
+    (var len (- (strlen path) 1))
+    (var dir (strdup path))
+    (while (> len 0) (do
+        (if (== (array_get char dir len) '/') (do
+            (array_set char dir len 0)
+            break
+            ))
+        (-= len 1)
+        ))
+    (if (== len 0) (do
+        (return (string "."))
+        ))
+    (return dir)
     ))
 
 (export fun not_reachable (name) (
