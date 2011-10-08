@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2011-10-05 04:03:09 nineties $
+; $Id: rowl1-node.rlc 2011-10-08 03:35:59 nineties $
 ;
 
 (import "rlvm-compile")
@@ -617,4 +617,68 @@
     (output_char ochan '}')
     ))
 
+(export fun make_env () (
+    (return (variant @EnvironmentE 2
+        (make_symtable) ; function and variable table
+        0 ; imported module list
+        0 ; local variable count
+	))
+    ))
+
+(export fun clone_env (env) (
+    (var tbl (get_vartable env))
+    (return (variant @EnvironmentE 1
+        (symtable_clone tbl)
+        (field_get env 3)
+        ))
+    ))
+
+(export fun get_vartable (env) (
+    (return (field_get env 1))
+    ))
+
+(export fun new_lvar_index (env) (
+    (var idx (field_get env 3))
+    (field_set env 3 (+ idx 1))
+    (return idx)
+    ))
+
+(export fun get_lvar_num (env) (
+    (return (field_get env 3))
+    ))
+
+(export fun reset_lvar_index (env) (
+    (field_set env 3 0)
+    ))
+
+(export fun push_env (env) (
+    (symtable_push (field_get env 1))
+    ))
+
+(export fun pop_env (env) (
+    (symtable_pop (field_get env 1))
+    ))
+
+(export fun is_global_env (env) (
+    (if (== (symtable_depth (get_vartable env)) 1)
+        (return @TRUE)
+        (return @FALSE)
+        )
+    ))
+
+(export fun is_already_imported (env path) (
+    (var list (field_get env 2))
+    (while list (do
+        (if (streq path (car list))
+            (return @TRUE)
+            )
+        (= list (cdr list))
+        ))
+    (return @FALSE)
+    ))
+
+(export fun add_imported_module (env path) (
+    ; XXX: fixme. canonicalize the `path'
+    (field_set env 2 (cons path (field_get env 2)))
+    ))
     ))

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-io.rlc 2011-09-28 16:54:25 nineties $
+; $Id: vm-prim-io.rlc 2011-10-09 02:27:32 nineties $
 ;
 
 (import "stdlib")
@@ -12,6 +12,8 @@
 (var SYS_WRITE 4)
 (var SYS_OPEN 5)
 (var SYS_CLOSE 6)
+(var SYS_CHDIR 12)
+(var SYS_FCHDIR 133)
 
 (var O_RDONLY 0)
 (var O_WRONLY 1)
@@ -56,6 +58,28 @@
 (fun prim_get_stdin  () ((return stdin)))
 (fun prim_get_stdout () ((return stdout)))
 (fun prim_get_stderr () ((return stderr)))
+
+(export prim_open)
+(fun prim_open (path) (
+    (int fd (syscall @SYS_OPEN path @O_RDONLY))
+    (if (< fd 0) ((open_error path)))
+    (return fd)
+    ))
+
+(export prim_close)
+(fun prim_close (fd) (
+    (syscall @SYS_CLOSE fd)
+    ))
+
+(export prim_chdir)
+(fun prim_chdir (path) (
+    (syscall @SYS_CHDIR path)
+    ))
+
+(export prim_fchdir)
+(fun prim_fchdir (fd) (
+    (syscall @SYS_FCHDIR fd)
+    ))
 
 ; ichan = (buf, fd, beg, end)
 (fun make_ichan (fd) (

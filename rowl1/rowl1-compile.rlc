@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2011-10-07 04:07:40 nineties $
+; $Id: rowl1-compile.rlc 2011-10-08 02:08:45 nineties $
 ;
 
 (import "rlvm-compile")
@@ -21,60 +21,10 @@
 (var ListAt (to_sym "ListAt"))
 (var ExprAt (to_sym "ExprAt"))
 
-(export fun make_env () (
-    (return (variant @EnvironmentE 1
-        (make_symtable) ; function and variable table
-        0 ; local variable count
-	))
-    ))
-
-(export fun clone_env (env) (
-    (var tbl (get_vartable env))
-    (return (variant @EnvironmentE 1
-        (symtable_clone tbl)
-        (field_get env 2)
-        ))
-    ))
-
-(export fun get_vartable (env) (
-    (return (field_get env 1))
-    ))
-
-(fun new_lvar_index (env) (
-    (var idx (field_get env 2))
-    (field_set env 2 (+ idx 1))
-    (return idx)
-    ))
-
-(fun get_lvar_num (env) (
-    (return (field_get env 2))
-    ))
-
-(fun reset_lvar_index (env) (
-    (field_set env 2 0)
-    ))
-
-(export fun push_env (env) (
-    (symtable_push (field_get env 1))
-    ))
-
-(export fun pop_env (env) (
-    (symtable_pop (field_get env 1))
-    ))
-
-(fun is_global_env (env) (
-    (if (== (symtable_depth (get_vartable env)) 1)
-        (return @TRUE)
-        (return @FALSE)
-        )
-    ))
-
 ; compilers
 (extern object current_loc)
 (extern object exec_env)
 (extern fun set_loc)
-(extern fun push_exec_env)
-(extern fun pop_exec_env)
 
 (fun undefined_error (sym arity) (
     (output_error stderr)
