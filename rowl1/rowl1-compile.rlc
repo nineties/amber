@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2011-10-08 02:08:45 nineties $
+; $Id: rowl1-compile.rlc 2011-10-11 00:57:33 nineties $
 ;
 
 (import "rlvm-compile")
@@ -108,7 +108,7 @@
     (var sym (expr_arg lhs 0))
     (var args (expr_arg_list lhs 1))
     (var asm_body (make_assembler))
-    (var code (bytecode 0 0 0 0))
+    (var code (allocate_bytecode))
 
     (var ent (add_function (get_vartable env) sym args code))
 
@@ -135,7 +135,7 @@
     (var sym (expr_arg lhs 0))
     (var args (expr_arg_list lhs 1))
     (var asm_body (make_assembler))
-    (var code (bytecode 0 0 0 0))
+    (var code (allocate_bytecode))
 
     (var ent (append_function (get_vartable env) sym args code))
 
@@ -324,9 +324,7 @@
 
     (if (== (node_type fun) @SymbolE)
         (do
-            (var code (lookup_func (get_vartable env) fun arity))
-            (put_push asm code)
-            (put_jcall asm (* 4 arity))
+            (compile_call asm env arity fun)
         )
         (do
             (not_implemented "compile_apply")
@@ -380,23 +378,6 @@
             (compile asm env (car expr))
             (put_cons asm)
         ))
-    ))
-
-(export fun compile_unary (asm env expr name) (
-    (var code (lookup_func (get_vartable env) (to_sym name) 1))
-    (check_arg_size name 1 expr)
-    (compile asm env (expr_arg expr 0))
-    (put_push asm code)
-    (put_jcall asm 4)
-    ))
-
-(export fun compile_binary (asm env expr name) (
-    (var code (lookup_func (get_vartable env) (to_sym name) 2))
-    (check_arg_size name 2 expr)
-    (compile asm env (expr_arg expr 1))
-    (compile asm env (expr_arg expr 0))
-    (put_push asm code)
-    (put_jcall asm 8)
     ))
 
 (fun compile_block (asm env expr) (
@@ -664,6 +645,12 @@
     (put_ireturn asm)
     ))
 
+(export fun compile_call (asm env arity sym) (
+    (var code (lookup_func (get_vartable env) sym arity))
+    (put_push asm code)
+    (put_jcall asm (* 4 arity))
+    ))
+
 (export fun compile_simple_call (asm arity func) (
     (if @(IS_PRIM func)
         (do
@@ -689,12 +676,12 @@
     (if ent
         (do
             (var pats (cons (list2 args code) (expr_arg (car ent) 1)))
-            (= ent (list2 (make_expr Function (list2 (bytecode 0 0 0 0) pats)) current_loc))
+            (= ent (list2 (make_expr Function (list2 (allocate_bytecode) pats)) current_loc))
             (compile_matching_hook (car ent) sym arity)
         )
         (do
             (var pats (list1 (list2 args code)))
-            (= ent (list2 (make_expr Function (list2 (bytecode 0 0 0 0) pats)) current_loc))
+            (= ent (list2 (make_expr Function (list2 (allocate_bytecode) pats)) current_loc))
             (compile_matching_hook (car ent) sym arity)
         ))
     (symtable_add tbl sym arity ent)
