@@ -1,6 +1,6 @@
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.rl 2011-10-07 03:03:43 nineties $
+# $Id: syntax.rl 2011-10-10 19:45:44 nineties $
 
 # Syntax definition of rowl language
 
@@ -39,8 +39,8 @@ infixl(NotEqual,     "!=", 10)
 infixl(And,          "&",  11)
 infixl(Xor,          "^",  12)
 infixl(Or,           "|",  13)
-infixl(LogicalAnd,   "and", 14)
-infixl(LogicalOr,    "or", 15)
+infixl(LogicalAnd,   "&&", 14)
+infixl(LogicalOr,    "||", 15)
 infixr(Assign,       "=",  17)
 infixr(PlusAssign,   "+=", 17)
 infixr(MinusAssign,  "-=", 17)
@@ -53,8 +53,26 @@ constr(For,          "for")
 command(Return,      "return")
 infixl(Else,         "else", 18)
 
++x => UnaryPlus($x)
+-x => UnaryMinus($x)
+not x => Not($x)
+x * y => Times($x, $y)
+x / y => Divide($x, $y)
+x % y => Mod($x, $y)
+x + y => Plus($x, $y)
+x - y => Minus($x, $y)
+x < y => LessThan($x, $y)
+x > y => GreaterThan($x, $y)
+x >= y => GreaterEqual($x, $y)
+x <= y => LessEqual($x, $y)
+(x += y) => ($x = $x + $y)
+(x -= y) => ($x = $x - $y)
+(x *= y) => ($x = $x * $y)
+(x /= y) => ($x = $x / $y)
+(x %= y) => ($x = $x % $y)
+
 true: `true
 false: `false
 
 command(Import, "import")
-infixl(Dot, ".", 2)
+infixl(DoubleColon, "::", 2)

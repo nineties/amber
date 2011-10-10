@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2011-10-02 10:04:32 nineties $
+; $Id: vm-gc.rlc 2011-10-11 00:55:35 nineties $
 ;
 
 (import "stdlib")
@@ -321,7 +321,7 @@
     (if (<= tag @TAG_PSTRUCT) ((return)))
     (if (== tag @TAG_CONS) (
         (move_object obj) ; car
-        (move_object (+ obj @WORD_SIZE)) ; cons
+        (move_object (+ obj @WORD_SIZE)) ; cdr
         (return)
         ))
     (if (== tag @TAG_SEQUENCE) (
@@ -589,24 +589,38 @@
     ))
 
 ; bytecode
-(export prim_bytecode)
-(fun prim_bytecode (code len indices nidx) (
+(export prim_allocate_bytecode)
+(fun prim_allocate_bytecode () (
     (void* ptr (allocate_object 5))
     @(SET_HEADER ptr TAG_BYTECODE 0 5)
     (+= ptr @WORD_SIZE)
-    ([]= ptr 0 code)
-    ([]= ptr 1 len)
-    ([]= ptr 2 indices)
-    ([]= ptr 3 nidx)
+    ([]= ptr 0 0)
+    ([]= ptr 1 0)
+    ([]= ptr 2 0)
+    ([]= ptr 3 0)
     (return ptr)
     ))
 
 (export prim_bytecode_set)
-(fun prim_bytecode_set (ptr code len indices nidx) (
+(fun prim_bytecode_set (ptr code len addrs objs nobj) (
+    ; this function must be atomic
+    (for i 0 nobj (
+        (int addr ([] addrs i))
+        ([]= (+ code addr) 0 ([] objs i))
+        ))
     ([]= ptr 0 code)
     ([]= ptr 1 len)
-    ([]= ptr 2 indices)
-    ([]= ptr 3 nidx)
+    ([]= ptr 2 addrs)
+    ([]= ptr 3 nobj)
+    ))
+
+(export prim_make_bytecode)
+(fun prim_make_bytecode (code len addrs objs nobj) (
+    (void* ptr (allocate_object 5))
+    @(SET_HEADER ptr TAG_BYTECODE 0 5)
+    (+= ptr @WORD_SIZE)
+    (prim_bytecode_set ptr code len addrs objs nobj)
+    (return ptr)
     ))
 
 (export prim_bytecode_ptr)
