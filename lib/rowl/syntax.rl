@@ -1,6 +1,6 @@
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.rl 2011-10-10 19:45:44 nineties $
+# $Id: syntax.rl 2011-10-11 11:47:16 nineties $
 
 # Syntax definition of rowl language
 
@@ -53,26 +53,27 @@ constr(For,          "for")
 command(Return,      "return")
 infixl(Else,         "else", 18)
 
-+x => UnaryPlus($x)
--x => UnaryMinus($x)
-not x => Not($x)
-x * y => Times($x, $y)
-x / y => Divide($x, $y)
-x % y => Mod($x, $y)
-x + y => Plus($x, $y)
-x - y => Minus($x, $y)
-x < y => LessThan($x, $y)
-x > y => GreaterThan($x, $y)
-x >= y => GreaterEqual($x, $y)
-x <= y => LessEqual($x, $y)
-(x += y) => ($x = $x + $y)
-(x -= y) => ($x = $x - $y)
-(x *= y) => ($x = $x * $y)
-(x /= y) => ($x = $x / $y)
-(x %= y) => ($x = $x % $y)
-
 true: `true
 false: `false
 
 command(Import, "import")
 infixl(DoubleColon, "::", 2)
+
++x     => UnaryPlus($x)
+-x     => UnaryMinus($x)
+not x  => Not($x)
+x * y  => Times($x, $y)
+x / y  => Divide($x, $y)
+x % y  => Mod($x, $y)
+x + y  => Plus($x, $y)
+x - y  => Minus($x, $y)
+x < y  => LessThan($x, $y)
+x > y  => GreaterThan($x, $y)
+x >= y => GreaterEqual($x, $y)
+x <= y => LessEqual($x, $y)
+x += y => $x = $x + $y
+x -= y => $x = $x - $y
+x *= y => $x = $x * $y
+x /= y => $x = $x / $y
+x %= y => $x = $x % $y
+x[y]   => Subscript($x, $y)

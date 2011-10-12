@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2011-10-11 00:57:33 nineties $
+; $Id: rowl1-compile.rlc 2011-10-12 20:35:12 nineties $
 ;
 
 (import "rlvm-compile")
@@ -124,7 +124,7 @@
     (pop_env env)
 
     (set_code code asm_body)
-    (function_updated sym (list_length args) ent)
+    (function_updated sym (list_len args) ent)
 
     (put_nil asm)
     ))
@@ -151,7 +151,7 @@
     (pop_env env)
 
     (set_code code asm_body)
-    (function_updated sym (list_length args) ent)
+    (function_updated sym (list_len args) ent)
 
     (put_nil asm)
     ))
@@ -285,13 +285,15 @@
         ))
     (if (== ty ListAt) (do
         (compile_operand asm (expr_arg info 0))
-        (put_list_at asm (expr_arg_int info 1))
+        (put_imm_int asm (expr_arg_int info 1))
+        (put_list_at asm)
         return
         ))
     (if (== ty ExprAt) (do
         (compile_operand asm (expr_arg info 0))
         (put_field_get2 asm)
-        (put_list_at asm (expr_arg_int info 1))
+        (put_imm_int asm (expr_arg_int info 1))
+        (put_list_at asm)
         return
         ))
     (not_reachable "compile_operand")
@@ -553,29 +555,9 @@
     ))
 
 (fun compile_assign (asm env expr) (
-    (compile_assign_main asm env Nil (expr_arg expr 0) (expr_arg expr 1))
-    ))
-(fun compile_plus_assign (asm env expr) (
-    (compile_assign_main asm env (to_sym "Plus") (expr_arg expr 0) (expr_arg expr 1))
-    ))
-(fun compile_minus_assign (asm env expr) (
-    (compile_assign_main asm env (to_sym "Minus") (expr_arg expr 0) (expr_arg expr 1))
-    ))
-(fun compile_times_assign (asm env expr) (
-    (compile_assign_main asm env (to_sym "Times") (expr_arg expr 0) (expr_arg expr 1))
-    ))
-(fun compile_divide_assign (asm env expr) (
-    (compile_assign_main asm env (to_sym "Divide") (expr_arg expr 0) (expr_arg expr 1))
-    ))
-(fun compile_mod_assign (asm env expr) (
-    (compile_assign_main asm env (to_sym "Mod") (expr_arg expr 0) (expr_arg expr 1))
-    ))
-
-(fun compile_assign_main (asm env op lhs rhs) (
-    (if (== op Nil)
-        (compile asm env rhs)
-        (compile asm env (make_expr op (list2 lhs rhs)))
-        )
+    (var lhs (expr_arg_symbol expr 0))
+    (var rhs (expr_arg expr 1))
+    (compile asm env rhs)
     (var v (symtable_find (get_vartable env) lhs -1))
     (if (== v 0) (do
         (output_error stderr)
@@ -664,7 +646,7 @@
 
 (extern fun compile_matching_hook)
 (fun add_function (tbl sym args code) (
-    (var arity (list_length args))
+    (var arity (list_len args))
     (var ent (symtable_find_local tbl sym arity))
     (if ent (do
         (var pats (cons (list2 args code) (expr_arg (car ent) 1)))
@@ -689,7 +671,7 @@
     ))
 
 (fun append_function (tbl sym args code) (
-    (var arity (list_length args))
+    (var arity (list_len args))
     (var ent (symtable_find tbl sym arity))
     (if ent
         (do
@@ -779,15 +761,11 @@
     (add_compiler tbl (make_expr Else (list2
         (make_expr If (list2 DontCare DontCare)) DontCare)) compile_ifelse)
     (add_compiler tbl (make_expr While (list2 DontCare DontCare)) compile_while)
-    (add_compiler tbl (make_expr (to_sym "Assign") (list2 symT DontCare)) compile_assign)
-    (add_compiler tbl (make_expr (to_sym "PlusAssign") (list2 symT DontCare)) compile_plus_assign)
-    (add_compiler tbl (make_expr (to_sym "MinusAssign") (list2 symT DontCare)) compile_minus_assign)
-    (add_compiler tbl (make_expr (to_sym "TimesAssign") (list2 symT DontCare)) compile_times_assign)
-    (add_compiler tbl (make_expr (to_sym "DivideAssign") (list2 symT DontCare)) compile_divide_assign)
-    (add_compiler tbl (make_expr (to_sym "ModAssign") (list2 symT DontCare)) compile_mod_assign)
     (add_compiler tbl (make_expr (to_sym "Return") (list1 DontCare)) compile_return)
     (add_compiler tbl (make_expr (to_sym "Equal") (list2 DontCare DontCare)) compile_eq)
     (add_compiler tbl (make_expr (to_sym "NotEqual") (list2 DontCare DontCare)) compile_ne)
+
+    (add_compiler tbl (make_expr (to_sym "Assign") (list2 symT DontCare)) compile_assign)
     ))
 
 (export fun add_compiler (tbl pat func) (
