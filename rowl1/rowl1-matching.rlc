@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2011-10-04 20:38:14 nineties $
+; $Id: rowl1-matching.rlc 2011-10-11 11:28:17 nineties $
 ;
 
 (import "rlvm-compile")
@@ -25,14 +25,14 @@
     (= pats (prepare_pats pats))
 
     (var args 0)
-    (var idx (list_length (caar pats)))
+    (var idx (list_len (caar pats)))
     (while (> idx 0) (do
         (decr idx)
         (= args (cons (make_arg idx) args))
         ))
 
     (compile_matching_main asm args pats)
-    (compile_matching_error asm sym (list_length (caar pats)))
+    (compile_matching_error asm sym (list_len (caar pats)))
 
     (set_code bytecode asm)
     (return bytecode)
@@ -102,6 +102,7 @@
 
 (fun compile_matching_main (asm args pats) (
     (if (== (caar pats) 0) (do
+
         (put_code asm (list_at (car pats) 1))
         return
         ))
@@ -161,7 +162,7 @@
         return
         ))
     (if (== hd List) (do
-        (var len (list_length p))
+        (var len (list_len p))
         (var check_failed (fresh_label asm))
         (compile_operand asm (car args))
         (put_check_list asm check_failed len)
@@ -235,7 +236,7 @@
     ))
 
 (fun compile_matching_intlit_tswitch (asm args pats cases) (
-    (var ncases (list_length cases))
+    (var ncases (list_len cases))
     (var end_lbl (fresh_label asm))
     (var case_lbls (array int ncases))
     (for i 0 ncases
@@ -464,11 +465,11 @@
     (= pats (sort_list_pat pats))
     (var n 1)
     (var orig pats)
-    (var len (list_length (caaar pats)))
+    (var len (list_len (caaar pats)))
     (= pats (cdr pats))
     (while pats (do
         (var nd (caaar pats))
-        (if (|| (!= (expr_head nd) List) (!= (list_length nd) len)) break)
+        (if (|| (!= (expr_head nd) List) (!= (list_len nd) len)) break)
         (= pats (cdr pats))
         (incr n)
         ))
@@ -491,8 +492,8 @@
     (var b (caaar pats))
     (if (!= (expr_head a) List) (return (cons (car pats) (insert_list_pat p (cdr pats)))))
     (if (!= (expr_head b) List) (return (cons p pats)))
-    (var alen (list_length a))
-    (var blen (list_length b))
+    (var alen (list_len a))
+    (var blen (list_len b))
     (if (<= alen blen)
         (return (cons p pats))
         (return (cons (car pats) (insert_list_pat p (cdr pats))))
