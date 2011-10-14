@@ -3,7 +3,7 @@
 # rowl - 2nd generation
 # Copyright (C) 2010 nineties
 #
-# $Id: main.rl 2011-10-12 21:13:26 nineties $
+# $Id: main.rl 2011-10-14 14:26:14 nineties $
 
 x: [1,2,3,4]
 puts(x)
@@ -16,3 +16,6 @@ puts(length(x))
 puts(cons("Hello World", x))
 puts(x)
 puts(reverse(cons("Hello World", x)))
+
+t: 1, 2
+puts(t)

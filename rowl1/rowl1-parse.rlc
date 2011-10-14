@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-parse.rlc 2011-10-11 10:22:20 nineties $
+; $Id: rowl1-parse.rlc 2011-10-14 03:02:36 nineties $
 ;
 
 (import "rlvm-compile")
@@ -33,7 +33,10 @@
 ; NB:
 ; - postfix operator must be unique
 
+(var comma_op null)
+
 (export fun init_parser (file ichan) (
+    (= comma_op (variant @OP_INFIX 1 (to_sym "Comma") @FALSE @ASSOC_COMMA))
     (init_lexer file ichan)
     ))
 
@@ -61,13 +64,13 @@
         (= tok (lex_sub offs))
         (if (== tok @TOK_END)
             (return (make_expr_user head 0))
-            (return (make_expr_user head (cons (parse_expr tok offs) 0)))
+            (return (make_expr_user head (cons (parse_expr tok offs @FALSE) 0)))
             )
         ))
-    (return (parse_expr tok offs))
+    (return (parse_expr tok offs @FALSE))
     ))
 
-(fun parse_expr (tok offs) (
+(fun parse_expr (tok offs in_seq) (
     (var expr_stack 0)
     (var op_stack 0)
     (var next_op)
@@ -93,21 +96,47 @@
     (= tok (lex_infix offs))
     (if (|| (== tok @TOK_INFIX) (== tok @TOK_POSTFIX))
         (= next_op (cons (get_token_value) (get_loc)))
+    (if (&& (! in_seq) (== tok ','))
+        (= next_op (cons comma_op (get_loc)))
         (do
+            (if (&& (!= tok @TOK_END) (&& (!= tok ',') (&& (!= tok ')') (&& (!= tok '}')
+                (!= tok ']'))))) (do
+                (output_loc stderr (get_loc))
+                (output_string stderr "infix or postfix operator is required before `")
+                (output_string stderr (get_token_text))
+                (output_string stderr "'\n")
+                (exit 1)
+                ))
             (if (!= tok @TOK_END) (unput))
             (= next_op (cons (variant @OP_END 0) (get_loc)))
-        )
-        )
+        )))
 
     (while 1 (do
         (var comp (compare_associativity (car op_stack) next_op))
         (if (== comp 0) (goto parse_expr_end)
-        (if (> comp 0) (do
-            ; reduce
-            (var op (car op_stack))
-            (= op_stack (cdr op_stack))
-            (= expr_stack (reduce op expr_stack))
-            continue
+        (if (> comp 0)
+            (do
+                ; reduce
+                (var op (car op_stack))
+                (if (== (car op) comma_op)
+                    (do
+                        (var elems (list1 (car expr_stack)))
+                        (= expr_stack (cdr expr_stack))
+                        (while (== (caar op_stack) comma_op) (do
+                            (= elems (cons (car expr_stack) elems))
+                            (= expr_stack (cdr expr_stack))
+                            (= op_stack (cdr op_stack))
+                            ))
+                        (= expr_stack (cons
+                            (make_expr_user Tuple elems)
+                            expr_stack
+                            ))
+                    )
+                    (do
+                        (= op_stack (cdr op_stack))
+                        (= expr_stack (reduce op expr_stack))
+                    ))
+                continue
             )
             (do
                 (= op_stack (cons next_op op_stack))
@@ -116,7 +145,8 @@
             ))
         ))
 
-    (if (== tok @TOK_INFIX) (do (= tok (lex_sub offs)) (goto parse_expr_front))
+    (if (|| (== tok @TOK_INFIX) (&& (! in_seq) (== tok ',')))
+        (do (= tok (lex_sub offs)) (goto parse_expr_front))
     (if (== tok @TOK_POSTFIX) (goto parse_expr_infix)
         ))
 
@@ -212,7 +242,7 @@
 
     (var elems 0)
     (label parse_comma_list_loop)
-    (var e (parse_expr t 0))
+    (var e (parse_expr t 0 @TRUE))
     (= elems (cons e elems))
     (= t (lex))
     (if (== t ',') (do
@@ -293,7 +323,7 @@
     (if (&& (== ltype @OP_INFIX) (== rtype @OP_INFIX)) (do
         (var is_left_l (field_get lop 2))
         (var is_left_r (field_get rop 2))
-        (if (== is_left_l is_left_r) (if is_left_l (return -1) (return 1)))
+        (if (== is_left_l is_left_r) (if is_left_l (return 1) (return -1)))
         ))
     (output_loc stderr (merge_loc (cdr lop_info) (cdr rop_info)))
     (output_string stderr "undetermined associativity ")
