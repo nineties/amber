@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2011-10-11 10:22:29 nineties $
+; $Id: rowl1-node.rlc 2011-10-15 03:41:26 nineties $
 ;
 
 (import "rlvm-compile")
@@ -387,9 +387,10 @@
     (var head (expr_head node))
     (var args (expr_args node))
 
-    (if (== head Block)   (return (pp_block ochan args)))
+    (if (== head Block) (return (pp_block ochan args)))
     (if (&& (== head Apply) (== (node_type (cadr args)) @ListE))
         (return (pp_apply ochan args assoc)))
+    (if (== head Tuple) (return (pp_tuple ochan args)))
     (if (&& (== head Subscript) (== (node_type (cadr args)) @ListE))
         (return (pp_subscr ochan args assoc)))
     (if (== head Located) (return (pretty_print_main ochan (expr_arg node 1) assoc)))
@@ -488,6 +489,16 @@
         (if args (output_string ochan ", "))
         ))
     (output_char ochan ']')
+    ))
+
+(fun pp_tuple (ochan args) (
+    (output_char ochan '(')
+    (while args (do
+        (pretty_print ochan (car args))
+        (= args (cdr args))
+        (if args (output_string ochan ", "))
+        ))
+    (output_char ochan ')')
     ))
 
 (fun pp_assembler (ochan expr) (
@@ -618,19 +629,12 @@
     ))
 
 (export fun make_env () (
-    (return (variant @EnvironmentE 2
+    (return (variant @EnvironmentE 3
         (make_symtable) ; function and variable table
+        (list1 0) ; method cache for Compile()
         0 ; imported module list
         0 ; local variable count
 	))
-    ))
-
-(export fun clone_env (env) (
-    (var tbl (get_vartable env))
-    (return (variant @EnvironmentE 1
-        (symtable_clone tbl)
-        (field_get env 3)
-        ))
     ))
 
 (export fun get_vartable (env) (
@@ -638,25 +642,35 @@
     ))
 
 (export fun new_lvar_index (env) (
-    (var idx (field_get env 3))
-    (field_set env 3 (+ idx 1))
+    (var idx (field_get env 4))
+    (field_set env 4 (+ idx 1))
     (return idx)
     ))
 
 (export fun get_lvar_num (env) (
-    (return (field_get env 3))
+    (return (field_get env 4))
     ))
 
 (export fun reset_lvar_index (env) (
-    (field_set env 3 0)
+    (field_set env 4 0)
     ))
 
 (export fun push_env (env) (
     (symtable_push (field_get env 1))
+    (field_set env 2 (cons 0 (field_get env 2)))
     ))
 
 (export fun pop_env (env) (
     (symtable_pop (field_get env 1))
+    (field_set env 2 (cdr (field_get env 2)))
+    ))
+
+(export fun get_compiler (env) (
+    (return (car (field_get env 2)))
+    ))
+
+(export fun set_compiler (env f) (
+    (setcar (field_get env 2) f)
     ))
 
 (export fun is_global_env (env) (
@@ -667,7 +681,7 @@
     ))
 
 (export fun is_already_imported (env path) (
-    (var list (field_get env 2))
+    (var list (field_get env 3))
     (while list (do
         (if (streq path (car list))
             (return @TRUE)
@@ -679,6 +693,6 @@
 
 (export fun add_imported_module (env path) (
     ; XXX: fixme. canonicalize the `path'
-    (field_set env 2 (cons path (field_get env 2)))
+    (field_set env 3 (cons path (field_get env 3)))
     ))
     ))
