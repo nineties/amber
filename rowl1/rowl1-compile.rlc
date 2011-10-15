@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2011-10-14 03:47:26 nineties $
+; $Id: rowl1-compile.rlc 2011-10-15 03:46:15 nineties $
 ;
 
 (import "rlvm-compile")
@@ -45,7 +45,11 @@
     ))
 
 (export fun compile (asm env expr) (
-    (var f (lookup_func (get_vartable env) Compile 3))
+    (var f (get_compiler env))
+    (if (! f) (do
+        (= f (lookup_func (get_vartable env) Compile 3))
+        (set_compiler env f)
+        ))
     (return (byterun f asm env expr))
     ))
 
