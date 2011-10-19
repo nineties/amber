@@ -1,43 +1,61 @@
 " Language:	Rowl
 " Maintainer:	nineties <nineties48@gmail.com>
-" $Id: rowl.vim 2010-10-19 14:10:27 nineties $
+" $Id: rowl.vim 2011-10-19 20:46:39 nineties $
 
 if exists("b:current_syntax")
-    finish
+"    finish
 endif
 
-syn case match
+syn case match " case sensitive
 
-syn keyword rowlConstructor true false
-syn keyword rowlCommand   goto label return new new_array type
-syn keyword rowlSymbol    if else syscall while for
-syn keyword rowlExternal  include export import external
-syn keyword rowlType      bool char int float double void string
-syn match rowlIdentifier  /\<\h\w*/
-syn match rowlInteger     /-\?\(0\b[01]\+\|0\o[0-7]\+\|0\|[1-9][0-9]*\|0x\x\+\)\>/
-syn match rowlFloat       /-\?\(0\|[1-9][0-9]*\)\.[0-9]\+\(e[+-]\?[0-9]+\)\?\>/
-syn match rowlEscape      /\\['"?\\abfnrtv0]/ contained
-syn match rowlCharacter   /'\(\\["?\\abfnrtv0]\|[^\\\n]\)'/ contains=rowlEscape
-syn match rowlString      /"\(\\['"?\\abfnrtv0]\|[^\\\"\n]\)*"/ contains=rowlEscape
-syn keyword rowlTodo TODO FIXME NOTE XXX contained
-syn region  rowlString start=/"/ skip=/\\"/ end=/"/
+syn keyword rowlConstant    true false
+syn keyword rowlStatement   return import
+syn keyword rowlConditional if else
+syn keyword rowlRepeat      while
+
+syn match   rowlStandardConstant    "stdin\|stdout\|stderr"
+
+syn keyword rowlTodo        contained Todo TODO Fixme FIXME XXX
+
+syn match   rowlSpecial     display contained "\\."
+syn match   rowlCharacter   "'[^\\]'"
+syn match   rowlCharacter   "'[^']*'" contains=rowlSpecial
+
+syn region  rowlString      start=+"+ skip=+\\\\\|\\"+ end=+"+ contains=rowlSpecial
+
+syn match   rowlOperator    "=>\|!\|\\\|\`\|@\|:"
+
+syn match   rowlHeader      "\<[A-Z][a-zA-Z0\9_]*"
+
+syn match   rowlCurlyError  "}"
+syn region  rowlBlock       start="{" end="}" contains=ALLBUT,rowlParen,rowlCurlyError fold
+
+syn match   rowlNumber      display "\d\+\>"
+syn match   rowlNumber      display "0x\x\+\>"
+syn match   rowlOctal       display "0\o\+\>" contains=rowlOctalZero
+syn match   rowlOctalZero   display "\<0"
+syn match   rowlFloat       display "\d\+\.\d*\(e[-+]\=\d\+\)"
+
 syn region  rowlComment start=/#/ end=/$/ contains=rowlTodo
 
-syn match rowlConstructor "\u\w*\>"
-
-hi def link rowlComment     Comment
-hi def link rowlCharacter   Character
-hi def link rowlEscape      SpecialChar
-hi def link rowlKeyOperator Operator
-hi def link rowlString      String
-hi def link rowlInteger     Number
-hi def link rowlFloat       Number
-hi def link rowlCommand     Statement
-hi def link rowlSymbol      Statement
-hi def link rowlExternal    PreProc
-hi def link rowlType        Type
-hi def link rowlTodo        Keyword
-hi def link rowlConstructor Constant
+hi def link rowlHeader              Type
+hi def link rowlStandardConstant    Identifier
+hi def link rowlOperator            Operator
+hi def link rowlConstant            Constant
+hi def link rowlStatement           Statement
+hi def link rowlConditional         Conditional
+hi def link rowlRepeat              Repeat
+hi def link rowlTodo                Todo
+hi def link rowlNumber              Number
+hi def link rowlOctal               Number
+hi def link rowlOctalZero           Number
+hi def link rowlFloat               Float
+hi def link rowlSpecialError        Error
+hi def link rowlSpecial             SpecialChar
+hi def link rowlCharacter           Character
+hi def link rowlString              String
+hi def link rowlCurlyError          Error
+hi def link rowlComment             Comment
 
 let b:current_syntax = "rowl"
 
