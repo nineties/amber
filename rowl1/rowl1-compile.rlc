@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2011-10-15 03:46:15 nineties $
+; $Id: rowl1-compile.rlc 2011-10-19 20:47:11 nineties $
 ;
 
 (import "rlvm-compile")
@@ -159,6 +159,61 @@
 
     (put_nil asm)
     ))
+(fun do_define_function (lhs body) (
+    (var sym (expr_arg_symbol lhs 0))
+    (var args (expr_arg_list lhs 1))
+    (var asm (make_assembler))
+    (var code (allocate_bytecode))
+    (var env exec_env)
+    (var tbl (get_vartable env))
+    (var ent (add_function tbl sym args code))
+    (reset_lvar_index env)
+    (push_env env)
+    (= args (setup_args env args))
+    (var cnt_addr (get_address asm))
+    (put_allocate asm 0)
+    (compile asm env body)
+    (put_ireturn asm)
+    (put_operand_byte asm (+ cnt_addr 1) (get_lvar_num env))
+    (pop_env env)
+
+    (set_code code asm)
+    (function_updated sym (list_len args) ent)
+    ))
+
+(fun do_append_function (lhs body) (
+    (var sym (expr_arg_symbol lhs 0))
+    (var args (expr_arg_list lhs 1))
+    (var asm (make_assembler))
+    (var code (allocate_bytecode))
+    (var env exec_env)
+    (var tbl (get_vartable env))
+    (var ent (append_function tbl sym args code))
+    (reset_lvar_index env)
+    (push_env env)
+    (= args (setup_args env args))
+    (var cnt_addr (get_address asm))
+    (put_allocate asm 0)
+    (compile asm env body)
+    (put_ireturn asm)
+    (put_operand_byte asm (+ cnt_addr 1) (get_lvar_num env))
+    (pop_env env)
+
+    (set_code code asm)
+    (function_updated sym (list_len args) ent)
+    ))
+
+(fun compile_define_function (asm env expr) (
+    (compile asm env (expr_arg expr 1))
+    (compile asm env (expr_arg expr 0))
+    (compile_simple_call asm 2 do_define_function)
+    ))
+
+(fun compile_append_function (asm env expr) (
+    (compile asm env (expr_arg expr 1))
+    (compile asm env (expr_arg expr 0))
+    (compile_simple_call asm 2 do_append_function)
+    ))
 
 (fun setup_args (env args) (
     (var orig args)
@@ -173,7 +228,7 @@
 
 (fun setup_arg (env obj arg) (
     (var argty (expr_head arg))
-    (if (|| (== argty Int) (|| (== argty String) (== argty SymbolP)))
+    (if (|| (== argty Int) (== argty String))
         return
         )
     (if (== argty Symbol) (do
@@ -260,7 +315,7 @@
     ))
 
 (fun check_redefinition (tbl sym) (
-    (var info (symtable_find tbl sym -1))
+    (var info (symtable_find_local tbl sym -1))
     (if info (do
         (output_error stderr)
         (output_string stderr "variable `")
@@ -340,11 +395,11 @@
 (export fun compile_quote_main (asm env expr) (
     (var hd (expr_head expr))
     (if (== hd Symbol)
-        (put_push asm expr)
+        (return (put_push asm expr)))
     (if (== hd Int)
-        (put_imm_int asm expr)
+        (return (put_imm_int asm expr)))
     (if (== hd String)
-        (put_push asm expr)
+        (return (put_push asm expr)))
     (if (== hd List)
         (if (! expr)
             (put_push asm 0)
@@ -352,20 +407,54 @@
                 (compile_quote_main asm env (cdr expr))
                 (compile_quote_main asm env (car expr))
                 (put_cons asm)
-            )
-        )
-    (if (== hd Unquote)
-        (compile asm env (expr_arg expr 0))
+            ))
         (do
             (compile_quote_main asm env (expr_args expr))
             (put_push asm (expr_head expr))
-            (compile_simple_call asm 2 make_expr)
-        )
-        )))))
+            (compile_simple_call asm 2 make_expr_user)
+        ))
     ))
 
 (fun compile_quote (asm env expr) (
     (compile_quote_main asm env (expr_arg expr 0))
+    ))
+
+(export fun compile_qquote_main (asm env expr level) (
+    (var hd (expr_head expr))
+    (if (== hd Symbol)
+        (return (put_push asm expr)))
+    (if (== hd Int)
+        (return (put_imm_int asm expr)))
+    (if (== hd String)
+        (return (put_push asm expr)))
+    (if (== hd List) (do
+        (if (! expr)
+            (put_push asm 0)
+            (do
+                (compile_qquote_main asm env (cdr expr) level)
+                (compile_qquote_main asm env (car expr) level)
+                (put_cons asm)
+            )
+        )
+        return
+        ))
+    (if (== hd Unquote) (do
+        (if (== level 0) (do
+            (compile asm env (expr_arg expr 0))
+            return
+            ))
+        (-= level 1)
+        )
+    (if (== hd QuasiQuote)
+        (+= level 1)
+        ))
+    (compile_qquote_main asm env (expr_args expr) level)
+    (put_push asm (expr_head expr))
+    (compile_simple_call asm 2 make_expr_user)
+    ))
+
+(fun compile_qquote (asm env expr) (
+    (compile_qquote_main asm env (expr_arg expr 0) 0)
     ))
 
 (fun compile_int (asm env val) (
@@ -739,14 +828,15 @@
     (var locT (make_expr Loc (list3 stringT intT intT)))
     (add_compiler tbl (make_expr Located (list2 locT DontCare)) compile_located)
     (add_compiler tbl (make_expr DefineSyntax (list2 symT DontCare)) compile_define_syntax)
-    (add_compiler tbl (make_expr DefineFunction
-        (list2 (make_expr Apply (list2 symT listT)) DontCare)) compile_define_function)
-    (add_compiler tbl (make_expr AppendFunction
-        (list2 (make_expr Apply (list2 symT listT)) DontCare)) compile_append_function)
+    (add_compiler tbl (make_expr DefineFunction (list2 DontCare DontCare)) compile_define_function)
+    (add_compiler tbl (make_expr AppendFunction (list2 DontCare DontCare)) compile_append_function)
     (add_compiler tbl (make_expr DefineVariable (list2 symT DontCare)) compile_define_variable)
     (add_compiler tbl (headP Symbol) compile_var)
     (add_compiler tbl (make_expr Apply (list2 DontCare listT)) compile_apply)
-    (add_compiler tbl (make_expr Quote (list1 (make_expr Quote (list1 (make_expr Unquote (list1 DontCare)))))) compile_quote)
+
+    (add_compiler tbl (quote (quote DontCare)) compile_quote)
+    (add_compiler tbl (quote (qquote DontCare)) compile_qquote)
+
     (add_compiler tbl (headP Int) compile_int)
     (add_compiler tbl (headP String) compile_string)
     (add_compiler tbl (headP Block) compile_block)

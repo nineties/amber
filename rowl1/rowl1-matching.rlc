@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2011-10-11 11:28:17 nineties $
+; $Id: rowl1-matching.rlc 2011-10-19 20:48:58 nineties $
 ;
 
 (import "rlvm-compile")
@@ -16,6 +16,8 @@
 (import "rowl1-compile")
 
 ; pattern matrix (((p11 p12 .. ) . e1) ((p21 p22 ..) . e2) ..)
+
+(var varP   (to_sym "%Var"))
 
 (fun compile_matching (sym funobj) (
     (var bytecode (expr_arg funobj 0))
@@ -42,62 +44,74 @@
     (if (== pats 0) (return 0))
     (return (cons
         (cons
-            (unquote_pat_list (caar pats))
+            (compile_pat_list (caar pats))
             (cdar pats)
             )
         (prepare_pats (cdr pats))
         ))
     ))
 
-(fun unquote_pat (pat) (
+(fun compile_pat_list (pat) (
+    (var ret 0)
+    (while pat (do
+        (= ret (cons (compile_pat (car pat)) ret))
+        (= pat (cdr pat))
+        ))
+    (return (list_reverse ret))
+    ))
+
+(fun compile_pat (pat) (
     (var hd (expr_head pat))
-    (if (|| (== hd Symbol) (|| (== hd Int) (== hd String)))
+    (if (== pat DontCare)
+        (return DontCare)
+        )
+    (if (== hd Symbol) (do
+        (return (make_expr varP (list1 pat)))
+        ))
+    (if (|| (== hd Int) (|| (== hd String) (== hd HeadP)))
         (return pat)
         )
     (if (== hd List)
-        (return (unquote_pat_list pat))
+        (return (compile_pat_list pat))
         )
     (if (== hd Quote)
-        (return (unquote_pat_sub (expr_arg pat 0)))
+        (return (expr_arg pat 0))
+        )
+    (if (== hd QuasiQuote)
+        (return (qquote_pat (expr_arg pat 0) 0))
         )
     (var args (expr_args pat))
-    (return (make_expr hd (unquote_pat_list args)))
+    (return (make_expr_user hd (compile_pat_list args)))
     ))
 
-(fun unquote_pat_list (pat) (
+(fun qquote_pat_list (pat level) (
     (var ret 0)
     (while pat (do
-        (= ret (cons (unquote_pat (car pat)) ret))
+        (= ret (cons (qquote_pat (car pat) level) ret))
         (= pat (cdr pat))
         ))
     (return (list_reverse ret))
     ))
 
-(fun unquote_pat_sub (pat) (
+(fun qquote_pat (pat level) (
     (var hd (expr_head pat))
-    (if (== hd Symbol)
-        (return (make_expr SymbolP (list1 pat)))
-        )
-    (if (|| (== hd Int) (== hd String))
+    (if (|| (== hd Symbol) (|| (== hd Int) (|| (== hd String) (== hd HeadP))))
         (return pat)
         )
-    (if (== hd Unquote)
-        (return (unquote_pat (expr_arg pat 0)))
-        )
     (if (== hd List)
-        (return (unquote_pat_sub_list pat))
+        (return (qquote_pat_list pat level))
         )
-    (var args (expr_args pat))
-    (return (make_expr hd (unquote_pat_sub_list args)))
-    ))
-
-(fun unquote_pat_sub_list (pat) (
-    (var ret 0)
-    (while pat (do
-        (= ret (cons (unquote_pat_sub (car pat)) ret))
-        (= pat (cdr pat))
+    (if (== hd Unquote) (do
+        (if (== level 0)
+            (return (compile_pat (expr_arg pat 0)))
+            )
+        (-= level 1)
+        )
+    (if (== hd QuasiQuote)
+        (+= level 1)
         ))
-    (return (list_reverse ret))
+    (var args (expr_args pat))
+    (return (make_expr_user hd (qquote_pat_list args level)))
     ))
 
 (fun compile_matching_main (asm args pats) (
@@ -116,9 +130,19 @@
 (fun compile_matching_single (asm args pats) (
     (var p (caaar pats))
     (var hd (expr_head p))
-    (if (== hd Symbol) (do
+    (if (== p DontCare) (do
         (= pats (shift_pat pats))
         (compile_matching_main asm (cdr args)  pats)
+        return
+        ))
+    (if (== hd Symbol) (do
+        (var check_failed (fresh_label asm))
+        (compile_operand asm (car args))
+        (put_push asm p)
+        (put_if_ne asm check_failed)
+        (= pats (shift_pat pats))
+        (compile_matching_main asm (cdr args) pats)
+        (set_label asm check_failed)
         return
         ))
     (if (== hd Int) (do
@@ -150,15 +174,9 @@
         (set_label asm check_failed)
         return
         ))
-    (if (== hd SymbolP) (do
-        (var sym (expr_arg_symbol p 0))
-        (var check_failed (fresh_label asm))
-        (compile_operand asm (car args))
-        (put_push asm sym)
-        (put_if_ne asm check_failed)
+    (if (== hd varP) (do
         (= pats (shift_pat pats))
-        (compile_matching_main asm (cdr args) pats)
-        (set_label asm check_failed)
+        (compile_matching_main asm (cdr args)  pats)
         return
         ))
     (if (== hd List) (do
@@ -379,11 +397,11 @@
 (fun split_pattern_matrix (pats) (
     (var p (caaar pats))
     (var hd (expr_head p))
-    (if (== hd Symbol) (return (split_any pats)))
+    (if (== hd varP) (return (split_any pats)))
     (if (== hd Int) (return (split_int_pat pats)))
     (if (== hd String) (return (split_string_pat pats)))
     (if (== hd HeadP) (return (split_head_pat (expr_arg_symbol p 1) pats)))
-    (if (== hd SymbolP) (return (split_symbol_pat (expr_arg_symbol p 0) pats)))
+    (if (== hd Symbol) (return (split_symbol_pat 0 pats)))
     (if (== hd List) (return (split_list_pat pats)))
     (return (split_composite_pat pats))
     ))
@@ -392,7 +410,7 @@
     (var n 1)
     (var orig pats)
     (= pats (cdr pats))
-    (while (&& pats (== (caaar pats) DontCare)) (do
+    (while (&& pats (|| (== (caaar pats) DontCare) (== (expr_head (caaar pats)) varP))) (do
         (= pats (cdr pats))
         (incr n)
         ))
@@ -444,7 +462,7 @@
 
 (fun same_symbol_pat (sym node) (
     (var hd (expr_head node))
-    (if (&& (== hd SymbolP) (== (expr_arg_symbol node 0) sym))
+    (if (&& (== hd Symbol) (== node sym))
         (return @TRUE)
         (return @FALSE)
         )
