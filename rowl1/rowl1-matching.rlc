@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2011-10-19 20:48:58 nineties $
+; $Id: rowl1-matching.rlc 2011-10-22 06:50:11 nineties $
 ;
 
 (import "rlvm-compile")
@@ -116,8 +116,13 @@
 
 (fun compile_matching_main (asm args pats) (
     (if (== (caar pats) 0) (do
-
-        (put_code asm (list_at (car pats) 1))
+        (var code (list_at (car pats) 1))
+        (if (< (bytecode_size code) @INLINE_THRESHOLD)
+            (put_code asm code)
+            (do
+                (put_push asm code)
+                (put_jjump asm)
+            ))
         return
         ))
     (var x (split_pattern_matrix pats)) ; (single . remain)

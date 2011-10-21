@@ -11,14 +11,16 @@ DefineSyntax{QuasiQuote, Prefix{"`", 3}}
 DefineSyntax{HeadP, InfixL{"@", 4}}
 DefineSyntax{Define, InfixR{":", 19}}
 
-DefineFunction{\Compile(_, _, x=>y),
-    \AppendFunction{
-        `Compile(out, env, !x),
-        `Compile(out, env, !y)
-    }
+DefineFunction{Compile(out, env, x=>y),
+    Compile(out, env,
+        `DefineFunction{
+            Compile(out, env, !x),
+            Compile(out, env, !y)
+        }
+    )
 }
 
-Apply{f@Symbol, args@List}: body => `DefineFunction{\Apply{!f, !args}, \!body}
+Apply{f@Symbol, args@List}: body => `DefineFunction{Apply{!f, !args}, !body}
 x@Symbol: value => `DefineVariable{!x, !value}
 
 (\infixl)(head@Symbol, repr@String, assoc@Int)  => `DefineSyntax{!head, InfixL{!repr, !assoc}}
@@ -42,11 +44,9 @@ infixl(LessEqual,    "<=", 9)
 infixl(GreaterEqual, ">=", 9)
 infixl(Equal,        "==", 10)
 infixl(NotEqual,     "!=", 10)
-infixl(And,          "&",  11)
-infixl(Xor,          "^",  12)
-infixl(Or,           "|",  13)
-infixl(LogicalAnd,   "&&", 14)
-infixl(LogicalOr,    "||", 15)
+infixl(LogicalAnd,   "&&", 11)
+infixl(LogicalOr,    "||", 12)
+infixr(Lambda,       "->", 13)
 infixr(Assign,       "=",  17)
 infixr(PlusAssign,   "+=", 17)
 infixr(MinusAssign,  "-=", 17)
