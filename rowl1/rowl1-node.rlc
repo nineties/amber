@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2011-10-19 19:43:21 nineties $
+; $Id: rowl1-node.rlc 2011-10-22 06:55:16 nineties $
 ;
 
 (import "rlvm-compile")
@@ -19,7 +19,7 @@
 (var builtin_symbol_index_gen -1)
 
 ; builtin expression headers and types
-(export var Nil         0)
+(export var Nil         null)
 (export var DontCare    (to_sym "_"))
 
 (export var true        (to_sym "true"))
@@ -608,7 +608,7 @@
     (tswitch (node_type node) (
         (@SymbolE           . (return (output_symbol ochan node)))
         (@ExprE             . (return (pp_expr_full ochan node)))
-        (@ListE             . (return (pp_expr_full ochan node)))
+        (@ListE             . (return (pp_list_full ochan node)))
         (@AssemblerE        . (return (pp_assembler ochan node)))
         (@EnvironmentE      . (return (pp_environment ochan node)))
         (@BytecodeE         . (return (pp_bytecode ochan node)))
@@ -635,10 +635,19 @@
     (output_char ochan '}')
     ))
 
+(fun pp_list_full (ochan args) (
+    (output_char ochan '[')
+    (while args (do
+        (pretty_print_full ochan (car args))
+        (= args (cdr args))
+        (if args (output_string ochan ", "))
+        ))
+    (output_char ochan ']')
+    ))
+
 (export fun make_env () (
-    (return (variant @EnvironmentE 3
+    (return (variant @EnvironmentE 2
         (make_symtable) ; function and variable table
-        (list1 0) ; method cache for Compile()
         0 ; imported module list
         0 ; local variable count
 	))
@@ -649,35 +658,25 @@
     ))
 
 (export fun new_lvar_index (env) (
-    (var idx (field_get env 4))
-    (field_set env 4 (+ idx 1))
+    (var idx (field_get env 3))
+    (field_set env 3 (+ idx 1))
     (return idx)
     ))
 
-(export fun get_lvar_num (env) (
-    (return (field_get env 4))
+(export fun get_lvarl_index (env) (
+    (return (field_get env 3))
     ))
 
-(export fun reset_lvar_index (env) (
-    (field_set env 4 0)
+(export fun set_lvar_index (env val) (
+    (field_set env 3 val)
     ))
 
 (export fun push_env (env) (
     (symtable_push (field_get env 1))
-    (field_set env 2 (cons 0 (field_get env 2)))
     ))
 
 (export fun pop_env (env) (
     (symtable_pop (field_get env 1))
-    (field_set env 2 (cdr (field_get env 2)))
-    ))
-
-(export fun get_compiler (env) (
-    (return (car (field_get env 2)))
-    ))
-
-(export fun set_compiler (env f) (
-    (setcar (field_get env 2) f)
     ))
 
 (export fun is_global_env (env) (
@@ -688,7 +687,7 @@
     ))
 
 (export fun is_already_imported (env path) (
-    (var list (field_get env 3))
+    (var list (field_get env 2))
     (while list (do
         (if (streq path (car list))
             (return @TRUE)
@@ -700,6 +699,6 @@
 
 (export fun add_imported_module (env path) (
     ; XXX: fixme. canonicalize the `path'
-    (field_set env 3 (cons path (field_get env 3)))
+    (field_set env 2 (cons path (field_get env 2)))
     ))
     ))

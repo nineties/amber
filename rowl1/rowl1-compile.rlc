@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2011-10-19 20:47:11 nineties $
+; $Id: rowl1-compile.rlc 2011-10-22 07:00:19 nineties $
 ;
 
 (import "rlvm-compile")
@@ -45,11 +45,7 @@
     ))
 
 (export fun compile (asm env expr) (
-    (var f (get_compiler env))
-    (if (! f) (do
-        (= f (lookup_func (get_vartable env) Compile 3))
-        (set_compiler env f)
-        ))
+    (var f (lookup_func (get_vartable env) Compile 3))
     (return (byterun f asm env expr))
     ))
 
@@ -80,6 +76,23 @@
 (extern fun add_postfix)
 (extern fun add_constr)
 (extern fun add_command)
+
+(fun compile_function (asm env args body) (
+    (var save_lvar_index (get_lvarl_index env))
+
+    (push_env env)
+    (set_lvar_index env 0)
+    (= args (setup_args env args))
+    (var cnt_addr (get_address asm))
+    (put_allocate asm 0)
+    (compile asm env body)
+    (put_ireturn asm)
+    (put_operand_byte asm (+ cnt_addr 1) (get_lvarl_index env))
+    (pop_env env)
+
+    (set_lvar_index env save_lvar_index)
+    ))
+
 (fun compile_define_syntax (asm env expr) (
     (var head (expr_arg expr 0))
     (var op   (expr_arg expr 1))
@@ -109,110 +122,35 @@
 (fun compile_define_function (asm env expr) (
     (var lhs (expr_arg expr 0))
     (var body (expr_arg expr 1))
-    (var sym (expr_arg lhs 0))
+    (var sym (expr_arg_symbol lhs 0))
     (var args (expr_arg_list lhs 1))
     (var asm_body (make_assembler))
     (var code (allocate_bytecode))
+    (var tbl (get_vartable env))
+    (var ent (add_function tbl sym args code))
 
-    (var ent (add_function (get_vartable env) sym args code))
-
-    (reset_lvar_index env)
-    (push_env env)
-    (= args (setup_args env args))
-
-    (var cnt_addr (get_address asm_body))
-    (put_allocate asm_body 0)
-    (compile asm_body env body)
-    (put_ireturn asm_body)
-    (put_operand_byte asm_body (+ cnt_addr 1) (get_lvar_num env))
-    (pop_env env)
-
+    (compile_function asm_body env args body)
     (set_code code asm_body)
     (function_updated sym (list_len args) ent)
 
-    (put_nil asm)
+    (do_nothing asm)
     ))
 
 (fun compile_append_function (asm env expr) (
     (var lhs (expr_arg expr 0))
     (var body (expr_arg expr 1))
-    (var sym (expr_arg lhs 0))
+    (var sym (expr_arg_symbol lhs 0))
     (var args (expr_arg_list lhs 1))
     (var asm_body (make_assembler))
     (var code (allocate_bytecode))
+    (var tbl (get_vartable env))
+    (var ent (append_function tbl sym args code))
 
-    (var ent (append_function (get_vartable env) sym args code))
-
-    (reset_lvar_index env)
-    (push_env env)
-    (= args (setup_args env args))
-
-    (var cnt_addr (get_address asm_body))
-    (put_allocate asm_body 0)
-    (compile asm_body env body)
-    (put_ireturn asm_body)
-    (put_operand_byte asm_body (+ cnt_addr 1) (get_lvar_num env))
-    (pop_env env)
-
+    (compile_function asm_body env args body)
     (set_code code asm_body)
     (function_updated sym (list_len args) ent)
 
-    (put_nil asm)
-    ))
-(fun do_define_function (lhs body) (
-    (var sym (expr_arg_symbol lhs 0))
-    (var args (expr_arg_list lhs 1))
-    (var asm (make_assembler))
-    (var code (allocate_bytecode))
-    (var env exec_env)
-    (var tbl (get_vartable env))
-    (var ent (add_function tbl sym args code))
-    (reset_lvar_index env)
-    (push_env env)
-    (= args (setup_args env args))
-    (var cnt_addr (get_address asm))
-    (put_allocate asm 0)
-    (compile asm env body)
-    (put_ireturn asm)
-    (put_operand_byte asm (+ cnt_addr 1) (get_lvar_num env))
-    (pop_env env)
-
-    (set_code code asm)
-    (function_updated sym (list_len args) ent)
-    ))
-
-(fun do_append_function (lhs body) (
-    (var sym (expr_arg_symbol lhs 0))
-    (var args (expr_arg_list lhs 1))
-    (var asm (make_assembler))
-    (var code (allocate_bytecode))
-    (var env exec_env)
-    (var tbl (get_vartable env))
-    (var ent (append_function tbl sym args code))
-    (reset_lvar_index env)
-    (push_env env)
-    (= args (setup_args env args))
-    (var cnt_addr (get_address asm))
-    (put_allocate asm 0)
-    (compile asm env body)
-    (put_ireturn asm)
-    (put_operand_byte asm (+ cnt_addr 1) (get_lvar_num env))
-    (pop_env env)
-
-    (set_code code asm)
-    (function_updated sym (list_len args) ent)
-    ))
-
-(fun compile_define_function (asm env expr) (
-    (compile asm env (expr_arg expr 1))
-    (compile asm env (expr_arg expr 0))
-    (compile_simple_call asm 2 do_define_function)
-    ))
-
-(fun compile_append_function (asm env expr) (
-    (compile asm env (expr_arg expr 1))
-    (compile asm env (expr_arg expr 0))
-    (compile_simple_call asm 2 do_append_function)
+    (do_nothing asm)
     ))
 
 (fun setup_args (env args) (
@@ -700,6 +638,25 @@
     (set_label asm exit_lbl)
     ))
 
+(extern fun compile_matching_hook)
+(fun compile_lambda_main (asm env args body) (
+    ; XXX: do closure conversion
+    (var asm_body (make_assembler))
+    (compile_function asm_body env args body)
+    (var pats (list1 (list2 args (get_code asm_body))))
+    (var expr (make_expr Function (list2 (allocate_bytecode) pats)))
+    (compile_matching_hook expr (to_sym "%Closure") (list_len args))
+    (put_push asm expr)
+    ))
+
+(fun compile_lambda (asm env expr) (
+    (compile_lambda_main asm env (expr_args (expr_arg expr 0)) (expr_arg expr 1))
+    ))
+
+(fun compile_lambda_1arg (asm env expr) (
+    (compile_lambda_main asm env (list1 (expr_arg expr 0)) (expr_arg expr 1))
+    ))
+
 (export fun compile_simple_function (asm arity func) (
     (var n arity)
     (while (> n 0) (do
@@ -727,7 +684,6 @@
         ))
     ))
 
-(extern fun compile_matching_hook)
 (fun add_function (tbl sym args code) (
     (var arity (list_len args))
     (var ent (symtable_find_local tbl sym arity))
@@ -823,13 +779,16 @@
     (var tbl (get_vartable exec_env))
     (var symT (headP Symbol))
     (var listT (headP List))
+    (var tupleT (headP Tuple))
     (var intT (headP Int))
     (var stringT (headP String))
     (var locT (make_expr Loc (list3 stringT intT intT)))
     (add_compiler tbl (make_expr Located (list2 locT DontCare)) compile_located)
     (add_compiler tbl (make_expr DefineSyntax (list2 symT DontCare)) compile_define_syntax)
-    (add_compiler tbl (make_expr DefineFunction (list2 DontCare DontCare)) compile_define_function)
-    (add_compiler tbl (make_expr AppendFunction (list2 DontCare DontCare)) compile_append_function)
+    (add_compiler tbl (make_expr DefineFunction (list2
+        (make_expr Apply (list2 symT listT)) DontCare)) compile_define_function)
+    (add_compiler tbl (make_expr AppendFunction (list2
+        (make_expr Apply (list2 symT listT)) DontCare)) compile_append_function)
     (add_compiler tbl (make_expr DefineVariable (list2 symT DontCare)) compile_define_variable)
     (add_compiler tbl (headP Symbol) compile_var)
     (add_compiler tbl (make_expr Apply (list2 DontCare listT)) compile_apply)
@@ -847,8 +806,9 @@
     (add_compiler tbl (make_expr (to_sym "Return") (list1 DontCare)) compile_return)
     (add_compiler tbl (make_expr (to_sym "Equal") (list2 DontCare DontCare)) compile_eq)
     (add_compiler tbl (make_expr (to_sym "NotEqual") (list2 DontCare DontCare)) compile_ne)
-
     (add_compiler tbl (make_expr (to_sym "Assign") (list2 symT DontCare)) compile_assign)
+    (add_compiler tbl (make_expr (to_sym "Lambda") (list2 DontCare DontCare)) compile_lambda_1arg)
+    (add_compiler tbl (make_expr (to_sym "Lambda") (list2 tupleT DontCare)) compile_lambda)
     ))
 
 (export fun add_compiler (tbl pat func) (
