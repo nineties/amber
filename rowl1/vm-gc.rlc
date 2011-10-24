@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2011-10-11 00:55:35 nineties $
+; $Id: vm-gc.rlc 2011-10-24 23:40:50 nineties $
 ;
 
 (import "stdlib")
@@ -398,8 +398,13 @@
 
     ; sweep across promoted pages with breadth-first traversing and copy their consistents.
     (while page_queue_head (
-        (void* p @(PDESCR2PAGE page_queue_head))
-        (void* end (+ p @PAGE_SIZE))
+        (void* p page_queue_head)
+        (void* end (+ p @PDESCR_SIZE))
+        (while (&& @(pdescr->joined end) (! @(IS_END_PDESCR end))) (
+            (+= end @PDESCR_SIZE)
+            ))
+        (= p @(PDESCR2PAGE p))
+        (= end @(PDESCR2PAGE end))
         (while (&& (< p end) (!= p freep)) (
             (move_fields p)
             (+= p (* @WORD_SIZE @(OBJECT_WORDS p)))
@@ -484,7 +489,10 @@
         (allocate_page (>> (- (+ words @PAGE_WORDS) 1) @PAGE_WORDS_SHIFT))
         ))
     (void* obj freep)
-    (if (<= words @PAGE_WORDS) ((-= free_words words)) ((= free_words 0)))
+    (if (<= words @PAGE_WORDS)
+        ((-= free_words words))
+        ((= free_words (- @PAGE_WORDS (% words @PAGE_WORDS))))
+        )
     (+= freep (* @WORD_SIZE words))
     (return obj)
     ))
