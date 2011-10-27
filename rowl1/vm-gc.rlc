@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2011-10-24 23:40:50 nineties $
+; $Id: vm-gc.rlc 2011-10-27 22:47:21 nineties $
 ;
 
 (import "stdlib")
@@ -399,13 +399,10 @@
     ; sweep across promoted pages with breadth-first traversing and copy their consistents.
     (while page_queue_head (
         (void* p page_queue_head)
-        (void* end (+ p @PDESCR_SIZE))
-        (while (&& @(pdescr->joined end) (! @(IS_END_PDESCR end))) (
-            (+= end @PDESCR_SIZE)
-            ))
         (= p @(PDESCR2PAGE p))
-        (= end @(PDESCR2PAGE end))
-        (while (&& (< p end) (!= p freep)) (
+        (move_fields p)
+        (+= p (* @WORD_SIZE @(OBJECT_WORDS p)))
+        (while (&& (& p @PAGE_MASK) (!= p freep)) (
             (move_fields p)
             (+= p (* @WORD_SIZE @(OBJECT_WORDS p)))
             ))
@@ -610,7 +607,7 @@
     ))
 
 (export prim_bytecode_set)
-(fun prim_bytecode_set (ptr code len addrs objs nobj) (
+(fun prim_bytecode_set (ptr code len addrs objs nobj pats) (
     ; this function must be atomic
     (for i 0 nobj (
         (int addr ([] addrs i))

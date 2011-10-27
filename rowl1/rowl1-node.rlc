@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2011-10-22 06:55:16 nineties $
+; $Id: rowl1-node.rlc 2011-10-27 22:52:13 nineties $
 ;
 
 (import "rlvm-compile")
@@ -60,11 +60,13 @@
 (export var AppendFunction (to_sym "AppendFunction"))
 (export var DefineVariable (to_sym "DefineVariable"))
 
-(export var Function    (to_sym "Function")) ; Function{code, defs}
 (export var Assembler   (to_builtin_sym "Assembler"))
 (export var Environment (to_builtin_sym "Environment"))
-(export var Bytecode    (to_builtin_sym "Bytecode"))
+(export var Function    (to_builtin_sym "Function"))
 (export var Builtin     (to_builtin_sym "Builtin"))
+(export var Bytecode    (to_builtin_sym "Bytecode"))
+(export var Function    (to_builtin_sym "Function")) ; Function{code, defs}
+(export var Closure     (to_builtin_sym "Closure"))
 (export var InputFileStream (to_builtin_sym "InputFileStream"))
 (export var OutputFileStream (to_builtin_sym "OutputFileStream"))
 
@@ -108,6 +110,8 @@
     (if (== tag @TAG_VARIANT) (return (field_get obj 0)))
     (if (== tag @TAG_CONS) (return @ListE))
     (if (== tag @TAG_BYTECODE) (return @BytecodeE))
+    (if (== tag @TAG_FUNCTION) (return @FunctionE))
+    (if (== tag @TAG_CLOSURE) (return @ClosureE))
     (return @BuiltinE)
     ))
 
@@ -182,6 +186,8 @@
         (@AssemblerE        . (return Assembler))
         (@EnvironmentE      . (return Environment))
         (@BytecodeE         . (return Bytecode))
+        (@FunctionE         . (return Function))
+        (@ClosureE          . (return Closure))
         (@InputFileStreamE  . (return InputFileStream))
         (@OutputFileStreamE . (return OutputFileStream))
         (@IntE              . (return Int))
@@ -331,12 +337,11 @@
 (var operator_table (make_symtable))
 
 (export fun register_operator (head op) (
-    (symtable_add operator_table head 0 op)
+    (symtable_add operator_table head op)
     ))
 
 (fun find_operator (head) (
-    (return (symtable_find operator_table head 0))
-
+    (return (symtable_find operator_table head))
     ))
 
 ; printing functions
@@ -358,6 +363,8 @@
         (@AssemblerE        . (return (output_string ochan "Assembler")))
         (@EnvironmentE      . (return (output_string ochan "Environment")))
         (@BytecodeE         . (return (output_string ochan "Bytecode")))
+        (@FunctionE         . (return (output_string ochan "Function")))
+        (@ClosureE          . (return (output_string ochan "Closure")))
         (@InputFileStreamE  . (return (output_string ochan "InputFileStream")))
         (@OutputFileStreamE . (return (output_string ochan "OutputFileStream")))
         (@IntE              . (return (output_string ochan "Int")))
@@ -380,6 +387,8 @@
         (@AssemblerE        . (return (pp_assembler ochan node)))
         (@EnvironmentE      . (return (pp_environment ochan node)))
         (@BytecodeE         . (return (pp_bytecode ochan node)))
+        (@FunctionE         . (return (pp_function ochan node)))
+        (@ClosureE          . (return (pp_closure ochan node)))
         (@InputFileStreamE  . (return (pp_file_stream ochan node)))
         (@OutputFileStreamE . (return (pp_file_stream ochan node)))
         (@IntE              . (return (pp_int ochan node)))
@@ -526,6 +535,18 @@
     (output_char ochan '>')
     ))
 
+(fun pp_function (ochan expr) (
+    (output_string ochan "<#Function:0x")
+    (output_hex ochan expr 8)
+    (output_char ochan '>')
+    ))
+
+(fun pp_closure (ochan expr) (
+    (output_string ochan "<#Closure:0x")
+    (output_hex ochan expr 8)
+    (output_char ochan '>')
+    ))
+
 (fun pp_file_stream (ochan node) (
     (if (== (node_type node) @InputFileStreamE)
         (output_string ochan "<#InputFileStream:")
@@ -612,6 +633,8 @@
         (@AssemblerE        . (return (pp_assembler ochan node)))
         (@EnvironmentE      . (return (pp_environment ochan node)))
         (@BytecodeE         . (return (pp_bytecode ochan node)))
+        (@FunctionE         . (return (pp_function ochan node)))
+        (@ClosureE          . (return (pp_closure ochan node)))
         (@InputFileStreamE  . (return (pp_file_stream ochan node)))
         (@OutputFileStreamE . (return (pp_file_stream ochan node)))
         (@IntE              . (return (pp_int ochan node)))

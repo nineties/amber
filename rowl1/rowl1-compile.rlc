@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2011-10-22 07:00:19 nineties $
+; $Id: rowl1-compile.rlc 2011-10-28 02:09:49 nineties $
 ;
 
 (import "rlvm-compile")
@@ -26,22 +26,74 @@
 (extern object exec_env)
 (extern fun set_loc)
 
-(fun undefined_error (sym arity) (
-    (output_error stderr)
-    (output_string stderr "no definition of `")
-    (output_symbol stderr sym)
-    (output_string stderr "' whose arity is ")
-    (output_int stderr arity)
-    (output_string stderr "\n")
-    (exit 1)
+(fun alloc_function () (
+    (return (variant @FunctionE 2 0 0 0)) ; code, defs, size
+    ))
+
+(fun clone_function (orig_func) (
+    (var new_func (alloc_function))
+    (field_set new_func 1 (field_get orig_func 1))
+    (field_set new_func 2 (field_get orig_func 2))
+    (field_set new_func 3 (field_get orig_func 3))
+    (return new_func)
+    ))
+
+(fun resize_function (func new_size) (
+    (var old_size (field_get func 3))
+    (if (< old_size new_size) (do
+        (var new_codes (array object new_size))
+        (var new_defs  (array object new_size))
+        (memcpy new_codes (field_get func 1) (* 4 old_size))
+        (memcpy new_defs  (field_get func 2) (* 4 old_size))
+        (field_set func 1 new_codes)
+        (field_set func 2 new_defs)
+        (field_set func 3 new_size)
+        ))
+    (return func)
+    ))
+
+(fun add_function_def (func arity pats code) (
+    (= func (resize_function func (+ arity 1)))
+    (var defs (field_get func 2))
+    (array_set object defs arity
+        (cons (list3 pats code current_loc) (array_get object defs arity)))
+    (var codes (field_get func 1))
+    (if (! (array_get object codes arity)) (do
+        (array_set object codes arity (allocate_bytecode))
+        ))
+    ))
+
+(export fun get_code_with_arity (func arity) (
+    (var codes (field_get func 1))
+    (var size (field_get func 3))
+    (if (<= size arity)
+        (return 0)
+        )
+    (return (array_get object codes arity))
+    ))
+
+(export fun get_defs_with_arity (func arity) (
+    (var defs (field_get func 2))
+    (var size (field_get func 3))
+    (if (<= size arity)
+        (return 0)
+        )
+    (return (array_get object defs arity))
     ))
 
 (fun lookup_func (tbl sym arity) (
-    (var ent (symtable_find tbl sym arity))
-    (if (! ent) (do
-        (undefined_error sym arity)
+    (var func (symtable_find tbl sym))
+    (var code (get_code_with_arity func arity))
+    (if (! code) (do
+        (output_error stderr)
+        (output_string stderr "no definition of `")
+        (output_symbol stderr sym)
+        (output_string stderr "' whose arity is ")
+        (output_int stderr arity)
+        (output_char stderr '\n')
+        (exit 1)
         ))
-    (return (expr_arg (car ent) 0))
+    (return code)
     ))
 
 (export fun compile (asm env expr) (
@@ -127,11 +179,11 @@
     (var asm_body (make_assembler))
     (var code (allocate_bytecode))
     (var tbl (get_vartable env))
-    (var ent (add_function tbl sym args code))
+    (var func (add_function tbl sym args code))
 
     (compile_function asm_body env args body)
     (set_code code asm_body)
-    (function_updated sym (list_len args) ent)
+    (function_updated sym (list_len args) func)
 
     (do_nothing asm)
     ))
@@ -144,11 +196,11 @@
     (var asm_body (make_assembler))
     (var code (allocate_bytecode))
     (var tbl (get_vartable env))
-    (var ent (append_function tbl sym args code))
+    (var func (append_function tbl sym args code))
 
     (compile_function asm_body env args body)
     (set_code code asm_body)
-    (function_updated sym (list_len args) ent)
+    (function_updated sym (list_len args) func)
 
     (do_nothing asm)
     ))
@@ -170,13 +222,13 @@
         return
         )
     (if (== argty Symbol) (do
-        (symtable_add (get_vartable env) arg -1 obj)
+        (symtable_add (get_vartable env) arg obj)
         return
         ))
     (if (== argty HeadP) (do
         (var head (expr_arg_symbol arg 1))
         (var v (expr_arg_symbol arg 0))
-        (symtable_add (get_vartable env) v -1 obj)
+        (symtable_add (get_vartable env) v obj)
         return
         ))
     (if (== argty List) (do
@@ -229,7 +281,7 @@
     (var tbl (get_vartable exec_env))
     (check_redefinition tbl sym)
     (var ent (make_gvar val))
-    (symtable_add tbl sym -1 ent)
+    (symtable_add tbl sym ent)
     ))
 
 (fun compile_define_variable (asm env expr) (
@@ -248,12 +300,12 @@
             (var idx (new_lvar_index env))
             (compile asm env val)
             (put_store_lvar asm idx)
-            (symtable_add tbl sym -1 (make_lvar idx))
+            (symtable_add tbl sym (make_lvar idx))
         ))
     ))
 
 (fun check_redefinition (tbl sym) (
-    (var info (symtable_find_local tbl sym -1))
+    (var info (symtable_find_local tbl sym))
     (if info (do
         (output_error stderr)
         (output_string stderr "variable `")
@@ -265,48 +317,55 @@
         ))
     ))
 
-(export fun compile_operand (asm info) (
-    (var ty (expr_head info))
+(export fun compile_operand (asm opd) (
+    (var ty (expr_head opd))
     (if (== ty GlobalVariable) (do
-        (put_push asm (expr_args info))
+        (put_push asm (expr_args opd))
         (put_car asm)
         return
         ))
     (if (== ty LocalVariable) (do
-        (put_load_lvar asm (expr_arg_int info 0))
+        (put_load_lvar asm (expr_arg_int opd 0))
         return
         ))
     (if (== ty Argument) (do
-        (put_arg asm (expr_arg_int info 0))
+        (put_arg asm (expr_arg_int opd 0))
         return
         ))
     (if (== ty ListAt) (do
-        (compile_operand asm (expr_arg info 0))
-        (put_imm_int asm (expr_arg_int info 1))
+        (compile_operand asm (expr_arg opd 0))
+        (put_imm_int asm (expr_arg_int opd 1))
         (put_list_at asm)
         return
         ))
     (if (== ty ExprAt) (do
-        (compile_operand asm (expr_arg info 0))
+        (compile_operand asm (expr_arg opd 0))
         (put_field_get2 asm)
-        (put_imm_int asm (expr_arg_int info 1))
+        (put_imm_int asm (expr_arg_int opd 1))
         (put_list_at asm)
+        return
+        ))
+    (if (== ty Function) (do
+        (put_push asm opd)
         return
         ))
     (not_reachable "compile_operand")
     ))
 
-(fun compile_var (asm env expr) (
-    (var v (symtable_find (get_vartable env 0) expr -1))
-    (if v
-        (compile_operand asm v)
-        (do
-            (output_error stderr)
-            (output_string stderr "undefined variable `")
-            (pretty_print stderr expr)
-            (output_string stderr "'\n")
-            (exit 1)
+(fun lookup_var (env sym) (
+    (var v (symtable_find (get_vartable env) sym))
+    (if (! v) (do
+        (output_error stderr)
+        (output_string stderr "undefined variable `")
+        (pretty_print stderr sym)
+        (output_string stderr "'\n")
+        (exit 1)
         ))
+    (return v)
+    ))
+
+(fun compile_var (asm env expr) (
+    (compile_operand asm (lookup_var env expr))
     ))
 
 (fun compile_apply (asm env expr) (
@@ -323,11 +382,32 @@
 
     (if (== (node_type fun) @SymbolE)
         (do
-            (compile_call asm env arity fun)
+            (var info (lookup_var env fun))
+            (if (== (expr_head info) Function) (do
+                ; direct call
+                (var code (get_code_with_arity info arity))
+                (if (! code) (do
+                    (output_error stderr)
+                    (output_string stderr "no definition of `")
+                    (output_symbol stderr fun)
+                    (output_string stderr "' whose arity is ")
+                    (output_int stderr arity)
+                    (output_char stderr '\n')
+                    (exit 1)
+                    ))
+                (put_push asm code)
+                (put_jcall asm (* 4 arity))
+                return
+                ))
+            (compile_operand asm info)
         )
-        (do
-            (not_implemented "compile_apply")
-        ))
+        (compile asm env fun)
+        )
+    ; indirect call
+    (put_field_get1 asm)
+    (put_imm_int32 asm arity)
+    (put_array_get32 asm)
+    (put_jcall asm (* 4 arity))
     ))
 
 (export fun compile_quote_main (asm env expr) (
@@ -579,7 +659,7 @@
     (var lhs (expr_arg_symbol expr 0))
     (var rhs (expr_arg expr 1))
     (compile asm env rhs)
-    (var v (symtable_find (get_vartable env) lhs -1))
+    (var v (symtable_find (get_vartable env) lhs))
     (if (== v 0) (do
         (output_error stderr)
         (output_string stderr "undefined variable `")
@@ -641,12 +721,13 @@
 (extern fun compile_matching_hook)
 (fun compile_lambda_main (asm env args body) (
     ; XXX: do closure conversion
+    (var arity (list_len args))
     (var asm_body (make_assembler))
     (compile_function asm_body env args body)
-    (var pats (list1 (list2 args (get_code asm_body))))
-    (var expr (make_expr Function (list2 (allocate_bytecode) pats)))
-    (compile_matching_hook expr (to_sym "%Closure") (list_len args))
-    (put_push asm expr)
+    (var func (alloc_function))
+    (add_function_def func arity args (get_code asm_body))
+    (compile_matching_hook func (to_sym "lambda") arity)
+    (put_push asm func)
     ))
 
 (fun compile_lambda (asm env expr) (
@@ -667,12 +748,6 @@
     (put_ireturn asm)
     ))
 
-(export fun compile_call (asm env arity sym) (
-    (var code (lookup_func (get_vartable env) sym arity))
-    (put_push asm code)
-    (put_jcall asm (* 4 arity))
-    ))
-
 (export fun compile_simple_call (asm arity func) (
     (if @(IS_PRIM func)
         (do
@@ -686,58 +761,63 @@
 
 (fun add_function (tbl sym args code) (
     (var arity (list_len args))
-    (var ent (symtable_find_local tbl sym arity))
-    (if ent (do
-        (var pats (cons (list2 args code) (expr_arg (car ent) 1)))
-        (expr_arg_set (car ent) 1 pats)
-        (compile_matching_hook (car ent) sym arity)
-        (return ent)
+    (var func (symtable_find_local tbl sym))
+    (if func (do
+        (if (!= (node_type func) @FunctionE) (do
+            (output_error stderr)
+            (output_string stderr "`")
+            (output_symbol stderr sym)
+            (output_string stderr "' is already defined as a variable at")
+            (output_loc stderr (var_loc func))
+            (output_char stderr '\n')
+            (exit 1)
+            ))
+        (add_function_def func arity args code)
+        (compile_matching_hook func sym arity)
+        (return func)
         ))
-    (var ent (symtable_find tbl sym arity))
-    (if ent
+    (= func (symtable_find tbl sym))
+    (if (&& func (== (node_type func) @FunctionE))
         (do
-            (var pats (cons (list2 args code) (expr_arg (car ent) 1)))
-            (= ent (list2 (make_expr Function (list2 (allocate_bytecode) pats)) current_loc))
-            (compile_matching_hook (car ent) sym arity)
+            (= func (clone_function func))
+            (add_function_def func arity args code)
+            (compile_matching_hook func sym arity)
         )
         (do
-            (var pats (list1 (list2 args code)))
-            (= ent (list2 (make_expr Function (list2 (allocate_bytecode) pats)) current_loc))
-            (compile_matching_hook (car ent) sym arity)
+            (= func (alloc_function))
+            (add_function_def func arity args code)
+            (compile_matching_hook func sym arity)
         ))
-    (symtable_add tbl sym arity ent)
-    (return ent)
+    (symtable_add tbl sym func)
+    (return func)
     ))
 
 (fun append_function (tbl sym args code) (
     (var arity (list_len args))
-    (var ent (symtable_find tbl sym arity))
-    (if ent
+    (var func (symtable_find tbl sym))
+    (if (&& func (== (node_type func) @FunctionE))
         (do
-            (var pats (cons (list2 args code) (expr_arg (car ent) 1)))
-            (expr_arg_set (car ent) 1 pats)
-            (compile_matching_hook (car ent) sym arity)
-            (return ent)
+            (add_function_def func arity args code)
+            (compile_matching_hook func sym arity)
+            (return func)
         )
         (do
             (output_error stderr)
-            (output_string stderr "no definition of `")
+            (output_string stderr "function `")
             (output_symbol stderr sym)
-            (output_string stderr "' whose arity is ")
-            (output_int stderr arity)
-            (output_string stderr "\n")
+            (output_string stderr "is not defined\n")
             (exit 1)
         ))
     ))
 
-(fun function_updated (sym arity ent) (
-    (compile_matching_hook (car ent) sym arity)
+(fun function_updated (sym arity func) (
+    (compile_matching_hook func sym arity)
     ))
 
 (export fun add_global_variable (tbl sym val) (
     (check_redefinition tbl sym)
     (var ent (make_gvar val))
-    (symtable_add tbl sym -1 ent)
+    (symtable_add tbl sym ent)
     ))
 
 (export fun add_builtin_function0 (tbl sym func) (

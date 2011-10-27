@@ -3,12 +3,11 @@
 # rowl - 2nd generation
 # Copyright (C) 2010 nineties
 #
-# $Id: main.rl 2011-10-22 06:56:33 nineties $
+# $Id: main.rl 2011-10-28 02:24:21 nineties $
 
-#test of lambda
+# test of lambda
 {
     puts(obj): puts(\fullform, obj)
-    (\puts)(obj) => `puts(\fullform, !obj)
     puts(\(x -> x + 1))
     p: x -> x + 1
     puts(p)
@@ -21,9 +20,9 @@
     puts(\f(x))
     puts(\f(x,y,z))
 }
-
-#fib(n): fib(n-1) + fib(n-2)
-#fib(0): 0
-#fib(1): 1
-
-#puts(fib(36))
+f(): { puts("Hello") }
+x: f
+puts(\fullform, x)
+x()
+puts(\fullform, x->x+1)
+puts((x->x+1)(2))

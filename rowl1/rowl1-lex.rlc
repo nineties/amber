@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-lex.rlc 2011-09-26 13:24:20 nineties $
+; $Id: rowl1-lex.rlc 2011-10-27 23:02:19 nineties $
 ;
 
 (import "rlvm-compile")
@@ -191,7 +191,8 @@
 (var lexbuf null)
 (var lexbuf_end 0)
 (var token_tag @TOK_NONE)
-(var token_value 0) ; for integer and character
+(var token_unboxed 0) ; for integer
+(var token_boxed null)
 (var token_buf null)
 (var srcfile null)
 (var srcline 1)
@@ -211,7 +212,8 @@
 
 (export fun get_token_text () ((return (cvector_raw token_buf))))
 (export fun get_token_len  () ((return (- (cvector_size token_buf) 1))))
-(export fun get_token_value () ((return token_value)))
+(export fun get_token_unboxed () ((return token_unboxed)))
+(export fun get_token_boxed () ((return token_boxed)))
 (export fun get_clmn () ((return srcclmn)))
 (export fun get_loc () (
     (if unputted
@@ -232,7 +234,7 @@
 
 (fun init_token_buf () (
     (= token_tag @TOK_NONE)
-    (= token_value 0)
+    (= token_unboxed 0)
     (cvector_resize token_buf 0)
     (cvector_pushback token_buf '\0')
     return
@@ -340,7 +342,7 @@
     (= next_srcline 1)
     (= next_srcclmn 1)
     (= token_tag @TOK_NONE)
-    (= token_value 0)
+    (= token_unboxed 0)
     (= unputted 0)
     (= lexichan ichan)
     (= token_buf (make_cvector 0))
@@ -445,8 +447,8 @@
         (17 . (do
             (accept @TOK_INT)
             (var c (consume))
-            (<<= token_value 1)
-            (|= token_value (- c '0'))
+            (<<= token_unboxed 1)
+            (|= token_unboxed (- c '0'))
             (= state (next_state s17next))
             (goto lexloop)
             ))
@@ -461,8 +463,8 @@
         (19 . (do
             (accept @TOK_INT)
             (var c (consume))
-            (<<= token_value 3)
-            (|= token_value (- c '0'))
+            (<<= token_unboxed 3)
+            (|= token_unboxed (- c '0'))
             (= state (next_state s19next))
             (goto lexloop)
             ))
@@ -476,20 +478,20 @@
             ))
         (21 . (do
             (accept @TOK_INT)
-            (<<= token_value 4)
+            (<<= token_unboxed 4)
             (var c (consume))
             (if (<= 'a' c)
-                (|= token_value (+ (- c 'a') 10))
+                (|= token_unboxed (+ (- c 'a') 10))
             (if (<= 'A' c)
-                (|= token_value (+ (- c 'A') 10))
-                (|= token_value (- c '0'))
+                (|= token_unboxed (+ (- c 'A') 10))
+                (|= token_unboxed (- c '0'))
                 ))
             (= state (next_state s21next))
             (goto lexloop)
             ))
         (22 . (do
             (accept @TOK_INT)
-            (= token_value (+ (* 10 token_value) (- (consume) '0')))
+            (= token_unboxed (+ (* 10 token_unboxed) (- (consume) '0')))
             (= state (next_state s22next))
             (goto lexloop)
             ))
@@ -547,7 +549,7 @@
                 (accept @TOK_CHAR)
                 (var str (get_unquoted_token_text))
                 (unescape_string str)
-                (= token_value (string str))
+                (= token_boxed (string str))
                 (= state 1)
                 (goto lexloop)
                 ))
@@ -566,7 +568,7 @@
                 (accept @TOK_CHAR)
                 (var str (get_unquoted_token_text))
                 (unescape_string str)
-                (= token_value (string str))
+                (= token_boxed (string str))
                 (= state 1)
                 (goto lexloop)
                 ))
@@ -588,7 +590,7 @@
             (accept @TOK_STRING)
             (var str (get_unquoted_token_text))
             (unescape_string str)
-            (= token_value (string str))
+            (= token_boxed (string str))
             (= state 1)
             (goto lexloop)
             ))
@@ -601,7 +603,7 @@
                     (accept_operator op infix_p)
                     (do
                         (accept @TOK_SYMBOL)
-                        (= token_value (to_sym (get_token_text)))
+                        (= token_boxed (to_sym (get_token_text)))
                     ))
 		))
             (goto lexloop)
@@ -660,13 +662,15 @@
 (var save_srcline 0)
 (var save_srcclmn 0)
 (var save_token_len 0)
-(var save_token_value 0)
+(var save_token_unboxed 0)
+(var save_token_boxed null)
 (fun store_lexer_state () (
     (= save_lexbuf_end lexbuf_end)
     (= save_srcline next_srcline)
     (= save_srcclmn next_srcclmn)
     (= save_token_len (get_token_len))
-    (= save_token_value (get_token_value))
+    (= save_token_unboxed (get_token_unboxed))
+    (= save_token_boxed (get_token_boxed))
     ))
 
 (fun restore_lexer_state () (
@@ -675,7 +679,8 @@
     (= next_srcclmn save_srcclmn)
     (cvector_resize token_buf save_token_len)
     (cvector_pushback token_buf '\0')
-    (= token_value save_token_value)
+    (= token_unboxed save_token_unboxed)
+    (= token_boxed save_token_boxed)
     ))
 
 (fun get_unquoted_token_text () (
@@ -700,7 +705,7 @@
             )
         )
         ))))))
-    (= token_value op)
+    (= token_boxed op)
     ))
 
 (fun push_operator_table () (

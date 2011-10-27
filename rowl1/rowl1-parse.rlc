@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-parse.rlc 2011-10-16 02:47:14 nineties $
+; $Id: rowl1-parse.rlc 2011-10-27 23:01:00 nineties $
 ;
 
 (import "rlvm-compile")
@@ -59,7 +59,7 @@
 
 (fun parse_expr_top (tok offs) (
     (if (== tok @TOK_COMMAND) (do
-        (var op (get_token_value))
+        (var op (get_token_boxed))
         (var head (field_get op 1))
         (= tok (lex_sub offs))
         (if (== tok @TOK_END)
@@ -79,7 +79,7 @@
 
     (label parse_expr_front)
     (while (== tok @TOK_PREFIX) (do
-        (= op_stack (cons (cons (get_token_value) (get_loc)) op_stack))
+        (= op_stack (cons (cons (get_token_boxed) (get_loc)) op_stack))
         (= tok (lex_sub offs))
         ))
     (var e (parse_primary tok))
@@ -95,7 +95,7 @@
     (label parse_expr_infix)
     (= tok (lex_infix offs))
     (if (|| (== tok @TOK_INFIX) (== tok @TOK_POSTFIX))
-        (= next_op (cons (get_token_value) (get_loc)))
+        (= next_op (cons (get_token_boxed) (get_loc)))
     (if (&& (! in_seq) (== tok ','))
         (= next_op (cons comma_op (get_loc)))
         (do
@@ -197,13 +197,13 @@
     (if (== t @TOK_END)
         (= t (lex))
         )
-    (if (== t @TOK_CHAR)   (return (get_token_value))
-    (if (== t @TOK_INT)    (return (box (get_token_value)))
+    (if (== t @TOK_CHAR)   (return (get_token_boxed))
+    (if (== t @TOK_INT)    (return (box (get_token_unboxed)))
     (if (== t @TOK_FLOAT)  (return (make_float_from_string (get_token_text)))
-    (if (== t @TOK_STRING) (return (get_token_value))
-    (if (== t @TOK_SYMBOL) (return (get_token_value))
+    (if (== t @TOK_STRING) (return (get_token_boxed))
+    (if (== t @TOK_SYMBOL) (return (get_token_boxed))
     (if (== t @TOK_CONSTR) (do
-        (var op (get_token_value))
+        (var op (get_token_boxed))
         (var head (field_get op 1))
         (var offs (get_clmn))
         (var args 0)
