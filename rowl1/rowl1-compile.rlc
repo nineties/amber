@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2011-10-28 02:09:49 nineties $
+; $Id: rowl1-compile.rlc 2011-10-28 14:18:43 nineties $
 ;
 
 (import "rlvm-compile")
@@ -63,36 +63,40 @@
         ))
     ))
 
-(export fun get_code_with_arity (func arity) (
+(export fun get_code_with_arity (arity func) (
     (var codes (field_get func 1))
     (var size (field_get func 3))
     (if (<= size arity)
-        (return 0)
-        )
+        (do
+            (output_error stderr)
+            (output_string stderr "invalid number of arguments\n")
+            (exit 1)
+        ))
     (return (array_get object codes arity))
     ))
 
-(export fun get_defs_with_arity (func arity) (
+(export fun get_defs_with_arity (arity func) (
     (var defs (field_get func 2))
     (var size (field_get func 3))
     (if (<= size arity)
-        (return 0)
-        )
+        (do
+            (output_error stderr)
+            (output_string stderr "invalid number of arguments\n")
+            (exit 1)
+        ))
     (return (array_get object defs arity))
     ))
 
 (fun lookup_func (tbl sym arity) (
     (var func (symtable_find tbl sym))
-    (var code (get_code_with_arity func arity))
-    (if (! code) (do
+    (if (! func) (do
         (output_error stderr)
-        (output_string stderr "no definition of `")
+        (output_string stderr "undefined function `")
         (output_symbol stderr sym)
-        (output_string stderr "' whose arity is ")
-        (output_int stderr arity)
-        (output_char stderr '\n')
+        (output_string stderr "'\n")
         (exit 1)
         ))
+    (var code (get_code_with_arity arity func))
     (return code)
     ))
 
@@ -385,16 +389,7 @@
             (var info (lookup_var env fun))
             (if (== (expr_head info) Function) (do
                 ; direct call
-                (var code (get_code_with_arity info arity))
-                (if (! code) (do
-                    (output_error stderr)
-                    (output_string stderr "no definition of `")
-                    (output_symbol stderr fun)
-                    (output_string stderr "' whose arity is ")
-                    (output_int stderr arity)
-                    (output_char stderr '\n')
-                    (exit 1)
-                    ))
+                (var code (get_code_with_arity arity info))
                 (put_push asm code)
                 (put_jcall asm (* 4 arity))
                 return
@@ -404,9 +399,8 @@
         (compile asm env fun)
         )
     ; indirect call
-    (put_field_get1 asm)
-    (put_imm_int32 asm arity)
-    (put_array_get32 asm)
+    (put_imm_int asm arity)
+    (compile_simple_call asm 2 get_code_with_arity)
     (put_jcall asm (* 4 arity))
     ))
 
@@ -660,7 +654,7 @@
     (var rhs (expr_arg expr 1))
     (compile asm env rhs)
     (var v (symtable_find (get_vartable env) lhs))
-    (if (== v 0) (do
+    (if (! v) (do
         (output_error stderr)
         (output_string stderr "undefined variable `")
         (pretty_print stderr lhs)
