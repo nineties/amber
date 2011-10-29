@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2011-10-28 14:18:43 nineties $
+; $Id: rowl1-compile.rlc 2011-10-29 22:36:15 nineties $
 ;
 
 (import "rlvm-compile")
@@ -25,6 +25,75 @@
 (extern object current_loc)
 (extern object exec_env)
 (extern fun set_loc)
+
+(fun delete_vars (tbl expr) (
+    (var hd (expr_head expr))
+    (if (== hd Symbol) (do
+        (symtable_delete tbl expr)
+        return
+        ))
+    (if (is_atom_type expr) return)
+    (var args (expr_args expr))
+    (while args (do
+        (delete_vars tbl (car args))
+        (= args (cdr args))
+        ))
+    ))
+
+(fun fv_iter_block (env tbl exprs) (
+    (if (! exprs) return)
+    (fv_iter_block env tbl (cdr exprs))
+    (fv_iter env tbl (car exprs) 0)
+    ))
+
+(fun fv_iter (env tbl expr level) (
+    (var hd (expr_head expr))
+    (if (== hd Symbol) (do
+        (if (== level 0) (do
+            (if (symtable_find tbl expr) return) ; check for duplication
+            (if (symtable_find_global (get_vartable env) expr) return)
+            (symtable_add tbl expr expr)
+            ))
+        return
+        ))
+    (if (is_atom_type expr) return)
+    (if (== level 0) (do
+        (if (== hd DefineSyntax) return)
+        (if (|| (== hd DefineFunction) (== hd AppendFunction)) (do
+            (fv_iter env tbl (expr_arg expr 1) 0)
+            (delete_vars tbl (expr_arg expr 0))
+            return
+            ))
+        (if (== hd DefineVariable) (do
+            (fv_iter env tbl (expr_arg expr 1) 0)
+            (delete_vars tbl (expr_arg expr 0))
+            return
+            ))
+        (if (== hd Lambda) (do
+            (fv_iter env tbl (expr_arg expr 1) 0)
+            (delete_vars tbl (expr_arg expr 0))
+            return
+            ))
+        (if (== hd Block) (do
+            (fv_iter_block env tbl (expr_args expr) 0)
+            return
+            ))
+        ))
+    (if (== hd Quote) return)
+    (if (== hd QuasiQuote) (+= level 1)
+    (if (== hd Unquote) (-= level 1)))
+    (var args (expr_args expr))
+    (while args (do
+        (fv_iter env tbl (car args) level)
+        (= args (cdr args))
+        ))
+    ))
+
+(fun free_variables (env expr) (
+    (var tbl (make_symtable 10))
+    (fv_iter env tbl expr 0)
+    (return tbl)
+    ))
 
 (fun alloc_function () (
     (return (variant @FunctionE 2 0 0 0)) ; code, defs, size
@@ -138,7 +207,7 @@
 
     (push_env env)
     (set_lvar_index env 0)
-    (= args (setup_args env args))
+    (= args (setup_args (get_vartable env) args))
     (var cnt_addr (get_address asm))
     (put_allocate asm 0)
     (compile asm env body)
@@ -209,36 +278,36 @@
     (do_nothing asm)
     ))
 
-(fun setup_args (env args) (
+(fun setup_args (tbl args) (
     (var orig args)
     (var idx 0)
     (while args (do
-        (setup_arg env (make_arg idx) (car args))
+        (setup_arg tbl (make_arg idx) (car args))
         (= args (cdr args))
         (+= idx 1)
         ))
     (return orig)
     ))
 
-(fun setup_arg (env obj arg) (
+(fun setup_arg (tbl obj arg) (
     (var argty (expr_head arg))
     (if (|| (== argty Int) (== argty String))
         return
         )
     (if (== argty Symbol) (do
-        (symtable_add (get_vartable env) arg obj)
+        (symtable_add tbl arg obj)
         return
         ))
     (if (== argty HeadP) (do
         (var head (expr_arg_symbol arg 1))
         (var v (expr_arg_symbol arg 0))
-        (symtable_add (get_vartable env) v obj)
+        (symtable_add tbl v obj)
         return
         ))
     (if (== argty List) (do
         (var idx 0)
         (while arg (do
-            (setup_arg env (make_list_at obj idx) (car arg))
+            (setup_arg tbl (make_list_at obj idx) (car arg))
             (= arg (cdr arg))
             (incr idx)
             ))
@@ -247,7 +316,7 @@
     (var idx 0)
     (var args (expr_args arg))
     (while args (do
-        (setup_arg env (make_expr_at obj idx) (car args))
+        (setup_arg tbl (make_expr_at obj idx) (car args))
         (= args (cdr args))
         (incr idx)
         ))
@@ -404,31 +473,8 @@
     (put_jcall asm (* 4 arity))
     ))
 
-(export fun compile_quote_main (asm env expr) (
-    (var hd (expr_head expr))
-    (if (== hd Symbol)
-        (return (put_push asm expr)))
-    (if (== hd Int)
-        (return (put_imm_int asm expr)))
-    (if (== hd String)
-        (return (put_push asm expr)))
-    (if (== hd List)
-        (if (! expr)
-            (put_push asm 0)
-            (do
-                (compile_quote_main asm env (cdr expr))
-                (compile_quote_main asm env (car expr))
-                (put_cons asm)
-            ))
-        (do
-            (compile_quote_main asm env (expr_args expr))
-            (put_push asm (expr_head expr))
-            (compile_simple_call asm 2 make_expr_user)
-        ))
-    ))
-
 (fun compile_quote (asm env expr) (
-    (compile_quote_main asm env (expr_arg expr 0))
+    (put_push asm (expr_arg expr 0))
     ))
 
 (export fun compile_qquote_main (asm env expr level) (
