@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-symtable.rlc 2011-10-25 18:12:34 nineties $
+; $Id: rowl1-symtable.rlc 2011-10-28 21:54:36 nineties $
 ;
 
 (import "rlvm-compile")
@@ -23,14 +23,15 @@
 ;   2 : pointer to the next entry
 ;   3 : hash
 ;   4 : name space id
+;   5 : index of entries
 
 (array int prime_numbers (
     5 11 17 37 67 131 257 521 1031 2053 4099 8209 16411 32771 65537 131101
     0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
     ))
 
-(export fun make_symtable () (
-    (var size (array_get int prime_numbers 0))
+(export fun make_symtable (hint) (
+    (var size (array_get int prime_numbers (bsr hint)))
     (var table (struct 3 (make_vector size) (make_vector 0) (make_ivector 0)))
     (symtable_push table)
     (return table)
@@ -42,11 +43,6 @@
         (vector_clone (field_get table 1))
         (ivector_clone (field_get table 2))
         ))
-    ))
-
-(export fun symtable_size (table) (
-    (var entries (field_get table 1))
-    (return (vector_size entries))
     ))
 
 (export fun symtable_depth (table) (
@@ -96,6 +92,7 @@
         (var entries (field_get table 1))
         (for i 0 (vector_size entries) (do
             (var entry (vector_at entries i))
+            (if (! entry) continue)
             (var h (% (field_get entry 3) new_size))
             (field_set entry 2 (vector_at bucket h))
             (vector_put bucket h entry)
@@ -116,7 +113,7 @@
 
     (if (== depth 0) (error "symtable_add: no namespace"))
 
-    (var ent (struct 3 sym obj 0 h depth))
+    (var ent (struct 3 sym obj 0 h depth (vector_size entries)))
     (%= h size)
 
     (vector_pushback entries ent)
@@ -129,6 +126,32 @@
     (ivector_put display (- depth 1) (+ n 1))
     ))
 
+; delete most recent entry
+(export fun symtable_delete (table sym) (
+    (var bucket (field_get table 0))
+    (var entries (field_get table 1))
+    (var size (vector_size bucket))
+    (var h (hash sym))
+    (%= h size)
+    (var entry (vector_at bucket h))
+    (var prev 0)
+    (while entry (do
+        (var e_sym (field_get entry 0))
+        (if (== e_sym sym) (do
+            (if (! prev)
+                (vector_put bucket h (field_get entry 2))
+                (field_set prev 2 (field_get entry 2))
+                )
+            (vector_put entries (field_get entry 5) 0)
+            (return (field_get entry 1))
+            ))
+        (= prev entry)
+        (= entry (field_get entry 2))
+        ))
+    (return 0)
+    ))
+
+; lookup symbol from local scope
 (export fun symtable_find_local (table sym) (
     (var bucket (field_get table 0))
     (var display (field_get table 2))
@@ -141,6 +164,25 @@
         (var e_sym (field_get entry 0))
         (var e_depth (field_get entry 4))
         (if (< e_depth depth) (return 0))
+        (if (== e_sym sym)
+            (return (field_get entry 1))
+            )
+        (= entry (field_get entry 2))
+        ))
+    (return 0)
+    ))
+
+; lookup symbol from global scope
+(export fun symtable_find_global (table sym) (
+    (var bucket (field_get table 0))
+    (var size (vector_size bucket))
+    (var h (hash sym))
+    (%= h size)
+    (var entry (vector_at bucket h))
+    (while entry (do
+        (var e_sym (field_get entry 0))
+        (var e_depth (field_get entry 4))
+        (if (!= e_depth 1) (return 0))
         (if (== e_sym sym)
             (return (field_get entry 1))
             )
@@ -169,10 +211,9 @@
     (var entries (field_get table 1))
     (for i 0 (vector_size entries) (do
         (var entry (vector_at entries i))
+        (if (! entry) continue)
         (pretty_print ochan (field_get entry 0))
-        (output_char ochan '(')
-        (output_int ochan (field_get entry 4))
-        (output_string ochan ") => ")
+        (output_string ochan " => ")
         (pretty_print ochan (field_get entry 1))
         (output_char ochan '\n')
         ))

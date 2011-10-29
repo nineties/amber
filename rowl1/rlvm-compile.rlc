@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlvm-compile.rlc 2011-10-11 10:23:45 nineties $
+; $Id: rlvm-compile.rlc 2011-10-28 22:02:55 nineties $
 ;
 
 (import "stdlib")
@@ -44,7 +44,6 @@
     (var clbl (mklabel))
     (push break_labels blbl)
     (push continue_labels clbl)
-    (emit_insn `(label @clbl))
     ))
 (define pop_exit_label () (do
     (var blbl (car break_labels))
@@ -450,7 +449,13 @@
 (define compile_while ((_ expr body)) (do
     (var loop_label (mklabel))
     (push_exit_label)
-    (compile_if `(if @expr (do (label @loop_label) @body (if @expr (goto @loop_label)))))
+    (compile_if
+        `(if @expr (do
+            (label @loop_label)
+            @body
+            (label @(car continue_labels))
+            (if @expr (goto @loop_label))
+            )))
     (pop_exit_label)
     nil
     ))
@@ -477,6 +482,7 @@
         (if (< @it end) (do
             (label @loop_label)
             @body
+            (label @(car continue_labels))
             (incr @it)
             (if (< @it end) (goto @loop_label))
             ))
