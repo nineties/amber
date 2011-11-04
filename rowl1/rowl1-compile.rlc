@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2011-10-29 22:36:15 nineties $
+; $Id: rowl1-compile.rlc 2011-11-04 22:27:20 nineties $
 ;
 
 (import "rlvm-compile")
@@ -58,7 +58,6 @@
         ))
     (if (is_atom_type expr) return)
     (if (== level 0) (do
-        (if (== hd DefineSyntax) return)
         (if (|| (== hd DefineFunction) (== hd AppendFunction)) (do
             (fv_iter env tbl (expr_arg expr 1) 0)
             (delete_vars tbl (expr_arg expr 0))
@@ -216,32 +215,6 @@
     (pop_env env)
 
     (set_lvar_index env save_lvar_index)
-    ))
-
-(fun compile_define_syntax (asm env expr) (
-    (var head (expr_arg expr 0))
-    (var op   (expr_arg expr 1))
-
-    (do_nothing asm)
-
-    (if (== (node_type op) @ExprE) (do
-        (var type (expr_head op))
-        (if (|| (== type InfixL) (== type InfixR))
-            (return (add_infix head op))
-        (if (== type Prefix)
-            (return (add_prefix head op))
-        (if (== type Postfix)
-            (return (add_postfix head op))
-        (if (== type Constr)
-            (return (add_constr head op))
-        (if (== type Command)
-            (return (add_command head op)))))))
-        ))
-    (output_error stderr)
-    (output_string stderr "invalid syntax specifier `")
-    (pretty_print stderr op)
-    (output_string stderr "'\n")
-    (exit 1)
     ))
 
 (fun compile_define_function (asm env expr) (
@@ -904,7 +877,6 @@
     (var stringT (headP String))
     (var locT (make_expr Loc (list3 stringT intT intT)))
     (add_compiler tbl (make_expr Located (list2 locT DontCare)) compile_located)
-    (add_compiler tbl (make_expr DefineSyntax (list2 symT DontCare)) compile_define_syntax)
     (add_compiler tbl (make_expr DefineFunction (list2
         (make_expr Apply (list2 symT listT)) DontCare)) compile_define_function)
     (add_compiler tbl (make_expr AppendFunction (list2

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2011-10-22 06:54:07 nineties $
+; $Id: rowl1-interp.rlc 2011-11-04 19:12:38 nineties $
 ;
 
 (import "rlvm-compile")
@@ -16,6 +16,7 @@
 (import "rowl1-symtable")
 (import "rowl1-assemble")
 (import "rowl1-compile")
+(import "rowl1-module")
 
 (export var current_loc null)
 (export fun set_loc (loc) (
@@ -27,19 +28,31 @@
 (export fun init_exec_env () (
     (= exec_env (make_env))
     ))
+
 (export fun push_exec_env () (
     (push_env exec_env)
     ))
+
 (export fun pop_exec_env () (
     (pop_env exec_env)
     ))
 
-(export fun interpret () (
-    (while 1 (do
-        (var e (parse))
-        (if (! e) break)
-        (eval e)
-        ))
+(export var current_mod null)
+
+(export fun eval_file (path) (
+    (= current_mod (make_module (to_sym (get_modulename path)) 0))
+    (pretty_print_full stderr current_mod)
+    (output_char stderr '\n')
+
+    (var ichan (open_in path))
+    (init_parser path ichan)
+    (interpret)
+    (close_in ichan)
+    ))
+
+(fun interpret () (
+    (var es (parse))
+    (pretty_print stderr es)
     ))
 
 (var import_dirs null)

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-lex.rlc 2011-10-27 23:02:19 nineties $
+; $Id: rowl1-lex.rlc 2011-11-04 22:21:56 nineties $
 ;
 
 (import "rlvm-compile")
@@ -134,6 +134,7 @@
 
 (import "rowl1-util")
 (import "rowl1-node")
+(import "rowl1-module")
 
 (array char chgroup (
      0 25 25 25 25 25 25 25 25  1  2 25 25  1 25 25
@@ -205,8 +206,9 @@
 (var prev_srcclmn 1)
 (var newline 1)
 (var unputted 0)
-(var operator_table (make_idtable))
 (var lexer_stack null)
+
+(extern object current_mod)
 
 (fun is_member_of (c group) ((return (array_get char group c))))
 
@@ -349,6 +351,14 @@
     (cvector_pushback token_buf '\0')
     (= lexbuf (make_cvector 0))
     (= lexbuf_end 0)
+
+    ; setup special constructors
+    (add_constr DefInfixL "infixl")
+    (add_constr DefInfixR "infixr")
+    (add_constr DefPrefix "prefix")
+    (add_constr DefPostfix "postfix")
+    (add_constr DefConstr "constructor")
+    (add_constr DefCommand "command")
     ))
 
 ; XXX: not good design. should implement reentrant lexer
@@ -381,7 +391,7 @@
 (fun lex_main (infix_p offs) (
     (if unputted (do
         (= unputted 0)
-        (var op (lookup_operator_token (get_token_text)))
+        (var op (lookup_operator current_mod (get_token_text)))
         (if op (accept_operator op infix_p))
         (return token_tag)
         ))
@@ -598,7 +608,7 @@
             (consume)
             (= state (next_state s35next))
 	    (if (== state 1) (do
-                (var op (lookup_operator_token (get_token_text)))
+                (var op (lookup_operator current_mod (get_token_text)))
                 (if op
                     (accept_operator op infix_p)
                     (do
@@ -610,7 +620,7 @@
             ))
         (36 . (do
             (consume)
-            (var op (lookup_operator_token (get_token_text)))
+            (var op (lookup_operator current_mod (get_token_text)))
             (if op
                 (do
                     (accept_operator op infix_p)
@@ -708,22 +718,6 @@
     (= token_boxed op)
     ))
 
-(fun push_operator_table () (
-    (idtable_push operator_table)
-    ))
-
-(fun pop_operator_table () (
-    (idtable_pop operator_table)
-    ))
-
-(fun add_operator (name op) (
-    (idtable_add operator_table name op)
-    ))
-
-(fun lookup_operator_token (name) (
-    (return (idtable_find operator_table name))
-    ))
-
 (fun check_assoc (name assoc) (
     (if (&& (> assoc @ASSOC_PRIMARY) (< assoc @ASSOC_MAX)) return)
     (output_error stderr)
@@ -807,76 +801,66 @@
     (exit 1)
     ))
 
-(export fun add_prefix (head op) (
-    (var name (expr_arg_string op 0))
-    (var assoc (expr_arg_int op 1))
-    (check_operator_format name)
-    (check_assoc name assoc)
-    (register_operator head op)
-    (var op (lookup_operator_token name))
-    (var prefix_op (variant @OP_PREFIX 1 head assoc))
+
+(export fun add_prefix (head repr assoc) (
+    (check_operator_format repr)
+    (check_assoc repr assoc)
+    (var new_op (variant @OP_PREFIX 2 head repr assoc))
+    (var op (lookup_operator current_mod repr))
     (if op (do
         (var optype (field_get op 0))
         (if (== optype @OP_INFIX) (do
-            (add_operator name (variant @OP_PREFIX_OR_INFIX 2 prefix_op op))
+            (add_operator current_mod repr 0 (variant @OP_PREFIX_OR_INFIX 2 new_op op))
             return
             ))
         (if (== optype @OP_PREFIX_OR_INFIX) (do
-            (add_operator name (variant @OP_PREFIX_OR_INFIX 2 prefix_op (field_get op 2)))
+            (add_operator current_mod repr 0 (variant @OP_PREFIX_OR_INFIX 2 new_op (field_get op 2)))
             return
             ))
         ))
-    (add_operator name prefix_op)
+    (add_operator current_mod repr head new_op)
     return
     ))
 
-(export fun add_postfix (head op) (
-    (var name (expr_arg_string op 0))
-    (var assoc (expr_arg_int op 1))
-    (check_operator_format name)
-    (check_assoc name assoc)
-    (register_operator head op)
-    (add_operator name (variant @OP_POSTFIX 1 head assoc))
+(export fun add_postfix (head repr assoc) (
+    (check_operator_format repr)
+    (check_assoc repr assoc)
+    (var op (variant @OP_POSTFIX 2 head repr assoc))
+    (add_operator current_mod repr head op)
     ))
 
-(export fun add_infix (head op) (
-    (var type (expr_head op))
-    (var name (expr_arg_string op 0))
-    (var assoc (expr_arg_int op 1))
-    (check_operator_format name)
-    (check_assoc name assoc)
-    (register_operator head op)
-    (var is_left)
-    (if (== type InfixL) (= is_left @TRUE) (= is_left @FALSE))
-    (var infix_op (variant @OP_INFIX 1 head is_left assoc))
-    (var op (lookup_operator_token name))
+(export fun add_infixl (head repr assoc) ((add_infix head repr assoc @TRUE)))
+(export fun add_infixr (head repr assoc) ((add_infix head repr assoc @FALSE)))
+(fun add_infix (head repr assoc is_left) (
+    (check_operator_format repr)
+    (check_assoc repr assoc)
+    (var new_op (variant @OP_INFIX 2 head repr is_left assoc))
+    (var op (lookup_operator current_mod repr))
     (if op (do
         (var optype (field_get op 0))
         (if (== optype @OP_PREFIX) (do
-            (add_operator name (variant @OP_PREFIX_OR_INFIX 2 op infix_op))
+            (add_operator current_mod repr 0 (variant @OP_PREFIX_OR_INFIX 2 op new_op))
             return
             ))
         (if (== optype @OP_PREFIX_OR_INFIX) (do
-            (add_operator name (variant @OP_PREFIX_OR_INFIX 2 (field_get op 1) infix_op))
+            (add_operator current_mod repr 0 (variant @OP_PREFIX_OR_INFIX 2 (field_get op 1) new_op))
             return
             ))
         ))
-    (add_operator name infix_op)
+    (add_operator current_mod repr head new_op)
     ))
 
-(export fun add_constr (head op) (
-    (var name (expr_arg_string op 0))
-    (check_operator_format name)
-    (register_operator head op)
-    (add_operator name (variant @OP_CONSTR 1 head))
+(export fun add_constr (head repr) (
+    (check_operator_format repr)
+    (var op (variant @OP_CONSTR 2 head repr))
+    (add_operator current_mod repr head op)
     return
     ))
 
-(export fun add_command (head op) (
-    (var name (expr_arg_string op 0))
-    (check_operator_format name)
-    (register_operator head op)
-    (add_operator name (variant @OP_COMMAND 1 head))
+(export fun add_command (head repr) (
+    (check_operator_format repr)
+    (var op (variant @OP_COMMAND 2 head repr))
+    (add_operator current_mod repr head op)
     return
     ))
 
