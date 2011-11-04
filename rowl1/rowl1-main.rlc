@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-main.rlc 2011-10-14 03:51:21 nineties $
+; $Id: rowl1-main.rlc 2011-11-04 11:23:59 nineties $
 ;
 
 (import "rlvm-compile")
@@ -11,7 +11,6 @@
 (compile `object `(
 
 (import "rowl1-node")
-(import "rowl1-parse")
 (import "rowl1-interp")
 
 (fun main (argc argv) (
@@ -20,8 +19,7 @@
         (output_string stderr "no input files\n")
         (exit 1)
         ))
-    (for i 0 argc (eval_file (array_get string argv i)))
-    (return 0)
+    (return (eval_file (array_get string argv 0)))
     ))
 
 (fun parse_option (argcp argv) (
@@ -36,20 +34,6 @@
         (incr j)
         ))
     (set argcp new_argc)
-    ))
-
-(extern fun make_env)
-(fun eval_file (file) (
-    (var ichan (open_in file))
-    (init_exec_env)
-    (init_stdlib)
-    (init_parser file ichan)
-    (add_import_dir "/usr/lib/rowl/")
-    (add_import_dir "./")
-    (import_module_direct Nil "rowl/syntax")
-    (import_module_direct Nil "rowl/io")
-    (interpret)
-    (close_in ichan)
     ))
 
 (extern fun setup_builtin_compilers)

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-parse.rlc 2011-10-27 23:01:00 nineties $
+; $Id: rowl1-parse.rlc 2011-11-04 22:30:56 nineties $
 ;
 
 (import "rlvm-compile")
@@ -13,6 +13,7 @@
 (import "rowl1-util")
 (import "rowl1-lex")
 (import "rowl1-node")
+(import "rowl1-module")
 
 ; Prog      ::= Expr*
 ; Expr      ::= Secondary
@@ -33,10 +34,11 @@
 ; NB:
 ; - postfix operator must be unique
 
-(var comma_op null)
+(extern object current_mod)
+
+(var comma_op (variant @OP_INFIX 1 (to_sym "Comma") @FALSE @ASSOC_COMMA))
 
 (export fun init_parser (file ichan) (
-    (= comma_op (variant @OP_INFIX 1 (to_sym "Comma") @FALSE @ASSOC_COMMA))
     (init_lexer file ichan)
     ))
 
@@ -49,12 +51,16 @@
     ))
 
 (export fun parse () (
+    (var es 0)
     (var t (lex))
-    (if (== t @TOK_EOF) (return 0))
-    (var begin (get_loc))
-    (var e (parse_expr_top t (get_clmn)))
-    (var end (get_loc))
-    (return (make_located (merge_loc begin end) e))
+    (while (!= t @TOK_EOF) (do
+        (var begin (get_loc))
+        (var e (parse_expr_top t (get_clmn)))
+        (var end (get_loc))
+        (= es (cons (make_located (merge_loc begin end) e) es))
+        (= t (lex))
+        ))
+    (return (list_reverse es))
     ))
 
 (fun parse_expr_top (tok offs) (
@@ -67,7 +73,26 @@
             (return (make_expr_user head (cons (parse_expr tok offs) 0)))
             )
         ))
-    (return (parse_expr tok offs))
+    (var e (parse_expr tok offs))
+    (evaluate_parser_command e)
+    (return e)
+    ))
+
+(fun evaluate_parser_command (e) (
+    (var ty (expr_head e))
+    (if (== ty DefInfixL)
+        (add_infixl (expr_arg_symbol e 0) (expr_arg_string e 1) (expr_arg_int e 2))
+    (if (== ty DefInfixR)
+        (add_infixr (expr_arg_symbol e 0) (expr_arg_string e 1) (expr_arg_int e 2))
+    (if (== ty DefPrefix)
+        (add_prefix (expr_arg_symbol e 0) (expr_arg_string e 1) (expr_arg_int e 2))
+    (if (== ty DefPostfix)
+        (add_postfix (expr_arg_symbol e 0) (expr_arg_string e 1) (expr_arg_int e 2))
+    (if (== ty DefConstr)
+        (add_constr (expr_arg_symbol e 0) (expr_arg_string e 1))
+    (if (== ty DefCommand)
+        (add_command (expr_arg_symbol e 0) (expr_arg_string e 1))
+        ))))))
     ))
 
 (fun parse_expr (tok offs in_seq) (
@@ -99,8 +124,8 @@
     (if (&& (! in_seq) (== tok ','))
         (= next_op (cons comma_op (get_loc)))
         (do
-            (if (&& (!= tok @TOK_END) (&& (!= tok ',') (&& (!= tok ')') (&& (!= tok '}')
-                (!= tok ']'))))) (do
+            (if (&& (!= tok @TOK_EOF) (&& (!= tok @TOK_END)
+                (&& (!= tok ',') (&& (!= tok ')') (&& (!= tok '}') (!= tok ']')))))) (do
                 (output_loc stderr (get_loc))
                 (output_string stderr "infix or postfix operator is required before `")
                 (output_string stderr (get_token_text))
@@ -193,10 +218,7 @@
 (fun parse_primary (t) ((return (parse_primary_main t @TRUE))))
 (fun try_parse_primary (t) ((return (parse_primary_main t @FALSE))))
 
-(fun parse_primary_main (t error) (
-    (if (== t @TOK_END)
-        (= t (lex))
-        )
+(fun parse_primary_main (t force) (
     (if (== t @TOK_CHAR)   (return (get_token_boxed))
     (if (== t @TOK_INT)    (return (box (get_token_unboxed)))
     (if (== t @TOK_FLOAT)  (return (make_float_from_string (get_token_text)))
@@ -216,10 +238,15 @@
         )
     (if (== t '(') (return (parse_tuple (lex)))
     (if (== t '[') (return (parse_list (lex)))
-    (if (== t '{') (return (parse_block (lex)))
+    (if (== t '{') (do
+        (push_lextable current_mod)
+        (var e (parse_block (lex)))
+        (pop_lextable current_mod)
+        (return e)
+        )
         )))))))))
 
-    (if error
+    (if force
         (do
             (output_loc stderr (get_loc))
             (output_string stderr "expect a literal expression")
@@ -286,10 +313,10 @@
 
 (fun associativity (op) (
     (var type (field_get op 0))
-    (if (== type @OP_PREFIX) (return (field_get op 2))
-    (if (== type @OP_POSTFIX) (return (field_get op 2))
-    (if (== type @OP_INFIX) (return (field_get op 3))
-    (if (== type @OP_CONSTR) (return (field_get op 2))
+    (if (== type @OP_PREFIX) (return (field_get op 3))
+    (if (== type @OP_POSTFIX) (return (field_get op 3))
+    (if (== type @OP_INFIX) (return (field_get op 4))
+    (if (== type @OP_CONSTR) (return (field_get op 3))
     (if (== type @OP_START) (return @ASSOC_MAX)
     (if (== type @OP_END) (return @ASSOC_MAX)
         ))))))
@@ -324,8 +351,8 @@
     (var rtype (field_get rop 0))
     (if (== ltype @OP_START) (return 0))
     (if (&& (== ltype @OP_INFIX) (== rtype @OP_INFIX)) (do
-        (var is_left_l (field_get lop 2))
-        (var is_left_r (field_get rop 2))
+        (var is_left_l (field_get lop 3))
+        (var is_left_r (field_get rop 3))
         (if (== is_left_l is_left_r) (if is_left_l (return 1) (return -1)))
         ))
     (output_loc stderr (merge_loc (cdr lop_info) (cdr rop_info)))

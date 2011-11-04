@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2011-10-29 01:52:23 nineties $
+; $Id: rowl1-node.rlc 2011-11-04 22:23:31 nineties $
 ;
 
 (import "rlvm-compile")
@@ -55,7 +55,6 @@
 (export var LogicalAnd  (to_sym "LogicalAnd"))
 (export var LogicalOr   (to_sym "LogicalOr"))
 
-(export var DefineSyntax   (to_sym "DefineSyntax"))
 (export var DefineFunction (to_sym "DefineFunction"))
 (export var AppendFunction (to_sym "AppendFunction"))
 (export var DefineVariable (to_sym "DefineVariable"))
@@ -70,6 +69,14 @@
 (export var Closure     (to_builtin_sym "Closure"))
 (export var InputFileStream (to_builtin_sym "InputFileStream"))
 (export var OutputFileStream (to_builtin_sym "OutputFileStream"))
+(export var Module      (to_builtin_sym "Module"))
+
+(export var DefInfixL   (to_sym "DefineInfixL"))
+(export var DefInfixR   (to_sym "DefineInfixR"))
+(export var DefPrefix   (to_sym "DefinePrefix"))
+(export var DefPostfix  (to_sym "DefinePostfix"))
+(export var DefConstr   (to_sym "DefineConstr"))
+(export var DefCommand  (to_sym "DefineCommand"))
 
 
 (export fun to_builtin_sym (name) (
@@ -191,6 +198,7 @@
         (@ClosureE          . (return Closure))
         (@InputFileStreamE  . (return InputFileStream))
         (@OutputFileStreamE . (return OutputFileStream))
+        (@ModuleE           . (return Module))
         (@IntE              . (return Int))
         (@FloatE            . (return Float))
         (@StringE           . (return String))
@@ -335,16 +343,6 @@
     (output_string ochan (field_get sym @SymbolName))
     ))
 
-(var operator_table (make_symtable 20))
-
-(export fun register_operator (head op) (
-    (symtable_add operator_table head op)
-    ))
-
-(fun find_operator (head) (
-    (return (symtable_find operator_table head))
-    ))
-
 ; printing functions
 (fun output_ordinal (ochan idx) (
     (output_int ochan idx)
@@ -368,6 +366,7 @@
         (@ClosureE          . (return (output_string ochan "Closure")))
         (@InputFileStreamE  . (return (output_string ochan "InputFileStream")))
         (@OutputFileStreamE . (return (output_string ochan "OutputFileStream")))
+        (@ModuleE           . (return (output_string ochan "Module")))
         (@IntE              . (return (output_string ochan "Int")))
         (@FloatE            . (return (output_string ochan "Float")))
         (@StringE           . (return (output_string ochan "String")))
@@ -375,6 +374,8 @@
         (default            . (not_reachable "output_type"))
         ))
     ))
+
+(extern fun pp_module)
 
 (export fun pretty_print (ochan node) (
     (pretty_print_main ochan node @ASSOC_MAX)
@@ -392,6 +393,7 @@
         (@ClosureE          . (return (pp_closure ochan node)))
         (@InputFileStreamE  . (return (pp_file_stream ochan node)))
         (@OutputFileStreamE . (return (pp_file_stream ochan node)))
+        (@ModuleE           . (return (pp_module ochan node)))
         (@IntE              . (return (pp_int ochan node)))
         (@FloatE            . (return (pp_float ochan node)))
         (@StringE           . (return (pp_string ochan node)))
@@ -400,6 +402,8 @@
         ))
     ))
 
+(extern object current_mod)
+(extern fun lookup_operator_from_head)
 (fun pp_expr (ochan node assoc) (
     (var head (expr_head node))
     (var args (expr_args node))
@@ -412,7 +416,7 @@
         (return (pp_subscr ochan args assoc)))
     (if (== head Located) (return (pretty_print_main ochan (expr_arg node 1) assoc)))
 
-    (var op (find_operator head))
+    (var op (lookup_operator_from_head current_mod head))
     (if op (return (pp_operational_form ochan op args assoc)))
     (output_symbol ochan head)
     (output_char ochan '{')
@@ -425,13 +429,12 @@
     ))
 
 (fun pp_operational_form (ochan op args assoc) (
-    (var ophead (expr_head op))
-    (if (== ophead Prefix)  (return (pp_prefix ochan op args assoc)))
-    (if (== ophead Postfix) (return (pp_postfix ochan op args assoc)))
-    (if (== ophead InfixL)  (return (pp_infix ochan op args @TRUE assoc)))
-    (if (== ophead InfixR)  (return (pp_infix ochan op args @FALSE assoc)))
-    (if (== ophead Constr)  (return (pp_constr ochan op args)))
-    (if (== ophead Command) (return (pp_command ochan op args)))
+    (var optype (field_get op 0))
+    (if (== optype @OP_PREFIX)  (return (pp_prefix ochan op args assoc)))
+    (if (== optype @OP_POSTFIX) (return (pp_postfix ochan op args assoc)))
+    (if (== optype @OP_INFIX)   (return (pp_infix ochan op args (field_get op 3) assoc)))
+    (if (== optype @OP_CONSTR)  (return (pp_constr ochan op args)))
+    (if (== optype @OP_COMMAND) (return (pp_command ochan op args)))
     (not_reachable "pp_operational_form")
     ))
 
@@ -444,8 +447,8 @@
     ))
 
 (fun pp_prefix (ochan op args outer_assoc) (
-    (var repr (expr_arg op 0))
-    (var assoc (expr_arg_int op 1))
+    (var repr (field_get op 2))
+    (var assoc (field_get op 3))
     (if (> assoc outer_assoc) (output_char ochan '('))
     (output_string ochan repr)
     (if (! (is_sign_operator repr)) (output_char ochan ' '))
@@ -454,8 +457,8 @@
     ))
 
 (fun pp_postfix (ochan op args outer_assoc) (
-    (var repr (expr_arg op 0))
-    (var assoc (expr_arg_int op 1))
+    (var repr (field_get op 2))
+    (var assoc (field_get op 3))
     (if (> assoc outer_assoc) (output_char ochan '('))
     (pretty_print_main ochan (car args) assoc)
     (if (! (is_sign_operator repr)) (output_char ochan ' '))
@@ -464,8 +467,8 @@
     ))
 
 (fun pp_infix (ochan op args is_left outer_assoc) (
-    (var repr (expr_arg op 0))
-    (var assoc (expr_arg_int op 1))
+    (var repr (field_get op 2))
+    (var assoc (field_get op 4))
     (var need_space @FALSE)
     (if (> assoc outer_assoc) (output_char ochan '('))
     (if (! (is_sign_operator repr)) (= need_space @TRUE))
@@ -478,7 +481,7 @@
     ))
 
 (fun pp_constr (ochan op args) (
-    (var repr (expr_arg op 0))
+    (var repr (field_get op 2))
     (output_string ochan repr)
     (if (&& args (! (is_sign_operator repr))) (output_char ochan ' '))
     (while args (do
@@ -490,7 +493,7 @@
     ))
 
 (fun pp_command (ochan op args) (
-    (var repr (expr_arg op 0))
+    (var repr (field_get op 2))
     (output_string ochan repr)
     (if args (do
         (if (! (is_sign_operator repr)) (output_char ochan ' '))
@@ -638,6 +641,7 @@
         (@ClosureE          . (return (pp_closure ochan node)))
         (@InputFileStreamE  . (return (pp_file_stream ochan node)))
         (@OutputFileStreamE . (return (pp_file_stream ochan node)))
+        (@ModuleE           . (return (pp_module ochan node)))
         (@IntE              . (return (pp_int ochan node)))
         (@FloatE            . (return (pp_float ochan node)))
         (@StringE           . (return (pp_string ochan node)))

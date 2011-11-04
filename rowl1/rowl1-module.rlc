@@ -1,0 +1,86 @@
+;
+; rowl - 1st generation
+; Copyright (C) 2010 nineties
+;
+; $Id: rowl1-module.rlc 2011-11-04 22:17:01 nineties $
+;
+
+(import "rlvm-compile")
+(import "rowl1-types")
+
+; - one file corresponds to one module of same name.
+; - structure of module object:
+;   (name : symbol,
+;    super module : module,
+;    variable table : symtable,
+;    operator table : idtable,  # string repr -> operator
+;    repr table : symtable, # head -> string repr
+;   )
+;
+; XXX: implementation of operator table and repr table is heavy.
+;   - try use assoc list
+
+(compile `object `(
+
+(import "rowl1-node")
+(import "rowl1-symtable")
+
+(export fun make_module (sym outer) (
+    (return (variant @ModuleE 4
+        sym
+        outer
+        (make_symtable 10)
+        (make_idtable)
+        (make_symtable 10)
+        ))
+    ))
+
+(export fun super_module (mod) (
+    (return (field_get mod 2))
+    ))
+
+(export fun add_operator (mod repr head op) (
+    (var optbl (field_get mod 4))
+    (var rptbl (field_get mod 5))
+    (idtable_add optbl repr op)
+    (if head (symtable_add rptbl head op))
+    ))
+
+(export fun lookup_operator (mod repr) (
+    (while mod (do
+        (var tbl (field_get mod 4))
+        (var v (idtable_find tbl repr))
+        (if v (return v))
+        (= mod (super_module mod))
+        ))
+    (return 0)
+    ))
+
+(export fun lookup_operator_from_head (mod head) (
+    (while mod (do
+        (var tbl (field_get mod 5))
+        (var v (symtable_find tbl head))
+        (if v (return v))
+        (= mod (super_module mod))
+        ))
+    (return 0)
+    ))
+
+(export fun push_lextable (mod) (
+    (idtable_push (field_get mod 4))
+    (symtable_push (field_get mod 5))
+    ))
+
+(export fun pop_lextable (mod) (
+    (idtable_pop (field_get mod 4))
+    (symtable_pop (field_get mod 5))
+    ))
+
+(export fun pp_module (ochan obj) (
+    (var sym (field_get obj 1))
+    (output_string ochan "<#Module:")
+    (output_symbol ochan sym)
+    (output_char ochan '>')
+    ))
+
+    ))

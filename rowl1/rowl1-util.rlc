@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-util.rlc 2011-10-11 12:24:08 nineties $
+; $Id: rowl1-util.rlc 2011-11-01 02:17:54 nineties $
 ;
 
 (import "rlvm-compile")
@@ -172,6 +172,28 @@
         (return (string "."))
         ))
     (return dir)
+    ))
+
+; path must be 'foo/bar/baz/XYZ.rl"
+(export fun get_modulename (path) (
+    (var end (- (strlen path) 1))
+    (if (< end 3) (return 0))
+    (if (|| (!= (array_get char path end) 'l') (|| (!= (array_get char path (- end 1)) 'r')
+        (!= (array_get char path (- end 2)) '.')))
+        (return 0)
+        )
+    (var begin end)
+    (while (> begin 0) (do
+        (if (== (array_get char path begin) '/') (do
+            (+= begin 1)
+            break
+            ))
+        (-= begin 1)
+        ))
+    (var len (- (- end begin) 2))
+    (var dst (allocate_string len))
+    (strncpy dst (+ path begin) len)
+    (return dst)
     ))
 
 (export fun not_reachable (name) (
