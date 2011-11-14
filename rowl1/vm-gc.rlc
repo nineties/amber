@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2011-10-27 22:47:21 nineties $
+; $Id: vm-gc.rlc 2011-11-08 15:33:22 nineties $
 ;
 
 (import "stdlib")
@@ -432,7 +432,6 @@
 
 (fun allocate_page (npages) (
     (void* firstpage 0)
-
     (if (> npages @PAGES_PER_BLOCK) (
         (error "allocate_page: try to allocate too many pages\n")
         ))
@@ -481,14 +480,16 @@
     ))
 
 (fun allocate_object (words) (
+    (int npage 0)
     (while (> words free_words) (
         (insert_padding)
-        (allocate_page (>> (- (+ words @PAGE_WORDS) 1) @PAGE_WORDS_SHIFT))
+        (= npage (>> (- (+ words @PAGE_WORDS) 1) @PAGE_WORDS_SHIFT))
+        (allocate_page npage)
         ))
     (void* obj freep)
     (if (<= words @PAGE_WORDS)
         ((-= free_words words))
-        ((= free_words (- @PAGE_WORDS (% words @PAGE_WORDS))))
+        ((= free_words (- (* npage @PAGE_WORDS) words)))
         )
     (+= freep (* @WORD_SIZE words))
     (return obj)

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2011-11-04 22:23:31 nineties $
+; $Id: rowl1-node.rlc 2011-11-09 02:23:00 nineties $
 ;
 
 (import "rlvm-compile")
@@ -58,10 +58,10 @@
 (export var DefineFunction (to_sym "DefineFunction"))
 (export var AppendFunction (to_sym "AppendFunction"))
 (export var DefineVariable (to_sym "DefineVariable"))
+(export var DeSugar        (to_sym "DeSugar"))
 (export var Lambda         (to_sym "Lambda"))
 
 (export var Assembler   (to_builtin_sym "Assembler"))
-(export var Environment (to_builtin_sym "Environment"))
 (export var Function    (to_builtin_sym "Function"))
 (export var Builtin     (to_builtin_sym "Builtin"))
 (export var Bytecode    (to_builtin_sym "Bytecode"))
@@ -77,7 +77,6 @@
 (export var DefPostfix  (to_sym "DefinePostfix"))
 (export var DefConstr   (to_sym "DefineConstr"))
 (export var DefCommand  (to_sym "DefineCommand"))
-
 
 (export fun to_builtin_sym (name) (
     (var sym (idtable_find symbol_table name))
@@ -123,15 +122,15 @@
     (return @BuiltinE)
     ))
 
-(fun is_atom (ty) (
+(fun is_atom_type (ty) (
     (if (|| (== ty @ExprE) (== ty @ListE))
         (return @FALSE)
         (return @TRUE)
         )
     ))
 
-(export fun is_atom_type (obj) (
-    (return (is_atom (node_type obj)))
+(export fun is_atom (obj) (
+    (return (is_atom_type (node_type obj)))
     ))
 
 ; XXX: output precise information
@@ -192,7 +191,6 @@
         (@ExprE             . (return (field_get node @ExprHead)))
         (@ListE             . (return List))
         (@AssemblerE        . (return Assembler))
-        (@EnvironmentE      . (return Environment))
         (@BytecodeE         . (return Bytecode))
         (@FunctionE         . (return Function))
         (@ClosureE          . (return Closure))
@@ -209,7 +207,7 @@
 
 (export fun expr_args (expr) (
     (var ty (node_type expr))
-    (if (is_atom ty) (return (cons expr 0)))
+    (if (is_atom_type ty) (return (cons expr 0)))
     (if (== ty @ListE) (return expr))
     (return (field_get expr @ExprArgs))
     ))
@@ -360,7 +358,6 @@
         (@ExprE             . (return (output_string ochan "composite expression")))
         (@ListE             . (return (output_string ochan "List")))
         (@AssemblerE        . (return (output_string ochan "Assembler")))
-        (@EnvironmentE      . (return (output_string ochan "Environment")))
         (@BytecodeE         . (return (output_string ochan "Bytecode")))
         (@FunctionE         . (return (output_string ochan "Function")))
         (@ClosureE          . (return (output_string ochan "Closure")))
@@ -387,7 +384,6 @@
         (@ExprE             . (return (pp_expr ochan node assoc)))
         (@ListE             . (return (pp_list ochan node)))
         (@AssemblerE        . (return (pp_assembler ochan node)))
-        (@EnvironmentE      . (return (pp_environment ochan node)))
         (@BytecodeE         . (return (pp_bytecode ochan node)))
         (@FunctionE         . (return (pp_function ochan node)))
         (@ClosureE          . (return (pp_closure ochan node)))
@@ -527,12 +523,6 @@
     (output_char ochan '>')
     ))
 
-(fun pp_environment (ochan expr) (
-    (output_string ochan "<#Environment:0x")
-    (output_hex ochan expr 8)
-    (output_char ochan '>')
-    ))
-
 (fun pp_bytecode (ochan expr) (
     (output_string ochan "<#Bytecode:0x")
     (output_hex ochan expr 8)
@@ -635,7 +625,6 @@
         (@ExprE             . (return (pp_expr_full ochan node)))
         (@ListE             . (return (pp_list_full ochan node)))
         (@AssemblerE        . (return (pp_assembler ochan node)))
-        (@EnvironmentE      . (return (pp_environment ochan node)))
         (@BytecodeE         . (return (pp_bytecode ochan node)))
         (@FunctionE         . (return (pp_function ochan node)))
         (@ClosureE          . (return (pp_closure ochan node)))
@@ -673,60 +662,4 @@
     (output_char ochan ']')
     ))
 
-(export fun make_env () (
-    (return (variant @EnvironmentE 2
-        (make_symtable 1000) ; function and variable table
-        0 ; imported module list
-        0 ; local variable count
-	))
-    ))
-
-(export fun get_vartable (env) (
-    (return (field_get env 1))
-    ))
-
-(export fun new_lvar_index (env) (
-    (var idx (field_get env 3))
-    (field_set env 3 (+ idx 1))
-    (return idx)
-    ))
-
-(export fun get_lvarl_index (env) (
-    (return (field_get env 3))
-    ))
-
-(export fun set_lvar_index (env val) (
-    (field_set env 3 val)
-    ))
-
-(export fun push_env (env) (
-    (symtable_push (field_get env 1))
-    ))
-
-(export fun pop_env (env) (
-    (symtable_pop (field_get env 1))
-    ))
-
-(export fun is_global_env (env) (
-    (if (== (symtable_depth (get_vartable env)) 1)
-        (return @TRUE)
-        (return @FALSE)
-        )
-    ))
-
-(export fun is_already_imported (env path) (
-    (var list (field_get env 2))
-    (while list (do
-        (if (streq path (car list))
-            (return @TRUE)
-            )
-        (= list (cdr list))
-        ))
-    (return @FALSE)
-    ))
-
-(export fun add_imported_module (env path) (
-    ; XXX: fixme. canonicalize the `path'
-    (field_set env 2 (cons path (field_get env 2)))
-    ))
     ))
