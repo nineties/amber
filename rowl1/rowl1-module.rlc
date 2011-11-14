@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-module.rlc 2011-11-04 22:17:01 nineties $
+; $Id: rowl1-module.rlc 2011-11-11 21:08:08 nineties $
 ;
 
 (import "rlvm-compile")
@@ -26,7 +26,7 @@
 (import "rowl1-symtable")
 
 (export fun make_module (sym outer) (
-    (return (variant @ModuleE 4
+    (return (variant @ModuleE 5
         sym
         outer
         (make_symtable 10)
@@ -37,6 +37,58 @@
 
 (export fun super_module (mod) (
     (return (field_get mod 2))
+    ))
+
+(export fun vartable_add (mod sym v) (
+    (symtable_add (field_get mod 3) sym v)
+    ))
+
+(export fun vartable_find (mod sym) (
+    (while mod (do
+        (var tbl (field_get mod 3))
+        (var v (symtable_find tbl sym))
+        (if v (return v))
+        (= mod (super_module mod))
+        ))
+    (return 0)
+    ))
+
+(export fun vartable_find_local (mod sym) (
+    (var tbl (field_get mod 3))
+    (return (symtable_find_local tbl sym))
+    ))
+
+(export fun vartable_find_global (mod sym) (
+    (while mod (do
+        (var tbl (field_get mod 3))
+        (var v (symtable_find_global tbl sym))
+        (if v (return v))
+        (= mod (super_module mod))
+        ))
+    (return 0)
+    ))
+
+(export fun push_vartable (mod) (
+    (symtable_push (field_get mod 3))
+    ))
+
+(export fun pop_vartable (mod) (
+    (symtable_pop (field_get mod 3))
+    ))
+
+(export fun in_global_scope (mod) (
+    (if (== (symtable_depth (field_get mod 3)) 1)
+        (return @TRUE)
+        (return @FALSE)
+        )
+    ))
+
+(export fun get_vartable (mod) (
+    (return (field_get mod 3))
+    ))
+
+(export fun count_local_variable (mod) (
+    (return (symtable_count_local (field_get mod 3)))
     ))
 
 (export fun add_operator (mod repr head op) (

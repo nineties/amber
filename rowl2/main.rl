@@ -3,16 +3,32 @@
 # rowl - 2nd generation
 # Copyright (C) 2010 nineties
 #
-# $Id: main.rl 2011-11-04 19:47:07 nineties $
+# $Id: main.rl 2011-11-12 03:04:42 nineties $
 
-prefix UnaryPlus "+" 5
-prefix UnaryMinus "-" 5
-prefix Not "not" 5
-infixl Times "*" 6
-
-+ y
-{
-    prefix Hoge "+" 5
-    +y
+i:0
+s:0
+while (i < 100) {
+    s += i
+    i += 1
 }
-+z
+puts(stdout, s)
+puts(\(x -> y))
+
+
+#f(): {
+#    g(): puts("Hello")
+#    g()
+#    g(): puts("Hoge")
+#}
+#f()
+
+fib(n): fib(n-1)+fib(n-2)
+fib(0): 0
+fib(1): 1
+puts(fib(30))
+{
+    fib(0):1
+    fib(1):1
+    puts(fib(30))
+}
+puts(fib(30))

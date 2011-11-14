@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2011-11-04 19:12:38 nineties $
+; $Id: rowl1-interp.rlc 2011-11-11 22:09:37 nineties $
 ;
 
 (import "rlvm-compile")
@@ -23,46 +23,47 @@
     (= current_loc loc)
     ))
 
-(export var exec_env null)
-
-(export fun init_exec_env () (
-    (= exec_env (make_env))
-    ))
-
-(export fun push_exec_env () (
-    (push_env exec_env)
-    ))
-
-(export fun pop_exec_env () (
-    (pop_env exec_env)
-    ))
-
 (export var current_mod null)
 
 (export fun eval_file (path) (
-    (= current_mod (make_module (to_sym (get_modulename path)) 0))
-    (pretty_print_full stderr current_mod)
-    (output_char stderr '\n')
+    (var modname (get_modulename path))
+    (if (! modname) (do
+        (output_string stderr "invalid filename:`")
+        (output_string stderr path)
+        (output_string stderr "'\n")
+        (exit 1)
+        ))
+    (= current_mod (make_module (to_sym modname) 0))
+    (= current_loc no_loc)
+
+    (setup_builtin_functions current_mod)
+    (setup_builtin_compilers current_mod)
+    (init_stdlib current_mod)
 
     (var ichan (open_in path))
     (init_parser path ichan)
+
+    (add_import_dir "./")
+    (add_import_dir "/usr/lib/rowl/")
+    (import_module_direct 0 "rowl/syntax")
+    (import_module_direct 0 "rowl/io")
+
     (interpret)
     (close_in ichan)
     ))
 
 (fun interpret () (
     (var es (parse))
-    (pretty_print stderr es)
+    (while es (do
+        (var e (desugar current_mod (car es)))
+        (eval e)
+        (= es (cdr es))
+        ))
     ))
 
-(var import_dirs null)
-(export fun add_import_dir (path) (
-    (= import_dirs (cons path import_dirs))
-    ))
-
-(export fun eval (expr) (
+(fun eval (expr) (
     (var asm (make_assembler))
-    (compile asm exec_env expr)
+    (compile asm current_mod expr)
     (put_ireturn asm)
     (byterun (get_code asm))
     ))
@@ -72,15 +73,38 @@
     (compile_simple_call asm 1 eval)
     ))
 
-(export fun import_module_direct (orig path) (
+(var import_dirs null)
+(var imported_modules null)
+
+(fun add_import_dir (path) (
+    (= import_dirs (cons path import_dirs))
+    ))
+
+(fun add_imported_module (path) (
+    ; XXX: fixme. canonicalize the `path'
+    (= imported_modules (cons path imported_modules))
+    ))
+
+(fun is_already_imported (path) (
+    (var list imported_modules)
+    (while list (do
+        (if (streq path (car list))
+            (return @TRUE)
+            )
+        (= list (cdr list))
+        ))
+    (return @FALSE)
+    ))
+
+(fun import_module_direct (orig path) (
     (var dir import_dirs)
     (while dir (do
         (var fullpath (build_path (car dir) path ".rl"))
         (if (file_exists fullpath) (do
-            (if (is_already_imported exec_env fullpath)
+            (if (is_already_imported current_mod fullpath)
                 (return Nil)
                 )
-            (add_imported_module exec_env fullpath)
+            (add_imported_module fullpath)
 
             (var ichan (open_in fullpath))
             (var fd (open "."))
@@ -131,12 +155,35 @@
     (compile_simple_call asm 1 import_module)
     ))
 
-(export fun setup_interpreter () (
-    (= current_loc no_loc)
-    (var tbl (get_vartable exec_env))
-    (add_compiler tbl (make_expr Eval (list1 DontCare)) compile_eval)
-    (add_compiler tbl (make_expr (to_sym "Import") (list1 DontCare)) compile_import)
+(fun builtin_desugar_args (args) (
+    (if (! args) (return 0))
+    (return (cons (desugar current_mod (car args)) (builtin_desugar_args (cdr args))))
     ))
 
+(fun builtin_desugar (expr) (
+    (if (is_atom expr) (return expr))
+    (var hd (expr_head expr))
+    (var args (builtin_desugar_args (expr_args expr)))
+    (if (== hd List)
+        (return args)
+        (return (make_expr hd args))
+        )
+    ))
+
+(fun setup_builtin_functions (mod) (
+    (add_builtin_function1 mod DeSugar DontCare builtin_desugar)
+    ))
+
+(extern fun setup_numeric)
+(extern fun setup_io)
+(extern fun setup_list)
+(extern fun setup_tuple)
+
+(fun init_stdlib (mod) (
+    (setup_numeric mod)
+    (setup_io mod)
+    (setup_list mod)
+    (setup_tuple mod)
+    ))
 
     ))
