@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2011-11-15 00:15:35 nineties $
+; $Id: rowl1-compile.rlc 2011-11-24 01:53:34 nineties $
 ;
 
 (import "rlvm-compile")
@@ -57,7 +57,7 @@
         ))
     (if (is_atom expr) return)
     (if (== level 0) (do
-        (if (|| (== hd DefineFunction) (== hd AppendFunction)) (do
+        (if (== hd DefineFunction) (do
             (fv_iter tbl (expr_arg expr 1) 0)
             (delete_vars tbl (expr_arg expr 0))
             return
@@ -94,14 +94,24 @@
     ))
 
 (fun alloc_function () (
-    (return (variant @FunctionE 2 0 0 0)) ; code, defs, size
+    (return (variant @FunctionE 2 0 0 0)) ; codes, defs, size
     ))
 
 (fun clone_function (orig_func) (
     (var new_func (alloc_function))
-    (field_set new_func 1 (field_get orig_func 1))
-    (field_set new_func 2 (field_get orig_func 2))
-    (field_set new_func 3 (field_get orig_func 3))
+    (var codes (field_get orig_func 1))
+    (var defs (field_get orig_func 2))
+    (var size (field_get orig_func 3))
+    (field_set new_func 1 (array object size))
+    (var new_defs (array object size))
+    (field_set new_func 2 new_defs)
+    (field_set new_func 3 size)
+    (for i 0 size (do
+        (var code (array_get object codes i))
+        (if code
+            (array_set object new_defs i (list1 (list2 (diag_list i DontCare) code)))
+            )
+        ))
     (return new_func)
     ))
 
@@ -109,9 +119,9 @@
     (var old_size (field_get func 3))
     (if (< old_size new_size) (do
         (var new_codes (array object new_size))
-        (var new_defs  (array object new_size))
         (memcpy new_codes (field_get func 1) (* 4 old_size))
-        (memcpy new_defs  (field_get func 2) (* 4 old_size))
+        (var new_defs (array object new_size))
+        (memcpy new_defs (field_get func 2) (* 4 old_size))
         (field_set func 1 new_codes)
         (field_set func 2 new_defs)
         (field_set func 3 new_size)
@@ -119,27 +129,45 @@
     (return func)
     ))
 
-(fun add_function_def (func arity pats code) (
-    (= func (resize_function func (+ arity 1)))
-    (var defs (field_get func 2))
-    (array_set object defs arity
-        (cons (list3 pats code current_loc) (array_get object defs arity)))
+(extern fun is_complete_pattern)
+(extern fun compile_matching_driver)
+(fun add_function_def (sym func arity def code) (
+    (resize_function func (+ arity 1))
     (var codes (field_get func 1))
-    (if (! (array_get object codes arity)) (do
-        (array_set object codes arity (allocate_bytecode))
+    (var defs (field_get func 2))
+    (var ent 0)
+    (if (! (is_complete_pattern def)) (do
+        (= ent (array_get object defs arity))
+        (if (! ent) (do
+            (var asm (make_assembler))
+            (compile_undefined_error asm sym arity)
+            (= ent (list1 (list2 (diag_list arity DontCare) (get_code asm))))
+            ))
         ))
+    (= ent (cons (list2 def code) ent))
+    (array_set object defs arity ent)
+    (var bcode (array_get object codes arity))
+    (if (! bcode) (do
+        (= bcode (allocate_bytecode))
+        (array_set object codes arity bcode)
+        ))
+    (compile_matching_driver bcode ent)
+    ))
+
+(fun update_function_def (func arity code) (
+    (var codes (field_get func 1))
+    (var defs (field_get func 2))
+    (array_set object codes arity code)
+    (array_set object defs arity (list1 (list2 (list1 DontCare) code)))
     ))
 
 (export fun get_code_with_arity (arity func) (
     (var codes (field_get func 1))
     (var size (field_get func 3))
     (if (< arity size) (do
-        (var c (array_get object codes arity))
-        (if c (return c))
+        (return (array_get object codes arity))
         ))
-    (output_error stderr)
-    (output_string stderr "invalid number of arguments\n")
-    (exit 1)
+    (not_reachable "get_code_with_arity")
     ))
 
 (export fun get_defs_with_arity (arity func) (
@@ -163,18 +191,54 @@
         (output_string stderr "'\n")
         (exit 1)
         ))
-    (var code (get_code_with_arity arity func))
-    (return code)
+    (return (get_code_with_arity arity func))
     ))
+
+(fun undefined_error (sym args) (
+    (output_error stderr)
+    (output_string stderr "no definition of `")
+    (output_symbol stderr sym)
+    (output_string stderr "' matches to argument(s) ")
+    (pretty_print stderr args)
+    (output_char stderr '\n')
+    (exit 1)
+    ))
+
+(fun compile_undefined_error (asm sym arity) (
+    (put_imm_int asm 0) ; nil
+    (while (> arity 0) (do
+        (decr arity)
+        (put_arg asm arity)
+        (put_cons asm)
+        ))
+    (put_push asm sym)
+    (compile_simple_call asm 2 undefined_error)
+    ))
+
+; generate matching tree for function entry of `ent' with given arity.
+;(fun compile_matching_if_needed (func arity) (
+;    (var defs (get_defs_with_arity arity func))
+;    (var code (get_code_with_arity arity func))
+;    (output_string stderr "compile_matching_if_needed :")
+;    (pretty_print stderr defs)
+;    (output_char stderr '\n')
+;    (if (! code) (do
+;        ; This function has new definition, so it needs to be compiled.
+;        (= code (allocate_bytecode))
+;        (compile_matching code defs)
+;        (update_function_def func arity code)
+;        ))
+;    (return code)
+;    ))
 
 (export fun compile (asm mod expr) (
-    (var f (lookup_func mod Compile 3))
-    (return (byterun f asm mod expr))
+    (var code (lookup_func mod Compile 3))
+    (return (byterun code asm mod expr))
     ))
 
-(export fun desugar (mod expr) (
-    (var f (lookup_func mod DeSugar 1))
-    (return (byterun f expr))
+(export fun expand (mod expr) (
+    (var code (lookup_func mod Macro 1))
+    (return (byterun code expr))
     ))
 
 (fun do_nothing (asm mod expr) (
@@ -223,29 +287,24 @@
     (var args (expr_arg_list lhs 1))
     (var asm_body (make_assembler))
     (var code (allocate_bytecode))
-    (var func (add_function mod sym args code))
+    (var info (add_function mod sym args code))
+    (var func (car info))
+    (var global_func (cdr info))
 
     (compile_function asm_body mod args body)
     (set_code code asm_body)
-    (function_updated sym (list_len args) func)
 
-    (put_nil asm)
-    ))
-
-(fun compile_append_function (asm mod expr) (
-    (var lhs (expr_arg expr 0))
-    (var body (expr_arg expr 1))
-    (var sym (expr_arg_symbol lhs 0))
-    (var args (expr_arg_list lhs 1))
-    (var asm_body (make_assembler))
-    (var code (allocate_bytecode))
-    (var func (append_function mod sym args code))
-
-    (compile_function asm_body mod args body)
-    (set_code code asm_body)
-    (function_updated sym (list_len args) func)
-
-    (put_nil asm)
+    (if global_func
+        (do
+            (var arity (list_len args))
+            (var global_code (get_code_with_arity arity global_func))
+            (var local_code (get_code_with_arity arity func))
+            (put_push asm local_code)
+            (put_push asm global_code)
+            (compile_simple_call asm 2 bytecode_push)
+        )
+        (put_nil asm)
+        )
     ))
 
 (fun setup_args (tbl args) (
@@ -425,15 +484,15 @@
 
     (if (== (node_type fun) @SymbolE)
         (do
-            (var info (lookup_var mod fun))
-            (if (== (expr_head info) Function) (do
+            (var func (lookup_var mod fun))
+            (if (== (expr_head func) Function) (do
                 ; direct call
-                (var code (get_code_with_arity arity info))
+                (var code (get_code_with_arity arity func))
                 (put_push asm code)
                 (put_jcall asm (* 4 arity))
                 return
                 ))
-            (compile_operand asm info)
+            (compile_operand asm func)
         )
         (compile asm mod fun)
         )
@@ -744,16 +803,16 @@
     (set_label asm exit_lbl)
     ))
 
-(extern fun compile_matching_driver)
+;(extern fun compile_matching_driver)
 (fun compile_lambda_main (asm mod args body) (
     ; XXX: do closure conversion
-    (var arity (list_len args))
-    (var asm_body (make_assembler))
-    (compile_function asm_body mod args body)
-    (var func (alloc_function))
-    (add_function_def func arity args (get_code asm_body))
-    (compile_matching_driver func (to_sym "lambda") arity)
-    (put_push asm func)
+    ;(var arity (list_len args))
+    ;(var asm_body (make_assembler))
+    ;(compile_function asm_body mod args body)
+    ;(var func (alloc_function))
+    ;(add_function_def func arity args (get_code asm_body))
+    ;(compile_matching_driver func (to_sym "lambda") arity)
+    ;(put_push asm func)
     ))
 
 (fun compile_lambda (asm mod expr) (
@@ -798,46 +857,27 @@
             (output_char stderr '\n')
             (exit 1)
             ))
-        (add_function_def func arity args code)
-        (compile_matching_driver func sym arity)
-        (return func)
+        (add_function_def sym func arity args code)
+        (return (cons func 0))
         ))
     (= func (vartable_find mod sym))
     (if (&& func (== (node_type func) @FunctionE))
         (do
-            (= func (clone_function func))
-            (add_function_def func arity args code)
-            (compile_matching_driver func sym arity)
+            (var local_func (clone_function func))
+            (add_function_def sym local_func arity args code)
+            (vartable_add mod sym local_func)
+            (return (cons local_func func))
         )
         (do
             (= func (alloc_function))
-            (add_function_def func arity args code)
-            (compile_matching_driver func sym arity)
-        ))
-    (vartable_add mod sym func)
-    (return func)
-    ))
-
-(fun append_function (mod sym args code) (
-    (var arity (list_len args))
-    (var func (vartable_find mod sym))
-    (if (&& func (== (node_type func) @FunctionE))
-        (do
-            (add_function_def func arity args code)
-            (compile_matching_driver func sym arity)
-            (return func)
-        )
-        (do
-            (output_error stderr)
-            (output_string stderr "function `")
-            (output_symbol stderr sym)
-            (output_string stderr "is not defined\n")
-            (exit 1)
+            (add_function_def sym func arity args code)
+            (vartable_add mod sym func)
+            (return (cons func 0))
         ))
     ))
 
 (fun function_updated (sym arity func) (
-    (compile_matching_driver func sym arity)
+    ;(compile_matching_driver func sym arity)
     ))
 
 (export fun add_builtin_function0 (mod sym func) (
@@ -885,8 +925,6 @@
     (add_compiler mod (make_expr Located (list2 locT DontCare)) compile_located)
     (add_compiler mod (make_expr DefineFunction (list2
         (make_expr Apply (list2 symT listT)) DontCare)) compile_define_function)
-    (add_compiler mod (make_expr AppendFunction (list2
-        (make_expr Apply (list2 symT listT)) DontCare)) compile_append_function)
     (add_compiler mod (make_expr DefineVariable (list2 symT DontCare)) compile_define_variable)
     (add_compiler mod (headP Symbol) compile_var)
     (add_compiler mod (make_expr Apply (list2 DontCare listT)) compile_apply)
