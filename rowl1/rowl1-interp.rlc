@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2011-11-11 22:09:37 nineties $
+; $Id: rowl1-interp.rlc 2011-11-23 13:36:01 nineties $
 ;
 
 (import "rlvm-compile")
@@ -55,7 +55,7 @@
 (fun interpret () (
     (var es (parse))
     (while es (do
-        (var e (desugar current_mod (car es)))
+        (var e (expand current_mod (car es)))
         (eval e)
         (= es (cdr es))
         ))
@@ -155,15 +155,15 @@
     (compile_simple_call asm 1 import_module)
     ))
 
-(fun builtin_desugar_args (args) (
+(fun builtin_expand_args (args) (
     (if (! args) (return 0))
-    (return (cons (desugar current_mod (car args)) (builtin_desugar_args (cdr args))))
+    (return (cons (expand current_mod (car args)) (builtin_expand_args (cdr args))))
     ))
 
-(fun builtin_desugar (expr) (
+(fun builtin_expand (expr) (
     (if (is_atom expr) (return expr))
     (var hd (expr_head expr))
-    (var args (builtin_desugar_args (expr_args expr)))
+    (var args (builtin_expand_args (expr_args expr)))
     (if (== hd List)
         (return args)
         (return (make_expr hd args))
@@ -171,7 +171,7 @@
     ))
 
 (fun setup_builtin_functions (mod) (
-    (add_builtin_function1 mod DeSugar DontCare builtin_desugar)
+    (add_builtin_function1 mod Macro DontCare builtin_expand)
     ))
 
 (extern fun setup_numeric)

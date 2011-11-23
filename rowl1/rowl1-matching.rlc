@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2011-11-12 11:19:58 nineties $
+; $Id: rowl1-matching.rlc 2011-11-23 20:41:11 nineties $
 ;
 
 (import "rlvm-compile")
@@ -19,7 +19,17 @@
 
 (var varP   (to_sym "%Var"))
 
-(fun compile_matching (sym bytecode defs) (
+(export fun is_complete_pattern (pat) (
+    (while pat (do
+        (if (!= (car pat) DontCare)
+            (return @FALSE)
+            )
+        (= pat (cdr pat))
+        ))
+    (return @TRUE)
+    ))
+
+(fun compile_matching (bytecode defs) (
     (var asm (make_assembler))
 
     (= defs (prepare_pats defs))
@@ -32,10 +42,18 @@
         ))
 
     (compile_matching_main asm args defs)
-    (compile_matching_error asm sym (list_len (caar defs)))
 
     (set_code bytecode asm)
     (return bytecode)
+    ))
+
+(export fun compile_matching_driver (bytecode defs) (
+    (var asm (make_assembler))
+    (put_push asm defs)
+    (put_push asm bytecode)
+    (compile_simple_call asm 2 compile_matching)
+    (put_jjump asm)
+    (set_code bytecode asm)
     ))
 
 (fun prepare_pats (pats) (
@@ -115,12 +133,8 @@
 (fun compile_matching_main (asm args pats) (
     (if (== (caar pats) 0) (do
         (var code (list_at (car pats) 1))
-        (if (< (bytecode_size code) @INLINE_THRESHOLD)
-            (put_code asm code)
-            (do
-                (put_push asm code)
-                (put_jjump asm)
-            ))
+        (put_push asm code)
+        (put_jjump asm)
         return
         ))
     (var x (split_pattern_matrix pats)) ; (single . remain)
@@ -552,40 +566,6 @@
     (if (== pats 0) (return 0))
     (return (cons (cons (list_append (expr_args (caaar pats)) (cdaar pats)) (cdar pats))
         (expand_composite_pat (cdr pats))))
-    ))
-
-(export fun compile_matching_driver (func sym arity) (
-    (var asm (make_assembler))
-    (var code (get_code_with_arity arity func))
-    (var defs (get_defs_with_arity arity func))
-
-    (put_push asm defs)
-    (put_push asm code)
-    (put_push asm sym)
-    (put_imm_int32 asm compile_matching)
-    (put_dcall asm 12)
-    (put_jjump asm)
-
-    (set_code code asm)
-    ))
-
-(fun matching_error (head args) (
-    (output_error stderr)
-    (output_string stderr "no definition matches to ")
-    (pretty_print stderr (make_expr head args))
-    (output_string stderr "\n")
-    (exit 1)
-    ))
-
-(fun compile_matching_error (asm head arity) (
-    (put_imm_int asm 0) ; nil
-    (while (> arity 0) (do
-        (decr arity)
-        (put_arg asm arity)
-        (put_cons asm)
-        ))
-    (put_push asm head)
-    (compile_simple_call asm 2 matching_error)
     ))
 
     ))

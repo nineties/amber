@@ -12,10 +12,10 @@ infixl HeadP "@" 4
 infixr Define ":" 19
 
 DefineFunction{
-    DeSugar(x => y),
+    Macro(x => y),
     `DefineFunction{
-        DeSugar(!x),
-        DeSugar(!y)
+        Macro(!x),
+        Macro(!y)
     }
 }
 
@@ -51,8 +51,8 @@ constr For          "for"
 command Return      "return"
 infixl Else         "else" 18
 
-true: `true
-false: `false
+true: \true
+false: \false
 
 command Import "import"
 infixl  Dot "." 2

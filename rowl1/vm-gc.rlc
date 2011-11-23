@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2011-11-08 15:33:22 nineties $
+; $Id: vm-gc.rlc 2011-11-24 01:54:36 nineties $
 ;
 
 (import "stdlib")
@@ -354,7 +354,7 @@
         ))
     (if (== tag @TAG_BYTECODE) (
         (move_object obj) ; bytecode
-        (move_object (+ obj @(* 2 WORD_SIZE))) ; indices
+        (move_object (+ obj @(* 2 WORD_SIZE))) ; addrs
         (void* code ([] obj 0))
         (void* reloc ([] obj 2))
         (int n ([] obj 3))
@@ -362,6 +362,7 @@
             (int offs ([] reloc i))
             (move_object (+ code offs))
             ))
+        (move_object (+ obj @(* 4 WORD_SIZE))) ; next
         (return)
         ))
     (error "move_fields: not reachable")
@@ -597,18 +598,19 @@
 ; bytecode
 (export prim_allocate_bytecode)
 (fun prim_allocate_bytecode () (
-    (void* ptr (allocate_object 5))
-    @(SET_HEADER ptr TAG_BYTECODE 0 5)
+    (void* ptr (allocate_object 6))
+    @(SET_HEADER ptr TAG_BYTECODE 0 6)
     (+= ptr @WORD_SIZE)
     ([]= ptr 0 0)
     ([]= ptr 1 0)
     ([]= ptr 2 0)
     ([]= ptr 3 0)
+    ([]= ptr 4 0)
     (return ptr)
     ))
 
 (export prim_bytecode_set)
-(fun prim_bytecode_set (ptr code len addrs objs nobj pats) (
+(fun prim_bytecode_set (ptr code len addrs objs nobj next) (
     ; this function must be atomic
     (for i 0 nobj (
         (int addr ([] addrs i))
@@ -618,15 +620,45 @@
     ([]= ptr 1 len)
     ([]= ptr 2 addrs)
     ([]= ptr 3 nobj)
+    ([]= ptr 4 next)
     ))
 
 (export prim_make_bytecode)
 (fun prim_make_bytecode (code len addrs objs nobj) (
-    (void* ptr (allocate_object 5))
-    @(SET_HEADER ptr TAG_BYTECODE 0 5)
+    (void* ptr (allocate_object 6))
+    @(SET_HEADER ptr TAG_BYTECODE 0 6)
     (+= ptr @WORD_SIZE)
-    (prim_bytecode_set ptr code len addrs objs nobj)
+    (prim_bytecode_set ptr code len addrs objs nobj 0)
     (return ptr)
+    ))
+
+(export prim_bytecode_push)
+(fun prim_bytecode_push (obj new) (
+    (void* ptr (allocate_object 6))
+    @(SET_HEADER ptr TAG_BYTECODE 0 6)
+    (+= ptr @WORD_SIZE)
+
+    ([]= ptr 0 ([] obj 0))
+    ([]= ptr 1 ([] obj 1))
+    ([]= ptr 2 ([] obj 2))
+    ([]= ptr 3 ([] obj 3))
+    ([]= ptr 4 ([] obj 4))
+
+    ([]= obj 0 ([] new 0))
+    ([]= obj 1 ([] new 1))
+    ([]= obj 2 ([] new 2))
+    ([]= obj 3 ([] new 3))
+    ([]= obj 4 ptr)
+    ))
+
+(export prim_bytecode_pop)
+(fun prim_bytecode_pop (obj) (
+    (void* ptr ([] obj 4))
+    ([]= obj 0 ([] ptr 0))
+    ([]= obj 1 ([] ptr 1))
+    ([]= obj 2 ([] ptr 2))
+    ([]= obj 3 ([] ptr 3))
+    ([]= obj 4 ([] ptr 4))
     ))
 
 (export prim_bytecode_ptr)
