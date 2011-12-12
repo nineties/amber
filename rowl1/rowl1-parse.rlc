@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-parse.rlc 2011-11-04 22:30:56 nineties $
+; $Id: rowl1-parse.rlc 2011-12-13 01:24:59 nineties $
 ;
 
 (import "rlvm-compile")
@@ -35,6 +35,7 @@
 ; - postfix operator must be unique
 
 (extern object current_mod)
+(extern fun set_current_module)
 
 (var comma_op (variant @OP_INFIX 1 (to_sym "Comma") @FALSE @ASSOC_COMMA))
 
@@ -227,6 +228,7 @@
     (if (== t @TOK_CONSTR) (do
         (var op (get_token_boxed))
         (var head (field_get op 1))
+		(if (== head DefModule) (return (parse_module)))
         (var offs (get_clmn))
         (var args 0)
         (while 1 (do
@@ -255,6 +257,44 @@
     (unput)
     (return 0)
     ))
+
+(fun lookup_module (name) (
+	(var hd (expr_head name))
+	(if (== hd Symbol) (do
+		(var mod (vartable_find current_mod name))
+		(if (&& mod (!= (node_type mod) @ModuleE)) (do
+			(output_loc stderr (get_loc))
+			(output_string stderr "variable ")
+			(output_symbol stderr name)
+			(output_string stderr " is already defined\n")
+			(exit 1)
+			))
+		(return mod)
+		))
+	(output_loc stderr (get_loc))
+	(output_string stderr "invalid module signature\n")
+	(exit 1)
+	))
+
+(fun parse_module () (
+	(var offs (get_clmn))
+	(var module_name (try_parse_primary (lex_sub offs)))
+	(var module (lookup_module module_name))
+	(if (! module) (do
+		(= module (make_module module_name current_mod))
+		(vartable_add current_mod module_name module)
+		))
+	(if (!= (lex_sub offs) '{') (do
+		(output_loc stderr (get_loc))
+		(output_string stderr "module definition has no body block\n")
+		(exit 1)
+		))
+	(var save_current_mod current_mod)
+	(set_current_module module)
+	(var body (parse_block (lex)))
+	(set_current_module save_current_mod)
+	(return (make_expr_user DefModule (list2 module_name body)))
+	))
 
 (fun parse_tuple (t) (
     (var elems (parse_comma_list t ')'))
