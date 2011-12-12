@@ -1,6 +1,6 @@
 # Copyright (C) 2010 nineties
 #
-# !Id: syntax.rl 2011-10-17 22:55:58 nineties !
+# $Id: syntax.rl 2011-12-13 01:22:56 nineties $
 
 # Syntax definition of rowl language
 
@@ -12,10 +12,10 @@ infixl HeadP "@" 4
 infixr Define ":" 19
 
 DefineFunction{
-    Macro(x => y),
+    Rewrite(x => y),
     `DefineFunction{
-        Macro(!x),
-        Macro(!y)
+        Rewrite(!x),
+        Rewrite(!y)
     }
 }
 

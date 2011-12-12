@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2011-11-22 23:32:49 nineties $
+; $Id: rowl1-node.rlc 2011-12-13 01:24:13 nineties $
 ;
 
 (import "rlvm-compile")
@@ -57,7 +57,7 @@
 
 (export var DefineFunction (to_sym "DefineFunction"))
 (export var DefineVariable (to_sym "DefineVariable"))
-(export var Macro          (to_sym "Macro"))
+(export var Rewrite        (to_sym "Rewrite"))
 (export var Lambda         (to_sym "Lambda"))
 
 (export var Assembler   (to_builtin_sym "Assembler"))
@@ -76,6 +76,7 @@
 (export var DefPostfix  (to_sym "DefinePostfix"))
 (export var DefConstr   (to_sym "DefineConstr"))
 (export var DefCommand  (to_sym "DefineCommand"))
+(export var DefModule	(to_sym "DefineModule"))
 
 (export fun to_builtin_sym (name) (
     (var sym (idtable_find symbol_table name))
@@ -213,20 +214,20 @@
 
 (export fun expr_arg (expr idx) (
     (var args (expr_args expr))
-    (while (> idx 0) (do
-        (if (! args) (do
-            (output_error stderr)
-            (output_string stderr "`")
-            (pretty_print stderr expr)
-            (output_string stderr "' does not have ")
-            (output_ordinal stderr (+ idx 1))
-            (output_string stderr " parameter\n")
-            (exit 1)
-            ))
-        (if (! args) (not_reachable "expr_arg"))
+	(var i idx)
+    (while (&& (> i 0) args) (do
         (= args (cdr args))
-        (decr idx)
+        (decr i)
         ))
+	(if (! args) (do
+		(output_error stderr)
+		(output_string stderr "`")
+		(pretty_print stderr expr)
+		(output_string stderr "' does not have ")
+		(output_ordinal stderr (+ idx 1))
+		(output_string stderr " parameter\n")
+		(exit 1)
+		))
     (return (car args))
     ))
 
