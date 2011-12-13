@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2011-12-13 07:51:40 nineties $
+; $Id: rowl1-compile.rlc 2011-12-14 00:21:56 nineties $
 ;
 
 (import "rlvm-compile")
@@ -247,12 +247,17 @@
     (compile asm mod (expr_arg expr 1))
     ))
 
-(fun compile_module (asm curmod expr) (
-    (var modname (expr_arg_symbol expr 0))
-    (var block   (expr_arg expr 1))
-    (var module (vartable_find curmod modname))
-    ; NB: `module' has been initialized in parsing phase.
+(fun compile_define_module (asm curmod expr) (
+    (var modsig (expr_arg expr 0))
+    (var block  (expr_arg expr 1))
+    (var module (find_module current_loc curmod modsig))
     (compile_block_body asm module (expr_args block))
+    ))
+
+(fun compile_qualified (asm curmod expr) (
+    (var modsig (expr_arg expr 0))
+    (var module (find_module current_loc curmod modsig))
+    (compile asm module (expr_arg expr 1))
     ))
 
 (fun compile_function (asm mod args body) (
@@ -915,13 +920,16 @@
     (var locT (make_expr Loc (list3 stringT intT intT)))
     (add_compiler mod (make_expr Located (list2 locT DontCare)) compile_located)
 
-    (add_compiler mod (make_expr DefModule (list2 symT blockT)) compile_module)
     (add_compiler mod (make_expr DefInfixL (list3 symT stringT intT)) do_nothing)
     (add_compiler mod (make_expr DefInfixR (list3 symT stringT intT)) do_nothing)
     (add_compiler mod (make_expr DefPrefix (list3 symT stringT intT)) do_nothing)
     (add_compiler mod (make_expr DefPostfix (list3 symT stringT intT)) do_nothing)
     (add_compiler mod (make_expr DefConstr (list2 symT stringT)) do_nothing)
     (add_compiler mod (make_expr DefCommand (list2 symT stringT)) do_nothing)
+
+    (add_compiler mod (make_expr DefModule (list2 symT blockT)) compile_define_module)
+    (add_compiler mod (make_expr DefModule (list2 (headP Qualified) blockT)) compile_define_module)
+    (add_compiler mod (make_expr Qualified (list2 symT DontCare)) compile_qualified)
 
     (add_compiler mod (make_expr DefineFunction (list2
         (make_expr Apply (list2 symT listT)) DontCare)) compile_define_function)

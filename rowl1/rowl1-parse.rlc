@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-parse.rlc 2011-12-13 21:42:54 nineties $
+; $Id: rowl1-parse.rlc 2011-12-14 00:10:25 nineties $
 ;
 
 (import "rlvm-compile")
@@ -211,7 +211,6 @@
     ))
 
 (fun parse_primary (t) ((return (parse_primary_main t @TRUE))))
-(fun try_parse_primary (t) ((return (parse_primary_main t @FALSE))))
 
 (fun parse_primary_main (t force) (
     (if (== t @TOK_CHAR)   (return (get_token_boxed))
@@ -226,7 +225,7 @@
         (var offs (get_clmn))
         (var args 0)
         (while 1 (do
-            (var e (try_parse_primary (lex_sub offs)))
+            (var e (try_parse_primary (lex_sub offs) offs))
             (if (! e) break)
             (= args (cons e args))
             ))
@@ -252,42 +251,104 @@
     (return 0)
     ))
 
-(fun lookup_module (name) (
-	(var hd (expr_head name))
-	(if (== hd Symbol) (do
-		(var mod (vartable_find_local current_mod name))
-		(if (&& mod (!= (node_type mod) @ModuleE)) (do
-			(output_loc stderr (get_loc))
-			(output_string stderr "variable ")
-			(output_symbol stderr name)
-			(output_string stderr " is already defined\n")
-			(exit 1)
-			))
-		(return mod)
-		))
-	(output_loc stderr (get_loc))
-	(output_string stderr "invalid module signature\n")
-	(exit 1)
-	))
+(fun try_parse_primary (tok offs) (
+    (var expr_stack 0)
+    (var op_stack 0)
+    (var next_op 0)
+
+    (= op_stack (list1 (cons (variant @OP_START 0) (get_loc))))
+
+    (label try_parse_primary_front)
+    (if (== tok @TOK_PREFIX) (do
+        (var op (get_token_boxed))
+        (if (!= (associativity op) @ASSOC_PRIMARY) (do
+            (unput)
+            (return 0)
+            ))
+        (= tok (lex_sub offs))
+        (goto try_parse_primary_front)
+        ))
+    (if (cdr op_stack) ; length(op_stack) != 1
+        (= expr_stack (cons (parse_primary tok) expr_stack))
+        (do
+            (var e (parse_primary_main tok @FALSE))
+            (if (! e) (return 0))
+            (= expr_stack (cons e expr_stack))
+        ))
+    
+    (label try_parse_primary_middle)
+    (= next_op (parse_primary_infix_operator offs))
+
+    (while 1 (do
+        (var comp (compare_associativity (car op_stack) next_op))
+        (if (== comp 0) (goto try_parse_primary_end)
+        (if (> comp 0)
+            (do
+                (var op (car op_stack))
+                (= op_stack (cdr op_stack))
+                (= expr_stack (reduce op expr_stack))
+                continue
+            )
+            (do
+                (= op_stack (cons next_op op_stack))
+                break
+            )
+            ))
+        ))
+
+    (var type (field_get (car next_op) 0))
+    (if (== type @OP_INFIX)
+        (do (= tok (lex_sub offs)) (goto try_parse_primary_front))
+    (if (== type @OP_POSTFIX)
+        (goto try_parse_primary_middle)
+        ))
+    
+    (output_loc stderr (get_loc))
+    (output_string stderr "expect an infix or a postfix operator\n")
+    (exit 1)
+
+    (label try_parse_primary_end)
+
+    (var len (list_len expr_stack))
+    (if (== len 0) (return 0))
+    (if (> len 1) (do
+        (output_loc stderr (get_loc))
+        (output_string stderr "irreducible expression\n")
+        (exit 1)
+        ))
+    (return (car expr_stack))
+    ))
+
+(fun parse_primary_infix_operator (offs) (
+    (var tok (lex_infix offs))
+    (if (|| (== tok @TOK_INFIX) (== tok @TOK_POSTFIX)) (do
+        (var op (get_token_boxed))
+        (if (!= (associativity op) @ASSOC_PRIMARY) (do
+            (unput)
+            (return 0)
+            ))
+        (return (cons op (get_loc)))
+        ))
+    (if (!= tok @TOK_END) (unput))
+    (return (cons (variant @OP_END 0) (get_loc)))
+    ))
 
 (fun parse_module () (
 	(var offs (get_clmn))
-	(var modname (try_parse_primary (lex_sub offs)))
-	(var module (lookup_module modname))
-	(if (! module) (do
-		(= module (make_module modname current_mod))
-		(vartable_add current_mod modname module)
-		))
-	(if (!= (lex_sub offs) '{') (do
-		(output_loc stderr (get_loc))
-		(output_string stderr "module definition has no body block\n")
-		(exit 1)
-		))
+	(var modsig (try_parse_primary (lex_sub offs) offs))
+    (if (! modsig) (goto parse_module_error))
+	(var module (find_module (get_loc) current_mod modsig))
+	(if (!= (lex_sub offs) '{') (goto parse_module_error))
 	(var save_current_mod current_mod)
 	(set_current_module module)
 	(var body (parse_block (lex)))
 	(set_current_module save_current_mod)
-	(return (make_expr_user DefModule (list2 modname body)))
+	(return (make_expr_user DefModule (list2 modsig body)))
+
+    (label parse_module_error)
+    (output_loc stderr (get_loc))
+    (output_string stderr "invalid syntax of module definition\n")
+    (exit 1)
 	))
 
 (fun parse_tuple (t) (
