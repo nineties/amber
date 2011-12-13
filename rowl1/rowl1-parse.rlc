@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-parse.rlc 2011-12-13 01:24:59 nineties $
+; $Id: rowl1-parse.rlc 2011-12-13 21:42:54 nineties $
 ;
 
 (import "rlvm-compile")
@@ -97,52 +97,28 @@
     ))
 
 (fun parse_expr (tok offs in_seq) (
-    (var expr_stack 0)
-    (var op_stack 0)
-    (var next_op)
+    (var expr_stack 0)  ; list of expressions
+    (var op_stack 0)    ; list of (operator . location)
+    (var next_op 0)
 
-    (= op_stack (cons (cons (variant @OP_START 0) (get_loc)) op_stack))
+    (= op_stack (list1 (cons (variant @OP_START 0) (get_loc))))
 
     (label parse_expr_front)
-    (while (== tok @TOK_PREFIX) (do
+    (if (== tok @TOK_PREFIX) (do
         (= op_stack (cons (cons (get_token_boxed) (get_loc)) op_stack))
         (= tok (lex_sub offs))
+        (goto parse_expr_front)
         ))
-    (var e (parse_primary tok))
-    (while (&& op_stack (< (associativity (caar op_stack)) @ASSOC_SECONDARY)) (do
-        (var op (caar op_stack))
-        (= e (make_expr_user (field_get op 1) (list1 e)))
-        (= op_stack (cdr op_stack))
-        ))
-    (= e (parse_secondary e offs))
-    (= expr_stack (cons e expr_stack))
+    (= expr_stack (cons (parse_primary tok) expr_stack))
 
-
-    (label parse_expr_infix)
-    (= tok (lex_infix offs))
-    (if (|| (== tok @TOK_INFIX) (== tok @TOK_POSTFIX))
-        (= next_op (cons (get_token_boxed) (get_loc)))
-    (if (&& (! in_seq) (== tok ','))
-        (= next_op (cons comma_op (get_loc)))
-        (do
-            (if (&& (!= tok @TOK_EOF) (&& (!= tok @TOK_END)
-                (&& (!= tok ',') (&& (!= tok ')') (&& (!= tok '}') (!= tok ']')))))) (do
-                (output_loc stderr (get_loc))
-                (output_string stderr "infix or postfix operator is required before `")
-                (output_string stderr (get_token_text))
-                (output_string stderr "'\n")
-                (exit 1)
-                ))
-            (if (!= tok @TOK_END) (unput))
-            (= next_op (cons (variant @OP_END 0) (get_loc)))
-        )))
+    (label parse_expr_middle)
+    (= next_op (parse_successive_operator offs in_seq))
 
     (while 1 (do
         (var comp (compare_associativity (car op_stack) next_op))
         (if (== comp 0) (goto parse_expr_end)
         (if (> comp 0)
             (do
-                ; reduce
                 (var op (car op_stack))
                 (if (== (car op) comma_op)
                     (do
@@ -153,10 +129,7 @@
                             (= expr_stack (cdr expr_stack))
                             (= op_stack (cdr op_stack))
                             ))
-                        (= expr_stack (cons
-                            (make_expr_user Tuple elems)
-                            expr_stack
-                            ))
+                        (= expr_stack (cons (make_expr_user Tuple elems) expr_stack))
                     )
                     (do
                         (= op_stack (cdr op_stack))
@@ -171,11 +144,13 @@
             ))
         ))
 
-    (if (|| (== tok @TOK_INFIX) (&& (! in_seq) (== tok ',')))
+    (var type (field_get (car next_op) 0))
+    (if (== type @OP_INFIX)
         (do (= tok (lex_sub offs)) (goto parse_expr_front))
-    (if (== tok @TOK_POSTFIX) (goto parse_expr_infix)
+    (if (|| (== type @OP_POSTFIX) (|| (== type @OP_APPLICATIVE) (== type @OP_OBJECT)))
+        (goto parse_expr_middle)
         ))
-
+    
     (output_loc stderr (get_loc))
     (output_string stderr "expect an infix or a postfix operator\n")
     (exit 1)
@@ -192,28 +167,47 @@
     (return (car expr_stack))
     ))
 
-(fun parse_secondary (e offs) (
-    (label parse_secondary_loop)
-    (var t (lex_sub offs))
-    (if (== t '(') (do
-        (var args (parse_comma_list (lex) ')'))
-        (= e (make_expr_user Apply (list2 e args)))
-        (goto parse_secondary_loop)
+(fun parse_successive_operator (offs in_seq) (
+    (var tok (lex_infix offs))
+    (if (|| (== tok @TOK_INFIX) (== tok @TOK_POSTFIX))
+        (return (cons (get_token_boxed) (get_loc)))
         )
-    (if (== t '[') (do
-        (var args (parse_comma_list (lex) ']'))
-        (= e (make_expr_user Subscript (list2 e args)))
-        (goto parse_secondary_loop)
-        )))
-    (if (&& (== t '{') (== (node_type e) @SymbolE)) (do
-        (var args (parse_comma_list (lex) '}'))
-        (if (== e List)
-            (return args)
-            (return (make_expr_user e args))
-            )
+    (if (&& (! in_seq) (== tok ','))
+        (return (cons comma_op (get_loc)))
+        )
+    (if (== tok '(') (do
+        (var args (parse_comma_list (lex) ')'))
+        (return (cons
+            (variant @OP_APPLICATIVE 2 Apply args @ASSOC_SECONDARY)
+            (get_loc)
+            ))
         ))
-    (unput)
-    (return e)
+    (if (== tok '[') (do
+        (var args (parse_comma_list (lex) ']'))
+        (return (cons
+            (variant @OP_APPLICATIVE 2 Subscript args @ASSOC_SECONDARY)
+            (get_loc)
+            ))
+        ))
+    (if (== tok '{') (do
+        (var args (parse_comma_list (lex) '}'))
+        (return (cons
+            (variant @OP_OBJECT 1 args)
+            (get_loc)
+            ))
+        ))
+    (if (&& (!= tok @TOK_EOF) (&& (!= tok @TOK_END)
+        (&& (!= tok ',') (&& (!= tok ')') (&& (!= tok '}') (!= tok ']')))))) (do
+        (output_int stderr tok)
+        (output_char stderr '\n')
+        (output_loc stderr (get_loc))
+        (output_string stderr "infix or postfix operator is required before `")
+        (output_string stderr (get_token_text))
+        (output_string stderr "'\n")
+        (exit 1)
+        ))
+    (if (!= tok @TOK_END) (unput))
+    (return (cons (variant @OP_END 0) (get_loc)))
     ))
 
 (fun parse_primary (t) ((return (parse_primary_main t @TRUE))))
@@ -261,7 +255,7 @@
 (fun lookup_module (name) (
 	(var hd (expr_head name))
 	(if (== hd Symbol) (do
-		(var mod (vartable_find current_mod name))
+		(var mod (vartable_find_local current_mod name))
 		(if (&& mod (!= (node_type mod) @ModuleE)) (do
 			(output_loc stderr (get_loc))
 			(output_string stderr "variable ")
@@ -278,11 +272,11 @@
 
 (fun parse_module () (
 	(var offs (get_clmn))
-	(var module_name (try_parse_primary (lex_sub offs)))
-	(var module (lookup_module module_name))
+	(var modname (try_parse_primary (lex_sub offs)))
+	(var module (lookup_module modname))
 	(if (! module) (do
-		(= module (make_module module_name current_mod))
-		(vartable_add current_mod module_name module)
+		(= module (make_module modname current_mod))
+		(vartable_add current_mod modname module)
 		))
 	(if (!= (lex_sub offs) '{') (do
 		(output_loc stderr (get_loc))
@@ -293,7 +287,7 @@
 	(set_current_module module)
 	(var body (parse_block (lex)))
 	(set_current_module save_current_mod)
-	(return (make_expr_user DefModule (list2 module_name body)))
+	(return (make_expr_user DefModule (list2 modname body)))
 	))
 
 (fun parse_tuple (t) (
@@ -357,9 +351,11 @@
     (if (== type @OP_POSTFIX) (return (field_get op 3))
     (if (== type @OP_INFIX) (return (field_get op 4))
     (if (== type @OP_CONSTR) (return (field_get op 3))
+    (if (== type @OP_APPLICATIVE) (return (field_get op 3))
+    (if (== type @OP_OBJECT) (return @ASSOC_PRIMARY)
     (if (== type @OP_START) (return @ASSOC_MAX)
     (if (== type @OP_END) (return @ASSOC_MAX)
-        ))))))
+        ))))))))
     ))
 
 (fun reduce (opinfo exprs) (
@@ -368,17 +364,33 @@
     (if (|| (== type @OP_PREFIX) (== type @OP_POSTFIX))
         (do
             (var arg (car exprs))
-            (var expr (make_expr_user (field_get op 1) (cons arg 0)))
+            (var expr (make_expr_user (field_get op 1) (list1 arg)))
             (return (cons expr (cdr exprs)))
         )
     (if (== type @OP_INFIX)
         (do
             (var lhs (cadr exprs))
             (var rhs (car exprs))
-            (var expr (make_expr_user (field_get op 1) (cons lhs (cons rhs 0))))
+            (var expr (make_expr_user (field_get op 1) (list2 lhs rhs)))
             (return (cons expr (cddr exprs)))
         )
-        ))
+    (if (== type @OP_APPLICATIVE)
+        (do
+            (var lhs (car exprs))
+            (var expr (make_expr_user (field_get op 1) (list2 lhs (field_get op 2))))
+            (return (cons expr (cdr exprs)))
+        )
+    (if (== type @OP_OBJECT)
+        (do
+            (var hd (car exprs))
+            (if (!= (node_type hd) @SymbolE) (do
+                (output_loc stderr (cdr opinfo))
+                (output_string stderr "object header must be a Symbol\n")
+                (exit 1)
+                ))
+            (var expr (make_expr_user hd (field_get op 1)))
+            (return (cons expr (cdr exprs)))
+        )))))
     ))
 
 (fun compare_associativity (lop_info rop_info) (
