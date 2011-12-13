@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2011-12-13 01:23:49 nineties $
+; $Id: rowl1-compile.rlc 2011-12-13 07:51:40 nineties $
 ;
 
 (import "rlvm-compile")
@@ -215,22 +215,6 @@
     (compile_simple_call asm 2 undefined_error)
     ))
 
-; generate matching tree for function entry of `ent' with given arity.
-;(fun compile_matching_if_needed (func arity) (
-;    (var defs (get_defs_with_arity arity func))
-;    (var code (get_code_with_arity arity func))
-;    (output_string stderr "compile_matching_if_needed :")
-;    (pretty_print stderr defs)
-;    (output_char stderr '\n')
-;    (if (! code) (do
-;        ; This function has new definition, so it needs to be compiled.
-;        (= code (allocate_bytecode))
-;        (compile_matching code defs)
-;        (update_function_def func arity code)
-;        ))
-;    (return code)
-;    ))
-
 (export fun compile (asm mod expr) (
     (var code (lookup_func mod Compile 3))
     (return (byterun code asm mod expr))
@@ -263,11 +247,13 @@
     (compile asm mod (expr_arg expr 1))
     ))
 
-(extern fun add_infix)
-(extern fun add_prefix)
-(extern fun add_postfix)
-(extern fun add_constr)
-(extern fun add_command)
+(fun compile_module (asm curmod expr) (
+    (var modname (expr_arg_symbol expr 0))
+    (var block   (expr_arg expr 1))
+    (var module (vartable_find curmod modname))
+    ; NB: `module' has been initialized in parsing phase.
+    (compile_block_body asm module (expr_args block))
+    ))
 
 (fun compile_function (asm mod args body) (
     (push_vartable mod)
@@ -552,7 +538,11 @@
     (put_push asm val)
     ))
 
-(fun compile_block_main (asm mod exprs) (
+(fun compile_block_body (asm mod exprs) (
+    (if (! exprs) (do
+        (put_nil asm)
+        return
+        ))
     (while exprs (do
         (compile asm mod (car exprs))
         (= exprs (cdr exprs))
@@ -567,13 +557,13 @@
             (push_vartable mod)
             (var cnt_addr (get_address asm))
             (put_allocate asm 0)
-            (compile_block_main asm mod exprs)
+            (compile_block_body asm mod exprs)
             (put_operand_byte asm (+ cnt_addr 1) (count_local_variable mod))
             (pop_vartable mod)
         )
         (do
             (push_vartable mod)
-            (compile_block_main asm mod exprs)
+            (compile_block_body asm mod exprs)
             (pop_vartable mod)
         )
         )
@@ -921,8 +911,18 @@
     (var tupleT (headP Tuple))
     (var intT (headP Int))
     (var stringT (headP String))
+    (var blockT (headP Block))
     (var locT (make_expr Loc (list3 stringT intT intT)))
     (add_compiler mod (make_expr Located (list2 locT DontCare)) compile_located)
+
+    (add_compiler mod (make_expr DefModule (list2 symT blockT)) compile_module)
+    (add_compiler mod (make_expr DefInfixL (list3 symT stringT intT)) do_nothing)
+    (add_compiler mod (make_expr DefInfixR (list3 symT stringT intT)) do_nothing)
+    (add_compiler mod (make_expr DefPrefix (list3 symT stringT intT)) do_nothing)
+    (add_compiler mod (make_expr DefPostfix (list3 symT stringT intT)) do_nothing)
+    (add_compiler mod (make_expr DefConstr (list2 symT stringT)) do_nothing)
+    (add_compiler mod (make_expr DefCommand (list2 symT stringT)) do_nothing)
+
     (add_compiler mod (make_expr DefineFunction (list2
         (make_expr Apply (list2 symT listT)) DontCare)) compile_define_function)
     (add_compiler mod (make_expr DefineVariable (list2 symT DontCare)) compile_define_variable)
@@ -946,12 +946,6 @@
     (add_compiler mod (make_expr (to_sym "Lambda") (list2 DontCare DontCare)) compile_lambda_1arg)
     (add_compiler mod (make_expr (to_sym "Lambda") (list2 tupleT DontCare)) compile_lambda)
 
-    (add_compiler mod (make_expr DefInfixL (list3 symT stringT intT)) do_nothing)
-    (add_compiler mod (make_expr DefInfixR (list3 symT stringT intT)) do_nothing)
-    (add_compiler mod (make_expr DefPrefix (list3 symT stringT intT)) do_nothing)
-    (add_compiler mod (make_expr DefPostfix (list3 symT stringT intT)) do_nothing)
-    (add_compiler mod (make_expr DefConstr (list2 symT stringT)) do_nothing)
-    (add_compiler mod (make_expr DefCommand (list2 symT stringT)) do_nothing)
     ))
 
 (export fun add_compiler (mod pat func) (
