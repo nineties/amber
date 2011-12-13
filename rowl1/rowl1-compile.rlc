@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2011-12-14 00:21:56 nineties $
+; $Id: rowl1-compile.rlc 2011-12-14 00:29:02 nineties $
 ;
 
 (import "rlvm-compile")
@@ -248,6 +248,11 @@
     ))
 
 (fun compile_define_module (asm curmod expr) (
+    (if (! (in_global_scope curmod)) (do
+        (output_error stderr)
+        (output_string stderr "module definition in sub-scope is not allowed\n")
+        (exit 1)
+        ))
     (var modsig (expr_arg expr 0))
     (var block  (expr_arg expr 1))
     (var module (find_module current_loc curmod modsig))
