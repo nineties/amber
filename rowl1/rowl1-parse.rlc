@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-parse.rlc 2011-12-14 00:10:25 nineties $
+; $Id: rowl1-parse.rlc 2011-12-14 00:44:01 nineties $
 ;
 
 (import "rlvm-compile")
@@ -37,7 +37,7 @@
 (extern object current_mod)
 (extern fun set_current_module)
 
-(var comma_op (variant @OP_INFIX 1 (to_sym "Comma") @FALSE @ASSOC_COMMA))
+(var comma_op (variant @OP_INFIX 1 (to_sym "Comma") "," @FALSE @ASSOC_COMMA))
 
 (export fun init_parser (file ichan) (
     (init_lexer file ichan)
@@ -71,10 +71,10 @@
         (= tok (lex_sub offs))
         (if (== tok @TOK_END)
             (return (make_expr_user head 0))
-            (return (make_expr_user head (cons (parse_expr tok offs) 0)))
+            (return (make_expr_user head (list1 (parse_expr tok offs @FALSE))))
             )
         ))
-    (var e (parse_expr tok offs))
+    (var e (parse_expr tok offs @FALSE))
     (evaluate_parser_command e)
     (return e)
     ))
@@ -198,8 +198,6 @@
         ))
     (if (&& (!= tok @TOK_EOF) (&& (!= tok @TOK_END)
         (&& (!= tok ',') (&& (!= tok ')') (&& (!= tok '}') (!= tok ']')))))) (do
-        (output_int stderr tok)
-        (output_char stderr '\n')
         (output_loc stderr (get_loc))
         (output_string stderr "infix or postfix operator is required before `")
         (output_string stderr (get_token_text))
