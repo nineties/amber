@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-module.rlc 2011-12-13 21:42:26 nineties $
+; $Id: rowl1-module.rlc 2011-12-14 00:09:58 nineties $
 ;
 
 (import "rlvm-compile")
@@ -74,6 +74,32 @@
 
 (export fun pop_vartable (mod) (
     (symtable_pop (field_get mod 3))
+    ))
+
+(export fun find_module (loc curmod sig) (
+	(var hd (expr_head sig))
+	(if (== hd Symbol) (do
+		(var mod (vartable_find_local curmod sig))
+		(if (&& mod (!= (node_type mod) @ModuleE)) (do
+			(output_loc stderr loc)
+			(output_string stderr "variable ")
+			(output_symbol stderr sig)
+			(output_string stderr " is already defined\n")
+			(exit 1)
+			))
+        (if (! mod) (do
+            (= mod (make_module sig curmod))
+            (vartable_add curmod sig mod)
+            ))
+		(return mod)
+		))
+    (if (== hd Qualified)
+        (return (find_module loc (find_module loc curmod (expr_arg_symbol sig 0))
+                    (expr_arg sig 1)))
+        )
+	(output_loc stderr loc)
+	(output_string stderr "invalid module signature\n")
+	(exit 1)
     ))
 
 (export fun in_global_scope (mod) (

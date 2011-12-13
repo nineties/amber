@@ -1,14 +1,14 @@
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.rl 2011-12-13 21:38:34 nineties $
+# $Id: syntax.rl 2011-12-14 00:09:11 nineties $
 
 # Syntax definition of rowl language
 
-infixl Qualified "::" 2
-prefix Unquote "!" 4
-prefix Quote "\\" 4
-prefix QuasiQuote "`" 4
-infixl HeadP "@" 5
+infixr Qualified "::" 1
+prefix Unquote "!" 3
+prefix Quote "\\" 3
+prefix QuasiQuote "`" 3
+infixl HeadP "@" 4
 infixr Define ":" 19
 infixr Rewrite "=>" 20
 
@@ -23,23 +23,23 @@ DefineFunction{
 Apply{f@Symbol, args@List}: body => `DefineFunction{Apply{!f, !args}, !body}
 x@Symbol: value => `DefineVariable{!x, !value}
 
-prefix UnaryPlus    "+"  6
-prefix UnaryMinus   "-"  6
-prefix Not          "not"6
-infixl Times        "*"  7
-infixl Divide       "/"  7
-infixl Mod          "%"  7
-infixl Plus         "+"  8
-infixl Minus        "-"  8
-infixl LessThan     "<"  10 
-infixl GreaterThan  ">"  10
-infixl LessEqual    "<=" 10
-infixl GreaterEqual ">=" 10
-infixl Equal        "==" 11
-infixl NotEqual     "!=" 11
-infixl LogicalAnd   "&&" 12
-infixl LogicalOr    "||" 13
-infixr Lambda       "->" 14
+prefix UnaryPlus    "+"  5
+prefix UnaryMinus   "-"  5
+prefix Not          "not"5
+infixl Times        "*"  6
+infixl Divide       "/"  6
+infixl Mod          "%"  6
+infixl Plus         "+"  7
+infixl Minus        "-"  7
+infixl LessThan     "<"  9 
+infixl GreaterThan  ">"  9
+infixl LessEqual    "<=" 9
+infixl GreaterEqual ">=" 9
+infixl Equal        "==" 10
+infixl NotEqual     "!=" 10
+infixl LogicalAnd   "&&" 11
+infixl LogicalOr    "||" 12
+infixr Lambda       "->" 13
 infixr Assign       "="  17
 infixr PlusAssign   "+=" 17
 infixr MinusAssign  "-=" 17
