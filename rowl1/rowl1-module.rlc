@@ -2,36 +2,28 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-module.rlc 2011-12-14 00:09:58 nineties $
+; $Id: rowl1-module.rlc 2011-12-14 16:41:13 nineties $
 ;
 
 (import "rlvm-compile")
 (import "rowl1-types")
 
-; - one file corresponds to one module of same name.
-; - structure of module object:
-;   (name : symbol,
-;    super module : module,
-;    variable table : symtable,
-;    operator table : idtable,  # string repr -> operator
-;    repr table : symtable, # head -> string repr
-;   )
-;
-; XXX: implementation of operator table and repr table is heavy.
-;   - try use assoc list
-
 (compile `object `(
 
+(import "rowl1-util")
 (import "rowl1-node")
 (import "rowl1-symtable")
 
-(export fun make_module (sym outer) (
-    (return (variant @ModuleE 5
+(extern object current_loc)
+
+(export fun make_module (sym super) (
+    (return (variant @ModuleE 6
         sym
-        outer
-        (make_symtable 10)
-        (make_idtable)
-        (make_symtable 10)
+        super
+        (list1 0)           ; stack of list of imported modules
+        (make_symtable 10)  ; variable table
+        (make_idtable)      ; string represtation -> operator
+        (make_symtable 10)  ; head -> string representation of operator
         ))
     ))
 
@@ -39,28 +31,59 @@
     (return (field_get mod 2))
     ))
 
-(export fun vartable_add (mod sym v) (
-    (symtable_add (field_get mod 3) sym v)
+(fun add_module (curmod mod) (
+    (var stack (field_get curmod 3))
+    (setcar stack (cons mod (list_delete mod (car stack))))
     ))
 
-(export fun vartable_find (mod sym) (
+(export fun import_module (curmod sym) (
+    (var mod (lookup_symbol curmod sym))
+    (if (! mod) (do
+        (output_error stderr current_loc)
+        (output_string stderr "module `")
+        (output_symbol stderr sym)
+        (output_string stderr "' is not found\n")
+        (exit 1)
+        ))
+    (add_module curmod mod)
+    ))
+
+(export fun add_symbol (mod sym v) (
+    (symtable_add (field_get mod 4) sym v)
+    ))
+
+(export fun lookup_symbol (mod sym) (
     (while mod (do
-        (var tbl (field_get mod 3))
+        ; First, lookup variable table.
+        (var tbl (field_get mod 4))
         (var v (symtable_find tbl sym))
         (if v (return v))
+
+        ; Next, lookup imported modules.
+        (var import_stack (field_get mod 3))
+        (while import_stack (do
+            (var list (car import_stack))
+            (while list (do
+                (= v (lookup_symbol (car list) sym))
+                (if v (return v))
+                (= list (cdr list))
+                ))
+            (= import_stack (cdr import_stack))
+            ))
+
         (= mod (super_module mod))
         ))
     (return 0)
     ))
 
-(export fun vartable_find_local (mod sym) (
-    (var tbl (field_get mod 3))
+(export fun lookup_symbol_local (mod sym) (
+    (var tbl (field_get mod 4))
     (return (symtable_find_local tbl sym))
     ))
 
-(export fun vartable_find_global (mod sym) (
+(export fun lookup_symbol_global (mod sym) (
     (while mod (do
-        (var tbl (field_get mod 3))
+        (var tbl (field_get mod 4))
         (var v (symtable_find_global tbl sym))
         (if v (return v))
         (= mod (super_module mod))
@@ -68,65 +91,67 @@
     (return 0)
     ))
 
-(export fun push_vartable (mod) (
-    (symtable_push (field_get mod 3))
+(export fun push_scope (mod) (
+    (symtable_push (field_get mod 4))
+    (field_set mod 3 (cons 0 (field_get mod 3)))
     ))
 
-(export fun pop_vartable (mod) (
-    (symtable_pop (field_get mod 3))
+(export fun pop_scope (mod) (
+    (symtable_pop (field_get mod 4))
+    (field_set mod 3 (cdr (field_get mod 3)))
     ))
 
 (export fun find_module (loc curmod sig) (
-	(var hd (expr_head sig))
-	(if (== hd Symbol) (do
-		(var mod (vartable_find_local curmod sig))
-		(if (&& mod (!= (node_type mod) @ModuleE)) (do
-			(output_loc stderr loc)
-			(output_string stderr "variable ")
-			(output_symbol stderr sig)
-			(output_string stderr " is already defined\n")
-			(exit 1)
-			))
+    (var hd (expr_head sig))
+    (if (== hd Symbol) (do
+        (var mod (lookup_symbol_local curmod sig))
+        (if (&& mod (!= (node_type mod) @ModuleE)) (do
+            (output_loc stderr loc)
+            (output_string stderr "variable ")
+            (output_symbol stderr sig)
+            (output_string stderr " is already defined\n")
+            (exit 1)
+            ))
         (if (! mod) (do
             (= mod (make_module sig curmod))
-            (vartable_add curmod sig mod)
+            (add_symbol curmod sig mod)
             ))
-		(return mod)
-		))
+        (return mod)
+        ))
     (if (== hd Qualified)
         (return (find_module loc (find_module loc curmod (expr_arg_symbol sig 0))
                     (expr_arg sig 1)))
         )
-	(output_loc stderr loc)
-	(output_string stderr "invalid module signature\n")
-	(exit 1)
+    (output_loc stderr loc)
+    (output_string stderr "invalid module signature\n")
+    (exit 1)
     ))
 
 (export fun in_global_scope (mod) (
-    (if (== (symtable_depth (field_get mod 3)) 1)
+    (if (== (symtable_depth (field_get mod 4)) 1)
         (return @TRUE)
         (return @FALSE)
         )
     ))
 
 (export fun get_vartable (mod) (
-    (return (field_get mod 3))
+    (return (field_get mod 4))
     ))
 
 (export fun count_local_variable (mod) (
-    (return (symtable_count_local (field_get mod 3)))
+    (return (symtable_count_local (field_get mod 4)))
     ))
 
 (export fun add_operator (mod repr head op) (
-    (var optbl (field_get mod 4))
-    (var rptbl (field_get mod 5))
+    (var optbl (field_get mod 5))
+    (var rptbl (field_get mod 6))
     (idtable_add optbl repr op)
     (if head (symtable_add rptbl head op))
     ))
 
 (export fun lookup_operator (mod repr) (
     (while mod (do
-        (var tbl (field_get mod 4))
+        (var tbl (field_get mod 5))
         (var v (idtable_find tbl repr))
         (if v (return v))
         (= mod (super_module mod))
@@ -136,7 +161,7 @@
 
 (export fun lookup_operator_from_head (mod head) (
     (while mod (do
-        (var tbl (field_get mod 5))
+        (var tbl (field_get mod 6))
         (var v (symtable_find tbl head))
         (if v (return v))
         (= mod (super_module mod))
@@ -145,13 +170,13 @@
     ))
 
 (export fun push_lextable (mod) (
-    (idtable_push (field_get mod 4))
-    (symtable_push (field_get mod 5))
+    (idtable_push (field_get mod 5))
+    (symtable_push (field_get mod 6))
     ))
 
 (export fun pop_lextable (mod) (
-    (idtable_pop (field_get mod 4))
-    (symtable_pop (field_get mod 5))
+    (idtable_pop (field_get mod 5))
+    (symtable_pop (field_get mod 6))
     ))
 
 (export fun pp_module (ochan obj) (

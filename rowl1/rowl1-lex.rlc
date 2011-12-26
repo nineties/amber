@@ -136,6 +136,8 @@
 (import "rowl1-node")
 (import "rowl1-module")
 
+(extern object current_loc)
+
 (array char chgroup (
      0 25 25 25 25 25 25 25 25  1  2 25 25  1 25 25
     25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25
@@ -219,9 +221,9 @@
 (export fun get_clmn () ((return srcclmn)))
 (export fun get_loc () (
     (if unputted
-	(return (make_loc prev_srcfile prev_srcline prev_srcline))
-	(return (make_loc srcfile srcline srcline))
-	)
+    (return (make_loc prev_srcfile prev_srcline prev_srcline))
+    (return (make_loc srcfile srcline srcline))
+    )
     ))
 
 (array char esc2val_table (
@@ -266,15 +268,15 @@
     (= c (cvector_at lexbuf lexbuf_end))
     (incr lexbuf_end)
     (if (== c '\n')
-	(do
-	    (incr next_srcline)
-	    (= next_srcclmn 1)
-	    (= newline @TRUE)
+    (do
+        (incr next_srcline)
+        (= next_srcclmn 1)
+        (= newline @TRUE)
         )
-	(do
-	    (incr next_srcclmn)
-	    (if (!= c ' ') (= newline @FALSE))
-	)
+    (do
+        (incr next_srcclmn)
+        (if (!= c ' ') (= newline @FALSE))
+    )
         )
     (return c)
     ))
@@ -353,7 +355,7 @@
     (= lexbuf_end 0)
 
     ; setup special constructors
-	(add_constr DefModule "module")
+    (add_constr DefModule "module")
     (add_constr DefInfixL "infixl")
     (add_constr DefInfixR "infixr")
     (add_constr DefPrefix "prefix")
@@ -400,9 +402,9 @@
     (skip_spaces)
 
     (if (&& newline (<= next_srcclmn offs)) (do
-	(accept @TOK_END)
-	(return @TOK_END)
-	))
+    (accept @TOK_END)
+    (return @TOK_END)
+    ))
 
     (= prev_srcfile srcfile)
     (= prev_srcline srcline)
@@ -420,8 +422,8 @@
             (goto lexloop)
             ))
         (1  . (do
-	    (return token_tag)
-	    ))
+        (return token_tag)
+        ))
         (2  . (lex_error "invalid character"))
         (3  . (lex_error "invalid decimal integer literal"))
         (4  . (lex_error "invalid binary integer literal"))
@@ -438,7 +440,7 @@
             (return @TOK_EOF)
             ))
         (14 . (do
-	    (not_reachable "lex_main")
+        (not_reachable "lex_main")
             ))
         (15 . (do
             (consume)
@@ -608,7 +610,7 @@
         (35 . (do
             (consume)
             (= state (next_state s35next))
-	    (if (== state 1) (do
+        (if (== state 1) (do
                 (var op (lookup_operator current_mod (get_token_text)))
                 (if op
                     (accept_operator op infix_p)
@@ -616,7 +618,7 @@
                         (accept @TOK_SYMBOL)
                         (= token_boxed (to_sym (get_token_text)))
                     ))
-		))
+        ))
             (goto lexloop)
             ))
         (36 . (do
@@ -652,21 +654,21 @@
 (fun skip_spaces () (
     (var c (lookahead))
     (while 1 (do
-	(if (== c @CH_SHARP) (do
-	    (ignore)
-	    (while (!= (lookahead) @CH_NL) (ignore))
-	    (ignore)
-	    )
-	(if (|| (== c @CH_SPACES) (== c @CH_NL)) (do
-	    (while (|| (== c @CH_SPACES) (== c @CH_NL)) (do
-		(ignore)
-		(= c (lookahead))
-		))
-	    )
-	    break
-	    ))
-	(= c (lookahead))
-	))
+    (if (== c @CH_SHARP) (do
+        (ignore)
+        (while (!= (lookahead) @CH_NL) (ignore))
+        (ignore)
+        )
+    (if (|| (== c @CH_SPACES) (== c @CH_NL)) (do
+        (while (|| (== c @CH_SPACES) (== c @CH_NL)) (do
+        (ignore)
+        (= c (lookahead))
+        ))
+        )
+        break
+        ))
+    (= c (lookahead))
+    ))
     ))
 
 (var save_lexbuf_end 0)
@@ -721,7 +723,7 @@
 
 (fun check_assoc (name assoc) (
     (if (&& (>= assoc @ASSOC_PRIMARY) (<= assoc @ASSOC_MAX)) return)
-    (output_error stderr)
+    (output_error stderr current_loc)
     (output_string stderr "associativity of operator `")
     (output_string stderr name)
     (output_string stderr "' must be in ")
@@ -795,7 +797,7 @@
             (incr i)
             ))
         )))
-    (output_error stderr)
+    (output_error stderr current_loc)
     (output_string stderr "invalid string for operator, \"")
     (output_string_escape stderr name)
     (output_string stderr "\"\n")

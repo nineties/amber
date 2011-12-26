@@ -3,12 +3,14 @@
 # rowl - 2nd generation
 # Copyright (C) 2010 nineties
 #
-# $Id: main.rl 2011-12-14 00:44:25 nineties $
+# $Id: main.rl 2011-12-27 02:42:40 nineties $
 
-module X {
-    constr Hoge "hoge"
-}
+#include "rowl.rl"
 
-module M {
-    import X, Y
-}
+#fib(n): fib(n-1) + fib(n-2)
+#f(): {
+#	fib(0): 0
+#	fib(1): 1
+#	fib(30) # -> Apply{fib, [30]}
+#}
+

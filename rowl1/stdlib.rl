@@ -237,7 +237,7 @@ fputi: (p0, p1) {
             fputs(p0, "-2147483648");
             return;
         };
-	fputc(p0, '-');
+    fputc(p0, '-');
         fputi(p0, -p1);
         return;
     };
@@ -379,7 +379,7 @@ unlink: (p0) {
     allocate(1);
     x0 = syscall(SYS_UNLINK, p0);
     if (x0 == -2) { (% ENOENT %);
-	return;
+    return;
     };
     if (x0 < 0) { panic("unlink failed"); };
 };

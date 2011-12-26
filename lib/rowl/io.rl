@@ -1,6 +1,8 @@
 # Copyright (C) 2010 nineties
 #
-# $Id: io.rl 2011-10-19 21:10:41 nineties $
+# $Id: io.rl 2011-12-14 01:14:08 nineties $
+
+module stdlib::io {
 
 print(obj): print(stdout, obj)
 print(\fullform, obj): print(stdout, \fullform, obj)
@@ -20,3 +22,5 @@ puts(io@OutputFileStream, \fullform, obj): {
 }
 puts(obj): puts(stdout, obj)
 puts(\fullform, obj): puts(stdout, \fullform, obj)
+
+}
