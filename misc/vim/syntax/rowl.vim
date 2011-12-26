@@ -1,6 +1,6 @@
 " Language:	Rowl
 " Maintainer:	nineties <nineties48@gmail.com>
-" $Id: rowl.vim 2011-10-19 20:46:39 nineties $
+" $Id: rowl.vim 2011-12-14 12:23:34 nineties $
 
 if exists("b:current_syntax")
 "    finish
@@ -9,7 +9,7 @@ endif
 syn case match " case sensitive
 
 syn keyword rowlConstant    true false
-syn keyword rowlStatement   return import
+syn keyword rowlStatement   module return import include
 syn keyword rowlConditional if else
 syn keyword rowlRepeat      while
 

@@ -1,8 +1,13 @@
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.rl 2011-12-14 00:09:11 nineties $
+# $Id: syntax.rl 2011-12-14 12:23:21 nineties $
 
 # Syntax definition of rowl language
+
+module core {
+
+command Include "include"
+command Import "import"
 
 infixr Qualified "::" 1
 prefix Unquote "!" 3
@@ -12,17 +17,17 @@ infixl HeadP "@" 4
 infixr Define ":" 19
 infixr Rewrite "=>" 20
 
-DefineFunction{
-    Rewrite(x => y),
-    `DefineFunction{
-        Rewrite(!x),
-        Rewrite(!y)
-    }
-}
-
-Apply{f@Symbol, args@List}: body => `DefineFunction{Apply{!f, !args}, !body}
-x@Symbol: value => `DefineVariable{!x, !value}
-
+#DefineFunction{
+#    Rewrite(x => y),
+#    `DefineFunction{
+#        Rewrite(!x),
+#        Rewrite(!y)
+#    }
+#}
+#
+#Apply{f@Symbol, args@List}: body => `DefineFunction{Apply{!f, !args}, !body}
+#x@Symbol: value => `DefineVariable{!x, !value}
+#
 prefix UnaryPlus    "+"  5
 prefix UnaryMinus   "-"  5
 prefix Not          "not"5
@@ -52,27 +57,26 @@ constr For          "for"
 command Return      "return"
 infixl Else         "else" 18
 
-true: \true
-false: \false
+#true: \true
+#false: \false
 
-command Import "import"
-infixl  Dot "." 2
+#+x     => `UnaryPlus(!x)
+#-x     => `UnaryMinus(!x)
+#not x  => `Not(!x)
+#x * y  => `Times(!x, !y)
+#x / y  => `Divide(!x, !y)
+#x % y  => `Mod(!x, !y)
+#x + y  => `Plus(!x, !y)
+#x - y  => `Minus(!x, !y)
+#x < y  => `LessThan(!x, !y)
+#x > y  => `GreaterThan(!x, !y)
+#x >= y => `GreaterEqual(!x, !y)
+#x <= y => `LessEqual(!x, !y)
+#x += y => `(!x = !x + !y)
+#x -= y => `(!x = !x - !y)
+#x *= y => `(!x = !x * !y)
+#x /= y => `(!x = !x / !y)
+#x %= y => `(!x = !x % !y)
+#x[y]   => `Subscript(!x, !y)
 
-+x     => `UnaryPlus(!x)
--x     => `UnaryMinus(!x)
-not x  => `Not(!x)
-x * y  => `Times(!x, !y)
-x / y  => `Divide(!x, !y)
-x % y  => `Mod(!x, !y)
-x + y  => `Plus(!x, !y)
-x - y  => `Minus(!x, !y)
-x < y  => `LessThan(!x, !y)
-x > y  => `GreaterThan(!x, !y)
-x >= y => `GreaterEqual(!x, !y)
-x <= y => `LessEqual(!x, !y)
-x += y => `(!x = !x + !y)
-x -= y => `(!x = !x - !y)
-x *= y => `(!x = !x * !y)
-x /= y => `(!x = !x / !y)
-x %= y => `(!x = !x % !y)
-x[y]   => `Subscript(!x, !y)
+}

@@ -29,54 +29,60 @@
     (return @TRUE)
     ))
 
-(fun compile_matching (bytecode defs) (
+(export fun compile_matching (def) (
     (var asm (make_assembler))
 
-    (= defs (prepare_pats defs))
+    ; construct pattern matrix 
+    (var mat (construct_pattern_matrix def))
 
     (var args 0)
-    (var idx (list_len (caar defs)))
+    (var idx (- (list_len (caar mat)) 1))
     (while (> idx 0) (do
         (decr idx)
         (= args (cons (make_arg idx) args))
         ))
+    (= args (cons (get_arity) args))
 
-    (compile_matching_main asm args defs)
-
-    (set_code bytecode asm)
-    (return bytecode)
+    (compile_matching_main asm args mat)
+    (compile_matching_error asm)
+    (return (get_code asm))
     ))
 
-(export fun compile_matching_driver (bytecode defs) (
-    (var asm (make_assembler))
-    (put_push asm defs)
-    (put_push asm bytecode)
-    (compile_simple_call asm 2 compile_matching)
-    (put_jjump asm)
-    (set_code bytecode asm)
-    ))
-
-(fun prepare_pats (pats) (
-    (if (== pats 0) (return 0))
-    (return (cons
-        (cons
-            (compile_pat_list (caar pats))
-            (cdar pats)
-            )
-        (prepare_pats (cdr pats))
+(fun construct_pattern_matrix (def) (
+    ; compute maximum arity
+    (var len (max_arity def))
+    (var mat 0)
+    (while def (do
+        (= mat (cons (construct_row len def) mat))
+        (= def (field_get def 3))
         ))
+    (return (list_reverse mat))
     ))
 
-(fun compile_pat_list (pat) (
-    (var ret 0)
-    (while pat (do
-        (= ret (cons (compile_pat (car pat)) ret))
-        (= pat (cdr pat))
+(fun max_arity (def) (
+    (var len 0)
+    (while def (do
+        (var l (list_len (field_get def 1)))
+        (if (> l len) (= len l))
+        (= def (field_get def 3))
         ))
-    (return (list_reverse ret))
+    (return len)
     ))
 
-(fun compile_pat (pat) (
+(fun construct_row (len def) (
+    (var args (field_get def 1))
+    (var code (field_get def 2))
+    (= args (setup_args len args))
+    (return (cons args code))
+    ))
+
+(fun setup_args (len args) (
+    (if (== len 0) (return 0))
+    (if (! args) (return (diag_list len DontCare)))
+    (return (cons (setup_pat (car args)) (setup_args (- len 1) (cdr args))))
+    ))
+
+(fun setup_pat (pat) (
     (var hd (expr_head pat))
     (if (== pat DontCare)
         (return DontCare)
@@ -88,7 +94,7 @@
         (return pat)
         )
     (if (== hd List)
-        (return (compile_pat_list pat))
+        (return (setup_pat_list pat))
         )
     (if (== hd Quote)
         (return (expr_arg pat 0))
@@ -97,7 +103,12 @@
         (return (qquote_pat (expr_arg pat 0) 0))
         )
     (var args (expr_args pat))
-    (return (make_expr_user hd (compile_pat_list args)))
+    (return (make_expr_user hd (setup_pat_list args)))
+    ))
+
+(fun setup_pat_list (list) (
+    (if (! list) (return 0))
+    (return (cons (setup_pat (car list)) (setup_pat_list (cdr list))))
     ))
 
 (fun qquote_pat_list (pat level) (
@@ -119,7 +130,7 @@
         )
     (if (== hd Unquote) (do
         (if (== level 0)
-            (return (compile_pat (expr_arg pat 0)))
+            (return (setup_pat (expr_arg pat 0)))
             )
         (-= level 1)
         )
@@ -130,9 +141,28 @@
     (return (make_expr_user hd (qquote_pat_list args level)))
     ))
 
+; unifty length of patterns
+(fun unify_length (pats) (
+    (var max (max_length pats))
+    (output_string stderr "max length:")
+    (output_int stderr max)
+    (output_char stderr '\n')
+    (return pats)
+    ))
+
+(fun max_length (pats) (
+    (if (! pats) (return 0))
+    (var len1 (unbox (caaar pats)))
+    (var len2 (max_length (cdr pats)))
+    (if (> len1 len2)
+        (return len1)
+        (return len2)
+        )
+    ))
+
 (fun compile_matching_main (asm args pats) (
     (if (== (caar pats) 0) (do
-        (var code (list_at (car pats) 1))
+        (var code (cdr (car pats)))
         (put_push asm code)
         (put_jjump asm)
         return
@@ -566,6 +596,54 @@
     (if (== pats 0) (return 0))
     (return (cons (cons (list_append (expr_args (caaar pats)) (cdaar pats)) (cdar pats))
         (expand_composite_pat (cdr pats))))
+    ))
+
+(var arity_max 8)
+(fun matching_error (loc arity args) (
+    (output_error stderr loc)
+    (output_string stderr "no definition matches to argument(s): (")
+    (while args (do
+        (pretty_print stderr (car args))
+        (= args (cdr args))
+        (if args (output_string stderr ", "))
+        ))
+    (if (<= arity arity_max)
+        (output_string stderr ")\n")
+        (output_string stderr ", ...)\n")
+        )
+    (exit 1)
+    ))
+
+(extern object current_loc)
+(fun compile_matching_error (asm) (
+    ; construct list of arguments
+    (var end_lbl (fresh_label asm))
+    (var case_lbls (array int arity_max))
+    (for i 0 arity_max
+        (array_set int case_lbls i (fresh_label asm))
+        )
+    (put_imm_i0 asm) ; null list
+
+    (put_arity asm)
+    ; unbox
+    (put_imm_i1 asm)
+    (put_sar asm)
+    (put_tswitch asm arity_max)
+    (for i 0 arity_max
+        (emit_tswitch_label asm (array_get int case_lbls i))
+        )
+    (emit_tswitch_label asm end_lbl)
+    (set_label asm end_lbl)
+    (for i 0 arity_max (do
+        (var arg_idx (- (- arity_max i) 1))
+        (set_label asm (array_get int case_lbls arg_idx))
+        (put_arg asm arg_idx)
+        (put_cons asm)
+        ))
+    (set_label asm (array_get int case_lbls 0))
+    (put_arg asm 0)
+    (put_push asm current_loc)
+    (compile_simple_call asm 2 matching_error)
     ))
 
     ))

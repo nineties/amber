@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2011-11-11 21:11:27 nineties $
+; $Id: vm-insn.rlc 2011-12-27 02:30:03 nineties $
 ;
 
 (define gen_field_get (idx) `(
@@ -152,7 +152,7 @@
         (asm "movl %eax, (%esi)")
         ))
     (list_at () @true (
-	(vmpop %ecx)
+        (vmpop %ecx)
         (asm "movl (%esi), %eax")
         (asm "0:")
         (asm "cmpl $0, %ecx")
@@ -165,17 +165,17 @@
         (asm "movl %eax, (%esi)")
         ))
     (list_len () @true (
-	(asm "movl (%esi), %eax")
-	(asm "movl $0, %ecx")
-	(asm "0:")
-	(asm "cmpl $0, %eax")
-	(asm "je 1f")
-	(asm "movl 4(%eax), %eax")
-	(asm "incl %ecx")
-	(asm "jmp 0b")
-	(asm "1:")
-	(asm "movl %ecx, (%esi)")
-	))
+        (asm "movl (%esi), %eax")
+        (asm "movl $0, %ecx")
+        (asm "0:")
+        (asm "cmpl $0, %eax")
+        (asm "je 1f")
+        (asm "movl 4(%eax), %eax")
+        (asm "incl %ecx")
+        (asm "jmp 0b")
+        (asm "1:")
+        (asm "movl %ecx, (%esi)")
+    ))
     ; allocate plain object
     ; arg0 = size (in bytes)
     ; NB: allocated memory is not be zero-cleared
@@ -331,12 +331,19 @@
         (asm "sall $2, %eax")
         (asm "subl %eax, %esi")
         ))
+    ; number of arguments
+    (arity () @true (
+        (asm "movl 8(%edi), %eax") ; %eax = 4 * arity
+        (asm "shrl $1, %eax") ; convert to boxed int
+        (asm "incl %eax")
+        (vmpush %eax))
+    )
     ; arguments
-    (arg0 () @true ((asm "movl 8(%edi), %eax") (vmpush %eax)))
-    (arg1 () @true ((asm "movl 12(%edi), %eax") (vmpush %eax)))
-    (arg2 () @true ((asm "movl 16(%edi), %eax") (vmpush %eax)))
-    (arg3 () @true ((asm "movl 20(%edi), %eax") (vmpush %eax)))
-    (arg4 () @true ((asm "movl 24(%edi), %eax") (vmpush %eax)))
+    (arg0 () @true ((asm "movl 12(%edi), %eax") (vmpush %eax)))
+    (arg1 () @true ((asm "movl 16(%edi), %eax") (vmpush %eax)))
+    (arg2 () @true ((asm "movl 20(%edi), %eax") (vmpush %eax)))
+    (arg3 () @true ((asm "movl 24(%edi), %eax") (vmpush %eax)))
+    (arg4 () @true ((asm "movl 28(%edi), %eax") (vmpush %eax)))
     ; load word from local
     (loadl0 () @true ((asm "movl -4(%edi), %eax") (vmpush %eax)))
     (loadl1 () @true ((asm "movl -8(%edi), %eax") (vmpush %eax)))
@@ -460,6 +467,8 @@
         ))
     ; 'call:1' 'relative address of the function:2' 'size of arguments:1'
     (call (addr byte)  @nil  (
+        (vmubyte 3 %eax)
+        (vmpush %eax) ; store size of arguments
         (asm "movl %ebx, %eax")
         (asm "addl $4, %eax")
         (vmpush %eax) ; store return point
@@ -499,14 +508,16 @@
                 (call vm_pcall)
                 (asm "addl $12, %esp")
                 (vmrestore)
-                (vmubyte 3 %ecx) ; total size of arguments
+                (vmubyte 1 %ecx) ; total size of arguments
                 (asm "addl %ecx, %esi") ; remove arguments from stack
                 (vmpush %eax) ; push return value
             )
             ( ; absolute call
                 (asm "movl %ebx, %ecx")
                 (asm "addl $2, %ecx")
+                (vmubyte 1 %eax)
                 (vmpop %ebx)
+                (vmpush %eax) ; store size of arguments
                 (vmpush %ecx) ; store return point
                 (vmpush %edi) ; store base pointer
                 (asm "movl %esi, %edi") ; set base pointer
@@ -518,8 +529,10 @@
     (jcall (byte) @nil (
         (asm "movl %ebx, %ecx")
         (asm "addl $2, %ecx")
+        (vmubyte 1 %eax)
         (vmpop %ebx)
         (asm "movl (%ebx), %ebx") ; pointer to the bytecode
+        (vmpush %eax) ; store size of arguments
         (vmpush %ecx) ; store return point
         (vmpush %edi) ; store base pointer
         (asm "movl %esi, %edi") ; set base pointer
@@ -539,7 +552,7 @@
         (asm "movl %edi, %esi")
         (vmpop %edi) ; base pointer
         (vmpop %ebx) ; return address
-        (asm "movzbl -1(%ebx), %eax") ; total size of arguments
+        (vmpop %eax) ; total size of arguments
         (asm "addl %eax, %esi")
         (vmpush %ecx) ; push return value
         (vmfetch)
@@ -549,7 +562,7 @@
         (asm "movl %edi, %esi")
         (vmpop %edi) ; base pointer
         (vmpop %ebx) ; return address
-        (asm "movzbl -1(%ebx), %eax") ; total size of arguments
+        (vmpop %eax) ; total size of arguments
         (asm "addl %eax, %esi")
         (vmpush %ecx) ; push return value
         (vmfetch)

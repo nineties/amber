@@ -56,10 +56,10 @@ unescape: (p0) {
 parse_sexp: (p0) {
     allocate(3);
     if (p0 == '`') {
-	return mkquote(parse_sexp(lex()));
+    return mkquote(parse_sexp(lex()));
     };
     if (p0 == '@') {
-	return mkunquote(parse_sexp(lex()));
+    return mkunquote(parse_sexp(lex()));
     };
     if (p0 == '(') {
         x0 = parse_list_body(lex());

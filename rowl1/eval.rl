@@ -319,8 +319,8 @@ eval_import: (p0) {
     check_arity(p0, 1, "import");
     x0 = eval_sexp(car(p0));
     if (string_p(x0) == nil_sym) {
-	fputs(stderr, "ERROR 'import': required string\n");
-	exit(1);
+    fputs(stderr, "ERROR 'import': required string\n");
+    exit(1);
     };
     x1 = string_value(x0);
     if (set_contains(imported, x1)) {
@@ -329,8 +329,8 @@ eval_import: (p0) {
     set_add(imported, x1);
     x2 = parse_module(x1);
     while (x2 != nil_sym) {
-	eval_sexp(car(x2));
-	x2 = cdr(x2);
+    eval_sexp(car(x2));
+    x2 = cdr(x2);
     };
     return nil_sym;
 };

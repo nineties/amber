@@ -55,13 +55,15 @@
 (export var LogicalAnd  (to_sym "LogicalAnd"))
 (export var LogicalOr   (to_sym "LogicalOr"))
 
+(export var Include        (to_sym "Include"))
+(export var Import        (to_sym "Import"))
 (export var DefInfixL   (to_sym "DefineInfixL"))
 (export var DefInfixR   (to_sym "DefineInfixR"))
 (export var DefPrefix   (to_sym "DefinePrefix"))
 (export var DefPostfix  (to_sym "DefinePostfix"))
 (export var DefConstr   (to_sym "DefineConstr"))
 (export var DefCommand  (to_sym "DefineCommand"))
-(export var DefModule	(to_sym "DefineModule"))
+(export var DefModule    (to_sym "DefineModule"))
 (export var DefineFunction (to_sym "DefineFunction"))
 (export var DefineVariable (to_sym "DefineVariable"))
 
@@ -70,10 +72,9 @@
 (export var Lambda      (to_sym "Lambda"))
 
 (export var Assembler   (to_builtin_sym "Assembler"))
-(export var Function    (to_builtin_sym "Function"))
 (export var Builtin     (to_builtin_sym "Builtin"))
 (export var Bytecode    (to_builtin_sym "Bytecode"))
-(export var Function    (to_builtin_sym "Function")) ; Function{code, defs}
+(export var Function    (to_builtin_sym "Function"))
 (export var Closure     (to_builtin_sym "Closure"))
 (export var InputFileStream (to_builtin_sym "InputFileStream"))
 (export var OutputFileStream (to_builtin_sym "OutputFileStream"))
@@ -118,7 +119,6 @@
     (if (== tag @TAG_VARIANT) (return (field_get obj 0)))
     (if (== tag @TAG_CONS) (return @ListE))
     (if (== tag @TAG_BYTECODE) (return @BytecodeE))
-    (if (== tag @TAG_FUNCTION) (return @FunctionE))
     (if (== tag @TAG_CLOSURE) (return @ClosureE))
     (return @BuiltinE)
     ))
@@ -153,9 +153,9 @@
     (return (make_expr Loc (list3 file (box begin) (box end))))
     ))
 
-(fun loc_file  (loc) ((return (car (field_get loc @ExprArgs)))))
-(fun loc_begin (loc) ((return (unbox (cadr (field_get loc @ExprArgs))))))
-(fun loc_end   (loc) ((return (unbox (caddr (field_get loc @ExprArgs))))))
+(fun loc_file  (loc) ((return (expr_arg_string loc 0))))
+(fun loc_begin (loc) ((return (expr_arg_int loc 1))))
+(fun loc_end   (loc) ((return (expr_arg_int loc 2))))
 
 (export fun merge_loc (loc1 loc2) (
     (var begin (loc_begin loc1))
@@ -180,9 +180,9 @@
     ))
 
 (extern object current_loc)
-(export fun output_error (ochan) (
+(export fun output_error (ochan loc) (
     (flush stdout)
-    (output_loc ochan current_loc)
+    (output_loc ochan loc)
     (output_string ochan "ERROR: ")
     ))
 
@@ -215,27 +215,27 @@
 
 (export fun expr_arg (expr idx) (
     (var args (expr_args expr))
-	(var i idx)
+    (var i idx)
     (while (&& (> i 0) args) (do
         (= args (cdr args))
         (decr i)
         ))
-	(if (! args) (do
-		(output_error stderr)
-		(output_string stderr "`")
-		(pretty_print stderr expr)
-		(output_string stderr "' does not have ")
-		(output_ordinal stderr (+ idx 1))
-		(output_string stderr " parameter\n")
-		(exit 1)
-		))
+    (if (! args) (do
+        (output_error stderr current_loc)
+        (output_string stderr "`")
+        (pretty_print stderr expr)
+        (output_string stderr "' does not have ")
+        (output_ordinal stderr (+ idx 1))
+        (output_string stderr " parameter\n")
+        (exit 1)
+        ))
     (return (car args))
     ))
 
 (fun expr_arg_check (expr type idx) (
     (var arg (expr_arg expr idx))
     (if (!= (node_type arg) type) (do
-        (output_error stderr)
+        (output_error stderr current_loc)
         (output_string stderr "the ")
         (output_ordinal stderr (+ idx 1))
         (output_string stderr " parameter of `")
@@ -268,7 +268,7 @@
 (export fun expr_arg_head (expr head idx) (
     (var arg (expr_arg expr idx))
     (if (!= (expr_head arg) head) (do
-        (output_error stderr)
+        (output_error stderr current_loc)
         (output_string stderr "the head of ")
         (output_ordinal stderr (+ idx 1))
         (output_string stderr " parameter of `")
@@ -285,7 +285,7 @@
     (var args (expr_args expr))
     (while (> idx 0) (do
         (if (! args) (do
-            (output_error stderr)
+            (output_error stderr current_loc)
             (output_string stderr "`")
             (pretty_print stderr expr)
             (output_string stderr "' does not have ")
@@ -309,7 +309,7 @@
 
 (export fun make_expr_user (head args) (
     (if (is_builtin_sym head) (do
-        (output_error stderr)
+        (output_error stderr current_loc)
         (output_string stderr "can not create builtin object: ")
         (pretty_print stderr head)
         (output_string stderr "{..}\n")
@@ -536,6 +536,20 @@
     (output_char ochan '>')
     ))
 
+(fun pp_function_full (ochan expr) (
+    (output_string ochan "<#Function:0x")
+    (output_hex ochan expr 8)
+    (output_string ochan ":domain=[")
+    (while expr (do
+        ; XXX: should not use magic numbers
+        (var args (field_get expr 1))
+        (pretty_print_full ochan args)
+        (= expr (field_get expr 3))
+        (if expr (output_char ochan ','))
+        ))
+    (output_string ochan "]>")
+    ))
+
 (fun pp_closure (ochan expr) (
     (output_string ochan "<#Closure:0x")
     (output_hex ochan expr 8)
@@ -627,7 +641,7 @@
         (@ListE             . (return (pp_list_full ochan node)))
         (@AssemblerE        . (return (pp_assembler ochan node)))
         (@BytecodeE         . (return (pp_bytecode ochan node)))
-        (@FunctionE         . (return (pp_function ochan node)))
+        (@FunctionE         . (return (pp_function_full ochan node)))
         (@ClosureE          . (return (pp_closure ochan node)))
         (@InputFileStreamE  . (return (pp_file_stream ochan node)))
         (@OutputFileStreamE . (return (pp_file_stream ochan node)))
