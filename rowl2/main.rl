@@ -3,7 +3,7 @@
 # rowl - 2nd generation
 # Copyright (C) 2010 nineties
 #
-# $Id: main.rl 2011-12-28 11:06:39 nineties $
+# $Id: main.rl 2011-12-28 11:12:26 nineties $
 
 #include "rowl.rl"
 

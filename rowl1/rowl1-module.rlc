@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-module.rlc 2011-12-14 16:41:13 nineties $
+; $Id: rowl1-module.rlc 2011-12-28 11:11:55 nineties $
 ;
 
 (import "rlvm-compile")
@@ -60,7 +60,14 @@
     ))
 
 (export fun lookup_symbol (mod sym) (
+    (return (lookup_symbol_iter (fresh_mark) mod sym))
+    ))
+(fun lookup_symbol_iter (mark mod sym) (
     (while mod (do
+        ; check visited-mark
+        (if (== (field_get mod 7) mark) break)
+        (field_set mod 7 mark)
+
         ; First, lookup variable table.
         (var tbl (field_get mod 4))
         (var v (symtable_find tbl sym))
@@ -71,7 +78,7 @@
         (while import_stack (do
             (var list (car import_stack))
             (while list (do
-                (= v (lookup_symbol (car list) sym))
+                (= v (lookup_symbol_iter mark (car list) sym))
                 (if v (return v))
                 (= list (cdr list))
                 ))
@@ -86,16 +93,6 @@
 (export fun lookup_symbol_local (mod sym) (
     (var tbl (field_get mod 4))
     (return (symtable_find_local tbl sym))
-    ))
-
-(export fun lookup_symbol_global (mod sym) (
-    (while mod (do
-        (var tbl (field_get mod 4))
-        (var v (symtable_find_global tbl sym))
-        (if v (return v))
-        (= mod (super_module mod))
-        ))
-    (return 0)
     ))
 
 (export fun push_scope (mod) (
