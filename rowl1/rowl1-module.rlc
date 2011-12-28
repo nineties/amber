@@ -24,7 +24,14 @@
         (make_symtable 10)  ; variable table
         (make_idtable)      ; string represtation -> operator
         (make_symtable 10)  ; head -> string representation of operator
+        0                   ; visited-mark
         ))
+    ))
+
+(var visited_mark 0)
+(fun fresh_mark () (
+    (+= visited_mark 1)
+    (return visited_mark)
     ))
 
 (export fun super_module (mod) (
@@ -150,10 +157,32 @@
     ))
 
 (export fun lookup_operator (mod repr) (
+    (return (lookup_operator_iter (fresh_mark) mod repr))
+    ))
+
+(fun lookup_operator_iter (mark mod repr) (
     (while mod (do
+        ; check visited-mark
+        (if (== (field_get mod 7) mark) break)
+        (field_set mod 7 mark)
+
+        ; First, lookup local operator table.
         (var tbl (field_get mod 5))
         (var v (idtable_find tbl repr))
         (if v (return v))
+
+        ; Next, lookup imported modules.
+        (var import_stack (field_get mod 3))
+        (while import_stack (do
+            (var list (car import_stack))
+            (while list (do
+                (= v (lookup_operator_iter mark (car list) repr))
+                (if v (return v))
+                (= list (cdr list))
+                ))
+            (= import_stack (cdr import_stack))
+            ))
+
         (= mod (super_module mod))
         ))
     (return 0)
