@@ -186,10 +186,32 @@
     ))
 
 (export fun lookup_operator_from_head (mod head) (
+    (return (lookup_operator_from_head_iter (fresh_mark) mod head))
+    ))
+
+(fun lookup_operator_from_head_iter (mark mod head) (
     (while mod (do
+        ; check visited-mark
+        (if (== (field_get mod 7) mark) break)
+        (field_set mod 7 mark)
+
+        ; First, lookup local operator table.
         (var tbl (field_get mod 6))
         (var v (symtable_find tbl head))
         (if v (return v))
+
+        ; Next, lookup imported modules.
+        (var import_stack (field_get mod 3))
+        (while import_stack (do
+            (var list (car import_stack))
+            (while list (do
+                (= v (lookup_operator_from_head_iter mark (car list) head))
+                (if v (return v))
+                (= list (cdr list))
+                ))
+            (= import_stack (cdr import_stack))
+            ))
+
         (= mod (super_module mod))
         ))
     (return 0)

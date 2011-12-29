@@ -3,7 +3,7 @@
 # rowl - 2nd generation
 # Copyright (C) 2010 nineties
 #
-# $Id: main.rl 2011-12-28 11:12:26 nineties $
+# $Id: main.rl 2011-12-29 00:43:12 nineties $
 
 #include "rowl.rl"
 
@@ -14,5 +14,5 @@
 #	fib(30) # -> Apply{fib, [30]}
 #}
 
-print(stdout, "Hello World\n")
-print(stdout, \fullform, "Hello World\n")
+print(stdout, \(x -> x))
+print(stdout, '\n')
