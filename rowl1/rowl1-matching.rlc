@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2011-11-23 20:41:11 nineties $
+; $Id: rowl1-matching.rlc 2011-12-31 10:33:29 nineties $
 ;
 
 (import "rlvm-compile")
@@ -29,8 +29,15 @@
     (return @TRUE)
     ))
 
-(export fun compile_matching (def) (
-    (var asm (make_assembler))
+(export fun compile_matching (loc def) (
+    (if (! (callable def)) (do
+        (output_error stderr loc)
+        (pretty_print stderr def)
+        (output_string stderr " is not a callable expression\n")
+        (exit 1)
+        ))
+
+    ; here, `def' has form of Function{ ... } or Bind{ function1, function2 }
 
     ; construct pattern matrix 
     (var mat (construct_pattern_matrix def))
@@ -43,30 +50,38 @@
         ))
     (= args (cons (get_arity) args))
 
+    (var asm (make_assembler))
     (compile_matching_main asm args mat)
-    (compile_matching_error asm)
+    (compile_matching_error asm loc)
     (return (get_code asm))
     ))
 
 (fun construct_pattern_matrix (def) (
     ; compute maximum arity
     (var len (max_arity def))
-    (var mat 0)
-    (while def (do
-        (= mat (cons (construct_row len def) mat))
-        (= def (field_get def 3))
-        ))
-    (return (list_reverse mat))
+    (return (construct_pattern_matrix_sub len def 0))
+    ))
+
+(fun construct_pattern_matrix_sub (len def tl) (
+    (if (== (expr_head def) Function)
+        (return (cons (construct_row len def) tl))
+        )
+    (var fun1 (expr_arg def 0))
+    (var fun2 (expr_arg def 1))
+    (= tl (construct_pattern_matrix_sub len fun2 tl))
+    (return (construct_pattern_matrix_sub len fun1 tl))
     ))
 
 (fun max_arity (def) (
-    (var len 0)
-    (while def (do
-        (var l (list_len (field_get def 1)))
-        (if (> l len) (= len l))
-        (= def (field_get def 3))
-        ))
-    (return len)
+    (if (== (expr_head def) Function)
+        (return (list_len (field_get def 1)))
+        )
+    (var len1 (max_arity (expr_arg def 0)))
+    (var len2 (max_arity (expr_arg def 1)))
+    (if (< len1 len2)
+        (return len2)
+        (return len1)
+        )
     ))
 
 (fun construct_row (len def) (
@@ -614,8 +629,7 @@
     (exit 1)
     ))
 
-(extern object current_loc)
-(fun compile_matching_error (asm) (
+(fun compile_matching_error (asm loc) (
     ; construct list of arguments
     (var end_lbl (fresh_label asm))
     (var case_lbls (array int arity_max))
@@ -642,7 +656,7 @@
         ))
     (set_label asm (array_get int case_lbls 0))
     (put_arg asm 0)
-    (put_push asm current_loc)
+    (put_push asm loc)
     (compile_simple_call asm 2 matching_error)
     ))
 

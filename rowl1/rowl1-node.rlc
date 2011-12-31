@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2011-12-13 21:42:11 nineties $
+; $Id: rowl1-node.rlc 2011-12-31 10:33:45 nineties $
 ;
 
 (import "rlvm-compile")
@@ -75,6 +75,7 @@
 (export var Builtin     (to_builtin_sym "Builtin"))
 (export var Bytecode    (to_builtin_sym "Bytecode"))
 (export var Function    (to_builtin_sym "Function"))
+(export var Bind        (to_sym "Bind"))
 (export var Closure     (to_builtin_sym "Closure"))
 (export var InputFileStream (to_builtin_sym "InputFileStream"))
 (export var OutputFileStream (to_builtin_sym "OutputFileStream"))
@@ -533,21 +534,9 @@
 (fun pp_function (ochan expr) (
     (output_string ochan "<#Function:0x")
     (output_hex ochan expr 8)
+    (output_char ochan ':')
+    (pretty_print ochan (field_get expr 1))
     (output_char ochan '>')
-    ))
-
-(fun pp_function_full (ochan expr) (
-    (output_string ochan "<#Function:0x")
-    (output_hex ochan expr 8)
-    (output_string ochan ":domain=[")
-    (while expr (do
-        ; XXX: should not use magic numbers
-        (var args (field_get expr 1))
-        (pretty_print_full ochan args)
-        (= expr (field_get expr 3))
-        (if expr (output_char ochan ','))
-        ))
-    (output_string ochan "]>")
     ))
 
 (fun pp_closure (ochan expr) (
@@ -641,7 +630,7 @@
         (@ListE             . (return (pp_list_full ochan node)))
         (@AssemblerE        . (return (pp_assembler ochan node)))
         (@BytecodeE         . (return (pp_bytecode ochan node)))
-        (@FunctionE         . (return (pp_function_full ochan node)))
+        (@FunctionE         . (return (pp_function ochan node)))
         (@ClosureE          . (return (pp_closure ochan node)))
         (@InputFileStreamE  . (return (pp_file_stream ochan node)))
         (@OutputFileStreamE . (return (pp_file_stream ochan node)))

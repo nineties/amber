@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2011-12-24 01:35:03 nineties $
+; $Id: rowl1-compile.rlc 2011-12-31 10:32:16 nineties $
 ;
 
 (import "rlvm-compile")
@@ -17,11 +17,11 @@
 (import "rowl1-assemble")
 
 (var GlobalVariable (to_sym "%GlobalVariable"))
-(var LocalVariable (to_sym "%LocalVariable"))
-(var Arity (to_sym "%Arity"))
-(var Argument (to_sym "%Argument"))
-(var ListAt (to_sym "%ListAt"))
-(var ExprAt (to_sym "%ExprAt"))
+(var LocalVariable  (to_sym "%LocalVariable"))
+(var Arity          (to_sym "%Arity"))
+(var Argument       (to_sym "%Argument"))
+(var ListAt         (to_sym "%ListAt"))
+(var ExprAt         (to_sym "%ExprAt"))
 
 ; compilers
 (extern object current_loc)
@@ -33,6 +33,19 @@
     (if (&& (== hd Qualified) (== (expr_size expr) 2)) (do
         (if (!= (expr_head (expr_arg expr 0)) Symbol) (return @FALSE))
         (return (is_identifier (expr_arg expr 1)))
+        ))
+    (return @FALSE)
+    ))
+
+(export fun callable (expr) (
+    (var hd (expr_head expr))
+    (if (== hd Function)
+        (return @TRUE)
+    (if (&& (== hd Bind)
+        (&& (== (expr_size expr) 2)
+        (&& (callable (expr_arg expr 0))
+            (callable (expr_arg expr 1)))))
+        (return @TRUE)
         ))
     (return @FALSE)
     ))
@@ -104,8 +117,14 @@
     (return tbl)
     ))
 
-(fun make_function (args code next) (
-    (return (variant @FunctionE 3 args code next))
+(fun make_function (args code) (
+    (var arity (list_len args))
+    (= args (cons (box arity) args))
+    (return (variant @FunctionE 2 args code))
+    ))
+
+(fun make_bind (fun1 fun2) (
+    (return (make_expr Bind (list2 fun1 fun2)))
     ))
 
 ;(fun alloc_function () (
@@ -205,15 +224,15 @@
         (output_string stderr "'\n")
         (exit 1)
         ))
-    (= def (car def))
-    (if (!= (node_type def) @FunctionE) (do
+    (= def (expr_arg def 0))
+    (if (! (callable def)) (do
         (output_error stderr current_loc)
         (output_string stderr "`")
         (output_symbol stderr sym)
         (output_string stderr "' is defined as non-function\n")
         (exit 1)
         ))
-    (return (compile_matching def))
+    (return (compile_matching current_loc def))
     ))
 
 (fun undefined_error (sym args) (
@@ -238,9 +257,6 @@
     ))
 
 (export fun compile (asm mod expr) (
-    (output_string stderr "compile:")
-    (pretty_print_full stderr expr)
-    (output_char stderr '\n')
     (var code (lookup_func mod Compile))
     (return (byterun code asm mod expr))
     ))
@@ -275,7 +291,7 @@
 
 (fun compile_function (asm mod args body) (
     (push_scope mod)
-    (= args (setup_args (get_vartable mod) args))
+    (setup_args (get_vartable mod) args)
     (var cnt_addr (get_address asm))
     (put_allocate asm 0)
     (compile asm mod body)
@@ -478,19 +494,6 @@
     (compile_operand asm (lookup_var mod expr))
     ))
 
-(fun bind_function (mod id) (
-    (if (== (expr_head id) Qualified) (do
-        (= mod (find_module current_loc mod (expr_arg id 0)))
-        (= id (expr_arg_symbol id 1))
-        ))
-    (output_string stderr "module:")
-    (pretty_print stderr mod)
-    (output_string stderr " id:")
-    (pretty_print stderr id)
-    (output_string stderr " found:")
-    (pretty_print stderr (lookup_symbol mod id))
-    ))
-
 (fun compile_apply (asm mod expr) (
     (var func (expr_arg expr 0))
     (var args (expr_arg expr 1))
@@ -504,14 +507,9 @@
         (incr arity)
         ))
 
-    (if (! (is_identifier func)) (do
-        (compile asm mod func)
-        (put_jcall asm (* 4 arity))
-        ))
-
-    (put_push asm func)
-    (put_push asm mod)
-    (compile_simple_call asm 2 lookup_func)
+    (compile asm mod func)
+    (put_push asm current_loc)
+    (compile_simple_call asm 2 compile_matching)
     (put_jcall asm (* 4 arity))
     ))
 
@@ -822,13 +820,9 @@
 
 (fun compile_lambda_main (asm mod args body) (
     ; XXX: do closure conversion
-    ;(var arity (list_len args))
-    ;(var asm_body (make_assembler))
-    ;(compile_function asm_body mod args body)
-    ;(var func (alloc_function))
-    ;(append_function_def func arity args (get_code asm_body))
-    ;(put_push asm func)
-    (put_nil asm)
+    (var asm_func (make_assembler))
+    (compile_function asm_func mod args body)
+    (put_push asm (make_function args (get_code asm_func)))
     ))
 
 (fun compile_lambda (asm mod expr) (
@@ -837,6 +831,12 @@
 
 (fun compile_lambda_1arg (asm mod expr) (
     (compile_lambda_main asm mod (list1 (expr_arg expr 0)) (expr_arg expr 1))
+    ))
+
+(fun compile_bind (asm mod expr) (
+    (compile asm mod (expr_arg expr 1))
+    (compile asm mod (expr_arg expr 0))
+    (compile_simple_call asm 2 make_bind)
     ))
 
 (export fun compile_simple_function (asm arity func) (
@@ -861,21 +861,20 @@
     ))
 
 (fun append_function (mod sym args code) (
-    (var arity (list_len args))
-    (= args (cons (box arity) args))
-    (pretty_print_full stderr args)
-    (output_char stderr '\n')
-    (var info (lookup_symbol_local mod sym)) ; (function)
+    (var info (lookup_symbol_local mod sym))
     (if info
         (do
-            (var func (car info))
-            (if (== (node_type func) @FunctionE)
-                (= func (make_function args code func current_loc))
-                (= func (make_function args code 0 current_loc))
+            (var func (expr_arg info 0))
+            (if (callable func)
+                (= func (make_bind (make_function args code) func))
+                (= func (make_function args code))
                 )
-            (setcar info func)
+            (expr_arg_set info 0 func)
         )
-        (add_symbol mod sym (list1 (make_function args code 0 current_loc)))
+        (if (in_global_scope mod)
+            (add_symbol mod sym (make_gvar (make_function args code)))
+            (add_symbol mod sym (make_lvar (make_function args code)))
+            )
         )
     ))
 
@@ -955,6 +954,7 @@
     (add_compiler mod (make_expr (to_sym "Assign") (list2 symT DontCare)) compile_assign)
     (add_compiler mod (make_expr (to_sym "Lambda") (list2 DontCare DontCare)) compile_lambda_1arg)
     (add_compiler mod (make_expr (to_sym "Lambda") (list2 tupleT DontCare)) compile_lambda)
+    (add_compiler mod (make_expr (to_sym "Bind") (list2 DontCare DontCare)) compile_bind)
 
     ))
 

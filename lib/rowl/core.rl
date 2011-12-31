@@ -1,6 +1,6 @@
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.rl 2011-12-14 12:23:21 nineties $
+# $Id: core.rl 2011-12-31 10:32:42 nineties $
 
 # Syntax definition of rowl language
 
@@ -9,13 +9,16 @@ module core {
 command Include "include"
 command Import "import"
 
-infixr Qualified "::" 1
-prefix Unquote "!" 3
-prefix Quote "\\" 3
-prefix QuasiQuote "`" 3
-infixl HeadP "@" 4
-infixr Define ":" 19
-infixr Rewrite "=>" 20
+infixr Qualified  "::" 1
+prefix Unquote    "!"  3
+prefix Quote      "\\" 3
+prefix QuasiQuote "`"  3
+infixl HeadP      "@"  4
+infixr Define     ":"  19
+infixr Rewrite    "=>" 20
+
+infixr Lambda     "->" 13
+infixr Bind       "|"  14
 
 #DefineFunction{
 #    Rewrite(x => y),
@@ -44,7 +47,6 @@ infixl Equal        "==" 10
 infixl NotEqual     "!=" 10
 infixl LogicalAnd   "&&" 11
 infixl LogicalOr    "||" 12
-infixr Lambda       "->" 13
 infixr Assign       "="  17
 infixr PlusAssign   "+=" 17
 infixr MinusAssign  "-=" 17
