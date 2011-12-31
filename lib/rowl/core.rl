@@ -1,6 +1,6 @@
 # Copyright (C) 2010 nineties
 #
-# $Id: core.rl 2011-12-31 10:32:42 nineties $
+# $Id: lib/rowl/core.rl 2011-12-31 17:44:26 nineties $
 
 # Syntax definition of rowl language
 
@@ -20,17 +20,6 @@ infixr Rewrite    "=>" 20
 infixr Lambda     "->" 13
 infixr Bind       "|"  14
 
-#DefineFunction{
-#    Rewrite(x => y),
-#    `DefineFunction{
-#        Rewrite(!x),
-#        Rewrite(!y)
-#    }
-#}
-#
-#Apply{f@Symbol, args@List}: body => `DefineFunction{Apply{!f, !args}, !body}
-#x@Symbol: value => `DefineVariable{!x, !value}
-#
 prefix UnaryPlus    "+"  5
 prefix UnaryMinus   "-"  5
 prefix Not          "not"5
@@ -59,26 +48,35 @@ constr For          "for"
 command Return      "return"
 infixl Else         "else" 18
 
-#true: \true
-#false: \false
+Rewrite = (x => y) -> {
+              Rewrite = Eval(`(!x -> !y)) | Rewrite
+              ()
+          }
+        | Rewrite
 
-#+x     => `UnaryPlus(!x)
-#-x     => `UnaryMinus(!x)
-#not x  => `Not(!x)
-#x * y  => `Times(!x, !y)
-#x / y  => `Divide(!x, !y)
-#x % y  => `Mod(!x, !y)
-#x + y  => `Plus(!x, !y)
-#x - y  => `Minus(!x, !y)
-#x < y  => `LessThan(!x, !y)
-#x > y  => `GreaterThan(!x, !y)
-#x >= y => `GreaterEqual(!x, !y)
-#x <= y => `LessEqual(!x, !y)
-#x += y => `(!x = !x + !y)
-#x -= y => `(!x = !x - !y)
-#x *= y => `(!x = !x * !y)
-#x /= y => `(!x = !x / !y)
-#x %= y => `(!x = !x % !y)
-#x[y]   => `Subscript(!x, !y)
+Apply{f@Symbol, args@List}: body => `AppendFunction{Apply{!f, !args}, !body}
+x@Symbol: value => `DefineVariable{!x, !value}
+
+true: \true
+false: \false
+
++x     => `UnaryPlus(!x)
+-x     => `UnaryMinus(!x)
+not x  => `Not(!x)
+x * y  => `Times(!x, !y)
+x / y  => `Divide(!x, !y)
+x % y  => `Mod(!x, !y)
+x + y  => `Plus(!x, !y)
+x - y  => `Minus(!x, !y)
+x < y  => `LessThan(!x, !y)
+x > y  => `GreaterThan(!x, !y)
+x >= y => `GreaterEqual(!x, !y)
+x <= y => `LessEqual(!x, !y)
+x += y => `(!x = !x + !y)
+x -= y => `(!x = !x - !y)
+x *= y => `(!x = !x * !y)
+x /= y => `(!x = !x / !y)
+x %= y => `(!x = !x % !y)
+x[y]   => `Subscript(!x, !y)
 
 }
