@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2011-12-31 10:33:29 nineties $
+; $Id: rowl1-matching.rlc 2011-12-31 22:43:35 nineties $
 ;
 
 (import "rlvm-compile")
@@ -636,12 +636,9 @@
     (for i 0 arity_max
         (array_set int case_lbls i (fresh_label asm))
         )
-    (put_imm_i0 asm) ; null list
 
+    (put_imm_i0 asm) ; null list
     (put_arity asm)
-    ; unbox
-    (put_imm_i1 asm)
-    (put_sar asm)
     (put_tswitch asm arity_max)
     (for i 0 arity_max
         (emit_tswitch_label asm (array_get int case_lbls i))
@@ -650,12 +647,11 @@
     (set_label asm end_lbl)
     (for i 0 arity_max (do
         (var arg_idx (- (- arity_max i) 1))
-        (set_label asm (array_get int case_lbls arg_idx))
         (put_arg asm arg_idx)
         (put_cons asm)
+        (set_label asm (array_get int case_lbls arg_idx))
         ))
-    (set_label asm (array_get int case_lbls 0))
-    (put_arg asm 0)
+    (put_arity asm)
     (put_push asm loc)
     (compile_simple_call asm 2 matching_error)
     ))
