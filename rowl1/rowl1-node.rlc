@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2011-12-31 10:33:45 nineties $
+; $Id: rowl1-node.rlc 2012-01-01 01:52:42 nineties $
 ;
 
 (import "rlvm-compile")
@@ -56,16 +56,16 @@
 (export var LogicalOr   (to_sym "LogicalOr"))
 
 (export var Include        (to_sym "Include"))
-(export var Import        (to_sym "Import"))
-(export var DefInfixL   (to_sym "DefineInfixL"))
-(export var DefInfixR   (to_sym "DefineInfixR"))
-(export var DefPrefix   (to_sym "DefinePrefix"))
-(export var DefPostfix  (to_sym "DefinePostfix"))
-(export var DefConstr   (to_sym "DefineConstr"))
-(export var DefCommand  (to_sym "DefineCommand"))
-(export var DefModule    (to_sym "DefineModule"))
-(export var DefineFunction (to_sym "DefineFunction"))
+(export var Import         (to_sym "Import"))
+(export var DefInfixL      (to_sym "DefineInfixL"))
+(export var DefInfixR      (to_sym "DefineInfixR"))
+(export var DefPrefix      (to_sym "DefinePrefix"))
+(export var DefPostfix     (to_sym "DefinePostfix"))
+(export var DefConstr      (to_sym "DefineConstr"))
+(export var DefCommand     (to_sym "DefineCommand"))
+(export var DefModule      (to_sym "DefineModule"))
 (export var DefineVariable (to_sym "DefineVariable"))
+(export var AppendFunction (to_sym "AppendFunction"))
 
 (export var Qualified   (to_sym "Qualified"))
 (export var Rewrite     (to_sym "Rewrite"))
@@ -110,6 +110,10 @@
 
 (export fun symbol_name (sym) (
     (return (field_get sym @SymbolName))
+    ))
+
+(export fun qualified (outer inner) (
+    (return (make_expr Qualified (list2 (to_sym outer) inner)))
     ))
 
 (export fun node_type (obj) (
@@ -309,11 +313,21 @@
     ))
 
 (export fun make_expr_user (head args) (
+    (if (!= (node_type head) @SymbolE) (do
+        (output_error stderr current_loc)
+        (output_string stderr "the 1st argument of MakeExpression must be a Symbol\n")
+        (exit 1)
+        ))
     (if (is_builtin_sym head) (do
         (output_error stderr current_loc)
         (output_string stderr "can not create builtin object: ")
         (pretty_print stderr head)
         (output_string stderr "{..}\n")
+        (exit 1)
+        ))
+    (if (!= (node_type args) @ListE) (do
+        (output_error stderr current_loc)
+        (output_string stderr "the 2nd argument of MakeExpression must be a List\n")
         (exit 1)
         ))
     (return (variant @ExprE 2 head args))
@@ -550,7 +564,7 @@
         (output_string ochan "<#InputFileStream:")
         (output_string ochan "<#OutputFileStream:")
         )
-    (pretty_print ochan (field_get node 2))
+    (pretty_print ochan (field_get node 1))
     (output_char ochan '>')
     ))
 

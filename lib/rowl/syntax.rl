@@ -1,24 +1,23 @@
 # Copyright (C) 2010 nineties
 #
-# $Id: lib/rowl/core.rl 2011-12-31 17:44:26 nineties $
+# $Id: lib/rowl/core.rl 2012-01-01 12:39:01 nineties $
 
 # Syntax definition of rowl language
 
-module core {
+module (Qualified{std,syntax}) {
 
 command Include "include"
 command Import "import"
 
-infixr Qualified  "::" 1
-prefix Unquote    "!"  3
-prefix Quote      "\\" 3
-prefix QuasiQuote "`"  3
-infixl HeadP      "@"  4
-infixr Define     ":"  19
-infixr Rewrite    "=>" 20
-
-infixr Lambda     "->" 13
-infixr Bind       "|"  14
+infixr Qualified    "::" 1
+prefix Unquote      "!"  3
+prefix Quote        "\\" 3
+prefix QuasiQuote   "`"  3
+infixl HeadP        "@"  4
+infixr Define       ":"  19
+infixr Rewrite      "=>" 20
+infixr Lambda       "->" 13
+infixr Bind         "|"  14
 
 prefix UnaryPlus    "+"  5
 prefix UnaryMinus   "-"  5
@@ -48,14 +47,14 @@ constr For          "for"
 command Return      "return"
 infixl Else         "else" 18
 
-Rewrite = (x => y) -> {
-              Rewrite = Eval(`(!x -> !y)) | Rewrite
-              ()
-          }
+Rewrite = (x => y) -> `(Rewrite = (!x -> !y) | Rewrite)
         | Rewrite
 
-Apply{f@Symbol, args@List}: body => `AppendFunction{Apply{!f, !args}, !body}
-x@Symbol: value => `DefineVariable{!x, !value}
+Apply{f@Symbol, args@List}: body
+    => `AppendFunction{!f, !MakeExpression{\Tuple,args} -> !body}
+
+x@Symbol: value
+    => `DefineVariable{!x, !value}
 
 true: \true
 false: \false
