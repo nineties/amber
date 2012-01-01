@@ -1,8 +1,8 @@
 # Copyright (C) 2010 nineties
 #
-# $Id: io.rl 2011-12-14 01:14:08 nineties $
+# $Id: io.rl 2012-01-01 01:47:50 nineties $
 
-module stdlib::io {
+module std::io {
 
 print(obj): print(stdout, obj)
 print(\fullform, obj): print(stdout, \fullform, obj)

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2011-12-31 22:46:28 nineties $
+; $Id: rowl1-interp.rlc 2012-01-01 23:47:49 nineties $
 ;
 
 (import "rlvm-compile")
@@ -42,9 +42,10 @@
 
     (add_include_dir "./")
     (add_include_dir "/usr/lib/rowl/")
-    (include_module_direct 0 "rowl/core")
-    (import_module current_mod (to_sym "core"))
-    ;(include_module_direct 0 "rowl/io")
+    (include_module_direct 0 "rowl/syntax")
+    (import_module current_mod (qualified "std" (to_sym "syntax")))
+    (include_module_direct 0 "rowl/io")
+    (import_module current_mod (qualified "std" (to_sym "io")))
 
     (interpret)
     (close_in ichan)
@@ -70,6 +71,7 @@
         (eval e)
         (= es (cdr es))
         ))
+    (= current_loc no_loc)
     ))
 
 (fun default_eval (expr) (
@@ -93,7 +95,7 @@
     (var modsig (expr_arg expr 0))
     (var block  (expr_arg expr 1))
     (var save_current_mod current_mod)
-    (var module (find_module current_loc current_mod modsig))
+    (var module (find_module current_loc current_mod modsig @TRUE))
     (set_current_module module)
     
     (var es (expr_args block))

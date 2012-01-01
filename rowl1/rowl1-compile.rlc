@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2011-12-31 22:46:21 nineties $
+; $Id: rowl1-compile.rlc 2012-01-01 23:47:04 nineties $
 ;
 
 (import "rlvm-compile")
@@ -81,11 +81,6 @@
         ))
     (if (is_atom expr) return)
     (if (== level 0) (do
-        (if (== hd DefineFunction) (do
-            (fv_iter tbl (expr_arg expr 1) 0)
-            (delete_vars tbl (expr_arg expr 0))
-            return
-            ))
         (if (== hd DefineVariable) (do
             (fv_iter tbl (expr_arg expr 1) 0)
             (delete_vars tbl (expr_arg expr 0))
@@ -126,93 +121,6 @@
 (fun make_bind (fun1 fun2) (
     (return (make_expr Bind (list2 fun1 fun2)))
     ))
-
-;(fun alloc_function () (
-;    (return (variant @FunctionE 2 0 0))
-;    ))
-;(fun clone_function (orig_func) (
-;    (var new_func (alloc_function))
-;    (var codes (field_get orig_func 1))
-;    (var defs (field_get orig_func 2))
-;    (var size (field_get orig_func 3))
-;    (field_set new_func 1 (array object size))
-;    (var new_defs (array object size))
-;    (field_set new_func 2 new_defs)
-;    (field_set new_func 3 size)
-;    (for i 0 size (do
-;        (var code (array_get object codes i))
-;        (if code
-;            (array_set object new_defs i (list1 (list2 (diag_list i DontCare) code)))
-;            )
-;        ))
-;    (return new_func)
-;    ))
-;
-;(fun resize_function (func new_size) (
-;    (var old_size (field_get func 3))
-;    (if (< old_size new_size) (do
-;        (var new_codes (array object new_size))
-;        (memcpy new_codes (field_get func 1) (* 4 old_size))
-;        (var new_defs (array object new_size))
-;        (memcpy new_defs (field_get func 2) (* 4 old_size))
-;        (field_set func 1 new_codes)
-;        (field_set func 2 new_defs)
-;        (field_set func 3 new_size)
-;        ))
-;    (return func)
-;    ))
-
-(extern fun is_complete_pattern)
-;(fun append_function_def (sym func arity def code) (
-;    (resize_function func (+ arity 1))
-;    (var codes (field_get func 1))
-;    (var defs (field_get func 2))
-;    (var ent 0)
-;    (if (! (is_complete_pattern def)) (do
-;        (= ent (array_get object defs arity))
-;        (if (! ent) (do
-;            (var asm (make_assembler))
-;            (compile_undefined_error asm sym arity)
-;            (= ent (list1 (list2 (diag_list arity DontCare) (get_code asm))))
-;            ))
-;        ))
-;    (= ent (cons (list2 def code) ent))
-;    (array_set object defs arity ent)
-;    (var bcode (array_get object codes arity))
-;    (if (! bcode) (do
-;        (= bcode (allocate_bytecode))
-;        (array_set object codes arity bcode)
-;        ))
-;    ))
-;
-;(fun update_function_def (func arity code) (
-;    (var codes (field_get func 1))
-;    (var defs (field_get func 2))
-;    (array_set object codes arity code)
-;    (array_set object defs arity (list1 (list2 (list1 DontCare) code)))
-;    ))
-;
-;(export fun get_code_with_arity (arity func) (
-;    (var codes (field_get func 1))
-;    (var size (field_get func 3))
-;    (if (< arity size) (do
-;        (return (array_get object codes arity))
-;        ))
-;    (not_reachable "get_code_with_arity")
-;    ))
-;
-;(export fun get_defs_with_arity (arity func) (
-;    (var defs (field_get func 2))
-;    (var size (field_get func 3))
-;    (if (< arity size) (do
-;        (var c (array_get object defs arity))
-;        (if c (return c))
-;        ))
-;    (output_error stderr current_loc)
-;    (output_string stderr "invalid number of arguments\n")
-;    (exit 1)
-;    ))
-
 
 (extern fun compile_matching)
 (export fun lookup_func (mod sym) (
@@ -258,7 +166,7 @@
 
 (export fun compile (asm mod expr) (
     (var code (lookup_func mod Compile))
-    (return (byterun code asm mod expr))
+    (byterun code asm mod expr)
     ))
 
 (fun do_nothing (asm mod expr) (
@@ -285,8 +193,14 @@
 
 (fun compile_qualified (asm curmod expr) (
     (var modsig (expr_arg expr 0))
-    (var module (find_module current_loc curmod modsig))
+    (var module (find_module current_loc curmod modsig @FALSE))
     (compile asm module (expr_arg expr 1))
+    ))
+
+(fun compile_make_expr (asm mod expr) (
+    (compile asm mod (expr_arg expr 1))
+    (compile asm mod (expr_arg expr 0))
+    (compile_simple_call asm 2 make_expr_user)
     ))
 
 (fun compile_function (asm mod args body) (
@@ -298,33 +212,6 @@
     (put_ireturn asm)
     (put_operand_byte asm (+ cnt_addr 1) (count_local_variable mod))
     (pop_scope mod)
-    ))
-
-(fun compile_define_function (asm mod expr) (
-    (var lhs (expr_arg expr 0))
-    (var body (expr_arg expr 1))
-    (var sym (expr_arg_symbol lhs 0))
-    (var args (expr_arg_list lhs 1))
-    (var asm_body (make_assembler))
-    (var code (allocate_bytecode))
-    (var info (append_function mod sym args code))
-    (var func (car info))
-    (var global_func (cdr info))
-
-    (compile_function asm_body mod args body)
-    (set_code code asm_body)
-
-    ;(if global_func
-    ;    (do
-    ;        (var arity (list_len args))
-    ;        ;(var global_code (get_code_with_arity arity global_func))
-    ;        (var local_code (get_code_with_arity arity func))
-    ;        (put_push asm local_code)
-    ;        (put_push asm global_code)
-    ;        (compile_simple_call asm 2 bytecode_push)
-    ;    )
-    ;    (put_nil asm)
-    ;    )
     ))
 
 (fun setup_args (tbl args) (
@@ -863,57 +750,66 @@
         ))
     ))
 
-(fun append_function (mod sym args code) (
+(fun append_function (mod sym newfunc) (
     (var info (lookup_symbol_local mod sym))
     (if info
         (do
             (var func (expr_arg info 0))
             (if (callable func)
-                (= func (make_bind (make_function args code) func))
-                (= func (make_function args code))
+                (= func (make_bind newfunc func))
+                (= func newfunc)
                 )
             (expr_arg_set info 0 func)
         )
         (if (in_global_scope mod)
-            (add_symbol mod sym (make_gvar (make_function args code)))
-            (add_symbol mod sym (make_lvar (make_function args code)))
+            (add_symbol mod sym (make_gvar newfunc))
+            (add_symbol mod sym (make_lvar newfunc))
             )
         )
+    ))
+
+(fun compile_append_function (asm mod expr) (
+    (var sym (expr_arg_symbol expr 0))
+    (var fun (expr_arg expr 1))
+    (compile asm mod fun)
+    (put_push asm sym)
+    (put_push asm mod)
+    (compile_simple_call asm 3 append_function)
     ))
 
 (export fun add_builtin_function0 (mod sym func) (
     (var asm (make_assembler))
     (compile_simple_function asm 1 func @TRUE)
     (var code (get_code asm))
-    (append_function mod sym 0 code)
+    (append_function mod sym (make_function 0 code))
     ))
 
 (export fun add_builtin_function1 (mod sym pat func) (
     (var asm (make_assembler))
     (compile_simple_function asm 1 func @TRUE)
     (var code (get_code asm))
-    (append_function mod sym (list1 pat) code)
+    (append_function mod sym (make_function (list1 pat) code))
     ))
 
 (export fun add_builtin_function2 (mod sym pat1 pat2 func) (
     (var asm (make_assembler))
     (compile_simple_function asm 2 func @TRUE)
     (var code (get_code asm))
-    (append_function mod sym (list2 pat1 pat2) code)
+    (append_function mod sym (make_function (list2 pat1 pat2) code))
     ))
 
 (export fun add_builtin_function3 (mod sym pat1 pat2 pat3 func) (
     (var asm (make_assembler))
     (compile_simple_function asm 3 func @TRUE)
     (var code (get_code asm))
-    (append_function mod sym (list3 pat1 pat2 pat3) code)
+    (append_function mod sym (make_function (list3 pat1 pat2 pat3) code))
     ))
 
 (export fun add_builtin_function4 (mod sym pat1 pat2 pat3 pat4 func) (
     (var asm (make_assembler))
     (compile_simple_function asm 4 func @TRUE)
     (var code (get_code asm))
-    (append_function mod sym (list4 pat1 pat2 pat3 pat4) code)
+    (append_function mod sym (make_function (list4 pat1 pat2 pat3 pat4) code))
     ))
 
 (export fun setup_builtin_compilers (mod) (
@@ -935,9 +831,9 @@
 
     (add_compiler mod (make_expr Qualified (list2 symT DontCare)) compile_qualified)
 
-    (add_compiler mod (make_expr DefineFunction (list2
-        (make_expr Apply (list2 symT listT)) DontCare)) compile_define_function)
+    (add_compiler mod (make_expr (to_sym "MakeExpression") (list2 DontCare DontCare)) compile_make_expr)
     (add_compiler mod (make_expr DefineVariable (list2 symT DontCare)) compile_define_variable)
+    (add_compiler mod (make_expr AppendFunction (list2 symT DontCare)) compile_append_function)
     (add_compiler mod (headP Symbol) compile_var)
     (add_compiler mod (make_expr Apply (list2 DontCare listT)) compile_apply)
 
