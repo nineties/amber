@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2012-01-17 19:04:37 nineties $
+; $Id: rowl1-interp.rlc 2012-01-18 07:33:13 nineties $
 ;
 
 (import "rlvm-compile")
@@ -43,9 +43,9 @@
 
     (add_include_dir "./")
     (add_include_dir "/usr/lib/rowl/")
-    (include_module_direct 0 "rowl/syntax")
+    (include_file "rowl/syntax.rl")
     (import_module current_mod (qualified "std" (to_sym "syntax")))
-    (include_module_direct 0 "rowl/io")
+    (include_file "rowl/io.rl")
     (import_module current_mod (qualified "std" (to_sym "io")))
 
     (interpret)
@@ -148,12 +148,14 @@
     (return @FALSE)
     ))
 
-(fun include_module_direct (orig path) (
+(fun include_file (path) (
     (var dir include_dirs)
     (while dir (do
-        (var fullpath (build_path (car dir) path ".rl"))
+        (var fullpath (build_path (car dir) path ""))
+        (output_string stderr fullpath)
+        (output_char stderr '\n')
         (if (file_exists fullpath) (do
-            (if (is_already_included current_mod fullpath)
+            (if (is_already_included fullpath)
                 (return Nil)
                 )
             (add_included_module fullpath)
@@ -174,13 +176,16 @@
         (= dir (cdr dir))
         ))
     (output_error stderr current_loc)
-    (output_string stderr "module `")
-    (if orig
-        (pretty_print stderr orig)
-        (output_string stderr path)
-        )
+    (output_string stderr "`")
+    (output_string stderr path)
     (output_string stderr "' was not found\n")
     (exit 1)
+    ))
+
+(fun eval_include (expr) (
+    (var path (expr_arg_string expr 0))
+    (include_file path)
+    (return 0)
     ))
 
 (fun setup_builtin_functions (mod) (
@@ -195,6 +200,9 @@
     (add_builtin_function1 mod Eval
          (make_expr DefModule (list2 (headP Qualified) blockT))
          eval_define_module)
+    (add_builtin_function1 mod Eval
+        (make_expr Include (list1 (headP String)))
+        eval_include)
     ))
 
 (extern fun setup_numeric)
