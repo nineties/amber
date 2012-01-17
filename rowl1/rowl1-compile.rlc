@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-01-17 19:05:02 nineties $
+; $Id: rowl1-compile.rlc 2012-01-18 06:39:06 nineties $
 ;
 
 (import "rlvm-compile")
@@ -752,7 +752,7 @@
     ))
 
 (fun append_function (mod sym newfunc) (
-    (var info (lookup_symbol mod sym))
+    (var info (lookup_symbol_local mod sym))
     (if info
         (do
             (var func (expr_arg info 0))
@@ -761,11 +761,19 @@
                 (= func newfunc)
                 )
             (expr_arg_set info 0 func)
-        )
-        (if (in_global_scope mod)
-            (add_symbol mod sym (make_gvar newfunc))
-            (add_symbol mod sym (make_lvar newfunc))
-            )
+            return
+        ))
+    (= info (lookup_symbol mod sym))
+    (if info
+        (do
+            (var func (expr_arg info 0))
+            (if (callable func)
+                (= newfunc (make_bind newfunc func))
+                )
+        ))
+    (if (in_global_scope mod)
+        (add_symbol mod sym (make_gvar newfunc))
+        (add_symbol mod sym (make_lvar newfunc))
         )
     ))
 
