@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2011-12-31 23:56:21 nineties $
+; $Id: rowl1-matching.rlc 2012-01-17 19:05:17 nineties $
 ;
 
 (import "rlvm-compile")
@@ -19,7 +19,7 @@
 
 (var varP   (to_sym "%Var"))
 
-(export fun compile_matching (loc def) (
+(export fun compile_matching (loc name def) (
     (if (! (callable def)) (do
         (output_error stderr loc)
         (pretty_print stderr def)
@@ -42,7 +42,7 @@
 
     (var asm (make_assembler))
     (compile_matching_main asm args mat)
-    (compile_matching_error asm loc)
+    (compile_matching_error asm loc name)
     (return (get_code asm))
     ))
 
@@ -604,9 +604,14 @@
     ))
 
 (var arity_max 8)
-(fun matching_error (loc arity args) (
+(fun matching_error (loc name arity args) (
     (output_error stderr loc)
-    (output_string stderr "no definition matches to argument(s): (")
+    (output_string stderr "no definition matches to argument(s): ")
+    (if name
+        (pretty_print stderr name)
+        (output_string stderr "<unnamed function>")
+        )
+    (output_char stderr '(')
     (while args (do
         (pretty_print stderr (car args))
         (= args (cdr args))
@@ -619,7 +624,7 @@
     (exit 1)
     ))
 
-(fun compile_matching_error (asm loc) (
+(fun compile_matching_error (asm loc name) (
     ; construct list of arguments
     (var end_lbl (fresh_label asm))
     (var case_lbls (array int arity_max))
@@ -642,8 +647,9 @@
         (set_label asm (array_get int case_lbls arg_idx))
         ))
     (put_arity asm)
+    (put_push asm name)
     (put_push asm loc)
-    (compile_simple_call asm 2 matching_error)
+    (compile_simple_call asm 4 matching_error)
     ))
 
     ))

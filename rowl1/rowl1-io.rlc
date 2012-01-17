@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-io.rlc 2011-12-27 04:36:39 nineties $
+; $Id: rowl1-io.rlc 2012-01-02 02:25:31 nineties $
 ;
 
 (import "rlvm-compile")
@@ -94,25 +94,28 @@
     ))
 
 (extern object exec_env)
-(export fun setup_io (mod) (
-    (add_global_variable mod (to_sym "stdin") (make_ifstream (string "stdin") stdin))
-    (add_global_variable mod (to_sym "stdout") (make_ofstream (string "stdout") stdout))
-    (add_global_variable mod (to_sym "stderr") (make_ofstream (string "stderr") stderr))
+(export fun setup_io (std) (
+    (var io (make_module (to_sym "io") std))
+    (output_string stderr "setup_io:")
+    (pretty_print stderr io)
+    (add_global_variable io (to_sym "stdin") (make_ifstream (string "stdin") stdin))
+    (add_global_variable io (to_sym "stdout") (make_ofstream (string "stdout") stdout))
+    (add_global_variable io (to_sym "stderr") (make_ofstream (string "stderr") stderr))
 
     ; file IO
-    (add_builtin_function1 mod (to_sym "open_in") (headP String) io_open_in)
-    (add_builtin_function1 mod (to_sym "open_out") (headP String) io_open_out)
-    (add_builtin_function1 mod (to_sym "close") (headP InputFileStream) io_close_in)
-    (add_builtin_function1 mod (to_sym "close") (headP OutputFileStream) io_close_out)
-    (add_builtin_function2 mod (to_sym "print") (headP OutputFileStream) DontCare io_print)
-    (add_builtin_function2 mod (to_sym "print") (headP OutputFileStream) (headP String) io_print_str)
-    (add_builtin_function2 mod (to_sym "print") (headP OutputFileStream) (headP Int) io_print_int)
-    (add_builtin_function3 mod (to_sym "print") (headP OutputFileStream) (to_sym "fullform") DontCare
+    (add_builtin_function1 io (to_sym "open_in") (headP String) io_open_in)
+    (add_builtin_function1 io (to_sym "open_out") (headP String) io_open_out)
+    (add_builtin_function1 io (to_sym "close") (headP InputFileStream) io_close_in)
+    (add_builtin_function1 io (to_sym "close") (headP OutputFileStream) io_close_out)
+    (add_builtin_function2 io (to_sym "print") (headP OutputFileStream) DontCare io_print)
+    (add_builtin_function2 io (to_sym "print") (headP OutputFileStream) (headP String) io_print_str)
+    (add_builtin_function2 io (to_sym "print") (headP OutputFileStream) (headP Int) io_print_int)
+    (add_builtin_function3 io (to_sym "print") (headP OutputFileStream) (to_sym "fullform") DontCare
         io_print_full)
-    (add_builtin_function1 mod (to_sym "read_char") (headP InputFileStream) io_read_char)
-    (add_builtin_function1 mod (to_sym "read_string") (headP InputFileStream) io_read_string)
-    (add_builtin_function1 mod (to_sym "read_line") (headP InputFileStream) io_read_line)
-    (add_builtin_function1 mod (to_sym "read_int") (headP InputFileStream) io_read_int)
+    (add_builtin_function1 io (to_sym "read_char") (headP InputFileStream) io_read_char)
+    (add_builtin_function1 io (to_sym "read_string") (headP InputFileStream) io_read_string)
+    (add_builtin_function1 io (to_sym "read_line") (headP InputFileStream) io_read_line)
+    (add_builtin_function1 io (to_sym "read_int") (headP InputFileStream) io_read_int)
     ))
 
     ))
