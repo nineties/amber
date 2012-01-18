@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2012-01-18 07:33:13 nineties $
+; $Id: rowl1-interp.rlc 2012-01-18 14:22:33 nineties $
 ;
 
 (import "rlvm-compile")
@@ -30,6 +30,7 @@
     ))
 
 (export fun eval_file (path) (
+    (var start (gettimeofday))
     (= current_mod (make_module (to_sym "%global") 0))
     (= current_loc no_loc)
 
@@ -50,6 +51,12 @@
 
     (interpret)
     (close_in ichan)
+
+    (var end (gettimeofday))
+    (var diff (timeval_sub end start))
+    (output_string stderr "elapsed time : ")
+    (output_timeval stderr diff)
+    (output_char stderr '\n')
     ))
 
 (fun call1 (mod sym arg0) (
@@ -152,8 +159,6 @@
     (var dir include_dirs)
     (while dir (do
         (var fullpath (build_path (car dir) path ""))
-        (output_string stderr fullpath)
-        (output_char stderr '\n')
         (if (file_exists fullpath) (do
             (if (is_already_included fullpath)
                 (return Nil)

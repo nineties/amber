@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2011-12-27 02:10:44 nineties $
+# $Id: Makefile 2012-01-18 13:06:32 nineties $
 
 TOPDIR = ..
 ROWL0DIR = $(TOPDIR)/rowl0
@@ -58,22 +58,24 @@ VMOBJECTS = vm-main.o\
 		vm-gc.o\
 		vm-load.o\
 		vm-prim-util.o\
+		vm-prim-sys.o\
 		vm-prim-io.o\
 		vm-prim-string.o\
 		vm-prim-vector.o\
 		vm-prim-tuple.o\
 		vm-prim-idtable.o
 
-vm-compile.o	  : rlci stdlib.rlc config.rlc
-vm-main.o		 : rlci stdlib.rlc vm-compile.rlc
-vm-eval.o		 : rlci stdlib.rlc vm-compile.rlc vm-insn.rlc vm-prim-inc.rlc
-vm-gc.o		   : rlci stdlib.rlc vm-compile.rlc
-vm-load.o		 : rlci stdlib.rlc config.rlc vm-compile.rlc
-vm-prim-util.o	: rlci stdlib.rlc vm-compile.rlc
-vm-prim-io.o	  : rlci stdlib.rlc vm-compile.rlc
+vm-compile.o      : rlci stdlib.rlc config.rlc
+vm-main.o         : rlci stdlib.rlc vm-compile.rlc
+vm-eval.o         : rlci stdlib.rlc vm-compile.rlc vm-insn.rlc vm-prim-inc.rlc
+vm-gc.o           : rlci stdlib.rlc vm-compile.rlc
+vm-load.o         : rlci stdlib.rlc config.rlc vm-compile.rlc
+vm-prim-util.o    : rlci stdlib.rlc vm-compile.rlc
+vm-prim-sys.o     : rlci stdlib.rlc vm-compile.rlc
+vm-prim-io.o      : rlci stdlib.rlc vm-compile.rlc
 vm-prim-string.o  : rlci stdlib.rlc vm-compile.rlc
 vm-prim-vector.o  : rlci stdlib.rlc vm-compile.rlc
-vm-prim-tuple.o	  : rlci stdlib.rlc vm-compile.rlc
+vm-prim-tuple.o   : rlci stdlib.rlc vm-compile.rlc
 vm-prim-idtable.o : rlci stdlib.rlc vm-compile.rlc
 
 RLC1OBJECTS = rowl1-main.rlo\
