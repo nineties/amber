@@ -1,0 +1,73 @@
+;
+; rowl - 1st generation
+; Copyright (C) 2010 nineties
+;
+; $Id: vm-prim-io.rlc 2012-01-18 14:22:11 nineties $
+;
+
+(import "stdlib")
+(import "vm-compile")
+
+(var SYS_GETTIMEOFDAY 78)
+
+(var vm-prim-code `(
+
+(export prim_gettimeofday)
+(fun prim_gettimeofday () (
+    (void* tv (prim_make_struct2 0 0 0))
+    (if (< (syscall @SYS_GETTIMEOFDAY tv 0) 0) (
+        (prim_output_string (prim_get_stderr) "ERROR: gettimeofday failed\n")
+        (exit 1)
+        ))
+    (return tv)
+    ))
+
+(export prim_timeval_sub)
+(fun prim_timeval_sub (tv1 tv2) (
+    (int sec1 (get tv1 0))
+    (int usec1 (get tv1 1))
+    (int sec2 (get tv2 0))
+    (int usec2 (get tv2 1))
+    (int usec (- usec1 usec2))
+    (if (< usec 0) (
+        (= usec (+ usec 1000000))
+        (= sec1 (- sec1 1))
+        ))
+    (int sec (- sec1 sec2))
+    (return (prim_make_struct2 0 sec usec))
+    ))
+
+(export prim_output_timeval)
+(fun prim_output_timeval (ochan tv) (
+    (int sec (get tv 0))
+    (int usec (get tv 1))
+    (int h (/ sec 3600))
+    (int m (/ (% sec 3600) 60))
+    (int s (% sec 60))
+    (int ms (/ usec 1000))
+    (int us (% usec 1000))
+    (if h (
+        (prim_output_int ochan h)
+        (prim_output_string ochan "h ")
+        ))
+    (if (|| h m) (
+        (prim_output_int ochan m)
+        (prim_output_string ochan "m ")
+        ))
+    (if (|| h (|| m s)) (
+        (prim_output_int ochan s)
+        (prim_output_string ochan "s ")
+        ))
+    (if (|| h (|| m (|| s ms))) (
+        (prim_output_int ochan ms)
+        (prim_output_string ochan "ms ")
+        ))
+    (prim_output_int ochan us)
+    (prim_output_string ochan "us")
+    ))
+
+    ))
+
+(vtable_push)
+(compile vm-prim-code)
+(vtable_pop)
