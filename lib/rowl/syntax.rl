@@ -1,6 +1,6 @@
 # Copyright (C) 2010 nineties
 #
-# $Id: lib/rowl/core.rl 2012-01-18 22:18:32 nineties $
+# $Id: lib/rowl/syntax.rl 2012-01-19 21:51:26 nineties $
 
 # Syntax definition of rowl language
 
