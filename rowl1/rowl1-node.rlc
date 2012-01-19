@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2012-01-01 01:52:42 nineties $
+; $Id: rowl1-node.rlc 2012-01-19 10:58:17 nineties $
 ;
 
 (import "rlvm-compile")
@@ -65,18 +65,18 @@
 (export var DefCommand     (to_sym "DefineCommand"))
 (export var DefModule      (to_sym "DefineModule"))
 (export var DefineVariable (to_sym "DefineVariable"))
-(export var AppendFunction (to_sym "AppendFunction"))
+(export var DefineFunction (to_sym "DefineFunction"))
 
 (export var Qualified   (to_sym "Qualified"))
 (export var Rewrite     (to_sym "Rewrite"))
 (export var Lambda      (to_sym "Lambda"))
 
-(export var Assembler   (to_builtin_sym "Assembler"))
-(export var Builtin     (to_builtin_sym "Builtin"))
-(export var Bytecode    (to_builtin_sym "Bytecode"))
-(export var Function    (to_builtin_sym "Function"))
-(export var Bind        (to_sym "Bind"))
-(export var Closure     (to_builtin_sym "Closure"))
+(export var Assembler     (to_builtin_sym "Assembler"))
+(export var Builtin       (to_builtin_sym "Builtin"))
+(export var Bytecode      (to_builtin_sym "Bytecode"))
+(export var Function      (to_builtin_sym "Function"))
+(export var BoundFunction (to_builtin_sym "BoundFunction"))
+(export var Closure       (to_builtin_sym "Closure"))
 (export var InputFileStream (to_builtin_sym "InputFileStream"))
 (export var OutputFileStream (to_builtin_sym "OutputFileStream"))
 (export var Module      (to_builtin_sym "Module"))
@@ -199,6 +199,7 @@
         (@AssemblerE        . (return Assembler))
         (@BytecodeE         . (return Bytecode))
         (@FunctionE         . (return Function))
+        (@BoundFunctionE    . (return BoundFunction))
         (@ClosureE          . (return Closure))
         (@InputFileStreamE  . (return InputFileStream))
         (@OutputFileStreamE . (return OutputFileStream))
@@ -376,6 +377,7 @@
         (@AssemblerE        . (return (output_string ochan "Assembler")))
         (@BytecodeE         . (return (output_string ochan "Bytecode")))
         (@FunctionE         . (return (output_string ochan "Function")))
+        (@BoundFunctionE    . (return (output_string ochan "BoundFunction")))
         (@ClosureE          . (return (output_string ochan "Closure")))
         (@InputFileStreamE  . (return (output_string ochan "InputFileStream")))
         (@OutputFileStreamE . (return (output_string ochan "OutputFileStream")))
@@ -402,6 +404,7 @@
         (@AssemblerE        . (return (pp_assembler ochan node)))
         (@BytecodeE         . (return (pp_bytecode ochan node)))
         (@FunctionE         . (return (pp_function ochan node)))
+        (@BoundFunctionE    . (return (pp_bound ochan node)))
         (@ClosureE          . (return (pp_closure ochan node)))
         (@InputFileStreamE  . (return (pp_file_stream ochan node)))
         (@OutputFileStreamE . (return (pp_file_stream ochan node)))
@@ -549,7 +552,17 @@
     (output_string ochan "<#Function:0x")
     (output_hex ochan expr 8)
     (output_char ochan ':')
-    (pretty_print ochan (field_get expr 1))
+    (pretty_print ochan (field_get expr 2))
+    (output_char ochan '>')
+    ))
+
+(fun pp_bound (ochan expr) (
+    (output_string ochan "<#BoundFunction:")
+    (output_hex ochan expr 8)
+    (output_char ochan ':')
+    (pretty_print ochan (field_get expr 2))
+    (output_char ochan ',')
+    (pretty_print ochan (field_get expr 3))
     (output_char ochan '>')
     ))
 
@@ -645,6 +658,7 @@
         (@AssemblerE        . (return (pp_assembler ochan node)))
         (@BytecodeE         . (return (pp_bytecode ochan node)))
         (@FunctionE         . (return (pp_function ochan node)))
+        (@BoundFunctionE    . (return (pp_bound ochan node)))
         (@ClosureE          . (return (pp_closure ochan node)))
         (@InputFileStreamE  . (return (pp_file_stream ochan node)))
         (@OutputFileStreamE . (return (pp_file_stream ochan node)))
