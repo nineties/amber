@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2012-01-17 19:05:17 nineties $
+; $Id: rowl1-matching.rlc 2012-01-19 21:40:31 nineties $
 ;
 
 (import "rlvm-compile")
@@ -20,14 +20,18 @@
 (var varP   (to_sym "%Var"))
 
 (export fun compile_matching (loc name def) (
-    (if (! (callable def)) (do
+    (var ty (node_type def))
+    (if (&& (!= ty @BoundFunctionE) (!= ty @FunctionE)) (do
         (output_error stderr loc)
-        (pretty_print stderr def)
-        (output_string stderr " is not a callable expression\n")
+        (pretty_print stderr name)
+        (output_string stderr " is not a function\n")
         (exit 1)
         ))
 
-    ; here, `def' has form of Function{ ... } or Bind{ function1, function2 }
+    (var cache (field_get def 1))
+    (if cache (return cache))
+
+    ; here, `def' has form of Function{ ... } or BoundFunction{ ... }
 
     ; construct pattern matrix 
     (var mat (construct_pattern_matrix def))
@@ -43,6 +47,9 @@
     (var asm (make_assembler))
     (compile_matching_main asm args mat)
     (compile_matching_error asm loc name)
+
+    (field_set def 1 (get_code asm)) ; caching
+
     (return (get_code asm))
     ))
 
@@ -56,18 +63,20 @@
     (if (== (expr_head def) Function)
         (return (cons (construct_row len def) tl))
         )
-    (var fun1 (expr_arg def 0))
-    (var fun2 (expr_arg def 1))
+    ; here `def' is a BoundFunction
+    (var fun1 (field_get def 2))
+    (var fun2 (field_get def 3))
     (= tl (construct_pattern_matrix_sub len fun2 tl))
     (return (construct_pattern_matrix_sub len fun1 tl))
     ))
 
 (fun max_arity (def) (
     (if (== (expr_head def) Function)
-        (return (list_len (field_get def 1)))
+        (return (list_len (field_get def 2)))
         )
-    (var len1 (max_arity (expr_arg def 0)))
-    (var len2 (max_arity (expr_arg def 1)))
+    ; here `def' is a BoundFunction 
+    (var len1 (max_arity (field_get def 2)))
+    (var len2 (max_arity (field_get def 3)))
     (if (< len1 len2)
         (return len2)
         (return len1)
@@ -75,8 +84,8 @@
     ))
 
 (fun construct_row (len def) (
-    (var args (field_get def 1))
-    (var code (field_get def 2))
+    (var args (field_get def 2))
+    (var code (field_get def 3))
     (= args (setup_args len args))
     (return (cons args code))
     ))

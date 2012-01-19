@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-01-18 06:39:06 nineties $
+; $Id: rowl1-compile.rlc 2012-01-19 21:34:59 nineties $
 ;
 
 (import "rlvm-compile")
@@ -39,14 +39,9 @@
 
 (export fun callable (expr) (
     (var hd (expr_head expr))
-    (if (== hd Function)
+    (if (|| (== hd Function) (== hd BoundFunction))
         (return @TRUE)
-    (if (&& (== hd Bind)
-        (&& (== (expr_size expr) 2)
-        (&& (callable (expr_arg expr 0))
-            (callable (expr_arg expr 1)))))
-        (return @TRUE)
-        ))
+        )
     (return @FALSE)
     ))
 
@@ -115,11 +110,23 @@
 (fun make_function (args code) (
     (var arity (list_len args))
     (= args (cons (box arity) args))
-    (return (variant @FunctionE 2 args code))
+    (return (variant @FunctionE 3 0 args code))
     ))
 
-(fun make_bind (fun1 fun2) (
-    (return (make_expr Bind (list2 fun1 fun2)))
+(fun make_bound (fun1 fun2) (
+    (if (! (callable fun1)) (do
+        (output_error stderr current_loc)
+        (pretty_print stderr fun1)
+        (output_string stderr " is not a function\n")
+        (exit 1)
+        ))
+    (if (! (callable fun2)) (do
+        (output_error stderr current_loc)
+        (pretty_print stderr fun2)
+        (output_string stderr " is not a function\n")
+        (exit 1)
+        ))
+    (return (variant @BoundFunctionE 3 0 fun1 fun2))
     ))
 
 (extern fun compile_matching)
@@ -727,7 +734,7 @@
 (fun compile_bind (asm mod expr) (
     (compile asm mod (expr_arg expr 1))
     (compile asm mod (expr_arg expr 0))
-    (compile_simple_call asm 2 make_bind)
+    (compile_simple_call asm 2 make_bound)
     ))
 
 (export fun compile_simple_function (asm arity func) (
@@ -757,7 +764,7 @@
         (do
             (var func (expr_arg info 0))
             (if (callable func)
-                (= func (make_bind newfunc func))
+                (= func (make_bound newfunc func))
                 (= func newfunc)
                 )
             (expr_arg_set info 0 func)
@@ -768,7 +775,7 @@
         (do
             (var func (expr_arg info 0))
             (if (callable func)
-                (= newfunc (make_bind newfunc func))
+                (= newfunc (make_bound newfunc func))
                 )
         ))
     (if (in_global_scope mod)
@@ -842,7 +849,7 @@
 
     (add_compiler mod (make_expr (to_sym "MakeExpression") (list2 DontCare DontCare)) compile_make_expr)
     (add_compiler mod (make_expr DefineVariable (list2 symT DontCare)) compile_define_variable)
-    (add_compiler mod (make_expr AppendFunction (list2 symT DontCare)) compile_append_function)
+    (add_compiler mod (make_expr DefineFunction (list2 symT DontCare)) compile_append_function)
     (add_compiler mod (headP Symbol) compile_var)
     (add_compiler mod (make_expr Apply (list2 DontCare listT)) compile_apply)
 

@@ -1,6 +1,6 @@
 # Copyright (C) 2010 nineties
 #
-# $Id: lib/rowl/core.rl 2012-01-01 12:39:01 nineties $
+# $Id: lib/rowl/core.rl 2012-01-18 22:18:32 nineties $
 
 # Syntax definition of rowl language
 
@@ -51,7 +51,7 @@ Rewrite = (x => y) -> `(Rewrite = (!x -> !y) | Rewrite)
         | Rewrite
 
 Apply{f@Symbol, args@List}: body
-    => `AppendFunction{!f, !MakeExpression{\Tuple,args} -> !body}
+    => `DefineFunction{!f, !MakeExpression{\Tuple,args} -> !body}
 
 x@Symbol: value
     => `DefineVariable{!x, !value}
