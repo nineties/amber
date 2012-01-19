@@ -1,9 +1,9 @@
 #
-# rowl - 
+# amber - 
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2012-01-18 13:06:32 nineties $
+# $Id: Makefile 2012-01-19 22:51:48 nineties $
 
 TOPDIR = ..
 ROWL0DIR = $(TOPDIR)/rowl0
@@ -153,10 +153,10 @@ clean:
 install:
 	cd $(TOPDIR); $(MAKE) install
 
-install_binaries: rlvm rowl
+install_binaries: rlvm amber
 	mkdir -p $(BINDIR)
 	cp $^ $(BINDIR)
 
 install_libraries: rowl1
-	mkdir -p $(LIBDIR)/rowl/bin
-	cp $^ $(LIBDIR)/rowl/bin
+	mkdir -p $(LIBDIR)/amber/bin
+	cp $^ $(LIBDIR)/amber/bin
