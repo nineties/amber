@@ -3,7 +3,7 @@
 # Copyright (C) 2009 nineties
 #
 
-# $Id: Makefile 2010-12-16 17:25:05 nineties $
+# $Id: Makefile 2012-01-19 22:55:46 nineties $
 
 LIBDIR = /usr/lib
 
@@ -13,8 +13,8 @@ all:
 
 install:
 	cd rowl1; $(MAKE) install_binaries install_libraries
-	mkdir -p /usr/lib/rowl
-	cp -r lib/* /usr/lib/rowl/
+	mkdir -p /usr/lib/amber
+	cp -r lib/* /usr/lib/amber/
 
 .PHONY: clean
 clean:
