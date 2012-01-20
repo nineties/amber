@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-01-19 21:34:59 nineties $
+; $Id: rowl1-compile.rlc 2012-01-21 02:02:05 nineties $
 ;
 
 (import "rlvm-compile")
@@ -225,41 +225,52 @@
     (var orig args)
     (var idx 0)
     (while args (do
-        (setup_arg tbl (make_arg idx) (car args))
+        (setup_arg tbl (make_arg idx) (car args) 0)
         (= args (cdr args))
         (+= idx 1)
         ))
     (return orig)
     ))
 
-(fun setup_arg (tbl obj arg) (
+(fun setup_arg (tbl obj arg level) (
     (var argty (expr_head arg))
     (if (|| (== argty Int) (== argty String))
         return
         )
     (if (== argty Symbol) (do
-        (symtable_add tbl arg obj)
+        (if (== level 0) (symtable_add tbl arg obj))
         return
         ))
     (if (== argty HeadP) (do
-        (var head (expr_arg_symbol arg 1))
-        (var v (expr_arg_symbol arg 0))
-        (symtable_add tbl v obj)
+        (if (== level 0) (do
+            (var head (expr_arg_symbol arg 1))
+            (var v (expr_arg_symbol arg 0))
+            (symtable_add tbl v obj)
+            ))
         return
         ))
     (if (== argty List) (do
         (var idx 0)
         (while arg (do
-            (setup_arg tbl (make_list_at obj idx) (car arg))
+            (setup_arg tbl (make_list_at obj idx) (car arg) level)
             (= arg (cdr arg))
             (incr idx)
             ))
         return
         ))
+    (if (== argty Quote)
+        return
+        )
+    (if (== argty Unquote) 
+        (-= level 1)
+        )
+    (if (== argty QuasiQuote)
+        (+= level 1)
+        )
     (var idx 0)
     (var args (expr_args arg))
     (while args (do
-        (setup_arg tbl (make_expr_at obj idx) (car args))
+        (setup_arg tbl (make_expr_at obj idx) (car args) level)
         (= args (cdr args))
         (incr idx)
         ))
