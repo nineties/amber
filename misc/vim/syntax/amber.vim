@@ -1,6 +1,6 @@
 " Language:	Amber
 " Maintainer:	nineties <nineties48@gmail.com>
-" $Id: amber.vim 2012-01-19 23:28:07 nineties $
+" $Id: amber.vim 2012-01-21 02:41:06 nineties $
 
 if exists("b:current_syntax")
 "    finish
@@ -30,10 +30,10 @@ syn match   amberHeader      "\<[A-Z][a-zA-Z0\9_]*"
 syn match   amberCurlyError  "}"
 syn region  amberBlock       start="{" end="}" contains=ALLBUT,amberParen,amberCurlyError fold
 
-syn match   amberNumber      display "\d\+\>"
-syn match   amberNumber      display "0x\x\+\>"
-syn match   amberOctal       display "0\o\+\>" contains=amberOctalZero
-syn match   amberOctalZero   display "\<0"
+syn match   amberNumber      display "\<\d\+\>"
+syn match   amberHex         display "\<0x\x\+\>"
+syn match   amberOctal       display "\<0\o\+\>" contains=amberOctalZero
+syn match   amberOctalZero   display "\<0\>"
 syn match   amberFloat       display "\d\+\.\d*\(e[-+]\=\d\+\)"
 
 syn region  amberComment start=/#/ end=/$/ contains=amberTodo
@@ -47,6 +47,7 @@ hi def link amberConditional         Conditional
 hi def link amberRepeat              Repeat
 hi def link amberTodo                Todo
 hi def link amberNumber              Number
+hi def link amberHex                 Number
 hi def link amberOctal               Number
 hi def link amberOctalZero           Number
 hi def link amberFloat               Float
