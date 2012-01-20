@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-parse.rlc 2011-12-14 00:44:01 nineties $
+; $Id: rowl1-parse.rlc 2012-01-20 18:05:24 nineties $
 ;
 
 (import "rlvm-compile")
@@ -148,7 +148,11 @@
     (if (== type @OP_INFIX)
         (do (= tok (lex_sub offs)) (goto parse_expr_front))
     (if (|| (== type @OP_POSTFIX) (|| (== type @OP_APPLICATIVE) (== type @OP_OBJECT)))
-        (goto parse_expr_middle)
+        (do
+            (= op_stack (cdr op_stack))
+            (= expr_stack (reduce next_op expr_stack))
+            (goto parse_expr_middle)
+        )
         ))
     
     (output_loc stderr (get_loc))
