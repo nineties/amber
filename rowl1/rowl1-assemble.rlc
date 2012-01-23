@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-assemble.rlc 2011-10-26 01:24:37 nineties $
+; $Id: rowl1-assemble.rlc 2012-01-23 22:02:31 nineties $
 ;
 
 ; -- Just in time assembler
@@ -25,6 +25,7 @@
     (int    . (do (output_opd_int ochan ptr i) (+= i 4)))
     (prim   . (do (output_opd_prim ochan ptr i) (+= i 2)))
     (addr   . (do (output_opd_short ochan ptr i) (+= i 2)))
+    (laddr  . (do (output_opd_int ochan ptr i) (+= i 4)))
     (object . (do (output_opd_object ochan ptr i) (+= i 4)))
     ))
 
@@ -265,11 +266,18 @@
     (ivector_put (field_get c 2) v addr)
     ))
 
-(export fun emit_label (c v) (
+(export fun emit_addr (c v) (
     (var offs (get_address c))
     (var info (struct 1 (field_get c 3) v offs (- offs 1)))
     (field_set c 3 info)
     (emit_short c 0)
+    ))
+
+(export fun emit_laddr (c v) (
+    (var offs (get_address c))
+    (var info (struct 1 (field_get c 3) v offs (- offs 1)))
+    (field_set c 3 info)
+    (emit_int c 0)
     ))
 
 (export fun emit_tswitch_label (c v) (
@@ -404,7 +412,8 @@
     (int    . emit_int)
     (prim   . emit_prim)
     (object . emit_object)
-    (addr   . emit_label)
+    (addr   . emit_addr)
+    (laddr  . emit_laddr)
     ))
 
 (var code 0)

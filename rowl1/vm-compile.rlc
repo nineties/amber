@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-compile.rlc 2010-11-17 17:29:02 nineties $
+; $Id: vm-compile.rlc 2012-01-23 04:39:22 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -570,6 +570,17 @@
     (if ret (emit_return `(return) nil nil))
     ))
 
+(define emit_rfor ((_ v a b body) _ ret) (do
+    (var loop-lbl (mklabel `loop))
+    (emit_expr `(int @v (- @b 1)) nil nil)
+    (print_label loop-lbl)
+    (push_break_point)
+    (emit_if `(if (>= @v @a) @(append body `((decr @v) (goto @loop-lbl)))) nil nil)
+    (emit_break_point)
+    (pop_break_point)
+    (if ret (emit_return `(return) nil nil))
+    ))
+
 (define emit_bsr ((_ expr) dst ret) (do
     (if dst
     (do
@@ -602,6 +613,7 @@
     (if      . @emit_if)
     (while   . @emit_while)
     (for     . @emit_for)
+    (rfor    . @emit_rfor)
     (int     . @emit_def)
     (char    . @emit_def)
     (byte    . @emit_def)
@@ -748,6 +760,7 @@
     (if    . @scan_if)
     (while . @scan_while)
     (for   . @scan_for)
+    (rfor  . @scan_for)
     ))
 
 (define emit_function ((_ name params body)) (do

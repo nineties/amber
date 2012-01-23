@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-01-21 02:02:05 nineties $
+; $Id: rowl1-compile.rlc 2012-01-22 23:50:19 nineties $
 ;
 
 (import "rlvm-compile")
@@ -45,18 +45,37 @@
     (return @FALSE)
     ))
 
-(fun delete_vars (tbl expr) (
+(fun iter_args (f expr arg level) (
     (var hd (expr_head expr))
     (if (== hd Symbol) (do
-        (symtable_delete tbl expr)
+        (if (== level 0) (f expr arg))
         return
         ))
     (if (is_atom expr) return)
+    (if (== hd Quote) return)
+    (if (== hd QuasiQuote) (+= level 1))
+    (if (== hd Unquote) (-= level 1))
     (var args (expr_args expr))
     (while args (do
-        (delete_vars tbl (car args))
+        (iter_args f (car args) arg level)
         (= args (cdr args))
         ))
+    ))
+
+(fun delete_var (sym tbl) (
+    (symtable_delete tbl sym)
+    ))
+
+(fun delete_args (tbl expr) (
+    (iter_args delete_var expr tbl 0)
+    ))
+
+(fun add_var (sym tbl) (
+    (symtable_add tbl sym)
+    ))
+
+(fun collect_args (tbl expr) (
+    (iter_args add_var expr tbl 0)
     ))
 
 (fun fv_iter_block (tbl exprs) (
@@ -78,12 +97,12 @@
     (if (== level 0) (do
         (if (== hd DefineVariable) (do
             (fv_iter tbl (expr_arg expr 1) 0)
-            (delete_vars tbl (expr_arg expr 0))
+            (delete_args tbl (expr_arg expr 0))
             return
             ))
         (if (== hd Lambda) (do
             (fv_iter tbl (expr_arg expr 1) 0)
-            (delete_vars tbl (expr_arg expr 0))
+            (delete_args tbl (expr_arg expr 0))
             return
             ))
         (if (== hd Block) (do
@@ -127,6 +146,23 @@
         (exit 1)
         ))
     (return (variant @BoundFunctionE 3 0 fun1 fun2))
+    ))
+
+; closure conversion
+(fun close (ftbl expr) (
+    (output_string stderr "close:")
+    (pretty_print_full stderr expr)
+    (output_char stderr '\n')
+    (var hd (expr_head expr))
+    (if (is_atom expr) (return expr))
+    (if (== hd Located) (do
+        (expr_arg_set expr 1 (close ftbl (expr_arg expr 1)))
+        (return expr)
+        ))
+    (if (== hd Apply) (do
+        (var lhs (expr_arg expr 0))
+        (var args (expr_arg_list expr 1))
+        ))
     ))
 
 (extern fun compile_matching)
@@ -211,14 +247,29 @@
     ))
 
 (fun compile_function (asm mod args body) (
-    (push_scope mod)
+    ; XXX: do closure conversion
+    (var fv (free_variables body))
+    (delete_args fv args)
+    (output_string stderr "free variables of:")
+    (pretty_print stderr args)
+    (output_string stderr " -> ")
+    (pretty_print stderr body)
+    (symtable_dump stderr fv)
+
+    (push_varscope mod)
     (setup_args (get_vartable mod) args)
     (var cnt_addr (get_address asm))
     (put_allocate asm 0)
+
+    ; closure conversion
+    (var vtbl (make_symtable 10))
+    (collect_args vtbl args)
+    (close vtbl body)
+
     (compile asm mod body)
     (put_ireturn asm)
     (put_operand_byte asm (+ cnt_addr 1) (count_local_variable mod))
-    (pop_scope mod)
+    (pop_varscope mod)
     ))
 
 (fun setup_args (tbl args) (
@@ -319,7 +370,7 @@
     (var tbl (get_vartable mod))
     (check_redefinition mod sym)
 
-    (if (in_global_scope mod)
+    (if (in_top_scope mod)
         (do
             (var ent (make_gvar 0))
             (compile asm mod val)
@@ -386,20 +437,39 @@
     (not_reachable "compile_operand")
     ))
 
-(fun lookup_var (mod sym) (
+(fun lookup_global_var (cache mod sym) (
+    (var c (field_get cache 0))
+    (if c (return (car c)))
     (var v (lookup_symbol mod sym))
     (if (! v) (do
         (output_error stderr current_loc)
-        (output_string stderr "undefined variable `")
+        (output_string stderr "undefined global variable `")
         (pretty_print stderr sym)
         (output_string stderr "'\n")
         (exit 1)
         ))
-    (return v)
+    (var ty (expr_head v))
+    (if (!= ty GlobalVariable) (do
+        (output_error stderr current_loc)
+        (output_string stderr "`")
+        (pretty_print stderr sym)
+        (output_string stderr "' is defined as non-variable\n")
+        (exit 1)
+        ))
+    (field_set cache 0 (expr_args v))
+    (return (expr_arg v 0))
     ))
 
 (fun compile_var (asm mod expr) (
-    (compile_operand asm (lookup_var mod expr))
+    (var v (lookup_symbol mod expr))
+    (if v (do
+        (compile_operand asm v)
+        return
+        ))
+    (put_push asm expr)
+    (put_push asm mod)
+    (put_push asm (make_struct1 1 0))
+    (compile_simple_call asm 3 lookup_global_var)
     ))
 
 (fun compile_apply (asm mod expr) (
@@ -486,19 +556,19 @@
 
 (fun compile_block (asm mod expr) (
     (var exprs (expr_args expr))
-    (if (in_global_scope mod)
+    (if (in_top_scope mod)
         (do
-            (push_scope mod)
+            (push_varscope mod)
             (var cnt_addr (get_address asm))
             (put_allocate asm 0)
             (compile_block_body asm mod exprs)
             (put_operand_byte asm (+ cnt_addr 1) (count_local_variable mod))
-            (pop_scope mod)
+            (pop_varscope mod)
         )
         (do
-            (push_scope mod)
+            (push_varscope mod)
             (compile_block_body asm mod exprs)
-            (pop_scope mod)
+            (pop_varscope mod)
         )
         )
     ))
@@ -728,7 +798,6 @@
     ))
 
 (fun compile_lambda_main (asm mod args body) (
-    ; XXX: do closure conversion
     (var asm_func (make_assembler))
     (compile_function asm_func mod args body)
     (put_push asm (make_function args (get_code asm_func)))
@@ -789,7 +858,7 @@
                 (= newfunc (make_bound newfunc func))
                 )
         ))
-    (if (in_global_scope mod)
+    (if (in_top_scope mod)
         (add_symbol mod sym (make_gvar newfunc))
         (add_symbol mod sym (make_lvar newfunc))
         )

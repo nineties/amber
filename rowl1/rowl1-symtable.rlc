@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-symtable.rlc 2011-12-31 10:34:01 nineties $
+; $Id: rowl1-symtable.rlc 2012-01-24 01:28:29 nineties $
 ;
 
 (import "rlvm-compile")
@@ -124,6 +124,51 @@
     ; increment a counter in display
     (var n (ivector_at display (- depth 1)))
     (ivector_put display (- depth 1) (+ n 1))
+    ))
+
+(export fun symtable_add_to_global (table sym obj) (
+    (rehash table)
+
+    (var bucket (field_get table 0))
+    (var entries (field_get table 1))
+    (var display (field_get table 2))
+    (var size (vector_size bucket))
+    (var h (hash sym))
+    (var depth (ivector_size display))
+
+    (if (== depth 0) (error "symtable_add: no namespace"))
+
+    (var ngvar (ivector_at display 0))
+    (var ent (struct 3 sym obj 0 h 1 ngvar))
+    (%= h size)
+
+    (vector_pushfront entries ent)
+
+    ; insert `ent' to front of link
+    (var entries (vector_at bucket h))
+    (var prev 0)
+    (while entries (do
+        (var e_sym (field_get entries 0))
+        (var e_depth (field_get entries 4))
+        (if (!= e_sym sym) break)
+        (if (== e_depth 1) break)
+        (= prev entries)
+        (= entries (field_get entries 2))
+        ))
+    (if prev
+        (do
+            (field_set ent 2 (field_get prev 2))
+            (field_set prev 2 ent)
+        )
+        (do
+            (field_set ent 2 (vector_at bucket h))
+            (vector_put bucket h ent)
+        ))
+
+    ; increment a counter in display
+    (var n (ivector_at display 0))
+    (ivector_put display 0 (+ n 1))
+
     ))
 
 ; delete most recent entry

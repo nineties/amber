@@ -2,8 +2,21 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-module.rlc 2012-01-17 19:05:33 nineties $
+; $Id: rowl1-module.rlc 2012-01-24 01:47:05 nineties $
 ;
+
+; Module can be considered as a re-entrant scope.
+; rowl (Amber) has a two kinds of modules; named module and anonymous module.
+; 
+; Fields:
+; - sym      : name of the module (nil for anonymous module)
+; - super    : a link to module where this module is defined.
+; - imports  : list of imported modules.
+; - children : sub-modules in module hierarchy.
+; - vtbl     : variable table
+; - optbl    : operator table (string representation -> operator)
+; - rptbl    : operator table (operator head -> string representation)
+; - mark     : visited mark
 
 (import "rlvm-compile")
 (import "rowl1-types")
@@ -17,17 +30,25 @@
 (extern object current_loc)
 
 (export fun make_module (sym super) (
-    (var mod (variant @ModuleE 6
+    (var mod (variant @ModuleE 7
         sym
         super
-        (list1 0)           ; stack of list of imported modules
+        0                   ; list of imported modules
+        0                   ; children
         (make_symtable 10)  ; variable table
         (make_idtable)      ; string represtation -> operator
         (make_symtable 10)  ; head -> string representation of operator
         0                   ; visited-mark
         ))
-    (if super (add_symbol super sym mod))
+    (if super (do
+        (if sym (add_symbol super sym mod))
+        (add_child super mod)
+        ))
     (return mod)
+    ))
+
+(fun add_child (super sub) (
+    (field_set super 4 (cons sub (list_delete sub (field_get super 4))))
     ))
 
 (var visited_mark 0)
@@ -41,8 +62,7 @@
     ))
 
 (fun add_module (curmod mod) (
-    (var stack (field_get curmod 3))
-    (setcar stack (cons mod (list_delete mod (car stack))))
+    (field_set curmod 3 (cons mod (list_delete mod (field_get curmod 3))))
     ))
 
 (export fun import_module (curmod sig) (
@@ -51,33 +71,30 @@
     ))
 
 (export fun add_symbol (mod sym v) (
-    (symtable_add (field_get mod 4) sym v)
+    (symtable_add (field_get mod 5) sym v)
     ))
 
 (export fun lookup_symbol (mod sym) (
     (return (lookup_symbol_iter (fresh_mark) mod sym))
     ))
+
 (fun lookup_symbol_iter (mark mod sym) (
     (while mod (do
         ; check visited-mark
-        (if (== (field_get mod 7) mark) break)
-        (field_set mod 7 mark)
+        (if (== (field_get mod 8) mark) break)
+        (field_set mod 8 mark)
 
         ; First, lookup variable table.
-        (var tbl (field_get mod 4))
+        (var tbl (field_get mod 5))
         (var v (symtable_find tbl sym))
         (if v (return v))
 
         ; Next, lookup imported modules.
-        (var import_stack (field_get mod 3))
-        (while import_stack (do
-            (var list (car import_stack))
-            (while list (do
-                (= v (lookup_symbol_iter mark (car list) sym))
-                (if v (return v))
-                (= list (cdr list))
-                ))
-            (= import_stack (cdr import_stack))
+        (var imports (field_get mod 3))
+        (while imports (do
+            (= v (lookup_symbol_iter mark (car imports) sym))
+            (if v (return v))
+            (= imports (cdr imports))
             ))
 
         (= mod (super_module mod))
@@ -86,18 +103,42 @@
     ))
 
 (export fun lookup_symbol_local (mod sym) (
-    (var tbl (field_get mod 4))
+    (var tbl (field_get mod 5))
     (return (symtable_find_local tbl sym))
     ))
 
-(export fun push_scope (mod) (
-    (symtable_push (field_get mod 4))
-    (field_set mod 3 (cons 0 (field_get mod 3)))
+(export fun push_varscope (mod) (
+    (symtable_push (field_get mod 5))
     ))
 
-(export fun pop_scope (mod) (
-    (symtable_pop (field_get mod 4))
-    (field_set mod 3 (cdr (field_get mod 3)))
+(export fun pop_varscope (mod) (
+    (symtable_pop (field_get mod 5))
+    ))
+
+(export fun make_variable_display (mod sym) (
+    (var box (struct 2 0 current_loc))
+    (var display (struct 1 box))
+    (symtable_add_to_global (field_get mod 5) sym display)
+    (var mark (fresh_mark))
+    (field_set mod 8 mark)
+    (var children (field_get mod 4))
+    (while children (do
+        (update_display_iter mark (car children) sym box)
+        (= children (cdr children))
+        ))
+    ))
+
+(fun update_display_iter (mark mod sym box) (
+    (if (== (field_get mod 8) mark) return)
+    (field_set mod 8 mark)
+    (var vtbl (field_get mod 5))
+    (var display (symtable_find_global vtbl sym))
+    (if display (field_set display 0 box))
+    (var children (field_get mod 4))
+    (while children (do
+        (update_display_iter mark (car children) sym box)
+        (= children (cdr children))
+        ))
     ))
 
 (export fun find_module (loc curmod sig createp) (
@@ -136,24 +177,24 @@
     (exit 1)
     ))
 
-(export fun in_global_scope (mod) (
-    (if (== (symtable_depth (field_get mod 4)) 1)
+(export fun in_top_scope (mod) (
+    (if (== (symtable_depth (field_get mod 5)) 1)
         (return @TRUE)
         (return @FALSE)
         )
     ))
 
 (export fun get_vartable (mod) (
-    (return (field_get mod 4))
+    (return (field_get mod 5))
     ))
 
 (export fun count_local_variable (mod) (
-    (return (symtable_count_local (field_get mod 4)))
+    (return (symtable_count_local (field_get mod 5)))
     ))
 
 (export fun add_operator (mod repr head op) (
-    (var optbl (field_get mod 5))
-    (var rptbl (field_get mod 6))
+    (var optbl (field_get mod 6))
+    (var rptbl (field_get mod 7))
     (idtable_add optbl repr op)
     (if head (symtable_add rptbl head op))
     ))
@@ -165,24 +206,20 @@
 (fun lookup_operator_iter (mark mod repr) (
     (while mod (do
         ; check visited-mark
-        (if (== (field_get mod 7) mark) break)
-        (field_set mod 7 mark)
+        (if (== (field_get mod 8) mark) break)
+        (field_set mod 8 mark)
 
         ; First, lookup local operator table.
-        (var tbl (field_get mod 5))
+        (var tbl (field_get mod 6))
         (var v (idtable_find tbl repr))
         (if v (return v))
 
         ; Next, lookup imported modules.
-        (var import_stack (field_get mod 3))
-        (while import_stack (do
-            (var list (car import_stack))
-            (while list (do
-                (= v (lookup_operator_iter mark (car list) repr))
-                (if v (return v))
-                (= list (cdr list))
-                ))
-            (= import_stack (cdr import_stack))
+        (var imports (field_get mod 3))
+        (while imports (do
+            (= v (lookup_operator_iter mark (car imports) repr))
+            (if v (return v))
+            (= imports (cdr imports))
             ))
 
         (= mod (super_module mod))
@@ -197,24 +234,20 @@
 (fun lookup_operator_from_head_iter (mark mod head) (
     (while mod (do
         ; check visited-mark
-        (if (== (field_get mod 7) mark) break)
-        (field_set mod 7 mark)
+        (if (== (field_get mod 8) mark) break)
+        (field_set mod 8 mark)
 
         ; First, lookup local operator table.
-        (var tbl (field_get mod 6))
+        (var tbl (field_get mod 7))
         (var v (symtable_find tbl head))
         (if v (return v))
 
         ; Next, lookup imported modules.
-        (var import_stack (field_get mod 3))
-        (while import_stack (do
-            (var list (car import_stack))
-            (while list (do
-                (= v (lookup_operator_from_head_iter mark (car list) head))
-                (if v (return v))
-                (= list (cdr list))
-                ))
-            (= import_stack (cdr import_stack))
+        (var imports (field_get mod 3))
+        (while imports (do
+            (= v (lookup_operator_from_head_iter mark (car imports) head))
+            (if v (return v))
+            (= imports (cdr imports))
             ))
 
         (= mod (super_module mod))
@@ -223,19 +256,22 @@
     ))
 
 (export fun push_lextable (mod) (
-    (idtable_push (field_get mod 5))
-    (symtable_push (field_get mod 6))
+    (idtable_push (field_get mod 6))
+    (symtable_push (field_get mod 7))
     ))
 
 (export fun pop_lextable (mod) (
-    (idtable_pop (field_get mod 5))
-    (symtable_pop (field_get mod 6))
+    (idtable_pop (field_get mod 6))
+    (symtable_pop (field_get mod 7))
     ))
 
 (export fun pp_module (ochan obj) (
     (var sym (field_get obj 1))
     (output_string ochan "<#Module:")
-    (output_symbol ochan sym)
+    (if sym
+        (output_symbol ochan sym)
+        (output_string ochan "(anonym)")
+        )
     (output_string stderr ":")
     (output_hex ochan obj 8)
     (output_char ochan '>')

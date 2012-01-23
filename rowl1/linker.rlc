@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: linker.rlc 2011-09-26 16:56:12 nineties $
+; $Id: linker.rlc 2012-01-24 01:17:42 nineties $
 ;
 
 (import "config")
@@ -10,12 +10,12 @@
 (import "vm-insn")
 (import "vm-prim-inc")
 
-(var call_info  (assoc `call vm_insn_table))
+(var lcall_info  (assoc `lcall vm_insn_table))
 (var pcall_info (assoc `pcall vm_insn_table))
 (var drop_info  (assoc `drop vm_insn_table))
 (var exit_info  (assoc `exit vm_insn_table))
-(var call_init_len (+ (cadr call_info) (cadr drop_info)))
-(var call_main_len (+ (* 2 (cadr pcall_info)) (+ (cadr call_info) (cadr exit_info))))
+(var call_init_len (+ (cadr lcall_info) (cadr drop_info)))
+(var call_main_len (+ (* 2 (cadr pcall_info)) (+ (cadr lcall_info) (cadr exit_info))))
 (var cmd_argv_index (car (assoc `cmd_argv prim_table)))
 (var cmd_argc_index (car (assoc `cmd_argc prim_table)))
 
@@ -203,7 +203,7 @@
     (var real_operand_addr (compute_real_address operand_addr rfile_index))
 
     (array_set
-        short
+        int
         (+ (vector_at codes rfile_index) operand_addr)
         0
         (+ (- real_addr real_operand_addr) 1)
@@ -315,8 +315,8 @@
     (var init_addr startup_len)
     (for i 0 num_files (do
         ; call init-function
-        (output_byte oc @(car call_info))
-        (output_short oc (- init_addr call_addr))
+        (output_byte oc @(car lcall_info))
+        (output_word oc (- init_addr call_addr))
         (output_byte oc 0)
         (output_byte oc @(car drop_info))
         (+= call_addr @call_init_len)
@@ -332,9 +332,9 @@
 
     (+= call_addr 8)
 
-    (output_byte oc @(car call_info))
+    (output_byte oc @(car lcall_info))
     (var main_address (lookup_main))
-    (output_short oc (- main_address call_addr))
+    (output_word oc (- main_address call_addr))
     (output_byte oc 8)
 
     (output_byte oc @(car exit_info))
