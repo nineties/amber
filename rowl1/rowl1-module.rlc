@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-module.rlc 2012-01-24 01:47:05 nineties $
+; $Id: rowl1-module.rlc 2012-01-26 02:01:13 nineties $
 ;
 
 ; Module can be considered as a re-entrant scope.
@@ -107,6 +107,11 @@
     (return (symtable_find_local tbl sym))
     ))
 
+(export fun lookup_symbol_current_module (mod sym) (
+    (var tbl (field_get mod 5))
+    (return (symtable_find tbl sym))
+    ))
+
 (export fun push_varscope (mod) (
     (symtable_push (field_get mod 5))
     ))
@@ -115,25 +120,54 @@
     (symtable_pop (field_get mod 5))
     ))
 
-(export fun make_variable_display (mod sym) (
-    (var box (struct 2 0 current_loc))
-    (var display (struct 1 box))
-    (symtable_add_to_global (field_get mod 5) sym display)
+; add definition of module variable `sym' to `mod'.
+; `val' is a initial value.
+(export fun add_module_variable (mod sym val) (
+    (var ent (lookup_symbol_local mod sym))
+    (if (! ent) (do
+        (var box (struct 2 val current_loc))
+        (= ent (make_expr ModuleVariable (list2 box true)))
+        (symtable_add_to_global (field_get mod 5) sym ent)
+        (goto update_displays)
+        ))
+    (if (== (expr_arg ent 1) true) (do
+        (output_error stderr current_loc)
+        (output_string stderr "variable `")
+        (output_symbol stderr sym)
+        (output_string stderr "' is already defined\n")
+        (exit 1)
+        ))
+    (expr_arg_set ent 1 true)
+    (var box (struct 2 val current_loc))
+    (expr_arg_set ent 0 box)
+    ; update variable-displays
+    (label update_displays)
     (var mark (fresh_mark))
-    (field_set mod 8 mark)
     (var children (field_get mod 4))
     (while children (do
         (update_display_iter mark (car children) sym box)
         (= children (cdr children))
         ))
+    (return ent)
     ))
 
+(export fun add_module_variable_display (mod sym box) (
+    (var ent (lookup_symbol_local mod sym))
+    (if (! ent) (do
+        (= ent (make_expr ModuleVariable (list2 box false)))
+        (symtable_add_to_global (field_get mod 5) sym ent)
+        ))
+    (return ent)
+    ))
+    
 (fun update_display_iter (mark mod sym box) (
     (if (== (field_get mod 8) mark) return)
     (field_set mod 8 mark)
     (var vtbl (field_get mod 5))
     (var display (symtable_find_global vtbl sym))
-    (if display (field_set display 0 box))
+    (if (&& display (== (expr_arg display 1) false))
+        (expr_arg_set display 0 box)
+        )
     (var children (field_get mod 4))
     (while children (do
         (update_display_iter mark (car children) sym box)

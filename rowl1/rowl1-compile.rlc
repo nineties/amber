@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-01-22 23:50:19 nineties $
+; $Id: rowl1-compile.rlc 2012-01-26 02:05:47 nineties $
 ;
 
 (import "rlvm-compile")
@@ -16,16 +16,37 @@
 (import "rowl1-module")
 (import "rowl1-assemble")
 
-(var GlobalVariable (to_sym "%GlobalVariable"))
-(var LocalVariable  (to_sym "%LocalVariable"))
-(var Arity          (to_sym "%Arity"))
-(var Argument       (to_sym "%Argument"))
-(var ListAt         (to_sym "%ListAt"))
-(var ExprAt         (to_sym "%ExprAt"))
-
 ; compilers
 (extern object current_loc)
 (extern fun set_loc)
+
+(fun topscope_only (mod name) (
+    (if (! (in_top_scope mod)) (do
+        (output_error stderr current_loc)
+        (output_char stderr '`')
+        (output_string stderr name)
+        (output_string stderr "' must be called in top scope\n")
+        (exit 1)
+        ))
+    ))
+
+(fun must_be_module_variable (sym val) (
+    (if (!= (expr_head val) ModuleVariable) (do
+        (output_error stderr current_loc)
+        (output_char stderr '`')
+        (output_symbol stderr sym)
+        (output_string stderr "' must be a module variable\n")
+        (exit 1)
+        ))
+    ))
+
+(fun is_effective_variable (v) (
+    (if (! v) (return @FALSE))
+    (if (&& (== (expr_head v) ModuleVariable) (== (expr_arg v 1) false))
+        (return @FALSE)
+        )
+    (return @TRUE)
+    ))
 
 (fun is_identifier (expr) (
     (var hd (expr_head expr))
@@ -150,9 +171,6 @@
 
 ; closure conversion
 (fun close (ftbl expr) (
-    (output_string stderr "close:")
-    (pretty_print_full stderr expr)
-    (output_char stderr '\n')
     (var hd (expr_head expr))
     (if (is_atom expr) (return expr))
     (if (== hd Located) (do
@@ -175,15 +193,19 @@
         (output_string stderr "'\n")
         (exit 1)
         ))
-    (= def (expr_arg def 0))
-    (if (! (callable def)) (do
+    (must_be_module_variable sym def)
+    (check_if_initialized sym def)
+    (var box (expr_arg def 0))
+    (var func (field_get box 0))
+    (if (! (callable func)) (do
         (output_error stderr current_loc)
         (output_string stderr "`")
         (output_symbol stderr sym)
         (output_string stderr "' is defined as non-function\n")
         (exit 1)
         ))
-    (return (compile_matching current_loc sym def))
+    (var loc (field_get box 1))
+    (return (compile_matching loc sym func))
     ))
 
 (fun undefined_error (sym args) (
@@ -248,13 +270,13 @@
 
 (fun compile_function (asm mod args body) (
     ; XXX: do closure conversion
-    (var fv (free_variables body))
-    (delete_args fv args)
-    (output_string stderr "free variables of:")
-    (pretty_print stderr args)
-    (output_string stderr " -> ")
-    (pretty_print stderr body)
-    (symtable_dump stderr fv)
+    ;(var fv (free_variables body))
+    ;(delete_args fv args)
+    ;(output_string stderr "free variables of:")
+    ;(pretty_print stderr args)
+    ;(output_string stderr " -> ")
+    ;(pretty_print stderr body)
+    ;(symtable_dump stderr fv)
 
     (push_varscope mod)
     (setup_args (get_vartable mod) args)
@@ -262,9 +284,9 @@
     (put_allocate asm 0)
 
     ; closure conversion
-    (var vtbl (make_symtable 10))
-    (collect_args vtbl args)
-    (close vtbl body)
+    ;(var vtbl (make_symtable 10))
+    ;(collect_args vtbl args)
+    ;(close vtbl body)
 
     (compile asm mod body)
     (put_ireturn asm)
@@ -332,11 +354,14 @@
     (if (|| (== hd ListAt) (== hd ExprAt))
         (return (var_loc (expr_arg info 0)))
         )
+    (if (== hd ModuleVariable) (do
+        (var box (expr_arg info 0))
+        (if (! box)
+            (return no_loc)
+            (return (field_get box 1))
+            )
+        ))
     (return (expr_arg info 1))
-    ))
-
-(fun make_gvar (val) (
-    (return (make_expr GlobalVariable (list2 val current_loc)))
     ))
 
 (fun make_lvar (idx) (
@@ -359,10 +384,6 @@
     (return (make_expr ExprAt (list2 obj (box idx))))
     ))
 
-(export fun add_global_variable (mod sym val) (
-    (add_symbol mod sym (make_gvar val))
-    ))
-
 (fun compile_define_variable (asm mod expr) (
     (check_arg_size (symbol_name DefineVariable) 2 expr)
     (var sym (expr_arg_symbol expr 0))
@@ -372,11 +393,10 @@
 
     (if (in_top_scope mod)
         (do
-            (var ent (make_gvar 0))
+            (var ent (add_module_variable mod sym 0))
             (compile asm mod val)
-            (put_push asm (expr_args ent))
+            (put_push asm (expr_arg ent 0))
             (put_setcar asm)
-            (add_symbol mod sym ent)
         )
         (do
             (var idx (count_local_variable mod))
@@ -388,21 +408,37 @@
 
 (fun check_redefinition (mod sym) (
     (var info (lookup_symbol_local mod sym))
-    (if info (do
-        (output_error stderr current_loc)
-        (output_string stderr "variable `")
-        (pretty_print stderr sym)
-        (output_string stderr "' is already defined at ")
-        (output_loc stderr (var_loc info))
-        (output_char stderr '\n')
+    (if (! info) return)
+    (if (== (expr_head info) ModuleVariable) (do
+        (var declared_in_this_scope (expr_arg info 1))
+        (if (== declared_in_this_scope false) return)
+        ))
+    (output_error stderr current_loc)
+    (output_string stderr "variable `")
+    (pretty_print stderr sym)
+    (output_string stderr "' is already defined at ")
+    (output_loc stderr (var_loc info))
+    (output_char stderr '\n')
+    (exit 1)
+    ))
+
+(fun check_if_initialized (sym info) (
+    (var box (expr_arg info 0))
+    (if (! box) (do
+        (var loc (expr_arg info 1))
+        (output_error stderr loc)
+        (output_char stderr '`')
+        (output_symbol stderr sym)
+        (output_string stderr "' is not initialized\n")
         (exit 1)
         ))
     ))
 
 (export fun compile_operand (asm opd) (
     (var ty (expr_head opd))
-    (if (== ty GlobalVariable) (do
-        (put_push asm (expr_args opd))
+    (if (== ty ModuleVariable) (do
+        (put_push asm (expr_args opd)) ; variable-display
+        (put_car asm)
         (put_car asm)
         return
         ))
@@ -437,39 +473,18 @@
     (not_reachable "compile_operand")
     ))
 
-(fun lookup_global_var (cache mod sym) (
-    (var c (field_get cache 0))
-    (if c (return (car c)))
+(fun compile_var (asm mod sym) (
     (var v (lookup_symbol mod sym))
-    (if (! v) (do
-        (output_error stderr current_loc)
-        (output_string stderr "undefined global variable `")
-        (pretty_print stderr sym)
-        (output_string stderr "'\n")
-        (exit 1)
-        ))
-    (var ty (expr_head v))
-    (if (!= ty GlobalVariable) (do
-        (output_error stderr current_loc)
-        (output_string stderr "`")
-        (pretty_print stderr sym)
-        (output_string stderr "' is defined as non-variable\n")
-        (exit 1)
-        ))
-    (field_set cache 0 (expr_args v))
-    (return (expr_arg v 0))
-    ))
-
-(fun compile_var (asm mod expr) (
-    (var v (lookup_symbol mod expr))
-    (if v (do
-        (compile_operand asm v)
-        return
-        ))
-    (put_push asm expr)
-    (put_push asm mod)
-    (put_push asm (make_struct1 1 0))
-    (compile_simple_call asm 3 lookup_global_var)
+    (if (! v)
+        ; `sym' is a module variable
+        (= v (add_module_variable_display mod sym (struct 2 (to_sym "undefined") no_loc)))
+    (if (== (expr_head v) ModuleVariable) (do
+        (var u (lookup_symbol_current_module mod sym))
+        (if (! u)
+            (= v (add_module_variable_display mod sym (expr_arg v 0)))
+            )
+        )))
+    (compile_operand asm v)
     ))
 
 (fun compile_apply (asm mod expr) (
@@ -747,8 +762,9 @@
         (exit 1)
         ))
     (var vty (expr_head v))
-    (if (== vty GlobalVariable) (do
+    (if (== vty ModuleVariable) (do
         (put_push asm (expr_args v))
+        (put_car asm)
         (put_setcar asm)
         return
         )
@@ -839,38 +855,53 @@
     ))
 
 (fun append_function (mod sym newfunc) (
+    (topscope_only mod "append_function")
     (var info (lookup_symbol_local mod sym))
     (if info
         (do
-            (var func (expr_arg info 0))
+            (must_be_module_variable sym info)
+            (check_if_initialized sym info)
+            (var box (expr_arg info 0))
+            (var func (field_get box 0))
             (if (callable func)
-                (= func (make_bound newfunc func))
-                (= func newfunc)
+                (= newfunc (make_bound newfunc func))
                 )
-            (expr_arg_set info 0 func)
+            (field_set box 0 newfunc)
             return
         ))
     (= info (lookup_symbol mod sym))
     (if info
         (do
-            (var func (expr_arg info 0))
+            (must_be_module_variable sym info)
+            (check_if_initialized sym info)
+            (var box (expr_arg info 0))
+            (var func (field_get box 0))
             (if (callable func)
                 (= newfunc (make_bound newfunc func))
                 )
         ))
-    (if (in_top_scope mod)
-        (add_symbol mod sym (make_gvar newfunc))
-        (add_symbol mod sym (make_lvar newfunc))
-        )
+    (add_module_variable mod sym newfunc)
     ))
 
-(fun compile_append_function (asm mod expr) (
+; AppendFunction{sym, fun} is equivalent to:
+; sym: fun          (when `sym' is not defined)
+; sym: fun | sym    (when `sym' is defined in outer scope)
+; sym = fun | sym   (when `sym' is defined in local scope)
+(fun compile_define_function (asm mod expr) (
     (var sym (expr_arg_symbol expr 0))
     (var fun (expr_arg expr 1))
-    (compile asm mod fun)
-    (put_push asm sym)
-    (put_push asm mod)
-    (compile_simple_call asm 3 append_function)
+    (var info (lookup_symbol_local mod sym))
+    (if (is_effective_variable info)
+        (return (compile asm mod
+            (make_expr Assign (list2 sym (make_expr Bind (list2 fun sym))))))
+        )
+    (= info (lookup_symbol mod sym))
+    (if (is_effective_variable info)
+        (return (compile asm mod
+            (make_expr DefineVariable (list2 sym (make_expr Bind (list2 fun sym))))))
+        (return (compile asm mod
+            (make_expr DefineVariable (list2 sym fun))))
+        )
     ))
 
 (export fun add_builtin_function0 (mod sym func) (
@@ -929,7 +960,7 @@
 
     (add_compiler mod (make_expr (to_sym "MakeExpression") (list2 DontCare DontCare)) compile_make_expr)
     (add_compiler mod (make_expr DefineVariable (list2 symT DontCare)) compile_define_variable)
-    (add_compiler mod (make_expr DefineFunction (list2 symT DontCare)) compile_append_function)
+    (add_compiler mod (make_expr DefineFunction (list2 symT DontCare)) compile_define_function)
     (add_compiler mod (headP Symbol) compile_var)
     (add_compiler mod (make_expr Apply (list2 DontCare listT)) compile_apply)
 
@@ -946,10 +977,10 @@
     (add_compiler mod (make_expr (to_sym "Return") (list1 DontCare)) compile_return)
     (add_compiler mod (make_expr (to_sym "Equal") (list2 DontCare DontCare)) compile_eq)
     (add_compiler mod (make_expr (to_sym "NotEqual") (list2 DontCare DontCare)) compile_ne)
-    (add_compiler mod (make_expr (to_sym "Assign") (list2 symT DontCare)) compile_assign)
-    (add_compiler mod (make_expr (to_sym "Lambda") (list2 DontCare DontCare)) compile_lambda_1arg)
-    (add_compiler mod (make_expr (to_sym "Lambda") (list2 tupleT DontCare)) compile_lambda)
-    (add_compiler mod (make_expr (to_sym "Bind") (list2 DontCare DontCare)) compile_bind)
+    (add_compiler mod (make_expr Assign (list2 symT DontCare)) compile_assign)
+    (add_compiler mod (make_expr Lambda (list2 DontCare DontCare)) compile_lambda_1arg)
+    (add_compiler mod (make_expr Lambda (list2 tupleT DontCare)) compile_lambda)
+    (add_compiler mod (make_expr Bind (list2 DontCare DontCare)) compile_bind)
 
     ))
 
