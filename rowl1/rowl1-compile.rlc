@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-01-26 02:05:47 nineties $
+; $Id: rowl1-compile.rlc 2012-01-26 02:32:02 nineties $
 ;
 
 (import "rlvm-compile")
@@ -623,19 +623,24 @@
         (if (== ifelse Nil)
             (do
                 (compile asm mod cnd)
+                (put_nil asm mod)
             )
             (do
                 (var exit_lbl (fresh_label asm))
+                (put_nil asm mod)
                 (compile asm mod cnd)
                 (put_if_true asm exit_lbl)
+                (put_drop asm mod)
                 (compile asm mod ifelse)
                 (set_label asm exit_lbl)
             ))
         (if (== ifelse Nil)
             (do
                 (var exit_lbl (fresh_label asm))
+                (put_nil asm mod)
                 (compile asm mod cnd)
                 (put_if_false asm exit_lbl)
+                (put_drop asm mod)
                 (compile asm mod ifthen)
                 (set_label asm exit_lbl)
             )
