@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2012-01-26 12:08:49 nineties $
+; $Id: rowl1-matching.rlc 2012-01-26 22:18:30 nineties $
 ;
 
 (import "rlvm-compile")
@@ -15,9 +15,11 @@
 (import "rowl1-assemble")
 (import "rowl1-compile")
 
-; pattern matrix (((p11 p12 .. ) . e1) ((p21 p22 ..) . e2) ..)
+; pattern matrix (((p11 p12 .. ) e1 g1) ((p21 p22 ..) e2 g2) ..)
 
-(var varP   (to_sym "%Var"))
+(var dontcareP (to_sym "%DontCare"))
+(var varP      (to_sym "%Var"))
+(var headP     (to_sym "%HeadPattern"))
 
 (export fun compile_matching (loc name def) (
     (var ty (node_type def))
@@ -86,27 +88,33 @@
 (fun construct_row (len def) (
     (var args (field_get def 2))
     (var code (field_get def 3))
+    (var guard (field_get def 4))
     (= args (setup_args len args))
-    (return (cons args code))
+    (return (list3 args code guard))
     ))
 
 (fun setup_args (len args) (
     (if (== len 0) (return 0))
-    (if (! args) (return (diag_list len DontCare)))
+    (if (! args) (return (diag_list len dontcareP)))
     (return (cons (setup_pat (car args)) (setup_args (- len 1) (cdr args))))
     ))
 
 (fun setup_pat (pat) (
     (var hd (expr_head pat))
     (if (== pat DontCare)
-        (return DontCare)
+        (return dontcareP)
         )
     (if (== hd Symbol) (do
         (return (make_expr varP (list1 pat)))
         ))
-    (if (|| (== hd Int) (|| (== hd String) (== hd Domain)))
+    (if (|| (== hd Int) (== hd String))
         (return pat)
         )
+    (if (== hd Domain) (do
+        (var lhs (setup_pat (expr_arg pat 0)))
+        (var dom (expr_arg pat 1))
+        (return (make_expr headP (list2 lhs dom)))
+        ))
     (if (== hd List)
         (return (setup_pat_list pat))
         )
@@ -136,7 +144,7 @@
 
 (fun qquote_pat (pat level) (
     (var hd (expr_head pat))
-    (if (|| (== hd Symbol) (|| (== hd Int) (|| (== hd String) (== hd Domain))))
+    (if (|| (== hd Symbol) (|| (== hd Int) (== hd String)))
         (return pat)
         )
     (if (== hd List)
@@ -145,8 +153,8 @@
     (if (== hd Unquote) (do
         (if (== level 0)
             (return (setup_pat (expr_arg pat 0)))
+            (return (qquote_pat (expr_arg pat 0) (- level 1)))
             )
-        (-= level 1)
         )
     (if (== hd QuasiQuote)
         (+= level 1)
@@ -155,30 +163,25 @@
     (return (make_expr_user hd (qquote_pat_list args level)))
     ))
 
-; unifty length of patterns
-(fun unify_length (pats) (
-    (var max (max_length pats))
-    (output_string stderr "max length:")
-    (output_int stderr max)
-    (output_char stderr '\n')
-    (return pats)
-    ))
-
-(fun max_length (pats) (
-    (if (! pats) (return 0))
-    (var len1 (unbox (caaar pats)))
-    (var len2 (max_length (cdr pats)))
-    (if (> len1 len2)
-        (return len1)
-        (return len2)
-        )
-    ))
-
 (fun compile_matching_main (asm args pats) (
     (if (== (caar pats) 0) (do
-        (var code (cdr (car pats)))
-        (put_push asm code)
-        (put_jjump asm)
+        (var func (car pats))
+        (var code (list_at func 1))
+        (var guard (list_at func 2))
+        (if guard
+            (do
+                (var guard_failed (fresh_label asm))
+                (put_code asm guard)
+                (put_push asm true)
+                (put_if_ne asm guard_failed)
+                (put_push asm code)
+                (put_jjump asm)
+                (set_label asm guard_failed)
+            )
+            (do
+                (put_push asm code)
+                (put_jjump asm)
+            ))
         return
         ))
     (var x (split_pattern_matrix pats)) ; (single . remain)
@@ -191,7 +194,7 @@
 (fun compile_matching_single (asm args pats) (
     (var p (caaar pats))
     (var hd (expr_head p))
-    (if (== p DontCare) (do
+    (if (== p dontcareP) (do
         (= pats (shift_pat pats))
         (compile_matching_main asm (cdr args)  pats)
         return
@@ -225,7 +228,7 @@
         (set_label asm check_failed)
         return
         ))
-    (if (== hd Domain) (do
+    (if (== hd headP) (do
         (var pat (expr_arg_symbol p 1))
         (var check_failed (fresh_label asm))
         (compile_operand asm (car args))
@@ -461,7 +464,7 @@
     (if (== hd varP) (return (split_any pats)))
     (if (== hd Int) (return (split_int_pat pats)))
     (if (== hd String) (return (split_string_pat pats)))
-    (if (== hd Domain) (return (split_head_pat (expr_arg_symbol p 1) pats)))
+    (if (== hd headP) (return (split_head_pat (expr_arg_symbol p 1) pats)))
     (if (== hd Symbol) (return (split_symbol_pat 0 pats)))
     (if (== hd List) (return (split_list_pat pats)))
     (return (split_composite_pat pats))
@@ -471,7 +474,7 @@
     (var n 1)
     (var orig pats)
     (= pats (cdr pats))
-    (while (&& pats (|| (== (caaar pats) DontCare) (== (expr_head (caaar pats)) varP))) (do
+    (while (&& pats (|| (== (caaar pats) dontcareP) (== (expr_head (caaar pats)) varP))) (do
         (= pats (cdr pats))
         (incr n)
         ))
@@ -504,7 +507,7 @@
     ))
 
 (fun same_head_pat (hd node) (
-    (if (&& (== (expr_head node) Domain) (== (expr_arg_symbol node 1) hd))
+    (if (&& (== (expr_head node) headP) (== (expr_arg_symbol node 1) hd))
         (return @TRUE)
         (return @FALSE)
         )
@@ -622,7 +625,7 @@
         )
     (output_char stderr '(')
     (while args (do
-        (pretty_print stderr (car args))
+        (pretty_print_full stderr (car args))
         (= args (cdr args))
         (if args (output_string stderr ", "))
         ))

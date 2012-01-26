@@ -1,6 +1,6 @@
 # Copyright (C) 2010 nineties
 #
-# $Id: lib/rowl/syntax.ab 2012-01-26 13:05:50 nineties $
+# $Id: lib/rowl/syntax.ab 2012-01-26 22:03:00 nineties $
 
 # Syntax definition of rowl language
 
@@ -13,11 +13,11 @@ infixr Qualified    "::" 1
 prefix Unquote      "!"  3
 prefix Quote        "\\" 3
 prefix QuasiQuote   "`"  3
-infixl Domain       "@"  4
+infixl Domain       "@"  13
 infixr Define       ":"  19
 infixr Rewrite      "=>" 20
-infixr Lambda       "->" 13
-infixr Bind         "|"  14
+infixr Lambda       "->" 14
+infixr Bind         "|"  15
 
 prefix UnaryPlus    "+"  5
 prefix UnaryMinus   "-"  5
@@ -52,6 +52,9 @@ Rewrite = (x => y) -> `(Rewrite = (!x -> Rewrite(!y)) | Rewrite)
 
 Apply{f@Symbol, args@List}: body
     => `DefineFunction{!f, !MakeExpression{\Tuple,args} -> !body}
+
+`(Apply{!(f@Symbol), !(args@List)} @ !cond): body
+    => `DefineFunction{!f, !MakeExpression{\Tuple,args} @ !cond -> !body}
 
 x@Symbol: value
     => `DefineVariable{!x, !value}
