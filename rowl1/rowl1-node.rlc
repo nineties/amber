@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2012-01-26 13:07:21 nineties $
+; $Id: rowl1-node.rlc 2012-01-26 22:37:35 nineties $
 ;
 
 (import "rlvm-compile")
@@ -341,6 +341,11 @@
         (output_string stderr "the 2nd argument of MakeExpression must be a List\n")
         (exit 1)
         ))
+
+    ; special case : Tuple{x} is equal to x
+    (if (&& (== head Tuple) (== (list_len args) 1))
+        (return (car args))
+        )
     (return (variant @ExprE 2 head args))
     ))
 
@@ -359,6 +364,11 @@
 (export fun unquote (expr) (
     (return (make_expr Unquote (list1 expr)))
     ))
+
+(export fun make_ifelse (cnd then else) (
+	(return (make_expr Else (list2 (make_expr If (list2 cnd then)) else)))
+	))
+
 ; patterns
 (export fun domainP (sym) (
     (return (make_expr Domain (list2 DontCare sym)))

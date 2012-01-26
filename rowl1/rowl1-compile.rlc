@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-01-26 12:22:01 nineties $
+; $Id: rowl1-compile.rlc 2012-01-26 22:37:55 nineties $
 ;
 
 (import "rlvm-compile")
@@ -147,10 +147,10 @@
     (return tbl)
     ))
 
-(fun make_function (args code) (
+(fun make_function (args code guard) (
     (var arity (list_len args))
     (= args (cons (box arity) args))
-    (return (variant @FunctionE 3 0 args code))
+    (return (variant @FunctionE 4 0 args code guard))
     ))
 
 (fun make_bound (fun1 fun2) (
@@ -269,7 +269,7 @@
     ))
 
 (var max_lvar_idx 0)
-(fun compile_function (asm mod args body) (
+(fun compile_function (asm_body asm_guard mod args body guard) (
     ; XXX: do closure conversion
     ;(var fv (free_variables body))
     ;(delete_args fv args)
@@ -281,8 +281,11 @@
 
     (push_varscope mod)
     (setup_args (get_vartable mod) args)
-    (var cnt_addr (get_address asm))
-    (put_allocate asm 0)
+
+    (if (!= guard true) (compile asm_guard mod guard))
+
+    (var cnt_addr (get_address asm_body))
+    (put_allocate asm_body 0)
 
     ; closure conversion
     ;(var vtbl (make_symtable 10))
@@ -293,9 +296,10 @@
     (= max_lvar_idx 0)
     (reset_variable_count mod)
 
-    (compile asm mod body)
-    (put_ireturn asm)
-    (put_operand_byte asm (+ cnt_addr 1) (+ max_lvar_idx 1))
+    (compile asm_body mod body)
+    (put_ireturn asm_body)
+    (put_operand_byte asm_body (+ cnt_addr 1) (+ max_lvar_idx 1))
+
     (pop_varscope mod)
 
     (= max_lvar_idx save_max_lvar_idx)
@@ -326,8 +330,8 @@
             (var head (expr_arg_symbol arg 1))
             (var v (expr_arg_symbol arg 0))
             (symtable_add tbl v obj)
+            return
             ))
-        return
         ))
     (if (== argty List) (do
         (var idx 0)
@@ -342,10 +346,10 @@
         return
         )
     (if (== argty Unquote) 
-        (-= level 1)
+        (return (setup_arg tbl obj (expr_arg arg 0) (- level 1)))
         )
     (if (== argty QuasiQuote)
-        (+= level 1)
+        (return (setup_arg tbl obj (expr_arg arg 0) (+ level 1)))
         )
     (var idx 0)
     (var args (expr_args arg))
@@ -540,13 +544,11 @@
         )
         return
         ))
-    (if (== hd Unquote) (do
-        (if (== level 0) (do
-            (compile asm mod (expr_arg expr 0))
-            return
-            ))
-        (-= level 1)
-        )
+    (if (== hd Unquote)
+        (if (== level 0)
+            (return (compile asm mod (expr_arg expr 0)))
+            (return (compile_qquote_main asm mod (expr_arg expr 0) (- level 1))) 
+            )
     (if (== hd QuasiQuote)
         (+= level 1)
         ))
@@ -847,18 +849,41 @@
     (set_label asm exit_lbl)
     ))
 
-(fun compile_lambda_main (asm mod args body) (
-    (var asm_func (make_assembler))
-    (compile_function asm_func mod args body)
-    (put_push asm (make_function args (get_code asm_func)))
+(fun compile_logical (asm mod expr) (
+	(compile asm mod (make_ifelse expr true false))
+	))
+
+(fun compile_lambda_main (asm mod args body guard) (
+    (var asm_body (make_assembler))
+    (if (== guard true)
+        (do
+            (compile_function asm_body 0 mod args body guard)
+            (put_push asm (make_function args (get_code asm_body) 0))
+        )
+        (do
+            (var asm_guard (make_assembler))
+            (compile_function asm_body asm_guard mod args body guard)
+            (put_push asm (make_function args (get_code asm_body) (get_code asm_guard)))
+        ))
     ))
 
 (fun compile_lambda (asm mod expr) (
-    (compile_lambda_main asm mod (expr_args (expr_arg expr 0)) (expr_arg expr 1))
-    ))
-
-(fun compile_lambda_1arg (asm mod expr) (
-    (compile_lambda_main asm mod (list1 (expr_arg expr 0)) (expr_arg expr 1))
+    (var lhs (expr_arg expr 0))
+    (var body (expr_arg expr 1))
+    (var hd (expr_head lhs))
+    (if (== hd Tuple)
+        (compile_lambda_main asm mod (expr_args lhs) body true)
+    (if (!= hd Domain)
+        (compile_lambda_main asm mod (list1 lhs) body true)
+        (do
+            (var guard (expr_arg lhs 1))
+            (= lhs (expr_arg lhs 0))
+            (= hd (expr_head lhs))
+            (if (== hd Tuple)
+                (compile_lambda_main asm mod (expr_args lhs) body guard)
+                (compile_lambda_main asm mod (list1 lhs) body guard)
+                )
+        )))
     ))
 
 (fun compile_bind (asm mod expr) (
@@ -942,35 +967,35 @@
     (var asm (make_assembler))
     (compile_simple_function asm 1 func @TRUE)
     (var code (get_code asm))
-    (append_function mod sym (make_function 0 code))
+    (append_function mod sym (make_function 0 code 0))
     ))
 
 (export fun add_builtin_function1 (mod sym pat func) (
     (var asm (make_assembler))
     (compile_simple_function asm 1 func @TRUE)
     (var code (get_code asm))
-    (append_function mod sym (make_function (list1 pat) code))
+    (append_function mod sym (make_function (list1 pat) code 0))
     ))
 
 (export fun add_builtin_function2 (mod sym pat1 pat2 func) (
     (var asm (make_assembler))
     (compile_simple_function asm 2 func @TRUE)
     (var code (get_code asm))
-    (append_function mod sym (make_function (list2 pat1 pat2) code))
+    (append_function mod sym (make_function (list2 pat1 pat2) code 0))
     ))
 
 (export fun add_builtin_function3 (mod sym pat1 pat2 pat3 func) (
     (var asm (make_assembler))
     (compile_simple_function asm 3 func @TRUE)
     (var code (get_code asm))
-    (append_function mod sym (make_function (list3 pat1 pat2 pat3) code))
+    (append_function mod sym (make_function (list3 pat1 pat2 pat3) code 0))
     ))
 
 (export fun add_builtin_function4 (mod sym pat1 pat2 pat3 pat4 func) (
     (var asm (make_assembler))
     (compile_simple_function asm 4 func @TRUE)
     (var code (get_code asm))
-    (append_function mod sym (make_function (list4 pat1 pat2 pat3 pat4) code))
+    (append_function mod sym (make_function (list4 pat1 pat2 pat3 pat4) code 0))
     ))
 
 (export fun setup_builtin_compilers (mod) (
@@ -999,8 +1024,8 @@
     (add_compiler mod (domainP Symbol) compile_var)
     (add_compiler mod (make_expr Apply (list2 DontCare listT)) compile_apply)
 
-    (add_compiler mod (quote (quote DontCare)) compile_quote)
-    (add_compiler mod (quote (qquote DontCare)) compile_qquote)
+    (add_compiler mod (qquote (quote (unquote DontCare))) compile_quote)
+    (add_compiler mod (qquote (qquote (unquote (unquote DontCare)))) compile_qquote)
 
     (add_compiler mod (domainP Int) compile_int)
     (add_compiler mod (domainP String) compile_string)
@@ -1009,15 +1034,16 @@
 
     (add_compiler mod (domainP Block) compile_block)
     (add_compiler mod (make_expr If (list2 DontCare DontCare)) compile_if)
-    (add_compiler mod (make_expr Else (list2
-        (make_expr If (list2 DontCare DontCare)) DontCare)) compile_ifelse)
+	(add_compiler mod (make_ifelse DontCare DontCare DontCare) compile_ifelse)
     (add_compiler mod (make_expr While (list2 DontCare DontCare)) compile_while)
     (add_compiler mod (make_expr (to_sym "Return") (list1 DontCare)) compile_return)
     (add_compiler mod (make_expr (to_sym "Equal") (list2 DontCare DontCare)) compile_eq)
     (add_compiler mod (make_expr (to_sym "NotEqual") (list2 DontCare DontCare)) compile_ne)
+	(add_compiler mod (make_expr LogicalAnd (list2 DontCare DontCare)) compile_logical)
+	(add_compiler mod (make_expr LogicalOr (list2 DontCare DontCare)) compile_logical)
+
     (add_compiler mod (make_expr Assign (list2 DontCare DontCare)) compile_assign)
-    (add_compiler mod (make_expr Lambda (list2 DontCare DontCare)) compile_lambda_1arg)
-    (add_compiler mod (make_expr Lambda (list2 tupleT DontCare)) compile_lambda)
+    (add_compiler mod (make_expr Lambda (list2 DontCare DontCare)) compile_lambda)
     (add_compiler mod (make_expr Bind (list2 DontCare DontCare)) compile_bind)
 
     ))
