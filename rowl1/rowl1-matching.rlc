@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2012-01-19 21:40:31 nineties $
+; $Id: rowl1-matching.rlc 2012-01-26 12:08:49 nineties $
 ;
 
 (import "rlvm-compile")
@@ -104,7 +104,7 @@
     (if (== hd Symbol) (do
         (return (make_expr varP (list1 pat)))
         ))
-    (if (|| (== hd Int) (|| (== hd String) (== hd HeadP)))
+    (if (|| (== hd Int) (|| (== hd String) (== hd Domain)))
         (return pat)
         )
     (if (== hd List)
@@ -136,7 +136,7 @@
 
 (fun qquote_pat (pat level) (
     (var hd (expr_head pat))
-    (if (|| (== hd Symbol) (|| (== hd Int) (|| (== hd String) (== hd HeadP))))
+    (if (|| (== hd Symbol) (|| (== hd Int) (|| (== hd String) (== hd Domain))))
         (return pat)
         )
     (if (== hd List)
@@ -225,7 +225,7 @@
         (set_label asm check_failed)
         return
         ))
-    (if (== hd HeadP) (do
+    (if (== hd Domain) (do
         (var pat (expr_arg_symbol p 1))
         (var check_failed (fresh_label asm))
         (compile_operand asm (car args))
@@ -461,7 +461,7 @@
     (if (== hd varP) (return (split_any pats)))
     (if (== hd Int) (return (split_int_pat pats)))
     (if (== hd String) (return (split_string_pat pats)))
-    (if (== hd HeadP) (return (split_head_pat (expr_arg_symbol p 1) pats)))
+    (if (== hd Domain) (return (split_head_pat (expr_arg_symbol p 1) pats)))
     (if (== hd Symbol) (return (split_symbol_pat 0 pats)))
     (if (== hd List) (return (split_list_pat pats)))
     (return (split_composite_pat pats))
@@ -504,7 +504,7 @@
     ))
 
 (fun same_head_pat (hd node) (
-    (if (&& (== (expr_head node) HeadP) (== (expr_arg_symbol node 1) hd))
+    (if (&& (== (expr_head node) Domain) (== (expr_arg_symbol node 1) hd))
         (return @TRUE)
         (return @FALSE)
         )
