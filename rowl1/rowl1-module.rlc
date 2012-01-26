@@ -2,21 +2,22 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-module.rlc 2012-01-26 02:01:13 nineties $
+; $Id: rowl1-module.rlc 2012-01-26 11:39:03 nineties $
 ;
 
 ; Module can be considered as a re-entrant scope.
 ; rowl (Amber) has a two kinds of modules; named module and anonymous module.
 ; 
 ; Fields:
-; - sym      : name of the module (nil for anonymous module)
-; - super    : a link to module where this module is defined.
-; - imports  : list of imported modules.
-; - children : sub-modules in module hierarchy.
-; - vtbl     : variable table
-; - optbl    : operator table (string representation -> operator)
-; - rptbl    : operator table (operator head -> string representation)
-; - mark     : visited mark
+; - sym       : name of the module (nil for anonymous module)
+; - super     : a link to module where this module is defined.
+; - imports   : list of imported modules.
+; - children  : sub-modules in module hierarchy.
+; - vtbl      : variable table
+; - optbl     : operator table (string representation -> operator)
+; - rptbl     : operator table (operator head -> string representation)
+; - count     : local variable index counter
+; - mark      : visited mark
 
 (import "rlvm-compile")
 (import "rowl1-types")
@@ -30,7 +31,7 @@
 (extern object current_loc)
 
 (export fun make_module (sym super) (
-    (var mod (variant @ModuleE 7
+    (var mod (variant @ModuleE 8
         sym
         super
         0                   ; list of imported modules
@@ -38,6 +39,7 @@
         (make_symtable 10)  ; variable table
         (make_idtable)      ; string represtation -> operator
         (make_symtable 10)  ; head -> string representation of operator
+        (list1 (box 0))     ; local variable index counter
         0                   ; visited-mark
         ))
     (if super (do
@@ -65,8 +67,8 @@
     (field_set curmod 3 (cons mod (list_delete mod (field_get curmod 3))))
     ))
 
-(export fun import_module (curmod sig) (
-    (var mod (find_module current_loc curmod sig @FALSE))
+(export fun import_module (loc curmod sig) (
+    (var mod (find_module loc curmod sig @FALSE))
     (add_module curmod mod)
     ))
 
@@ -74,15 +76,24 @@
     (symtable_add (field_get mod 5) sym v)
     ))
 
-(export fun lookup_symbol (mod sym) (
-    (return (lookup_symbol_iter (fresh_mark) mod sym))
+(export fun lookup_symbol (mod sig) (
+    (var hd (expr_head sig))
+    (if (== hd Symbol)
+        (return (lookup_symbol_iter (fresh_mark) mod sig))
+    (if (== hd Qualified)
+        (return (lookup_symbol
+            (find_module current_loc mod (expr_arg sig 0) @FALSE) (expr_arg sig 1)))
+        ))
+    (output_error stderr current_loc)
+    (output_string stderr "invalid argument for lookup_symbol\n")
+    (exit 1)
     ))
 
 (fun lookup_symbol_iter (mark mod sym) (
     (while mod (do
         ; check visited-mark
-        (if (== (field_get mod 8) mark) break)
-        (field_set mod 8 mark)
+        (if (== (field_get mod 9) mark) break)
+        (field_set mod 9 mark)
 
         ; First, lookup variable table.
         (var tbl (field_get mod 5))
@@ -112,12 +123,28 @@
     (return (symtable_find tbl sym))
     ))
 
+(export fun get_variable_count (mod) (
+    (return (unbox (car (field_get mod 8))))
+    ))
+
+(export fun reset_variable_count (mod) (
+    (setcar (field_get mod 8) (box 0))
+    ))
+
+(export fun incr_variable_count (mod) (
+    (var counters (field_get mod 8))
+    (setcar counters (+ (car counters) 2)) ; counters are boxed
+    ))
+
 (export fun push_varscope (mod) (
     (symtable_push (field_get mod 5))
+    (var counters (field_get mod 8))
+    (field_set mod 8 (cons (car counters) counters))
     ))
 
 (export fun pop_varscope (mod) (
     (symtable_pop (field_get mod 5))
+    (field_set mod 8 (cdr (field_get mod 8)))
     ))
 
 ; add definition of module variable `sym' to `mod'.
@@ -161,8 +188,8 @@
     ))
     
 (fun update_display_iter (mark mod sym box) (
-    (if (== (field_get mod 8) mark) return)
-    (field_set mod 8 mark)
+    (if (== (field_get mod 9) mark) return)
+    (field_set mod 9 mark)
     (var vtbl (field_get mod 5))
     (var display (symtable_find_global vtbl sym))
     (if (&& display (== (expr_arg display 1) false))
@@ -178,7 +205,7 @@
 (export fun find_module (loc curmod sig createp) (
     (var hd (expr_head sig))
     (if (== hd Symbol) (do
-        (var mod (lookup_symbol_local curmod sig))
+        (var mod (lookup_symbol curmod sig))
         (if (&& mod (!= (node_type mod) @ModuleE)) (do
             (output_loc stderr loc)
             (output_string stderr "variable ")
@@ -222,10 +249,6 @@
     (return (field_get mod 5))
     ))
 
-(export fun count_local_variable (mod) (
-    (return (symtable_count_local (field_get mod 5)))
-    ))
-
 (export fun add_operator (mod repr head op) (
     (var optbl (field_get mod 6))
     (var rptbl (field_get mod 7))
@@ -240,8 +263,8 @@
 (fun lookup_operator_iter (mark mod repr) (
     (while mod (do
         ; check visited-mark
-        (if (== (field_get mod 8) mark) break)
-        (field_set mod 8 mark)
+        (if (== (field_get mod 9) mark) break)
+        (field_set mod 9 mark)
 
         ; First, lookup local operator table.
         (var tbl (field_get mod 6))
@@ -268,8 +291,8 @@
 (fun lookup_operator_from_head_iter (mark mod head) (
     (while mod (do
         ; check visited-mark
-        (if (== (field_get mod 8) mark) break)
-        (field_set mod 8 mark)
+        (if (== (field_get mod 9) mark) break)
+        (field_set mod 9 mark)
 
         ; First, lookup local operator table.
         (var tbl (field_get mod 7))

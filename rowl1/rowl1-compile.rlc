@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-01-26 02:32:02 nineties $
+; $Id: rowl1-compile.rlc 2012-01-26 11:49:54 nineties $
 ;
 
 (import "rlvm-compile")
@@ -268,6 +268,7 @@
     (compile_simple_call asm 2 make_expr_user)
     ))
 
+(var max_lvar_idx 0)
 (fun compile_function (asm mod args body) (
     ; XXX: do closure conversion
     ;(var fv (free_variables body))
@@ -288,10 +289,16 @@
     ;(collect_args vtbl args)
     ;(close vtbl body)
 
+    (var save_max_lvar_idx max_lvar_idx)
+    (= max_lvar_idx 0)
+    (reset_variable_count mod)
+
     (compile asm mod body)
     (put_ireturn asm)
-    (put_operand_byte asm (+ cnt_addr 1) (count_local_variable mod))
+    (put_operand_byte asm (+ cnt_addr 1) (+ max_lvar_idx 1))
     (pop_varscope mod)
+
+    (= max_lvar_idx save_max_lvar_idx)
     ))
 
 (fun setup_args (tbl args) (
@@ -399,7 +406,10 @@
             (put_setcar asm)
         )
         (do
-            (var idx (count_local_variable mod))
+            (var idx (get_variable_count mod))
+            (if (> idx max_lvar_idx) (= max_lvar_idx idx))
+            (incr_variable_count mod)
+
             (compile asm mod val)
             (put_store_lvar asm idx)
             (add_symbol mod sym (make_lvar idx))
@@ -571,21 +581,24 @@
 
 (fun compile_block (asm mod expr) (
     (var exprs (expr_args expr))
+    (push_varscope mod)
     (if (in_top_scope mod)
         (do
-            (push_varscope mod)
+            (var save_max_lvar_idx max_lvar_idx)
+            (= max_lvar_idx 0)
+            (reset_variable_count mod)
+
             (var cnt_addr (get_address asm))
             (put_allocate asm 0)
             (compile_block_body asm mod exprs)
-            (put_operand_byte asm (+ cnt_addr 1) (count_local_variable mod))
-            (pop_varscope mod)
+            (put_operand_byte asm (+ cnt_addr 1) (+ max_lvar_idx 2))
+
+            (= max_lvar_idx save_max_lvar_idx)
         )
         (do
-            (push_varscope mod)
             (compile_block_body asm mod exprs)
-            (pop_varscope mod)
-        )
-        )
+        ))
+    (pop_varscope mod)
     ))
 
 (fun put_if_true (asm lbl) (
@@ -755,7 +768,7 @@
     ))
 
 (fun compile_assign (asm mod expr) (
-    (var lhs (expr_arg_symbol expr 0))
+    (var lhs (expr_arg expr 0))
     (var rhs (expr_arg expr 1))
     (compile asm mod rhs)
     (var v (lookup_symbol mod lhs))
@@ -960,6 +973,7 @@
     (add_compiler mod (make_expr DefPostfix (list3 symT stringT intT)) do_nothing)
     (add_compiler mod (make_expr DefConstr (list2 symT stringT)) do_nothing)
     (add_compiler mod (make_expr DefCommand (list2 symT stringT)) do_nothing)
+    (add_compiler mod (make_expr Import (list1 DontCare)) do_nothing)
 
     (add_compiler mod (make_expr Qualified (list2 symT DontCare)) compile_qualified)
 
@@ -982,7 +996,7 @@
     (add_compiler mod (make_expr (to_sym "Return") (list1 DontCare)) compile_return)
     (add_compiler mod (make_expr (to_sym "Equal") (list2 DontCare DontCare)) compile_eq)
     (add_compiler mod (make_expr (to_sym "NotEqual") (list2 DontCare DontCare)) compile_ne)
-    (add_compiler mod (make_expr Assign (list2 symT DontCare)) compile_assign)
+    (add_compiler mod (make_expr Assign (list2 DontCare DontCare)) compile_assign)
     (add_compiler mod (make_expr Lambda (list2 DontCare DontCare)) compile_lambda_1arg)
     (add_compiler mod (make_expr Lambda (list2 tupleT DontCare)) compile_lambda)
     (add_compiler mod (make_expr Bind (list2 DontCare DontCare)) compile_bind)

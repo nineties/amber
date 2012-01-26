@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-parse.rlc 2012-01-26 07:18:11 nineties $
+; $Id: rowl1-parse.rlc 2012-01-26 07:57:07 nineties $
 ;
 
 (import "rlvm-compile")
@@ -65,16 +65,18 @@
     ))
 
 (fun parse_expr_top (tok offs) (
+    (var e 0)
     (if (== tok @TOK_COMMAND) (do
         (var op (get_token_boxed))
         (var head (field_get op 1))
         (= tok (lex_sub offs))
         (if (== tok @TOK_END)
-            (return (make_expr_user head 0))
-            (return (make_expr_user head (list1 (parse_expr tok offs @FALSE))))
+            (= e (make_expr_user head 0))
+            (= e (make_expr_user head (list1 (parse_expr tok offs @FALSE))))
             )
-        ))
-    (var e (parse_expr tok offs @FALSE))
+        )
+        (= e (parse_expr tok offs @FALSE))
+        )
     (evaluate_parser_command e)
     (return e)
     ))
@@ -93,7 +95,9 @@
         (add_constr (expr_arg_symbol e 0) (expr_arg_string e 1))
     (if (== ty DefCommand)
         (add_command (expr_arg_symbol e 0) (expr_arg_string e 1))
-        ))))))
+    (if (== ty Import)
+        (import_module (get_loc) current_mod (expr_arg e 0))
+        )))))))
     ))
 
 (fun parse_expr (tok offs in_seq) (
