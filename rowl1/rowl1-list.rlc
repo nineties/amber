@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2011-11-07 19:24:24 nineties $
+; $Id: rowl1-list.rlc 2012-01-26 12:20:34 nineties $
 ;
 
 (import "rlvm-compile")
@@ -16,16 +16,6 @@
 (import "rowl1-assemble")
 
 (extern object current_loc)
-
-(export fun compile_list (asm env expr) (
-    (if (== expr 0)
-        (put_nil asm)
-        (do
-            (compile asm env (cdr expr))
-            (compile asm env (car expr))
-            (put_cons asm)
-        ))
-    ))
 
 (fun index_out_of_range () (
     (output_error stderr current_loc)
@@ -57,9 +47,8 @@
 
 (extern object exec_env)
 (export fun setup_list (mod) (
-    (var ListT (headP List))
-    (var IntT (headP Int))
-    (add_compiler mod (headP List) compile_list)
+    (var ListT (domainP List))
+    (var IntT (domainP Int))
     (add_builtin_function2 mod Subscript ListT IntT ls_at)
     (add_builtin_function1 mod (to_sym "length") ListT ls_length)
     (add_builtin_function2 mod (to_sym "cons") DontCare ListT ls_cons)

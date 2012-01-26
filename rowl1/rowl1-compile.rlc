@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-01-26 12:08:39 nineties $
+; $Id: rowl1-compile.rlc 2012-01-26 12:22:01 nineties $
 ;
 
 (import "rlvm-compile")
@@ -567,6 +567,22 @@
     (put_push asm val)
     ))
 
+(fun compile_list (asm mod expr) (
+    (if (== expr 0)
+        (put_nil asm)
+        (do
+            (compile asm mod (cdr expr))
+            (compile asm mod (car expr))
+            (put_cons asm)
+        ))
+    ))
+
+(fun compile_tuple (asm mod expr) (
+    (compile_list asm mod (expr_args expr))
+    (put_push asm Tuple)
+    (compile_simple_call asm 2 make_expr_user)
+    ))
+
 (fun compile_block_body (asm mod exprs) (
     (if (! exprs) (do
         (put_nil asm)
@@ -958,12 +974,12 @@
     ))
 
 (export fun setup_builtin_compilers (mod) (
-    (var symT (headP Symbol))
-    (var listT (headP List))
-    (var tupleT (headP Tuple))
-    (var intT (headP Int))
-    (var stringT (headP String))
-    (var blockT (headP Block))
+    (var symT (domainP Symbol))
+    (var listT (domainP List))
+    (var tupleT (domainP Tuple))
+    (var intT (domainP Int))
+    (var stringT (domainP String))
+    (var blockT (domainP Block))
     (var locT (make_expr Loc (list3 stringT intT intT)))
     (add_compiler mod (make_expr Located (list2 locT DontCare)) compile_located)
 
@@ -980,15 +996,18 @@
     (add_compiler mod (make_expr (to_sym "MakeExpression") (list2 DontCare DontCare)) compile_make_expr)
     (add_compiler mod (make_expr DefineVariable (list2 symT DontCare)) compile_define_variable)
     (add_compiler mod (make_expr DefineFunction (list2 symT DontCare)) compile_define_function)
-    (add_compiler mod (headP Symbol) compile_var)
+    (add_compiler mod (domainP Symbol) compile_var)
     (add_compiler mod (make_expr Apply (list2 DontCare listT)) compile_apply)
 
     (add_compiler mod (quote (quote DontCare)) compile_quote)
     (add_compiler mod (quote (qquote DontCare)) compile_qquote)
 
-    (add_compiler mod (headP Int) compile_int)
-    (add_compiler mod (headP String) compile_string)
-    (add_compiler mod (headP Block) compile_block)
+    (add_compiler mod (domainP Int) compile_int)
+    (add_compiler mod (domainP String) compile_string)
+    (add_compiler mod (domainP List) compile_list)
+    (add_compiler mod (domainP Tuple) compile_tuple)
+
+    (add_compiler mod (domainP Block) compile_block)
     (add_compiler mod (make_expr If (list2 DontCare DontCare)) compile_if)
     (add_compiler mod (make_expr Else (list2
         (make_expr If (list2 DontCare DontCare)) DontCare)) compile_ifelse)
@@ -1004,7 +1023,7 @@
     ))
 
 (export fun add_compiler (mod pat func) (
-    (add_builtin_function3 mod Compile (headP Assembler) (headP Module) pat func)
+    (add_builtin_function3 mod Compile (domainP Assembler) (domainP Module) pat func)
     ))
 
     ))
