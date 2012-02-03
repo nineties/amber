@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-02-03 11:27:22 nineties $
+; $Id: rowl1-compile.rlc 2012-02-03 11:35:05 nineties $
 ;
 
 (import "rlvm-compile")
@@ -317,6 +317,16 @@
     (output_char stderr '\n')
     (exit 1)
     ))
+    ))
+
+(fun compile_error (asm mod expr) (
+    (output_error stderr current_loc)
+    (output_string stderr "Unknown expression: ")
+    (pretty_print stderr expr)
+    (output_string stderr " (fullform: ")
+    (pretty_print_full stderr expr)
+    (output_string stderr ")\n")
+    (exit 1)
     ))
 
 (fun compile_located (asm mod expr) (
@@ -1112,6 +1122,9 @@
     (var stringT (domainP String))
     (var blockT (domainP Block))
     (var locT (make_expr Loc (list3 stringT intT intT)))
+
+    (add_compiler mod DontCare compile_error)
+
     (add_compiler mod (make_expr Located (list2 locT DontCare)) compile_located)
 
     (add_compiler mod (make_expr DefInfixL (list3 symT stringT intT)) do_nothing)
