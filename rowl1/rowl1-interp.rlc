@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2012-01-26 13:06:41 nineties $
+; $Id: rowl1-interp.rlc 2012-02-03 11:24:43 nineties $
 ;
 
 (import "rlvm-compile")
@@ -69,7 +69,8 @@
     ))
 
 (fun rewrite (expr) (
-    (return (call1 current_mod Rewrite expr))
+    (var e (call1 current_mod Rewrite expr))
+    (return e)
     ))
 
 (fun interpret () (
@@ -117,19 +118,20 @@
     (return 0)
     ))
 
-(fun builtin_rewrite_args (args) (
-    (if (! args) (return 0))
-    (return (cons (rewrite (car args)) (builtin_rewrite_args (cdr args))))
-    ))
-
-(fun builtin_rewrite (expr) (
+(fun default_rewrite (expr) (
     (if (is_atom expr) (return expr))
     (var hd (expr_head expr))
-    (var args (builtin_rewrite_args (expr_args expr)))
-    (if (== hd List)
-        (return args)
-        (return (make_expr hd args))
-        )
+    (var args (expr_args expr))
+    (while args (do
+        (setcar args (rewrite (car args)))
+        (= args (cdr args))
+        ))
+    (return expr)
+    ))
+
+(fun rewrite_located (expr) (
+    (expr_arg_set expr 1 (rewrite (expr_arg expr 1)))
+    (return expr)
     ))
 
 (var include_dirs null)
@@ -196,7 +198,8 @@
 (fun setup_builtin_functions (mod) (
     (var symT (domainP Symbol))
     (var blockT (domainP Block))
-    (add_builtin_function1 mod Rewrite DontCare builtin_rewrite)
+    (add_builtin_function1 mod Rewrite DontCare default_rewrite)
+    (add_builtin_function1 mod Rewrite (domainP Located) rewrite_located)
     (add_builtin_function1 mod Eval DontCare default_eval)
     (add_builtin_function1 mod Eval (domainP Located) eval_located)
     (add_builtin_function1 mod Eval
