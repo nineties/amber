@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-02-04 03:27:26 nineties $
+; $Id: rowl1-compile.rlc 2012-02-05 13:20:06 nineties $
 ;
 
 (import "rlvm-compile")
@@ -17,7 +17,8 @@
 (import "rowl1-assemble")
 
 (var BuildClosure  (to_sym "%BuildClosure"))
-(var FieldRef      (to_sym "%FieldRef"))
+(var ClosureVar    (to_sym "%ClosureVar"))
+(var Field         (to_sym "%Field"))
 (var uninitialized (to_sym "%uninitialized"))
 (var noguard       (to_sym "%noguard"))
 
@@ -106,21 +107,19 @@
     (iter_args add_var expr tbl 0)
     ))
 
-(fun fv_iter_block (mod exprs fv) (
+(fun fv_iter_block (mod env exprs fv) (
     (if (! exprs) (return fv))
-    (= fv (fv_iter_block mod (cdr exprs) fv))
-    (return (fv_iter mod (car exprs) 0 fv))
+    (= fv (fv_iter_block mod env (cdr exprs) fv))
+    (return (fv_iter mod env (car exprs) 0 fv))
     ))
 
-(fun fv_iter (mod expr level fv) (
+(fun fv_iter (mod env expr level fv) (
     (var hd (expr_head expr))
     (if (== hd Symbol) (do
         (if (== level 0) (do
             (= fv (list_delete expr fv))
-            ;(var info (lookup_symbol mod expr))
-            ;(if (|| (! info) (== (expr_head info) ModuleVariable))
-            ;    return
-            ;    )
+            (var info (symtable_find env expr))
+            (if (! info) (return fv))
             (return (cons expr fv))
             ))
         (return fv)
@@ -128,15 +127,15 @@
     (if (is_atom expr) (return fv))
     (if (== level 0) (do
         (if (== hd DefineVariable) (do
-            (= fv (fv_iter mod (expr_arg expr 1) 0 fv))
+            (= fv (fv_iter mod env (expr_arg expr 1) 0 fv))
             (return (list_delete (expr_arg_symbol expr 0) fv))
             ))
         (if (== hd Lambda) (do
-            (= fv (fv_iter mod (expr_arg expr 1) 0 fv))
+            (= fv (fv_iter mod env (expr_arg expr 1) 0 fv))
             (return (delete_args (expr_arg expr 0) fv))
             ))
         (if (== hd Block) 
-            (return (fv_iter_block mod (expr_args expr) 0 fv))
+            (return (fv_iter_block mod env (expr_args expr) 0 fv))
             )
         ))
     (if (== hd Quote) (return fv))
@@ -144,20 +143,24 @@
     (if (== hd Unquote) (-= level 1)))
     (var args (expr_args expr))
     (while args (do
-        (= fv (fv_iter mod (car args) level fv))
+        (= fv (fv_iter mod env (car args) level fv))
         (= args (cdr args))
         ))
     (return fv)
     ))
 
-(fun free_variables (mod expr) (
-    (return (fv_iter mod expr 0 0))
+(fun free_variables (mod env expr) (
+    (return (fv_iter mod env expr 0 0))
+    ))
+
+(fun alloc_function (args code guard) (
+    (return (variant @FunctionE 4 0 args code guard))
     ))
 
 (fun make_function (args code guard) (
     (var arity (list_len args))
     (= args (cons (box arity) args))
-    (return (variant @FunctionE 4 0 args code guard))
+    (return (alloc_function args code guard))
     ))
 
 (fun make_bound (fun1 fun2) (
@@ -191,12 +194,14 @@
         (expr_arg_set expr 1 (close mod env (expr_arg expr 1)))
         (return expr)
         ))
-    (if (== hd Apply) (do
-        (var lhs (expr_arg expr 0))
-        (var args (expr_arg_list expr 1))
+    (if (== hd DefineVariable) (do
+        (var sym (expr_arg_symbol expr 0))
+        (symtable_add env sym sym)
+        (expr_arg_set expr 1 (close mod env (expr_arg expr 1)))
         (return expr)
         ))
     (if (== hd Block) (do
+        (symtable_push env)
         ; XXX: not correct
         (var exprs (expr_args expr))
         (while exprs (do
@@ -204,47 +209,61 @@
             (= exprs (cdr exprs))
             ))
         (return expr)
-        ))
-    (if (== hd DefineVariable) (do
-        (expr_arg_set expr 1 (close mod env (expr_arg expr 1)))
-        (return expr)
-        ))
-    (if (== hd Return) (do
-        (expr_arg_set expr 0 (close mod env (expr_arg expr 0)))
-        (return expr)
+        (symtable_pop env)
         ))
     (if (== hd Lambda) 
         (return (close_function mod env expr))
         )
+    (if (== hd Quote)
+        (return expr)
+        )
+    (if (== hd QuasiQuote) (do
+        (expr_arg_set expr 0 (close_qquote mod env (expr_arg expr 0) 0))
+        (return expr)
+        ))
+    (var args (expr_args expr))
+    (while args (do
+        (setcar args (close mod env (car args)))
+        (= args (cdr args))
+        ))
     (return expr)
     ))
 
-(fun add_arg (args new_arg) (
-    (var hd (expr_head args))
-    (if (== hd Tuple)
-        (return (make_expr Tuple (list_append (expr_args args) (list1 new_arg))))
-    (if (== hd Domain)
-        (return (make_expr Domain
-            (list2 (add_arg (expr_arg args 0) new_arg) (expr_arg args 1))))
-        (return (make_expr Tuple (list2 args new_arg)))
+(fun close_qquote (mod env expr level) (
+    (if (is_atom expr) (return expr))
+    (var hd (expr_head expr))
+    (if (== hd Unquote) (do
+        (if (== level 0) (do
+            (expr_arg_set expr 0 (close mod env (expr_arg expr 0)))
+            (return expr)
+            ))
+        (-= level 1)
+        )
+    (if (== hd QuasiQuote) 
+        (+= level 1)
         ))
+    (var args (expr_args expr))
+    (while args (do
+        (setcar args (close_qquote mod env (car args) level))
+        (= args (cdr args))
+        ))
+    (return expr)
     ))
 
 (fun close_function (mod env lam) (
     ; XXX: implementation is not completed
-    (var fv (free_variables mod lam))
+    (var fv (free_variables mod env lam))
     (if (! fv) (return lam))
-    (var tbl (make_closure_env (to_sym "%clos") fv))
+    (var tbl (make_closure_env ClosureVar fv))
     (expr_arg_set lam 1 (close mod tbl (expr_arg lam 1)))
-    (expr_arg_set lam 0 (add_arg (expr_arg lam 0) (to_sym "%clos")))
     (return (make_expr BuildClosure (list2 lam fv)))
     ))
 
 (fun make_closure_env (clos fv) (
     (var tbl (make_symtable 10))
-    (var i 1) ; reseve 1 for lambda object
+    (var i 1)
     (while fv (do
-        (symtable_add tbl (car fv) (make_expr FieldRef (list2 clos (box i))))
+        (symtable_add tbl (car fv) (make_expr Field (list2 clos (box i))))
         (+= i 1)
         (= fv (cdr fv))
         ))
@@ -469,6 +488,7 @@
 (fun compile_define_variable (asm mod expr) (
     (check_arg_size (symbol_name DefineVariable) 2 expr)
     (var sym (expr_arg_symbol expr 0))
+
     (var val (expr_arg expr 1))
     (var tbl (get_vartable mod))
     (check_redefinition mod sym)
@@ -577,6 +597,12 @@
     ))
 
 (fun compile_var (asm mod sym) (
+    (if (== sym ClosureVar) (do
+        ; closure is always placed to 1st local variable position.
+        (put_load_lvar asm 0)
+        return
+        ))
+
     (var v (lookup_symbol mod sym))
     (if (! v)
         ; `sym' is a module variable
@@ -987,18 +1013,33 @@
     (compile_simple_call asm 2 make_bound)
     ))
 
+(fun build_closure (lam clos) (
+    (var args (field_get lam 2))
+    (= args (cdr args)) ; here, args[0] is arity.
+    (var body (field_get lam 3))
+    (var guard (field_get lam 4))
+    (var asm (make_assembler))
+    (put_push asm clos)
+    (put_push asm body)
+    (put_jjump asm)
+    (var f (alloc_function args (get_code asm) guard))
+    (return f)
+    ))
+
 (fun compile_build_closure (asm mod expr) (
     (var lam (expr_arg expr 0))
     (var fv (list_reverse (expr_arg expr 1)))
     ; allocate free variables
-    (var clos_len 1)
+    (var clos_len 0)
     (while fv (do
         (compile asm mod (car fv))
         (+= clos_len 1)
         (= fv (cdr fv))
         ))
-    (compile asm mod lam)
     (put_variant asm @ClosureE clos_len clos_len)
+    (compile asm mod lam)
+    ; stack image: [closure, lam (top)]
+    (compile_simple_call asm 2 build_closure)
     ))
 
 (fun compile_fieldref (asm mod expr) (
@@ -1006,6 +1047,16 @@
     (var idx (expr_arg_int expr 1))
     (compile asm mod obj)
     (put_fieldget asm idx)
+    ))
+
+(fun compile_fieldassign (asm mod expr) (
+    (var lhs (expr_arg expr 0))
+    (var rhs (expr_arg expr 1))
+    (var obj (expr_arg lhs 0))
+    (var idx (expr_arg_int lhs 1))
+    (compile asm mod rhs)
+    (compile asm mod obj)
+    (put_fieldset asm idx)
     ))
 
 (export fun compile_simple_function (asm arity func) (
@@ -1168,7 +1219,9 @@
 
     ; internal expressions
     (add_compiler mod (make_expr BuildClosure (list2 DontCare DontCare)) compile_build_closure)
-    (add_compiler mod (make_expr FieldRef (list2 DontCare DontCare)) compile_fieldref)
+    (add_compiler mod (make_expr Field (list2 DontCare DontCare)) compile_fieldref)
+    (add_compiler mod (make_expr Assign
+        (list2 (make_expr Field (list2 DontCare DontCare)) DontCare)) compile_fieldassign)
     ))
 
 (export fun add_compiler (mod pat func) (
