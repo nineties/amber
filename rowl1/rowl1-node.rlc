@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2012-02-03 12:31:24 nineties $
+; $Id: rowl1-node.rlc 2012-02-06 12:44:33 nineties $
 ;
 
 (import "rlvm-compile")
@@ -137,7 +137,6 @@
     (if (== tag @TAG_VARIANT) (return (field_get obj 0)))
     (if (== tag @TAG_CONS) (return @ListE))
     (if (== tag @TAG_BYTECODE) (return @BytecodeE))
-    (if (== tag @TAG_CLOSURE) (return @ClosureE))
     (return @BuiltinE)
     ))
 
@@ -213,7 +212,6 @@
         (@BytecodeE         . (return Bytecode))
         (@FunctionE         . (return Function))
         (@BoundFunctionE    . (return BoundFunction))
-        (@ClosureE          . (return Closure))
         (@InputFileStreamE  . (return InputFileStream))
         (@OutputFileStreamE . (return OutputFileStream))
         (@ModuleE           . (return Module))
@@ -405,7 +403,6 @@
         (@BytecodeE         . (return (output_string ochan "Bytecode")))
         (@FunctionE         . (return (output_string ochan "Function")))
         (@BoundFunctionE    . (return (output_string ochan "BoundFunction")))
-        (@ClosureE          . (return (output_string ochan "Closure")))
         (@InputFileStreamE  . (return (output_string ochan "InputFileStream")))
         (@OutputFileStreamE . (return (output_string ochan "OutputFileStream")))
         (@ModuleE           . (return (output_string ochan "Module")))
@@ -432,7 +429,6 @@
         (@BytecodeE         . (return (pp_bytecode ochan node)))
         (@FunctionE         . (return (pp_function ochan node)))
         (@BoundFunctionE    . (return (pp_bound ochan node)))
-        (@ClosureE          . (return (pp_closure ochan node)))
         (@InputFileStreamE  . (return (pp_file_stream ochan node)))
         (@OutputFileStreamE . (return (pp_file_stream ochan node)))
         (@ModuleE           . (return (pp_module ochan node)))
@@ -593,12 +589,6 @@
     (output_char ochan '>')
     ))
 
-(fun pp_closure (ochan expr) (
-    (output_string ochan "<#Closure:0x")
-    (output_hex ochan expr 8)
-    (output_char ochan '>')
-    ))
-
 (fun pp_file_stream (ochan node) (
     (if (== (node_type node) @InputFileStreamE)
         (output_string ochan "<#InputFileStream:")
@@ -686,7 +676,6 @@
         (@BytecodeE         . (return (pp_bytecode ochan node)))
         (@FunctionE         . (return (pp_function ochan node)))
         (@BoundFunctionE    . (return (pp_bound ochan node)))
-        (@ClosureE          . (return (pp_closure ochan node)))
         (@InputFileStreamE  . (return (pp_file_stream ochan node)))
         (@OutputFileStreamE . (return (pp_file_stream ochan node)))
         (@ModuleE           . (return (pp_module ochan node)))
