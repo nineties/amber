@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-02-07 01:42:12 nineties $
+; $Id: rowl1-compile.rlc 2012-02-08 15:10:54 nineties $
 ;
 
 (import "rlvm-compile")
@@ -261,6 +261,7 @@
     (var fv (free_variables mod env lam))
     (if (! fv) (return lam))
     (var tbl (make_closure_env Closure fv))
+    (collect_args tbl (expr_args (expr_arg lam 0)))
     (expr_arg_set lam 1 (close mod tbl (expr_arg lam 1)))
     (return (make_expr BuildClosure (list2 lam fv)))
     ))
@@ -1200,6 +1201,7 @@
 
     (add_compiler mod (make_expr Located (list2 locT DontCare)) compile_located)
 
+    ; These commands have been evaluated in parsing phase.
     (add_compiler mod (make_expr DefInfixL (list3 symT stringT intT)) do_nothing)
     (add_compiler mod (make_expr DefInfixR (list3 symT stringT intT)) do_nothing)
     (add_compiler mod (make_expr DefPrefix (list3 symT stringT intT)) do_nothing)
@@ -1207,6 +1209,7 @@
     (add_compiler mod (make_expr DefConstr (list2 symT stringT)) do_nothing)
     (add_compiler mod (make_expr DefCommand (list2 symT stringT)) do_nothing)
     (add_compiler mod (make_expr Import (list1 DontCare)) do_nothing)
+    (add_compiler mod (make_expr Include (list1 DontCare)) do_nothing)
 
     (add_compiler mod (make_expr Qualified (list2 symT DontCare)) compile_qualified)
 
