@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-lex.rlc 2011-12-14 00:09:47 nineties $
+; $Id: rowl1-lex.rlc 2012-02-09 04:10:53 nineties $
 ;
 
 (import "rlvm-compile")
@@ -295,6 +295,7 @@
 (export fun unput () (
     (if unputted (error "try to unput two or more tokens\n"))
     (= unputted 1)
+    (if (== token_tag @TOK_END) (error "(internal error) unput end token\n"))
     return
     ))
 
@@ -402,8 +403,8 @@
     (skip_spaces)
 
     (if (&& newline (<= next_srcclmn offs)) (do
-    (accept @TOK_END)
-    (return @TOK_END)
+        (accept @TOK_END)
+        (return @TOK_END)
     ))
 
     (= prev_srcfile srcfile)
