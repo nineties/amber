@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-string.rlc 2011-06-27 22:54:20 nineties $
+; $Id: vm-prim-string.rlc 2012-03-11 03:55:27 nineties $
 ;
 
 (import "stdlib")
@@ -18,6 +18,13 @@
     (return ptr)
     ))
 
+(export prim_ctos)
+(fun prim_ctos (c) (
+    (void* ptr (allocate_pstruct @PLAIN_STRING 2))
+    ([]=8 ptr 0 c)
+    (return ptr)
+    ))
+ 
 (export prim_allocate_string)
 (fun prim_allocate_string (n) (
     (return (allocate_pstruct @PLAIN_STRING (+ n 1)))
@@ -73,6 +80,13 @@
     (int size (+ (prim_strlen str) 1))
     (void* new_str (allocate_pstruct @PLAIN_STRING size))
     (prim_strcpy new_str str)
+    (return new_str)
+    ))
+
+(export prim_strndup)
+(fun prim_strndup (str len) (
+    (void* new_str (allocate_pstruct @PLAIN_STRING (+ len 1)))
+    (prim_strncpy new_str str len)
     (return new_str)
     ))
 

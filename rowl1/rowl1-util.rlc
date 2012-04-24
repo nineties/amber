@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-util.rlc 2012-01-19 23:02:28 nineties $
+; $Id: rowl1-util.rlc 2012-04-04 00:17:46 nineties $
 ;
 
 (import "rlvm-compile")
@@ -34,6 +34,19 @@
     ))
     ))
 
+(export fun escape_char (c) (
+    (if (== c '\\') (return "\\"))
+    (if (== c '\a') (return "\\a"))
+    (if (== c '\b') (return "\\b"))
+    (if (== c '\f') (return "\\f"))
+    (if (== c '\n') (return "\\n"))
+    (if (== c '\r') (return "\\r"))
+    (if (== c '\t') (return "\\t"))
+    (if (== c '\v') (return "\\v"))
+    (if (== c '\0') (return "\\0"))
+    (return (ctos c))
+    ))
+
 (fun unescape_char (c) (
     (if (== c '\\') (return '\\'))
     (if (== c 'a') (return '\a'))
@@ -47,7 +60,9 @@
     (not_reachable "unescape_char")
     ))
 
-(export fun unescape_string (str) (
+; unescape double-quoted string.
+; NB: given argument will be overriden
+(export fun unescape_string_d (str) (
     (var len (strlen str))
     (var i 0)
     (var j 0)
@@ -58,6 +73,33 @@
             (= c (unescape_char (array_get char str i)))
             ))
         (array_set char str j c)
+        (incr i)
+        (incr j)
+        ))
+    (array_set char str j 0)
+    ))
+
+; unescape single-quoted string.
+; NB: given argument will be overriden
+(export fun unescape_string_s (str) (
+    (var len (strlen str))
+    (var i 0)
+    (var j 0)
+    (while (< i len) (do
+        (var c (array_get char str i))
+        (if (== c '\\') (do
+            (incr i)
+            (var d (array_get char str i))
+            (if (== d ''')
+                (array_set char str j d)
+                (do
+                    (array_set char str j '\\')
+                    (incr j)
+                    (array_set char str j d)
+                ))
+            )
+            (array_set char str j c)
+            )
         (incr i)
         (incr j)
         ))

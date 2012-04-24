@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2012-02-10 00:21:35 nineties $
+; $Id: rowl1-interp.rlc 2012-04-18 16:07:16 nineties $
 ;
 
 (import "rlvm-compile")
@@ -12,7 +12,7 @@
 
 (import "rowl1-util")
 (import "rowl1-node")
-(import "rowl1-parse")
+(import "rowl1-packrat")
 (import "rowl1-symtable")
 (import "rowl1-assemble")
 (import "rowl1-compile")
@@ -29,8 +29,20 @@
     (= current_mod mod)
     ))
 
+(export fun eval_shell () (
+    (set_shell_mode)
+    (return (eval_main "amber" stdin))
+    ))
+
 (export fun eval_file (path) (
-    (var start (gettimeofday))
+    (var ichan (open_in path))
+    (var r (eval_main path ichan))
+    (close_in ichan)
+    (return r)
+    ))
+
+(export fun eval_main (file ichan) (
+    ;(var start (gettimeofday))
     (= current_mod (make_module (to_sym "%global") 0))
     (= current_loc no_loc)
 
@@ -39,24 +51,28 @@
     (init_stdlib current_mod)
     (import_module current_loc current_mod (to_sym "std"))
 
-    (var ichan (open_in path))
-    (init_parser path ichan)
+    (init_parser_funcs current_mod)
+    (import_module current_loc current_mod (qualified "std" (to_sym "parser")))
+    (var p (init_parser file ichan))
+    (= current_loc (get_loc p))
 
-    (add_include_dir "./")
-    (add_include_dir "/usr/lib/amber/")
-    (include_file "amber/syntax.ab")
-    (import_module current_loc current_mod (qualified "std" (to_sym "syntax")))
-    (include_file "amber/io.ab")
-    (import_module current_loc current_mod (qualified "std" (to_sym "io")))
+    (interpret p)
+    ;(init_parser path ichan)
 
-    (interpret)
-    (close_in ichan)
+    ;(add_include_dir "./")
+    ;(add_include_dir "/usr/lib/amber/")
+    ;(include_file "amber/syntax.ab")
+    ;(import_module current_loc current_mod (qualified "std" (to_sym "syntax")))
+    ;(include_file "amber/io.ab")
+    ;(import_module current_loc current_mod (qualified "std" (to_sym "io")))
 
-    (var end (gettimeofday))
-    (var diff (timeval_sub end start))
-    (output_string stderr "elapsed time : ")
-    (output_timeval stderr diff)
-    (output_char stderr '\n')
+    ;(interpret)
+
+    ;(var end (gettimeofday))
+    ;(var diff (timeval_sub end start))
+    ;(output_string stderr "elapsed time : ")
+    ;(output_timeval stderr diff)
+    ;(output_char stderr '\n')
     ))
 
 (fun call1 (mod sym arg0) (
@@ -73,14 +89,36 @@
     (return e)
     ))
 
-(fun interpret () (
-    (var es (parse))
-    (while es (do
-        (var e (rewrite (car es)))
-        (eval e)
-        (= es (cdr es))
+(fun interpret (p) (
+    (while 1 (do
+        (var e (call1 current_mod (to_sym "Stmt") p))
+        (if (!= e NoInput) (do
+            (var hd (expr_head e))
+            (if (== hd Parsed) (do
+                    (var ret (eval (expr_arg e 1)))
+                    (print_result p ret)
+                )
+            (if (== hd NoParse)
+                (output_syntax_errors e)
+                (do
+                    (output_string stderr "INTERNAL ERROR\n")
+                    (exit 1)
+                )))
+            ))
+        (flush_parser p)
         ))
-    (= current_loc no_loc)
+    ;(var es (parse))
+    ;(while es (do
+    ;    (var e (rewrite (car es)))
+    ;    (eval e)
+    ;    (= es (cdr es))
+    ;    ))
+    ;(= current_loc no_loc)
+    ))
+
+(fun print_result (p val) (
+    (pretty_print stdout val)
+    (output_char stdout '\n')
     ))
 
 (fun default_eval (expr) (
@@ -158,35 +196,35 @@
     ))
 
 (fun include_file (path) (
-    (var dir include_dirs)
-    (while dir (do
-        (var fullpath (build_path (car dir) path ""))
-        (if (file_exists fullpath) (do
-            (if (is_already_included fullpath)
-                (return Nil)
-                )
-            (add_included_module fullpath)
+    ;(var dir include_dirs)
+    ;(while dir (do
+    ;    (var fullpath (build_path (car dir) path ""))
+    ;    (if (file_exists fullpath) (do
+    ;        (if (is_already_included fullpath)
+    ;            (return Nil)
+    ;            )
+    ;        (add_included_module fullpath)
 
-            (var ichan (open_in fullpath))
-            (var fd (open "."))
-            (chdir (get_directory fullpath))
+    ;        (var ichan (open_in fullpath))
+    ;        (var fd (open "."))
+    ;        (chdir (get_directory fullpath))
 
-            (push_parser fullpath ichan)
-            (interpret)
-            (pop_parser)
+    ;        (push_parser fullpath ichan)
+    ;        (interpret)
+    ;        (pop_parser)
 
-            (fchdir fd)
-            (close_in ichan)
+    ;        (fchdir fd)
+    ;        (close_in ichan)
 
-            (return Nil)
-            ))
-        (= dir (cdr dir))
-        ))
-    (output_error stderr current_loc)
-    (output_string stderr "`")
-    (output_string stderr path)
-    (output_string stderr "' was not found\n")
-    (exit 1)
+    ;        (return Nil)
+    ;        ))
+    ;    (= dir (cdr dir))
+    ;    ))
+    ;(output_error stderr current_loc)
+    ;(output_string stderr "`")
+    ;(output_string stderr path)
+    ;(output_string stderr "' was not found\n")
+    ;(exit 1)
     ))
 
 (export fun eval_include (expr) (
@@ -198,16 +236,16 @@
 (fun setup_builtin_functions (mod) (
     (var symT (domainP Symbol))
     (var blockT (domainP Block))
-    (add_builtin_function1 mod Rewrite DontCare default_rewrite)
-    (add_builtin_function1 mod Rewrite (domainP Located) rewrite_located)
-    (add_builtin_function1 mod Eval DontCare default_eval)
-    (add_builtin_function1 mod Eval (domainP Located) eval_located)
+    (add_builtin_function1 mod Rewrite DontCare default_rewrite 0)
+    (add_builtin_function1 mod Rewrite (domainP Located) rewrite_located 0)
+    (add_builtin_function1 mod Eval DontCare default_eval 0)
+    (add_builtin_function1 mod Eval (domainP Located) eval_located 0)
     (add_builtin_function1 mod Eval
          (make_expr DefModule (list2 symT blockT))
-         eval_define_module)
+         eval_define_module 0)
     (add_builtin_function1 mod Eval
          (make_expr DefModule (list2 (domainP Qualified) blockT))
-         eval_define_module)
+         eval_define_module 0)
     ))
 
 (extern fun setup_numeric)
