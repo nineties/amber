@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2012-02-10 00:22:13 nineties $
+; $Id: rowl1-node.rlc 2012-04-06 01:04:29 nineties $
 ;
 
 (import "rlvm-compile")
@@ -25,11 +25,15 @@
 (export var true        (to_sym "true"))
 (export var false       (to_sym "false"))
 
+(export var Parsed     (to_sym "Parsed"))   ; Parsed (location node)
+(export var NoParse    (to_sym "NoParse"))  ; NoParse [(location msg)]
+(export var NoInput    (to_sym "NoInput"))
+
 (export var Symbol      (to_builtin_sym "Symbol"))
 (export var Int         (to_builtin_sym "Int"))
 (export var Float       (to_builtin_sym "Float"))
 (export var String      (to_builtin_sym "String"))
-(export var List        (to_builtin_sym "List"))
+(export var List        (to_sym "List"))
 (export var Tuple       (to_sym "Tuple"))
 (export var Eval        (to_sym "Eval"))
 (export var Block       (to_sym "Block"))
@@ -76,15 +80,16 @@
 (export var Return      (to_sym "Return"))
 (export var Seq         (to_sym "Seq"))
 
-(export var Assembler     (to_builtin_sym "Assembler"))
-(export var Builtin       (to_builtin_sym "Builtin"))
-(export var Bytecode      (to_builtin_sym "Bytecode"))
-(export var Function      (to_builtin_sym "Function"))
-(export var BoundFunction (to_builtin_sym "BoundFunction"))
-(export var Closure       (to_builtin_sym "Closure"))
-(export var InputFileStream (to_builtin_sym "InputFileStream"))
+(export var Assembler        (to_builtin_sym "Assembler"))
+(export var Builtin          (to_builtin_sym "Builtin"))
+(export var Bytecode         (to_builtin_sym "Bytecode"))
+(export var Function         (to_builtin_sym "Function"))
+(export var BoundFunction    (to_builtin_sym "BoundFunction"))
+(export var Closure          (to_builtin_sym "Closure"))
+(export var InputFileStream  (to_builtin_sym "InputFileStream"))
 (export var OutputFileStream (to_builtin_sym "OutputFileStream"))
-(export var Module      (to_builtin_sym "Module"))
+(export var Module           (to_builtin_sym "Module"))
+(export var Parser           (to_builtin_sym "Parser"))
 
 ; internal nodes
 (export var ModuleVariable        (to_sym "%ModuleVariable"))
@@ -182,6 +187,7 @@
     ))
 
 (export fun output_loc (ochan loc) (
+    (output_char ochan '[')
     (output_string ochan (loc_file loc))
     (output_char ochan ':')
     (var begin (loc_begin loc))
@@ -193,14 +199,20 @@
             (output_char ochan '-')
             (output_int ochan end)
         ))
-    (output_char ochan ' ')
+    (output_char ochan ']')
     ))
 
 (extern object current_loc)
 (export fun output_error (ochan loc) (
     (flush stdout)
-    (output_loc ochan loc)
-    (output_string ochan "ERROR: ")
+    (if loc 
+        (do
+            (output_string ochan "Error ")
+            (output_loc ochan loc)
+            (output_string ochan " : ")
+        )
+        (output_string ochan "Error : ")
+        )
     ))
 
 (export fun expr_head (node) (
@@ -215,6 +227,7 @@
         (@InputFileStreamE  . (return InputFileStream))
         (@OutputFileStreamE . (return OutputFileStream))
         (@ModuleE           . (return Module))
+        (@ParserE           . (return Parser))
         (@IntE              . (return Int))
         (@FloatE            . (return Float))
         (@StringE           . (return String))
@@ -343,6 +356,9 @@
         (exit 1)
         ))
 
+    (if (== head List)
+        (return args)
+        )
     ; special case : Tuple{x} is equal to x
     (if (&& (== head Tuple) (== (list_len args) 1))
         (return (car args))
@@ -406,6 +422,7 @@
         (@InputFileStreamE  . (return (output_string ochan "InputFileStream")))
         (@OutputFileStreamE . (return (output_string ochan "OutputFileStream")))
         (@ModuleE           . (return (output_string ochan "Module")))
+        (@ParserE           . (return (output_string ochan "Parser")))
         (@IntE              . (return (output_string ochan "Int")))
         (@FloatE            . (return (output_string ochan "Float")))
         (@StringE           . (return (output_string ochan "String")))
@@ -432,6 +449,7 @@
         (@InputFileStreamE  . (return (pp_file_stream ochan node)))
         (@OutputFileStreamE . (return (pp_file_stream ochan node)))
         (@ModuleE           . (return (pp_module ochan node)))
+        (@ParserE           . (return (pp_parser_state ochan node)))
         (@IntE              . (return (pp_int ochan node)))
         (@FloatE            . (return (pp_float ochan node)))
         (@StringE           . (return (pp_string ochan node)))
@@ -598,6 +616,12 @@
     (output_char ochan '>')
     ))
 
+(fun pp_parser_state (ochan node) (
+    (output_string ochan "<#Parser:")
+    (output_hex ochan node 8)
+    (output_char ochan '>')
+    ))
+
 (var indent 0)
 (fun incr_indent () ((+= indent 4)))
 (fun decr_indent () ((-= indent 4)))
@@ -679,6 +703,7 @@
         (@InputFileStreamE  . (return (pp_file_stream ochan node)))
         (@OutputFileStreamE . (return (pp_file_stream ochan node)))
         (@ModuleE           . (return (pp_module ochan node)))
+        (@ParserE           . (return (pp_parser_state ochan node)))
         (@IntE              . (return (pp_int ochan node)))
         (@FloatE            . (return (pp_float ochan node)))
         (@StringE           . (return (pp_string ochan node)))

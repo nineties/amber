@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2012-01-26 12:20:52 nineties $
+# $Id: Makefile 2012-03-15 05:31:54 nineties $
 
 TOPDIR = ..
 ROWL0DIR = $(TOPDIR)/rowl0
@@ -11,9 +11,9 @@ BINDIR = /usr/bin
 LIBDIR = /usr/lib
 
 AS = as
-ASFLAGS =
+ASFLAGS = --32
 LD = ld
-LDFLAGS = --nostdlib --entry=_start
+LDFLAGS = --nostdlib -m elf_i386 --entry=_start
 
 RLC0 = $(ROWL0DIR)/rlc
 
@@ -52,7 +52,7 @@ rlci: $(OBJECTS)
 	$(LD) $(OBJECTS) -o $@ $(LDFLAGS)
 
 
-VMLDFLAGS = --nostdlib --entry=_start
+VMLDFLAGS = --nostdlib -m elf_i386 --entry=_start
 VMOBJECTS = vm-main.o\
 		vm-eval.o\
 		vm-gc.o\
@@ -80,10 +80,9 @@ vm-prim-idtable.o : rlci stdlib.rlc vm-compile.rlc
 
 RLC1OBJECTS = rowl1-main.rlo\
 		  rowl1-util.rlo\
-		  rowl1-lex.rlo\
 		  rowl1-symtable.rlo\
 		  rowl1-node.rlo\
-		  rowl1-parse.rlo\
+		  rowl1-packrat.rlo\
 		  rowl1-module.rlo\
 		  rowl1-interp.rlo\
 		  rowl1-assemble.rlo\
@@ -104,12 +103,11 @@ RLVMCOMPILER = rlci\
 startup.rlo		: $(RLVMCOMPILER)
 rowl1-main.rlo	 : $(RLVMCOMPILER) rowl1-types.rlc rowl1-node.rlo rowl1-interp.rlo
 rowl1-util.rlo	 : $(RLVMCOMPILER) rowl1-types.rlc
-rowl1-lex.rlo	  : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-module.rlo
-rowl1-parse.rlo	: $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-lex.rlo rowl1-node.rlo rowl1-module.rlo
+rowl1-packrat.rlo	: $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-assemble.rlo rowl1-compile.rlo rowl1-module.rlo
 rowl1-node.rlo	 : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-symtable.rlo
 rowl1-symtable.rlo : $(RLVMCOMPILER) rowl1-types.rlc
 rowl1-module.rlo   : $(RLVMCOMPILER) rowl1-types.rlc rowl1-node.rlo rowl1-symtable.rlo
-rowl1-interp.rlo   : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-module.rlo rowl1-parse.rlo rowl1-symtable.rlo rowl1-assemble.rlo rowl1-compile.rlo rowl1-matching.rlo
+rowl1-interp.rlo   : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-module.rlo rowl1-packrat.rlo rowl1-symtable.rlo rowl1-assemble.rlo rowl1-compile.rlo rowl1-matching.rlo
 rowl1-assemble.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-node.rlo
 rowl1-compile.rlo  : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-symtable.rlo rowl1-module.rlo rowl1-assemble.rlo
 rowl1-matching.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-assemble.rlo rowl1-compile.rlo

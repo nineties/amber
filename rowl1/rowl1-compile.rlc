@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-02-08 15:10:54 nineties $
+; $Id: rowl1-compile.rlc 2012-04-19 01:27:48 nineties $
 ;
 
 (import "rlvm-compile")
@@ -633,6 +633,7 @@
     ))
 
 (fun compile_apply (asm mod expr) (
+    (debugpf expr)
     (var func (expr_arg expr 0))
     (var args (expr_arg expr 1))
     
@@ -1153,39 +1154,39 @@
         )
     ))
 
-(export fun add_builtin_function0 (mod sym func) (
+(export fun add_builtin_function0 (mod sym func guard) (
     (var asm (make_assembler))
-    (compile_simple_function asm 1 func @TRUE)
+    (compile_simple_function asm 1 func)
     (var code (get_code asm))
-    (append_function mod sym (make_function 0 code 0))
+    (append_function mod sym (make_function 0 code guard))
     ))
 
-(export fun add_builtin_function1 (mod sym pat func) (
+(export fun add_builtin_function1 (mod sym pat func guard) (
     (var asm (make_assembler))
-    (compile_simple_function asm 1 func @TRUE)
+    (compile_simple_function asm 1 func)
     (var code (get_code asm))
-    (append_function mod sym (make_function (list1 pat) code 0))
+    (append_function mod sym (make_function (list1 pat) code guard))
     ))
 
-(export fun add_builtin_function2 (mod sym pat1 pat2 func) (
+(export fun add_builtin_function2 (mod sym pat1 pat2 func guard) (
     (var asm (make_assembler))
-    (compile_simple_function asm 2 func @TRUE)
+    (compile_simple_function asm 2 func)
     (var code (get_code asm))
-    (append_function mod sym (make_function (list2 pat1 pat2) code 0))
+    (append_function mod sym (make_function (list2 pat1 pat2) code guard))
     ))
 
-(export fun add_builtin_function3 (mod sym pat1 pat2 pat3 func) (
+(export fun add_builtin_function3 (mod sym pat1 pat2 pat3 func guard) (
     (var asm (make_assembler))
-    (compile_simple_function asm 3 func @TRUE)
+    (compile_simple_function asm 3 func)
     (var code (get_code asm))
-    (append_function mod sym (make_function (list3 pat1 pat2 pat3) code 0))
+    (append_function mod sym (make_function (list3 pat1 pat2 pat3) code guard))
     ))
 
-(export fun add_builtin_function4 (mod sym pat1 pat2 pat3 pat4 func) (
+(export fun add_builtin_function4 (mod sym pat1 pat2 pat3 pat4 func guard) (
     (var asm (make_assembler))
-    (compile_simple_function asm 4 func @TRUE)
+    (compile_simple_function asm 4 func)
     (var code (get_code asm))
-    (append_function mod sym (make_function (list4 pat1 pat2 pat3 pat4) code 0))
+    (append_function mod sym (make_function (list4 pat1 pat2 pat3 pat4) code guard))
     ))
 
 (export fun setup_builtin_compilers (mod) (
@@ -1252,7 +1253,7 @@
     ))
 
 (export fun add_compiler (mod pat func) (
-    (add_builtin_function3 mod Compile (domainP Assembler) (domainP Module) pat func)
+    (add_builtin_function3 mod Compile (domainP Assembler) (domainP Module) pat func 0)
     ))
 
     ))

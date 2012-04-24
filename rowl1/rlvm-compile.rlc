@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlvm-compile.rlc 2012-01-26 22:11:57 nineties $
+; $Id: rlvm-compile.rlc 2012-04-05 18:17:49 nineties $
 ;
 
 (import "stdlib")
@@ -214,11 +214,12 @@
 (var unary_operator `((- . ineg) (bsr . bsr)))
 (var assignment_operator `((= . nop) (+= . iadd) (-= . isub) (*= . imul)
     (/= . idiv) (%= . imod) (<<= . sal) (>>= . sar) (&= . and) (|= . or) (^= . xor)))
-
+(var conditional_operator `(== != < > <= >= ! && ||))
 
 (define binary_operator? (op) (assoc op binary_operator))
 (define unary_operator? (op) (assoc op unary_operator))
 (define assignment_operator? (op) (assoc op assignment_operator))
+(define conditional_operator? (op) (member? op conditional_operator))
 
 (define compile_binexpr (expr) (do
     (var insn (assoc (car expr) binary_operator))
@@ -322,6 +323,16 @@
         ((== `object (car loc)) (compile_object_assign insn loc rhs))
         (otherwise (error "compile_assign: not implemented"))
         )
+    true
+    ))
+
+; translate (cmp a b) to 
+(define compile_conditional (expr) (do
+    (compile_block `(
+        (var ret 0)
+        (if @expr (incr ret))
+        ret
+        ))
     true
     ))
 
@@ -759,6 +770,7 @@
         ((== `cdr (car expr)) (compile_field_get `(field_get @(cadr expr) 1)))
         ((== `caar (car expr)) (compile_expr `(car (car @(cadr expr)))))
         ((== `caadr (car expr)) (compile_expr `(car (car (cdr @(cadr expr))))))
+        ((== `cadar (car expr)) (compile_expr `(car (cdr (car @(cadr expr))))))
         ((== `caaar (car expr)) (compile_expr `(car (car (car @(cadr expr))))))
         ((== `caaadr (car expr)) (compile_expr `(car (car (car (cdr @(cadr expr)))))))
         ((== `cdar (car expr)) (compile_expr `(cdr (car @(cadr expr)))))
@@ -779,6 +791,8 @@
             (compile_unexpr expr))
         ((and (== 3 (length expr)) (assignment_operator? (car expr)))
             (compile_assign expr))
+        ((and (cons? expr) (conditional_operator? (car expr)))
+            (compile_conditional expr))
         (otherwise (compile_call expr))
         )))
 

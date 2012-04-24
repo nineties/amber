@@ -3,12 +3,12 @@
 # Copyright (C) 2009 nineties
 #
 
-# $Id: Makefile 2010-01-15 03:29:08 nineties $
+# $Id: Makefile 2012-03-15 05:30:38 nineties $
 
 AS = as
-ASFLAGS =
+ASFLAGS = --32
 LD = ld
-LDFLAGS = --nostdlib --entry=_main
+LDFLAGS = --nostdlib -m elf_i386 --entry=_main
 
 all: rlc
 
