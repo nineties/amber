@@ -92,6 +92,9 @@
 (fun interpret (p) (
     (while 1 (do
         (var e (call1 current_mod (to_sym "Stmt") p))
+        (if (== e EOF)
+            (return 0)
+            )
         (if (!= e NoInput) (do
             (var hd (expr_head e))
             (if (== hd Parsed) (do
@@ -172,6 +175,11 @@
     (return expr)
     ))
 
+(fun eval_define_syntax (expr) (
+    (debugpf expr)
+    (return (box 1))
+    ))
+
 (var include_dirs null)
 (var included_modules null)
 
@@ -235,6 +243,7 @@
 
 (fun setup_builtin_functions (mod) (
     (var symT (domainP Symbol))
+    (var listT (domainP List))
     (var blockT (domainP Block))
     (add_builtin_function1 mod Rewrite DontCare default_rewrite 0)
     (add_builtin_function1 mod Rewrite (domainP Located) rewrite_located 0)
@@ -246,6 +255,9 @@
     (add_builtin_function1 mod Eval
          (make_expr DefModule (list2 (domainP Qualified) blockT))
          eval_define_module 0)
+    (add_builtin_function1 mod Eval
+        (make_expr DefSyntax (list3 symT listT DontCare))
+        eval_define_syntax 0)
     ))
 
 (extern fun setup_numeric)
