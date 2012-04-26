@@ -1,0 +1,687 @@
+;
+; rowl - 1st generation
+; Copyright (C) 2010 nineties
+;
+; $Id: rowl1-packrat.rlc 2012-04-18 23:44:25 nineties $
+;
+
+(import "rlvm-compile")
+(import "rowl1-types")
+
+; character groups
+(var CH_EOS        0) ; "\0"
+(var CH_SPACES     1) ; "\t\r "
+(var CH_NL         2) ; "\n"
+(var CH_0          3) ; "0"
+(var CH_1          4) ; "1"
+(var CH_2_7        5) ; "234567"
+(var CH_8_9        6) ; "89"
+(var CH_af         7) ; "af"
+(var CH_b          8) ; "b"
+(var CH_e          9) ; "e"
+(var CH_HEX       10) ; "ABCDEFcd"
+(var CH_o         11) ; "o"
+(var CH_rtv       12) ; "rtv"
+(var CH_x         13) ; "x"
+(var CH_n         14) ; "n"
+(var CH_OTHER     15) ; "GHIJKLMNOPQRSTUVWXYZcdghijklmpqsuwuz_"
+(var CH_SHARP     16) ; "#"
+(var CH_INVALID   17)
+
+; fixed-length integers are 31-bits because of boxing
+(var INTEGER_MAX  (- (<< 1 30) 1))
+
+(define CHGRP (c) `(array_get char chgroup @c))
+(define MEMOIZE (sym)
+    `(export fun @(s++ `parse_ sym) (p) (
+        (var s (to_sym @(tos sym)))
+        (var tbl (field_get (field_get p 1) 2))
+        (var pos (field_get p 3))
+        (var v (memotable_find tbl s pos))
+        (if v (do
+            (field_set p 3 (cdr v))
+            (return (car v))
+            ))
+        (= v (@(s++ `parse_ sym '_') p))
+        (memotable_add tbl s pos (cons v (field_get p 3)))
+        (return v)
+    )))
+
+(define OR (p ps) (do
+    (var end_lbl (mklabel))
+   `(do
+        (var state (copy_parser_state @p))
+        (var v 0)
+        (var errors 0)
+        (do . @(map (lambda (f) 
+            `(do
+              (= v (@(s++ `parse_ f) @p))
+              (if (== (expr_head v) Parsed) (goto @end_lbl))
+              (= errors (noparse_merge errors v))
+              (set_parser_state @p state)
+             )) ps))
+        (= v errors)
+        (label @end_lbl)
+        v
+    )))
+(define CHECK (v) `(if (== (expr_head @v) NoParse) (return @v)))
+
+(compile `object `(
+
+(import "rowl1-util")
+(import "rowl1-node")
+(import "rowl1-assemble")
+(import "rowl1-compile")
+(import "rowl1-module")
+
+(array char chgroup (
+     0 17 17 17 17 17 17 17 17  1  2 17 17  1 17 17
+    17 17 17 17 17 17 17 17 17 17 17 17 17 17 17 17
+     1 17 17 16 17 17 17 17 17 17 17 17 17 17 17 17
+     3  4  5  5  5  5  5  5  6  6 17 17 17 17 17 17
+    17 10 10 10 10 10 10 15 15 15 15 15 15 15 15 15
+    15 15 15 15 15 15 15 15 15 15 15 17 17 17 17 15
+    17  7  8 10 10  9  7 15 15 15 15 15 15 15 14 11
+    15 15 12 15 12 15 12 15 13 15 15 17 17 17 17 17
+    17 17 17 17 17 17 17 17 17 17 17 17 17 17 17 17
+    17 17 17 17 17 17 17 17 17 17 17 17 17 17 17 17
+    17 17 17 17 17 17 17 17 17 17 17 17 17 17 17 17
+    17 17 17 17 17 17 17 17 17 17 17 17 17 17 17 17
+    17 17 17 17 17 17 17 17 17 17 17 17 17 17 17 17
+    17 17 17 17 17 17 17 17 17 17 17 17 17 17 17 17
+    17 17 17 17 17 17 17 17 17 17 17 17 17 17 17 17
+    17 17 17 17 17 17 17 17 17 17 17 17 17 17 17 17
+    ))
+
+; hashtable for memoization
+; key:   (non-terminal symbol, position (integer))
+; value: expression
+;
+; structure of tables
+;   0 : bucket (vector)
+;   1 : entries (vector)
+;   
+; structure of entries
+;   0 : symbol
+;   1 : expression
+;   2 : pointer to the next entry
+;   3 : position value
+;   4 : hash value
+
+(array int prime_numbers (
+    5 11 17 37 67 131 257 521 1031 2053 4099 8209 16411 32771 65537 131101
+    0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+    ))
+
+(fun make_memotable (hint) (
+    (var size (array_get int prime_numbers (bsr hint)))
+    (return (struct 2 (make_vector size) (make_vector 0)))
+    ))
+
+(fun memotable_clear (table) (
+    (vector_clear (field_get table 0))
+    (vector_resize (field_get table 1) 0)
+    ))
+
+(fun hash (sym pos) (
+    (var h (field_get sym @SymbolIndex))
+    (= h (+ (* 7 h) pos))
+    (return h)
+    ))
+
+(fun rehash (table) (
+    (var old_size (vector_size (field_get table 0)))
+    (var num_ent  (vector_size (field_get table 1)))
+    (if (>= num_ent old_size) (do
+        (var new_size (array_get int prime_numbers (bsr num_ent)))
+        (if (! new_size) (error "rehash: too many entries"))
+        (var bucket (make_vector new_size))
+        (var entries (field_get table 1))
+        (for i 0 (vector_size entries) (do
+            (var entry (vector_at entries i))
+            (if (! entry) continue)
+            (var h (% (field_get entry 4) new_size))
+            (field_set entry 2 (vector_at bucket h))
+            (vector_put bucket h entry)
+            ))
+        (field_set table 0 bucket)
+        ))
+    ))
+
+(fun memotable_add (table sym pos obj) (
+    (rehash table)
+
+    (var bucket (field_get table 0))
+    (var entries (field_get table 1))
+    (var size (vector_size bucket))
+    (var h (hash sym pos))
+
+    (var ent (struct 3 sym obj 0 pos h))
+    (%= h size)
+
+    (vector_pushback entries ent)
+
+    (field_set ent 2 (vector_at bucket h))
+    (vector_put bucket h ent)
+    ))
+
+(fun memotable_find (table sym pos) (
+    (var bucket (field_get table 0))
+    (var size (vector_size bucket))
+    (var h (hash sym pos))
+    (%= h size)
+    (var entry (vector_at bucket h))
+    (while entry (do
+        (var e_sym (field_get entry 0))
+        (var e_pos (field_get entry 3))
+        (if (&& (== e_sym sym) (== e_pos pos))
+            (return (field_get entry 1))
+            )
+        (= entry (field_get entry 2))
+        ))
+    (return 0)
+    ))
+
+(var case_sensitive_p @TRUE)
+(var shell_mode_p @FALSE)
+
+(extern object current_mod)
+(extern fun set_current_module)
+
+(export fun set_shell_mode () (
+    (= shell_mode_p @TRUE)
+    ))
+
+(fun parsed (loc val) (
+    (return (make_expr Parsed (list2 loc val)))
+    ))
+(fun noparse (loc msg) (
+    (return (make_expr NoParse (list1 (list2 loc (string msg)))))
+    ))
+(fun noparse_merge (lhs rhs) (
+    (if (! lhs) (return rhs))
+    (if (! rhs) (return lhs))
+    (return (make_expr NoParse (list_append (expr_args lhs) (expr_args rhs))))
+    ))
+(fun integer_overflow (loc) (
+    (return (noparse loc "integer literal is too large"))
+    ))
+(fun junk_letter (loc) (
+    (return (noparse loc "junk letter(s) at the end of integer literal"))
+    ))
+
+(export fun init_parser (file ichan) (
+    ; character buffer
+    (var cbuf (make_cvector 0))
+    ; current position in cbuf
+    (var pos 0)
+    ; offset + pos is the number of total characters from the beginning of parsing
+    (var offset 0)
+
+    ; table for memoization
+    (var memo (make_memotable 1000))
+    (var buf (struct 3 cbuf ichan memo))
+    (return (variant @ParserE 2 buf (string file) pos offset 1))
+    ))
+
+(export fun flush_parser (p) (
+    (var buf (field_get p 1))
+    (var cbuf (field_get buf 0))
+    (var bufsz (cvector_size cbuf))
+
+    (cvector_resize cbuf 0)
+    (field_set p 4 (+ (field_get p 4) bufsz))
+    (field_set p 3 0)
+    (memotable_clear (field_get buf 2))
+    (if shell_mode_p (field_set p 5 (+ (field_get p 5) 1)))
+    ))
+
+(fun copy_parser_state (p) (
+    (var copy (variant @ParserE 2 0 0 0 0 0 0))
+    (memcpy copy p (* 7 @WORD_SIZE))
+    (return copy)
+    ))
+
+(fun set_parser_state (p state) (
+    (memcpy p state (* 7 @WORD_SIZE))
+    ))
+
+(fun extract_string (from p) (
+    (var begin (field_get from 3))
+    (var end   (field_get p 3))
+    (var len (- end begin))
+    (var vec (field_get (field_get p 1) 0))
+    (return (strndup (+ (cvector_raw vec) begin) len))
+    ))
+
+(export fun get_loc (p) (
+    (var line (field_get p 5))
+    (return (make_loc (field_get p 2) line line))
+    ))
+
+(fun print_prompt (p) (
+    (var line (field_get p 5))
+    (output_string stdout "amber:")
+    (output_int stdout line)
+    (output_string stdout "> ")
+    (flush stdout)
+    ))
+
+(fun reserve (p) (
+    (var buf (field_get p 1))
+    (var vec (field_get buf 0))
+    (var ichan (field_get buf 1))
+    (var line 0)
+    (if shell_mode_p (print_prompt p))
+    (var c 0)
+    (while (>= (input_char (address c) ichan) 0) (do
+        (cvector_pushback vec c)
+        (if (|| (== c '\n') (== c '\0')) (return 0))
+        ))
+    (return -1)
+    ))
+
+(fun lookahead (p) (
+    (var buf (field_get p 1))
+    (var vec (field_get buf 0))
+    (var idx (field_get p 3))
+    (if (>= idx (cvector_size vec)) (do
+        (if (< (reserve p) 0)
+            (return -2) ; XXX: fix me. dont use the magic nubmer.
+            )
+        ))
+    (if (>= idx (cvector_size vec))
+        (return -1)
+        )
+    (return (cvector_at vec idx))
+    ))
+
+(fun getc (p) (
+    (var c (lookahead p))
+    ; update source location
+    (if (&& (== c '\n') (! shell_mode_p))
+        (field_set p 5 (+ (field_get p 5) 1))
+        )
+    (field_set p 3 (+ (field_get p 3) 1))
+    (return c)
+    ))
+
+; utilities
+(fun is_spaces (c) (
+    (return (== @(CHGRP c) @CH_SPACES))
+    ))
+(fun is_01 (c) (
+    (= c @(CHGRP c))
+    (return (|| (== c @CH_0) (== c @CH_1)))
+    ))
+(fun is_0_9 (c) (
+    (= c @(CHGRP c))
+    (return (&& (<= @CH_0 c) (<= c @CH_8_9)))
+    ))
+(fun is_1_9 (c) (
+    (= c @(CHGRP c))
+    (return (&& (<= @CH_1 c) (<= c @CH_8_9)))
+    ))
+(fun is_0_7 (c) (
+    (= c @(CHGRP c))
+    (return (&& (<= @CH_0 c) (<= c @CH_2_7)))
+    ))
+(fun is_hexdigit (c) (
+    (= c @(CHGRP c))
+    (return (&& (<= @CH_0 c) (<= c @CH_HEX)))
+    ))
+(fun is_letter (c) (
+    (= c @(CHGRP c))
+    (return (&& (<= @CH_af c) (<= c @CH_OTHER)))
+    ))
+(fun is_identchar (c) (
+    (= c @(CHGRP c))
+    (return (&& (<= @CH_0 c) (<= c @CH_OTHER)))
+    ))
+(var escape_chars "'\"\\abfnrtv0")
+(fun is_escape_char (c) (
+    (for i 0 (strlen escape_chars) (do
+        (if (== c (array_get char escape_chars i))
+            (return @TRUE)
+        )))
+    (return @FALSE)
+    ))
+(fun is_end_of_token (p) (
+    (var c (lookahead p))
+    (if (< c 0) (return @TRUE))
+    (= c @(CHGRP c))
+    (return (|| (< c @CH_0) (> c @CH_OTHER)))
+    ))
+
+(fun parse_char (p c) (
+    (var loc (get_loc p))
+    (var v (getc p))
+    (if (== v c) (do
+        (return (parsed loc (ctos c)))
+        ))
+    (return (noparse loc 
+        (strcat "expected " 
+        (strcat (escape_char c)
+        (strcat " but got " (escape_char v))))))
+    ))
+
+(fun parse_any_char (p) (
+    (var loc (get_loc p))
+    (var c (getc p))
+    (if (< c 0)
+        (return (noparse loc "end of input stream"))
+        (return (parsed loc (ctos c)))
+        )
+    ))
+
+(fun parse_text (p str) (
+    (var loc (get_loc p))
+    (var i 0)
+    (var len (strlen str))
+    (for i 0 len (do
+        (var c (array_get char str i))
+        (if (!= c (getc p))
+            (return (noparse loc (strcat "expect " str)))
+            )
+        ))
+    (return (parsed loc (string str)))
+    ))
+
+; Integers
+; multi-precision integer is not supported for now
+(fun parse_decimal_ (p) (
+    (var loc (get_loc p))
+    (var v (getc p))
+    (if (&& (== v '0') (is_end_of_token p))
+        (return (parsed loc (box 0)))
+        )
+    (if (! (is_1_9 v)) (return (noparse p "expect 1-9")))
+    (var value (- v '0'))
+    (while (is_0_9 (lookahead p)) (do
+        (= v (- (getc p) '0'))
+        (if (> value (/ (- @INTEGER_MAX v) 10))
+            (return (integer_overflow p))
+            )
+        (= value (+ (* value 10) v))
+        ))
+    (if (is_end_of_token p)
+        (return (parsed loc (box value)))
+        )
+    (if (== (lookahead p) 'e') (do
+        (getc p)
+        (var exp (parse_decimal p))
+        @(CHECK exp)
+        (= exp (unbox (expr_arg exp 1)))
+        (while (> exp 0) (do
+            (if (> value (/ @INTEGER_MAX 10))
+                (return (integer_overflow loc))
+                )
+            (*= value 10)
+            (-= exp 1)
+            ))
+        (return (parsed loc (box value)))
+        ))
+    (return (junk_letter loc))
+    ))
+@(MEMOIZE decimal)
+
+(fun parse_binary_ (p) (
+    (var loc (get_loc p))
+    (var v (parse_text p "0b"))
+    @(CHECK v)
+    (if (! (is_01 (lookahead p))) (return (noparse loc "expect 0 or 1")))
+    (var value 0)
+    (while (is_01 (lookahead p)) (do
+        (var v (- (getc p) '0'))
+        (if (> value (/ (- @INTEGER_MAX v) 2))
+            (return (integer_overflow loc))
+            )
+        (= value (| (<< value 1) v))
+        ))
+    (if (! (is_end_of_token p))
+        (return (junk_letter loc))
+        )
+    (return (parsed loc (box value)))
+    ))
+@(MEMOIZE binary)
+
+(fun parse_octal_ (p) (
+    (var loc (get_loc p))
+    (var v (parse_text p "0o"))
+    @(CHECK v)
+    (if (! (is_0_7 (lookahead p))) (return (noparse loc "expect 0-7")))
+    (var value 0)
+    (while (is_0_7 (lookahead p)) (do
+        (var v (- (getc p) '0'))
+        (if (> value (>> (- @INTEGER_MAX v) 3))
+            (return (integer_overflow loc))
+            )
+        (= value (+ (<< value 3) v))
+        ))
+    (if (! (is_end_of_token p))
+        (return (junk_letter loc))
+        )
+    (return (parsed loc (box value)))
+    ))
+@(MEMOIZE octal)
+
+(fun parse_hex_ (p) (
+    (var loc (get_loc p))
+    (var v (parse_text p "0x"))
+    @(CHECK v)
+    (if (! (is_hexdigit (lookahead p))) (return (noparse loc "expect hex digit")))
+    (var value 0)
+    (while (is_hexdigit (lookahead p)) (do
+        (var v (getc p))
+        (if (<= 'a' v)
+            (= v (+ (- v 'a') 10))
+        (if (<= 'A' v)
+            (= v (+ (- v 'A') 10))
+            (= v (- v '0'))
+            ))
+        (if (> value (>> (- @INTEGER_MAX v) 4))
+            (return (integer_overflow loc))
+            )
+        (= value (+ (<< value 4) v))
+        ))
+    (if (! (is_end_of_token p))
+        (return (junk_letter loc))
+        )
+    (return (parsed loc (box value)))
+    ))
+@(MEMOIZE hex)
+
+(fun parse_integer_ (p) (
+    (var loc (get_loc p))
+    (var v @(OR p `(decimal hex octal binary)))
+    (if (== (expr_head v) NoParse) (return (noparse loc "expect integer literal")))
+    (return v)
+    ))
+@(MEMOIZE integer)
+
+(fun parse_comments (p) (
+    (while (!= (lookahead p) '\n') (getc p))
+    ))
+
+(fun parse_spaces_ (p) (
+    (var loc (get_loc p))
+    (while @TRUE (do
+        (var c (lookahead p))
+        (if (is_spaces c)
+            (getc p)
+        (if (== c '#')
+            (parse_comments p)
+            break
+            ))
+        ))
+    (return (parsed loc Nil))
+    ))
+@(MEMOIZE spaces)
+
+(fun parse_symbol_ (p) (
+    (var loc (get_loc p))
+    (if (! (is_letter (lookahead p))) (return (noparse loc "expect [a-zA-Z_]")))
+    (var begin (copy_parser_state p))
+    (while (is_identchar (lookahead p)) (do
+        (getc p)
+        ))
+    (return (parsed loc (to_sym (extract_string begin p))))
+    ))
+@(MEMOIZE symbol)
+
+; single-quoted string literal
+;   Only escape sequence \' is interpreted.
+(fun parse_string_s_ (p) (
+    (var loc (get_loc p))
+    (if (!= (getc p) ''') (return (noparse loc "expect '")))
+    (var begin (copy_parser_state p))
+    (while (!= (lookahead p) ''') (do
+        (var c (getc p))
+        (if (== c '\\') (getc p))
+        ))
+    (var end (copy_parser_state p))
+    (if (!= (getc p) ''') (return (noparse loc "expect '")))
+    (var str (extract_string begin end))
+    (unescape_string_s str)
+    (return (parsed loc str))
+    ))
+@(MEMOIZE string_s)
+
+; double-quoted string literal
+(fun parse_string_d_ (p) (
+    (var loc (get_loc p))
+    (if (!= (getc p) '"') (return (noparse loc "expect \"")))
+    (var begin (copy_parser_state p))
+    (while (!= (lookahead p) '"') (do
+        (var c (getc p))
+        (if (== c '\\') (do
+            (if (! (is_escape_char (getc p)))
+                (return (noparse loc "invalid escape sequence"))
+                )
+            ))
+        ))
+    (var end (copy_parser_state p))
+    (if (!= (getc p) '"') (return (noparse loc "expect \"")))
+    (var str (extract_string begin end))
+    (unescape_string_d str)
+    (return (parsed loc str))
+    ))
+@(MEMOIZE string_d)
+
+(fun parse_string_ (p) (
+    (var loc (get_loc p))
+    (var v @(OR p `(string_d string_s)))
+    (if (== (expr_head v) NoParse) (return (noparse loc "expect string literal")))
+    (return v)
+    ))
+@(MEMOIZE string)
+
+(fun parse_node_ (p) (
+    (var loc (get_loc p))
+    (var hd (parse_symbol p))
+    (if (== (expr_head hd) NoParse) (return (noparse loc "expect a head symbol")))
+    (= hd (expr_arg hd 1))
+
+    (parse_spaces p)
+    (var v (parse_char p '{'))
+    @(CHECK v)
+
+    (parse_spaces p)
+
+    (var args 0)
+    (if (!= (lookahead p) '}') (do
+        (while (> (lookahead p) 0) (do
+            (= v (parse_primary p))
+            @(CHECK v)
+            (parse_spaces p)
+
+            (= args (cons (expr_arg v 1) args))
+            (if (== (lookahead p) '}') break)
+            (= v (parse_char p ','))
+            @(CHECK v)
+            (parse_spaces p)
+            ))
+        ))
+    (= v (parse_char p '}'))
+    @(CHECK v)
+    (return (parsed loc (make_expr_user hd (list_reverse args))))
+    ))
+@(MEMOIZE node)
+
+(fun parse_primary_ (p) (
+    (var loc (get_loc p))
+    (var v @(OR p `(
+        node
+        symbol
+        integer
+        string
+    )))
+    (if (== (expr_head v) NoParse) (return (noparse loc "expect primary expression")))
+    (return v)
+    ))
+@(MEMOIZE primary)
+
+(fun parse_expr_ (p) (
+    (return (parse_primary p))
+    ))
+@(MEMOIZE expr)
+
+(fun parse_stmt (p) (
+    (var loc (get_loc p))
+    (if (== (lookahead p) -2) ; fixme. do not use the magic number.
+        (return EOF)
+        )
+    (parse_spaces p)
+    (if (== (lookahead p) '\n') (do
+        (getc p)
+        (return NoInput)
+        ))
+    (var v (parse_expr p))
+    @(CHECK v)
+    (parse_spaces p)
+    (var nl (parse_char p '\n'))
+    @(CHECK nl)
+    (return v)
+    ))
+
+(fun add_parser (mod sym func) (
+    (add_builtin_function1 mod sym (domainP Parser) func 0)
+    ))
+
+(export fun init_parser_funcs (mod) (
+    (var std (make_module (to_sym "std") mod))
+    (var parser (make_module (to_sym "parser") std))
+
+    (add_parser parser (to_sym "Decimal") parse_decimal)
+    (add_parser parser (to_sym "Binary") parse_binary)
+    (add_parser parser (to_sym "Octal") parse_octal)
+    (add_parser parser (to_sym "Hexadecimal") parse_hex)
+    (add_parser parser (to_sym "Integer") parse_integer)
+    (add_parser parser (to_sym "String") parse_string)
+    (add_parser parser (to_sym "Symbol") parse_symbol)
+
+    ; expressions
+    (add_parser parser (to_sym "PrimaryExpr") parse_primary)
+    (add_parser parser (to_sym "Expr") parse_expr)
+    (add_parser parser (to_sym "Stmt") parse_stmt)
+    ))
+
+(export fun output_syntax_errors (e) (
+    (output_string stderr "Syntax Error ")
+    (var errors (expr_args e))
+    (var multi @FALSE)
+    (if (!= (list_len errors) 1) (do
+        (= multi @TRUE)
+        (output_char stderr '\n'))
+        )
+    (while errors (do
+        (if multi (output_char stderr '\t'))
+        (output_loc stderr (caar errors))
+        (output_string stderr " : ")
+        (output_string stderr (cadar errors))
+        (output_char stderr '\n')
+        (= errors (cdr errors))
+        ))
+    ))
+
+    ))
