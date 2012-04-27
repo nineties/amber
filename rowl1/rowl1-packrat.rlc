@@ -221,7 +221,7 @@
     ; table for memoization
     (var memo (make_memotable 1000))
     (var buf (struct 3 cbuf ichan memo))
-    (return (variant @ParserE 2 buf (string file) pos offset 1))
+    (return (variant @ParserE 2 buf (string file) pos offset 1 0))
     ))
 
 (export fun flush_parser (p) (
@@ -244,6 +244,18 @@
 
 (fun set_parser_state (p state) (
     (memcpy p state (* 7 @WORD_SIZE))
+    ))
+
+(fun incr_nest_level (p) (
+    (field_set p 6 (+ (field_get p 6) 1))
+    ))
+
+(fun decr_nest_level (p) (
+    (field_set p 6 (- (field_get p 6) 1))
+    ))
+
+(fun nest_level (p) (
+    (return (field_get p 6))
     ))
 
 (fun extract_string (from p) (
@@ -338,7 +350,7 @@
     (= c @(CHGRP c))
     (return (&& (<= @CH_0 c) (<= c @CH_OTHER)))
     ))
-(var escape_chars "'\"\\abfnrtv0")
+(filevar escape_chars "'\"\\abfnrtv0")
 (fun is_escape_char (c) (
     (for i 0 (strlen escape_chars) (do
         (if (== c (array_get char escape_chars i))
@@ -511,8 +523,10 @@
             (getc p)
         (if (== c '#')
             (parse_comments p)
+        (if (&& (== c '\n') (> (nest_level p) 0))
+            (getc p)
             break
-            ))
+            )))
         ))
     (return (parsed loc Nil))
     ))
@@ -586,6 +600,7 @@
     (var v (parse_char p '{'))
     @(CHECK v)
 
+    (incr_nest_level p)
     (parse_spaces p)
 
     (var args 0)
@@ -604,6 +619,8 @@
         ))
     (= v (parse_char p '}'))
     @(CHECK v)
+
+    (decr_nest_level p)
     (return (parsed loc (make_expr_user hd (list_reverse args))))
     ))
 @(MEMOIZE node)
