@@ -192,6 +192,11 @@
     (= shell_mode_p @TRUE)
     ))
 
+(fun parse (name p) (
+    (var code (lookup_func current_mod (to_sym name)))
+    (return (byterun code p))
+    ))
+
 (fun parsed (loc val) (
     (return (make_expr Parsed (list2 loc val)))
     ))
@@ -639,7 +644,7 @@
 @(MEMOIZE primary)
 
 (fun parse_expr_ (p) (
-    (return (parse_primary p))
+    (return (parse "PrimaryExpr" p))
     ))
 @(MEMOIZE expr)
 
@@ -663,6 +668,57 @@
 
 (fun add_parser (mod sym func) (
     (add_builtin_function1 mod sym (domainP Parser) func 0)
+    ))
+
+(var Seq (to_sym "Seq"))
+(var ParserVar (to_sym "%Parser")) ; internal use
+(fun make_nodevar (idx) (
+    (return (to_sym (strcat "node" (itos idx))))
+    ))
+
+(fun gen_check (idx stmts) (
+    (var nodevar (make_nodevar idx))
+    (return (list2
+        (make_expr DefineVariable (list2 nodevar (make_expr Block stmts)))
+        (make_expr If (list2
+            (make_expr Equal (list2 (make_expr Head (list1 nodevar)) (quote NoParse)))
+            (make_expr Return (list1 nodevar))
+            ))
+        ))
+
+    ))
+
+(fun compile_parser_element (pat act) (
+    (var hd (expr_head pat))
+    (if (== hd String)
+        (return (list1 (make_expr Apply (list2 (to_sym "Text") (list2 ParserVar pat)))))
+    (if (== hd Seq)
+        (do
+            (var idx 0)
+            (var body 0)
+            (var args (expr_args pat))
+            (while args (do
+                (= body (list_append body (gen_check idx (compile_parser_element (car args) act))))
+                (incr idx)
+                (= args (cdr args))
+                (if args (= body (list_append body (list1 (make_expr Apply (list2 (to_sym "Spaces") (list1 ParserVar)))))))
+                ))
+            (return body)
+        )))
+    (not_reachable "compile_parser_element")
+    ))
+
+(fun compile_parser (pat act) (
+    (var body (compile_parser_element pat act))
+    (return (make_expr Block (list_append body (list1 act))))
+    ))
+
+(export fun define_syntax (sym pat act) (
+    (var body (compile_parser pat act))
+    (var stmt (make_expr DefineFunction
+        (list2 sym (make_expr Lambda (list2 ParserVar body)))))
+    (debugpf stmt)
+    (return stmt)
     ))
 
 (export fun init_parser_funcs (mod) (
