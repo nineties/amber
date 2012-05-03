@@ -53,6 +53,14 @@
     (field_set super 4 (cons sub (list_delete sub (field_get super 4))))
     ))
 
+(export fun is_effective_variable (v) (
+    (if (! v) (return @FALSE))
+    (if (&& (== (expr_head v) ModuleVariable) (== (expr_arg v 1) false))
+        (return @FALSE)
+        )
+    (return @TRUE)
+    ))
+
 (var visited_mark 0)
 (fun fresh_mark () (
     (+= visited_mark 1)
@@ -79,7 +87,7 @@
 (export fun lookup_symbol (mod sig) (
     (var hd (expr_head sig))
     (if (== hd Symbol)
-        (return (lookup_symbol_iter (fresh_mark) mod sig))
+        (return (lookup_symbol_iter (fresh_mark) mod sig @FALSE))
     (if (== hd Qualified)
         (return (lookup_symbol
             (find_module current_loc mod (expr_arg sig 0) @FALSE) (expr_arg sig 1)))
@@ -89,7 +97,20 @@
     (exit 1)
     ))
 
-(fun lookup_symbol_iter (mark mod sym) (
+(export fun lookup_effective_symbol (mod sig) (
+    (var hd (expr_head sig))
+    (if (== hd Symbol)
+        (return (lookup_symbol_iter (fresh_mark) mod sig @TRUE))
+    (if (== hd Qualified)
+        (return (lookup_symbol
+            (find_module current_loc mod (expr_arg sig 0) @FALSE) (expr_arg sig 1)))
+        ))
+    (output_error stderr current_loc)
+    (output_string stderr "invalid argument for lookup_symbol\n")
+    (exit 1)
+    ))
+
+(fun lookup_symbol_iter (mark mod sym find_effective) (
     (while mod (do
         ; check visited-mark
         (if (== (field_get mod 9) mark) break)
@@ -98,12 +119,15 @@
         ; First, lookup variable table.
         (var tbl (field_get mod 5))
         (var v (symtable_find tbl sym))
-        (if v (return v))
+        (if find_effective
+            (if (is_effective_variable v) (return v))
+            (if v (return v))
+            )
 
         ; Next, lookup imported modules.
         (var imports (field_get mod 3))
         (while imports (do
-            (= v (lookup_symbol_iter mark (car imports) sym))
+            (= v (lookup_symbol_iter mark (car imports) sym find_effective))
             (if v (return v))
             (= imports (cdr imports))
             ))
@@ -175,7 +199,7 @@
         (update_display_iter mark (car children) sym box)
         (= children (cdr children))
         ))
-    (return ent)
+    (return val)
     ))
 
 (export fun add_module_variable_display (mod sym box) (

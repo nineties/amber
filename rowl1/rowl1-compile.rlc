@@ -28,6 +28,17 @@
 
 (var compiling_closure null)
 
+(fun trace_func (msg val) (
+    (debugs msg)
+    (debugpf val)
+    (return val)
+    ))
+
+(fun trace (asm msg) (
+    (put_push asm (string msg))
+    (compile_simple_call asm 2 trace_func)
+    ))
+
 (fun topscope_only (mod name) (
     (if (! (in_top_scope mod)) (do
         (output_error stderr current_loc)
@@ -46,14 +57,6 @@
         (output_string stderr "' must be a module variable\n")
         (exit 1)
         ))
-    ))
-
-(fun is_effective_variable (v) (
-    (if (! v) (return @FALSE))
-    (if (&& (== (expr_head v) ModuleVariable) (== (expr_arg v 1) false))
-        (return @FALSE)
-        )
-    (return @TRUE)
     ))
 
 (fun is_identifier (expr) (
@@ -372,6 +375,16 @@
     (compile_simple_call asm 2 make_expr_user)
     ))
 
+(fun compile_head (asm mod expr) (
+    (compile asm mod (expr_arg expr 0))
+    (compile_simple_call asm 1 expr_head)
+    ))
+
+(fun compile_arguments (asm mod expr) (
+    (compile asm mod (expr_arg expr 0))
+    (compile_simple_call asm 1 expr_args)
+    ))
+
 (var max_lvar_idx 0)
 (fun compile_function (asm_body asm_guard mod args body guard) (
     (push_varscope mod)
@@ -505,10 +518,10 @@
 
     (if (in_top_scope mod)
         (do
-            (var ent (add_module_variable mod sym 0))
             (compile asm mod val)
-            (put_push asm (expr_arg ent 0))
-            (put_setcar asm)
+            (put_push asm sym)
+            (put_push asm mod)
+            (compile_simple_call asm 3 add_module_variable)
         )
         (do
             (var idx (get_variable_count mod))
@@ -619,7 +632,7 @@
         return
         ))
 
-    (var v (lookup_symbol mod sym))
+    (var v (lookup_effective_symbol mod sym))
     (if (! v)
         ; `sym' is a module variable
         (= v (add_module_variable_display mod sym (struct 2 uninitialized no_loc)))
@@ -1144,8 +1157,8 @@
         (return (compile asm mod
             (make_expr Assign (list2 sym (make_expr Bind (list2 fun sym))))))
         )
-    (= info (lookup_symbol mod sym))
-    (if (is_effective_variable info)
+    (= info (lookup_effective_symbol mod sym))
+    (if info 
         (return (compile asm mod
             (make_expr DefineVariable (list2 sym (make_expr Bind (list2 fun sym))))))
         (return (compile asm mod
@@ -1213,7 +1226,10 @@
 
     (add_compiler mod (make_expr Qualified (list2 symT DontCare)) compile_qualified)
 
-    (add_compiler mod (make_expr (to_sym "MakeExpression") (list2 DontCare DontCare)) compile_make_expr)
+    (add_compiler mod (make_expr MakeExpression (list2 DontCare DontCare)) compile_make_expr)
+    (add_compiler mod (make_expr Head (list1 DontCare)) compile_head)
+    (add_compiler mod (make_expr Arguments (list1 DontCare)) compile_arguments)
+
     (add_compiler mod (make_expr DefineVariable (list2 symT DontCare)) compile_define_variable)
     (add_compiler mod (make_expr DefineFunction (list2 symT DontCare)) compile_define_function)
     (add_compiler mod (domainP Symbol) compile_var)
@@ -1233,8 +1249,8 @@
 	(add_compiler mod (make_ifelse DontCare DontCare DontCare) compile_ifelse)
     (add_compiler mod (make_expr While (list2 DontCare DontCare)) compile_while)
     (add_compiler mod (make_expr Return (list1 DontCare)) compile_return)
-    (add_compiler mod (make_expr (to_sym "Equal") (list2 DontCare DontCare)) compile_eq)
-    (add_compiler mod (make_expr (to_sym "NotEqual") (list2 DontCare DontCare)) compile_ne)
+    (add_compiler mod (make_expr Equal (list2 DontCare DontCare)) compile_eq)
+    (add_compiler mod (make_expr NotEqual (list2 DontCare DontCare)) compile_ne)
 	(add_compiler mod (make_expr LogicalAnd (list2 DontCare DontCare)) compile_logical)
 	(add_compiler mod (make_expr LogicalOr (list2 DontCare DontCare)) compile_logical)
 

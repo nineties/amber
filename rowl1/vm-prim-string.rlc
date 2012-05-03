@@ -25,6 +25,33 @@
     (return ptr)
     ))
  
+(export prim_itos)
+(char[] 10 int_digits)
+(fun prim_itos (num) (
+    (void* ptr (allocate_pstruct @PLAIN_STRING 12))
+    (int idx 0)
+    (if (< num 0) (
+        ([]=8 ptr idx '-')
+        (incr idx)
+        (= num (neg num))
+        ))
+    (set8 int_digits 0 (+ (% num 10) '0'))
+    (/= num 10)
+    (int i 0)
+    (while (!= num 0) (
+        (incr i)
+        (set8 int_digits i (+ (% num 10) '0'))
+        (/= num 10)
+        ))
+    (while (>= i 0) (
+        ([]=8 ptr idx (get8 int_digits i))
+        (incr idx)
+        (decr i)
+        ))
+    ([]=8 ptr idx 0)
+    (return ptr)
+    ))
+
 (export prim_allocate_string)
 (fun prim_allocate_string (n) (
     (return (allocate_pstruct @PLAIN_STRING (+ n 1)))

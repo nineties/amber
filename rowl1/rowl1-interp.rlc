@@ -176,8 +176,10 @@
     ))
 
 (fun eval_define_syntax (expr) (
-    (debugpf expr)
-    (return (box 1))
+    (var sym (expr_arg expr 0))
+    (var pat (expr_arg expr 1))
+    (var act (expr_arg expr 2))
+    (return (eval (define_syntax sym pat act)))
     ))
 
 (var include_dirs null)
@@ -243,7 +245,6 @@
 
 (fun setup_builtin_functions (mod) (
     (var symT (domainP Symbol))
-    (var listT (domainP List))
     (var blockT (domainP Block))
     (add_builtin_function1 mod Rewrite DontCare default_rewrite 0)
     (add_builtin_function1 mod Rewrite (domainP Located) rewrite_located 0)
@@ -256,7 +257,7 @@
          (make_expr DefModule (list2 (domainP Qualified) blockT))
          eval_define_module 0)
     (add_builtin_function1 mod Eval
-        (make_expr DefSyntax (list3 symT listT DontCare))
+        (make_expr DefSyntax (list3 symT DontCare DontCare))
         eval_define_syntax 0)
     ))
 
