@@ -192,8 +192,8 @@
     (= shell_mode_p @TRUE)
     ))
 
-(fun parse (name p) (
-    (var code (lookup_func current_mod (to_sym name)))
+(export fun parse (name p) (
+    (var code (lookup_func current_mod (qualified "parser" (to_sym name))))
     (return (byterun code p))
     ))
 
@@ -716,14 +716,14 @@
 (export fun define_syntax (sym pat act) (
     (var body (compile_parser pat act))
     (var stmt (make_expr DefineFunction
-        (list2 sym (make_expr Lambda (list2 ParserVar body)))))
+        (list2 sym (make_expr Lambda (list2 (make_expr Domain (list2 ParserVar Parser)) body)))))
     (debugpf stmt)
     (return stmt)
     ))
 
 (export fun init_parser_funcs (mod) (
-    (var std (make_module (to_sym "std") mod))
-    (var parser (make_module (to_sym "parser") std))
+    (var std (find_module no_loc mod (to_sym "std") @TRUE))
+    (var parser (find_module no_loc std (to_sym "parser") @TRUE))
 
     (add_parser parser (to_sym "Decimal") parse_decimal)
     (add_parser parser (to_sym "Binary") parse_binary)

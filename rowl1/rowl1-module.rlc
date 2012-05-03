@@ -43,7 +43,7 @@
         0                   ; visited-mark
         ))
     (if super (do
-        (if sym (add_symbol super sym mod))
+        (if sym (add_module_variable super sym mod))
         (add_child super mod)
         ))
     (return mod)
@@ -229,28 +229,17 @@
 (export fun find_module (loc curmod sig createp) (
     (var hd (expr_head sig))
     (if (== hd Symbol) (do
-        (var mod (lookup_symbol curmod sig))
-        (if (&& mod (!= (node_type mod) @ModuleE)) (do
-            (output_loc stderr loc)
-            (output_string stderr "variable ")
-            (output_symbol stderr sig)
-            (output_string stderr " is already defined\n")
-            (exit 1)
+        (var mod (lookup_effective_symbol curmod sig))
+        (if mod (return (car (expr_arg mod 0))))
+        (if createp
+            (return (make_module sig curmod))
+            (do
+                (output_loc stderr loc)
+                (output_string stderr "module `")
+                (output_symbol stderr sig)
+                (output_string stderr "' is not found\n")
+                (exit 1)
             ))
-        (if (! mod)
-            (if createp
-                (do
-                    (= mod (make_module sig curmod))
-                    (add_symbol curmod sig mod)
-                )
-                (do
-                    (output_loc stderr loc)
-                    (output_string stderr "module `")
-                    (output_symbol stderr sig)
-                    (output_string stderr "' is not found\n")
-                    (exit 1)
-                )))
-        (return mod)
         ))
     (if (== hd Qualified)
         (return (find_module loc
@@ -353,7 +342,7 @@
         (output_symbol ochan sym)
         (output_string ochan "(anonym)")
         )
-    (output_string stderr ":")
+    (output_string ochan ":")
     (output_hex ochan obj 8)
     (output_char ochan '>')
     ))
