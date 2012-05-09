@@ -52,7 +52,7 @@
     (import_module current_loc current_mod (to_sym "std"))
 
     (init_parser_funcs current_mod)
-    ;(import_module current_loc current_mod (qualified "std" (to_sym "parser")))
+    (import_module current_loc current_mod (qualified "std" (to_sym "parser")))
     (var p (init_parser file ichan))
     (= current_loc (get_loc p))
 
@@ -91,7 +91,7 @@
 
 (fun interpret (p) (
     (while 1 (do
-        (var e (parse "Stmt" p))
+        (var e (parse "parse_statement" p))
         (if (== e EOF)
             (return 0)
             )
@@ -179,7 +179,12 @@
     (var sym (expr_arg expr 0))
     (var pat (expr_arg expr 1))
     (var act (expr_arg expr 2))
-    (return (eval (define_syntax sym pat act)))
+    (var stmts (compile_define_syntax sym pat act))
+    (while stmts (do
+        (eval (car stmts))
+        (= stmts (cdr stmts))
+        ))
+    (return 0)
     ))
 
 (var include_dirs null)

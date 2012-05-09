@@ -10,6 +10,8 @@
 
 (compile `object `(
 
+(import "rowl1-util")
+
 ; structur of table
 ;
 ; symtable
@@ -23,7 +25,7 @@
 ;   2 : pointer to the next entry
 ;   3 : hash
 ;   4 : name space id
-;   5 : index of entries
+;   5 : index for the entries
 
 (array int prime_numbers (
     5 11 17 37 67 131 257 521 1031 2053 4099 8209 16411 32771 65537 131101
@@ -69,8 +71,10 @@
     (var begin (- end npop))
     (while (< begin end) (do
         (var entry (vector_at entries begin))
-        (var h (% (field_get entry 3) size))
-        (vector_put bucket h (field_get (vector_at bucket h) 2))
+        (if entry (do
+            (var h (% (field_get entry 3) size))
+            (vector_put bucket h (field_get (vector_at bucket h) 2))
+            ))
         (incr begin)
         ))
     (vector_resize entries (- end npop))
@@ -136,16 +140,22 @@
     (var h (hash sym))
     (var depth (ivector_size display))
 
-    (if (== depth 0) (error "symtable_add: no namespace"))
+    (if (== depth 0) (error "symtable_add_to_global: no namespace"))
 
     (var ngvar (ivector_at display 0))
     (var ent (struct 3 sym obj 0 h 1 ngvar))
     (%= h size)
 
+    ; increment indices of entries
+    (for i 0 (vector_size entries) (do
+        (var entry (vector_at entries i))
+        (if entry (field_set entry 5 (+ (field_get entry 5) 1)))
+        ))
+
     (vector_pushfront entries ent)
 
     ; insert `ent' to front of link
-    (var entries (vector_at bucket h))
+    (= entries (vector_at bucket h))
     (var prev 0)
     (while entries (do
         (var e_sym (field_get entries 0))
@@ -171,7 +181,7 @@
 
     ))
 
-; delete most recent entry
+; delete the most recent entry
 (export fun symtable_delete (table sym) (
     (var bucket (field_get table 0))
     (var entries (field_get table 1))
@@ -260,7 +270,7 @@
     (var count 0)
     (while (< begin end) (do
         (var entry (vector_at entries begin))
-        (if entries (+= count 1))
+        (if entry (+= count 1))
         (incr begin)
         ))
     (return count)

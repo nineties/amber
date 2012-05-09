@@ -57,6 +57,8 @@
 (export var If          (to_sym "If"))
 (export var Else        (to_sym "Else"))
 (export var While       (to_sym "While"))
+(export var Break       (to_sym "Break"))
+(export var Continue    (to_sym "Continue"))
 (export var Not         (to_sym "Not"))
 (export var LogicalAnd  (to_sym "LogicalAnd"))
 (export var LogicalOr   (to_sym "LogicalOr"))
@@ -92,20 +94,24 @@
 (export var Builtin          (to_builtin_sym "Builtin"))
 (export var Bytecode         (to_builtin_sym "Bytecode"))
 (export var Function         (to_builtin_sym "Function"))
-(export var BoundFunction    (to_builtin_sym "BoundFunction"))
 (export var Closure          (to_builtin_sym "Closure"))
 (export var InputFileStream  (to_builtin_sym "InputFileStream"))
 (export var OutputFileStream (to_builtin_sym "OutputFileStream"))
 (export var Module           (to_builtin_sym "Module"))
+
+; for parser
 (export var Parser           (to_builtin_sym "Parser"))
+(export var Many             (to_sym "Many"))
+(export var Many1            (to_sym "Many1"))
 
 ; internal nodes
-(export var ModuleVariable        (to_sym "%ModuleVariable"))
-(export var LocalVariable         (to_sym "%LocalVariable"))
-(export var Arity                 (to_sym "%Arity"))
-(export var Argument              (to_sym "%Argument"))
-(export var ListAt                (to_sym "%ListAt"))
-(export var ExprAt                (to_sym "%ExprAt"))
+(export var ModuleVariable (to_sym "%ModuleVariable"))
+(export var LocalVariable  (to_sym "%LocalVariable"))
+(export var Label          (to_sym "%Label"))
+(export var Arity          (to_sym "%Arity"))
+(export var Argument       (to_sym "%Argument"))
+(export var ListAt         (to_sym "%ListAt"))
+(export var ExprAt         (to_sym "%ExprAt"))
 
 (export fun to_builtin_sym (name) (
     (var sym (idtable_find symbol_table name))
@@ -125,6 +131,10 @@
     (+= symbol_index_gen 1)
     (idtable_add symbol_table name sym)
     (return sym)
+    ))
+
+(export fun unique_sym () (
+    (return (to_sym (strcat "%s" (itos symbol_index_gen))))
     ))
 
 (fun is_builtin_sym (sym) (
@@ -231,7 +241,7 @@
         (@AssemblerE        . (return Assembler))
         (@BytecodeE         . (return Bytecode))
         (@FunctionE         . (return Function))
-        (@BoundFunctionE    . (return BoundFunction))
+        (@BoundFunctionE    . (return Function))
         (@InputFileStreamE  . (return InputFileStream))
         (@OutputFileStreamE . (return OutputFileStream))
         (@ModuleE           . (return Module))
@@ -426,7 +436,7 @@
         (@AssemblerE        . (return (output_string ochan "Assembler")))
         (@BytecodeE         . (return (output_string ochan "Bytecode")))
         (@FunctionE         . (return (output_string ochan "Function")))
-        (@BoundFunctionE    . (return (output_string ochan "BoundFunction")))
+        (@BoundFunctionE    . (return (output_string ochan "Function")))
         (@InputFileStreamE  . (return (output_string ochan "InputFileStream")))
         (@OutputFileStreamE . (return (output_string ochan "OutputFileStream")))
         (@ModuleE           . (return (output_string ochan "Module")))
@@ -606,7 +616,7 @@
     ))
 
 (fun pp_bound (ochan expr) (
-    (output_string ochan "<#BoundFunction:")
+    (output_string ochan "<#Function:")
     (output_hex ochan expr 8)
     (output_char ochan ':')
     (pretty_print_full ochan (field_get expr 2))
@@ -742,13 +752,6 @@
         ))
     (output_char ochan ']')
     ))
-
-(export fun debugc (c) ((output_char stderr c)))
-(export fun debugs (s) ((output_string stderr s)))
-(export fun debugi (i) ((output_int stderr i)))
-(export fun debugx (x) ((output_hex stderr x 8)))
-(export fun debugp (o) ((pretty_print stderr o) (debugc '\n')))
-(export fun debugpf (o) ((pretty_print_full stderr o) (debugc '\n')))
 
 
     ))

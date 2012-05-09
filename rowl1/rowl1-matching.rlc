@@ -21,11 +21,11 @@
 (var varP      (to_sym "%Var"))
 (var headP     (to_sym "%HeadPattern"))
 
-(export fun compile_matching (loc name def) (
+(export fun compile_matching (loc obj def) (
     (var ty (node_type def))
     (if (&& (!= ty @BoundFunctionE) (!= ty @FunctionE)) (do
         (output_error stderr loc)
-        (pretty_print stderr name)
+        (pretty_print stderr obj)
         (output_string stderr " is not a function\n")
         (exit 1)
         ))
@@ -33,7 +33,7 @@
     (var cache (field_get def 1))
     (if cache (return cache))
 
-    ; here, `def' has form of Function{ ... } or BoundFunction{ ... }
+    ; here, `def' has form of Function{ ... }
 
     ; construct pattern matrix 
     (var mat (construct_pattern_matrix def))
@@ -48,7 +48,7 @@
 
     (var asm (make_assembler))
     (compile_matching_main asm args mat)
-    (compile_matching_error asm loc name)
+    (compile_matching_error asm loc)
 
     (field_set def 1 (get_code asm)) ; caching
 
@@ -62,7 +62,7 @@
     ))
 
 (fun construct_pattern_matrix_sub (len def tl) (
-    (if (== (expr_head def) Function)
+    (if (== (node_type def) @FunctionE)
         (return (cons (construct_row len def) tl))
         )
     ; here `def' is a BoundFunction
@@ -73,7 +73,7 @@
     ))
 
 (fun max_arity (def) (
-    (if (== (expr_head def) Function)
+    (if (== (node_type def) @FunctionE)
         (return (list_len (field_get def 2)))
         )
     ; here `def' is a BoundFunction 
@@ -616,13 +616,9 @@
     ))
 
 (var arity_max 8)
-(fun matching_error (loc name arity args) (
+(fun matching_error (loc arity args) (
     (output_error stderr loc)
     (output_string stderr "no definition matches to argument(s): ")
-    (if name
-        (pretty_print stderr name)
-        (output_string stderr "<unnamed function>")
-        )
     (output_char stderr '(')
     (while args (do
         (pretty_print_full stderr (car args))
@@ -636,7 +632,7 @@
     (exit 1)
     ))
 
-(fun compile_matching_error (asm loc name) (
+(fun compile_matching_error (asm loc) (
     ; construct list of arguments
     (var end_lbl (fresh_label asm))
     (var case_lbls (array int arity_max))
@@ -659,9 +655,8 @@
         (set_label asm (array_get int case_lbls arg_idx))
         ))
     (put_arity asm)
-    (put_push asm name)
     (put_push asm loc)
-    (compile_simple_call asm 4 matching_error)
+    (compile_simple_call asm 3 matching_error)
     ))
 
     ))

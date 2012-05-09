@@ -34,7 +34,7 @@
 (define CHGRP (c) `(array_get char chgroup @c))
 (define MEMOIZE (sym)
     `(export fun @(s++ `parse_ sym) (p) (
-        (var s (to_sym @(tos sym)))
+        (var s (to_sym (strcat "parse_" @(tos sym))))
         (var tbl (field_get (field_get p 1) 2))
         (var pos (field_get p 3))
         (var v (memotable_find tbl s pos))
@@ -57,7 +57,7 @@
             `(do
               (= v (@(s++ `parse_ f) @p))
               (if (== (expr_head v) Parsed) (goto @end_lbl))
-              (= errors (noparse_merge errors v))
+              (= errors (merge_noparse errors v))
               (set_parser_state @p state)
              )) ps))
         (= v errors)
@@ -193,7 +193,7 @@
     ))
 
 (export fun parse (name p) (
-    (var code (lookup_func current_mod (qualified "parser" (to_sym name))))
+    (var code (lookup_func current_mod (to_sym name)))
     (return (byterun code p))
     ))
 
@@ -203,7 +203,7 @@
 (fun noparse (loc msg) (
     (return (make_expr NoParse (list1 (list2 loc (string msg)))))
     ))
-(fun noparse_merge (lhs rhs) (
+(fun merge_noparse (lhs rhs) (
     (if (! lhs) (return rhs))
     (if (! rhs) (return lhs))
     (return (make_expr NoParse (list_append (expr_args lhs) (expr_args rhs))))
@@ -404,7 +404,7 @@
     (return (parsed loc (string str)))
     ))
 
-; Integers
+; parse_integers
 ; multi-precision integer is not supported for now
 (fun parse_decimal_ (p) (
     (var loc (get_loc p))
@@ -644,7 +644,7 @@
 @(MEMOIZE primary)
 
 (fun parse_expr_ (p) (
-    (return (parse "PrimaryExpr" p))
+    (return (parse "parse_primary" p))
     ))
 @(MEMOIZE expr)
 
@@ -670,73 +670,243 @@
     (add_builtin_function1 mod sym (domainP Parser) func 0)
     ))
 
+(fun to_parse (sym) (
+    (return (to_sym (strcat "parse_" (symbol_name sym))))
+    ))
+
 (var Seq (to_sym "Seq"))
 (var ParserVar (to_sym "%Parser")) ; internal use
 (fun make_nodevar (idx) (
     (return (to_sym (strcat "node" (itos idx))))
     ))
-
+(fun gen_at (node idx) (
+    (return (make_expr Subscript (list2 node (box idx))))
+    ))
 (fun gen_check (idx stmts) (
     (var nodevar (make_nodevar idx))
-    (return (list2
+    (return (list4
         (make_expr DefineVariable (list2 nodevar (make_expr Block stmts)))
         (make_expr If (list2
             (make_expr Equal (list2 (make_expr Head (list1 nodevar)) (quote NoParse)))
             (make_expr Return (list1 nodevar))
             ))
+        (make_expr Assign (list2 nodevar (gen_at nodevar 1)))
         ))
-
     ))
 
-(fun compile_parser_element (pat act) (
+(fun compile_parser_element (pat) (
     (var hd (expr_head pat))
+    (if (== hd Symbol)
+        (return (make_expr Apply (list2 (to_parse pat) (list1 ParserVar)))))
     (if (== hd String)
-        (return (list1 (make_expr Apply (list2 (to_sym "Text") (list2 ParserVar pat)))))
-    (if (== hd Seq)
-        (do
-            (var idx 0)
-            (var body 0)
-            (var args (expr_args pat))
-            (while args (do
-                (= body (list_append body (gen_check idx (compile_parser_element (car args) act))))
-                (incr idx)
-                (= args (cdr args))
-                (if args (= body (list_append body (list1 (make_expr Apply (list2 (to_sym "Spaces") (list1 ParserVar)))))))
-                ))
-            (return body)
-        )))
+        (return (make_expr Apply (list2 (to_sym "parse_text") (list2 ParserVar pat)))))
+    (if (== hd Many)
+        (return (compile_many (expr_args pat)))
+        )
     (not_reachable "compile_parser_element")
     ))
 
-(fun compile_parser (pat act) (
-    (var body (compile_parser_element pat act))
-    (return (make_expr Block (list_append body (list1 act))))
+; List{ p1, p2, ...} is translated to
+;
+; elems = []
+; v = p1
+; if (v == NoParse) (return v)
+; elems = cons(val(v), elems)
+; v = p2
+; if (v == NoParse) (return v)
+; elems = cons(val(v), elems)
+; ...
+; return Parsed{merge{loc(p1), loc(pn)}, reverse(elems)}
+
+(fun compile_seq (elems) (
+    (var body 0)
+    (var tmp (unique_sym))
+    (var ret (unique_sym))
+    (var bloc (unique_sym))
+    (var eloc (unique_sym))
+    (var loc (to_sym "%Loc"))
+    (var firstp @TRUE)
+
+    (= body (cons (make_expr DefineVariable (list2 tmp 0)) body))
+    (= body (cons (make_expr DefineVariable (list2 ret 0)) body))
+    (while elems (do
+        (= body (cons (make_expr Assign (list2 tmp (compile_parser_element (car elems)))) body))
+        (= body (cons (make_expr If (list2
+            (make_expr Equal (list2 (make_expr Head (list1 tmp)) (quote NoParse)))
+            (make_expr Return (list1 tmp))
+            )) body))
+        (if firstp
+            (= body (cons (make_expr DefineVariable (list2 bloc (gen_at tmp 0))) body))
+            )
+        (= body (cons (make_expr Assign (list2 ret (make_expr Apply (list2 (to_sym "cons") (list2 (gen_at tmp 1) ret))))) body))
+        (= elems (cdr elems))
+        (if elems 
+            (= body (cons (make_expr Apply (list2 (to_sym "parse_spaces") (list1 ParserVar))) body))
+            (= body (cons (make_expr DefineVariable (list2 eloc (gen_at tmp 0))) body))
+            )
+        (= firstp @FALSE)
+        ))
+    (= body (cons (make_expr DefineVariable (list2 loc
+        (make_expr Apply (list2 (to_sym "%merge_loc") (list2 bloc eloc))))) body))
+    (= body (cons (qquote (make_expr Parsed (list2 (unquote loc) (unquote (make_expr Apply (list2 (to_sym "reverse") (list1 ret))))))) body))
+    (return (list_reverse body))
     ))
 
-(export fun define_syntax (sym pat act) (
-    (var body (compile_parser pat act))
-    (var stmt (make_expr DefineFunction
+; Many{ p } is translated to
+;
+; elems = []
+; state = copy_parser_state(..)
+; while true {
+;     v = p
+;     if (head(v) == NoParse) break
+;     elems = cons(val(v), elems)
+;     state = copy_parser_state(..)
+; }
+; set_parser_state(state)
+; Parsed{loc, reverse(elems)}
+
+(fun compile_many (items) (
+    (var v     (unique_sym))
+    (var state (unique_sym))
+    (var elems (unique_sym))
+    (var bloc  (unique_sym))
+    (var eloc  (unique_sym))
+    (var loc   (to_sym "%Loc"))
+    (var p (make_expr Apply (list2
+        (make_expr Lambda (list2 ParserVar
+        (make_expr Block (compile_seq items))))
+        (list1 ParserVar))))
+
+    (var loop_body 0)
+    (= loop_body (cons (make_expr DefineVariable (list2 v p)) loop_body))
+    (= loop_body (cons (make_expr If (list2
+            (make_expr Equal (list2 (make_expr Head (list1 v)) (quote NoParse)))
+            Break)) loop_body))
+    (= loop_body (cons (make_expr Assign (list2 eloc (gen_at v 0))) loop_body))
+    (= loop_body (cons (make_expr Assign (list2 elems (make_expr Apply (list2 (to_sym "cons") (list2 (gen_at v 1) elems))))) loop_body))
+    (= loop_body (cons (make_expr Assign (list2 state (make_expr Apply (list2 (to_sym "%copy_parser_state") (list1 ParserVar))))) loop_body))
+
+    (var body 0)
+    (= body (cons (make_expr DefineVariable (list2 bloc (make_expr Apply (list2 (to_sym "%get_loc") (list1 ParserVar))))) body))
+    (= body (cons (make_expr DefineVariable (list2 eloc (make_expr Apply (list2 (to_sym "%get_loc") (list1 ParserVar))))) body))
+    (= body (cons (make_expr DefineVariable (list2 elems 0)) body))
+    (= body (cons (make_expr DefineVariable (list2 state (make_expr Apply (list2 (to_sym "%copy_parser_state") (list1 ParserVar))))) body))
+    (= body (cons (make_expr While (list2 true
+            (make_expr Block (list_reverse loop_body)))) body))
+    (= body (cons (make_expr Assign (list2 state (make_expr Apply (list2 (to_sym "%set_parser_state") (list2 ParserVar state))))) body))
+    (= body (cons (make_expr DefineVariable (list2 loc
+        (make_expr Apply (list2 (to_sym "%merge_loc") (list2 bloc eloc))))) body))
+    (= body (cons (qquote (make_expr Parsed (list2 (unquote loc) (unquote (make_expr Apply (list2 (to_sym "reverse") (list1 elems))))))) body))
+    (return (make_expr Block (list_reverse body)))
+    ))
+
+(fun compile_parser_func (sym elems act) (
+    (var idx 0)
+    (var body 0)
+    (var bloc (unique_sym))
+    (var eloc (unique_sym))
+    (var loc (to_sym "%Loc"))
+
+    (while elems (do
+        (var ndvar (make_nodevar idx))
+        (= body (cons (make_expr DefineVariable
+            (list2 ndvar (compile_parser_element (car elems)))) body))
+        (= body (cons (make_expr If (list2
+            (make_expr Equal (list2 (make_expr Head (list1 ndvar)) (quote NoParse)))
+            (make_expr Return (list1 ndvar))
+            )) body))
+        (if (== idx 0)
+            (= body (cons (make_expr DefineVariable (list2 bloc (gen_at ndvar 0))) body))
+            )
+        (incr idx)
+        (= elems (cdr elems))
+        (if elems 
+            (= body (cons (make_expr Apply (list2 (to_sym "parse_spaces") (list1 ParserVar))) body))
+            (= body (cons (make_expr DefineVariable (list2 eloc (gen_at ndvar 0))) body))
+            )
+        (= body (cons (make_expr Assign (list2 ndvar (gen_at ndvar 1))) body))
+        ))
+    (= body (cons (make_expr DefineVariable (list2 loc
+        (make_expr Apply (list2 (to_sym "%merge_loc") (list2 bloc eloc))))) body))
+    (= body (cons (qquote (make_expr Parsed (list2 (unquote loc) (unquote act)))) body))
+
+    (= body (make_expr Block (list_reverse body)))
+    (return (make_expr DefineFunction
         (list2 sym (make_expr Lambda (list2 (make_expr Domain (list2 ParserVar Parser)) body)))))
-    (debugpf stmt)
-    (return stmt)
+    ))
+
+(extern fun compile_matching)
+(fun parse_helper (p sym new orig) (
+    (var tbl (field_get (field_get p 1) 2))
+    (var pos (field_get p 3))
+    (var v (memotable_find tbl sym pos))
+    (if v (do
+        (field_set p 3 (cdr v))
+        (return (car v))
+        ))
+    (var loc (get_loc p))
+    (var state (copy_parser_state p))
+    (var errors 0)
+
+    (= v (byterun (compile_matching loc sym new) p))
+    (if (== (expr_head v) Parsed) (goto end_lbl))
+    (= errors (merge_noparse errors v))
+    (set_parser_state p state)
+
+    (= v (byterun (compile_matching loc sym orig) p))
+    (if (== (expr_head v) Parsed) (goto end_lbl))
+    (= errors (merge_noparse errors v))
+    (set_parser_state p state)
+
+    (label end_lbl)
+    (memotable_add tbl sym pos (cons v (field_get p 3)))
+    (return v)
+    ))
+
+(fun compile_parser (sym new orig) (
+    (return (make_expr DefineFunction (list2 sym
+        (make_expr Lambda (list2 (make_expr Domain (list2 ParserVar Parser))
+        (make_expr Apply (list2 (to_sym "%parse_helper") (list4 ParserVar (quote sym) new orig)))
+        )))))
+    ))
+
+(export fun compile_define_syntax (sym pat act) (
+    (= sym (to_parse sym))
+    (var parser_sym (unique_sym))
+    (var copy_sym   (unique_sym))
+    (var new_parser_stmt (compile_parser_func parser_sym pat act))
+    (var stmts (list3
+        (make_expr DefineVariable (list2 copy_sym sym))
+        new_parser_stmt
+        (compile_parser sym parser_sym copy_sym)
+        ))
+    (return stmts)
     ))
 
 (export fun init_parser_funcs (mod) (
     (var std (find_module no_loc mod (to_sym "std") @TRUE))
     (var parser (find_module no_loc std (to_sym "parser") @TRUE))
 
-    (add_parser parser (to_sym "Decimal") parse_decimal)
-    (add_parser parser (to_sym "Binary") parse_binary)
-    (add_parser parser (to_sym "Octal") parse_octal)
-    (add_parser parser (to_sym "Hexadecimal") parse_hex)
-    (add_parser parser (to_sym "Integer") parse_integer)
-    (add_parser parser (to_sym "String") parse_string)
-    (add_parser parser (to_sym "Symbol") parse_symbol)
+    (add_builtin_function1 parser (to_sym "%get_loc") (domainP Parser) get_loc 0)
+    (add_builtin_function2 parser (to_sym "%merge_loc") (domainP Loc) (domainP Loc) merge_loc 0)
+    (add_builtin_function1 parser (to_sym "%copy_parser_state") (domainP Parser) copy_parser_state 0)
+    (add_builtin_function2 parser (to_sym "%set_parser_state") (domainP Parser) (domainP Parser) set_parser_state 0)
+    (add_builtin_function4 parser (to_sym "%parse_helper") (domainP Parser) (domainP Symbol) (domainP Function) (domainP Function) parse_helper 0)
+    (add_builtin_function2 parser (to_sym "parse_text") (domainP Parser) (domainP String) parse_text 0)
+
+    (add_parser parser (to_sym "parse_spaces") parse_spaces)
+    (add_parser parser (to_sym "parse_decimal") parse_decimal)
+    (add_parser parser (to_sym "parse_binary") parse_binary)
+    (add_parser parser (to_sym "parse_octal") parse_octal)
+    (add_parser parser (to_sym "parse_hex") parse_hex)
+    (add_parser parser (to_sym "parse_integer") parse_integer)
+    (add_parser parser (to_sym "parse_string") parse_string)
+    (add_parser parser (to_sym "parse_symbol") parse_symbol)
 
     ; expressions
-    (add_parser parser (to_sym "PrimaryExpr") parse_primary)
-    (add_parser parser (to_sym "Expr") parse_expr)
-    (add_parser parser (to_sym "Stmt") parse_stmt)
+    (add_parser parser (to_sym "parse_primary") parse_primary)
+    (add_parser parser (to_sym "parse_expression") parse_expr)
+    (add_parser parser (to_sym "parse_statement") parse_stmt)
     ))
 
 (export fun output_syntax_errors (e) (

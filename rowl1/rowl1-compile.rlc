@@ -71,7 +71,7 @@
 
 (export fun callable (expr) (
     (var hd (expr_head expr))
-    (if (|| (== hd Function) (== hd BoundFunction))
+    (if (== hd Function)
         (return @TRUE)
         )
     (return @FALSE)
@@ -216,9 +216,11 @@
         (return expr)
         (symtable_pop env)
         ))
-    (if (== hd Lambda) 
-        (return (close mod env (close_function mod env expr)))
-        )
+    (if (== hd Lambda) (do
+        (var closed (close_function mod env expr))
+        (if (! closed) (return expr))
+        (return (close mod env closed))
+        ))
     (if (== hd BuildClosure) (do
         (expr_arg_set expr 1 (close mod env (expr_arg expr 1)))
         (return expr)
@@ -262,7 +264,7 @@
 (fun close_function (mod env lam) (
     ; XXX: implementation is not completed
     (var fv (free_variables mod env lam))
-    (if (! fv) (return lam))
+    (if (! fv) (return 0))
     (var tbl (make_closure_env Closure fv))
     (collect_args tbl (expr_args (expr_arg lam 0)))
     (expr_arg_set lam 1 (close mod tbl (expr_arg lam 1)))
@@ -303,6 +305,10 @@
         ))
     (var loc (field_get box 1))
     (return (compile_matching loc sym func))
+    ))
+
+(export fun get_bytecode (obj func) (
+    (return (compile_matching current_loc obj func))
     ))
 
 (fun undefined_error (sym args) (
@@ -363,9 +369,13 @@
     (compile asm mod (expr_arg expr 1))
     ))
 
-(fun compile_qualified (asm curmod expr) (
+(fun compile_bool (asm mod expr) (
+    (put_push asm expr)
+    ))
+
+(fun compile_qualified (asm mod expr) (
     (var modsig (expr_arg expr 0))
-    (var module (find_module current_loc curmod modsig @FALSE))
+    (var module (find_module current_loc mod modsig @FALSE))
     (compile asm module (expr_arg expr 1))
     ))
 
@@ -383,6 +393,15 @@
 (fun compile_arguments (asm mod expr) (
     (compile asm mod (expr_arg expr 0))
     (compile_simple_call asm 1 expr_args)
+    ))
+
+(fun compile_subscript (asm mod expr) (
+    (compile asm mod (expr_arg expr 0))
+    (put_field_get2 asm)
+    (compile asm mod (expr_arg expr 1))
+    (put_imm_i1 asm)
+    (put_sar asm)
+    (put_list_at asm)
     ))
 
 (var max_lvar_idx 0)
@@ -490,6 +509,10 @@
 
 (fun make_lvar (idx) (
     (return (make_expr LocalVariable (list2 (box idx) current_loc)))
+    ))
+
+(fun make_label (lbl) (
+    (return (make_expr Label (list2 (box lbl) current_loc)))
     ))
 
 (export fun get_arity () (
@@ -924,6 +947,9 @@
     (var body (expr_arg expr 1))
     (var exit_lbl (fresh_label asm))
     (var head_lbl (fresh_label asm))
+
+    (add_symbol mod Label (make_label exit_lbl))
+
     (compile asm mod cnd)
     (put_if_false asm exit_lbl)
     (set_label asm head_lbl)
@@ -933,6 +959,22 @@
     (put_if_true asm head_lbl)
     (set_label asm exit_lbl)
     (put_nil asm)
+
+    (delete_symbol mod Label)
+    ))
+
+(fun compile_break (asm mod expr) (
+    (var lbl (lookup_symbol mod Label))
+    (if (! lbl) (do
+        (output_error stderr current_loc)
+        (output_string stderr "`break' statement outside loop\n")
+        (exit 1)
+        ))
+    (if (!= (expr_head lbl) Label)
+        (not_reachable "compile_break")
+        )
+    (put_nil asm)
+    (put_goto asm (expr_arg_int lbl 0))
     ))
 
 (fun compile_assign (asm mod expr) (
@@ -1232,7 +1274,11 @@
 
     (add_compiler mod (make_expr DefineVariable (list2 symT DontCare)) compile_define_variable)
     (add_compiler mod (make_expr DefineFunction (list2 symT DontCare)) compile_define_function)
+
     (add_compiler mod (domainP Symbol) compile_var)
+    (add_compiler mod (quote true) compile_bool)
+    (add_compiler mod (quote false) compile_bool)
+
     (add_compiler mod (make_expr Apply (list2 DontCare listT)) compile_apply)
 
     (add_compiler mod (qquote (quote (unquote DontCare))) compile_quote)
@@ -1248,6 +1294,8 @@
     (add_compiler mod (make_expr If (list2 DontCare DontCare)) compile_if)
 	(add_compiler mod (make_ifelse DontCare DontCare DontCare) compile_ifelse)
     (add_compiler mod (make_expr While (list2 DontCare DontCare)) compile_while)
+    (add_compiler mod (quote Break) compile_break) 
+
     (add_compiler mod (make_expr Return (list1 DontCare)) compile_return)
     (add_compiler mod (make_expr Equal (list2 DontCare DontCare)) compile_eq)
     (add_compiler mod (make_expr NotEqual (list2 DontCare DontCare)) compile_ne)
@@ -1259,6 +1307,8 @@
          compile_assign)
     (add_compiler mod (make_expr Lambda (list2 DontCare DontCare)) compile_lambda)
     (add_compiler mod (make_expr Bind (list2 DontCare DontCare)) compile_bind)
+
+    (add_compiler mod (make_expr Subscript (list2 DontCare intT)) compile_subscript)
 
     ; internal expressions
     (add_compiler mod (make_expr BuildClosure (list2 DontCare DontCare)) compile_build_closure)
