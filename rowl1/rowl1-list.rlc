@@ -37,6 +37,9 @@
     (return (cons a b))
     ))
 
+(fun ls_car (a) ((return (car a))))
+(fun ls_cdr (a) ((return (cdr a))))
+
 (fun ls_reverse (ls) (
     (return (list_reverse ls))
     ))
@@ -45,15 +48,29 @@
     (return (list_append a b))
     ))
 
+(fun ls_map (f ls) (
+    (var new_ls 0)
+    (var code (get_bytecode (string "first argument for map") f))
+    (while ls (do
+        (= new_ls (cons (byterun code (car ls)) new_ls))
+        (= ls (cdr ls))
+        ))
+    (return (list_reverse new_ls))
+    ))
+
 (extern object exec_env)
 (export fun setup_list (mod) (
     (var ListT (domainP List))
     (var IntT (domainP Int))
+    (var FunT (domainP Function))
     (add_builtin_function2 mod Subscript ListT IntT ls_at 0)
     (add_builtin_function1 mod (to_sym "length") ListT ls_length 0)
     (add_builtin_function2 mod (to_sym "cons") DontCare ListT ls_cons 0)
+    (add_builtin_function1 mod (to_sym "car") ListT ls_car 0)
+    (add_builtin_function1 mod (to_sym "cdr") ListT ls_cdr 0)
     (add_builtin_function1 mod (to_sym "reverse") ListT ls_reverse 0)
     (add_builtin_function2 mod (to_sym "append") ListT ListT ls_append 0)
+    (add_builtin_function2 mod (to_sym "map") FunT ListT ls_map 0)
     ))
 
     ))
