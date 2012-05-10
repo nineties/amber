@@ -200,17 +200,30 @@
 (fun parsed (loc val) (
     (return (make_expr Parsed (list2 loc val)))
     ))
+
 (fun noparse (loc msg) (
     (return (make_expr NoParse (list1 (list2 loc (string msg)))))
     ))
+
 (fun merge_noparse (lhs rhs) (
     (if (! lhs) (return rhs))
     (if (! rhs) (return lhs))
     (return (make_expr NoParse (list_append (expr_args lhs) (expr_args rhs))))
     ))
+
+(fun negate (val p) (
+    (var hd (expr_head val))
+    (var loc (get_loc p))
+    (if (== hd Parsed)
+        (return (noparse loc "unexpected token"))
+        (return (parsed loc 0))
+        )
+    ))
+
 (fun integer_overflow (loc) (
     (return (noparse loc "integer literal is too large"))
     ))
+
 (fun junk_letter (loc) (
     (return (noparse loc "junk letter(s) at the end of integer literal"))
     ))
@@ -712,6 +725,12 @@
     (if (== hd Option)
         (return (compile_option (expr_arg pat 0)))
         )
+    (if (== hd And)
+        (return (compile_and (expr_arg pat 0)))
+        )
+    (if (== hd Not)
+        (return (compile_not (expr_arg pat 0)))
+        )
     (output_error stderr current_loc)
     (output_string stderr "invalid syntax element: ")
     (pretty_print stderr pat)
@@ -943,6 +962,39 @@
             
     ))
 
+; And{ p } is translated to
+;
+; state = copy_parser_state(parser)
+; v = p
+; set_parser_state(parser, state)
+; v
+(fun compile_and (p) (
+    (var state (unique_sym))
+    (var v (unique_sym))
+    (return (make_expr Block (list4
+        (make_expr DefineVariable (list2 state (gen_copy_parser_state)))
+        (make_expr DefineVariable (list2 v (compile_parser_element p)))
+        (gen_set_parser_state state)
+        v)))
+    ))
+
+; Not{ p } is translated to
+;
+; state = copy_parser_state(parser)
+; v = p
+; set_parser_state(parser, state)
+; negate(v)
+(fun compile_not (p) (
+    (var state (unique_sym))
+    (var v (unique_sym))
+    (return (make_expr Block (list4
+        (make_expr DefineVariable (list2 state (gen_copy_parser_state)))
+        (make_expr DefineVariable (list2 v (compile_parser_element p)))
+        (gen_set_parser_state state)
+        (make_expr Apply (list2 (to_sym "%negate") (list1 v)))
+        )))
+    ))
+
 (fun compile_parser_func (sym elems act) (
     (var idx 0)
     (var body 0)
@@ -1036,6 +1088,7 @@
     (add_builtin_function2 parser (to_sym "%set_parser_state") (domainP Parser) (domainP Parser) set_parser_state 0)
     (add_builtin_function4 parser (to_sym "%parse_helper") (domainP Parser) (domainP Symbol) (domainP Function) (domainP Function) parse_helper 0)
     (add_builtin_function2 parser (to_sym "%merge_noparse") DontCare DontCare merge_noparse 0)
+    (add_builtin_function1 parser (to_sym "%negate") DontCare negate 0)
 
     (add_builtin_function2 parser (to_sym "parse_text") (domainP Parser) (domainP String) parse_text 0)
 
