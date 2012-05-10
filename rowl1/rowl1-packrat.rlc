@@ -192,6 +192,14 @@
     (= shell_mode_p @TRUE)
     ))
 
+(export fun unset_shell_mode () (
+    (= shell_mode_p @FALSE)
+    ))
+
+(export fun in_shell_mode () (
+    (return shell_mode_p)
+    ))
+
 (export fun parse (name p) (
     (var code (lookup_func current_mod (to_sym name)))
     (return (byterun code p))
@@ -656,13 +664,12 @@
     ))
 @(MEMOIZE primary)
 
-(fun parse_expr_ (p) (
+(fun parse_expression_ (p) (
     (return (parse "parse_primary" p))
     ))
-@(MEMOIZE expr)
+@(MEMOIZE expression)
 
-(fun parse_stmt (p) (
-    (var loc (get_loc p))
+(fun parse_statement (p) (
     (if (== (lookahead p) -2) ; fixme. do not use the magic number.
         (return EOF)
         )
@@ -671,12 +678,26 @@
         (getc p)
         (return NoInput)
         ))
+    (var loc (get_loc p))
     (var v (parse "parse_expression" p))
     @(CHECK v)
     (parse "parse_spaces" p)
     (var nl (parse_char p '\n'))
     @(CHECK nl)
-    (return v)
+    (var stmt (expr_arg v 1))
+    (eval_parser_command loc stmt)
+    (= loc (expr_arg v 0))
+    (return (parsed loc (make_located loc stmt)))
+    ))
+
+(extern fun eval_include)
+(fun eval_parser_command (loc expr) (
+    (var ty (expr_head expr))
+    (if (== ty Include)
+        (eval_include expr)
+    (if (== ty Import)
+        (import_module loc current_mod (expr_arg expr 0))
+        ))
     ))
 
 (fun add_parser (mod sym func) (
@@ -996,6 +1017,12 @@
     ))
 
 (fun compile_parser_func (sym elems act) (
+    (if (!= (expr_head elems) List) (do
+        (output_error stderr current_loc)
+        (output_string stderr "invalid syntax declaration\n")
+        (exit 1)
+        ))
+
     (var idx 0)
     (var body 0)
     (var bloc (unique_sym))
@@ -1031,7 +1058,21 @@
     ))
 
 (extern fun compile_matching)
-(fun parse_helper (p sym new orig) (
+(fun call_parser (p sym new) (
+    (var tbl (field_get (field_get p 1) 2))
+    (var pos (field_get p 3))
+    (var v (memotable_find tbl sym pos))
+    (if v (do
+        (field_set p 3 (cdr v))
+        (return (car v))
+        ))
+    (var loc (get_loc p))
+    (= v (byterun (compile_matching loc sym new) p))
+    (memotable_add tbl sym pos (cons v (field_get p 3)))
+    (return v)
+    ))
+
+(fun bind_parser (p sym new orig) (
     (var tbl (field_get (field_get p 1) 2))
     (var pos (field_get p 3))
     (var v (memotable_find tbl sym pos))
@@ -1058,24 +1099,43 @@
     (return v)
     ))
 
-(fun compile_parser (sym new orig) (
+(fun compile_parser1 (sym new) (
     (return (make_expr DefineFunction (list2 sym
         (make_expr Lambda (list2 (make_expr Domain (list2 ParserVar Parser))
-        (make_expr Apply (list2 (to_sym "%parse_helper") (list4 ParserVar (quote sym) new orig)))
+        (make_expr Apply (list2 (to_sym "%call_parser") (list3 ParserVar (quote sym) new)))
+        )))))
+    ))
+
+(fun compile_parser2 (sym new orig) (
+    (return (make_expr DefineFunction (list2 sym
+        (make_expr Lambda (list2 (make_expr Domain (list2 ParserVar Parser))
+        (make_expr Apply (list2 (to_sym "%bind_parser") (list4 ParserVar (quote sym) new orig)))
         )))))
     ))
 
 (export fun compile_define_syntax (sym pat act) (
     (= sym (to_parse sym))
-    (var parser_sym (unique_sym))
-    (var copy_sym   (unique_sym))
-    (var new_parser_stmt (compile_parser_func parser_sym pat act))
-    (var stmts (list3
-        (make_expr DefineVariable (list2 copy_sym sym))
-        new_parser_stmt
-        (compile_parser sym parser_sym copy_sym)
+    (if (lookup_symbol current_mod sym)
+        (do
+            (var parser_sym (unique_sym))
+            (var copy_sym   (unique_sym))
+            (var new_parser_stmt (compile_parser_func parser_sym pat act))
+            (var stmts (list3
+                (make_expr DefineVariable (list2 copy_sym sym))
+                new_parser_stmt
+                (compile_parser2 sym parser_sym copy_sym)
+                ))
+            (return stmts)
+        )
+        (do
+            (var parser_sym (unique_sym))
+            (var new_parser_stmt (compile_parser_func parser_sym pat act))
+            (var stmts (list2
+                new_parser_stmt
+                (compile_parser1 sym parser_sym)
+                ))
+            (return stmts)
         ))
-    (return stmts)
     ))
 
 (export fun init_parser_funcs (mod) (
@@ -1086,7 +1146,8 @@
     (add_builtin_function2 parser (to_sym "%merge_loc") (domainP Loc) (domainP Loc) merge_loc 0)
     (add_builtin_function1 parser (to_sym "%copy_parser_state") (domainP Parser) copy_parser_state 0)
     (add_builtin_function2 parser (to_sym "%set_parser_state") (domainP Parser) (domainP Parser) set_parser_state 0)
-    (add_builtin_function4 parser (to_sym "%parse_helper") (domainP Parser) (domainP Symbol) (domainP Function) (domainP Function) parse_helper 0)
+    (add_builtin_function3 parser (to_sym "%call_parser") (domainP Parser) (domainP Symbol) (domainP Function) call_parser 0)
+    (add_builtin_function4 parser (to_sym "%bind_parser") (domainP Parser) (domainP Symbol) (domainP Function) (domainP Function) bind_parser 0)
     (add_builtin_function2 parser (to_sym "%merge_noparse") DontCare DontCare merge_noparse 0)
     (add_builtin_function1 parser (to_sym "%negate") DontCare negate 0)
 
@@ -1103,8 +1164,8 @@
 
     ; expressions
     (add_parser parser (to_sym "parse_primary") parse_primary)
-    (add_parser parser (to_sym "parse_expression") parse_expr)
-    (add_parser parser (to_sym "parse_statement") parse_stmt)
+    (add_parser parser (to_sym "parse_expression") parse_expression)
+    (add_parser parser (to_sym "parse_statement") parse_statement)
     ))
 
 (export fun output_syntax_errors (e) (
