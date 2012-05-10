@@ -73,7 +73,18 @@
         (var entry (vector_at entries begin))
         (if entry (do
             (var h (% (field_get entry 3) size))
-            (vector_put bucket h (field_get (vector_at bucket h) 2))
+            (var e (vector_at bucket h))
+            (if (== e entry)
+                (vector_put bucket h (field_get e 2))
+                (while e (do
+                    (var next (field_get e 2))
+                    (if (== entry next) (do
+                        (field_set e 2 (field_get next 2))
+                        break
+                        ))
+                    (= e next)
+                    ))
+                )
             ))
         (incr begin)
         ))
@@ -178,7 +189,6 @@
     ; increment a counter in display
     (var n (ivector_at display 0))
     (ivector_put display 0 (+ n 1))
-
     ))
 
 ; delete the most recent entry
