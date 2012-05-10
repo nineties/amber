@@ -601,25 +601,25 @@
     (if (== (expr_head hd) NoParse) (return (noparse loc "expect a head symbol")))
     (= hd (expr_arg hd 1))
 
-    (parse_spaces p)
+    (parse "parse_spaces" p)
     (var v (parse_char p '{'))
     @(CHECK v)
 
     (incr_nest_level p)
-    (parse_spaces p)
+    (parse "parse_spaces" p)
 
     (var args 0)
     (if (!= (lookahead p) '}') (do
         (while (> (lookahead p) 0) (do
             (= v (parse_primary p))
             @(CHECK v)
-            (parse_spaces p)
+            (parse "parse_spaces" p)
 
             (= args (cons (expr_arg v 1) args))
             (if (== (lookahead p) '}') break)
             (= v (parse_char p ','))
             @(CHECK v)
-            (parse_spaces p)
+            (parse "parse_spaces" p)
             ))
         ))
     (= v (parse_char p '}'))
@@ -653,14 +653,14 @@
     (if (== (lookahead p) -2) ; fixme. do not use the magic number.
         (return EOF)
         )
-    (parse_spaces p)
+    (parse "parse_spaces" p)
     (if (== (lookahead p) '\n') (do
         (getc p)
         (return NoInput)
         ))
-    (var v (parse_expr p))
+    (var v (parse "parse_expression" p))
     @(CHECK v)
-    (parse_spaces p)
+    (parse "parse_spaces" p)
     (var nl (parse_char p '\n'))
     @(CHECK nl)
     (return v)
@@ -679,31 +679,44 @@
 (fun make_nodevar (idx) (
     (return (to_sym (strcat "node" (itos idx))))
     ))
+
 (fun gen_at (node idx) (
     (return (make_expr Subscript (list2 node (box idx))))
     ))
-(fun gen_check (idx stmts) (
-    (var nodevar (make_nodevar idx))
-    (return (list4
-        (make_expr DefineVariable (list2 nodevar (make_expr Block stmts)))
-        (make_expr If (list2
-            (make_expr Equal (list2 (make_expr Head (list1 nodevar)) (quote NoParse)))
-            (make_expr Return (list1 nodevar))
-            ))
-        (make_expr Assign (list2 nodevar (gen_at nodevar 1)))
-        ))
+(fun gen_copy_parser_state () (
+    (return (make_expr Apply (list2 (to_sym "%copy_parser_state") (list1 ParserVar))))
+    ))
+(fun gen_set_parser_state (state) (
+    (return (make_expr Apply (list2 (to_sym "%set_parser_state") (list2 ParserVar state))))
     ))
 
+(extern object current_loc)
 (fun compile_parser_element (pat) (
     (var hd (expr_head pat))
     (if (== hd Symbol)
         (return (make_expr Apply (list2 (to_parse pat) (list1 ParserVar)))))
     (if (== hd String)
         (return (make_expr Apply (list2 (to_sym "parse_text") (list2 ParserVar pat)))))
-    (if (== hd Many)
-        (return (compile_many (expr_args pat)))
+    (if (== hd List)
+        (return (compile_seq pat))
         )
-    (not_reachable "compile_parser_element")
+    (if (== hd Choice)
+        (return (compile_choice (expr_args pat)))
+        )
+    (if (== hd Many)
+        (return (compile_many (expr_arg pat 0)))
+        )
+    (if (== hd Many1)
+        (return (compile_many1 (expr_arg pat 0)))
+        )
+    (if (== hd Option)
+        (return (compile_option (expr_arg pat 0)))
+        )
+    (output_error stderr current_loc)
+    (output_string stderr "invalid syntax element: ")
+    (pretty_print stderr pat)
+    (output_char stderr '\n')
+    (exit 1)
     ))
 
 ; List{ p1, p2, ...} is translated to
@@ -749,7 +762,58 @@
     (= body (cons (make_expr DefineVariable (list2 loc
         (make_expr Apply (list2 (to_sym "%merge_loc") (list2 bloc eloc))))) body))
     (= body (cons (qquote (make_expr Parsed (list2 (unquote loc) (unquote (make_expr Apply (list2 (to_sym "reverse") (list1 ret))))))) body))
-    (return (list_reverse body))
+    (return (make_expr Apply (list2
+        (make_expr Lambda (list2 ParserVar
+        (make_expr Block (list_reverse body))))
+        (list1 ParserVar))))
+    ))
+
+; Choice{ p1, p2, .. } is translated to
+;
+; lambda() {
+;     errors = 0
+;     state = copy_parser_state(parser)
+;     v = p1
+;     if (head(v) == Parsed) (return v)
+;     errors = merge_noparse(errors, v)
+;     set_parser_state(parser, state)
+;     v = p2
+;     ...
+; }(p)
+
+(fun compile_choice (ps) (
+    (if (< (list_len ps) 2) (do
+        (output_error stderr current_loc)
+        (output_string stderr "Choice must have more than 1 argument.\n")
+        (exit 1)
+        ))
+
+    (var body 0)
+    (var state (unique_sym))
+    (var v (unique_sym))
+    (var errors (unique_sym))
+
+    (= body (cons (make_expr DefineVariable (list2 v 0)) body))
+    (= body (cons (make_expr DefineVariable (list2 errors 0)) body))
+    (= body (cons (make_expr DefineVariable (list2 state (gen_copy_parser_state))) body))
+
+    (while ps (do
+        (= body (cons (make_expr Assign (list2 v (compile_parser_element (car ps)))) body))
+        (= body (cons (make_expr If (list2
+            (make_expr Equal (list2 (make_expr Head (list1 v)) (quote Parsed)))
+            (make_expr Return (list1 v))
+            )) body))
+        (= body (cons (make_expr Assign (list2 errors
+            (make_expr Apply (list2 (to_sym "%merge_noparse") (list2 errors v))))) body))
+        (= body (cons (gen_set_parser_state state) body))
+        (= ps (cdr ps))
+        ))
+    (= body (cons errors body))
+
+    (return (make_expr Apply (list2
+        (make_expr Lambda (list2 ParserVar (make_expr Block (list_reverse body))))
+        (list1 ParserVar)
+        )))
     ))
 
 ; Many{ p } is translated to
@@ -765,17 +829,14 @@
 ; set_parser_state(state)
 ; Parsed{loc, reverse(elems)}
 
-(fun compile_many (items) (
+(fun compile_many (elem) (
     (var v     (unique_sym))
     (var state (unique_sym))
     (var elems (unique_sym))
     (var bloc  (unique_sym))
     (var eloc  (unique_sym))
     (var loc   (to_sym "%Loc"))
-    (var p (make_expr Apply (list2
-        (make_expr Lambda (list2 ParserVar
-        (make_expr Block (compile_seq items))))
-        (list1 ParserVar))))
+    (var p (compile_parser_element elem))
 
     (var loop_body 0)
     (= loop_body (cons (make_expr DefineVariable (list2 v p)) loop_body))
@@ -784,20 +845,102 @@
             Break)) loop_body))
     (= loop_body (cons (make_expr Assign (list2 eloc (gen_at v 0))) loop_body))
     (= loop_body (cons (make_expr Assign (list2 elems (make_expr Apply (list2 (to_sym "cons") (list2 (gen_at v 1) elems))))) loop_body))
-    (= loop_body (cons (make_expr Assign (list2 state (make_expr Apply (list2 (to_sym "%copy_parser_state") (list1 ParserVar))))) loop_body))
+    (= loop_body (cons (make_expr Assign (list2 state (gen_copy_parser_state))) loop_body))
 
     (var body 0)
     (= body (cons (make_expr DefineVariable (list2 bloc (make_expr Apply (list2 (to_sym "%get_loc") (list1 ParserVar))))) body))
     (= body (cons (make_expr DefineVariable (list2 eloc (make_expr Apply (list2 (to_sym "%get_loc") (list1 ParserVar))))) body))
     (= body (cons (make_expr DefineVariable (list2 elems 0)) body))
-    (= body (cons (make_expr DefineVariable (list2 state (make_expr Apply (list2 (to_sym "%copy_parser_state") (list1 ParserVar))))) body))
+    (= body (cons (make_expr DefineVariable (list2 state (gen_copy_parser_state))) body))
     (= body (cons (make_expr While (list2 true
             (make_expr Block (list_reverse loop_body)))) body))
-    (= body (cons (make_expr Assign (list2 state (make_expr Apply (list2 (to_sym "%set_parser_state") (list2 ParserVar state))))) body))
+    (= body (cons (gen_set_parser_state state) body))
     (= body (cons (make_expr DefineVariable (list2 loc
         (make_expr Apply (list2 (to_sym "%merge_loc") (list2 bloc eloc))))) body))
     (= body (cons (qquote (make_expr Parsed (list2 (unquote loc) (unquote (make_expr Apply (list2 (to_sym "reverse") (list1 elems))))))) body))
     (return (make_expr Block (list_reverse body)))
+    ))
+
+; Many1{ p } is translated to
+;
+; elems = []
+; v = p
+; if (head(v) == NoParse) return v
+; elems = cons(val(v), elems)
+; state = copy_parser_state(..)
+; while true {
+;     v = p
+;     if (head(v) == NoParse) break
+;     elems = cons(val(v), elems)
+;     state = copy_parser_state(..)
+; }
+; set_parser_state(state)
+; Parsed{loc, reverse(elems)}
+
+(fun compile_many1 (elem) (
+    (var v     (unique_sym))
+    (var state (unique_sym))
+    (var elems (unique_sym))
+    (var bloc  (unique_sym))
+    (var eloc  (unique_sym))
+    (var loc   (to_sym "%Loc"))
+    (var p (compile_parser_element elem))
+
+    (var loop_body 0)
+    (= loop_body (cons (make_expr Assign (list2 v p)) loop_body))
+    (= loop_body (cons (make_expr If (list2
+            (make_expr Equal (list2 (make_expr Head (list1 v)) (quote NoParse)))
+            Break)) loop_body))
+    (= loop_body (cons (make_expr Assign (list2 eloc (gen_at v 0))) loop_body))
+    (= loop_body (cons (make_expr Assign (list2 elems (make_expr Apply (list2 (to_sym "cons") (list2 (gen_at v 1) elems))))) loop_body))
+    (= loop_body (cons (make_expr Assign (list2 state (gen_copy_parser_state))) loop_body))
+
+    (var body 0)
+    (= body (cons (make_expr DefineVariable (list2 bloc (make_expr Apply (list2 (to_sym "%get_loc") (list1 ParserVar))))) body))
+    (= body (cons (make_expr DefineVariable (list2 eloc (make_expr Apply (list2 (to_sym "%get_loc") (list1 ParserVar))))) body))
+    (= body (cons (make_expr DefineVariable (list2 elems 0)) body))
+    (= body (cons (make_expr DefineVariable (list2 v p)) body))
+    (= body (cons (make_expr If (list2
+            (make_expr Equal (list2 (make_expr Head (list1 v)) (quote NoParse)))
+            (make_expr Return (list1 v)))) body))
+    (= body (cons (make_expr Assign (list2 elems (make_expr Apply (list2 (to_sym "cons") (list2 (gen_at v 1) elems))))) body))
+    (= body (cons (make_expr DefineVariable (list2 state (gen_copy_parser_state))) body))
+    (= body (cons (make_expr While (list2 true
+            (make_expr Block (list_reverse loop_body)))) body))
+    (= body (cons (gen_set_parser_state state) body))
+    (= body (cons (make_expr DefineVariable (list2 loc
+        (make_expr Apply (list2 (to_sym "%merge_loc") (list2 bloc eloc))))) body))
+    (= body (cons (qquote (make_expr Parsed (list2 (unquote loc) (unquote (make_expr Apply (list2 (to_sym "reverse") (list1 elems))))))) body))
+    (return (make_expr Block (list_reverse body)))
+    ))
+
+; Option{ p } is translated to
+;
+; state = copy_parser_state(parser)
+; v = p
+; if (head(v) == NoParse) {
+;   set_parser_state(parser, state)
+;   nil
+; } else
+;   Parsed{loc(v), Some{val(v)}}
+(fun compile_option (p) (
+    (var v (unique_sym))
+    (var state (unique_sym))
+    (var loc (to_sym "%Loc"))
+    (return (make_expr Block (list4
+        (make_expr DefineVariable (list2 state (gen_copy_parser_state)))
+        (make_expr DefineVariable (list2 loc (make_expr Apply (list2 (to_sym "%get_loc") (list1 ParserVar)))))
+        (make_expr DefineVariable (list2 v (compile_parser_element p)))
+        (make_ifelse
+            (make_expr Equal (list2 (make_expr Head (list1 v)) (quote NoParse)))
+            (make_expr Block (list2
+                (gen_set_parser_state state)
+                (qquote (make_expr Parsed (list2 (unquote loc) 0)))
+                ))
+            (qquote (make_expr Parsed (list2 (unquote (gen_at v 0))
+                (make_expr Some (list1 (unquote (gen_at v 1)))))))
+            ))))
+            
     ))
 
 (fun compile_parser_func (sym elems act) (
@@ -892,6 +1035,8 @@
     (add_builtin_function1 parser (to_sym "%copy_parser_state") (domainP Parser) copy_parser_state 0)
     (add_builtin_function2 parser (to_sym "%set_parser_state") (domainP Parser) (domainP Parser) set_parser_state 0)
     (add_builtin_function4 parser (to_sym "%parse_helper") (domainP Parser) (domainP Symbol) (domainP Function) (domainP Function) parse_helper 0)
+    (add_builtin_function2 parser (to_sym "%merge_noparse") DontCare DontCare merge_noparse 0)
+
     (add_builtin_function2 parser (to_sym "parse_text") (domainP Parser) (domainP String) parse_text 0)
 
     (add_parser parser (to_sym "parse_spaces") parse_spaces)
