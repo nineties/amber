@@ -91,32 +91,26 @@
 
 (fun interpret (p) (
     (while 1 (do
-        (var e (parse "parse_statement" p))
-        (if (== e EOF)
+        (var es (parse_statements p))
+        (if (! es)
             (return 0)
             )
-        (if (!= e NoInput) (do
+        (if (== (expr_head es) NoParse) (do
+            (output_syntax_errors es)
+            (exit 1)
+            ))
+        (while es (do
+            (var e (car es))
             (var hd (expr_head e))
             (if (== hd Parsed) (do
                     (var ret (eval (expr_arg e 1)))
                     (print_result p ret)
-                )
-            (if (== hd NoParse)
-                (output_syntax_errors e)
-                (do
-                    (output_string stderr "INTERNAL ERROR\n")
-                    (exit 1)
-                )))
+                ))
+            (= es (cdr es))
             ))
         (flush_parser p)
         ))
-    ;(var es (parse))
-    ;(while es (do
-    ;    (var e (rewrite (car es)))
-    ;    (eval e)
-    ;    (= es (cdr es))
-    ;    ))
-    ;(= current_loc no_loc)
+    (= current_loc no_loc)
     ))
 
 (fun print_result (p val) (
