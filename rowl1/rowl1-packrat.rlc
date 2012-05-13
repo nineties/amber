@@ -98,7 +98,7 @@
 
 ; hashtable for memoization
 ; key:   (non-terminal symbol, position (integer))
-; value: expression
+; value: (node, parser state)
 ;
 ; structure of tables
 ;   0 : bucket (vector)
@@ -212,8 +212,26 @@
     (return (make_expr Parsed (list2 loc val)))
     ))
 
+(fun maypase (loc msg) (
+    (return (make_expr NoParse (list1 (list3 loc (string msg) true))))
+    ))
+
 (fun noparse (loc msg) (
-    (return (make_expr NoParse (list1 (list2 loc (string msg)))))
+    (return (make_expr NoParse (list1 (list3 loc (string msg) false))))
+    ))
+
+(fun noparse_rewrite (loc msg orig) (
+    (if (! shell_mode_p) (return (noparse loc msg)))
+    (var args (expr_args orig))
+    (var flag false)
+    (while args (do
+        (if (== (list_at (car args) 2) true) (do
+            (= flag true)
+            break
+            ))
+        (= args (cdr args))
+        ))
+    (return (make_expr NoParse (list1 (list3 loc (string msg) flag))))
     ))
 
 (fun merge_noparse (lhs rhs) (
@@ -275,6 +293,12 @@
     (memcpy p state (* 8 @WORD_SIZE))
     ))
 
+(fun clear_parser_state (p state) (
+    (var buf (field_get p 1))
+    (set_parser_state p state)
+    (memotable_clear (field_get buf 2))
+    ))
+
 (fun incr_nest_level (p) (
     (field_set p 7 (+ (field_get p 7) 1))
     ))
@@ -304,20 +328,11 @@
     (return (box (field_get p 6)))
     ))
 
-(fun print_prompt (p) (
-    (var line (field_get p 5))
-    (output_string stdout "amber:")
-    (output_int stdout line)
-    (output_string stdout "> ")
-    (flush stdout)
-    ))
-
 (fun reserve (p) (
     (var buf (field_get p 1))
     (var vec (field_get buf 0))
     (var ichan (field_get buf 1))
     (var line 0)
-    (if shell_mode_p (print_prompt p))
     (var c 0)
     (while (>= (input_char (address c) ichan) 0) (do
         (cvector_pushback vec c)
@@ -331,7 +346,7 @@
     (var vec (field_get buf 0))
     (var idx (field_get p 3))
     (if (>= idx (cvector_size vec)) (do
-        (if (< (reserve p) 0)
+        (if (&& (! shell_mode_p) (< (reserve p) 0))
             (return @EOF)
             )
         ))
@@ -343,6 +358,7 @@
 
 (fun getc (p) (
     (var c (lookahead p))
+    (if (< c 0) (return c))
     ; update source location
     (if (&& (== c '\n') (! shell_mode_p)) (do
         (field_set p 5 (+ (field_get p 5) 1))
@@ -403,11 +419,14 @@
 (fun parse_char (p c) (
     (var loc (get_loc p))
     (var v (getc p))
+    (if (< v 0)
+        (return (maypase loc (strcat "expect " (escape_char c))))
+        )
     (if (== v c) (do
         (return (parsed loc (ctos c)))
         ))
     (return (noparse loc 
-        (strcat "expected " 
+        (strcat "expect " 
         (strcat (escape_char c)
         (strcat " but got " (escape_char v))))))
     ))
@@ -416,7 +435,7 @@
     (var loc (get_loc p))
     (var c (getc p))
     (if (< c 0)
-        (return (noparse loc "end of input stream"))
+        (return (maypase loc "end of input stream"))
         (return (parsed loc (ctos c)))
         )
     ))
@@ -427,9 +446,9 @@
     (var len (strlen str))
     (for i 0 len (do
         (var c (array_get char str i))
-        (if (!= c (getc p))
-            (return (noparse loc (strcat "expect " str)))
-            )
+        (var v (getc p))
+        (if (< v 0) (return (maypase loc (strcat "expect " str))))
+        (if (!= c v) (return (noparse loc (strcat "expect " str))))
         ))
     (return (parsed loc (string str)))
     ))
@@ -439,6 +458,9 @@
 (fun parse_decimal_ (p) (
     (var loc (get_loc p))
     (var v (getc p))
+
+    (if (< v 0) (return (maypase p "expect a number")))
+        
     (if (&& (== v '0') (is_end_of_token p))
         (return (parsed loc (box 0)))
         )
@@ -587,14 +609,20 @@
 ;   Only escape sequence \' is interpreted.
 (fun parse_string_s_ (p) (
     (var loc (get_loc p))
-    (if (!= (getc p) ''') (return (noparse loc "expect '")))
+    (var v (getc p))
+    (if (< v 0) (return (maypase loc "expect '")))
+    (if (!= v ''') (return (noparse loc "expect '")))
     (var begin (copy_parser_state p))
     (while (!= (lookahead p) ''') (do
         (var c (getc p))
         (if (== c '\\') (getc p))
         ))
     (var end (copy_parser_state p))
-    (if (!= (getc p) ''') (return (noparse loc "expect '")))
+
+    (= v (getc p))
+    (if (< v 0) (return (maypase loc "expect '")))
+    (if (!= v ''') (return (noparse loc "expect '")))
+
     (var str (extract_string begin end))
     (unescape_string_s str)
     (return (parsed loc str))
@@ -604,10 +632,16 @@
 ; double-quoted string literal
 (fun parse_string_d_ (p) (
     (var loc (get_loc p))
-    (if (!= (getc p) '"') (return (noparse loc "expect \"")))
+
+    (var v (getc p))
+    (if (< v 0) (return (maypase loc "expect \"")))
+    (if (!= v '"') (return (noparse loc "expect \"")))
+
     (var begin (copy_parser_state p))
     (while (!= (lookahead p) '"') (do
         (var c (getc p))
+        (if (< c 0) (return (maypase loc "expect character")))
+
         (if (== c '\\') (do
             (if (! (is_escape_char (getc p)))
                 (return (noparse loc "invalid escape sequence"))
@@ -615,7 +649,9 @@
             ))
         ))
     (var end (copy_parser_state p))
-    (if (!= (getc p) '"') (return (noparse loc "expect \"")))
+    (= v (getc p))
+    (if (< v 0) (return (maypase loc "expect \"")))
+    (if (!= v '"') (return (noparse loc "expect \"")))
     (var str (extract_string begin end))
     (unescape_string_d str)
     (return (parsed loc str))
@@ -625,7 +661,9 @@
 (fun parse_string_ (p) (
     (var loc (get_loc p))
     (var v @(OR p `(string_d string_s)))
-    (if (== (expr_head v) NoParse) (return (noparse loc "expect string literal")))
+    (if (== (expr_head v) NoParse)
+        (return (noparse_rewrite loc "expect string literal" v))
+        )
     (return v)
     ))
 @(MEMOIZE string)
@@ -633,8 +671,9 @@
 (fun parse_node_ (p) (
     (var hd (parse_symbol p))
     (var bloc (get_loc p))
-
-    (if (== (expr_head hd) NoParse) (return (noparse bloc "expect a head symbol")))
+    (if (== (expr_head hd) NoParse)
+        (return (noparse_rewrite bloc "expect a head symbol" hd))
+        )
     (= hd (expr_arg hd 1))
 
     (parse "parse_spaces" p)
@@ -647,7 +686,7 @@
     (var args 0)
     (if (!= (lookahead p) '}') (do
         (while (> (lookahead p) 0) (do
-            (= v (parse_item p))
+            (= v (parse "parse_item" p))
             @(CHECK v)
             (parse "parse_spaces" p)
 
@@ -676,7 +715,9 @@
         integer
         string
     )))
-    (if (== (expr_head v) NoParse) (return (noparse loc "expect an item")))
+    (if (== (expr_head v) NoParse) 
+        (return (noparse_rewrite loc "expect an item" v))
+        )
     (return v)
     ))
 @(MEMOIZE item)
@@ -724,7 +765,33 @@
     (return (list_reverse stmts))
     ))
 
-(extern fun eval_include)
+(fun print_prompt (p sign) (
+    (var line (field_get p 5))
+    (output_string stdout "amber:")
+    (output_int stdout line)
+    (output_string stdout sign)
+    (flush stdout)
+    ))
+
+(export fun parse_shell_statement (p) (
+    (print_prompt p "> ")
+    (reserve p)
+    (var state (copy_parser_state p))
+    (while @TRUE (do
+        (var e (parse "parse_statement" p))
+        (if (== (expr_head e) NoParse) (goto retry))
+        (parse_blanks p '\n')
+        (var nl (parse_char p '\n'))
+        (if (== (expr_head nl) NoParse) (goto retry))
+        (return e)
+
+        (label retry)
+        (clear_parser_state p state)
+        (print_prompt p "  ")
+        (reserve p)
+        ))
+    ))
+
 (fun eval_parser_command (loc expr) (
     (var ty (expr_head expr))
     (if (== ty Import)

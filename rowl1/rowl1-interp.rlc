@@ -60,7 +60,10 @@
     (add_include_dir "/usr/lib/amber/")
     (include_file "amber/syntax.ab")
 
-    (interpret p)
+    (if (in_shell_mode)
+        (interpret_shell p)
+        (interpret p)
+        )
 
     ;(import_module current_loc current_mod (qualified "std" (to_sym "syntax")))
     ;(include_file "amber/io.ab")
@@ -102,15 +105,23 @@
         (while es (do
             (var e (car es))
             (var hd (expr_head e))
-            (if (== hd Parsed) (do
-                    (var ret (eval (expr_arg e 1)))
-                    (print_result p ret)
-                ))
+            (if (== hd Parsed)
+                (eval (expr_arg e 1))
+                )
             (= es (cdr es))
             ))
         (flush_parser p)
         ))
     (= current_loc no_loc)
+    ))
+
+(fun interpret_shell (p) (
+    (while 1 (do
+        (var e (parse_shell_statement p))
+        (var ret (eval (expr_arg e 1)))
+        (print_result p ret)
+        (flush_parser p)
+        ))
     ))
 
 (fun print_result (p val) (
@@ -174,6 +185,7 @@
     (var pat (expr_arg expr 1))
     (var act (expr_arg expr 2))
     (var stmts (compile_define_syntax sym pat act))
+    (debugpf stmts)
     (while stmts (do
         (eval (car stmts))
         (= stmts (cdr stmts))
