@@ -686,7 +686,7 @@
     (var args 0)
     (if (!= (lookahead p) '}') (do
         (while (> (lookahead p) 0) (do
-            (= v (parse "parse_item" p))
+            (= v (parse "parse_expression" p))
             @(CHECK v)
             (parse "parse_spaces" p)
 
@@ -778,6 +778,7 @@
     (reserve p)
     (var state (copy_parser_state p))
     (while @TRUE (do
+        (parse_spaces p)
         (var e (parse "parse_statement" p))
         (if (== (expr_head e) NoParse) (goto retry))
         (parse_blanks p '\n')
@@ -814,7 +815,7 @@
     ))
 
 (fun gen_at (node idx) (
-    (return (make_expr Subscript (list2 node (box idx))))
+    (return (make_expr ExprAt (list2 node (box idx))))
     ))
 (fun gen_copy_parser_state () (
     (return (make_expr Apply (list2 (to_sym "%copy_parser_state") (list1 ParserVar))))
@@ -836,6 +837,12 @@
     (if (== hd Choice)
         (return (compile_choice (expr_args pat)))
         )
+    (var len (list_len (expr_args pat)))
+    (if (== hd Delimited) (do
+        (if (!= len 2) (goto compile_error))
+        (return (compile_delimited (expr_arg pat 0) (expr_arg pat 1)))
+        ))
+    (if (!= len 1) (goto compile_error))
     (if (== hd Many)
         (return (compile_many (expr_arg pat 0)))
         )
@@ -854,6 +861,7 @@
     (if (== hd Aligned)
         (return (compile_aligned (expr_arg pat 0)))
         )
+    (label compile_error)
     (output_error stderr current_loc)
     (output_string stderr "invalid syntax element: ")
     (pretty_print stderr pat)
@@ -1130,6 +1138,62 @@
     (return (make_expr Block (list_reverse body)))
     ))
 
+; Delimited{ p, delim } is translated to
+;
+; elems = []
+; state = copy_parser_state(..)
+; while true {
+;     v = p
+;     if (head(v) == NoParse) break
+;     elems = cons(val(v), elems)
+;     state = copy_parser_state(..)
+;     parse_spaces()
+;     v = delim
+;     if (head(v) == NoParse) break
+;     parse_spaces()
+; }
+; set_parser_state(state)
+; Parsed{loc, reverse(elems)}
+
+(fun compile_delimited (p delim) (
+    (var v     (unique_sym))
+    (var state (unique_sym))
+    (var elems (unique_sym))
+    (var bloc  (unique_sym))
+    (var eloc  (unique_sym))
+    (var loc   (to_sym "%Loc"))
+    (= p (compile_parser_element p))
+    (= delim (compile_parser_element delim))
+
+    (var loop_body 0)
+    (= loop_body (cons (make_expr DefineVariable (list2 v p)) loop_body))
+    (= loop_body (cons (make_expr If (list2
+            (make_expr Equal (list2 (make_expr Head (list1 v)) (quote NoParse)))
+            Break)) loop_body))
+    (= loop_body (cons (make_expr Assign (list2 eloc (gen_at v 0))) loop_body))
+    (= loop_body (cons (make_expr Assign (list2 elems (make_expr Apply (list2 (to_sym "cons") (list2 (gen_at v 1) elems))))) loop_body))
+    (= loop_body (cons (make_expr Assign (list2 state (gen_copy_parser_state))) loop_body))
+    (= loop_body (cons (make_expr Apply (list2 (to_sym "parse_spaces") (list1 ParserVar))) loop_body))
+    (= loop_body (cons (make_expr Assign (list2 v delim)) loop_body))
+    (= loop_body (cons (make_expr If (list2
+            (make_expr Equal (list2 (make_expr Head (list1 v)) (quote NoParse)))
+            Break)) loop_body))
+    (= loop_body (cons (make_expr Apply (list2 (to_sym "parse_spaces") (list1 ParserVar))) loop_body))
+
+    (var body 0)
+    (= body (cons (make_expr DefineVariable (list2 bloc (make_expr Apply (list2 (to_sym "%get_loc") (list1 ParserVar))))) body))
+    (= body (cons (make_expr DefineVariable (list2 eloc (make_expr Apply (list2 (to_sym "%get_loc") (list1 ParserVar))))) body))
+    (= body (cons (make_expr DefineVariable (list2 elems 0)) body))
+    (= body (cons (make_expr DefineVariable (list2 state (gen_copy_parser_state))) body))
+    (= body (cons (make_expr While (list2 true
+            (make_expr Block (list_reverse loop_body)))) body))
+    (= body (cons (gen_set_parser_state state) body))
+    (= body (cons (make_expr DefineVariable (list2 loc
+        (make_expr Apply (list2 (to_sym "%merge_loc") (list2 bloc eloc))))) body))
+    (= body (cons (qquote (make_expr Parsed (list2 (unquote loc) (unquote (make_expr Apply (list2 (to_sym "reverse") (list1 elems))))))) body))
+    (return (make_expr Block (list_reverse body)))
+    ))
+
 
 ; Option{ p } is translated to
 ;
@@ -1240,12 +1304,12 @@
     (var pos (field_get p 3))
     (var v (memotable_find tbl sym pos))
     (if v (do
-        (field_set p 3 (cdr v))
+        (set_parser_state p (cdr v))
         (return (car v))
         ))
     (var loc (get_loc p))
     (= v (byterun (compile_matching loc sym new) p))
-    (memotable_add tbl sym pos (cons v (field_get p 3)))
+    (memotable_add tbl sym pos (cons v (copy_parser_state p)))
     (return v)
     ))
 
@@ -1254,7 +1318,7 @@
     (var pos (field_get p 3))
     (var v (memotable_find tbl sym pos))
     (if v (do
-        (field_set p 3 (cdr v))
+        (set_parser_state p (cdr v))
         (return (car v))
         ))
     (var loc (get_loc p))
@@ -1272,7 +1336,7 @@
     (set_parser_state p state)
 
     (label end_lbl)
-    (memotable_add tbl sym pos (cons v (field_get p 3)))
+    (memotable_add tbl sym pos (cons v (copy_parser_state p)))
     (return v)
     ))
 
