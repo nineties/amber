@@ -187,6 +187,7 @@
 
 (var case_sensitive_p @TRUE)
 (var shell_mode_p @FALSE)
+(var may_parse @FALSE)
 
 (extern object current_mod)
 (extern fun set_current_module)
@@ -212,26 +213,13 @@
     (return (make_expr Parsed (list2 loc val)))
     ))
 
-(fun maypase (loc msg) (
-    (return (make_expr NoParse (list1 (list3 loc (string msg) true))))
+(fun mayparse (loc msg) (
+    (= may_parse @TRUE)
+    (return (make_expr NoParse (list1 (list2 loc (string msg)))))
     ))
 
 (fun noparse (loc msg) (
-    (return (make_expr NoParse (list1 (list3 loc (string msg) false))))
-    ))
-
-(fun noparse_rewrite (loc msg orig) (
-    (if (! shell_mode_p) (return (noparse loc msg)))
-    (var args (expr_args orig))
-    (var flag false)
-    (while args (do
-        (if (== (list_at (car args) 2) true) (do
-            (= flag true)
-            break
-            ))
-        (= args (cdr args))
-        ))
-    (return (make_expr NoParse (list1 (list3 loc (string msg) flag))))
+    (return (make_expr NoParse (list1 (list2 loc (string msg)))))
     ))
 
 (fun merge_noparse (lhs rhs) (
@@ -398,6 +386,7 @@
     (return (&& (<= @CH_af c) (<= c @CH_OTHER)))
     ))
 (fun is_identchar (c) (
+    (if (< c 0) (return @FALSE))
     (= c @(CHGRP c))
     (return (&& (<= @CH_0 c) (<= c @CH_OTHER)))
     ))
@@ -420,7 +409,7 @@
     (var loc (get_loc p))
     (var v (getc p))
     (if (< v 0)
-        (return (maypase loc (strcat "expect " (escape_char c))))
+        (return (mayparse loc (strcat "expect " (escape_char c))))
         )
     (if (== v c) (do
         (return (parsed loc (ctos c)))
@@ -435,7 +424,7 @@
     (var loc (get_loc p))
     (var c (getc p))
     (if (< c 0)
-        (return (maypase loc "end of input stream"))
+        (return (mayparse loc "end of input stream"))
         (return (parsed loc (ctos c)))
         )
     ))
@@ -447,7 +436,7 @@
     (for i 0 len (do
         (var c (array_get char str i))
         (var v (getc p))
-        (if (< v 0) (return (maypase loc (strcat "expect " str))))
+        (if (< v 0) (return (mayparse loc (strcat "expect " str))))
         (if (!= c v) (return (noparse loc (strcat "expect " str))))
         ))
     (return (parsed loc (string str)))
@@ -459,7 +448,7 @@
     (var loc (get_loc p))
     (var v (getc p))
 
-    (if (< v 0) (return (maypase p "expect a number")))
+    (if (< v 0) (return (mayparse p "expect a number")))
         
     (if (&& (== v '0') (is_end_of_token p))
         (return (parsed loc (box 0)))
@@ -596,7 +585,9 @@
 
 (fun parse_symbol_ (p) (
     (var loc (get_loc p))
-    (if (! (is_letter (lookahead p))) (return (noparse loc "expect [a-zA-Z_]")))
+    (var c (lookahead p))
+    (if (< c 0) (return (mayparse loc "expect a symbol")))
+    (if (! (is_letter c)) (return (noparse loc "expect a symbol")))
     (var begin (copy_parser_state p))
     (while (is_identchar (lookahead p)) (do
         (getc p)
@@ -610,7 +601,7 @@
 (fun parse_string_s_ (p) (
     (var loc (get_loc p))
     (var v (getc p))
-    (if (< v 0) (return (maypase loc "expect '")))
+    (if (< v 0) (return (mayparse loc "expect '")))
     (if (!= v ''') (return (noparse loc "expect '")))
     (var begin (copy_parser_state p))
     (while (!= (lookahead p) ''') (do
@@ -620,7 +611,7 @@
     (var end (copy_parser_state p))
 
     (= v (getc p))
-    (if (< v 0) (return (maypase loc "expect '")))
+    (if (< v 0) (return (mayparse loc "expect '")))
     (if (!= v ''') (return (noparse loc "expect '")))
 
     (var str (extract_string begin end))
@@ -634,13 +625,13 @@
     (var loc (get_loc p))
 
     (var v (getc p))
-    (if (< v 0) (return (maypase loc "expect \"")))
+    (if (< v 0) (return (mayparse loc "expect \"")))
     (if (!= v '"') (return (noparse loc "expect \"")))
 
     (var begin (copy_parser_state p))
     (while (!= (lookahead p) '"') (do
         (var c (getc p))
-        (if (< c 0) (return (maypase loc "expect character")))
+        (if (< c 0) (return (mayparse loc "expect character")))
 
         (if (== c '\\') (do
             (if (! (is_escape_char (getc p)))
@@ -650,7 +641,7 @@
         ))
     (var end (copy_parser_state p))
     (= v (getc p))
-    (if (< v 0) (return (maypase loc "expect \"")))
+    (if (< v 0) (return (mayparse loc "expect \"")))
     (if (!= v '"') (return (noparse loc "expect \"")))
     (var str (extract_string begin end))
     (unescape_string_d str)
@@ -662,7 +653,7 @@
     (var loc (get_loc p))
     (var v @(OR p `(string_d string_s)))
     (if (== (expr_head v) NoParse)
-        (return (noparse_rewrite loc "expect string literal" v))
+        (return (noparse loc "expect string literal"))
         )
     (return v)
     ))
@@ -672,7 +663,7 @@
     (var hd (parse_symbol p))
     (var bloc (get_loc p))
     (if (== (expr_head hd) NoParse)
-        (return (noparse_rewrite bloc "expect a head symbol" hd))
+        (return (noparse bloc "expect a head symbol"))
         )
     (= hd (expr_arg hd 1))
 
@@ -716,14 +707,15 @@
         string
     )))
     (if (== (expr_head v) NoParse) 
-        (return (noparse_rewrite loc "expect an item" v))
+        (return (noparse loc "expect an item"))
         )
     (return v)
     ))
 @(MEMOIZE item)
 
 (fun parse_expression (p) (
-    (return (parse "parse_item" p))
+    (var v (parse "parse_item" p))
+    (return v)
     ))
 
 (fun parse_statement_ (p) (
@@ -778,12 +770,13 @@
     (reserve p)
     (var state (copy_parser_state p))
     (while @TRUE (do
+        (= may_parse @FALSE)
         (parse_spaces p)
         (var e (parse "parse_statement" p))
-        (if (== (expr_head e) NoParse) (goto retry))
+        (if (== (expr_head e) NoParse) (if may_parse (goto retry) (return e)))
         (parse_blanks p '\n')
         (var nl (parse_char p '\n'))
-        (if (== (expr_head nl) NoParse) (goto retry))
+        (if (== (expr_head nl) NoParse) (if may_parse (goto retry) (return nl)))
         (return e)
 
         (label retry)
