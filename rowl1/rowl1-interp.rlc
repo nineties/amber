@@ -114,8 +114,13 @@
 (fun interpret_shell (p) (
     (while 1 (do
         (var e (parse_shell_statement p))
+        (if (== (expr_head e) NoParse) (do
+            (output_syntax_errors e)
+            (goto next)
+            ))
         (var ret (eval (expr_arg e 1)))
         (print_result p ret)
+        (label next)
         (flush_parser p)
         ))
     ))
