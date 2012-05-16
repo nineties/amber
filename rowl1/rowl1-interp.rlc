@@ -185,19 +185,7 @@
     (var sym (expr_arg expr 0))
     (var pat (expr_arg expr 1))
     (var act (expr_arg expr 2))
-    (var stmts (compile_define_syntax sym pat act @FALSE))
-    (while stmts (do
-        (eval (car stmts))
-        (= stmts (cdr stmts))
-        ))
-    (return 0)
-    ))
-
-(fun eval_define_syntax_space_sensitive (expr) (
-    (var sym (expr_arg expr 1))
-    (var pat (expr_arg expr 2))
-    (var act (expr_arg expr 3))
-    (var stmts (compile_define_syntax sym pat act @TRUE))
+    (var stmts (compile_define_syntax sym pat act (== (expr_size expr) 4)))
     (while stmts (do
         (eval (car stmts))
         (= stmts (cdr stmts))
@@ -234,7 +222,7 @@
         (var fullpath (build_path (car dir) path ""))
         (if (file_exists fullpath) (do
             (if (is_already_included fullpath)
-                (return Nil)
+                (return nil)
                 )
             (add_included_file fullpath)
 
@@ -253,7 +241,7 @@
             (fchdir fd)
             (close_in ichan)
 
-            (return Nil)
+            (return nil)
             ))
         (= dir (cdr dir))
         ))
@@ -288,8 +276,8 @@
         eval_define_syntax 0)
     (add_builtin_function1 mod Eval
         (make_expr DefSyntax (list4
-            (quote (to_sym "space_sensitive")) symT DontCare DontCare))
-        eval_define_syntax_space_sensitive 0)
+            symT DontCare DontCare (quote (to_sym "space_sensitive"))))
+        eval_define_syntax 0)
     ))
 
 (extern fun setup_numeric)
