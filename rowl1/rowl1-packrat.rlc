@@ -228,7 +228,7 @@
     (return (make_expr NoParse (list_append (expr_args lhs) (expr_args rhs))))
     ))
 
-(fun negate (val p) (
+(fun negate (p val) (
     (var hd (expr_head val))
     (var loc (get_loc p))
     (if (== hd Parsed)
@@ -771,8 +771,9 @@
     (var state (copy_parser_state p))
     (while @TRUE (do
         (= may_parse @FALSE)
-        (parse_spaces p)
+        (parse "parse_spaces" p)
         (var e (parse "parse_statement" p))
+        (debugpf e)
         (if (== (expr_head e) NoParse) (if may_parse (goto retry) (return e)))
         (parse_blanks p '\n')
         (var nl (parse_char p '\n'))
@@ -1238,7 +1239,7 @@
 ; state = copy_parser_state(parser)
 ; v = p
 ; set_parser_state(parser, state)
-; negate(v)
+; negate(v,p)
 (fun compile_not (p) (
     (var state (unique_sym))
     (var v (unique_sym))
@@ -1246,7 +1247,7 @@
         (make_expr DefineVariable (list2 state (gen_copy_parser_state)))
         (make_expr DefineVariable (list2 v (compile_parser_element p)))
         (gen_set_parser_state state)
-        (make_expr Apply (list2 (to_sym "%negate") (list1 v)))
+        (make_expr Apply (list2 (to_sym "%negate") (list2 ParserVar v)))
         )))
     ))
 
@@ -1318,7 +1319,8 @@
     (var state (copy_parser_state p))
     (var errors 0)
 
-    (= v (byterun (compile_matching loc sym new) p))
+    (var code (compile_matching loc sym new))
+    (= v (byterun code p))
     (if (== (expr_head v) Parsed) (goto end_lbl))
     (= errors (merge_noparse errors v))
     (set_parser_state p state)
@@ -1384,10 +1386,11 @@
     (add_builtin_function3 parser (to_sym "%call_parser") (domainP Parser) (domainP Symbol) (domainP Function) call_parser 0)
     (add_builtin_function4 parser (to_sym "%bind_parser") (domainP Parser) (domainP Symbol) (domainP Function) (domainP Function) bind_parser 0)
     (add_builtin_function2 parser (to_sym "%merge_noparse") DontCare DontCare merge_noparse 0)
-    (add_builtin_function1 parser (to_sym "%negate") DontCare negate 0)
+    (add_builtin_function2 parser (to_sym "%negate") (domainP Parser) DontCare negate 0)
 
     (add_builtin_function2 parser (to_sym "parse_text") (domainP Parser) (domainP String) parse_text 0)
 
+    (add_parser parser (to_sym "parse_any") parse_any_char)
     (add_parser parser (to_sym "parse_spaces") parse_spaces)
     (add_parser parser (to_sym "parse_blanks") parse_blanks)
     (add_parser parser (to_sym "parse_decimal") parse_decimal)
