@@ -185,8 +185,19 @@
     (var sym (expr_arg expr 0))
     (var pat (expr_arg expr 1))
     (var act (expr_arg expr 2))
-    (var stmts (compile_define_syntax sym pat act))
-    (debugpf stmts)
+    (var stmts (compile_define_syntax sym pat act @FALSE))
+    (while stmts (do
+        (eval (car stmts))
+        (= stmts (cdr stmts))
+        ))
+    (return 0)
+    ))
+
+(fun eval_define_syntax_space_sensitive (expr) (
+    (var sym (expr_arg expr 1))
+    (var pat (expr_arg expr 2))
+    (var act (expr_arg expr 3))
+    (var stmts (compile_define_syntax sym pat act @TRUE))
     (while stmts (do
         (eval (car stmts))
         (= stmts (cdr stmts))
@@ -275,6 +286,10 @@
     (add_builtin_function1 mod Eval
         (make_expr DefSyntax (list3 symT DontCare DontCare))
         eval_define_syntax 0)
+    (add_builtin_function1 mod Eval
+        (make_expr DefSyntax (list4
+            (quote (to_sym "space_sensitive")) symT DontCare DontCare))
+        eval_define_syntax_space_sensitive 0)
     ))
 
 (extern fun setup_numeric)
