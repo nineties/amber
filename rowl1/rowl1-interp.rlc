@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2012-04-18 16:07:16 nineties $
+; $Id: rowl1-interp.rlc 2012-05-20 09:45:59 nineties $
 ;
 
 (import "rlvm-compile")
@@ -162,7 +162,7 @@
         ))
 
     (set_current_module save_current_mod)
-    (return 0)
+    (return module)
     ))
 
 (fun default_rewrite (expr) (
@@ -183,14 +183,13 @@
 
 (fun eval_define_syntax (expr) (
     (var sym (expr_arg expr 0))
-    (var pat (expr_arg expr 1))
-    (var act (expr_arg expr 2))
-    (var stmts (compile_define_syntax sym pat act (== (expr_size expr) 4)))
+    (var elm (expr_arg expr 1))
+    (var stmts (compile_define_syntax sym elm (== (expr_size expr) 3)))
     (while stmts (do
         (eval (car stmts))
         (= stmts (cdr stmts))
         ))
-    (return 0)
+    (return nil)
     ))
 
 (var include_dirs null)
@@ -255,7 +254,7 @@
 (export fun eval_include (expr) (
     (var path (expr_arg_string expr 0))
     (include_file path)
-    (return 0)
+    (return nil)
     ))
 
 (fun setup_builtin_functions (mod) (
@@ -272,22 +271,26 @@
          (make_expr DefModule (list2 (domainP Qualified) blockT))
          eval_define_module 0)
     (add_builtin_function1 mod Eval
-        (make_expr DefSyntax (list3 symT DontCare DontCare))
+        (make_expr DefSyntax (list2 symT DontCare))
         eval_define_syntax 0)
     (add_builtin_function1 mod Eval
-        (make_expr DefSyntax (list4
-            symT DontCare DontCare (quote (to_sym "space_sensitive"))))
+        (make_expr DefSyntax (list3
+            symT DontCare (quote (to_sym "space_sensitive"))))
         eval_define_syntax 0)
     ))
 
+(extern fun setup_base)
 (extern fun setup_numeric)
+(extern fun setup_string)
 (extern fun setup_io)
 (extern fun setup_list)
 (extern fun setup_tuple)
 
 (fun init_stdlib (mod) (
     (var std (find_module no_loc mod (to_sym "std") @TRUE))
+    (setup_base std)
     (setup_numeric std)
+    (setup_string std)
     (setup_io std)
     (setup_list std)
     ))

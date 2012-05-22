@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-04-19 01:27:48 nineties $
+; $Id: rowl1-compile.rlc 2012-05-22 17:47:06 nineties $
 ;
 
 (import "rlvm-compile")
@@ -319,17 +319,6 @@
     (pretty_print stderr args)
     (output_char stderr '\n')
     (exit 1)
-    ))
-
-(fun compile_undefined_error (asm sym arity) (
-    (put_imm_int asm 0) ; nil
-    (while (> arity 0) (do
-        (decr arity)
-        (put_arg asm arity)
-        (put_cons asm)
-        ))
-    (put_push asm sym)
-    (compile_simple_call asm 2 undefined_error)
     ))
 
 (export fun compile (asm mod expr) (
@@ -1019,24 +1008,14 @@
     ))
 
 (fun compile_eq (asm mod expr) (
-    (var else_lbl (fresh_label asm))
-    (var exit_lbl (fresh_label asm))
-    (compile asm mod (expr_arg expr 1))
-    (compile asm mod (expr_arg expr 0))
-    (put_if_eq asm else_lbl)
-    (put_push asm false)
-    (put_goto asm exit_lbl)
-    (set_label asm else_lbl)
-    (put_push asm true)
-    (set_label asm exit_lbl)
+    (compile asm mod (make_expr Apply (list2 (to_sym "equal") (expr_args expr))))
     ))
 
 (fun compile_ne (asm mod expr) (
+    (compile_eq asm mod expr)
     (var else_lbl (fresh_label asm))
     (var exit_lbl (fresh_label asm))
-    (compile asm mod (expr_arg expr 1))
-    (compile asm mod (expr_arg expr 0))
-    (put_if_ne asm else_lbl)
+    (put_if_false asm else_lbl)
     (put_push asm false)
     (put_goto asm exit_lbl)
     (set_label asm else_lbl)
