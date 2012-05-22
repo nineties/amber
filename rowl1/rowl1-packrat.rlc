@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2012-04-18 23:44:25 nineties $
+; $Id: rowl1-packrat.rlc 2012-05-22 18:25:01 nineties $
 ;
 
 (import "rlvm-compile")
@@ -390,7 +390,7 @@
     (= c @(CHGRP c))
     (return (&& (<= @CH_0 c) (<= c @CH_OTHER)))
     ))
-(filevar escape_chars "'\"\\abfnrtv0")
+(var escape_chars "'\"\\abfnrtv0")
 (fun is_escape_char (c) (
     (for i 0 (strlen escape_chars) (do
         (if (== c (array_get char escape_chars i))
@@ -764,8 +764,18 @@
         @(CHECK nl)
         (var stmt (expr_arg v 1))
         (var loc (expr_arg v 0))
+
+        (if (!= (expr_head stmt) Located) (do
+            (output_error stderr loc)
+            (output_string stderr "parse_statement must returns Located{ ... }\n")
+            (exit 1)
+            ))
+
         (= stmts (cons stmt stmts))
-        (if (== (expr_head stmt) Include) break)
+
+        ; stop continue parsing when the stmt has side-effects for parsing.
+        (var hd (expr_head (expr_arg stmt 1)))
+        (if (|| (== hd Include) (== hd DefSyntax)) break)
         ))
     (return (list_reverse stmts))
     ))
@@ -1279,10 +1289,12 @@
         )))
     ))
 
-(fun compile_parser_func (sym elems act) (
+(fun compile_parser_action (elems act) (
     (if (!= (expr_head elems) List) (do
         (output_error stderr current_loc)
-        (output_string stderr "invalid syntax declaration\n")
+        (output_string stderr "syntax statement must be List{syntax element, ...}: ")
+        (pretty_print stderr elems)
+        (output_string stderr "\n")
         (exit 1)
         ))
 
@@ -1313,13 +1325,59 @@
             )
         (= body (cons (make_expr Assign (list2 ndvar (gen_at ndvar 1))) body))
         ))
+
     (= body (cons (make_expr DefineVariable (list2 loc
         (make_expr Apply (list2 (to_sym "%merge_loc") (list2 bloc eloc))))) body))
     (= body (cons (qquote (make_expr Parsed (list2 (unquote loc) (unquote act)))) body))
 
     (= body (make_expr Block (list_reverse body)))
+    (return (make_expr Apply (list2
+        (make_expr Lambda (list2 (make_expr Domain (list2 ParserVar Parser)) body))
+        (list1 ParserVar)
+        )))
+    ))
+
+(fun compile_parser_func (sym elems) (
+    (if (!= (expr_head elems) List) (do
+        (output_error stderr current_loc)
+        (output_string stderr "invalid syntax declaration\n")
+        (exit 1)
+        ))
+
+    (var body 0)
+    (var state (unique_sym))
+    (var v (unique_sym))
+    (var errors (unique_sym))
+    (= body (cons (make_expr DefineVariable (list2 v 0)) body))
+    (= body (cons (make_expr DefineVariable (list2 errors 0)) body))
+    (= body (cons (make_expr DefineVariable (list2 state (gen_copy_parser_state))) body))
+    (while elems (do
+        (var t (car elems))
+        (if (|| (!= (expr_head t) Tuple) (!= (expr_size t) 2)) (do
+            (output_error stderr current_loc)
+            (output_string stderr "parser element must be form of Tuple{parser, action}:")
+            (pretty_print stderr t)
+            (output_string stderr "\n")
+            (exit 1)
+            ))
+        (var act (compile_parser_action (expr_arg t 0) (expr_arg t 1)))
+        (= body (cons (make_expr Assign (list2 v act)) body))
+        (= body (cons (make_expr If (list2
+            (make_expr Equal (list2 (make_expr Head (list1 v)) (quote Parsed)))
+            (make_expr Return (list1 v))
+            )) body))
+        (= body (cons (make_expr Assign (list2 errors
+            (make_expr Apply (list2 (to_sym "%merge_noparse") (list2 errors v))))) body))
+        (= body (cons (gen_set_parser_state state) body))
+        (= elems (cdr elems))
+        ))
+    (= body (cons errors body))
+
     (return (make_expr DefineFunction
-        (list2 sym (make_expr Lambda (list2 (make_expr Domain (list2 ParserVar Parser)) body)))))
+        (list2 sym (make_expr Lambda (list2 (make_expr Domain
+            (list2 ParserVar Parser))
+            (make_expr Block (list_reverse body)))))))
+
     ))
 
 (extern fun compile_matching)
@@ -1378,14 +1436,14 @@
         )))))
     ))
 
-(export fun compile_define_syntax (sym pat act s) (
+(export fun compile_define_syntax (sym elems s) (
     (= space_sensitive_p s)
     (= sym (to_parse sym))
     (if (lookup_symbol current_mod sym)
         (do
             (var parser_sym (unique_sym))
             (var copy_sym   (unique_sym))
-            (var new_parser_stmt (compile_parser_func parser_sym pat act))
+            (var new_parser_stmt (compile_parser_func parser_sym elems))
             (var stmts (list3
                 (make_expr DefineVariable (list2 copy_sym sym))
                 new_parser_stmt
@@ -1395,7 +1453,7 @@
         )
         (do
             (var parser_sym (unique_sym))
-            (var new_parser_stmt (compile_parser_func parser_sym pat act))
+            (var new_parser_stmt (compile_parser_func parser_sym elems))
             (var stmts (list2
                 new_parser_stmt
                 (compile_parser1 sym parser_sym)
