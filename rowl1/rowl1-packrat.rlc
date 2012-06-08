@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2012-06-08 14:34:30 nineties $
+; $Id: rowl1-packrat.rlc 2012-06-09 04:35:38 nineties $
 ;
 
 (import "rlvm-compile")
@@ -36,7 +36,7 @@
 (define CHGRP (c) `(array_get char chgroup @c))
 (define MEMOIZE (sym)
     `(export fun @(s++ `parse_ sym) (p) (
-        (var s (to_sym (strcat "parse_" @(tos sym))))
+        (var s (to_sym @(++ "parse_" sym "_")))
         (var tbl (field_get (field_get p 1) 2))
         (var pos (field_get p 3))
         (var v (memotable_find tbl s pos))
@@ -1417,31 +1417,59 @@
     ))
 
 (extern fun compile_matching)
-(fun call_parser (p sym new) (
+(fun call_parser (p sym key new) (
     (var tbl (field_get (field_get p 1) 2))
     (var pos (field_get p 3))
-    (var v (memotable_find tbl sym pos))
-    (if v (do
-        (set_parser_state p (cdr v))
-        (return (car v))
-        ))
-    (var loc (get_loc p))
-    (= v (byterun (compile_matching loc sym new) p))
-    (memotable_add tbl sym pos (cons v (copy_parser_state p)))
-    (return v)
-    ))
-
-(fun bind_parser (p sym new orig) (
-    (var tbl (field_get (field_get p 1) 2))
-    (var pos (field_get p 3))
-    (var v (memotable_find tbl sym pos))
+    (var v (memotable_find tbl key pos))
     (if v (do
         (set_parser_state p (cdr v))
         (return (car v))
         ))
     (var loc (get_loc p))
     (var state (copy_parser_state p))
+    (var longest pos)
+
+    ; Trick for left recursion
+    (var ent (cons (noparse loc "Left recursion") state))
+    (memotable_add tbl key pos ent)
+    
+    (label retry_lbl)
+
+    (= v (byterun (compile_matching loc sym new) p))
+
+    (var new_state (copy_parser_state p))
+
+    (if (> (field_get new_state 3) longest) (do
+        ; Update detection
+        (setcar ent v)
+        (setcdr ent new_state)
+        (set_parser_state p state)
+        (= longest (field_get new_state 3))
+        (goto retry_lbl)
+        ))
+
+    ;(memotable_add tbl key pos (cons v (copy_parser_state p)))
+    (return (car ent))
+    ))
+
+(fun bind_parser (p sym key new orig) (
+    (var tbl (field_get (field_get p 1) 2))
+    (var pos (field_get p 3))
+    (var v (memotable_find tbl key pos))
+    (if v (do
+        (set_parser_state p (cdr v))
+        (return (car v))
+        ))
+    (var loc (get_loc p))
+    (var state (copy_parser_state p))
+    (var longest pos)
     (var errors 0)
+
+    ; Trick for left recursion 
+    (var ent (cons (noparse loc "Left recursion") state))
+    (memotable_add tbl key pos ent)
+
+    (label retry_lbl)
 
     (= v (byterun (compile_matching loc sym new) p))
     (if (== (expr_head v) Parsed) (goto end_lbl))
@@ -1454,21 +1482,33 @@
     (set_parser_state p state)
 
     (label end_lbl)
-    (memotable_add tbl sym pos (cons v (copy_parser_state p)))
-    (return v)
+
+    (var new_state (copy_parser_state p))
+
+    (if (> (field_get new_state 3) longest) (do
+        ; Update detection
+        (setcar ent v)
+        (setcdr ent new_state)
+        (set_parser_state p state)
+        (= longest (field_get new_state 3))
+        (goto retry_lbl)
+        ))
+
+    ;(memotable_add tbl key pos (cons v (copy_parser_state p)))
+    (return (car ent))
     ))
 
 (fun compile_parser1 (sym new) (
     (return (make_expr DefineFunction (list2 sym
         (make_expr Lambda (list2 (make_expr Domain (list2 ParserVar Parser))
-        (make_expr Apply (list2 (to_sym "%call_parser") (list3 ParserVar (quote sym) new)))
+        (make_expr Apply (list2 (to_sym "%call_parser") (list4 ParserVar (quote sym) (quote new) new)))
         )))))
     ))
 
 (fun compile_parser2 (sym new orig) (
     (return (make_expr DefineFunction (list2 sym
         (make_expr Lambda (list2 (make_expr Domain (list2 ParserVar Parser))
-        (make_expr Apply (list2 (to_sym "%bind_parser") (list4 ParserVar (quote sym) new orig)))
+        (make_expr Apply (list2 (to_sym "%bind_parser") (list5 ParserVar (quote sym) (quote new) new orig)))
         )))))
     ))
 
@@ -1507,8 +1547,8 @@
     (add_builtin_function2 parser (to_sym "%merge_loc") (domainP Loc) (domainP Loc) merge_loc 0)
     (add_builtin_function1 parser (to_sym "%copy_parser_state") (domainP Parser) copy_parser_state 0)
     (add_builtin_function2 parser (to_sym "%set_parser_state") (domainP Parser) (domainP Parser) set_parser_state 0)
-    (add_builtin_function3 parser (to_sym "%call_parser") (domainP Parser) (domainP Symbol) (domainP Function) call_parser 0)
-    (add_builtin_function4 parser (to_sym "%bind_parser") (domainP Parser) (domainP Symbol) (domainP Function) (domainP Function) bind_parser 0)
+    (add_builtin_function4 parser (to_sym "%call_parser") (domainP Parser) (domainP Symbol) (domainP Symbol) (domainP Function) call_parser 0)
+    (add_builtin_function5 parser (to_sym "%bind_parser") (domainP Parser) (domainP Symbol) (domainP Symbol) (domainP Function) (domainP Function) bind_parser 0)
     (add_builtin_function2 parser (to_sym "%merge_noparse") DontCare DontCare merge_noparse 0)
     (add_builtin_function2 parser (to_sym "%negate") (domainP Parser) DontCare negate 0)
 

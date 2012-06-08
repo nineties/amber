@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlvm-compile.rlc 2012-05-22 17:04:40 nineties $
+; $Id: rlvm-compile.rlc 2012-06-09 04:02:37 nineties $
 ;
 
 (import "stdlib")
@@ -39,6 +39,12 @@
 
 (var break_labels ())
 (var continue_labels ())
+(var current_fun nil)
+
+(define label (name) (do
+    `(label @(s++ current_fun '.' name))
+    ))
+
 (define push_exit_label () (do
     (var blbl (mklabel))
     (var clbl (mklabel))
@@ -49,7 +55,7 @@
     (var blbl (car break_labels))
     (set break_labels (cdr break_labels))
     (set continue_labels (cdr continue_labels))
-    (emit_insn `(label @blbl))
+    (emit_insn (label blbl))
     ))
 
 (var num_local_var 0)
@@ -400,12 +406,12 @@
     (var end_label (mklabel))
     (compile_expr lhs)
     (compile_expr rhs)
-    (emit_insn `(@insn (label @ifelse_label)))
+    (emit_insn `(@insn @(label ifelse_label)))
     (if (compile_expr ifthen) (emit_insn `drop))
-    (emit_insn `(goto (label @end_label)))
-    (emit_insn `(label @ifelse_label))
+    (emit_insn `(goto @(label end_label)))
+    (emit_insn (label ifelse_label))
     (if (compile_expr ifelse) (emit_insn `drop))
-    (emit_insn `(label @end_label))
+    (emit_insn (label end_label))
     nil
     ))
 
@@ -417,7 +423,7 @@
     (var ifend_label (mklabel))
     (compile_expr `(if @lhs (if @rhs (do @ifthen (goto @ifend_label)))))
     (compile_expr ifelse)
-    (emit_insn `(label @ifend_label))
+    (emit_insn (label ifend_label))
     nil
     ))
 
@@ -438,12 +444,12 @@
             (var ifelse_label (mklabel))
             (var end_label (mklabel))
             (compile_expr e)
-            (emit_insn `(if_zero (label @ifelse_label)))
+            (emit_insn `(if_zero @(label ifelse_label)))
             (if (compile_expr ifthen) (emit_insn `drop))
-            (emit_insn `(goto (label @end_label)))
-            (emit_insn `(label @ifelse_label))
+            (emit_insn `(goto @(label end_label)))
+            (emit_insn (label ifelse_label))
             (if (compile_expr ifelse) (emit_insn `drop))
-            (emit_insn `(label @end_label))
+            (emit_insn (label end_label))
             nil
             ))
         )))
@@ -522,10 +528,10 @@
     (push_exit_label)
     (emit_insn `(tswitch (short @(- ncase 1))))
     (foreach l labels (do
-        (emit_insn `(tswitch_ent (label @l)))
+        (emit_insn `(tswitch_ent @(label l)))
         ))
     (foreach c cases (do
-        (emit_insn `(label @(car labels)))
+        (emit_insn (label (car labels)))
         (if (compile_expr (cdr c)) (emit_insn `drop))
         (set labels (cdr labels))
         ))
@@ -556,10 +562,10 @@
     (push_exit_label)
     (emit_insn `(lswitch (long @val)))
     (foreach l labels (do
-        (emit_insn `(lswitch_ent (long @(car l)) (label @(cdr l))))
+        (emit_insn `(lswitch_ent (long @(car l)) @(label (cdr l))))
         ))
     (foreach c cases (do
-        (emit_insn `(label @(cdar labels)))
+        (emit_insn (label (cdar labels)))
         (if (compile_expr (cdr c)) (emit_insn `drop))
         (= labels (cdr labels))
         ))
@@ -568,24 +574,24 @@
     ))
 
 (define compile_label ((_ name)) (do
-    (emit_insn `(label @name))
+    (emit_insn (label name))
     nil
     ))
 
 (define compile_goto ((_ name)) (do
-    (emit_insn `(goto (label @name)))
+    (emit_insn `(goto @(label name)))
     nil
     ))
 
 (define compile_break (_) (do
     (var break_label (car break_labels))
-    (emit_insn `(goto (label @break_label)))
+    (emit_insn `(goto @(label break_label)))
     nil
     ))
 
 (define compile_continue (_) (do
     (var continue_label (car continue_labels))
-    (emit_insn `(goto (label @continue_label)))
+    (emit_insn `(goto @(label continue_label)))
     nil
     ))
 
@@ -810,6 +816,8 @@
     ))
 
 (define compile_fundecl ((_ name params body) export) (do
+    (= current_fun name)
+
     (add_var name `(fun @name))
     (vtable_push)
     (reset_insn_seq)
@@ -829,6 +837,9 @@
     (if (> num_local_var 0)
         (set insn_seq (cons `(allocate (byte @num_local_var)) insn_seq)))
     (vtable_pop)
+
+    (= current_fun nil)
+
     `(function @export @name @insn_seq)
     ))
 
