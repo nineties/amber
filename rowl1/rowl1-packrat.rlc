@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2012-05-22 18:25:01 nineties $
+; $Id: rowl1-packrat.rlc 2012-06-08 14:34:30 nineties $
 ;
 
 (import "rlvm-compile")
@@ -263,10 +263,16 @@
     (var buf (field_get p 1))
     (var cbuf (field_get buf 0))
     (var bufsz (cvector_size cbuf))
+    (var pos (field_get p 3))
 
-    (cvector_resize cbuf 0)
-    (field_set p 4 (+ (field_get p 4) bufsz))
-    (field_set p 3 0)
+    ; XXX: Not good implementation.
+    ; Ring buffer is better.
+    (if (>= pos bufsz) (do
+        (cvector_resize cbuf 0)
+        (field_set p 4 (+ (field_get p 4) bufsz))
+        (field_set p 3 0)
+        ))
+
     (memotable_clear (field_get buf 2))
     (if shell_mode_p (field_set p 5 (+ (field_get p 5) 1)))
     ))
@@ -742,7 +748,7 @@
 @(MEMOIZE statement)
 
 (export fun parse_statements (p) (
-    (if (== (lookahead p) @EOF) 0)
+    (if (== (lookahead p) @EOF) (return 0))
     (var stmts 0)
     (while @TRUE (do
         (if (== (lookahead p) @EOF) break)
@@ -775,7 +781,9 @@
 
         ; stop continue parsing when the stmt has side-effects for parsing.
         (var hd (expr_head (expr_arg stmt 1)))
-        (if (|| (== hd Include) (== hd DefSyntax)) break)
+        (if (|| (== hd Include) (== hd DefSyntax))
+            break
+            )
         ))
     (return (list_reverse stmts))
     ))
@@ -800,6 +808,12 @@
         (parse_blanks p '\n')
         (var nl (parse_char p '\n'))
         (if (== (expr_head nl) NoParse) (if may_parse (goto retry) (return nl)))
+
+        (if (!= (expr_head (expr_arg e 1)) Located) (do
+            (output_error stderr (expr_arg e 0))
+            (output_string stderr "parse_statement must returns Located{ ... }\n")
+            (exit 1)
+            ))
         (return e)
 
         (label retry)
@@ -824,10 +838,12 @@
     (return (to_sym (strcat "parse_" (symbol_name sym))))
     ))
 
-(var Seq (to_sym "Seq"))
 (var ParserVar (to_sym "%Parser")) ; internal use
 (fun make_nodevar (idx) (
     (return (to_sym (strcat "node" (itos idx))))
+    ))
+(fun make_locar (idx) (
+    (return (to_sym (strcat "loc" (itos idx))))
     ))
 
 (fun gen_at (node idx) (
@@ -856,7 +872,15 @@
     (var len (list_len (expr_args pat)))
     (if (== hd Delimited) (do
         (if (!= len 2) (goto compile_error))
-        (return (compile_delimited (expr_arg pat 0) (expr_arg pat 1)))
+        (return (compile_delimited (expr_arg pat 0) (expr_arg pat 1) 0))
+        ))
+    (if (== hd Delimited1) (do
+        (if (!= len 2) (goto compile_error))
+        (return (compile_delimited (expr_arg pat 0) (expr_arg pat 1) 1))
+        ))
+    (if (== hd Delimited2) (do
+        (if (!= len 2) (goto compile_error))
+        (return (compile_delimited (expr_arg pat 0) (expr_arg pat 1) 2))
         ))
     (if (!= len 1) (goto compile_error))
     (if (== hd Many)
@@ -1183,7 +1207,7 @@
 ; set_parser_state(state)
 ; Parsed{loc, reverse(elems)}
 
-(fun compile_delimited (p delim) (
+(fun compile_delimited (p delim minlen) (
     (var v     (unique_sym))
     (var state (unique_sym))
     (var elems (unique_sym))
@@ -1222,6 +1246,16 @@
     (= body (cons (gen_set_parser_state state) body))
     (= body (cons (make_expr DefineVariable (list2 loc
         (make_expr Apply (list2 (to_sym "%merge_loc") (list2 bloc eloc))))) body))
+    (if (> minlen 0)
+        (= body (cons (make_expr If (list2 
+            (make_expr Apply (list2 (to_sym "LessThan")
+                (list2 (make_expr Apply (list2 (to_sym "length") (list1 elems)))
+                    (box minlen))))
+            (make_expr Return (list1 
+                (qquote (make_expr NoParse (list1 (list2 (unquote loc) (string "The number of elements is insufficient")))))))
+            )) body))
+        ) 
+
     (= body (cons (qquote (make_expr Parsed (list2 (unquote loc) (unquote (make_expr Apply (list2 (to_sym "reverse") (list1 elems))))))) body))
     (return (make_expr Block (list_reverse body)))
     ))
@@ -1306,6 +1340,7 @@
 
     (while elems (do
         (var ndvar (make_nodevar idx))
+        (var locvar (make_locar idx))
         (= body (cons (make_expr DefineVariable
             (list2 ndvar (compile_parser_element (car elems)))) body))
         (= body (cons (make_expr If (list2
@@ -1323,6 +1358,7 @@
                 )
             (= body (cons (make_expr DefineVariable (list2 eloc (gen_at ndvar 0))) body))
             )
+        (= body (cons (make_expr DefineVariable (list2 locvar (gen_at ndvar 0))) body))
         (= body (cons (make_expr Assign (list2 ndvar (gen_at ndvar 1))) body))
         ))
 
@@ -1439,7 +1475,7 @@
 (export fun compile_define_syntax (sym elems s) (
     (= space_sensitive_p s)
     (= sym (to_parse sym))
-    (if (lookup_symbol current_mod sym)
+    (if (lookup_effective_symbol current_mod sym)
         (do
             (var parser_sym (unique_sym))
             (var copy_sym   (unique_sym))

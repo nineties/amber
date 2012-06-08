@@ -11,7 +11,7 @@ DefineSyntax{
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2012-05-17 22:55:35 nineties $
+# $Id: syntax.ab 2012-06-08 02:02:29 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -19,7 +19,8 @@ DefineSyntax{
 
 ### Syntax definition
 # Amber's parser uses Parsing Expression Grammer (PEG) 
-#
+
+## syntax elements
 # .     : any character
 # P*    : zero or many
 # P+    : one or many
@@ -30,53 +31,94 @@ DefineSyntax{
 # !P    : not
 # (...) : grouping
 
-#DefineSyntax{
-#    primary_syntax_element,
-#    List{
-#        Tuple{List{"."}, Quote{any}},
-#        Tuple{List{string}, node0}
-#    }
-#}
+## Amber's unique syntax elements
+# aligned(p)       : sequence of p where every p has same indentation
+# delimited(p, d)  : sequence of p delimited by d
+# delimited1(p, d) : sequence of p delimited by d (one or many)
+# delimited2(p, d) : sequence of p delimited by d (two or many)
 
-#DefineSyntax{
-#    primary_syntax_element,
-#    List{
-#        Tuple{List{"."}, Quote{any}},
-#        Tuple{List{string}, node0},
-#        Tuple{List{symbol}, node0}
-#    }
-#}
+DefineSyntax{
+    primary_syntax_element,
+    List{
+        Tuple{List{"."}, Quote{any}},
+        Tuple{List{string}, node0},
+        Tuple{List{symbol}, node0},
+        Tuple{List{"(", Many1{syntax_element}, ")"}, node1}
+    }
+}
 
-#DefineSyntax{
-#    primary_syntax_element,
-#    List{string},
-#    node0
-#}
-#
-#DefineSyntax{
-#    syntax_element,
-#    List{"."},
-#    Quote{any}
-#}
-#
-#DefineSyntax{
-#    syntax_element,
-#    List{syntax_element, "|" 
-#DefineSyntax{
-#    syntax_element,
-#    List{syntax_element, "*"},
-#    QuasiQuote{Many{Unquote{node0}}}
-#}
-#
-#DefineSyntax{
-#    syntax_element,
-#    List{syntax_element, "+"},
-#    QuasiQuote{Many1{Unquote{node0}}}
-#}
-#
-#DefineSyntax{
-#    syntax_element,
-#    List{syntax_element, "?"},
-#    QuasiQuote{Option{Unquote{node0*}}}
-#}
-#}
+DefineSyntax{
+    syntax_element,
+    List{
+        Tuple{List{primary_syntax_element, "?"},
+            QuasiQuote{Option{Unquote{node0}}}},
+        Tuple{List{primary_syntax_element, "*"},
+            QuasiQuote{Many{Unquote{node0}}}},
+        Tuple{List{primary_syntax_element, "+"},
+            QuasiQuote{Many1{Unquote{node0}}}},
+        Tuple{List{Delimited2{primary_syntax_element, "/"}},
+            MakeExpression{Quote{Choice}, node0}},
+        Tuple{List{"&", primary_syntax_element},
+            QuasiQuote{And{Unquote{node0}}}},
+        Tuple{List{"!", primary_syntax_element},
+            QuasiQuote{Not{Unquote{node0}}}},
+        Tuple{List{"aligned", "(", syntax_element, ")"},
+            QuasiQuote{Aligned{Unquote{node2}}}},
+        Tuple{List{"delimited", "(", syntax_element, ",", syntax_element, ")"},
+            QuasiQuote{Delimited{Unquote{node2}, Unquote{node4}}}},
+        Tuple{List{"delimited1", "(", syntax_element, ",", syntax_element, ")"},
+            QuasiQuote{Delimited1{Unquote{node2}, Unquote{node4}}}},
+        Tuple{List{"delimited2", "(", syntax_element, ",", syntax_element, ")"},
+            QuasiQuote{Delimited2{Unquote{node2}, Unquote{node4}}}},
+        Tuple{List{primary_syntax_element}, node0}
+    }
+}
+
+DefineSyntax{
+    parser_action,
+    List{
+        Tuple{List{"{", statement, "}"},
+            MakeExpression{Quote{Block}, List{node1}}}
+    }
+}
+
+DefineSyntax{
+    syntax,
+    List{
+        Tuple{List{Many1{syntax_element}, parser_action},
+            MakeExpression{Quote{Tuple}, List{node0, node1}}
+        }
+    }
+}
+
+DefineSyntax{
+    syntax_declaration,
+    List{
+        Tuple{List{symbol, "::=", Delimited1{syntax, "/"}},
+            QuasiQuote{DefineSyntax{
+                Unquote{node0},
+                Unquote{node2}
+            }}}
+    }
+}
+
+### enable the syntax_declaration statement.
+DefineSyntax{
+    statement,
+    List{Tuple{List{syntax_declaration}, QuasiQuote{Located{Unquote{loc0}, Unquote{node0}}}}}
+}
+
+### Expressions
+primary_expression
+    ::= item                                { node0 }
+      / "(" expression ")"                  { node1 } 
+      / "[" delimited(expression, ",") "]"  { node1 } # List literal
+      / "(" delimited2(expression, ",") ")" 
+        { MakeExpression{Quote{Tuple}, node1} } # Tuple literal
+
+postfix_expression
+    ::= postfix_expression "++" { node0 }
+      / primary_expression      { node0 }
+
+expression ::= postfix_expression { node0 }
+
