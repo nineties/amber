@@ -11,7 +11,7 @@ DefineSyntax{
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2012-06-08 02:02:29 nineties $
+# $Id: syntax.ab 2012-06-09 05:12:20 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -86,7 +86,10 @@ DefineSyntax{
     syntax,
     List{
         Tuple{List{Many1{syntax_element}, parser_action},
-            MakeExpression{Quote{Tuple}, List{node0, node1}}
+            QuasiQuote{Tuple{Unquote{node0}, Unquote{node1}}}
+        },
+        Tuple{List{syntax_element},
+            QuasiQuote{Tuple{Unquote{List{node0}}, node0}}
         }
     }
 }
@@ -94,7 +97,7 @@ DefineSyntax{
 DefineSyntax{
     syntax_declaration,
     List{
-        Tuple{List{symbol, "::=", Delimited1{syntax, "/"}},
+        Tuple{List{symbol, "::=", Delimited1{syntax, "|"}},
             QuasiQuote{DefineSyntax{
                 Unquote{node0},
                 Unquote{node2}
@@ -110,15 +113,16 @@ DefineSyntax{
 
 ### Expressions
 primary_expression
-    ::= item                                { node0 }
-      / "(" expression ")"                  { node1 } 
-      / "[" delimited(expression, ",") "]"  { node1 } # List literal
-      / "(" delimited2(expression, ",") ")" 
+    ::= item
+      | "(" expression ")"                  { node1 } 
+      | "[" delimited(expression, ",") "]"  { node1 } # List literal
+      | "(" delimited2(expression, ",") ")" 
         { MakeExpression{Quote{Tuple}, node1} } # Tuple literal
 
 postfix_expression
-    ::= postfix_expression "++" { node0 }
-      / primary_expression      { node0 }
+    ::= postfix_expression "(" delimited(expression, ",") ")"
+        { QuasiQuote{Apply{Unquote{node0}, Unquote{node2}}} }
+      | primary_expression
 
-expression ::= postfix_expression { node0 }
+expression ::= postfix_expression
 
