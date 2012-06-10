@@ -11,7 +11,7 @@ DefineSyntax{
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2012-06-09 05:12:20 nineties $
+# $Id: syntax.ab 2012-06-10 13:30:09 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -57,7 +57,7 @@ DefineSyntax{
         Tuple{List{primary_syntax_element, "+"},
             QuasiQuote{Many1{Unquote{node0}}}},
         Tuple{List{Delimited2{primary_syntax_element, "/"}},
-            MakeExpression{Quote{Choice}, node0}},
+            MakeExpr{Quote{Choice}, node0}},
         Tuple{List{"&", primary_syntax_element},
             QuasiQuote{And{Unquote{node0}}}},
         Tuple{List{"!", primary_syntax_element},
@@ -78,7 +78,7 @@ DefineSyntax{
     parser_action,
     List{
         Tuple{List{"{", statement, "}"},
-            MakeExpression{Quote{Block}, List{node1}}}
+            MakeExpr{Quote{Block}, List{node1}}}
     }
 }
 
@@ -112,17 +112,42 @@ DefineSyntax{
 }
 
 ### Expressions
-primary_expression
+primary_expr
     ::= item
-      | "(" expression ")"                  { node1 } 
-      | "[" delimited(expression, ",") "]"  { node1 } # List literal
-      | "(" delimited2(expression, ",") ")" 
-        { MakeExpression{Quote{Tuple}, node1} } # Tuple literal
+      | "(" expr ")"                  { node1 } 
+      | "[" delimited(expr, ",") "]"  { node1 } # List literal
+      | "(" delimited2(expr, ",") ")" 
+        { MakeExpr{Quote{Tuple}, node1} } # Tuple literal
 
-postfix_expression
-    ::= postfix_expression "(" delimited(expression, ",") ")"
-        { QuasiQuote{Apply{Unquote{node0}, Unquote{node2}}} }
-      | primary_expression
+postfix_expr
+    ::= postfix_expr "(" delimited(expr, ",") ")"
+        { QuasiQuote{Apply{Unquote{node0}, Unquote{node2}}} } # Function Application
+      | postfix_expr "[" delimited(expr, ",") "]"
+        { QuasiQuote{Subscript{Unquote{node0}, Unquote{node2}}} } # Subscription
+      | primary_expr
 
-expression ::= postfix_expression
+quote_expr
+    ::= "\\" quote_expr
+        { MakeExpr{Quote{Quote}, List{node1}} }
+      | "`"  quote_expr
+        { MakeExpr{Quote{QuasiQuote}, List{node1}} }
+      | "!"  quote_expr
+        { MakeExpr{Quote{Unquote}, List{node1}} }
+      | postfix_expr
+
+# enable use of quotation expressions for following definitions.
+expr ::= quote_expr
+
+multiplicative_expr
+    ::= multiplicative_expr '*' quote_expr { `Mul{!node0, !node2} }
+      | multiplicative_expr '/' quote_expr { `Div{!node0, !node2} }
+      | multiplicative_expr '%' quote_expr { `Mod{!node0, !node2} }
+      | quote_expr
+
+additive_expr
+    ::= additive_expr '+' multiplicative_expr { `Add{!node0, !node2} }
+      | additive_expr '-' multiplicative_expr { `Sub{!node0, !node2} }
+      | multiplicative_expr
+
+expr ::= additive_expr
 
