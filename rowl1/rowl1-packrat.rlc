@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2012-06-09 22:51:11 nineties $
+; $Id: rowl1-packrat.rlc 2012-06-10 01:08:47 nineties $
 ;
 
 (import "rlvm-compile")
@@ -106,7 +106,7 @@
 ;   
 ; structure of entries
 ;   0 : symbol
-;   1 : expression
+;   1 : expr
 ;   2 : pointer to the next entry
 ;   3 : position value
 ;   4 : hash value
@@ -696,7 +696,7 @@
     (var args 0)
     (if (!= (lookahead p) '}') (do
         (while (> (lookahead p) 0) (do
-            (= v (parse "parse_expression" p))
+            (= v (parse "parse_expr" p))
             @(CHECK v)
             (parse "parse_spaces" p)
 
@@ -732,13 +732,13 @@
     ))
 @(MEMOIZE item)
 
-(fun parse_expression (p) (
+(fun parse_expr (p) (
     (var v (parse "parse_item" p))
     (return v)
     ))
 
 (fun parse_statement_ (p) (
-    (var v (parse "parse_expression" p))
+    (var v (parse "parse_expr" p))
     @(CHECK v)
     (var loc (expr_arg v 0))
     (var stmt (expr_arg v 1))
@@ -1564,9 +1564,9 @@
     (add_parser parser (to_sym "parse_string") parse_string)
     (add_parser parser (to_sym "parse_symbol") parse_symbol)
 
-    ; expressions
+    ; exprs
     (add_parser parser (to_sym "parse_item") parse_item)
-    (add_parser parser (to_sym "parse_expression") parse_expression)
+    (add_parser parser (to_sym "parse_expr") parse_expr)
     (add_parser parser (to_sym "parse_statement") parse_statement)
     ))
 
