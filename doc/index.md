@@ -1,7 +1,6 @@
 ---
 layout: page
-title: Hello World!
-tagline: Supporting tagline
+title: Programming Language Amber
 ---
 {% include JB/setup %}
 
