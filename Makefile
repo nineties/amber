@@ -3,7 +3,7 @@
 # Copyright (C) 2009 nineties
 #
 
-# $Id: Makefile 2012-06-11 14:33:58 nineties $
+# $Id: Makefile 2012-06-11 16:16:00 nineties $
 
 LIBDIR = /usr/lib
 
@@ -17,7 +17,7 @@ install:
 	cp -r lib/* /usr/lib/amber/
 
 doc-preview:
-	cd doc; jekyll --server --safe
+	cd doc; jekyll --server
 
 doc:
 	cd doc; jekyll --no-auto --safe; rm -rf _deploy/*; cp -pr _site/* _deploy
