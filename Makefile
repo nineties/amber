@@ -3,7 +3,7 @@
 # Copyright (C) 2009 nineties
 #
 
-# $Id: Makefile 2012-01-19 22:55:46 nineties $
+# $Id: Makefile 2012-06-11 10:37:45 nineties $
 
 LIBDIR = /usr/lib
 
@@ -16,7 +16,13 @@ install:
 	mkdir -p /usr/lib/amber
 	cp -r lib/* /usr/lib/amber/
 
-.PHONY: clean
+doc:
+	cd doc; jekyll --no-auto
+	cd doc/_site; git add .; git commit -am 'update documents'; git push origin gh-pages
+	git add .; git commit -m 'update documents'
+
 clean:
 	cd rowl0; $(MAKE) clean
 	cd rowl1; $(MAKE) clean
+
+.PHONY: all install clean doc
