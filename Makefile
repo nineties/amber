@@ -3,7 +3,7 @@
 # Copyright (C) 2009 nineties
 #
 
-# $Id: Makefile 2012-06-11 11:38:22 nineties $
+# $Id: Makefile 2012-06-11 13:47:25 nineties $
 
 LIBDIR = /usr/lib
 
@@ -17,10 +17,10 @@ install:
 	cp -r lib/* /usr/lib/amber/
 
 doc-preview:
-	cd doc; jekyll --server --safe
+	cd doc; jekyll --server
 
 doc:
-	cd doc; jekyll --no-auto --safe; rm -rf _deploy/*; cp -pr _site/* _deploy
+	cd doc; jekyll --no-auto; rm -rf _deploy/*; cp -pr _site/* _deploy
 	cd doc/_deploy; git add .; git commit -am 'update documents'; git push origin gh-pages
 	git add .; git commit -m 'update documents'
 
