@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2012-06-14 13:49:36 nineties $
+; $Id: vm-gc.rlc 2012-06-14 14:39:23 nineties $
 ;
 
 (import "stdlib")
@@ -317,17 +317,8 @@
     (int tag @(OBJECT_TAG head))
     (if (<= tag @TAG_PSTRUCT) ((return)))
     (if (== tag @TAG_CONS) (
-        ;(if (== obj 0xf7508dac) (
-        ;    (debug "found!\n")
-        ;    (debugx ([] obj 0))
-        ;    (debugx ([] obj 1))
-        ;    ))
         (move_object obj) ; car
         (move_object (+ obj @WORD_SIZE)) ; cdr
-        ;(if (== obj 0xf7508dac) (
-        ;    (debugx ([] obj 0))
-        ;    (debugx ([] obj 1))
-        ;    ))
         (return)
         ))
     (if (== tag @TAG_SEQUENCE) (
@@ -371,19 +362,20 @@
             ))
 
         (move_object obj) ; bytecode
-        (= code ([] obj 0))
-        (for i 0 n (
-            (int offs ([] reloc i))
-            (move_object (+ code offs))
-            ))
 
+        (if (!= code ([] obj 0)) (
+            (= code ([] obj 0))
+            (for i 0 n (
+                (int offs ([] reloc i))
+                (move_object (+ code offs))
+                ))
+            ))
         (return)
         ))
     (error "move_fields: not reachable")
     ))
 
 (fun garbage_collect () (
-    (debug "GC start\n")
     (if @IN_GC (
         (alloc_new_block)
         (return)
@@ -428,7 +420,6 @@
     (insert_padding)
 
     (= current_gen next_gen) ; switch to next generation
-    (debug "GC end\n")
     ))
 
 (fun insert_padding () (
