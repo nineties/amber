@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlvm-compile.rlc 2012-06-09 04:02:37 nineties $
+; $Id: rlvm-compile.rlc 2012-06-14 19:25:27 nineties $
 ;
 
 (import "stdlib")
@@ -248,6 +248,18 @@
 (define arg_offs (idx) (* 4 (+ 3 idx)))
 (define local_offs (idx) (* -4 (+ 1 idx)))
 
+(define gen_storel (idx) (do
+    (cond
+        ((== idx 0) (emit_insn `storel0))
+        ((== idx 1) (emit_insn `storel1))
+        ((== idx 2) (emit_insn `storel2))
+        ((== idx 3) (emit_insn `storel3))
+        ((== idx 4) (emit_insn `storel4))
+        ((== idx 5) (emit_insn `storel5))
+        ((< idx 256) (emit_insn `(storel (byte @(local_offs idx)))))
+        (otherwise (error "too many local variables"))
+        )
+    ))
 (define compile_local_assign (insn loc rhs) (do
     (if (!= `nop insn)
         (do
@@ -259,17 +271,7 @@
             (compile_expr rhs)
         )
         )
-    (var idx (cadr loc))
-    (cond
-        ((== idx 0) (emit_insn `storel0))
-        ((== idx 1) (emit_insn `storel1))
-        ((== idx 2) (emit_insn `storel2))
-        ((== idx 3) (emit_insn `storel3))
-        ((== idx 4) (emit_insn `storel4))
-        ((== idx 5) (emit_insn `storel5))
-        ((< idx 256) (emit_insn `(storel (byte @(local_offs idx)))))
-        (otherwise (error "too many local variables"))
-        )
+    (gen_storel (cadr loc))
     ))
 
 (define compile_arg_assign (insn loc rhs) (do
@@ -573,6 +575,29 @@
     nil
     ))
 
+(define compile_try ((_ body (_ v handler))) (do
+    (var handler_lbl (mklabel))
+    (var cont_lbl (mklabel))
+
+    (emit_insn `(unwind_push @(label handler_lbl)))
+    (if (compile_expr body) (emit_insn `drop))
+    (emit_insn `unwind_pop)
+    (emit_insn `(goto @(label cont_lbl)))
+    (emit_insn (label handler_lbl))
+    
+    (gen_storel (register_local_var v))
+    (emit_insn `drop)
+    (if (compile_expr handler) (emit_insn `drop))
+a   (emit_insn (label cont_lbl))
+    nil
+    ))
+
+(define compile_throw ((_ e)) (do
+    (compile_expr e)
+    (emit_insn `throw)
+    nil
+    ))
+
 (define compile_label ((_ name)) (do
     (emit_insn (label name))
     nil
@@ -599,16 +624,7 @@
     (var idx (register_local_var name))
     (var val (if valopt (car valopt) 0))
     (compile_expr val)
-    (cond
-        ((== idx 0) (emit_insn `storel0))
-        ((== idx 1) (emit_insn `storel1))
-        ((== idx 2) (emit_insn `storel2))
-        ((== idx 3) (emit_insn `storel3))
-        ((== idx 4) (emit_insn `storel4))
-        ((== idx 5) (emit_insn `storel5))
-        ((< idx 256) (emit_insn `(storel (byte @(local_offs idx)))))
-        (otherwise (error "too many local variables"))
-        )
+    (gen_storel idx)
     true
     ))
 
@@ -753,6 +769,8 @@
         ((== `for (car expr)) (compile_for expr))
         ((== `tswitch (car expr)) (compile_tswitch expr))
         ((== `lswitch (car expr)) (compile_lswitch expr))
+        ((and (== `try (car expr)) (== `catch (caaddr expr))) (compile_try expr))
+        ((== `throw (car expr)) (compile_throw expr))
         ((== `label (car expr)) (compile_label expr))
         ((== `goto (car expr)) (compile_goto expr))
         ((== `do (car expr)) (compile_block (cdr expr)))
