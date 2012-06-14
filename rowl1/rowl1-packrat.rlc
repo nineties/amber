@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2012-06-10 01:08:47 nineties $
+; $Id: rowl1-packrat.rlc 2012-06-14 13:49:26 nineties $
 ;
 
 (import "rlvm-compile")
@@ -191,6 +191,10 @@
 
 (extern object current_mod)
 (extern fun set_current_module)
+
+(fun trace (obj) (
+    (return (make_expr Apply (list2 (to_sym "print") (list2 (to_sym "stderr") obj))))
+    ))
 
 (export fun set_shell_mode () (
     (= shell_mode_p @TRUE)
@@ -842,7 +846,7 @@
 (fun make_nodevar (idx) (
     (return (to_sym (strcat "node" (itos idx))))
     ))
-(fun make_locar (idx) (
+(fun make_locvar (idx) (
     (return (to_sym (strcat "loc" (itos idx))))
     ))
 
@@ -1340,7 +1344,7 @@
 
     (while elems (do
         (var ndvar (make_nodevar idx))
-        (var locvar (make_locar idx))
+        (var locvar (make_locvar idx))
         (= body (cons (make_expr DefineVariable
             (list2 ndvar (compile_parser_element (car elems)))) body))
         (= body (cons (make_expr If (list2

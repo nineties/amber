@@ -11,7 +11,7 @@ DefineSyntax{
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2012-06-10 13:30:09 nineties $
+# $Id: syntax.ab 2012-06-13 08:29:55 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -149,5 +149,16 @@ additive_expr
       | additive_expr '-' multiplicative_expr { `Sub{!node0, !node2} }
       | multiplicative_expr
 
-expr ::= additive_expr
+lambda_expr
+    ::= primary_expr "->" lambda_expr  { `Lambda{!node0, !node2} }
+      | additive_expr
 
+assign_expr
+    ::= symbol ":" assign_expr
+        { `DefineVariable{!node0, !node2} }
+      | symbol primary_expr ":" assign_expr
+        { `DefineFunction{!node0, Lambda{!node1, !node3}} }
+      | primary_expr "=" assign_expr { `Assign{!node0, !node2} }
+      | lambda_expr
+
+expr ::= assign_expr
