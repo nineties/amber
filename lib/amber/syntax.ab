@@ -11,7 +11,7 @@ DefineSyntax{
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2012-06-15 16:08:21 nineties $
+# $Id: syntax.ab 2012-06-16 01:09:14 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -108,7 +108,7 @@ DefineSyntax{
 ### enable the syntax_declaration statement.
 DefineSyntax{
     statement,
-    List{Tuple{List{syntax_declaration}, QuasiQuote{Located{Unquote{loc0}, Unquote{node0}}}}}
+    List{Tuple{List{syntax_declaration}, node0}}
 }
 
 ### Expressions
@@ -118,6 +118,8 @@ primary_expr
       | "[" delimited(expr, ",") "]"  { node1 } # List literal
       | "(" delimited2(expr, ",") ")" 
         { MakeExpr{Quote{Tuple}, node1} } # Tuple literal
+      | "{" aligned(statement) "}"
+        { MakeExpr{Quote{Block}, node1} } # Code block
 
 postfix_expr
     ::= postfix_expr "(" delimited(expr, ",") ")"
@@ -154,11 +156,18 @@ lambda_expr
       | additive_expr
 
 assign_expr
+    ::= primary_expr "=" assign_expr { `Assign{!node0, !node2} }
+      | lambda_expr
+
+expr ::= assign_expr
+
+### Statements
+definition_stmt
     ::= symbol ":" assign_expr
         { `DefineVariable{!node0, !node2} }
       | symbol primary_expr ":" assign_expr
         { `DefineFunction{!node0, Lambda{!node1, !node3}} }
-      | primary_expr "=" assign_expr { `Assign{!node0, !node2} }
-      | lambda_expr
 
-expr ::= assign_expr
+statement
+    ::= definition_stmt
+

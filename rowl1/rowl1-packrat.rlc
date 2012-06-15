@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2012-06-15 15:56:50 nineties $
+; $Id: rowl1-packrat.rlc 2012-06-16 01:20:25 nineties $
 ;
 
 (import "rlvm-compile")
@@ -243,8 +243,13 @@
     (var loc (get_loc p))
     (if (== hd Parsed)
         (return (noparse loc "unexpected token"))
-        (return (parsed loc 0))
+        (return (parsed loc nil))
         )
+    ))
+
+(fun apply_located (v) (
+    (expr_arg_set v 1 (make_located (expr_arg v 0) (expr_arg v 1)))
+    (return v)
     ))
 
 (fun integer_overflow (loc) (
@@ -364,8 +369,10 @@
     (var c (lookahead p))
     (if (< c 0) (return c))
     ; update source location
-    (if (&& (== c '\n') (! shell_mode_p)) (do
-        (field_set p 5 (+ (field_get p 5) 1))
+    (if (== c '\n') (do
+        (if (! shell_mode_p)
+            (field_set p 5 (+ (field_get p 5) 1))
+            )
         (field_set p 6 0)
         ))
     (field_set p 3 (+ (field_get p 3) 1))
@@ -853,9 +860,6 @@
 (var ParserVar (to_sym "%Parser")) ; internal use
 (fun make_nodevar (idx) (
     (return (to_sym (strcat "node" (itos idx))))
-    ))
-(fun make_locvar (idx) (
-    (return (to_sym (strcat "loc" (itos idx))))
     ))
 
 (fun gen_at (node idx) (
@@ -1352,7 +1356,6 @@
 
     (while elems (do
         (var ndvar (make_nodevar idx))
-        (var locvar (make_locvar idx))
         (= body (cons (make_expr DefineVariable
             (list2 ndvar (compile_parser_element (car elems)))) body))
         (= body (cons (make_expr If (list2
@@ -1370,7 +1373,6 @@
                 )
             (= body (cons (make_expr DefineVariable (list2 eloc (gen_at ndvar 0))) body))
             )
-        (= body (cons (make_expr DefineVariable (list2 locvar (gen_at ndvar 0))) body))
         (= body (cons (make_expr Assign (list2 ndvar (gen_at ndvar 1))) body))
         ))
 
@@ -1385,7 +1387,7 @@
         )))
     ))
 
-(fun compile_parser_func (sym elems) (
+(fun compile_parser_func (orig_sym sym elems) (
     (if (!= (expr_head elems) List) (do
         (output_error stderr current_loc)
         (output_string stderr "invalid syntax declaration\n")
@@ -1396,6 +1398,19 @@
     (var state (unique_sym))
     (var v (unique_sym))
     (var errors (unique_sym))
+
+    ; if sym == parse_statement
+    ; modify parsed expression to Located{...}
+    (var return_stmt 0)
+    (if (== orig_sym (to_sym "parse_statement"))
+        (= return_stmt 
+            (make_expr Return (list1 
+            (make_expr Apply (list2 (to_sym "%apply_located") (list1 v)))
+            )))
+        (= return_stmt
+            (make_expr Return (list1 v)))
+        )
+
     (= body (cons (make_expr DefineVariable (list2 v 0)) body))
     (= body (cons (make_expr DefineVariable (list2 errors 0)) body))
     (= body (cons (make_expr DefineVariable (list2 state (gen_copy_parser_state))) body))
@@ -1412,7 +1427,7 @@
         (= body (cons (make_expr Assign (list2 v act)) body))
         (= body (cons (make_expr If (list2
             (make_expr Equal (list2 (make_expr Head (list1 v)) (quote Parsed)))
-            (make_expr Return (list1 v))
+            return_stmt
             )) body))
         (= body (cons (make_expr Assign (list2 errors
             (make_expr Apply (list2 (to_sym "%merge_noparse") (list2 errors v))))) body))
@@ -1547,7 +1562,7 @@
         )))))
     ))
 
-(fun compile_parser2 (sym new orig) (
+(fun compile_parser_driver (sym new orig) (
     (return (make_expr DefineFunction (list2 sym
         (make_expr Lambda (list2 (make_expr Domain (list2 ParserVar Parser))
         (make_expr Apply (list2 (to_sym "%bind_parser") (list5 ParserVar (quote sym) (quote new) new orig)))
@@ -1561,17 +1576,17 @@
         (do
             (var parser_sym (unique_sym))
             (var copy_sym   (unique_sym))
-            (var new_parser_stmt (compile_parser_func parser_sym elems))
+            (var new_parser_stmt (compile_parser_func sym parser_sym elems))
             (var stmts (list3
                 (make_expr DefineVariable (list2 copy_sym sym))
                 new_parser_stmt
-                (compile_parser2 sym parser_sym copy_sym)
+                (compile_parser_driver sym parser_sym copy_sym)
                 ))
             (return stmts)
         )
         (do
             (var parser_sym (unique_sym))
-            (var new_parser_stmt (compile_parser_func parser_sym elems))
+            (var new_parser_stmt (compile_parser_func sym parser_sym elems))
             (var stmts (list2
                 new_parser_stmt
                 (compile_parser1 sym parser_sym)
@@ -1594,6 +1609,7 @@
 
     (add_builtin_function2 parser (to_sym "%merge_noparse") DontCare DontCare merge_noparse 0)
     (add_builtin_function2 parser (to_sym "%negate") (domainP Parser) DontCare negate 0)
+    (add_builtin_function1 parser (to_sym "%apply_located") DontCare apply_located 0)
 
     (add_builtin_function2 parser (to_sym "parse_text") (domainP Parser) (domainP String) parse_text 0)
 

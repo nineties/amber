@@ -1,0 +1,59 @@
+;
+; rowl - 1st generation
+; Copyright (C) 2010 nineties
+;
+; $Id: rowl1-node.rlc 2012-06-16 01:42:47 nineties $
+;
+
+(import "rlvm-compile")
+(import "rowl1-types")
+
+(compile `object `(
+
+(import "rowl1-util")
+(import "rowl1-node")
+
+(export fun exception (loc msg) (
+    (return (make_expr (to_sym "Exception") (list2 loc msg)))
+    ))
+
+(export fun type_error (loc required actual) (
+    (return (make_expr (to_sym "TypeError") (list2
+        (make_expr (to_sym "expected") (list1 required))
+        (make_expr (to_sym "actual_value") (list1 actual))
+        )))
+    ))
+
+(export fun matching_error (loc obj args) (
+    (return (make_expr (to_sym "MatchingFailed") (list3 loc
+        (make_expr (to_sym "function") (list1 obj))
+        (make_expr (to_sym "arguments") args))))
+    ))
+
+(export fun undefined_var (loc sym) (
+    (return (make_expr (to_sym "UndefinedVariable") (list2 loc sym)))
+    ))
+
+(export fun redefined_var (loc1 loc2 sym) (
+    (return (make_expr (to_sym "RedefinedVariable") (list3
+        (make_expr (to_sym "new_def") (list1 loc1))
+        (make_expr (to_sym "prev_def") (list1 loc2))
+        sym)))
+    ))
+
+(export fun undefined_fun (loc sym) (
+    (return (make_expr (to_sym "UndefinedFunction") (list2 loc sym)))
+    ))
+
+(export fun uninitialized_var (loc sym) (
+    (return (make_expr (to_sym "UninitializedVariable") (list2 loc sym)))
+    ))
+
+(export fun unknown_expression (loc expr) (
+    (return (make_expr (to_sym "UnknownExpression") (list2 loc expr)))
+    ))
+
+(export fun not_found (loc expr) (
+    (return (make_expr (to_sym "NotFound") (list2 loc expr)))
+    ))
+    ))
