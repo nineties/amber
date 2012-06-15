@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2012-06-14 13:49:26 nineties $
+; $Id: rowl1-packrat.rlc 2012-06-15 15:56:50 nineties $
 ;
 
 (import "rlvm-compile")
@@ -41,12 +41,12 @@
         (var pos (field_get p 3))
         (var v (memotable_find tbl s pos))
         (if v (do
-            (set_parser_state p (cdr v))
-            (return (car v))
+            (set_parser_state p (field_get v 1))
+            (return (field_get v 0))
             ))
         (= v (@(s++ `parse_ sym '_') p))
         (var state (copy_parser_state p))
-        (memotable_add tbl s pos (cons v state))
+        (memotable_add tbl s pos (struct 2 v state @FALSE))
         (return v)
     )))
 
@@ -188,12 +188,16 @@
 (var space_sensitive_p @FALSE)
 (var shell_mode_p @FALSE)
 (var may_parse @FALSE)
+(var LeftRec (noparse no_loc "Left Recursion Detection"))
 
 (extern object current_mod)
 (extern fun set_current_module)
 
 (fun trace (obj) (
-    (return (make_expr Apply (list2 (to_sym "print") (list2 (to_sym "stderr") obj))))
+    (return (make_expr Block (list2
+        (make_expr Apply (list2 (to_sym "print") (list2 (to_sym "stderr") obj)))
+        (make_expr Apply (list2 (to_sym "print") (list2 (to_sym "stderr") (string "\n"))))
+        )))
     ))
 
 (export fun set_shell_mode () (
@@ -229,6 +233,8 @@
 (fun merge_noparse (lhs rhs) (
     (if (! lhs) (return rhs))
     (if (! rhs) (return lhs))
+    (if (== lhs LeftRec) (return rhs))
+    (if (== rhs LeftRec) (return lhs))
     (return (make_expr NoParse (list_append (expr_args lhs) (expr_args rhs))))
     ))
 
@@ -263,7 +269,7 @@
     (return (variant @ParserE 2 buf (string file) pos offset 1 1 0))
     ))
 
-(export fun flush_parser (p) (
+(export fun flush_parser (p force) (
     (var buf (field_get p 1))
     (var cbuf (field_get buf 0))
     (var bufsz (cvector_size cbuf))
@@ -271,7 +277,7 @@
 
     ; XXX: Not good implementation.
     ; Ring buffer is better.
-    (if (>= pos bufsz) (do
+    (if (|| (>= pos bufsz) force) (do
         (cvector_resize cbuf 0)
         (field_set p 4 (+ (field_get p 4) bufsz))
         (field_set p 3 0)
@@ -744,6 +750,7 @@
 (fun parse_statement_ (p) (
     (var v (parse "parse_expr" p))
     @(CHECK v)
+
     (var loc (expr_arg v 0))
     (var stmt (expr_arg v 1))
     (eval_parser_command loc stmt)
@@ -807,6 +814,7 @@
     (while @TRUE (do
         (= may_parse @FALSE)
         (parse "parse_spaces" p)
+
         (var e (parse "parse_statement" p))
         (if (== (expr_head e) NoParse) (if may_parse (goto retry) (return e)))
         (parse_blanks p '\n')
@@ -1426,33 +1434,39 @@
     (var pos (field_get p 3))
     (var v (memotable_find tbl key pos))
     (if v (do
-        (set_parser_state p (cdr v))
-        (return (car v))
+        (if (== (field_get v 0) LeftRec)
+            ; detected left-recursion
+            (field_set v 2 @TRUE)
+            )
+        (set_parser_state p (field_get v 1))
+        (return (field_get v 0))
         ))
     (var loc (get_loc p))
     (var state (copy_parser_state p))
-    (var longest pos)
 
-    ; Trick for left recursion
-    (var ent (cons (noparse loc "Left recursion") state))
+    (var ent (struct 2 LeftRec state @FALSE))
     (memotable_add tbl key pos ent)
-    
     (label retry_lbl)
-
     (= v (byterun (compile_matching loc sym new) p))
 
-    (var new_state (copy_parser_state p))
-
-    (if (> (field_get new_state 3) longest) (do
-        ; Update detection
-        (setcar ent v)
-        (setcdr ent new_state)
-        (set_parser_state p state)
-        (= longest (field_get new_state 3))
-        (goto retry_lbl)
-        ))
-
-    (return (car ent))
+    (if (field_get ent 2)
+        (if (&& (== (expr_head v) Parsed)
+                (> (field_get p 3) (field_get (field_get ent 1) 3)))
+            (do
+                (field_set ent 0 v)
+                (field_set ent 1 (copy_parser_state p state))
+                (set_parser_state p state)
+                (goto retry_lbl)
+            )
+            (do
+                ; accept previous try
+                (set_parser_state p (field_get ent 1))
+                (return (field_get ent 0))
+            )))
+    ; not left-recursive
+    (field_set ent 0 v)
+    (field_set ent 1 (copy_parser_state p))
+    (return v)
     ))
 
 (fun bind_parser (p sym key new orig) (
@@ -1460,44 +1474,70 @@
     (var pos (field_get p 3))
     (var v (memotable_find tbl key pos))
     (if v (do
-        (set_parser_state p (cdr v))
-        (return (car v))
+        (if (== (field_get v 0) LeftRec)
+            ; detected left-recursion
+            (field_set v 2 @TRUE)
+            )
+        (set_parser_state p (field_get v 1))
+        (return (field_get v 0))
         ))
     (var loc (get_loc p))
     (var state (copy_parser_state p))
-    (var longest pos)
+    (var leftlec @FALSE)
     (var errors 0)
-
-    ; Trick for left recursion 
-    (var ent (cons (noparse loc "Left recursion") state))
+    (var ent (struct 2 LeftRec state @FALSE))
     (memotable_add tbl key pos ent)
 
     (label retry_lbl)
-
+    (= errors 0)
     (= v (byterun (compile_matching loc sym new) p))
-    (if (== (expr_head v) Parsed) (goto end_lbl))
-    (= errors (merge_noparse errors v))
-    (set_parser_state p state)
-
-    (= v (byterun (compile_matching loc sym orig) p))
-    (if (== (expr_head v) Parsed) (goto end_lbl))
-    (= errors (merge_noparse errors v))
-    (set_parser_state p state)
-
-    (label end_lbl)
-
-    (var new_state (copy_parser_state p))
-
-    (if (> (field_get new_state 3) longest) (do
-        ; Update detection
-        (setcar ent v)
-        (setcdr ent new_state)
-        (set_parser_state p state)
-        (= longest (field_get new_state 3))
-        (goto retry_lbl)
+    (if (field_get ent 2)
+        (if (&& (== (expr_head v) Parsed)
+                (> (field_get p 3) (field_get (field_get ent 1) 3)))
+            (do
+                (field_set ent 0 v)
+                (field_set ent 1 (copy_parser_state p state))
+                (set_parser_state p state)
+                (goto retry_lbl)
+            )
+            (do
+                ; accept previous try
+                (set_parser_state p (field_get ent 1))
+                (return (field_get ent 0))
+            )))
+    (if (== (expr_head v) Parsed) (do
+        (field_set ent 0 v)
+        (field_set ent 1 (copy_parser_state p))
+        (return v)
         ))
 
-    (return (car ent))
+    (= errors (merge_noparse errors v))
+
+    (set_parser_state p state)
+    (= v (byterun (compile_matching loc sym orig) p))
+    (if (field_get ent 2)
+        (if (&& (== (expr_head v) Parsed)
+                (> (field_get p 3) (field_get (field_get ent 1) 3)))
+            (do
+                (field_set ent 0 v)
+                (field_set ent 1 (copy_parser_state p state))
+                (set_parser_state p state)
+                (goto retry_lbl)
+            )
+            (do
+                ; accept previous try
+                (set_parser_state p (field_get ent 1))
+                (return (field_get ent 0))
+            )))
+    (if (== (expr_head v) Parsed) (do
+        (field_set ent 0 v)
+        (field_set ent 1 (copy_parser_state p))
+        (return v)
+        ))
+    (= v (merge_noparse errors v))
+    (field_set ent 0 v)
+    (field_set ent 1 (copy_parser_state p))
+    (return v)
     ))
 
 (fun compile_parser1 (sym new) (
@@ -1551,6 +1591,7 @@
     (add_builtin_function2 parser (to_sym "%set_parser_state") (domainP Parser) (domainP Parser) set_parser_state 0)
     (add_builtin_function4 parser (to_sym "%call_parser") (domainP Parser) (domainP Symbol) (domainP Symbol) (domainP Function) call_parser 0)
     (add_builtin_function5 parser (to_sym "%bind_parser") (domainP Parser) (domainP Symbol) (domainP Symbol) (domainP Function) (domainP Function) bind_parser 0)
+
     (add_builtin_function2 parser (to_sym "%merge_noparse") DontCare DontCare merge_noparse 0)
     (add_builtin_function2 parser (to_sym "%negate") (domainP Parser) DontCare negate 0)
 
