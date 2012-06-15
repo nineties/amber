@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2012-06-14 19:27:37 nineties $
+; $Id: rowl1-interp.rlc 2012-06-15 00:53:50 nineties $
 ;
 
 (import "rlvm-compile")
@@ -31,12 +31,27 @@
 
 (export fun eval_shell () (
     (set_shell_mode)
-    (return (eval_main "amber" stdin))
+    (try
+        (return (eval_main "amber" stdin))
+        (catch e (do
+            (output_string stderr "Exception Detected : ")
+            (pretty_print stderr e)
+            (output_string stderr "\n")
+            (return 1)
+        )))
     ))
 
 (export fun eval_file (path) (
+    (var r 0)
     (var ichan (open_in path))
-    (var r (eval_main path ichan))
+    (try
+        (= r (eval_main path ichan))
+        (catch e (do
+            (output_string stderr "Exception: ")
+            (pretty_print stderr e)
+            (output_string stderr "\n")
+            (= r 1)
+        )))
     (close_in ichan)
     (return r)
     ))
@@ -78,6 +93,8 @@
     ;(output_string stderr "elapsed time : ")
     ;(output_timeval stderr diff)
     ;(output_char stderr '\n')
+    
+    (return 0)
     ))
 
 (fun call1 (mod sym arg0) (
@@ -108,7 +125,7 @@
             (eval (car es))
             (= es (cdr es))
             ))
-        (flush_parser p)
+        (flush_parser p @FALSE)
         ))
     (= current_loc no_loc)
     ))
@@ -118,12 +135,13 @@
         (var e (parse_shell_statement p))
         (if (== (expr_head e) NoParse) (do
             (output_syntax_errors e)
-            (goto next)
+            (flush_parser p @TRUE)
+            continue
             ))
         (var ret (eval (expr_arg e 1)))
         (print_result p ret)
         (label next)
-        (flush_parser p)
+        (flush_parser p @FALSE)
         ))
     ))
 

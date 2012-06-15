@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-06-10 13:30:43 nineties $
+; $Id: rowl1-compile.rlc 2012-06-14 23:31:42 nineties $
 ;
 
 (import "rlvm-compile")
@@ -567,20 +567,26 @@
     (var box (expr_arg info 0))
     (if (! box) (do
         (var loc (expr_arg info 1))
-        (output_error stderr loc)
-        (output_char stderr '`')
-        (output_symbol stderr sym)
-        (output_string stderr "' is not initialized\n")
-        (exit 1)
+        (throw (make_expr (to_sym "UninitializedError")
+            (list2 loc sym)
+            ))
+        ;(output_error stderr loc)
+        ;(output_char stderr '`')
+        ;(output_symbol stderr sym)
+        ;(output_string stderr "' is not initialized\n")
+        ;(exit 1)
         ))
     ))
 
 (fun uninitialized_error (sym) (
-    (output_error stderr current_loc)
-    (output_string stderr "variable `")
-    (pretty_print stderr sym)
-    (output_string stderr "' is not initialized\n")
-    (exit 1)
+    (throw (make_expr (to_sym "UninitializedError")
+        (list2 current_loc sym)
+        ))
+    ;(output_error stderr current_loc)
+    ;(output_string stderr "variable `")
+    ;(pretty_print stderr sym)
+    ;(output_string stderr "' is not initialized\n")
+    ;(exit 1)
     ))
 
 (export fun compile_operand (asm opd sym) (
