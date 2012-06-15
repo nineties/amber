@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2012-06-14 11:53:34 nineties $
+; $Id: rowl1-matching.rlc 2012-06-16 01:31:47 nineties $
 ;
 
 (import "rlvm-compile")
@@ -14,6 +14,7 @@
 (import "rowl1-node")
 (import "rowl1-assemble")
 (import "rowl1-compile")
+(import "rowl1-error")
 
 ; pattern matrix (((p11 p12 .. ) e1 g1) ((p21 p22 ..) e2 g2) ..)
 
@@ -24,10 +25,9 @@
 (export fun compile_matching (loc obj def) (
     (var ty (node_type def))
     (if (&& (!= ty @BoundFunctionE) (!= ty @FunctionE)) (do
-        (output_error stderr loc)
-        (pretty_print stderr obj)
-        (output_string stderr " is not a function\n")
-        (exit 1)
+        (throw (type_error loc
+            (string "function")
+            obj))
         ))
 
     (var cache (field_get def 1))
@@ -48,7 +48,7 @@
 
     (var asm (make_assembler))
     (compile_matching_main asm args mat)
-    (compile_matching_error asm loc)
+    (compile_matching_error asm loc obj)
 
     (var code (get_code asm))
     (field_set def 1 code) ; caching
@@ -616,23 +616,7 @@
     ))
 
 (var arity_max 8)
-(fun matching_error (loc arity args) (
-    (output_error stderr loc)
-    (output_string stderr "no definition matches with argument(s): ")
-    (output_char stderr '(')
-    (while args (do
-        (pretty_print_full stderr (car args))
-        (= args (cdr args))
-        (if args (output_string stderr ", "))
-        ))
-    (if (<= arity arity_max)
-        (output_string stderr ")\n")
-        (output_string stderr ", ...)\n")
-        )
-    (exit 1)
-    ))
-
-(fun compile_matching_error (asm loc) (
+(fun compile_matching_error (asm loc obj) (
     ; construct list of arguments
     (var end_lbl (fresh_label asm))
     (var case_lbls (array int arity_max))
@@ -654,9 +638,10 @@
         (put_cons asm)
         (set_label asm (array_get int case_lbls arg_idx))
         ))
-    (put_arity asm)
+    (put_push asm obj)
     (put_push asm loc)
     (compile_simple_call asm 3 matching_error)
+    (put_throw asm)
     ))
 
     ))

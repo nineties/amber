@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2012-06-15 00:53:50 nineties $
+; $Id: rowl1-interp.rlc 2012-06-15 22:26:48 nineties $
 ;
 
 (import "rlvm-compile")
@@ -34,7 +34,7 @@
     (try
         (return (eval_main "amber" stdin))
         (catch e (do
-            (output_string stderr "Exception Detected : ")
+            (output_string stderr "Uncaught exception: ")
             (pretty_print stderr e)
             (output_string stderr "\n")
             (return 1)
@@ -131,18 +131,25 @@
     ))
 
 (fun interpret_shell (p) (
-    (while 1 (do
-        (var e (parse_shell_statement p))
-        (if (== (expr_head e) NoParse) (do
-            (output_syntax_errors e)
-            (flush_parser p @TRUE)
-            continue
+    (try 
+        (while 1 (do
+            (var e (parse_shell_statement p))
+            (if (== (expr_head e) NoParse) (do
+                (output_syntax_errors e)
+                (flush_parser p @TRUE)
+                continue
+                ))
+            (var ret (eval (expr_arg e 1)))
+            (print_result p ret)
+            (flush_parser p @FALSE)
             ))
-        (var ret (eval (expr_arg e 1)))
-        (print_result p ret)
-        (label next)
-        (flush_parser p @FALSE)
-        ))
+    (catch e (do
+        (output_string stderr "Error: ")
+        (pretty_print stderr e)
+        (output_string stderr "\n")
+        (flush_parser p @TRUE)
+        (interpret_shell p)
+        )))
     ))
 
 (fun print_result (p val) (

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-06-14 23:31:42 nineties $
+; $Id: rowl1-compile.rlc 2012-06-16 01:39:01 nineties $
 ;
 
 (import "rlvm-compile")
@@ -15,6 +15,7 @@
 (import "rowl1-symtable")
 (import "rowl1-module")
 (import "rowl1-assemble")
+(import "rowl1-error")
 
 (var BuildClosure  (to_sym "%BuildClosure"))
 (var Closure       (to_sym "%Closure"))
@@ -37,16 +38,6 @@
 (fun trace (asm msg) (
     (put_push asm (string msg))
     (compile_simple_call asm 2 trace_func)
-    ))
-
-(fun topscope_only (mod name) (
-    (if (! (in_top_scope mod)) (do
-        (output_error stderr current_loc)
-        (output_char stderr '`')
-        (output_string stderr name)
-        (output_string stderr "' must be called in top scope\n")
-        (exit 1)
-        ))
     ))
 
 (fun must_be_module_variable (sym val) (
@@ -285,40 +276,22 @@
 (extern fun compile_matching)
 (export fun lookup_func (mod sym) (
     (var def (lookup_symbol mod sym))
-    (if (! def) (do
-        (output_error stderr current_loc)
-        (output_string stderr "undefined function `")
-        (output_symbol stderr sym)
-        (output_string stderr "'\n")
-        (exit 1)
-        ))
+    (if (! def) 
+        (throw (undefined_fun current_loc sym))
+        )
     (must_be_module_variable sym def)
     (check_if_initialized sym def)
     (var box (expr_arg def 0))
     (var func (field_get box 0))
-    (if (! (callable func)) (do
-        (output_error stderr current_loc)
-        (output_string stderr "`")
-        (output_symbol stderr sym)
-        (output_string stderr "' is defined as non-function\n")
-        (exit 1)
-        ))
+    (if (! (callable func))
+        (throw (type_error current_loc (string "function") sym))
+        )
     (var loc (field_get box 1))
     (return (compile_matching loc sym func))
     ))
 
 (export fun get_bytecode (obj func) (
     (return (compile_matching current_loc obj func))
-    ))
-
-(fun undefined_error (sym args) (
-    (output_error stderr current_loc)
-    (output_string stderr "no definition of `")
-    (output_symbol stderr sym)
-    (output_string stderr "' matches to argument(s) ")
-    (pretty_print stderr args)
-    (output_char stderr '\n')
-    (exit 1)
     ))
 
 (export fun compile (asm mod expr) (
@@ -331,24 +304,17 @@
     ))
 
 (fun check_arg_size (name size expr) (
-    (if (!= (expr_size expr) size) (do
-    (output_error stderr current_loc)
-    (output_string stderr name)
-    (output_string stderr " requires just ")
-    (output_int stderr size)
-    (output_string stderr " argument")
-    (if (> size 1) (output_char stderr 's'))
-    (output_char stderr '\n')
-    (exit 1)
-    ))
+    (if (!= (expr_size expr) size)
+        (throw (type_error current_loc
+            (strcat "expression with "
+            (strcat (itos size) " arguments"))
+            expr
+            ))
+        )
     ))
 
 (fun compile_error (asm mod expr) (
-    (output_error stderr current_loc)
-    (output_string stderr "Unknown expression: ")
-    (pretty_print stderr expr)
-    (output_string stderr "\n")
-    (exit 1)
+    (throw (unknown_expression current_loc expr))
     ))
 
 (fun compile_located (asm mod expr) (
@@ -554,39 +520,15 @@
         (var declared_in_this_scope (expr_arg info 1))
         (if (== declared_in_this_scope false) return)
         ))
-    (output_error stderr current_loc)
-    (output_string stderr "variable `")
-    (pretty_print stderr sym)
-    (output_string stderr "' is already defined at ")
-    (output_loc stderr (var_loc info))
-    (output_char stderr '\n')
-    (exit 1)
+    (throw (redefined_var current_loc (var_loc info) sym))
     ))
 
 (fun check_if_initialized (sym info) (
     (var box (expr_arg info 0))
     (if (! box) (do
         (var loc (expr_arg info 1))
-        (throw (make_expr (to_sym "UninitializedError")
-            (list2 loc sym)
-            ))
-        ;(output_error stderr loc)
-        ;(output_char stderr '`')
-        ;(output_symbol stderr sym)
-        ;(output_string stderr "' is not initialized\n")
-        ;(exit 1)
+        (throw (uninitialized_var loc sym))
         ))
-    ))
-
-(fun uninitialized_error (sym) (
-    (throw (make_expr (to_sym "UninitializedError")
-        (list2 current_loc sym)
-        ))
-    ;(output_error stderr current_loc)
-    ;(output_string stderr "variable `")
-    ;(pretty_print stderr sym)
-    ;(output_string stderr "' is not initialized\n")
-    ;(exit 1)
     ))
 
 (export fun compile_operand (asm opd sym) (
@@ -602,8 +544,9 @@
         (put_push asm uninitialized)
         (put_if_ne asm lbl)
         (put_push asm sym)
-
-        (compile_simple_call asm 1 uninitialized_error)
+        (put_push asm current_loc)
+        (compile_simple_call asm 2 uninitialized_var)
+        (put_throw asm)
         (set_label asm lbl)
         return
         ))
@@ -958,11 +901,9 @@
 
 (fun compile_break (asm mod expr) (
     (var lbl (lookup_symbol mod Label))
-    (if (! lbl) (do
-        (output_error stderr current_loc)
-        (output_string stderr "`break' statement outside loop\n")
-        (exit 1)
-        ))
+    (if (! lbl)
+        (throw (exception current_loc (string "`break' statement outside loop")))
+        )
     (if (!= (expr_head lbl) Label)
         (not_reachable "compile_break")
         )
@@ -975,13 +916,9 @@
     (var rhs (expr_arg expr 1))
     (compile asm mod rhs)
     (var v (lookup_symbol mod lhs))
-    (if (! v) (do
-        (output_error stderr current_loc)
-        (output_string stderr "undefined variable `")
-        (pretty_print stderr lhs)
-        (output_string stderr "'\n")
-        (exit 1)
-        ))
+    (if (! v)
+        (throw (undefined_var current_loc lhs))
+        )
     (var vty (expr_head v))
     (if (== vty ModuleVariable) (do
         (put_push asm (expr_args v))
@@ -1142,7 +1079,6 @@
     ))
 
 (fun append_function (mod sym newfunc) (
-    (topscope_only mod "append_function")
     (var info (lookup_symbol_local mod sym))
     (if info
         (do

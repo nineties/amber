@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-module.rlc 2012-01-26 11:39:03 nineties $
+; $Id: rowl1-module.rlc 2012-06-16 01:43:42 nineties $
 ;
 
 ; Module can be considered as a re-entrant scope.
@@ -25,6 +25,7 @@
 (import "rowl1-util")
 (import "rowl1-node")
 (import "rowl1-symtable")
+(import "rowl1-error")
 
 (extern object current_loc)
 
@@ -92,9 +93,10 @@
         (return (lookup_symbol
             (find_module current_loc mod (expr_arg sig 0) @FALSE) (expr_arg sig 1)))
         ))
-    (output_error stderr current_loc)
-    (output_string stderr "invalid argument for lookup_symbol\n")
-    (exit 1)
+    (throw (type_error current_loc
+        (string "module signature")
+        sig
+        ))
     ))
 
 (export fun lookup_effective_symbol (mod sig) (
@@ -105,9 +107,10 @@
         (return (lookup_symbol
             (find_module current_loc mod (expr_arg sig 0) @FALSE) (expr_arg sig 1)))
         ))
-    (output_error stderr current_loc)
-    (output_string stderr "invalid argument for lookup_symbol\n")
-    (exit 1)
+    (throw (type_error current_loc
+        (string "module signature")
+        sig
+        ))
     ))
 
 (fun lookup_symbol_iter (mark mod sym find_effective) (
@@ -182,11 +185,8 @@
         (goto update_displays)
         ))
     (if (== (expr_arg ent 1) true) (do
-        (output_error stderr current_loc)
-        (output_string stderr "variable `")
-        (output_symbol stderr sym)
-        (output_string stderr "' is already defined\n")
-        (exit 1)
+        (var prev_loc (field_get (expr_arg ent 0) 1))
+        (throw (redefined_var current_loc sym))
         ))
     (expr_arg_set ent 1 true)
     (var box (struct 2 val current_loc))
@@ -233,22 +233,18 @@
         (if mod (return (car (expr_arg mod 0))))
         (if createp
             (return (make_module sig curmod))
-            (do
-                (output_loc stderr loc)
-                (output_string stderr "module `")
-                (output_symbol stderr sig)
-                (output_string stderr "' is not found\n")
-                (exit 1)
-            ))
+            (throw (not_found loc sig))
+            )
         ))
     (if (== hd Qualified)
         (return (find_module loc
              (find_module loc curmod (expr_arg_symbol sig 0) createp)
                  (expr_arg sig 1) createp))
         )
-    (output_loc stderr loc)
-    (output_string stderr "invalid module signature\n")
-    (exit 1)
+    (throw (type_error current_loc
+        (string "module signature")
+        sig
+        ))
     ))
 
 (export fun in_top_scope (mod) (
