@@ -11,7 +11,7 @@ DefineSyntax{
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2012-06-16 01:09:14 nineties $
+# $Id: syntax.ab 2012-06-20 00:58:44 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -111,22 +111,46 @@ DefineSyntax{
     List{Tuple{List{syntax_declaration}, node0}}
 }
 
-### Expressions
+## Expressions
+block_expr ::= "{" aligned(statement) "}" { MakeExpr{Quote{Block}, node1} }
+             | "{" "}"                    { MakeExpr{Quote{Block}, List{}} }
+
+qualified_expr
+    ::= symbol "::" qualified_expr
+        { MakeExpr{Quote{Qualified}, List{node0, node2}} }
+      | symbol
+
 primary_expr
-    ::= item
-      | "(" expr ")"                  { node1 } 
+    ::= "(" expr ")"                  { node1 } 
       | "[" delimited(expr, ",") "]"  { node1 } # List literal
+
+      # Tuple literals
+      | "(" ")"
+        { MakeExpr{Quote{Tuple}, List{}} }
       | "(" delimited2(expr, ",") ")" 
-        { MakeExpr{Quote{Tuple}, node1} } # Tuple literal
-      | "{" aligned(statement) "}"
-        { MakeExpr{Quote{Block}, node1} } # Code block
+        { MakeExpr{Quote{Tuple}, node1} } 
+
+      | block_expr
+      | atom
+
+secondary_expr
+    ::= qualified_expr
+      | primary_expr
 
 postfix_expr
+        # Function Application
     ::= postfix_expr "(" delimited(expr, ",") ")"
-        { QuasiQuote{Apply{Unquote{node0}, Unquote{node2}}} } # Function Application
+        { MakeExpr{Quote{Apply}, List{node0, node2}} }
+
+        # Subscription
       | postfix_expr "[" delimited(expr, ",") "]"
-        { QuasiQuote{Subscript{Unquote{node0}, Unquote{node2}}} } # Subscription
-      | primary_expr
+        { MakeExpr{Quote{Subscript}, List{node0, node2}} }
+
+        # Domain Pattern
+      | postfix_expr "@" secondary_expr
+        { MakeExpr{Quote{Domain}, List{node0, node2}} }
+      | node
+      | secondary_expr
 
 quote_expr
     ::= "\\" quote_expr
@@ -136,6 +160,8 @@ quote_expr
       | "!"  quote_expr
         { MakeExpr{Quote{Unquote}, List{node1}} }
       | postfix_expr
+
+pattern ::= quote_expr
 
 # enable use of quotation expressions for following definitions.
 expr ::= quote_expr
@@ -151,23 +177,78 @@ additive_expr
       | additive_expr '-' multiplicative_expr { `Sub{!node0, !node2} }
       | multiplicative_expr
 
-lambda_expr
-    ::= primary_expr "->" lambda_expr  { `Lambda{!node0, !node2} }
+rel_expr
+    ::= additive_expr "<"  additive_expr { `LessThan{!node0, !node2} }
+      | additive_expr "<=" additive_expr { `LessEqual{!node0, !node2} }
+      | additive_expr ">"  additive_expr { `GreaterThan{!node0, !node2} }
+      | additive_expr ">=" additive_expr { `GreaterEqual{!node0, !node2} }
+      | additive_expr "==" additive_expr { `Equal{!node0, !node2} }
+      | additive_expr "!=" additive_expr { `NotEqual{!node0, !node2} }
       | additive_expr
 
+seqand_expr
+    ::= rel_expr  "&&" rel_expr { `SeqAnd{!node0, !node2} }
+      | rel_expr
+
+seqor_expr
+    ::= seqand_expr "||" seqand_expr { `SeqOr{!node0, !node2} }
+      | seqand_expr
+
+lambda_expr
+    ::= pattern "->" lambda_expr  { `Lambda{!node0, !node2} }
+      | seqor_expr
+
 assign_expr
-    ::= primary_expr "=" assign_expr { `Assign{!node0, !node2} }
+    ::= pattern "=" assign_expr  { `Assign{!node0, !node2} }
+      | pattern "+=" assign_expr { `AddAssign{!node0, !node2} }
+      | pattern "-=" assign_expr { `SubAssign{!node0, !node2} }
+      | pattern "*=" assign_expr { `MulAssign{!node0, !node2} }
+      | pattern "/=" assign_expr { `DivAssign{!node0, !node2} }
+      | pattern "%=" assign_expr { `ModAssign{!node0, !node2} }
       | lambda_expr
 
 expr ::= assign_expr
 
 ### Statements
-definition_stmt
-    ::= symbol ":" assign_expr
-        { `DefineVariable{!node0, !node2} }
-      | symbol primary_expr ":" assign_expr
-        { `DefineFunction{!node0, Lambda{!node1, !node3}} }
+module_definition
+    ::= "module" qualified_expr block_expr
+        { `DefineModule{!node1, !node2} }
 
 statement
-    ::= definition_stmt
+    ::= module_definition
 
+      | "if" quote_expr statement "else" statement
+        { `IfElse{!node1, !node2, !node4} }
+      | "if" quote_expr statement
+        { `If{!node1, !node2} }
+
+      | "while" quote_expr statement
+        { `While{!node1, !node2} }
+      | "continue"
+        { `Continue }
+      | "break"
+        { `Break }
+
+      | "return" expr
+        { `Return{!node1} }
+      | "return"
+        { `Return{nil} }
+
+      | symbol secondary_expr ":" expr
+        { `DefineFunction{!node0, Lambda{!node1, !node3}} }
+      | symbol ":" expr
+        { `DefineVariable{!node0, !node2} }
+
+      | expr "=>" expr
+        { `DefineFunction{Rewrite, Lambda{!node0, !node2}} }
+
+x + y => `add(!x, !y)
+x - y => `sub(!x, !y)
+x * y => `mul(!x, !y)
+x / y => `div(!x, !y)
+x % y => `mod(!x, !y)
+x += y => `(!x = !x + !y)
+x -= y => `(!x = !x - !y)
+x *= y => `(!x = !x * !y)
+x /= y => `(!x = !x / !y)
+x %= y => `(!x = !x % !y)

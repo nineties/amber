@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2012-06-15 22:26:48 nineties $
+; $Id: rowl1-interp.rlc 2012-06-20 01:02:39 nineties $
 ;
 
 (import "rlvm-compile")
@@ -58,6 +58,7 @@
 
 (export fun eval_main (file ichan) (
     ;(var start (gettimeofday))
+
     (= current_mod (make_module (to_sym "%global") 0))
     (= current_loc no_loc)
 
@@ -75,25 +76,18 @@
     (add_include_dir "./")
     (add_include_dir "/usr/lib/amber/")
     (include_file "amber/syntax.ab")
-
+    (include_file "amber/io.ab")
 
     (if (in_shell_mode)
         (interpret_shell p)
         (interpret p)
         )
 
-    ;(import_module current_loc current_mod (qualified "std" (to_sym "syntax")))
-    ;(include_file "amber/io.ab")
-    ;(import_module current_loc current_mod (qualified "std" (to_sym "io")))
-
-    ;(interpret)
-
     ;(var end (gettimeofday))
     ;(var diff (timeval_sub end start))
-    ;(output_string stderr "elapsed time : ")
+    ;(output_string stderr "startup time : ")
     ;(output_timeval stderr diff)
     ;(output_char stderr '\n')
-    
     (return 0)
     ))
 
@@ -103,7 +97,7 @@
     ))
 
 (fun eval (expr) (
-    (return (call1 current_mod Eval expr))
+    (return (call1 current_mod Eval (rewrite expr)))
     ))
 
 (fun rewrite (expr) (
@@ -184,8 +178,7 @@
     
     (var es (expr_args block))
     (while es (do
-        (var e (rewrite (car es)))
-        (eval e)
+        (eval (car es))
         (= es (cdr es))
         ))
 
