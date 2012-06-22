@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2012-06-16 13:47:21 nineties $
+; $Id: rowl1-node.rlc 2012-06-21 15:30:14 nineties $
 ;
 
 (import "rlvm-compile")
@@ -34,6 +34,7 @@
 (export var Tuple       (to_sym "Tuple"))
 (export var Eval        (to_sym "Eval"))
 (export var Block       (to_sym "Block"))
+(export var OpenBlock   (to_sym "OpenBlock"))
 (export var Apply       (to_sym "Apply"))
 (export var Subscript   (to_sym "Subscript"))
 (export var Located     (to_sym "Located"))
@@ -67,11 +68,13 @@
 
 (export var Include        (to_sym "Include"))
 (export var Import         (to_sym "Import"))
-(export var DefModule      (to_sym "DefineModule"))
 (export var DefSyntax      (to_sym "DefineSyntax"))
 (export var DefineVariable (to_sym "DefineVariable"))
 (export var DefineFunction (to_sym "DefineFunction"))
+(export var BeginModule    (to_sym "BeginModule"))
+(export var EndModule      (to_sym "EndModule"))
 
+(export var Dynamic     (to_sym "Dynamic"))
 (export var Qualified   (to_sym "Qualified"))
 (export var Rewrite     (to_sym "Rewrite"))
 (export var Assign      (to_sym "Assign"))
@@ -95,13 +98,14 @@
 (export var NoParse    (to_sym "NoParse"))  ; NoParse [(location msg)]
 (export var MayParse   (to_sym "MayParse")) ; MayParse (shell mode only)
 
-(export var Option    (to_sym "Option"))
-(export var Choice    (to_sym "Choice"))
-(export var Many      (to_sym "Many"))
-(export var Many1     (to_sym "Many1"))
-(export var And       (to_sym "And"))
+(export var Option     (to_sym "Option"))
+(export var Choice     (to_sym "Choice"))
+(export var Many       (to_sym "Many"))
+(export var Many1      (to_sym "Many1"))
+(export var And        (to_sym "And"))
 ; Amber's original syntax elements
-(export var Aligned   (to_sym "Aligned"))
+(export var Scoped     (to_sym "Scoped"))
+(export var Aligned    (to_sym "Aligned"))
 (export var Delimited  (to_sym "Delimited"))
 (export var Delimited1 (to_sym "Delimited1"))
 (export var Delimited2 (to_sym "Delimited2"))
@@ -406,6 +410,10 @@
     (return (make_expr Unquote (list1 expr)))
     ))
 
+(export fun dynamic (sym) (
+    (return (make_expr Dynamic (list1 sym)))
+    ))
+
 (export fun make_ifelse (cnd then else) (
 	(return (make_expr IfElse (list3 cnd then else)))
 	))
@@ -540,7 +548,6 @@
 (fun pp_bound (ochan expr) (
     (output_string ochan "<#Function:0x")
     (output_hex ochan expr 8)
-    (output_char ochan ':')
     (output_char ochan '>')
     ))
 

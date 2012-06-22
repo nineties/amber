@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-module.rlc 2012-06-16 01:43:42 nineties $
+; $Id: rowl1-module.rlc 2012-06-21 14:49:19 nineties $
 ;
 
 ; Module can be considered as a re-entrant scope.
@@ -40,7 +40,7 @@
         0                   ; visited-mark
         ))
     (if super (do
-        (if sym (add_module_variable super sym mod))
+        (if (!= sym nil) (add_module_variable super sym mod))
         (add_child super mod)
         ))
     (return mod)
@@ -70,6 +70,10 @@
 
 (fun add_module (curmod mod) (
     (field_set curmod 3 (cons mod (list_delete mod (field_get curmod 3))))
+    ))
+
+(export fun imported_modules (mod) (
+    (return (field_get mod 3))
     ))
 
 (export fun import_module (loc curmod sig) (
@@ -186,7 +190,7 @@
         ))
     (if (== (expr_arg ent 1) true) (do
         (var prev_loc (field_get (expr_arg ent 0) 1))
-        (throw (redefined_var current_loc sym))
+        (throw (redefined_var current_loc prev_loc sym))
         ))
     (expr_arg_set ent 1 true)
     (var box (struct 2 val current_loc))
@@ -261,7 +265,7 @@
 (export fun pp_module (ochan obj) (
     (var sym (field_get obj 1))
     (output_string ochan "<#Module:")
-    (if sym
+    (if (!= sym nil)
         (output_symbol ochan sym)
         (output_string ochan "(anonym)")
         )

@@ -3,12 +3,12 @@ module A {
 	x: 0
 }
 
-# access by qualified identifier
+# access to module-local variable using qualified identifier
 puts(A::x)
 A::x = 1
 puts(A::x)
 
-# access by import
+# access to module-local variable using import
 module B {
     import A
     puts(x)
@@ -18,35 +18,35 @@ module B {
 module A {
     x = 2
 }
+puts(A::x)
 
 ### module local syntax
 module A {
-    infixl Define "is" 19
+    statement ::= symbol "is" expr
+        { `open{ !node0 : !node2 } }
 
     y is x
     puts(y)
-
     module C {
-        # you can use the syntax in innner module
+        # you can use the syntax in innner modules
         z is 0
         puts(z)
     }
 }
-# you can't use the syntax in outer module
-# z is 0 (invalid)
 
 module B {
-    # the new definitions in A is visible in B  
+    # the new definitions in A is visible in its super modules
     puts(y)
     z is y
     puts(z)
 }
 
-### anonymous scope 
-# you can import some module to anonymous scope
+### scope local imports
+# modules can be imported to anonymous scopes locally
 f(): {
-    a : 1
-    b : 2
+    import A
+    a is 1
+    b is 2
     return a + b
 }
 puts(f())
