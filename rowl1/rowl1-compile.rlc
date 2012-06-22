@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-06-19 22:23:52 nineties $
+; $Id: rowl1-compile.rlc 2012-06-21 19:04:32 nineties $
 ;
 
 (import "rlvm-compile")
@@ -24,7 +24,9 @@
 (var noguard       (to_sym "%noguard"))
 
 ; compilers
+
 (extern object current_loc)
+(extern object current_mod)
 (extern fun set_loc)
 
 (var compiling_closure null)
@@ -223,6 +225,9 @@
         (expr_arg_set expr 0 (close_qquote mod env (expr_arg expr 0) 0))
         (return expr)
         ))
+    (if (== hd Dynamic)
+        (return expr)
+        )
     (var args (expr_args expr))
     (while args (do
         (setcar args (close mod env (car args)))
@@ -604,6 +609,19 @@
     (compile_operand asm v sym)
     ))
 
+(fun lookup_dynamic_var (sym) (
+    (var info (lookup_effective_symbol current_mod sym))
+    (must_be_module_variable sym info)
+    (var box (expr_arg info 0))
+    (return (field_get box 0))
+    ))
+
+(fun compile_dynamic_var (asm mod expr) (
+    (var sym (expr_arg_symbol expr 0))
+    (put_push asm sym)
+    (compile_simple_call asm 1 lookup_dynamic_var)
+    ))
+
 (fun compile_apply (asm mod expr) (
     (var func (expr_arg expr 0))
     (var args (expr_arg expr 1))
@@ -720,6 +738,30 @@
             (compile_block_body asm mod exprs)
         ))
     (pop_varscope mod)
+    ))
+
+(fun compile_openblock (asm mod expr) (
+    (var exprs (expr_args expr))
+    (if (in_top_scope mod)
+        (do
+            (var save_max_lvar_idx max_lvar_idx)
+            (= max_lvar_idx 0)
+            (reset_variable_count mod)
+
+            (var cnt_addr (get_address asm))
+            (put_allocate asm 0)
+            (compile_block_body asm mod exprs)
+            (put_operand_byte asm (+ cnt_addr 1) (+ max_lvar_idx 1))
+
+            (= max_lvar_idx save_max_lvar_idx)
+        )
+        (do
+            (compile_block_body asm mod exprs)
+        ))
+    ))
+
+(fun compile_scoped (asm mod expr) (
+    (compile asm (expr_arg expr 0) (expr_arg expr 1))
     ))
 
 (fun compile_seq (asm mod expr) (
@@ -1209,6 +1251,7 @@
     (add_compiler mod (make_expr DefineFunction (list2 symT DontCare)) compile_define_function)
 
     (add_compiler mod (domainP Symbol) compile_var)
+    (add_compiler mod (make_expr Dynamic (list1 symT)) compile_dynamic_var)
     (add_compiler mod (quote true) compile_const)
     (add_compiler mod (quote false) compile_const)
     (add_compiler mod (quote nil) compile_const)
@@ -1224,6 +1267,10 @@
     (add_compiler mod (domainP Tuple) compile_tuple)
 
     (add_compiler mod (domainP Block) compile_block)
+    (add_compiler mod (domainP OpenBlock) compile_openblock)
+    (add_compiler mod (make_expr Scoped (list2 (domainP Module) DontCare))
+        compile_scoped)
+
     (add_compiler mod (make_seq DontCare DontCare) compile_seq)
     (add_compiler mod (make_expr If (list2 DontCare DontCare)) compile_if)
 	(add_compiler mod (make_ifelse DontCare DontCare DontCare) compile_ifelse)
@@ -1234,6 +1281,8 @@
     (add_compiler mod (make_expr Return (list1 DontCare)) compile_return)
     (add_compiler mod (make_expr Equal (list2 DontCare DontCare)) compile_eq)
     (add_compiler mod (make_expr NotEqual (list2 DontCare DontCare)) compile_ne)
+
+    (add_compiler mod (make_expr Not (list1 DontCare)) compile_logical)
 	(add_compiler mod (make_expr SeqAnd (list2 DontCare DontCare)) compile_logical)
 	(add_compiler mod (make_expr SeqOr (list2 DontCare DontCare)) compile_logical)
 

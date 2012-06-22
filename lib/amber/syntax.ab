@@ -11,7 +11,7 @@ DefineSyntax{
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2012-06-20 00:58:44 nineties $
+# $Id: syntax.ab 2012-06-22 14:01:13 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -70,6 +70,8 @@ DefineSyntax{
             QuasiQuote{Delimited1{Unquote{node2}, Unquote{node4}}}},
         Tuple{List{"delimited2", "(", syntax_element, ",", syntax_element, ")"},
             QuasiQuote{Delimited2{Unquote{node2}, Unquote{node4}}}},
+        Tuple{List{"scoped", "(", syntax_element, ")"},
+            QuasiQuote{Scoped{Unquote{node2}}}},
         Tuple{List{primary_syntax_element}, node0}
     }
 }
@@ -112,8 +114,12 @@ DefineSyntax{
 }
 
 ## Expressions
-block_expr ::= "{" aligned(statement) "}" { MakeExpr{Quote{Block}, node1} }
-             | "{" "}"                    { MakeExpr{Quote{Block}, List{}} }
+block_body ::= "{" aligned(statement) "}"
+                { MakeExpr{Quote{Block}, node1} }
+             | "{" "}"
+                { MakeExpr{Quote{Block}, List{}} }
+
+block_expr ::= scoped(block_body)
 
 qualified_expr
     ::= symbol "::" qualified_expr
@@ -149,6 +155,9 @@ postfix_expr
         # Domain Pattern
       | postfix_expr "@" secondary_expr
         { MakeExpr{Quote{Domain}, List{node0, node2}} }
+
+      | "open" block_expr
+        { MakeExpr{Quote{OpenBlock}, Arguments{node1}} }
       | node
       | secondary_expr
 
@@ -166,11 +175,17 @@ pattern ::= quote_expr
 # enable use of quotation expressions for following definitions.
 expr ::= quote_expr
 
-multiplicative_expr
-    ::= multiplicative_expr '*' quote_expr { `Mul{!node0, !node2} }
-      | multiplicative_expr '/' quote_expr { `Div{!node0, !node2} }
-      | multiplicative_expr '%' quote_expr { `Mod{!node0, !node2} }
+prefix_expr
+    ::= "+"   quote_expr    { `UnaryPlus{!node1} }
+      | "-"   quote_expr    { `UnaryMinus{!node1} }
+      | "not" quote_expr    { `Not{!node1} }
       | quote_expr
+
+multiplicative_expr
+    ::= multiplicative_expr '*' prefix_expr { `Mul{!node0, !node2} }
+      | multiplicative_expr '/' prefix_expr { `Div{!node0, !node2} }
+      | multiplicative_expr '%' prefix_expr { `Mod{!node0, !node2} }
+      | prefix_expr
 
 additive_expr
     ::= additive_expr '+' multiplicative_expr { `Add{!node0, !node2} }
@@ -194,9 +209,19 @@ seqor_expr
     ::= seqand_expr "||" seqand_expr { `SeqOr{!node0, !node2} }
       | seqand_expr
 
+guard_expr ::= seqor_expr
+
 lambda_expr
-    ::= pattern "->" lambda_expr  { `Lambda{!node0, !node2} }
+    ::= pattern "->" lambda_expr
+        { `Lambda{!node0, !node2} }
+      | pattern "where" guard_expr "->" lambda_expr
+        { `Lambda{Where{!node0, !node2}, !node4} }
       | seqor_expr
+
+composite_expr
+    ::= lambda_expr "|" composite_expr
+        { `Bind{!node0, !node2} }
+      | lambda_expr
 
 assign_expr
     ::= pattern "=" assign_expr  { `Assign{!node0, !node2} }
@@ -205,17 +230,21 @@ assign_expr
       | pattern "*=" assign_expr { `MulAssign{!node0, !node2} }
       | pattern "/=" assign_expr { `DivAssign{!node0, !node2} }
       | pattern "%=" assign_expr { `ModAssign{!node0, !node2} }
-      | lambda_expr
+      | composite_expr
 
 expr ::= assign_expr
 
 ### Statements
-module_definition
-    ::= "module" qualified_expr block_expr
-        { `DefineModule{!node1, !node2} }
-
 statement
-    ::= module_definition
+     ::= "module" qualified_expr "{"
+        { `BeginModule{!node1} }
+      | "}"
+        { \EndModule{} }
+
+      | "import" qualified_expr
+        { `Import{!node1} }
+      | "include" expr
+        { `Include{!node1} }
 
       | "if" quote_expr statement "else" statement
         { `IfElse{!node1, !node2, !node4} }
@@ -234,21 +263,32 @@ statement
       | "return"
         { `Return{nil} }
 
-      | symbol secondary_expr ":" expr
+      | symbol secondary_expr ":" statement
         { `DefineFunction{!node0, Lambda{!node1, !node3}} }
-      | symbol ":" expr
+      | symbol secondary_expr "where" guard_expr ":" statement
+        { `DefineFunction{!node0, Lambda{Where{!node1, !node3}, !node5}} }
+      | pattern ":" expr
         { `DefineVariable{!node0, !node2} }
 
       | expr "=>" expr
         { `DefineFunction{Rewrite, Lambda{!node0, !node2}} }
 
-x + y => `add(!x, !y)
-x - y => `sub(!x, !y)
-x * y => `mul(!x, !y)
-x / y => `div(!x, !y)
-x % y => `mod(!x, !y)
+# Macros
+UnaryPlus{x}  => `uplus(!x)
+UnaryMinus{x} => `uminus(!x)
+x + y  => `add(!x, !y)
+x - y  => `sub(!x, !y)
+x * y  => `mul(!x, !y)
+x / y  => `div(!x, !y)
+x % y  => `mod(!x, !y)
 x += y => `(!x = !x + !y)
 x -= y => `(!x = !x - !y)
 x *= y => `(!x = !x * !y)
 x /= y => `(!x = !x / !y)
 x %= y => `(!x = !x % !y)
+x < y  => `lt(!x, !y)
+x > y  => `gt(!x, !y)
+x <= y => `le(!x, !y)
+x >= y => `ge(!x, !y)
+x == y => `equal(!x, !y)
+x != y => `(not equal(!x, !y))

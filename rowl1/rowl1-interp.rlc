@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2012-06-20 01:02:39 nineties $
+; $Id: rowl1-interp.rlc 2012-06-21 19:04:21 nineties $
 ;
 
 (import "rlvm-compile")
@@ -17,6 +17,7 @@
 (import "rowl1-assemble")
 (import "rowl1-compile")
 (import "rowl1-module")
+(import "rowl1-error")
 
 (export var current_loc null)
 (export fun set_loc (loc) (
@@ -24,6 +25,7 @@
     ))
 
 (export var current_mod null)
+(var module_stack null)
 
 (export fun set_current_module (mod) (
     (= current_mod mod)
@@ -57,9 +59,11 @@
     ))
 
 (export fun eval_main (file ichan) (
-    ;(var start (gettimeofday))
+    (var start (gettimeofday))
 
     (= current_mod (make_module (to_sym "%global") 0))
+    (= module_stack (cons current_mod 0))
+
     (= current_loc no_loc)
 
     (setup_builtin_functions current_mod)
@@ -76,6 +80,11 @@
     (add_include_dir "./")
     (add_include_dir "/usr/lib/amber/")
     (include_file "amber/syntax.ab")
+    (var end (gettimeofday))
+    (var diff (timeval_sub end start))
+    (output_string stderr "startup time : ")
+    (output_timeval stderr diff)
+    (output_char stderr '\n')
     (include_file "amber/io.ab")
 
     (if (in_shell_mode)
@@ -83,11 +92,6 @@
         (interpret p)
         )
 
-    ;(var end (gettimeofday))
-    ;(var diff (timeval_sub end start))
-    ;(output_string stderr "startup time : ")
-    ;(output_timeval stderr diff)
-    ;(output_char stderr '\n')
     (return 0)
     ))
 
@@ -164,26 +168,30 @@
     (return (eval (expr_arg expr 1)))
     ))
 
-(fun eval_define_module (expr) (
-    (if (! (in_top_scope current_mod)) (do
-        (output_error stderr current_loc)
-        (output_string stderr "module definition in sub-scope is not allowed\n")
-        (exit 1)
-        ))
+(fun eval_begin_module (expr) (
+    (if (! (in_top_scope current_mod))
+        (throw (exception current_mod (string "module definition in sub-scope is not allowed\n")))
+        )
     (var modsig (expr_arg expr 0))
-    (var block  (expr_arg expr 1))
     (var save_current_mod current_mod)
     (var module (find_module current_loc current_mod modsig @TRUE))
+    (= module_stack (cons module module_stack))
     (set_current_module module)
-    
-    (var es (expr_args block))
-    (while es (do
-        (eval (car es))
-        (= es (cdr es))
-        ))
-
-    (set_current_module save_current_mod)
     (return module)
+    ))
+
+(fun eval_end_module (expr) (
+    (if (! (in_top_scope current_mod))
+        (throw (exception current_mod (string "module definition in sub-scope is not allowed")))
+        )
+    (= module_stack (cdr module_stack))
+    (var module (car module_stack))
+    (if (! module) 
+        (throw (exception current_mod (string "can not exit global-scope")))
+        )
+    (var r current_mod)
+    (set_current_module module)
+    (return r)
     ))
 
 (fun default_rewrite (expr) (
@@ -289,12 +297,12 @@
     (add_builtin_function1 mod Rewrite (domainP Located) rewrite_located 0)
     (add_builtin_function1 mod Eval DontCare default_eval 0)
     (add_builtin_function1 mod Eval (domainP Located) eval_located 0)
-    (add_builtin_function1 mod Eval
-         (make_expr DefModule (list2 symT blockT))
-         eval_define_module 0)
-    (add_builtin_function1 mod Eval
-         (make_expr DefModule (list2 (domainP Qualified) blockT))
-         eval_define_module 0)
+    (add_builtin_function1 mod Eval (make_expr BeginModule (list1 symT))
+        eval_begin_module 0)
+    (add_builtin_function1 mod Eval (make_expr BeginModule (list1 (domainP Qualified)))
+        eval_begin_module 0)
+    (add_builtin_function1 mod Eval (make_expr EndModule 0)
+        eval_end_module 0)
     (add_builtin_function1 mod Eval
         (make_expr DefSyntax (list2 symT DontCare))
         eval_define_syntax 0)
