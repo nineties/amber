@@ -11,7 +11,7 @@ DefineSyntax{
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2012-06-22 14:01:13 nineties $
+# $Id: syntax.ab 2012-06-24 12:24:40 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -131,13 +131,12 @@ primary_expr
       | "[" delimited(expr, ",") "]"  { node1 } # List literal
 
       # Tuple literals
-      | "(" ")"
-        { MakeExpr{Quote{Tuple}, List{}} }
-      | "(" delimited2(expr, ",") ")" 
-        { MakeExpr{Quote{Tuple}, node1} } 
+      | "(" ")"                       { MakeExpr{Quote{Tuple}, List{}} }
+      | "(" delimited2(expr, ",") ")" { MakeExpr{Quote{Tuple}, node1} }
 
       | block_expr
       | atom
+      | "..."   { Quote{Ellipsis{nil}} }
 
 secondary_expr
     ::= qualified_expr
@@ -151,6 +150,10 @@ postfix_expr
         # Subscription
       | postfix_expr "[" delimited(expr, ",") "]"
         { MakeExpr{Quote{Subscript}, List{node0, node2}} }
+
+      | # Ellipsis pattern
+        postfix_expr "@" "..."
+        { MakeExpr{Quote{Ellipsis}, List{node0}} }
 
         # Domain Pattern
       | postfix_expr "@" secondary_expr
