@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-06-21 19:04:32 nineties $
+; $Id: rowl1-compile.rlc 2012-06-24 11:27:30 nineties $
 ;
 
 (import "rlvm-compile")
@@ -155,25 +155,35 @@
     (return (variant @FunctionE 4 0 args code guard))
     ))
 
+(fun validate_args (args) (
+    ; variable-length arguments is not allowed
+    ; f(x,y,...): ...
+    ; f(x,y,z@...): ...
+    (while args (do
+        (var arg (car args))
+        (if (== (expr_head arg) Ellipsis)
+            (throw (exception current_loc
+                (string "variable-length arguments is not allowed")))
+            )
+        (= args (cdr args))
+        ))
+    ))
+
 (fun make_function (args code guard) (
+    (validate_args args)
+    
     (var arity (list_len args))
     (= args (cons (box arity) args))
     (return (alloc_function args code guard))
     ))
 
 (fun make_bound (fun1 fun2) (
-    (if (! (callable fun1)) (do
-        (output_error stderr current_loc)
-        (pretty_print stderr fun1)
-        (output_string stderr " is not a function\n")
-        (exit 1)
-        ))
-    (if (! (callable fun2)) (do
-        (output_error stderr current_loc)
-        (pretty_print stderr fun2)
-        (output_string stderr " is not a function\n")
-        (exit 1)
-        ))
+    (if (! (callable fun1))
+        (throw (type_error current_loc (string "function") fun1))
+        )
+    (if (! (callable fun2))
+        (throw (type_error current_loc (string "function") fun2))
+        )
     (return (variant @BoundFunctionE 3 0 fun1 fun2))
     ))
 

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2012-06-16 02:01:42 nineties $
+; $Id: rowl1-matching.rlc 2012-06-24 12:37:06 nineties $
 ;
 
 (import "rlvm-compile")
@@ -19,6 +19,7 @@
 ; pattern matrix (((p11 p12 .. ) e1 g1) ((p21 p22 ..) e2 g2) ..)
 
 (var dontcareP (to_sym "%DontCare"))
+(var ellipsisP (to_sym "%Ellipsis"))
 (var varP      (to_sym "%Var"))
 (var headP     (to_sym "%HeadPattern"))
 
@@ -100,13 +101,13 @@
     ))
 
 (fun setup_pat (pat) (
-    (var hd (expr_head pat))
     (if (== pat DontCare)
         (return dontcareP)
         )
-    (if (== hd Symbol) (do
-        (return (make_expr varP (list1 pat)))
-        ))
+    (var hd (expr_head pat))
+    (if (== hd Symbol)
+        (return varP)
+        )
     (if (|| (== hd Int) (== hd String))
         (return pat)
         )
@@ -115,6 +116,9 @@
         (var dom (expr_arg pat 1))
         (return (make_expr headP (list2 lhs dom)))
         ))
+    (if (== hd Ellipsis)
+        (return ellipsisP)
+        )
     (if (== hd List)
         (return (setup_pat_list pat))
         )
@@ -199,6 +203,11 @@
         (compile_matching_main asm (cdr args)  pats)
         return
         ))
+    (if (== p varP) (do
+        (= pats (shift_pat pats))
+        (compile_matching_main asm (cdr args)  pats)
+        return
+        ))
     (if (== hd Symbol) (do
         (var check_failed (fresh_label asm))
         (compile_operand asm (car args))
@@ -236,11 +245,6 @@
         (= pats (shift_pat pats))
         (compile_matching_main asm (cdr args) pats)
         (set_label asm check_failed)
-        return
-        ))
-    (if (== hd varP) (do
-        (= pats (shift_pat pats))
-        (compile_matching_main asm (cdr args)  pats)
         return
         ))
     (if (== hd List) (do
@@ -460,8 +464,8 @@
 
 (fun split_pattern_matrix (pats) (
     (var p (caaar pats))
+    (if (== p varP) (return (split_any pats)))
     (var hd (expr_head p))
-    (if (== hd varP) (return (split_any pats)))
     (if (== hd Int) (return (split_int_pat pats)))
     (if (== hd String) (return (split_string_pat pats)))
     (if (== hd headP) (return (split_head_pat (expr_arg_symbol p 1) pats)))
@@ -474,7 +478,7 @@
     (var n 1)
     (var orig pats)
     (= pats (cdr pats))
-    (while (&& pats (|| (== (caaar pats) dontcareP) (== (expr_head (caaar pats)) varP))) (do
+    (while (&& pats (|| (== (caaar pats) dontcareP) (== (caaar pats) varP))) (do
         (= pats (cdr pats))
         (incr n)
         ))

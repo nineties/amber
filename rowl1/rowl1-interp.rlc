@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2012-06-21 19:04:21 nineties $
+; $Id: rowl1-interp.rlc 2012-06-22 15:23:37 nineties $
 ;
 
 (import "rlvm-compile")
@@ -197,9 +197,55 @@
 (fun default_rewrite (expr) (
     (if (is_atom expr) (return expr))
     (var hd (expr_head expr))
+    (if (== hd Quote) (return expr))
+    (if (== hd QuasiQuote) (do
+        (expr_arg_set expr 0 (rewrite_qquote (expr_arg expr 0) 0))
+        (return expr)
+        ))
+
+    ; Don't rewrite patterns
+    (if (== hd DefineVariable) (do
+        (expr_arg_set expr 1 (rewrite (expr_arg expr 1)))
+        (return expr)
+        ))
+    (if (== hd DefineFunction) (do
+        (expr_arg_set expr 1 (rewrite (expr_arg expr 1)))
+        (return expr)
+        ))
+    (if (== hd Lambda) (do
+        (var lhs (expr_arg expr 0))
+        (if (== (expr_head lhs) Where)
+            (expr_arg_set lhs 1 (rewrite (expr_arg lhs 1)))
+            )
+        (expr_arg_set expr 1 (rewrite (expr_arg expr 1)))
+        (return expr)
+        ))
+
     (var args (expr_args expr))
     (while args (do
         (setcar args (rewrite (car args)))
+        (= args (cdr args))
+        ))
+    (return expr)
+    ))
+
+(fun rewrite_qquote (expr level) (
+    (if (is_atom expr) (return expr))
+    (var hd (expr_head expr))
+    (if (== hd Unquote) (do
+        (if (== level 0)
+            (expr_arg_set expr 0 (rewrite (expr_arg expr 0)))
+            (expr_arg_set expr 0
+                (rewrite_qquote (expr_arg expr 0) (- level 1)))
+            )
+        (return expr)
+        )
+    (if (== hd QuasiQuote)
+        (+= level 1)
+        ))
+    (var args (expr_args expr))
+    (while args (do
+        (setcar args (rewrite_qquote (car args) level))
         (= args (cdr args))
         ))
     (return expr)
