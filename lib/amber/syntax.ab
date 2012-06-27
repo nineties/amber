@@ -11,7 +11,7 @@ DefineSyntax{
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2012-06-24 12:24:40 nineties $
+# $Id: syntax.ab 2012-06-27 09:24:43 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -238,8 +238,12 @@ assign_expr
 expr ::= assign_expr
 
 ### Statements
+arguments
+    ::= "(" delimited(expr, ",") ")"
+        { MakeExpr{\Tuple, node1} }
+
 statement
-     ::= "module" qualified_expr "{"
+    ::= "module" qualified_expr "{"
         { `BeginModule{!node1} }
       | "}"
         { \EndModule{} }
@@ -266,9 +270,9 @@ statement
       | "return"
         { `Return{nil} }
 
-      | symbol secondary_expr ":" statement
+      | symbol arguments ":" statement
         { `DefineFunction{!node0, Lambda{!node1, !node3}} }
-      | symbol secondary_expr "where" guard_expr ":" statement
+      | symbol arguments "where" guard_expr ":" statement
         { `DefineFunction{!node0, Lambda{Where{!node1, !node3}, !node5}} }
       | pattern ":" expr
         { `DefineVariable{!node0, !node2} }
