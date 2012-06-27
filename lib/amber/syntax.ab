@@ -11,7 +11,7 @@ DefineSyntax{
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2012-06-27 09:24:43 nineties $
+# $Id: syntax.ab 2012-06-27 12:06:45 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -221,8 +221,8 @@ lambda_expr
         { `Lambda{Where{!node0, !node2}, !node4} }
       | seqor_expr
 
-composite_expr
-    ::= lambda_expr "|" composite_expr
+multi_lambda_expr
+    ::= lambda_expr "|" multi_lambda_expr
         { `Bind{!node0, !node2} }
       | lambda_expr
 
@@ -233,7 +233,7 @@ assign_expr
       | pattern "*=" assign_expr { `MulAssign{!node0, !node2} }
       | pattern "/=" assign_expr { `DivAssign{!node0, !node2} }
       | pattern "%=" assign_expr { `ModAssign{!node0, !node2} }
-      | composite_expr
+      | multi_lambda_expr
 
 expr ::= assign_expr
 
@@ -269,6 +269,11 @@ statement
         { `Return{!node1} }
       | "return"
         { `Return{nil} }
+
+      | "throw" expr
+        { `Throw{!node1} }
+      | "try" statement "catch" multi_lambda_expr
+        { `Try{!node1, !node3} }
 
       | symbol arguments ":" statement
         { `DefineFunction{!node0, Lambda{!node1, !node3}} }

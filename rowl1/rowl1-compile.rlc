@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-06-24 11:27:30 nineties $
+; $Id: rowl1-compile.rlc 2012-06-27 12:33:29 nineties $
 ;
 
 (import "rlvm-compile")
@@ -315,7 +315,7 @@
     ))
 
 (fun do_nothing (asm mod expr) (
-    (put_nil asm)
+    (put_push asm nil)
     ))
 
 (fun check_arg_size (name size expr) (
@@ -718,7 +718,7 @@
 
 (fun compile_block_body (asm mod exprs) (
     (if (! exprs) (do
-        (put_nil asm)
+        (put_push asm nil)
         return
         ))
     (while exprs (do
@@ -814,11 +814,11 @@
         (if (== ifelse nil)
             (do
                 (compile asm mod cnd)
-                (put_nil asm mod)
+                (put_push asm nil)
             )
             (do
                 (var exit_lbl (fresh_label asm))
-                (put_nil asm mod)
+                (put_push asm nil)
                 (compile asm mod cnd)
                 (put_if_true asm exit_lbl)
                 (put_drop asm mod)
@@ -828,7 +828,7 @@
         (if (== ifelse nil)
             (do
                 (var exit_lbl (fresh_label asm))
-                (put_nil asm mod)
+                (put_push asm nil)
                 (compile asm mod cnd)
                 (put_if_false asm exit_lbl)
                 (put_drop asm mod)
@@ -946,7 +946,7 @@
     (compile asm mod cnd)
     (put_if_true asm head_lbl)
     (set_label asm exit_lbl)
-    (put_nil asm)
+    (put_push asm nil)
 
     (delete_symbol mod ContinueLabel)
     (delete_symbol mod BreakLabel)
@@ -960,7 +960,7 @@
     (if (!= (expr_head lbl) Label)
         (not_reachable "compile_break")
         )
-    (put_nil asm)
+    (put_push asm nil)
     (put_goto asm (expr_arg_int lbl 0))
     ))
 
@@ -972,7 +972,7 @@
     (if (!= (expr_head lbl) Label)
         (not_reachable "compile_continue")
         )
-    (put_nil asm)
+    (put_push asm nil)
     (put_goto asm (expr_arg_int lbl 0))
     ))
 
@@ -1011,6 +1011,39 @@
 (fun compile_return (asm mod expr) (
     (compile asm mod (expr_arg expr 0))
     (put_ireturn asm)
+    ))
+
+; handler must be a lambda
+(var default_hdler (make_expr Lambda (list2 (to_sym "x")
+    (make_expr Throw (list1 (to_sym "x"))))))
+(fun compile_try (asm mod expr) (
+    (var stmt (expr_arg expr 0))
+    (var hdlr (expr_arg expr 1))
+    (var hdlr_lbl (fresh_label asm))
+    (var cont_lbl (fresh_label asm)) 
+
+    (put_unwind_push asm hdlr_lbl)
+    (compile asm mod stmt)
+    (put_drop asm)
+
+    (put_unwind_pop asm)
+    (put_goto asm cont_lbl)
+    (set_label asm hdlr_lbl)
+
+    ; here, the thrown exception is on the top of stack.
+    (compile asm mod (make_expr Bind (list2 hdlr default_hdler)))
+    (put_push asm hdlr)
+    (put_push asm current_loc)
+    (compile_simple_call asm 3 compile_matching)
+    (put_jcall asm 4)
+    (put_drop asm)
+    (set_label asm cont_lbl)
+    (put_push asm nil)
+    ))
+
+(fun compile_throw (asm mod expr) (
+    (compile asm mod (expr_arg expr 0))
+    (put_throw asm)
     ))
 
 (fun compile_eq (asm mod expr) (
@@ -1287,11 +1320,12 @@
     (add_compiler mod (make_expr While (list2 DontCare DontCare)) compile_while)
     (add_compiler mod (quote Break) compile_break) 
     (add_compiler mod (quote Continue) compile_continue)
-
     (add_compiler mod (make_expr Return (list1 DontCare)) compile_return)
+    (add_compiler mod (make_expr Try (list2 DontCare DontCare)) compile_try)
+    (add_compiler mod (make_expr Throw (list1 DontCare)) compile_throw)
+
     (add_compiler mod (make_expr Equal (list2 DontCare DontCare)) compile_eq)
     (add_compiler mod (make_expr NotEqual (list2 DontCare DontCare)) compile_ne)
-
     (add_compiler mod (make_expr Not (list1 DontCare)) compile_logical)
 	(add_compiler mod (make_expr SeqAnd (list2 DontCare DontCare)) compile_logical)
 	(add_compiler mod (make_expr SeqOr (list2 DontCare DontCare)) compile_logical)
