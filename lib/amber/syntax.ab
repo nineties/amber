@@ -1,7 +1,9 @@
 DefineSyntax{
     comment,
-    List{Tuple{List{"#", Many{List{Not{"\n"}, any}}}, Quote{nil}}},
-    space_sensitive
+    List{Tuple{List{"#", Many{List{Not{"\n"}, any}}},
+        Quote{nil},
+        space_sensitive
+    }}
 }
 
 DefineSyntax{
@@ -11,7 +13,7 @@ DefineSyntax{
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2012-06-27 16:00:00 nineties $
+# $Id: syntax.ab 2012-06-29 00:06:07 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -43,7 +45,7 @@ DefineSyntax{
         Tuple{List{"."}, Quote{any}},
         Tuple{List{string}, node0},
         Tuple{List{symbol}, node0},
-        Tuple{List{"(", Many1{syntax_element}, ")"}, node1}
+        Tuple{List{"(", Many1{syntax_element}, ")"}, node1, multiline}
     }
 }
 
@@ -63,15 +65,15 @@ DefineSyntax{
         Tuple{List{"!", primary_syntax_element},
             QuasiQuote{Not{Unquote{node0}}}},
         Tuple{List{"aligned", "(", syntax_element, ")"},
-            QuasiQuote{Aligned{Unquote{node2}}}},
+            QuasiQuote{Aligned{Unquote{node2}}}, multiline},
         Tuple{List{"delimited", "(", syntax_element, ",", syntax_element, ")"},
-            QuasiQuote{Delimited{Unquote{node2}, Unquote{node4}}}},
+            QuasiQuote{Delimited{Unquote{node2}, Unquote{node4}}}, multiline},
         Tuple{List{"delimited1", "(", syntax_element, ",", syntax_element, ")"},
-            QuasiQuote{Delimited1{Unquote{node2}, Unquote{node4}}}},
+            QuasiQuote{Delimited1{Unquote{node2}, Unquote{node4}}}, multiline},
         Tuple{List{"delimited2", "(", syntax_element, ",", syntax_element, ")"},
-            QuasiQuote{Delimited2{Unquote{node2}, Unquote{node4}}}},
+            QuasiQuote{Delimited2{Unquote{node2}, Unquote{node4}}}, multiline},
         Tuple{List{"scoped", "(", syntax_element, ")"},
-            QuasiQuote{Scoped{Unquote{node2}}}},
+            QuasiQuote{Scoped{Unquote{node2}}}, multiline},
         Tuple{List{primary_syntax_element}, node0}
     }
 }
@@ -80,13 +82,24 @@ DefineSyntax{
     parser_action,
     List{
         Tuple{List{"{", statement, "}"},
-            MakeExpr{Quote{Block}, List{node1}}}
+            MakeExpr{Quote{Block}, List{node1}}, multiline}
+    }
+}
+
+DefineSyntax{
+    parser_option,
+    List{
+        Tuple{List{"[", Many1{symbol}, "]"},
+            node1, multiline}
     }
 }
 
 DefineSyntax{
     syntax,
     List{
+        Tuple{List{parser_option, Many1{syntax_element}, parser_action},
+            QuasiQuote{Tuple{Unquote{node1}, Unquote{node2}, Unquote{node0}}}
+        },
         Tuple{List{Many1{syntax_element}, parser_action},
             QuasiQuote{Tuple{Unquote{node0}, Unquote{node1}}}
         },
@@ -114,9 +127,9 @@ DefineSyntax{
 }
 
 ## Expressions
-block_body ::= "{" aligned(statement) "}"
+block_body ::= [multiline] "{" aligned(statement) "}"
                 { MakeExpr{Quote{Block}, node1} }
-             | "{" "}"
+             | [multiline] "{" "}"
                 { MakeExpr{Quote{Block}, List{}} }
 
 block_expr ::= scoped(block_body)
@@ -127,12 +140,14 @@ qualified_expr
       | symbol
 
 primary_expr
-    ::= "(" expr ")"                  { node1 } 
-      | "[" delimited(expr, ",") "]"  { node1 } # List literal
+    ::= [multiline] "(" expr ")"                  { node1 } 
+      | [multiline] "[" delimited(expr, ",") "]"  { node1 } # List literal
 
       # Tuple literals
-      | "(" ")"                       { MakeExpr{Quote{Tuple}, List{}} }
-      | "(" delimited2(expr, ",") ")" { MakeExpr{Quote{Tuple}, node1} }
+      | [multiline] "(" ")"
+        { MakeExpr{Quote{Tuple}, List{}} }
+      | [multiline] "(" delimited2(expr, ",") ")"
+        { MakeExpr{Quote{Tuple}, node1} }
 
       | block_expr
       | atom
@@ -253,7 +268,7 @@ statement
       | "include" expr
         { `Include{!node1} }
 
-      | "if" quote_expr statement "else" statement
+      | [multiline] "if" quote_expr statement "else" statement
         { `IfElse{!node1, !node2, !node4} }
       | "if" quote_expr statement
         { `If{!node1, !node2} }
@@ -272,7 +287,7 @@ statement
 
       | "throw" expr
         { `Throw{!node1} }
-      | "try" statement "catch" multi_lambda_expr
+      | [multiline] "try" statement "catch" multi_lambda_expr
         { `Try{!node1, !node3} }
 
       | symbol arguments ":" statement
@@ -285,9 +300,9 @@ statement
       | expr "=>" expr
         { `DefineFunction{rewrite, Lambda{!node0, !node2}} }
 
-# Macros
-UnaryPlus{x}  => `uplus(!x)
-UnaryMinus{x} => `uminus(!x)
+## Macros
++x     => `uplus(!x)
+-x     => `uminus(!x)
 x + y  => `add(!x, !y)
 x - y  => `sub(!x, !y)
 x * y  => `mul(!x, !y)
