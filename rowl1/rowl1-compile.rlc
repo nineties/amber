@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-06-27 12:33:29 nineties $
+; $Id: rowl1-compile.rlc 2012-06-28 11:31:48 nineties $
 ;
 
 (import "rlvm-compile")
@@ -155,23 +155,7 @@
     (return (variant @FunctionE 4 0 args code guard))
     ))
 
-(fun validate_args (args) (
-    ; variable-length arguments is not allowed
-    ; f(x,y,...): ...
-    ; f(x,y,z@...): ...
-    (while args (do
-        (var arg (car args))
-        (if (== (expr_head arg) Ellipsis)
-            (throw (exception current_loc
-                (string "variable-length arguments is not allowed")))
-            )
-        (= args (cdr args))
-        ))
-    ))
-
 (fun make_function (args code guard) (
-    (validate_args args)
-    
     (var arity (list_len args))
     (= args (cons (box arity) args))
     (return (alloc_function args code guard))
@@ -436,7 +420,18 @@
     (if (== argty List) (do
         (var idx 0)
         (while arg (do
-            (setup_arg tbl (make_list_at obj idx) (car arg) level)
+            (var a (car arg))
+            (if (== (expr_head a) Ellipsis) (do
+                (if (cdr arg)
+                    (throw (exception current_loc (string "Ellipsis node must be placed last in the order of arguments")))
+                    )
+                (if (> (expr_size a) 0) (do
+                    (var v (expr_arg_symbol a 0))
+                    (symtable_add tbl v (make_list_from obj idx))
+                    ))
+                return
+                ))
+            (setup_arg tbl (make_list_at obj idx) a level)
             (= arg (cdr arg))
             (incr idx)
             ))
@@ -451,9 +446,23 @@
     (if (== argty QuasiQuote)
         (return (setup_arg tbl obj (expr_arg arg 0) (+ level 1)))
         )
+    (if (== argty Ellipsis)
+        (throw (exception current_loc (string "Variable-length arguments is not allowed")))
+        )
     (var idx 0)
     (var args (expr_args arg))
     (while args (do
+        (var a (car args))
+        (if (== (expr_head a) Ellipsis) (do
+            (if (cdr args)
+                (throw (exception current_loc (string "Ellipsis node must be placed last in the order of arguments")))
+                )
+            (if (> (expr_size a) 0) (do
+                (var v (expr_arg_symbol a 0))
+                (symtable_add tbl v (make_expr_from obj idx))
+                ))
+            return
+            ))
         (setup_arg tbl (make_expr_at obj idx) (car args) level)
         (= args (cdr args))
         (incr idx)
@@ -462,7 +471,7 @@
 
 (fun var_loc (info) (
     (var hd (expr_head info))
-    (if (|| (== hd ListAt) (== hd ExprAt))
+    (if (|| (== hd ListAt) (|| (== hd ListFrom) (|| (== hd ExprAt) (== hd ExprFrom))))
         (return (var_loc (expr_arg info 0)))
         )
     (if (== hd ModuleVariable) (do
@@ -495,8 +504,16 @@
     (return (make_expr ListAt (list2 obj (box idx))))
     ))
 
+(export fun make_list_from (obj idx) (
+    (return (make_expr ListFrom (list2 obj (box idx))))
+    ))
+
 (export fun make_expr_at (obj idx) (
     (return (make_expr ExprAt (list2 obj (box idx))))
+    ))
+
+(export fun make_expr_from (obj idx) (
+    (return (make_expr ExprFrom (list2 obj (box idx))))
     ))
 
 (fun compile_define_variable (asm mod expr) (
@@ -589,11 +606,24 @@
         (put_list_at asm)
         return
         ))
+    (if (== ty ListFrom) (do
+        (compile_operand asm (expr_arg opd 0) sym)
+        (put_imm_int asm (expr_arg_int opd 1))
+        (put_list_from asm)
+        return
+        ))
     (if (== ty ExprAt) (do
         (compile_operand asm (expr_arg opd 0) sym)
         (put_field_get2 asm)
         (put_imm_int asm (expr_arg_int opd 1))
         (put_list_at asm)
+        return
+        ))
+    (if (== ty ExprAt) (do
+        (compile_operand asm (expr_arg opd 0) sym)
+        (put_field_get2 asm)
+        (put_imm_int asm (expr_arg_int opd 1))
+        (put_list_from asm)
         return
         ))
     (not_reachable "compile_operand")
