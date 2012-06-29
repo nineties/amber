@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-module.rlc 2012-06-21 14:49:19 nineties $
+; $Id: rowl1-module.rlc 2012-06-29 11:55:17 nineties $
 ;
 
 ; Module can be considered as a re-entrant scope.
@@ -181,9 +181,10 @@
 ; add definition of module variable `sym' to `mod'.
 ; `val' is a initial value.
 (export fun add_module_variable (mod sym val) (
+    (var box nil)
     (var ent (lookup_symbol_local mod sym))
     (if (! ent) (do
-        (var box (struct 2 val current_loc))
+        (= box (struct 2 val current_loc))
         (= ent (make_expr ModuleVariable (list2 box true)))
         (symtable_add_to_global (field_get mod 5) sym ent)
         (goto update_displays)
@@ -193,7 +194,7 @@
         (throw (redefined_var current_loc prev_loc sym))
         ))
     (expr_arg_set ent 1 true)
-    (var box (struct 2 val current_loc))
+    (= box (struct 2 val current_loc))
     (expr_arg_set ent 0 box)
     ; update variable-displays
     (label update_displays)
@@ -220,9 +221,9 @@
     (field_set mod 7 mark)
     (var vtbl (field_get mod 5))
     (var display (symtable_find_global vtbl sym))
-    (if (&& display (== (expr_arg display 1) false))
+    (if (&& display (== (expr_arg display 1) false)) (do
         (expr_arg_set display 0 box)
-        )
+        ))
     (var children (field_get mod 4))
     (while children (do
         (update_display_iter mark (car children) sym box)
