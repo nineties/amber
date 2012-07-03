@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2012-06-28 23:58:05 nineties $
+; $Id: rowl1-interp.rlc 2012-07-04 03:03:52 nineties $
 ;
 
 (import "rlvm-compile")
@@ -19,16 +19,19 @@
 (import "rowl1-module")
 (import "rowl1-error")
 
+(export var global_mod null)
 (export var current_loc null)
+(export var current_mod null)
 (export fun set_loc (loc) (
     (= current_loc loc)
+    (add_module_variable global_mod (to_sym "LOCATION") loc true)
     ))
 
-(export var current_mod null)
 (var module_stack null)
 
 (export fun set_current_module (mod) (
     (= current_mod mod)
+    (add_module_variable global_mod (to_sym "MODULE") mod true)
     ))
 
 (export fun eval_shell () (
@@ -61,20 +64,22 @@
 (export fun eval_main (file ichan) (
     ;(var start (gettimeofday))
 
-    (= current_mod (make_module (to_sym "%global") 0))
-    (= module_stack (cons current_mod 0))
+    (= global_mod (make_module (to_sym "%global") 0))
+    (= module_stack (cons global_mod 0))
 
     (= current_loc no_loc)
 
-    (setup_builtin_functions current_mod)
-    (setup_builtin_compilers current_mod)
-    (init_stdlib current_mod)
-    (import_module current_loc current_mod (to_sym "std"))
-    (import_module current_loc current_mod (qualified "std" (to_sym "io")))
+    (setup_globals global_mod)
+    (setup_builtin_compilers global_mod)
+    (init_stdlib global_mod)
+    (import_module current_loc global_mod (to_sym "std"))
+    (import_module current_loc global_mod (qualified "std" (to_sym "io")))
 
-    (init_parser_funcs current_mod)
-    (import_module current_loc current_mod (qualified "std" (to_sym "parser")))
+    (init_parser_funcs global_mod)
+    (import_module current_loc global_mod (qualified "std" (to_sym "parser")))
     (var p (init_parser file ichan))
+
+    (= current_mod global_mod)
     (= current_loc (get_loc p))
 
     (add_include_dir "./")
@@ -87,6 +92,7 @@
     ;(output_string stderr "startup time : ")
     ;(output_timeval stderr diff)
     ;(output_char stderr '\n')
+
 
     (if (in_shell_mode)
         (interpret_shell p)
@@ -340,9 +346,13 @@
     (return nil)
     ))
 
-(fun setup_builtin_functions (mod) (
+(fun setup_globals (mod) (
     (var symT (domainP Symbol))
     (var blockT (domainP Block))
+    
+    (add_module_variable mod (to_sym "LOCATION") current_loc false)
+    (add_module_variable mod (to_sym "MODULE") current_mod false)
+    
     (add_builtin_function1 mod Rewrite DontCare default_rewrite 0)
     (add_builtin_function1 mod Rewrite (domainP Located) rewrite_located 0)
     (add_builtin_function1 mod Eval DontCare default_eval 0)

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2012-06-29 15:34:19 nineties $
+; $Id: rowl1-packrat.rlc 2012-07-04 03:04:29 nineties $
 ;
 
 ; TODO:
@@ -761,7 +761,7 @@
     ))
 @(MEMOIZE atom)
 
-(fun parse_expr (p) (
+(fun parse_expr_ (p) (
     (var loc (get_loc p))
     (var v @(OR p `(
         node
@@ -769,6 +769,7 @@
     )))
     (return v)
     ))
+@(MEMOIZE expr)
 
 (fun parse_statement_ (p) (
     (var v (parse "parse_expr" p))
@@ -881,6 +882,10 @@
 
 (fun to_parse (sym) (
     (return (to_sym (strcat "parse_" (symbol_name sym))))
+    ))
+
+(fun to_parse_ (sym) (
+    (return (to_sym (strcat "parse_" (strcat (symbol_name sym) "_"))))
     ))
 
 (var ParserVar (to_sym "%Parser")) ; internal use
@@ -1490,7 +1495,7 @@
     (= multiline_p @FALSE)
     ))
 
-(fun compile_parser_func (orig_sym sym elems) (
+(fun compile_parser (sym elems) (
     (if (!= (expr_head elems) List) (do
         (output_error stderr current_loc)
         (output_string stderr "invalid syntax declaration\n")
@@ -1505,7 +1510,7 @@
     ; if sym == parse_statement
     ; modify parsed expression to Located{...}
     (var return_stmt 0)
-    (if (== orig_sym (to_sym "parse_statement"))
+    (if (== sym (to_sym "parse_statement_"))
         (= return_stmt (make_expr Block (list2
             (apply (to_sym "%eval_parser_command") (list1 v))
             (mkreturn 
@@ -1546,18 +1551,14 @@
         ))
     (= body (cons errors body))
 
-    (return (make_expr DefineFunction
-        (list2 sym (make_expr Lambda (list2 (make_expr Domain
-            (list2 ParserVar Parser))
-            (make_expr Block (list_reverse body)))))))
-
+    (return (make_expr Block (list_reverse body)))
     ))
 
 (extern fun compile_matching)
-(fun call_parser (p sym key new) (
+(fun call_parser (p sym new) (
     (var tbl (field_get (field_get p 1) 2))
     (var pos (field_get p 3))
-    (var v (memotable_find tbl key pos))
+    (var v (memotable_find tbl sym pos))
     (if v (do
         (if (== (field_get v 0) LeftRec) (do
             ; detected left-recursion
@@ -1571,7 +1572,7 @@
     (var state (copy_parser_state p))
 
     (var ent (struct 2 LeftRec state @FALSE))
-    (memotable_add tbl key pos ent)
+    (memotable_add tbl sym pos ent)
     (label retry_lbl)
     (= v (byterun (compile_matching loc sym new) p))
 
@@ -1595,114 +1596,51 @@
     (return v)
     ))
 
-(fun bind_parser (p sym key new orig) (
-    (var tbl (field_get (field_get p 1) 2))
-    (var pos (field_get p 3))
-    (var v (memotable_find tbl key pos))
-    (if v (do
-        (if (== (field_get v 0) LeftRec) (do
-            ; detected left-recursion
-            (field_set v 1 (copy_parser_state (field_get v 1)))
-            (field_set v 2 @TRUE)
-            ))
-        (set_parser_state p (field_get v 1))
-        (return (field_get v 0))
-        ))
-    (var loc (get_loc p))
-    (var state (copy_parser_state p))
-    (var leftlec @FALSE)
-    (var errors 0)
-    (var ent (struct 2 LeftRec state @FALSE))
-    (memotable_add tbl key pos ent)
-    (var code1 (compile_matching loc sym new))
-    (var code2 (compile_matching loc sym orig))
-
-    (label retry_lbl)
-    (= errors 0)
-    (= v (byterun code1 p))
-    (if (field_get ent 2)
-        (if (&& (== (expr_head v) Parsed)
-                (> (field_get p 3) (field_get (field_get ent 1) 3)))
-            (do
-                (field_set ent 0 v)
-                (set_parser_state (field_get ent 1) p)
-                (set_parser_state p state)
-                (goto retry_lbl)
-            )
-            (do
-                ; accept previous try
-                (set_parser_state p (field_get ent 1))
-                (return (field_get ent 0))
-            )))
-    (if (== (expr_head v) Parsed) (do
-        (field_set ent 0 v)
-        (set_parser_state (field_get ent 1) p)
-        (return v)
-        ))
-
-    (= errors (merge_noparse errors v))
-
-    (set_parser_state p state)
-    (= v (byterun code2 p))
-    (if (field_get ent 2)
-        (if (&& (== (expr_head v) Parsed)
-                (> (field_get p 3) (field_get (field_get ent 1) 3)))
-            (do
-                (field_set ent 0 v)
-                (set_parser_state (field_get ent 1) p)
-                (set_parser_state p state)
-                (goto retry_lbl)
-            )
-            (do
-                ; accept previous try
-                (set_parser_state p (field_get ent 1))
-                (return (field_get ent 0))
-            )))
-    (if (== (expr_head v) Parsed) (do
-        (field_set ent 0 v)
-        (set_parser_state (field_get ent 1) p)
-        (return v)
-        ))
-    (= v (merge_noparse errors v))
-    (field_set ent 0 v)
-    (set_parser_state (field_get ent 1) p)
-    (return v)
+(fun bind_parser (old_parser new_parser) (
+    (var v (unique_sym))
+    (return (make_expr Block (list3
+        (defvar v new_parser)
+        (mkif (make_expr Equal (list2 (make_expr Head (list1 v)) (quote Parsed)))
+            (mkreturn v))
+        (apply old_parser (list1 ParserVar))
+        )))
     ))
 
-(fun compile_parser1 (sym new) (
+(fun compile_parser_driver (sym sym_) (
     (return (make_expr DefineFunction (list2 sym
         (make_expr Lambda (list2 (make_expr Domain (list2 ParserVar Parser))
-        (apply (to_sym "%call_parser") (list4 ParserVar (quote sym) (quote new) new))
-        )))))
-    ))
-
-(fun compile_parser_driver (sym new orig) (
-    (return (make_expr DefineFunction (list2 sym
-        (make_expr Lambda (list2 (make_expr Domain (list2 ParserVar Parser))
-        (apply (to_sym "%bind_parser") (list5 ParserVar (quote sym) (quote new) new orig))
+        (apply (to_sym "%call_parser") (list3 ParserVar (quote sym) sym_))
         )))))
     ))
 
 (export fun compile_define_syntax (sym elems) (
-    (= sym (to_parse sym))
-    (if (lookup_effective_symbol current_mod sym)
+    (var parser_sym (to_parse sym))
+    (var parser_sym_ (to_parse_ sym))
+    (if (lookup_effective_symbol current_mod parser_sym)
         (do
-            (var parser_sym (unique_sym))
             (var copy_sym   (unique_sym))
-            (var new_parser_stmt (compile_parser_func sym parser_sym elems))
+            (var new_parser (compile_parser parser_sym_ elems))
             (var stmts (list3
-                (make_expr DefineFunction (list2 copy_sym sym))
-                new_parser_stmt
-                (compile_parser_driver sym parser_sym copy_sym)
+                ; save existing parser
+                (make_expr DefineFunction (list2 copy_sym parser_sym_))
+                (make_expr DefineFunction (list2 parser_sym_
+                    (make_expr Lambda (list2
+                        (make_expr Domain (list2 ParserVar Parser))
+                        (bind_parser copy_sym new_parser)))
+                    ))
+                (compile_parser_driver parser_sym parser_sym_)
                 ))
             (return stmts)
         )
         (do
-            (var parser_sym (unique_sym))
-            (var new_parser_stmt (compile_parser_func sym parser_sym elems))
+            (var new_parser (compile_parser parser_sym_ elems))
             (var stmts (list2
-                new_parser_stmt
-                (compile_parser1 sym parser_sym)
+                (make_expr DefineFunction (list2 parser_sym_
+                    (make_expr Lambda (list2
+                        (make_expr Domain (list2 ParserVar Parser))
+                        new_parser))
+                    ))
+                (compile_parser_driver parser_sym parser_sym_)
                 ))
             (return stmts)
         ))
@@ -1718,8 +1656,7 @@
     (add_builtin_function2 parser (to_sym "%merge_loc") (domainP Loc) (domainP Loc) merge_loc 0)
     (add_builtin_function1 parser (to_sym "%copy_parser_state") (domainP Parser) copy_parser_state 0)
     (add_builtin_function2 parser (to_sym "%set_parser_state") (domainP Parser) (domainP Parser) set_parser_state 0)
-    (add_builtin_function4 parser (to_sym "%call_parser") (domainP Parser) (domainP Symbol) (domainP Symbol) (domainP Function) call_parser 0)
-    (add_builtin_function5 parser (to_sym "%bind_parser") (domainP Parser) (domainP Symbol) (domainP Symbol) (domainP Function) (domainP Function) bind_parser 0)
+    (add_builtin_function3 parser (to_sym "%call_parser") (domainP Parser) (domainP Symbol) (domainP Function) call_parser 0)
 
     (add_builtin_function2 parser (to_sym "%merge_noparse") DontCare DontCare merge_noparse 0)
     (add_builtin_function2 parser (to_sym "%negate") (domainP Parser) DontCare negate 0)
@@ -1732,6 +1669,20 @@
 
     (add_builtin_function2 parser (to_sym "parse_text") (domainP Parser) (domainP String) parse_text 0)
 
+    (add_parser parser (to_sym "parse_any_") parse_any_char)
+    (add_parser parser (to_sym "parse_blank_") parse_blank_)
+    (add_parser parser (to_sym "parse_decimal_") parse_decimal_)
+    (add_parser parser (to_sym "parse_binary_") parse_binary_)
+    (add_parser parser (to_sym "parse_octal_") parse_octal_)
+    (add_parser parser (to_sym "parse_hex_") parse_hex_)
+    (add_parser parser (to_sym "parse_integer_") parse_integer_)
+    (add_parser parser (to_sym "parse_string_") parse_string_)
+    (add_parser parser (to_sym "parse_symbol_") parse_symbol_)
+    (add_parser parser (to_sym "parse_atom_") parse_atom_)
+    (add_parser parser (to_sym "parse_node_") parse_node_)
+    (add_parser parser (to_sym "parse_expr_") parse_expr_)
+    (add_parser parser (to_sym "parse_statement_") parse_statement_)
+
     (add_parser parser (to_sym "parse_any") parse_any_char)
     (add_parser parser (to_sym "parse_blank") parse_blank)
     (add_parser parser (to_sym "parse_decimal") parse_decimal)
@@ -1741,8 +1692,6 @@
     (add_parser parser (to_sym "parse_integer") parse_integer)
     (add_parser parser (to_sym "parse_string") parse_string)
     (add_parser parser (to_sym "parse_symbol") parse_symbol)
-
-    ; exprs
     (add_parser parser (to_sym "parse_atom") parse_atom)
     (add_parser parser (to_sym "parse_node") parse_node)
     (add_parser parser (to_sym "parse_expr") parse_expr)
