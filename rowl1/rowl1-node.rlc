@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2012-06-28 17:39:59 nineties $
+; $Id: rowl1-node.rlc 2012-07-05 23:56:31 nineties $
 ;
 
 (import "rlvm-compile")
@@ -12,6 +12,8 @@
 
 (import "rowl1-util")
 (import "rowl1-symtable")
+
+(extern object current_loc)
 
 ; symbol table (symbols are globally unique)
 (var symbol_table (make_idtable))
@@ -84,6 +86,7 @@
 (export var Closure          (to_builtin_sym "Closure"))
 (export var InputFileStream  (to_builtin_sym "InputFileStream"))
 (export var OutputFileStream (to_builtin_sym "OutputFileStream"))
+(export var StringIO         (to_builtin_sym "StringIO"))
 (export var Module           (to_builtin_sym "Module"))
 
 (export var Eval        (to_sym "eval"))
@@ -96,6 +99,8 @@
 (export var NoParse    (to_sym "NoParse"))  ; NoParse [(location msg)]
 (export var MayParse   (to_sym "MayParse")) ; MayParse (shell mode only)
 
+(export var OneOf      (to_sym "OneOf"))
+(export var NoneOf     (to_sym "NoneOf"))
 (export var Option     (to_sym "Option"))
 (export var Choice     (to_sym "Choice"))
 (export var Many       (to_sym "Many"))
@@ -141,6 +146,24 @@
     (+= symbol_index_gen 1)
     (idtable_add symbol_table name sym)
     (return sym)
+    ))
+
+(extern fun is_letter)
+(extern fun is_identchar)
+(extern fun invalid_argument)
+(export fun to_sym_user (name) (
+    (var len (strlen name))
+    (if (! len) (goto to_sym_error))
+    (if (! (is_letter (array_get char name 0))) (goto to_sym_error))
+    (for i 1 len (do
+        (if (! (is_identchar (array_get char name i))) (goto to_sym_error))
+        ))
+    (return (to_sym name))
+    (label to_sym_error)
+    (throw (invalid_argument current_loc
+        (string "invalid identifier string")
+        name
+        ))
     ))
 
 (export fun unique_sym () (
@@ -226,7 +249,6 @@
     (output_char ochan ']')
     ))
 
-(extern object current_loc)
 (export fun output_error (ochan loc) (
     (flush stdout)
     (if loc 
@@ -252,6 +274,7 @@
         (@OutputFileStreamE . (return OutputFileStream))
         (@ModuleE           . (return Module))
         (@ParserE           . (return Parser))
+        (@StringIOE         . (return StringIO))
         (@IntE              . (return Int))
         (@FloatE            . (return Float))
         (@StringE           . (return String))
@@ -447,6 +470,13 @@
     (output_string ochan (field_get sym @SymbolName))
     ))
 
+; types
+(export var symT    (domainP Symbol))
+(export var stringT (domainP String))
+(export var intT    (domainP Int))
+(export var listT   (domainP List))
+(export var tupleT  (domainP Tuple))
+
 ; printing functions
 (fun output_ordinal (ochan idx) (
     (output_int ochan idx)
@@ -471,6 +501,7 @@
         (@OutputFileStreamE . (return (output_string ochan "OutputFileStream")))
         (@ModuleE           . (return (output_string ochan "Module")))
         (@ParserE           . (return (output_string ochan "Parser")))
+        (@StringIOE         . (return (output_string ochan "StringIO")))
         (@IntE              . (return (output_string ochan "Int")))
         (@FloatE            . (return (output_string ochan "Float")))
         (@StringE           . (return (output_string ochan "String")))
@@ -498,6 +529,7 @@
         (@OutputFileStreamE . (return (pp_file_stream ochan node)))
         (@ModuleE           . (return (pp_module ochan node)))
         (@ParserE           . (return (pp_parser ochan node)))
+        (@StringIOE         . (return (pp_stringio ochan node)))
         (@IntE              . (return (pp_int ochan node)))
         (@FloatE            . (return (pp_float ochan node)))
         (@StringE           . (return (pp_string ochan node)))
@@ -582,6 +614,12 @@
     (output_char ochan '>')
     ))
 
+(fun pp_stringio (ochan node) (
+    (output_string ochan "<#StringIO:")
+    (output_hex ochan node 8)
+    (output_char ochan '>')
+    ))
+
 (fun pp_int (ochan node) (
     (output_int ochan (unbox node))
     ))
@@ -619,6 +657,7 @@
         (@OutputFileStreamE . (return (pp_file_stream ochan node)))
         (@ModuleE           . (return (pp_module ochan node)))
         (@ParserE           . (return (pp_parser ochan node)))
+        (@StringIOE         . (return (pp_stringio ochan node)))
         (@IntE              . (return (pp_int ochan node)))
         (@FloatE            . (return (pp_float ochan node)))
         (@StringE           . (return (pp_string ochan node)))

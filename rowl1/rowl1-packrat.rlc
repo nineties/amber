@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2012-07-04 03:04:29 nineties $
+; $Id: rowl1-packrat.rlc 2012-07-09 08:41:41 nineties $
 ;
 
 ; TODO:
@@ -328,12 +328,19 @@
     (memotable_clear (field_get buf 2))
     ))
 
-(fun extract_string (from p) (
-    (var begin (field_get from 3))
-    (var end   (field_get p 3))
+(fun extract_string (p begin end) (
     (var len (- end begin))
     (var vec (field_get (field_get p 1) 0))
     (return (strndup (+ (cvector_raw vec) begin) len))
+    ))
+
+; boxed version
+(fun extract_string_ (p begin end) (
+    (return (extract_string p (unbox begin) (unbox end)))
+    ))
+
+(export fun get_pos (p) (
+    (return (box (field_get p 3)))
     ))
 
 (export fun get_loc (p) (
@@ -423,11 +430,11 @@
     (= c @(CHGRP c))
     (return (&& (<= @CH_0 c) (<= c @CH_HEX)))
     ))
-(fun is_letter (c) (
+(export fun is_letter (c) (
     (= c @(CHGRP c))
     (return (&& (<= @CH_af c) (<= c @CH_OTHER)))
     ))
-(fun is_identchar (c) (
+(export fun is_identchar (c) (
     (if (< c 0) (return @FALSE))
     (= c @(CHGRP c))
     (return (&& (<= @CH_0 c) (<= c @CH_OTHER)))
@@ -643,11 +650,11 @@
     (var c (lookahead p))
     (if (< c 0) (return (mayparse loc "expect a symbol")))
     (if (! (is_letter c)) (return (noparse loc "expect a symbol")))
-    (var begin (copy_parser_state p))
+    (var begin (field_get p 3))
     (while (is_identchar (lookahead p)) (do
         (getc p)
         ))
-    (return (parsed loc (to_sym (extract_string begin p))))
+    (return (parsed loc (to_sym (extract_string p begin (field_get p 3)))))
     ))
 @(MEMOIZE symbol)
 
@@ -658,18 +665,18 @@
     (var v (getc p))
     (if (< v 0) (return (mayparse loc "expect '")))
     (if (!= v ''') (return (noparse loc "expect '")))
-    (var begin (copy_parser_state p))
+    (var begin (field_get p 3))
     (while (!= (lookahead p) ''') (do
         (var c (getc p))
         (if (== c '\\') (getc p))
         ))
-    (var end (copy_parser_state p))
+    (var end (field_get p 3))
 
     (= v (getc p))
     (if (< v 0) (return (mayparse loc "expect '")))
     (if (!= v ''') (return (noparse loc "expect '")))
 
-    (var str (extract_string begin end))
+    (var str (extract_string p begin end))
     (unescape_string_s str)
     (return (parsed loc str))
     ))
@@ -682,8 +689,7 @@
     (var v (getc p))
     (if (< v 0) (return (mayparse loc "expect \"")))
     (if (!= v '"') (return (noparse loc "expect \"")))
-
-    (var begin (copy_parser_state p))
+    (var begin (field_get p 3))
     (while (!= (lookahead p) '"') (do
         (var c (getc p))
         (if (< c 0) (return (mayparse loc "expect character")))
@@ -694,11 +700,11 @@
                 )
             ))
         ))
-    (var end (copy_parser_state p))
+    (var end (field_get p 3))
     (= v (getc p))
     (if (< v 0) (return (mayparse loc "expect \"")))
     (if (!= v '"') (return (noparse loc "expect \"")))
-    (var str (extract_string begin end))
+    (var str (extract_string p begin end))
     (unescape_string_d str)
     (return (parsed loc str))
     ))
@@ -957,7 +963,17 @@
         (if (!= len 2) (goto compile_error))
         (return (compile_delimited (expr_arg pat 0) (expr_arg pat 1) 2))
         ))
+    (if (== hd Scoped) (do
+        (if (!= len 2) (goto compile_error))
+        (return (compile_scoped (expr_arg pat 0) (expr_arg pat 1)))
+        ))
     (if (!= len 1) (goto compile_error))
+    (if (== hd OneOf)
+        (return (compile_oneof (expr_arg pat 0)))
+        )
+    (if (== hd NoneOf)
+        (return (compile_noneof (expr_arg pat 0)))
+        )
     (if (== hd Many)
         (return (compile_many (expr_arg pat 0)))
         )
@@ -976,11 +992,93 @@
     (if (== hd Aligned)
         (return (compile_aligned (expr_arg pat 0)))
         )
-    (if (== hd Scoped)
-        (return (compile_scoped (expr_arg pat 0)))
-        )
     (label compile_error)
     (throw (exception current_loc (list2 (string "invalid syntax element") pat)))
+    ))
+
+(fun oneof (p tbl str) (
+    (var loc (get_loc p))
+    (var c (getc p))
+    (if (< c 0)
+        (return (mayparse loc (strcat "expect one of " str)))
+        )
+    (if (array_get char tbl c)
+        (return (parsed loc (ctos c)))
+        )
+    (return (noparse loc
+        (strcat "expect one of " 
+        (strcat str
+        (strcat " but got " (escape_char c))))))
+    ))
+
+(fun noneof (p tbl str) (
+    (var loc (get_loc p))
+    (var c (getc p))
+    (if (< c 0)
+        (return (mayparse loc (strcat "expect none of " str)))
+        )
+    (if (! (array_get char tbl c))
+        (return (parsed loc (ctos c)))
+        )
+    (return (noparse loc
+        (strcat "expect none of " 
+        (strcat str
+        (strcat " but got " (escape_char c))))))
+    ))
+
+(fun compile_character_set (str) (
+    (var tbl (allocate_string 128))
+    (var len (strlen str))
+    (var i 0)
+    (while (< i len) (do
+        (var c (array_get char str i))
+        (if (== c '\\') (do ; escaped char
+            (+= i 1)
+            (if (== i len) (goto error))
+            (= c (array_get char str i))
+            (if (== c 'a') (array_set char tbl '\a' 1)
+            (if (== c 'b') (array_set char tbl '\b' 1)
+            (if (== c 'f') (array_set char tbl '\f' 1)
+            (if (== c 'n') (array_set char tbl '\n' 1)
+            (if (== c 'r') (array_set char tbl '\r' 1)
+            (if (== c 't') (array_set char tbl '\t' 1)
+            (if (== c 'v') (array_set char tbl '\v' 1)
+            (if (== c '0') (array_set char tbl '\0' 1)
+                (array_set char tbl c 1)
+                ))))))))
+            (+= i 1)
+            continue
+            ))
+        (if (== (array_get char str (+ i 1)) '-') (do
+            (if (>= (+ i 2) len) (goto error))
+            (var d (array_get char str (+ i 2)))
+            (if (> c d) (goto error))
+            (while (<= c d) (do
+                (array_set char tbl c 1)
+                (+= c 1)
+                ))
+            (+= i 3)
+            continue
+            ))
+        (array_set char tbl c 1)
+        (+= i 1)
+        ))
+    (return tbl)
+    (label error)
+    (throw (invalid_argument current_loc 
+        (string "invalid character-set")
+        str
+        ))
+    ))
+
+(fun compile_oneof (str) (
+    (var tbl (compile_character_set str))
+    (return (apply (to_sym "%oneof") (list3 ParserVar tbl str)))
+    ))
+
+(fun compile_noneof (str) (
+    (var tbl (compile_character_set str))
+    (return (apply (to_sym "%noneof") (list3 ParserVar tbl str)))
     ))
 
 ; List{ p1, p2, ...} is translated to
@@ -1335,23 +1433,28 @@
 ;
 ; module = new anonymous module
 ; enter module
+; execute `pre`
 ; v = p
+; execute `post`
 ; exit module
 ; v
-(fun compile_scoped (elem) (
+(fun compile_scoped (mod elem) (
     (var v (unique_sym))
     (var p (compile_parser_element elem))
     (return (make_expr Block (list3
-        (apply (to_sym "%open_scope") 0)
+        (apply (to_sym "%open_scope") (list1 (quote mod)))
         (defvar v p)
         (apply (to_sym "%close_scope") (list1 v))
         )))
     ))
 
 ; enter anonymous scope
-(fun open_scope () (
+(fun open_scope (extra) (
     (var module (make_module nil current_mod))
     (set_current_module module)
+    (if (!= extra nil)
+        (import_module current_loc module extra)
+        )
     ))
 
 ; exit from anonymous scope
@@ -1440,8 +1543,10 @@
     (var body 0)
     (var bloc (unique_sym))
     (var eloc (unique_sym))
+    (var bpos (unique_sym))
     (var loc (to_sym "%Loc"))
 
+    (= body (cons (defvar bpos (apply (to_sym "%get_pos") (list1 ParserVar))) body))
     (while elems (do
         (var ndvar (make_nodevar idx))
         (= body (cons (defvar ndvar (compile_parser_element (car elems))) body))
@@ -1460,6 +1565,15 @@
             )
         (= body (cons (assign ndvar (gen_at ndvar 1)) body))
         ))
+
+    (= body (cons (defvar (to_sym "GET_INPUT_TEXT")
+        (make_expr Lambda (list2 (make_expr Tuple 0)
+            (apply (to_sym "%extract_string") (list3
+                ParserVar
+                bpos
+                (apply (to_sym "%get_pos") (list1 ParserVar))
+            )))))
+        body))
 
     (= body (cons (defvar loc
         (apply (to_sym "%merge_loc") (list2 bloc eloc))) body))
@@ -1496,11 +1610,9 @@
     ))
 
 (fun compile_parser (sym elems) (
-    (if (!= (expr_head elems) List) (do
-        (output_error stderr current_loc)
-        (output_string stderr "invalid syntax declaration\n")
-        (exit 1)
-        ))
+    (if (!= (expr_head elems) List)
+        (throw (exception current_loc (string "invalid syntax declaration")))
+        )
 
     (var body 0)
     (var state (unique_sym))
@@ -1647,55 +1759,56 @@
     ))
 
 (export fun init_parser_funcs (mod) (
-    (var std (find_module no_loc mod (to_sym "std") @TRUE))
-    (var parser (find_module no_loc std (to_sym "parser") @TRUE))
+    (add_builtin_function1 mod (to_sym "%get_loc") (domainP Parser) get_loc 0)
+    (add_builtin_function1 mod (to_sym "%get_column") (domainP Parser) get_column 0)
+    (add_builtin_function2 mod (to_sym "%set_indent") (domainP Parser) (domainP Int) set_indent 0)
+    (add_builtin_function2 mod (to_sym "%merge_loc") (domainP Loc) (domainP Loc) merge_loc 0)
+    (add_builtin_function1 mod (to_sym "%copy_parser_state") (domainP Parser) copy_parser_state 0)
+    (add_builtin_function2 mod (to_sym "%set_parser_state") (domainP Parser) (domainP Parser) set_parser_state 0)
+    (add_builtin_function3 mod (to_sym "%call_parser") (domainP Parser) (domainP Symbol) (domainP Function) call_parser 0)
 
-    (add_builtin_function1 parser (to_sym "%get_loc") (domainP Parser) get_loc 0)
-    (add_builtin_function1 parser (to_sym "%get_column") (domainP Parser) get_column 0)
-    (add_builtin_function2 parser (to_sym "%set_indent") (domainP Parser) (domainP Int) set_indent 0)
-    (add_builtin_function2 parser (to_sym "%merge_loc") (domainP Loc) (domainP Loc) merge_loc 0)
-    (add_builtin_function1 parser (to_sym "%copy_parser_state") (domainP Parser) copy_parser_state 0)
-    (add_builtin_function2 parser (to_sym "%set_parser_state") (domainP Parser) (domainP Parser) set_parser_state 0)
-    (add_builtin_function3 parser (to_sym "%call_parser") (domainP Parser) (domainP Symbol) (domainP Function) call_parser 0)
+    (add_builtin_function2 mod (to_sym "%merge_noparse") DontCare DontCare merge_noparse 0)
+    (add_builtin_function2 mod (to_sym "%negate") (domainP Parser) DontCare negate 0)
+    (add_builtin_function3 mod (to_sym "%oneof") (domainP Parser) stringT stringT oneof 0)
+    (add_builtin_function3 mod (to_sym "%noneof") (domainP Parser) stringT stringT noneof 0)
+    (add_builtin_function1 mod (to_sym "%apply_located") DontCare apply_located 0)
+    (add_builtin_function1 mod (to_sym "%eval_parser_command") DontCare eval_parser_command 0)
+    (add_builtin_function1 mod (to_sym "%open_scope") DontCare open_scope 0)
+    (add_builtin_function1 mod (to_sym "%close_scope") DontCare close_scope 0)
+    (add_builtin_function1 mod (to_sym "%get_pos") (domainP Parser) get_pos 0)
+    (add_builtin_function3 mod (to_sym "%extract_string")
+        (domainP Parser) (domainP Int) (domainP Int) extract_string_ 0)
 
-    (add_builtin_function2 parser (to_sym "%merge_noparse") DontCare DontCare merge_noparse 0)
-    (add_builtin_function2 parser (to_sym "%negate") (domainP Parser) DontCare negate 0)
-    (add_builtin_function1 parser (to_sym "%apply_located") DontCare apply_located 0)
-    (add_builtin_function1 parser (to_sym "%eval_parser_command") DontCare eval_parser_command 0)
-    (add_builtin_function0 parser (to_sym "%open_scope") open_scope 0)
-    (add_builtin_function1 parser (to_sym "%close_scope") DontCare close_scope 0)
+    (add_parser mod (to_sym "%parse_spaces") parse_spaces)
 
-    (add_parser parser (to_sym "%parse_spaces") parse_spaces)
+    (add_builtin_function2 mod (to_sym "parse_text") (domainP Parser) stringT parse_text 0)
+    (add_parser mod (to_sym "parse_any_") parse_any_char)
+    (add_parser mod (to_sym "parse_blank_") parse_blank_)
+    (add_parser mod (to_sym "parse_decimal_") parse_decimal_)
+    (add_parser mod (to_sym "parse_binary_") parse_binary_)
+    (add_parser mod (to_sym "parse_octal_") parse_octal_)
+    (add_parser mod (to_sym "parse_hex_") parse_hex_)
+    (add_parser mod (to_sym "parse_integer_") parse_integer_)
+    (add_parser mod (to_sym "parse_string_") parse_string_)
+    (add_parser mod (to_sym "parse_symbol_") parse_symbol_)
+    (add_parser mod (to_sym "parse_atom_") parse_atom_)
+    (add_parser mod (to_sym "parse_node_") parse_node_)
+    (add_parser mod (to_sym "parse_expr_") parse_expr_)
+    (add_parser mod (to_sym "parse_statement_") parse_statement_)
 
-    (add_builtin_function2 parser (to_sym "parse_text") (domainP Parser) (domainP String) parse_text 0)
-
-    (add_parser parser (to_sym "parse_any_") parse_any_char)
-    (add_parser parser (to_sym "parse_blank_") parse_blank_)
-    (add_parser parser (to_sym "parse_decimal_") parse_decimal_)
-    (add_parser parser (to_sym "parse_binary_") parse_binary_)
-    (add_parser parser (to_sym "parse_octal_") parse_octal_)
-    (add_parser parser (to_sym "parse_hex_") parse_hex_)
-    (add_parser parser (to_sym "parse_integer_") parse_integer_)
-    (add_parser parser (to_sym "parse_string_") parse_string_)
-    (add_parser parser (to_sym "parse_symbol_") parse_symbol_)
-    (add_parser parser (to_sym "parse_atom_") parse_atom_)
-    (add_parser parser (to_sym "parse_node_") parse_node_)
-    (add_parser parser (to_sym "parse_expr_") parse_expr_)
-    (add_parser parser (to_sym "parse_statement_") parse_statement_)
-
-    (add_parser parser (to_sym "parse_any") parse_any_char)
-    (add_parser parser (to_sym "parse_blank") parse_blank)
-    (add_parser parser (to_sym "parse_decimal") parse_decimal)
-    (add_parser parser (to_sym "parse_binary") parse_binary)
-    (add_parser parser (to_sym "parse_octal") parse_octal)
-    (add_parser parser (to_sym "parse_hex") parse_hex)
-    (add_parser parser (to_sym "parse_integer") parse_integer)
-    (add_parser parser (to_sym "parse_string") parse_string)
-    (add_parser parser (to_sym "parse_symbol") parse_symbol)
-    (add_parser parser (to_sym "parse_atom") parse_atom)
-    (add_parser parser (to_sym "parse_node") parse_node)
-    (add_parser parser (to_sym "parse_expr") parse_expr)
-    (add_parser parser (to_sym "parse_statement") parse_statement)
+    (add_parser mod (to_sym "parse_any") parse_any_char)
+    (add_parser mod (to_sym "parse_blank") parse_blank)
+    (add_parser mod (to_sym "parse_decimal") parse_decimal)
+    (add_parser mod (to_sym "parse_binary") parse_binary)
+    (add_parser mod (to_sym "parse_octal") parse_octal)
+    (add_parser mod (to_sym "parse_hex") parse_hex)
+    (add_parser mod (to_sym "parse_integer") parse_integer)
+    (add_parser mod (to_sym "parse_string") parse_string)
+    (add_parser mod (to_sym "parse_symbol") parse_symbol)
+    (add_parser mod (to_sym "parse_atom") parse_atom)
+    (add_parser mod (to_sym "parse_node") parse_node)
+    (add_parser mod (to_sym "parse_expr") parse_expr)
+    (add_parser mod (to_sym "parse_statement") parse_statement)
     ))
 
 (export fun output_syntax_errors (e) (
