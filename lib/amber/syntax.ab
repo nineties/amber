@@ -13,7 +13,7 @@ DefineSyntax{
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2012-06-29 23:33:23 nineties $
+# $Id: syntax.ab 2012-07-07 22:12:07 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -32,6 +32,8 @@ DefineSyntax{
 # &P    : and
 # !P    : not
 # (...) : grouping
+# [...] : oneof
+# [^..] : noneof
 
 ## Amber's unique syntax elements
 # aligned(p)       : sequence of p where every p has same indentation
@@ -40,12 +42,23 @@ DefineSyntax{
 # delimited2(p, d) : sequence of p delimited by d (two or many)
 
 DefineSyntax{
+    character_set,
+    List{Tuple{List{Many1{Choice{List{'\\', any}, List{Not{"]"}, any}}}},
+        Apply{GET_INPUT_TEXT, List{}}}
+    }
+}
+
+DefineSyntax{
     primary_syntax_element,
     List{
         Tuple{List{"."}, Quote{any}},
         Tuple{List{string}, node0},
         Tuple{List{symbol}, node0},
-        Tuple{List{"(", Many1{syntax_element}, ")"}, node1, multiline}
+        Tuple{List{"(", Many1{syntax_element}, ")"}, node1, multiline},
+        Tuple{List{"[", "^", character_set, "]"},
+            QuasiQuote{NoneOf{Unquote{node2}}}},
+        Tuple{List{"[", character_set, "]"},
+            QuasiQuote{OneOf{Unquote{node1}}}}
     }
 }
 
@@ -61,9 +74,9 @@ DefineSyntax{
         Tuple{List{Delimited2{primary_syntax_element, "/"}},
             MakeExpr{Quote{Choice}, node0}},
         Tuple{List{"&", primary_syntax_element},
-            QuasiQuote{And{Unquote{node0}}}},
+            QuasiQuote{And{Unquote{node1}}}},
         Tuple{List{"!", primary_syntax_element},
-            QuasiQuote{Not{Unquote{node0}}}},
+            QuasiQuote{Not{Unquote{node1}}}},
         Tuple{List{"aligned", "(", syntax_element, ")"},
             QuasiQuote{Aligned{Unquote{node2}}}, multiline},
         Tuple{List{"delimited", "(", syntax_element, ",", syntax_element, ")"},
@@ -73,16 +86,8 @@ DefineSyntax{
         Tuple{List{"delimited2", "(", syntax_element, ",", syntax_element, ")"},
             QuasiQuote{Delimited2{Unquote{node2}, Unquote{node4}}}, multiline},
         Tuple{List{"scoped", "(", syntax_element, ")"},
-            QuasiQuote{Scoped{Unquote{node2}}}, multiline},
+            QuasiQuote{Scoped{nil, Unquote{node2}}}, multiline},
         Tuple{List{primary_syntax_element}, node0}
-    }
-}
-
-DefineSyntax{
-    parser_action,
-    List{
-        Tuple{List{"{", statement, "}"},
-            MakeExpr{Quote{Block}, List{node1}}, multiline}
     }
 }
 
@@ -92,6 +97,24 @@ DefineSyntax{
         Tuple{List{"[", Many1{symbol}, "]"},
             node1, multiline}
     }
+}
+
+BeginModule{parser}
+EndModule{}
+
+DefineSyntax{
+    parser_action_body,
+    List{
+        Tuple{List{"{", Aligned{statement}, "}"},
+            MakeExpr{Quote{Block}, node1}, multiline},
+        Tuple{List{"{", "}"},
+            MakeExpr{Quote{Block}, List{}}, multiline}
+    }
+}
+
+DefineSyntax{
+    parser_action,
+    List{Tuple{List{Scoped{parser, parser_action_body}}, node0}}
 }
 
 DefineSyntax{
@@ -166,13 +189,21 @@ postfix_expr
       | postfix_expr "[" delimited(expr, ",") "]"
         { MakeExpr{Quote{Subscript}, List{node0, node2}} }
 
-      | # Ellipsis pattern
+      | # Ellipsis Pattern
         postfix_expr "@" "..."
         { MakeExpr{Quote{Ellipsis}, List{node0}} }
 
         # Domain Pattern
       | postfix_expr "@" secondary_expr
         { MakeExpr{Quote{Domain}, List{node0, node2}} }
+
+        # Message Passing Style
+        # e.s and e.s(a,b,c) are just syntax-sugars of s(e) and s(e,a,b,c)
+      | postfix_expr "." symbol "(" delimited(expr, ",") ")"
+        { MakeExpr{Quote{Apply}, List{node2,
+            Apply{cons, List{node0, node4}}}} }
+      | postfix_expr "." symbol
+        { MakeExpr{Quote{Apply}, List{node2, List{node0}}} }
 
       | "open" block_expr
         { MakeExpr{Quote{OpenBlock}, Arguments{node1}} }
@@ -300,7 +331,7 @@ statement
       | expr "=>" statement
         { `DefineFunction{rewrite, Lambda{!node0, !node2}} }
 
-## Macros
+## Syntax Sugars
 +x     => `uplus(!x)
 -x     => `uminus(!x)
 x + y  => `add(!x, !y)
@@ -319,3 +350,7 @@ x <= y => `le(!x, !y)
 x >= y => `ge(!x, !y)
 x == y => `equal(!x, !y)
 x != y => `(not equal(!x, !y))
+
+module parser {
+    prefix_expr ::= "$" decimal { ("node" + node1).intern }
+}

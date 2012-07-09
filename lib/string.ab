@@ -1,0 +1,22 @@
+# Copyright (C) 2010 nineties
+#
+# $Id: io.ab 2012-07-05 23:00:49 nineties $
+
+module std::string {
+    ### Format string
+    format_string_element
+        ::= "%s"    { \String }
+          | "%d"    { \Decimal }
+          | "%x"    { \Hexadecimal }
+          | "%o"    { \Octal }
+          | "%b"    { \Binary }
+          | "%" .   { throw `SyntaxError{!LOCATION,
+                        "Invalid format string", !($0 + $1)}
+                    }
+
+    format_string ::= '"' format_string_element* '"' { $1 }
+
+    postfix_expr
+        ::= "fmt" "<->" format_string
+            { QuasiQuote{Quote{Unquote{$2}} }
+}

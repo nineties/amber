@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-string.rlc 2012-05-17 19:28:28 nineties $
+; $Id: rowl1-string.rlc 2012-07-05 23:39:29 nineties $
 ;
 
 (import "rlvm-compile")
@@ -12,19 +12,64 @@
 
 (import "rowl1-util")
 (import "rowl1-node")
+(import "rowl1-module")
 (import "rowl1-compile")
-(import "rowl1-assemble")
 
-(fun _equal (a b) (
+(fun s_equal (a b) (
     (if (streq a b)
         (return true)
         (return false)
         )
     ))
 
-(export fun setup_string (mod) (
-    (var stringT (domainP String))
-    (add_builtin_function2 mod (to_sym "equal") stringT stringT _equal 0)
+(fun s_to_s (s) (
+    (return s)
+    ))
+
+(fun s_add (a b) (
+    (return (strcat a b))
+    ))
+
+(fun s_add2 (a b) (
+    (var to_s (to_sym "to_s"))
+    (= a (call1 to_s a))
+    (= b (call1 to_s b))
+    (return (strcat a b))
+    ))
+
+;; StringIO
+(fun new_sio () (
+    (return (variant @StringIOE 1 (make_sio)))
+    ))
+
+(fun sio_to_s (io) (
+    (return (string (sio_get (field_get io 1))))
+    ))
+
+(fun sio_print_str (io str) (
+    (output_string (field_get io 1) str)
+    (return nil)
+    ))
+
+(fun sio_print_int (io n) (
+    (output_int (field_get io 1) (unbox n))
+    (return nil)
+    ))
+
+(export fun setup_string (std) (
+    (var string (find_module no_loc std (to_sym "string") @TRUE))
+    (var sioT (domainP StringIO))
+
+    (add_builtin_function2 string (to_sym "equal") stringT stringT s_equal 0)
+    (add_builtin_function1 string (to_sym "to_s") stringT s_to_s 0)
+    (add_builtin_function2 string (to_sym "add") stringT stringT s_add 0)
+    (add_builtin_function2 string (to_sym "add") stringT DontCare s_add2 0)
+    (add_builtin_function2 string (to_sym "add") DontCare stringT s_add2 0)
+
+    (add_builtin_function1 string (to_sym "new") (quote StringIO) new_sio 0)
+    (add_builtin_function1 string (to_sym "to_s") sioT sio_to_s 0)
+    (add_builtin_function2 string (to_sym "print") sioT stringT sio_print_str 0)
+    (add_builtin_function2 string (to_sym "print") sioT intT sio_print_int 0)
     ))
 
     ))

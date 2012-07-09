@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2012-07-04 03:03:52 nineties $
+; $Id: rowl1-interp.rlc 2012-07-05 23:00:13 nineties $
 ;
 
 (import "rlvm-compile")
@@ -74,9 +74,9 @@
     (init_stdlib global_mod)
     (import_module current_loc global_mod (to_sym "std"))
     (import_module current_loc global_mod (qualified "std" (to_sym "io")))
+    (import_module current_loc global_mod (qualified "std" (to_sym "string")))
 
     (init_parser_funcs global_mod)
-    (import_module current_loc global_mod (qualified "std" (to_sym "parser")))
     (var p (init_parser file ichan))
 
     (= current_mod global_mod)
@@ -85,6 +85,7 @@
     (add_include_dir "./")
     (add_include_dir "/usr/lib/amber/")
     (include_file "amber/syntax.ab")
+    (include_file "string.ab")
     (include_file "io.ab")
 
     ;(var end (gettimeofday))
@@ -102,13 +103,8 @@
     (return 0)
     ))
 
-(fun call1 (mod sym arg0) (
-    (var code (lookup_func mod sym))
-    (return (byterun code arg0))
-    ))
-
 (fun eval (expr) (
-    (return (call1 current_mod Eval (rewrite expr)))
+    (return (call1 Eval (rewrite expr)))
     ))
 
 (fun rewrite (expr) (
@@ -146,7 +142,7 @@
         (= args (cdr args))
         ))
     (label finish)
-    (return (call1 current_mod Rewrite expr))
+    (return (call1 Rewrite expr))
     ))
 
 (fun rewrite_qquote (expr level) (
