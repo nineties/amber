@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2012-07-24 10:27:30 nineties $
+; $Id: vm-insn.rlc 2012-07-24 19:14:46 nineties $
 ;
 
 (define gen_field_get (idx) `(
@@ -743,7 +743,7 @@
         (vmsshort 1 %ecx)
         (vmsucc %ecx)
         (vmfetch)
-        (asm "2:") ; here, %eax is.
+        (asm "2:")
         (asm "xorl %edx, %edx")
         (vmsucc 7)
         (vmfetch)
@@ -755,23 +755,28 @@
         (asm "0:")
         (asm "cmpl $0, %eax")
         (asm "je 1f")
+        (asm "cmpl $0, %ecx")
+        (asm "je 2f")
         (asm "test $1, %eax") ; if 1 & %eax != 0 then %eax is a boxed integer.
-        (asm "jnz 2f")
+        (asm "jnz 3f")
         (asm "movl -4(%eax), %edx") ; %edx <- header of %eax
         (asm "andl $7, %edx")
         (asm "cmpl $" @TAG_CONS ", %edx")
-        (asm "jne 2f")
+        (asm "jne 3f")
         (asm "movl 4(%eax), %eax") ; %eax <- cdr %eax
         (asm "decl %ecx")
-        (asm "jmp 0b")
-        (asm "2:") ; here, %eax is not a list of length %ecx.
+        (asm "Jmp 0b")
+        (asm "1:")
+        (asm "cmpl $0, %ecx")
+        (asm "jne 3f")
+        (asm "2:")
+        (asm "xorl %edx, %edx")
+        (vmsucc 7)
+        (vmfetch)
+        (asm "3:")
         (asm "xorl %edx, %edx")
         (vmsshort 1 %ecx)
         (vmsucc %ecx)
-        (vmfetch)
-        (asm "1:") ; here, %eax is.
-        (asm "xorl %edx, %edx")
-        (vmsucc 7)
         (vmfetch)
         ))
     ))
