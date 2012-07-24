@@ -1,0 +1,34 @@
+# Copyright (C) 2012 nineties
+#
+# $Id: io.ab 2012-07-24 17:20:39 nineties $
+
+module unittest {
+    #USAGE :
+    #
+    # target "target name" {
+    #     test "description" {
+    #         expression (return true is success)
+    #     }
+    # }
+
+    statement
+        ::= "test" expr block { `UnitTestTarget{!$1, !$2} }
+          | string block { `UnitTestItem{!$0, !$1} }
+
+    UnitTestTarget{target, tests} => `{
+        printf("=== tests of %s ===\n\n", !target)
+        success: 0
+        failed:  0
+        !tests
+        printf("\n[success %d, failed %d]\n", success, failed)
+    }
+    UnitTestItem{description, code} => `{
+        v: !code
+        printf("    %s ... %s\n", !description, v == true ? "OK" : "failed")
+        if (v == true)
+            success += 1
+        else
+            failed += 1
+    }
+}
+
