@@ -13,7 +13,7 @@ DefineSyntax{
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2012-07-10 15:48:10 nineties $
+# $Id: syntax.ab 2012-07-24 16:38:02 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -155,7 +155,7 @@ block_body ::= [multiline] "{" "}"
              | [multiline] "{" aligned(statement) "}"
                 { MakeExpr{Quote{Block}, node1} }
 
-block_expr ::= scoped(block_body)
+block ::= scoped(block_body)
 
 qualified_expr
     ::= symbol "::" qualified_expr
@@ -172,7 +172,7 @@ primary_expr
       | [multiline] "(" delimited2(expr, ",") ")"
         { MakeExpr{Quote{Tuple}, node1} }
 
-      | block_expr
+      | block
       | atom
       | "..."   { Quote{Ellipsis{nil}} }
 
@@ -205,7 +205,7 @@ postfix_expr
       | postfix_expr "." symbol
         { MakeExpr{Quote{Apply}, List{node2, List{node0}}} }
 
-      | "open" block_expr
+      | "open" block
         { MakeExpr{Quote{OpenBlock}, Arguments{node1}} }
       | node
       | secondary_expr
@@ -258,14 +258,19 @@ seqor_expr
     ::= seqand_expr "||" seqor_expr { `SeqOr{!node0, !node2} }
       | seqand_expr
 
-guard_expr ::= seqor_expr
+ternary_expr
+    ::= seqor_expr "?" seqor_expr ":" seqor_expr
+        { `IfElse{!node0, !node2, !node4} }
+      | seqor_expr
+
+guard_expr ::= ternary_expr
 
 lambda_expr
     ::= pattern "->" lambda_expr
         { `Lambda{!node0, !node2} }
       | pattern "where" guard_expr "->" lambda_expr
         { `Lambda{Where{!node0, !node2}, !node4} }
-      | seqor_expr
+      | ternary_expr
 
 multi_lambda_expr
     ::= lambda_expr "|" multi_lambda_expr

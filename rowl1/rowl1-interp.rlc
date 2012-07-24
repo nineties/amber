@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2012-07-24 11:20:58 nineties $
+; $Id: rowl1-interp.rlc 2012-07-24 16:14:04 nineties $
 ;
 
 (import "rlvm-compile")
@@ -215,7 +215,7 @@
     ))
 
 (fun default_eval (expr) (
-    (return (byterun (compile_main current_mod expr)))
+    (return (byterun (compile_main current_mod (rewrite expr))))
     ))
 
 (fun eval_located (expr) (
@@ -351,6 +351,8 @@
     (add_builtin_function1 mod Rewrite (domainP Located) rewrite_located 0)
     (add_builtin_function1 mod Eval DontCare default_eval 0)
     (add_builtin_function1 mod Eval (domainP Located) eval_located 0)
+    (add_builtin_function1 mod Eval (make_expr Include (list1 stringT))
+        eval_include 0)
     (add_builtin_function1 mod Eval (make_expr BeginModule (list1 symT))
         eval_begin_module 0)
     (add_builtin_function1 mod Eval (make_expr BeginModule (list1 (domainP Qualified)))
