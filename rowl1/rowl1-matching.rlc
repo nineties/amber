@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2012-06-28 01:09:55 nineties $
+; $Id: rowl1-matching.rlc 2012-07-24 11:31:12 nineties $
 ;
 
 (import "rlvm-compile")
@@ -23,6 +23,7 @@
 (var varP      (to_sym "%Var"))
 (var headP     (to_sym "%HeadPattern"))
 
+(extern object current_loc)
 (export fun compile_matching (loc obj def) (
     (var ty (node_type def))
     (if (&& (!= ty @BoundFunctionE) (!= ty @FunctionE)) (do
@@ -49,7 +50,7 @@
 
     (var asm (make_assembler))
     (compile_matching_main asm args mat)
-    (compile_matching_error asm obj)
+    (compile_matching_error asm def)
 
     (var code (get_code asm))
     (field_set def 1 code) ; caching
@@ -167,8 +168,6 @@
     (return (make_expr_user hd (qquote_pat_list args level)))
     ))
 
-(var Decons   (to_sym "%Decons"))
-(var PopList  (to_sym "%PopList"))
 (fun compile_matching_main (asm args pats) (
     (if (== (caar pats) 0) (do
         (var func (car pats))
@@ -191,18 +190,6 @@
         return
         ))
     (var x (split_pattern_matrix pats)) ; (single . remain)
-
-    (var arg (car args))
-    (if (== arg PopList) (do
-        (put_drop asm)
-        (= args (cdr args))
-        (= arg  (car args))
-        ))
-    (if (== arg Decons) 
-        (put_decons asm)
-        (compile_operand asm (car args) nil)
-        )
-
     (compile_matching_single asm args (car x))
     (if (cdr x)
         (compile_matching_main asm args (cdr x))
@@ -213,19 +200,23 @@
     (var p (caaar pats))
     (var hd (expr_head p))
     (if (== p dontcareP) (do
-        (put_drop asm)
         (= pats (shift_pat pats))
-        (compile_matching_main asm (cdr args)  pats)
+        (compile_matching_main asm (cdr args) pats)
         return
         ))
     (if (== p varP) (do
-        (put_drop asm)
         (= pats (shift_pat pats))
-        (compile_matching_main asm (cdr args)  pats)
+        (compile_matching_main asm (cdr args) pats)
+        return
+        ))
+    (if (== p ellipsisP) (do
+        (= pats (shift_pat pats))
+        (compile_matching_main asm args pats)
         return
         ))
     (if (== hd Symbol) (do
         (var check_failed (fresh_label asm))
+        (compile_operand asm (car args) nil)
         (put_push asm p)
         (put_if_ne asm check_failed)
         (= pats (shift_pat pats))
@@ -235,31 +226,27 @@
         ))
     (if (== hd Int) (do
         (var check_failed (fresh_label asm))
-        (put_dup asm)                           ; .. | arg | arg
-        (put_check_int asm check_failed)        ; .. | arg
+        (compile_operand asm (car args) nil)
+        (put_check_int asm check_failed)
         (compile_matching_intlit asm args pats)
-        (put_nil asm) ; for `drop`
         (set_label asm check_failed)
-        (put_drop asm)
         return
         ))
     (if (== hd String) (do
         (var check_failed (fresh_label asm))
-        (var check_failed2 (fresh_label asm))
-        (put_dup asm)                           ; .. | arg | arg
-        (put_check_string asm check_failed)     ; .. | arg
-        (compile_matching_string_lit asm p check_failed2)
+        (compile_operand asm (car args) nil)
+        (put_check_string asm check_failed)
+        (compile_operand asm (car args) nil)
+        (compile_matching_string_lit asm p check_failed)
         (= pats (shift_pat pats))
         (compile_matching_main asm (cdr args) pats)
-        (put_nil asm) ; for `drop`
         (set_label asm check_failed)
-        (put_drop asm)
-        (set_label asm check_failed2)
         return
         ))
     (if (== hd headP) (do
         (var pat (expr_arg_symbol p 1))
         (var check_failed (fresh_label asm))
+        (compile_operand asm (car args) nil)
         (compile_head_check asm pat check_failed)
         (= pats (shift_pat pats))
         (compile_matching_main asm (cdr args) pats)
@@ -267,36 +254,105 @@
         return
         ))
     (if (== hd List) (do
-        (var len (list_len p))
-        (var check_failed (fresh_label asm))
-        (put_dup asm)                           ; .. | arg | arg
-        (put_check_list asm check_failed len)   ; .. | arg
+        (if (is_ellipsis_list p)
+            (do
+                (var len (- (list_len p) 1))
+                (var check_failed (fresh_label asm))
+                (compile_operand asm (car args) nil)
+                (put_check_list2 asm check_failed len)
 
-        ; flatten list pattern
-        (= pats (expand_list_pat pats))
-        (= args (list_append (diag_list len Decons) (cons PopList (cdr args))))
-        (compile_matching_main asm args pats)
-        (put_nil asm)   ; for `drop`
-        (set_label asm check_failed)
-        (put_drop asm)
+                ; flatten list pattern
+                (= pats (expand_list_pat pats))
+
+                ; add list elements to args
+                (var ls (car args))
+                (= args (cdr args))
+                (while (> len 0) (do
+                    (decr len)
+                    (= args (cons (make_list_at ls len) args))
+                    ))
+
+                (compile_matching_main asm args pats)
+                (set_label asm check_failed)
+            )
+            (do
+                (var len (list_len p))
+                (var check_failed (fresh_label asm))
+                (compile_operand asm (car args) nil)
+                (put_check_list asm check_failed len)
+
+                ; flatten list pattern
+                (= pats (expand_list_pat pats))
+
+                ; add list elements to args
+                (var ls (car args))
+                (= args (cdr args))
+                (while (> len 0) (do
+                    (decr len)
+                    (= args (cons (make_list_at ls len) args))
+                    ))
+
+                (compile_matching_main asm args pats)
+                (set_label asm check_failed)
+            ))
         return
         ))
 
     (var check_failed (fresh_label asm))
     (var size (expr_size p))
-    (put_dup asm)                               ; .. | arg | arg
-    (compile_head_check asm hd check_failed)    ; .. | arg
-    (put_field_get2 asm)
-    (put_dup asm)                               ; .. | args | args
-    (put_check_list asm check_failed size)      ; .. | args
+    (compile_operand asm (car args) nil)
 
-    ; flattern expression pattern
-    (= pats (expand_composite_pat pats))
-    (= args (list_append (diag_list size Decons) (cons PopList (cdr args))))
-    (compile_matching_main asm args pats)
-    (put_nil asm) ; for `drop`
-    (set_label asm check_failed)
-    (put_drop asm)
+    (compile_head_check asm hd check_failed)
+    (compile_operand asm (car args) nil)
+    (put_field_get2 asm)
+    
+    (if (is_ellipsis_list (expr_args p))
+        (do
+            (-= size 1)
+            (put_check_list2 asm check_failed size)
+
+            ; flattern expression pattern
+            (= pats (expand_composite_pat pats))
+
+            ; add list elements to args
+            (var expr (car args))
+            (= args (cdr args))
+            (while (> size 0) (do
+                (decr size)
+                (= args (cons (make_expr_at expr size) args))
+                ))
+
+            (compile_matching_main asm args pats)
+            (set_label asm check_failed)
+        )
+        (do
+            (put_check_list asm check_failed size)
+
+            ; flattern expression pattern
+            (= pats (expand_composite_pat pats))
+
+            ; add list elements to args
+            (var expr (car args))
+            (= args (cdr args))
+            (while (> size 0) (do
+                (decr size)
+                (= args (cons (make_expr_at expr size) args))
+                ))
+
+            (compile_matching_main asm args pats)
+            (set_label asm check_failed)
+        ))
+    ))
+
+(fun is_ellipsis_list (pats) (
+    (while pats (do
+        (if (== (car pats) ellipsisP) (do
+            (if (cdr pats) (throw (exception current_loc (string "ellipsis-pattern must be placed at the end of the list"))))
+            (return @TRUE)
+            ))
+        (= pats (cdr pats))
+        ))
+    (return @FALSE)
     ))
 
 (fun compile_head_check (asm ty exit_lbl) (
@@ -334,6 +390,8 @@
     (for i 0 ncases
         (array_set int case_lbls i (fresh_label asm))
         )
+
+    (compile_operand asm (car args) nil)
 
     ; unbox
     (put_imm_i1 asm)
@@ -373,6 +431,8 @@
     (for i 0 ncases
         (array_set int case_lbls i (fresh_label asm))
         )
+
+    (compile_operand asm (car args) nil)
 
     ; unbox arg
     (put_imm_i1 asm)
@@ -512,7 +572,7 @@
     (return (list_split orig n))
     ))
 
-(fun same_head_pat (hd node) (
+(fun head_check (hd node) (
     (if (&& (== (expr_head node) headP) (== (expr_arg_symbol node 1) hd))
         (return @TRUE)
         (return @FALSE)
@@ -523,7 +583,7 @@
     (var n 1)
     (var orig pats)
     (= pats (cdr pats))
-    (while (&& pats (same_head_pat hd (caaar pats))) (do
+    (while (&& pats (head_check hd (caaar pats))) (do
         (= pats (cdr pats))
         (incr n)
         ))
@@ -622,7 +682,7 @@
     ))
 
 (var arity_max 8)
-(fun compile_matching_error (asm obj) (
+(fun compile_matching_error (asm def) (
     ; construct list of arguments
     (var end_lbl (fresh_label asm))
     (var case_lbls (array int arity_max))
@@ -644,7 +704,7 @@
         (put_cons asm)
         (set_label asm (array_get int case_lbls arg_idx))
         ))
-    (put_push asm obj)
+    (put_push asm def)
     (compile_simple_call asm 2 matching_failed)
     (put_throw asm)
     ))
