@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2012-06-28 13:34:38 nineties $
+; $Id: rowl1-matching.rlc 2012-06-28 01:09:55 nineties $
 ;
 
 (import "rlvm-compile")
@@ -167,9 +167,8 @@
     (return (make_expr_user hd (qquote_pat_list args level)))
     ))
 
-(var Decons    (to_sym "%Decons"))
-(var PopList   (to_sym "%PopList"))
-(var DoNothing (to_sym "%DoNothing"))
+(var Decons   (to_sym "%Decons"))
+(var PopList  (to_sym "%PopList"))
 (fun compile_matching_main (asm args pats) (
     (if (== (caar pats) 0) (do
         (var func (car pats))
@@ -201,23 +200,13 @@
         ))
     (if (== arg Decons) 
         (put_decons asm)
-    (if (!= arg DoNothing)
         (compile_operand asm (car args) nil)
-        ))
+        )
 
     (compile_matching_single asm args (car x))
     (if (cdr x)
         (compile_matching_main asm args (cdr x))
         )
-    ))
-
-(fun is_ellipsis_list (ls) (
-    (if (! ls) (return @FALSE))
-    (while (cdr ls) (do
-        (= ls (cdr ls))
-        ))
-    (if (== (car ls) ellipsisP) (return @TRUE))
-    (return @FALSE)
     ))
 
 (fun compile_matching_single (asm args pats) (
@@ -233,12 +222,6 @@
         (put_drop asm)
         (= pats (shift_pat pats))
         (compile_matching_main asm (cdr args)  pats)
-        return
-        ))
-    (if (== p ellipsisP) (do
-        (put_drop asm)
-        (= pats (shift_pat pats))
-        (compile_matching_main asm (cdr args) pats)
         return
         ))
     (if (== hd Symbol) (do
@@ -284,39 +267,19 @@
         return
         ))
     (if (== hd List) (do
-        (if (is_ellipsis_list p)
-            (do
-                (var len (- (list_len p) 1))
-                (var check_failed (fresh_label asm))
-                (put_dup asm)                           ; .. | arg | arg
-                (put_check_list2 asm check_failed len)  ; .. | arg
+        (var len (list_len p))
+        (var check_failed (fresh_label asm))
+        (put_dup asm)                           ; .. | arg | arg
+        (put_check_list asm check_failed len)   ; .. | arg
 
-                ; flatten list pattern
-                (= pats (expand_list_pat pats))
-                (= args (list_append (diag_list len Decons)
-                    (cons DoNothing (cdr args))))
-                (compile_matching_main asm args pats)
-                (put_nil asm)   ; for `drop`
-                (set_label asm check_failed)
-                (put_drop asm)
-                return
-            )
-            (do
-                (var len (list_len p))
-                (var check_failed (fresh_label asm))
-                (put_dup asm)                           ; .. | arg | arg
-                (put_check_list asm check_failed len)   ; .. | arg
-
-                ; flatten list pattern
-                (= pats (expand_list_pat pats))
-                (= args (list_append (diag_list len Decons)
-                    (cons PopList (cdr args))))
-                (compile_matching_main asm args pats)
-                (put_nil asm)   ; for `drop`
-                (set_label asm check_failed)
-                (put_drop asm)
-                return
-            ))
+        ; flatten list pattern
+        (= pats (expand_list_pat pats))
+        (= args (list_append (diag_list len Decons) (cons PopList (cdr args))))
+        (compile_matching_main asm args pats)
+        (put_nil asm)   ; for `drop`
+        (set_label asm check_failed)
+        (put_drop asm)
+        return
         ))
 
     (var check_failed (fresh_label asm))
@@ -324,35 +287,16 @@
     (put_dup asm)                               ; .. | arg | arg
     (compile_head_check asm hd check_failed)    ; .. | arg
     (put_field_get2 asm)
-    
-    (if (is_ellipsis_list (expr_args p))
-        (do
-            (= size (- size 1))
-            (put_dup asm)                           ; .. | args | args
-            (put_check_list2 asm check_failed size) ; .. | args
+    (put_dup asm)                               ; .. | args | args
+    (put_check_list asm check_failed size)      ; .. | args
 
-            ; flattern expression pattern
-            (= pats (expand_composite_pat pats))
-            (= args (list_append (diag_list size Decons)
-                (cons DoNothing (cdr args))))
-            (compile_matching_main asm args pats)
-            (put_nil asm) ; for `drop`
-            (set_label asm check_failed)
-            (put_drop asm)
-        )
-        (do
-            (put_dup asm)                               ; .. | args | args
-            (put_check_list asm check_failed size)      ; .. | args
-
-            ; flattern expression pattern
-            (= pats (expand_composite_pat pats))
-            (= args (list_append (diag_list size Decons)
-                (cons PopList (cdr args))))
-            (compile_matching_main asm args pats)
-            (put_nil asm) ; for `drop`
-            (set_label asm check_failed)
-            (put_drop asm)
-        ))
+    ; flattern expression pattern
+    (= pats (expand_composite_pat pats))
+    (= args (list_append (diag_list size Decons) (cons PopList (cdr args))))
+    (compile_matching_main asm args pats)
+    (put_nil asm) ; for `drop`
+    (set_label asm check_failed)
+    (put_drop asm)
     ))
 
 (fun compile_head_check (asm ty exit_lbl) (

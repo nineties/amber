@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2012-07-05 18:33:14 nineties $
+; $Id: rowl1-list.rlc 2012-07-10 07:49:41 nineties $
 ;
 
 (import "rlvm-compile")
@@ -14,19 +14,22 @@
 (import "rowl1-node")
 (import "rowl1-compile")
 (import "rowl1-assemble")
+(import "rowl1-error")
 
 (extern object current_loc)
 
 (fun index_out_of_range () (
-    (output_error stderr current_loc)
-    (output_string stderr "index out of range\n")
-    (exit 1)
+    (throw (out_of_range current_loc))
     ))
 
 (fun ls_at (ls i) (
     (= i (unbox i))
-    (if (>= i (list_len ls)) (index_out_of_range))
-    (return (list_at ls i))
+    (while (&& (> i 0) ls) (do
+        (-= i 1)
+        (= ls (cdr ls))
+        ))
+    (if (! ls) (index_out_of_range))
+    (return (car ls))
     ))
 
 (fun ls_length (ls) (
@@ -37,8 +40,14 @@
     (return (cons a b))
     ))
 
-(fun ls_car (a) ((return (car a))))
-(fun ls_cdr (a) ((return (cdr a))))
+(fun ls_car (a) (
+    (if (! a) (index_out_of_range))
+    (return (car a))
+    ))
+(fun ls_cdr (a) (
+    (if (! a) (index_out_of_range))
+    (return (cdr a))
+    ))
 
 (fun ls_reverse (ls) (
     (return (list_reverse ls))
@@ -59,18 +68,15 @@
     ))
 
 (export fun setup_list (mod) (
-    (var ListT (domainP List))
-    (var IntT (domainP Int))
-    (var FunT (domainP Function))
-    (add_builtin_function2 mod Subscript ListT IntT ls_at 0)
-    (add_builtin_function1 mod (to_sym "length") ListT ls_length 0)
-    (add_builtin_function1 mod (to_sym "size") ListT ls_length 0)
-    (add_builtin_function2 mod (to_sym "cons") DontCare ListT ls_cons 0)
-    (add_builtin_function1 mod (to_sym "car") ListT ls_car 0)
-    (add_builtin_function1 mod (to_sym "cdr") ListT ls_cdr 0)
-    (add_builtin_function1 mod (to_sym "reverse") ListT ls_reverse 0)
-    (add_builtin_function2 mod (to_sym "append") ListT ListT ls_append 0)
-    (add_builtin_function2 mod (to_sym "map") FunT ListT ls_map 0)
+    (add_builtin_function1 mod (to_sym "length") listT ls_length 0)
+    (add_builtin_function1 mod (to_sym "size") listT ls_length 0)
+    (add_builtin_function2 mod (to_sym "cons") DontCare listT ls_cons 0)
+    (add_builtin_function1 mod (to_sym "car") listT ls_car 0)
+    (add_builtin_function1 mod (to_sym "cdr") listT ls_cdr 0)
+    (add_builtin_function2 mod (to_sym "at") listT intT ls_at 0)
+    (add_builtin_function1 mod (to_sym "reverse") listT ls_reverse 0)
+    (add_builtin_function2 mod (to_sym "append") listT listT ls_append 0)
+    (add_builtin_function2 mod (to_sym "map") funT listT ls_map 0)
     ))
 
     ))

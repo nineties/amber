@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-assemble.rlc 2012-01-27 03:11:34 nineties $
+; $Id: rowl1-assemble.rlc 2012-07-24 09:03:15 nineties $
 ;
 
 ; -- Just in time assembler
@@ -51,6 +51,7 @@
 
 (var code-base `(
 (import "rowl1-node")
+(import "rowl1-util")
 
 (export fun make_assembler () (
     (return (variant @AssemblerE 5 (make_cvector 0) (make_ivector 0) 0 (make_ivector 0) (make_vector 0) 0))
@@ -305,6 +306,7 @@
         (var offs  (field_get repls 3))
         (if (>= label (ivector_size labels)) (error "undefined label"))
         (var addr (ivector_at labels label))
+        (if (< addr 0) (error "undefined label"))
         (-= addr offs)
         (cvector_put vec pos (& addr 0xff))
         (cvector_put vec (+ pos 1) (>> addr 8))
@@ -326,7 +328,7 @@
     (var ptr (bytecode_ptr code))
     (var i 0)
     (while (< i size) (do
-        (var byte (array_get char (+ ptr i) 0))
+        (var byte (array_get uchar (+ ptr i) 0))
         (output_int ochan i)
         (output_string ochan "\t: ")
         (var name (array_get string insn_names byte))

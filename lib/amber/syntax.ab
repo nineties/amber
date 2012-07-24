@@ -13,7 +13,7 @@ DefineSyntax{
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2012-07-07 22:12:07 nineties $
+# $Id: syntax.ab 2012-07-10 15:48:10 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -150,10 +150,10 @@ DefineSyntax{
 }
 
 ## Expressions
-block_body ::= [multiline] "{" aligned(statement) "}"
-                { MakeExpr{Quote{Block}, node1} }
-             | [multiline] "{" "}"
+block_body ::= [multiline] "{" "}"
                 { MakeExpr{Quote{Block}, List{}} }
+             | [multiline] "{" aligned(statement) "}"
+                { MakeExpr{Quote{Block}, node1} }
 
 block_expr ::= scoped(block_body)
 
@@ -307,9 +307,9 @@ statement
       | "while" quote_expr statement
         { `While{!node1, !node2} }
       | "continue"
-        { `Continue }
+        { `Continue{} }
       | "break"
-        { `Break }
+        { `Break{} }
 
       | "return" expr
         { `Return{!node1} }
@@ -350,7 +350,9 @@ x <= y => `le(!x, !y)
 x >= y => `ge(!x, !y)
 x == y => `equal(!x, !y)
 x != y => `(not equal(!x, !y))
+x[args@...]     => `Apply{at, !cons(x, args)}
 
 module parser {
-    prefix_expr ::= "$" decimal { ("node" + node1).intern }
+    primary_expr ::= "$" decimal { ("node" + node1).intern }
+                   | "$input"    { \GET_INPUT_TEXT() }
 }
