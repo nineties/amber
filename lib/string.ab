@@ -1,40 +1,39 @@
 # Copyright (C) 2010 nineties
 #
-# $Id: io.ab 2012-07-24 16:42:58 nineties $
-module std::string {
-    ### Format string
+# $Id: string.ab 2012-07-25 10:34:26 nineties $
 
-    format_string_element
-        ::= "%s"    { \String }
-          | "%d"    { \Decimal }
-          | "%x"    { \Hexadecimal }
-          | "%o"    { \Octal }
-          | "%b"    { \Binary }
-          | "%" .   { throw `SyntaxError{!LOCATION,
-                        "Invalid format string", !($0 + $1)}
-                    }
-          | [space_sensitive]
-            [^%\""]+ { $input.unescape }
+### Format string
 
-    format_string
-        ::= [space_sensitive]
-            '"' format_string_element* '"' { $1 }
+format_string_element
+    ::= "%s"    { \String }
+      | "%d"    { \Decimal }
+      | "%x"    { \Hexadecimal }
+      | "%o"    { \Octal }
+      | "%b"    { \Binary }
+      | "%" .   { throw `SyntaxError{!LOCATION,
+                    "Invalid format string", !($0 + $1)}
+                }
+      | [space_sensitive]
+        [^%\""]+ { $input.unescape }
 
-    module impl {
-        printf_compile(fmt, args): {
-            loop: 
-                ([], [], ls)
-                    -> MakeExpr{\Block, ls.reverse}
-              | ([f@String, fs@...], args, ls)
-                    -> loop(fs, args, cons(`print(!f), ls))
-              | ([\String, fs@...], [s, ss@...], ls)
-                    -> loop(fs, ss, cons(`print(!s), ls))
-              | ([\Decimal, fs@...], [s, ss@...], ls)
-                    -> loop(fs, ss, cons(`print(!s), ls))
-            loop(fmt, args, [])
-        }
+format_string
+    ::= [space_sensitive]
+        '"' format_string_element* '"' { $1 }
+
+module impl {
+    printf_compile(fmt, args): {
+        loop: 
+            ([], [], ls)
+                -> MakeExpr{\Block, ls.reverse}
+          | ([f@String, fs@...], args, ls)
+                -> loop(fs, args, cons(`print(!f), ls))
+          | ([\String, fs@...], [s, ss@...], ls)
+                -> loop(fs, ss, cons(`print(!s), ls))
+          | ([\Decimal, fs@...], [s, ss@...], ls)
+                -> loop(fs, ss, cons(`print(!s), ls))
+        loop(fmt, args, [])
     }
-    postfix_expr
-        ::= "printf" "(" format_string ("," expr)* ")" 
-            { impl::printf_compile($2, map(x -> x[1], $3)) }
 }
+postfix_expr
+    ::= "printf" "(" format_string ("," expr)* ")" 
+        { impl::printf_compile($2, map(x -> x[1], $3)) }

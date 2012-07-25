@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2012-07-10 07:49:41 nineties $
+; $Id: rowl1-list.rlc 2012-07-25 16:18:01 nineties $
 ;
 
 (import "rlvm-compile")
@@ -17,6 +17,7 @@
 (import "rowl1-error")
 
 (extern object current_loc)
+(extern object current_mod)
 
 (fun index_out_of_range () (
     (throw (out_of_range current_loc))
@@ -30,6 +31,28 @@
         ))
     (if (! ls) (index_out_of_range))
     (return (car ls))
+    ))
+
+(fun ls_store (ls i v) (
+    (= i (unbox i))
+    (while (&& (> i 0) ls) (do
+        (-= i 1)
+        (= ls (cdr ls))
+        ))
+    (if (! ls) (index_out_of_range))
+    (setcar ls v)
+    (return v)
+    ))
+
+(fun ls_equal (ls1 ls2) (
+    (if (!= (list_len ls1) (list_len ls2)) (return false))
+    (var code (lookup_func current_mod (to_sym "equal")))
+    (while ls1 (do
+        (if (== (byterun code (car ls1) (car ls2)) false) (return false))
+        (= ls1 (cdr ls1))
+        (= ls2 (cdr ls2))
+        ))
+    (return true)
     ))
 
 (fun ls_length (ls) (
@@ -57,14 +80,23 @@
     (return (list_append a b))
     ))
 
-(fun ls_map (f ls) (
+(fun ls_map (ls f) (
     (var new_ls 0)
-    (var code (get_bytecode (string "first argument for map") f))
+    (var code (get_bytecode (string "1st argument for map") f))
     (while ls (do
         (= new_ls (cons (byterun code (car ls)) new_ls))
         (= ls (cdr ls))
         ))
     (return (list_reverse new_ls))
+    ))
+
+(fun ls_foldl (ls v f) (
+    (var code (get_bytecode (string "3rd argument for foldl") f))
+    (while ls (do
+        (= v (byterun code v (car ls)))
+        (= ls (cdr ls))
+        ))
+    (return v)
     ))
 
 (export fun setup_list (mod) (
@@ -74,9 +106,12 @@
     (add_builtin_function1 mod (to_sym "car") listT ls_car 0)
     (add_builtin_function1 mod (to_sym "cdr") listT ls_cdr 0)
     (add_builtin_function2 mod (to_sym "at") listT intT ls_at 0)
+    (add_builtin_function3 mod (to_sym "store") listT intT DontCare ls_store 0)
+    (add_builtin_function2 mod (to_sym "equal") listT listT ls_equal 0)
     (add_builtin_function1 mod (to_sym "reverse") listT ls_reverse 0)
     (add_builtin_function2 mod (to_sym "append") listT listT ls_append 0)
-    (add_builtin_function2 mod (to_sym "map") funT listT ls_map 0)
+    (add_builtin_function2 mod (to_sym "map") listT funT ls_map 0)
+    (add_builtin_function3 mod (to_sym "foldl") listT DontCare funT ls_foldl 0)
     ))
 
     ))

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2012-07-07 23:27:47 nineties $
+; $Id: vm-gc.rlc 2012-07-25 15:30:21 nineties $
 ;
 
 (import "stdlib")
@@ -127,6 +127,7 @@
 (define OBJECT_SETCOPYED (addr) `([]= @addr 0 (| ([] @addr 0) @(<< 1 31))))
 (define BOXED_FIELD_SIZE (addr) `(& (>> ([] @addr 0) 3) @(- (<< 1 8) 1)))
 (define OBJECT_PLAIN_TAG (addr) (BOXED_FIELD_SIZE addr))
+(define SEQUENCE_TAG (addr) (BOXED_FIELD_SIZE addr))
 
 (define HEADER (tag nboxed objsz) `(| (<< @objsz 11) (| (<< @nboxed 3) @tag)))
 (define SET_HEADER (addr tag nboxed objsz) `([]= @addr 0 @(HEADER tag nboxed objsz)))
@@ -596,9 +597,15 @@
     (return ptr)
     ))
 
-(export allocate_array)
-(fun allocate_array (nelem) (
+(export prim_allocate_array)
+(fun prim_allocate_array (nelem) (
     (return (allocate_sequence @SEQ_ARRAY nelem))
+    ))
+
+(export prim_array_size)
+(fun prim_array_size (ary) (
+    (-= ary @WORD_SIZE)
+    (return (- @(OBJECT_WORDS ary) 1))
     ))
 
 ; bytecode
@@ -659,6 +666,15 @@
         (error "get_pstruct_tag: given object is not a plain object\n")
         ))
     (return @(OBJECT_PLAIN_TAG obj))
+    ))
+
+(export prim_get_sequence_tag)
+(fun prim_get_sequence_tag (obj) (
+    (-= obj @WORD_SIZE)
+    (if (!= @(OBJECT_TAG obj) @TAG_SEQUENCE) (
+        (error "get_sequence_tag: given object is not a plain object\n")
+        ))
+    (return @(SEQUENCE_TAG obj))
     ))
 
 (fun init_pdescrs (block_addr) (

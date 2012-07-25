@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlvm-compile.rlc 2012-07-20 23:19:44 nineties $
+; $Id: rlvm-compile.rlc 2012-07-25 15:48:16 nineties $
 ;
 
 (import "stdlib")
@@ -513,6 +513,39 @@
     nil
     ))
 
+; rfor v high low body
+;
+; is equal to
+;
+; v = high-1;
+; e = low;
+; if (v >= e) {
+; loop:
+;     body;
+;     decr v;
+;     if (v >= e) goto loop;
+; }
+
+(define compile_rfor ((_ it high low body)) (do
+    (var loop_label (mklabel))
+    (push_exit_label)
+    (if (compile_block `(
+        (var @it (- @high 1))
+        (var end @low)
+        (if (>= @it end) (do
+            (label @loop_label)
+            @body
+            (label @(car continue_labels))
+            (decr @it)
+            (if (>= @it end) (goto @loop_label))
+            ))
+        ))
+        (emit_insn `drop)
+        )
+    (pop_exit_label)
+    nil
+    ))
+
 (define compile_tswitch ((_ e cases)) (do
     (var ncase (length cases))
     (var idx 0)
@@ -767,6 +800,7 @@ a   (emit_insn (label cont_lbl))
         ((== `if (car expr)) (compile_if expr))
         ((== `while (car expr)) (compile_while expr))
         ((== `for (car expr)) (compile_for expr))
+        ((== `rfor (car expr)) (compile_rfor expr))
         ((== `tswitch (car expr)) (compile_tswitch expr))
         ((== `lswitch (car expr)) (compile_lswitch expr))
         ((and (== `try (car expr)) (== `catch (caaddr expr))) (compile_try expr))
