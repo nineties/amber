@@ -1,0 +1,80 @@
+;
+; rowl - 1st generation
+; Copyright (C) 2010 nineties
+;
+; $Id: rowl1-array.rlc 2012-07-25 15:52:52 nineties $
+;
+
+(import "rlvm-compile")
+(import "rowl1-types")
+
+(compile `object `(
+
+(import "rowl1-util")
+(import "rowl1-node")
+(import "rowl1-compile")
+(import "rowl1-assemble")
+(import "rowl1-error")
+
+(extern object current_loc)
+
+(fun new_array (ary size) (
+    (= size (unbox size))
+    (if (< size 0) (throw (invalid_argument current_loc (string "length of array must be positive integer") (box size))))
+    (var ary (allocate_array size))
+    (for i 0 size (do
+        (array_set object ary i undefined)
+        ))
+    (return ary)
+    )) 
+
+(export fun ary_size (ary) (
+    (return (box (array_size ary)))
+    ))
+
+(export fun ary_to_list (ary) (
+    (var size (array_size ary))
+    (var ret 0)
+    (rfor i size 0 (do
+        (= ret (cons (array_get object ary i) ret))
+        ))
+    (return ret)
+    ))
+
+(export fun list_to_ary (ls) (
+    (var size (list_len ls))
+    (var ary (allocate_array size))
+    (var i 0)
+    (while ls (do
+        (array_set object ary i (car ls))
+        (+= i 1)
+        (= ls (cdr ls))
+        ))
+    (return ary)
+    ))
+
+(fun ary_at (ary i) (
+    (= i (unbox i))
+    (if (< i (array_size ary)) (return (array_get object ary i)))
+    (throw (out_of_range current_loc))
+    ))
+
+(fun ary_store (ary i v) (
+    (= i (unbox i))
+    (if (< i (array_size ary)) (do
+        (array_set object ary i v)
+        (return v)
+        ))
+    (throw (out_of_range current_loc))
+    ))
+
+(export fun setup_array (std) (
+    (add_builtin_function2 std (to_sym "new") (quote Array) intT new_array 0)
+    (add_builtin_function1 std (to_sym "size") arrayT ary_size 0)
+    (add_builtin_function1 std (to_sym "to_list") arrayT ary_to_list 0)
+    (add_builtin_function1 std (to_sym "to_array") listT list_to_ary 0)
+    (add_builtin_function2 std (to_sym "at") arrayT intT ary_at 0)
+    (add_builtin_function3 std (to_sym "store") arrayT intT DontCare ary_store 0)
+    ))
+
+    ))

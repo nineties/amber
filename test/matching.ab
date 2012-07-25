@@ -1,10 +1,12 @@
+# $Id: matching.ab 2012-07-25 14:13:21 nineties $
+
 include "unittest.ab"
 import unittest
 
 block
     ::= expr "matches" expr
         { `{ try (!$0 -> true)(!$2) catch (e -> false) } }
-      | expr "doesn't" "matches" expr 
+      | expr "doesn't" "match" expr 
         { `{ try (!$0 -> false)(!$3) catch (e -> true) } }
 
 test "pattern-matching engine (positive check)" {
@@ -16,23 +18,29 @@ test "pattern-matching engine (positive check)" {
     "literal pattern (node)"   SomeNode{0,1,2}   matches \SomeNode{0,1,2}
     "ellipsis pattern (list)"  [0,1,2,...]       matches [0,1,2,3,4]
     "ellipsis pattern (node)"  SomeNode{0,1,...} matches \SomeNode{0,1,2,3}
+    "nested node"              Node1{Node2{0,1}} matches \Node1{Node2{0,1}}
     "head pattern (Int)"       (x @ Int)         matches 0
     "head pattern (String)"    (x @ String)      matches "Hello"
 }
 
 test "pattern-matching engine (negative check)" {
-    "literal pattern (int)"    0                 doesn't matches 1
-    "literal pattern (int2)"   0                 doesn't matches "Hello"
-    "literal pattern (string)" "Hello"           doesn't matches "World"
-    "literal pattern (list)"   [0,1,2]           doesn't matches [0,1,2,3]
-    "literal pattern (list2)"  [0,1,2]           doesn't matches [0,1]
-    "literal pattern (list3)"  [0,1,2]           doesn't matches [2,1,0]
-    "literal pattern (node)"   SomeNode{0,1,2}   doesn't matches \SomeNode{0,1,2,3}
-    "literal pattern (node2)"  SomeNode{0,1,2}   doesn't matches \SomeNode{2,1,0}
-    "ellipsis pattern (list)"  [0,1,2,...]       doesn't matches [0,1]
-    "ellipsis pattern (list2)" [0,1,2,...]       doesn't matches [0,2,1]
-    "ellipsis pattern (node)"  SomeNode{0,1,...} doesn't matches \SomeNode{0}
-    "ellipsis pattern (node2)" SomeNode{0,1,...} doesn't matches \SomeNode{1,1}
-    "head pattern (Int)"       (x @ Int)         doesn't matches "Hello"
-    "head pattern (String)"    (x @ String)      doesn't matches 0
+    "literal pattern (int)"    0                 doesn't match 1
+    "literal pattern (int2)"   0                 doesn't match "Hello"
+    "literal pattern (string)" "Hello"           doesn't match "World"
+    "literal pattern (list)"   [0,1,2]           doesn't match [0,1,2,3]
+    "literal pattern (list2)"  [0,1,2]           doesn't match [0,1]
+    "literal pattern (list3)"  [0,1,2]           doesn't match [2,1,0]
+    "literal pattern (node)"   SomeNode{0,1,2}   doesn't match \SomeNode{0,1,2,3}
+    "literal pattern (node2)"  SomeNode{0,1,2}   doesn't match \SomeNode{2,1,0}
+    "ellipsis pattern (list)"  [0,1,2,...]       doesn't match [0,1]
+    "ellipsis pattern (list2)" [0,1,2,...]       doesn't match [0,2,1]
+    "ellipsis pattern (node)"  SomeNode{0,1,...} doesn't match \SomeNode{0}
+    "ellipsis pattern (node2)" SomeNode{0,1,...} doesn't match \SomeNode{1,1}
+    "head pattern (Int)"       (x @ Int)         doesn't match "Hello"
+    "head pattern (String)"    (x @ String)      doesn't match 0
+}
+
+test "pattern-matching engine (guard clauses)" {
+    "positive test" { try (x where x > 0 -> true)(1) catch (e -> false) }
+    "negative tesw" { try (x where x > 0 -> false)(0) catch (e -> true) }
 }
