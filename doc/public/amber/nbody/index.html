@@ -9,7 +9,7 @@
   <meta name="author" content="Koichi Nakamura">
 
   
-  <meta name="description" content="Amber Application Example: N-Body Simulation Jul 28th, 2012 Koichi: Hi Douglas and Piet, I'm glad you're interested in my new computer
+  <meta name="description" content="Amber Application Example: N-Body Simulation Jul 30th, 2012 Koichi: Hi Douglas and Piet, I'm glad you're interested in my new computer
 language, &hellip;">
   
 
@@ -87,7 +87,7 @@ language, &hellip;">
   
 
 
-<time datetime="2012-07-28T08:56:00+09:00" pubdate data-updated="true">Jul 28<span>th</span>, 2012</time></p>
+<time datetime="2012-07-30T09:41:00+09:00" pubdate data-updated="true">Jul 30<span>th</span>, 2012</time></p>
   </header>
   
   <p>Koichi:</p>
@@ -228,7 +228,7 @@ differential_equation ::= "d" symbol "/" "d" symbol "=" expr
 
 <p>Douglas:</p>
 
-<blockquote><p>I notice you've added an extra expression (in braces) to each piece of syntax. I'll ask you about that in a minute, but what is the analogous concept for the syntax `1 + 2' which you mentioned previousl?</p></blockquote>
+<blockquote><p>I notice you've added an extra expression (in braces) to each piece of syntax. I'll ask you about that in a minute, but what is the analogous concept for the syntax <code>1 + 2</code> which you mentioned previously?</p></blockquote>
 
 <p>koichi:</p>
 
@@ -248,13 +248,20 @@ differential_equation ::= "d" symbol "/" "d" symbol "=" expr
 
 <p>koichi:</p>
 
-<blockquote><p>(WE NEED EXPLANATION)</p></blockquote>
+<blockquote><p><code>$n</code> represents "nth-element of the syntax". For example, when amber parses <code>d y / d x = ...</code> using the syntax definition,</p></blockquote>
+
+<pre><code>differential_equation ::= "d" symbol "/" "d" symbol "=" expr
+</code></pre>
+
+<blockquote><p><code>$0</code> will be a string <code>"d"</code>, <code>$1</code> will be a symbol <code>y</code>, <code>$2</code> will be a string <code>"/"</code> and so on.</p>
+
+<p><code>`</code> and <code>!</code> represent operations called quasi-quotation and unquotation. <code>`( some expression )</code> means "do not evaluate this expression" and <code>!( some expression )</code> means "evaluate only this expression". For example, when you write <code>`(1 + !(2 + 3))</code> amber evaluates it to <code>Add{1, 5}</code></p></blockquote>
 
 <p>koichi:</p>
 
 <blockquote><p>Finally, we have to define the meanings attached to these internal representations, like this:</p></blockquote>
 
-<pre><code>NbodySim{ini, fin, eqation} =&gt; `to_C_program{
+<pre><code>NbodySim{ini, fin, eqation} =&gt; `compile("C") {
     !ini
     while (not !fin) {
         !eqation
@@ -268,9 +275,7 @@ DiffEqn{y, x, fun} =&gt; `{
 
 <p>koichi:</p>
 
-<blockquote><p>These definitions mean that the patterns on the left hand side of <code>=&gt;</code>, like <code>NbodySim{init, fin, equation}</code>, will be translated into the corresponding programs on the right. <code>to_C_program</code>, from standard library of Amber, translates the program into a C-program.</p></blockquote>
-
-<p>(WE ALSO NEED EXPLANATION OF QUOTATION AND UNQUOTATION HERE)</p>
+<blockquote><p>These definitions mean that the patterns on the left hand side of <code>=&gt;</code>, like <code>NbodySim{init, fin, equation}</code>, will be translated into the corresponding programs on the right. <code>compile("C") { ... }</code>, from standard library of Amber, translates the program into a C-program.</p></blockquote>
 
 <p>Douglas:</p>
 
@@ -301,12 +306,11 @@ So what does this Kepler problem look like if we implement it in amber?</p></blo
 
 <pre><code>include "nbody-lib.ab"
 Nbody_simulation {
-    initial: v: Vector(0.0, 1.0, 0.0), x: Vector(1.0, 0.0, 0.0)
+    initial: v: Vector[0.0, 1.0, 0.0], x: Vector[1.0, 0.0, 0.0]
     final:   t &gt;= 1.0
-    equation: {
+    equation:
         d x / d t = v
         d v / d t = - x/|x|^3
-    }
 }
 </code></pre>
 
@@ -322,7 +326,9 @@ Nbody_simulation {
 
 <blockquote><p>How about <code>|x|</code> and <code>|x|^3</code>?</p></blockquote>
 
-<p>(NEEDS TO BE COMPLETED)</p>
+<p>koichi:</p>
+
+<blockquote><p>It's also in a library. <code>|x|</code> is the absolute value of the <code>x</code>, that is the euclidean norm of the vector <code>x</code> in this case. And <code>|x|^3</code> is the cube of <code>|x|</code>.</p></blockquote>
 
 <hr />
 
@@ -361,7 +367,7 @@ Nbody_simulation {
   
 
 
-<time datetime="2012-07-28T08:56:00+09:00" pubdate data-updated="true">Jul 28<span>th</span>, 2012</time>
+<time datetime="2012-07-30T09:41:00+09:00" pubdate data-updated="true">Jul 30<span>th</span>, 2012</time>
         
       </p>
       
