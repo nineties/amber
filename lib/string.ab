@@ -1,39 +1,55 @@
 # Copyright (C) 2010 nineties
 #
-# $Id: string.ab 2012-07-25 10:34:26 nineties $
+# $Id: string.ab 2012-07-30 00:19:05 nineties $
 
-### Format string
-
-format_string_element
-    ::= "%s"    { \String }
-      | "%d"    { \Decimal }
-      | "%x"    { \Hexadecimal }
-      | "%o"    { \Octal }
-      | "%b"    { \Binary }
-      | "%" .   { throw `SyntaxError{!LOCATION,
-                    "Invalid format string", !($0 + $1)}
-                }
-      | [space_sensitive]
-        [^%\""]+ { $input.unescape }
-
-format_string
-    ::= [space_sensitive]
-        '"' format_string_element* '"' { $1 }
-
-module impl {
-    printf_compile(fmt, args): {
-        loop: 
-            ([], [], ls)
-                -> MakeExpr{\Block, ls.reverse}
-          | ([f@String, fs@...], args, ls)
-                -> loop(fs, args, cons(`print(!f), ls))
-          | ([\String, fs@...], [s, ss@...], ls)
-                -> loop(fs, ss, cons(`print(!s), ls))
-          | ([\Decimal, fs@...], [s, ss@...], ls)
-                -> loop(fs, ss, cons(`print(!s), ls))
-        loop(fmt, args, [])
+module std {
+    ### Format string
+    
+    format_string_element
+        ::= "%s"    { \String }
+          | "%S"    { \Symbol }
+          | "%d"    { \Decimal }
+          | "%x"    { \Hexadecimal }
+          | "%o"    { \Octal }
+          | "%b"    { \Binary }
+          | "%" .   { throw `SyntaxError{!LOCATION,
+                        "Invalid format string", !($0 + $1)}
+                    }
+          | [space_sensitive]
+            [^%\""]+ { $input.unescape }
+    
+    format_string
+        ::= [space_sensitive]
+            '"' format_string_element* '"' { $1 }
+    
+    module String {
+        compile_printf(io, fmt, args): {
+            loop: 
+                ([], [], ls)
+                    -> MakeExpr{\Block, ls.reverse}
+              | ([f@String, fs...], args, ls)
+                    -> loop(fs, args, cons(`print(!io, !f), ls))
+              | ([\String, fs...], [s, ss...], ls)
+                    -> loop(fs, ss, cons(`print(!io, !s), ls))
+              | ([\Symbol, fs...], [s, ss...], ls)
+                    -> loop(fs, ss, cons(`print(!io, !s), ls))
+              | ([\Decimal, fs...], [s, ss...], ls)
+                    -> loop(fs, ss, cons(`print(!io, !s), ls))
+            loop(fmt, args, [])
+        }
+        compile_format(fmt, args):
+            `{
+                io: StringIO::new()
+                !compile_printf(\io, fmt, args)
+                io.to_s
+            }
     }
+    
+    postfix_expr
+        ::= "printf" "(" format_string ("," expr)* ")" 
+            { String::compile_printf(\stdout, $2, map($3, x -> x[1])) }
+          | "printf" "(" expr "," format_string ("," expr)* ")"
+            { String::compile_printf($2, $4, map($5, x -> x[1])) }
+          | "format" "(" format_string ("," expr)* ")"
+            { String::compile_format($2, map($3, x -> x[1])) }
 }
-postfix_expr
-    ::= "printf" "(" format_string ("," expr)* ")" 
-        { impl::printf_compile($2, map(x -> x[1], $3)) }

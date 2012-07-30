@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2012-07-24 11:31:12 nineties $
+; $Id: rowl1-matching.rlc 2012-07-27 13:20:27 nineties $
 ;
 
 (import "rlvm-compile")
@@ -50,7 +50,7 @@
 
     (var asm (make_assembler))
     (compile_matching_main asm args mat)
-    (compile_matching_error asm def)
+    (compile_matching_error asm obj)
 
     (var code (get_code asm))
     (field_set def 1 code) ; caching
@@ -682,7 +682,7 @@
     ))
 
 (var arity_max 8)
-(fun compile_matching_error (asm def) (
+(fun compile_matching_error (asm obj) (
     ; construct list of arguments
     (var end_lbl (fresh_label asm))
     (var case_lbls (array int arity_max))
@@ -704,7 +704,7 @@
         (put_cons asm)
         (set_label asm (array_get int case_lbls arg_idx))
         ))
-    (put_push asm def)
+    (put_push asm obj)
     (compile_simple_call asm 2 matching_failed)
     (put_throw asm)
     ))

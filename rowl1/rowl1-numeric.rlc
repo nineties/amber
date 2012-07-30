@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-numeric.rlc 2012-07-05 21:20:24 nineties $
+; $Id: rowl1-numeric.rlc 2012-07-28 16:45:50 nineties $
 ;
 
 (import "rlvm-compile")
@@ -63,6 +63,18 @@
     (return (itos (unbox n)))
     ))
 
+(fun int_hash (n) (
+    (return n)
+    ))
+
+(fun int_times (n f) (
+    (var code (get_bytecode (string "argument for times") f))
+    (for i 0 (unbox n) (do
+        (byterun code (box i))
+        ))
+    (return nil)
+    ))
+
 (export fun setup_numeric (mod) (
     ; integer arithmetic
     (add_builtin_function1 mod (to_sym "uplus") intT int_uplus 0)
@@ -76,8 +88,10 @@
     (add_builtin_function2 mod (to_sym "gt") intT intT int_gt 0)
     (add_builtin_function2 mod (to_sym "le") intT intT int_le 0)
     (add_builtin_function2 mod (to_sym "ge") intT intT int_ge 0)
-
     (add_builtin_function1 mod (to_sym "to_s") intT int_to_s 0)
+    (add_builtin_function1 mod (to_sym "hash") intT int_hash 0)
+
+    (add_builtin_function2 mod (to_sym "times") intT funT int_times 0) 
     ))
 
     ))

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2012-07-25 15:54:17 nineties $
+; $Id: rowl1-node.rlc 2012-07-30 00:20:36 nineties $
 ;
 
 (import "rlvm-compile")
@@ -30,10 +30,11 @@
 
 (export var Symbol      (to_builtin_sym "Symbol"))
 (export var Int         (to_builtin_sym "Int"))
-(export var Float       (to_builtin_sym "Float"))
 (export var String      (to_builtin_sym "String"))
+(export var Float       (to_sym "Float"))
 (export var List        (to_sym "List"))
 (export var Array       (to_sym "Array"))
+(export var Table       (to_sym "Table"))
 (export var Tuple       (to_sym "Tuple"))
 (export var Block       (to_sym "Block"))
 (export var OpenBlock   (to_sym "OpenBlock"))
@@ -168,7 +169,7 @@
     ))
 
 (export fun unique_sym () (
-    (return (to_sym (strcat "%s" (itos symbol_index_gen))))
+    (return (to_sym (strcat "x" (itos symbol_index_gen))))
     ))
 
 (fun is_builtin_sym (sym) (
@@ -265,14 +266,13 @@
         )
     ))
 
-(extern fun ary_to_list)
-
 (export fun expr_head (node) (
     (tswitch (node_type node) (
         (@SymbolE           . (return Symbol))
         (@ExprE             . (return (field_get node @ExprHead)))
         (@ListE             . (return List))
         (@ArrayE            . (return Array))
+        (@TableE            . (return Table))
         (@AssemblerE        . (return Assembler))
         (@BytecodeE         . (return Bytecode))
         (@FunctionE         . (return Function))
@@ -283,13 +283,13 @@
         (@ParserE           . (return Parser))
         (@StringIOE         . (return StringIO))
         (@IntE              . (return Int))
-        (@FloatE            . (return Float))
         (@StringE           . (return String))
         (@BuiltinE          . (return Builtin))
         (default            . (not_reachable "expr_head"))
         ))
     ))
 
+(extern fun ary_to_list)
 (export fun expr_args (expr) (
     (var ty (node_type expr))
     (if (is_atom_type ty) (return (cons expr 0)))
@@ -479,13 +479,14 @@
     ))
 
 ; types
-(export var symT    (domainP Symbol))
-(export var stringT (domainP String))
-(export var intT    (domainP Int))
-(export var listT   (domainP List))
-(export var arrayT  (domainP Array))
-(export var tupleT  (domainP Tuple))
-(export var funT    (domainP Function))
+(export var symT       (domainP Symbol))
+(export var stringT    (domainP String))
+(export var intT       (domainP Int))
+(export var listT      (domainP List))
+(export var arrayT     (domainP Array))
+(export var tableT     (domainP Table))
+(export var tupleT     (domainP Tuple))
+(export var funT       (domainP Function))
 
 ; printing functions
 (fun output_ordinal (ochan idx) (
@@ -504,6 +505,7 @@
         (@ExprE             . (return (output_string ochan "composite expression")))
         (@ListE             . (return (output_string ochan "List")))
         (@ArrayE            . (return (output_string ochan "Array")))
+        (@TableE            . (return (output_string ochan "Table")))
         (@AssemblerE        . (return (output_string ochan "Assembler")))
         (@BytecodeE         . (return (output_string ochan "Bytecode")))
         (@FunctionE         . (return (output_string ochan "Function")))
@@ -514,7 +516,6 @@
         (@ParserE           . (return (output_string ochan "Parser")))
         (@StringIOE         . (return (output_string ochan "StringIO")))
         (@IntE              . (return (output_string ochan "Int")))
-        (@FloatE            . (return (output_string ochan "Float")))
         (@StringE           . (return (output_string ochan "String")))
         (@BuiltinE          . (return (output_string ochan "Builtin")))
         (default            . (not_reachable "output_type"))
@@ -522,6 +523,8 @@
     ))
 
 (extern fun pp_module)
+(extern fun pp_table)
+(extern fun pp_table_full)
 
 (export fun pretty_print (ochan node) (
     (pretty_print_main ochan node)
@@ -533,6 +536,7 @@
         (@ExprE             . (return (pp_expr ochan node)))
         (@ListE             . (return (pp_list ochan node)))
         (@ArrayE            . (return (pp_array ochan node)))
+        (@TableE            . (return (pp_table ochan node)))
         (@AssemblerE        . (return (pp_assembler ochan node)))
         (@BytecodeE         . (return (pp_bytecode ochan node)))
         (@FunctionE         . (return (pp_function ochan node)))
@@ -543,7 +547,6 @@
         (@ParserE           . (return (pp_parser ochan node)))
         (@StringIOE         . (return (pp_stringio ochan node)))
         (@IntE              . (return (pp_int ochan node)))
-        (@FloatE            . (return (pp_float ochan node)))
         (@StringE           . (return (pp_string ochan node)))
         (@BuiltinE          . (return (pp_builtin ochan node)))
         (default            . (not_reachable "pretty_print"))
@@ -577,20 +580,13 @@
     (output_char ochan ']')
     ))
 
-(fun pp_array (ochan node) (
-    (output_string ochan "Array[")
-    (var size (array_size node))
-    (if (< size 6)
-        (for i 0 size (do
-            (pretty_print ochan (array_get object node i))
-            (if (< i (- size 1)) (output_string ochan ", "))
-            ))
-        (for i 0 5 (do
-            (pretty_print ochan (array_get object node i))
-            (if (< i 4) (output_string ochan ", ")
-            (if (== i 4) (output_string ochan ", ...")))
-            ))
-        )
+(fun pp_array (ochan ary) (
+    (output_string ochan "Array [")
+    (var size (array_size ary))
+    (for i 0 size (do
+        (pretty_print ochan (array_get object ary i))
+        (if (< i (- size 1)) (output_string ochan ", "))
+        ))
     (output_char ochan ']')
     ))
 
@@ -658,10 +654,6 @@
     (output_int ochan (unbox node))
     ))
 
-(fun pp_float (ochan node) (
-    (not_implemented "pp_float")
-    ))
-
 (fun pp_string (ochan node) (
     (output_char ochan '"')
     (var i 0)
@@ -684,6 +676,7 @@
         (@ExprE             . (return (pp_expr_full ochan node)))
         (@ListE             . (return (pp_list_full ochan node)))
         (@ArrayE            . (return (pp_array_full ochan node)))
+        (@TableE            . (return (pp_table_full ochan node)))
         (@AssemblerE        . (return (pp_assembler ochan node)))
         (@BytecodeE         . (return (pp_bytecode ochan node)))
         (@FunctionE         . (return (pp_function ochan node)))
@@ -694,7 +687,6 @@
         (@ParserE           . (return (pp_parser ochan node)))
         (@StringIOE         . (return (pp_stringio ochan node)))
         (@IntE              . (return (pp_int ochan node)))
-        (@FloatE            . (return (pp_float ochan node)))
         (@StringE           . (return (pp_string ochan node)))
         (@BuiltinE          . (return (pp_builtin ochan node)))
         (default            . (not_reachable "pretty_print"))
@@ -724,11 +716,11 @@
     (output_char ochan ']')
     ))
 
-(fun pp_array_full (ochan node) (
-    (output_string ochan "Array[")
-    (var size (array_size node))
+(fun pp_array_full (ochan ary) (
+    (output_string ochan "Array [")
+    (var size (array_size ary))
     (for i 0 size (do
-        (pretty_print_full ochan (array_get object node i))
+        (pretty_print_full ochan (array_get object ary i))
         (if (< i (- size 1)) (output_string ochan ", "))
         ))
     (output_char ochan ']')

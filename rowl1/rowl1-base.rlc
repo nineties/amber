@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-base.rlc 2012-07-05 18:10:15 nineties $
+; $Id: rowl1-base.rlc 2012-07-30 00:57:32 nineties $
 ;
 
 (import "rlvm-compile")
@@ -14,21 +14,59 @@
 (import "rowl1-node")
 (import "rowl1-compile")
 (import "rowl1-assemble")
+(import "rowl1-error")
 
-(fun _intern (s) (
-    (return (to_sym_user s))
-    ))
+(extern object current_loc)
+(extern object current_mod)
 
 (fun _equal (a b) (
-    (if (== a b)
-        (return true)
-        (return false)
-        )
+    (var eql (lookup_func current_mod (to_sym "equal")))
+    (return (_equal_sub a b eql))
+    ))
+
+(fun _equal_sub (a b eql) (
+    (if (== a b) (return true))
+    (if (|| (is_atom a) (is_atom b)) (return false))
+    (var hd1 (expr_head a))
+    (var hd2 (expr_head b))
+    (if (!= hd1 hd2) (return false))
+    (var args1 (expr_args a))
+    (var args2 (expr_args b))
+    (if (!= (list_len args1) (list_len args2)) (return false))
+    (while args1 (do
+        (var v1 (car args1))
+        (var v2 (car args2))
+        (if (&& (!= v1 v2) (== (byterun eql v1 v2) false)) (return false))
+        (= args1 (cdr args1))
+        (= args2 (cdr args2))
+        ))
+    (return true)
+    ))
+
+(fun _hash (obj) (
+    (if (is_atom obj) (return (box (% obj 65537))))
+    (var hash (lookup_func current_mod (to_sym "hash")))
+    (var vars (expr_args obj))
+    (var val 0)
+    (while vars (do
+        (+= val (* (unbox (byterun hash (car vars))) 13))
+        (= vars (cdr vars))
+        ))
+    (+= val (unbox (byterun hash (expr_head obj))))
+    (return (box val))
+    ))
+
+(fun _at (obj i) (
+    (= i (unbox i))
+    (var size (expr_size obj))
+    (if (< i size) (return (expr_arg obj i)))
+    (throw (out_of_range current_loc))
     ))
 
 (export fun setup_base (mod) (
-    (add_builtin_function1 mod (to_sym "intern") stringT _intern 0)
     (add_builtin_function2 mod (to_sym "equal") DontCare DontCare _equal 0)
+    (add_builtin_function1 mod (to_sym "hash") DontCare _hash 0)
+    (add_builtin_function2 mod (to_sym "at") DontCare intT _at 0)
     ))
 
     ))

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-string.rlc 2012-07-24 22:40:52 nineties $
+; $Id: rowl1-string.rlc 2012-07-30 01:03:30 nineties $
 ;
 
 (import "rlvm-compile")
@@ -20,6 +20,15 @@
         (return true)
         (return false)
         )
+    ))
+
+(fun s_hash (s) (
+    (var len (strlen s))
+    (var h 0)
+    (for i 0 len (do
+        (+= h (array_get char s i))
+        ))
+    (return (box h))
     ))
 
 (fun s_to_s (s) (
@@ -52,6 +61,11 @@
     (return (string (sio_get (field_get io 1))))
     ))
 
+(fun sio_print_symbol (io sym) (
+    (output_string (field_get io 1) (symbol_name sym))
+    (return nil)
+    ))
+
 (fun sio_print_str (io str) (
     (output_string (field_get io 1) str)
     (return nil)
@@ -63,16 +77,22 @@
     ))
 
 (export fun setup_string (std) (
-    (var sioT (domainP StringIO))
 
     (add_builtin_function2 std (to_sym "equal") stringT stringT s_equal 0)
+    (add_builtin_function1 std (to_sym "hash") stringT s_hash 0)
     (add_builtin_function1 std (to_sym "to_s") stringT s_to_s 0)
     (add_builtin_function2 std (to_sym "add") stringT stringT s_add 0)
     (add_builtin_function2 std (to_sym "add") stringT DontCare s_add2 0)
     (add_builtin_function2 std (to_sym "add") DontCare stringT s_add2 0)
+
     (add_builtin_function1 std (to_sym "unescape") stringT s_unescape 0)
-    (add_builtin_function1 std (to_sym "new") (quote StringIO) new_sio 0)
+
+    (var sioT (domainP StringIO))
+    (var SIO (find_module no_loc std (to_sym "StringIO") @TRUE))
+
+    (add_builtin_function0 SIO (to_sym "new") new_sio 0)
     (add_builtin_function1 std (to_sym "to_s") sioT sio_to_s 0)
+    (add_builtin_function2 std (to_sym "print") sioT symT sio_print_symbol 0)
     (add_builtin_function2 std (to_sym "print") sioT stringT sio_print_str 0)
     (add_builtin_function2 std (to_sym "print") sioT intT sio_print_int 0)
     ))

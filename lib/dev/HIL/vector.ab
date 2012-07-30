@@ -1,0 +1,77 @@
+# Copyright (C) 2012 nineties
+#
+# $Id: vector.ab 2012-07-30 09:17:05 nineties $
+
+# Vector arithmetic for HIL
+module HIL {
+    postfix_expr ::= [multiline] "Vector" "[" delimited(expr, ",") "]"
+           { MakeExpr{\Vector, $2} }
+
+    copyprop(sbst, Vector{values...}):
+        MakeExpr{\Vector, map(values, v -> copyprop(sbst, v))}
+
+    linearize(Vector{values...}): {
+        t: newSymbol()
+        (`(!t : !MakeExpr{\Vector, map(values, v -> linearize(v)[1])}), t)
+    }
+
+    typing_expr(tmap, Vector{values...}): {
+        ts: map(values, v -> typing_expr(tmap, v)[0])
+        dim: ts.length
+        ts = ts.uniq
+        if (ts.length > 1) throw `InvalidArg{!LOCATION, "fields of vector must have same types"}
+        if (ts[0] == \Int)
+            return (`IVector{!dim}, MakeExpr{\IVector, cons(dim, values)})
+        else if (ts[0] == \Float)
+            return (`FVector{!dim}, MakeExpr{\FVector, cons(dim, values)})
+        throw `InvalidVectorType{!LOCATION, "field of vector must be integer of floating point"}
+    }
+
+    iasgnop: Table[
+        \Assign => \IVasgn,
+        \AddAssign => \IVaddasgn,
+        \SubAssign => \IVsubasgn,
+        \MulAssign => \IVmulasgn,
+        \DivAssign => \IVdivasgn,
+        \ModAssign => \IVmodasgn
+        ]
+    fasgnop: Table[
+        \Assign => \FVasgn,
+        \AddAssign => \FVaddasgn,
+        \SubAssign => \FVsubasgn,
+        \MulAssign => \FVmulasgn,
+        \DivAssign => \FVdivasgn,
+        \ModAssign => \FVmodasgn
+        ]
+
+    typing_assign(x, IVector{dim1}, e, IVector{dim2}, op) where dim1 == dim2 :
+        MakeExpr{iasgnop[op], [dim1, x, e]}
+    typing_assign(x, FVector{dim1}, e, FVector{dim2}, op) where dim1 == dim2 :
+        MakeExpr{fasgnop[op], [dim1, x, e]}
+
+    typing_unary(e, IVector{dim}, \UnaryMinus):
+        (`IVector{!dim}, `IVneg{!dim, !e})
+    typing_unary(e, IVector{dim}, \Absolute):
+        (\Float, `IVabs{!dim, !e})
+
+    typing_unary(e, FVector{dim}, \UnaryMinus):
+        (`FVector{!dim}, `FVneg{!dim, !e})
+    typing_unary(e, FVector{dim}, \Absolute):
+        (\Float, `FVabs{!dim, !e})
+
+    typing_binary(v1, FVector{dim1}, v2, FVector{dim2}, \Add) where dim1 == dim2:
+        (`FVector{!dim1}, `FVadd{!dim1, !v1, !v2})
+    typing_binary(v1, FVector{dim1}, v2, FVector{dim2}, \Sub) where dim1 == dim2:
+        (`FVector{!dim1}, `FVsub{!dim1, !v1, !v2})
+    typing_binary(v1, FVector{dim1}, v2, FVector{dim2}, \Mul) where dim1 == dim2:
+        (`FVector{!dim1}, `FVmul{!dim1, !v1, !v2})
+    typing_binary(v1, FVector{dim1}, v2, FVector{dim2}, \Div) where dim1 == dim2:
+        (`FVector{!dim1}, `FVdiv{!dim1, !v1, !v2})
+
+    typing_binary(v, FVector{dim}, r, Float, \Mul):
+        (`FVector{!dim}, `FVmuls{!dim, !v, !r})
+    typing_binary(r, Float, v, FVector{dim}, \Mul):
+        (`FVector{!dim}, `FVmuls{!dim, !v, !r})
+    typing_binary(v, FVector{dim}, r, Float, \Div):
+        (`FVector{!dim}, `FVdivs{!dim, !v, !r})
+}
