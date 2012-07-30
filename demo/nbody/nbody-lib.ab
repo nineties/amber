@@ -1,0 +1,42 @@
+include "dev/HIL/C.ab"
+
+statement ::= [multiline] "Nbody_simulation" "{"
+    initial_condition
+    final_condition
+    equation
+    "}"
+    { `Nbody_simulation{!$2,!$3, !$4} }
+
+initial_condition ::= "initial" ":" aligned(statement)
+    { MakeExpr{\OpenBlock, $2} }
+final_condition   ::= "final" ":" expr
+    { $2 }
+equation ::= "equation" ":" aligned(differential_equation) { $2 }
+
+differential_equation
+    ::= "d" symbol "/" "d" symbol "=" expr
+        { `DiffEqn{!$1, !$4, !$6} }
+
+Nbody_simulation{ini, fin, eqn} => `{
+    compile(stdout, "C") {
+        !ini
+        while (not !fin) {
+            !discretize(eqn)
+        }
+    }
+}
+
+# Euler method
+discretize(equations): {
+    len: equations.length
+    vars: List::create(len, i -> newSymbol())
+
+    # XXX: fixme!
+    dvar: ("d" + equations[0][1]).intern
+
+    body1: List::create(len, i -> `DefineVariable{!vars[i], !equations[i][2]})
+    body2: List::create(len, i ->`AddAssign{!equations[i][0], Mul{!vars[i], !dvar}})
+    body3: [`AddAssign{!equations[0][1], !dvar}]
+    
+    MakeExpr{\OpenBlock, append(append(body1, body2), body3)}
+}
