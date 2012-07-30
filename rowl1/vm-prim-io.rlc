@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-io.rlc 2012-07-05 20:57:43 nineties $
+; $Id: vm-prim-io.rlc 2012-07-27 14:15:11 nineties $
 ;
 
 (import "stdlib")
@@ -98,16 +98,16 @@
 ; sio = (buf, -1, pos, capa)    ; StringIO
 (export prim_make_sio)
 (fun prim_make_sio () (
-    (void* chan (prim_make_struct4 1 (make_carray 10) -1 0 10))
-    (return chan)
+    (return (prim_make_struct4 1 (make_carray 10) -1 0 10))
     ))
 
 (fun reserve_sio (sio) (
     (int size (get sio 2))
     (int new_capa (* 2 (get sio 3)))
     (void* new_buf (make_carray new_capa))
-    (prim_memcpy new_buf (get sio 0) size)
-    (return (prim_make_struct4 1 new_buf -1 size new_capa))
+    (prim_memcpy new_buf (get sio 0) (+ size 1))
+    (set sio 0 new_buf)
+    (set sio 3 new_capa)
     ))
 
 (export prim_sio_get)

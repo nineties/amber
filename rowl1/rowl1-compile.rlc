@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-07-24 19:16:12 nineties $
+; $Id: rowl1-compile.rlc 2012-07-28 12:16:36 nineties $
 ;
 
 (import "rlvm-compile")
@@ -835,6 +835,7 @@
             (compile asm mod (make_expr Assign (list2 clsref val)))
         )
         (do
+            (compile asm mod val)
             (var idx 0)
             (if (== overwrite true)
                 (do
@@ -847,7 +848,6 @@
                     (incr_variable_count mod)
                     (add_symbol mod sym (make_lvar idx))
                 ))
-            (compile asm mod val)
             (if compiling_closure
                 (put_store_lvar asm (+ idx 1))
                 (put_store_lvar asm idx)
@@ -1647,6 +1647,7 @@
     (add_compiler mod (quote true) compile_const)
     (add_compiler mod (quote false) compile_const)
     (add_compiler mod (quote nil) compile_const)
+    (add_compiler mod (quote undefined) compile_const)
 
     (add_compiler mod (make_expr Apply (list2 DontCare listT)) compile_apply)
     (add_compiler mod (make_expr Subscript (list2 DontCare listT)) compile_subscript)

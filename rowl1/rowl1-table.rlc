@@ -1,0 +1,220 @@
+;
+; rowl - 1st generation
+; Copyright (C) 2012 nineties
+;
+; $Id: rowl1-table.rlc 2012-07-30 01:05:01 nineties $
+;
+
+(import "rlvm-compile")
+(import "rowl1-types")
+
+(compile `object `(
+
+(import "rowl1-util")
+(import "rowl1-node")
+(import "rowl1-module")
+(import "rowl1-compile")
+(import "rowl1-error")
+
+(extern object current_mod)
+(extern object current_loc)
+
+(array int prime_numbers (
+    5 11 17 37 67 131 257 521 1031 2053 4099 8209 16411 32771 65537 131101
+    0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+    ))
+
+(fun ht_new_with_hint (hint) (
+    (var size (array_get int prime_numbers (bsr hint)))
+    (var tbl (variant @TableE 3 (make_vector size) (make_vector 0) (make_ivector 0)))
+    (ht_push tbl)
+    (return tbl)
+    ))
+
+(fun ht_new () (
+    (return (ht_new_with_hint 10))
+    ))
+
+(fun ht_push (tbl) (
+    (var display (field_get tbl 3))
+    (ivector_pushback display 0)
+    (return nil)
+    ))
+
+(fun ht_pop (tbl) (
+    (var display (field_get tbl 3))
+    (var entries (field_get tbl 2))
+    (var bucket (field_get tbl 1))
+    (var size (vector_size bucket))
+
+    (var depth (ivector_size display))
+    (var npop  (ivector_at display (- depth 1)))
+    (ivector_resize display (- depth 1))
+
+    (var end (vector_size entries))
+    (var begin (- end npop))
+    (while (< begin end) (do
+        (var entry (vector_at entries begin))
+        (if entry (do
+            (var h (% (field_get entry 3) size))
+            (var e (vector_at bucket h))
+            (if (== e entry)
+                (vector_put bucket h (field_get e 2))
+                (while e (do
+                    (var next (field_get e 2))
+                    (if (== entry next) (do
+                        (field_set e 2 (field_get next 2))
+                        break
+                        ))
+                    (= e next)
+                    ))
+                )
+            ))
+        (incr begin)
+        ))
+    (vector_resize entries (- end npop))
+    (return nil)
+    ))
+
+(fun rehash (tbl) (
+    (var old_size (vector_size (field_get tbl 1)))
+    (var num_ent  (vector_size (field_get tbl 2)))
+    (if (>= num_ent old_size) (do
+        (var new_size (array_get int prime_numbers (bsr num_ent)))
+        (if (! new_size) (error "rehash: too many entries"))
+        (var bucket (make_vector new_size))
+        (var entries (field_get tbl 2))
+        (for i 0 (vector_size entries) (do
+            (var entry (vector_at entries i))
+            (if (! entry) continue)
+            (var h (% (field_get entry 3) new_size))
+            (field_set entry 2 (vector_at bucket h))
+            (vector_put bucket h entry)
+            ))
+        (field_set tbl 1 bucket)
+        ))
+    ))
+
+(fun ht_add (tbl key val hash) (
+    (rehash tbl)
+
+    (var bucket (field_get tbl 1))
+    (var entries (field_get tbl 2))
+    (var display (field_get tbl 3))
+    (var size (vector_size bucket))
+    (var h (unbox (byterun hash key)))
+    (var depth (ivector_size display))
+
+    (if (== depth 0) (error "symtable_add: no namespace"))
+
+    (var ent (struct 3 key val 0 h depth (vector_size entries)))
+    (%= h size)
+
+    (vector_pushback entries ent)
+
+    (field_set ent 2 (vector_at bucket h))
+    (vector_put bucket h ent)
+
+    ; increment a counter in display
+    (var n (ivector_at display (- depth 1)))
+    (ivector_put display (- depth 1) (+ n 1))
+    ))
+
+(fun ht_store (tbl key val) (
+    (var hash (lookup_func current_mod (to_sym "hash")))
+    (var eql  (lookup_func current_mod (to_sym "equal")))
+
+    (var bucket (field_get tbl 1))
+    (var entries (field_get tbl 2))
+    (var size (vector_size bucket))
+    (var h (unbox (byterun hash key)))
+    (%= h size)
+    (var entry (vector_at bucket h))
+    (while entry (do
+        (var e_key (field_get entry 0))
+        (if (== (byterun eql e_key key) true) (do
+            (field_set entry 1 val)
+            (return val)
+            ))
+        (= entry (field_get entry 2))
+        ))
+    (ht_add tbl key val hash)
+    (return val)
+    ))
+
+(fun ht_at (tbl key) (
+    (var hash (lookup_func current_mod (to_sym "hash")))
+    (var eql  (lookup_func current_mod (to_sym "equal")))
+
+    (var bucket (field_get tbl 1))
+    (var display (field_get tbl 3))
+    (var size (vector_size bucket))
+    (var h (unbox (byterun hash key)))
+    (%= h size)
+    (var entry (vector_at bucket h))
+    (while entry (do
+        (var e_key (field_get entry 0))
+        (if (== (byterun eql e_key key) true)
+            (return (field_get entry 1))
+            )
+        (= entry (field_get entry 2))
+        ))
+    (return undefined)
+    ))
+
+(export fun pp_table (ochan tbl) (
+    (var entries (field_get tbl 2))
+    (var size (vector_size entries))
+    (output_string ochan "{")
+    (for i 0 size (do
+        (var entry (vector_at entries i))
+        (if (! entry) continue)
+        (pretty_print ochan (field_get entry 0))
+        (output_string ochan " => ")
+        (pretty_print ochan (field_get entry 1))
+        (if (< i (- size 1)) (output_string ochan ", "))
+        ))
+    (output_string ochan "}")
+    ))
+
+(export fun pp_table_full (ochan tbl) (
+    (var entries (field_get tbl 2))
+    (var size (vector_size entries))
+    (output_string ochan "{")
+    (for i 0 size (do
+        (var entry (vector_at entries i))
+        (if (! entry) continue)
+        (pretty_print_full ochan (field_get entry 0))
+        (output_string ochan " => ")
+        (pretty_print_full ochan (field_get entry 1))
+        (if (< i (- size 1)) (output_string ochan ", "))
+        ))
+    (output_string ochan "}")
+    ))
+
+(fun ht_from_list (list) (
+    (var orig list)
+    (var tbl (ht_new_with_hint (list_len list)))
+    (while list (do
+        (var ent (car list))
+        (if (|| (!= (expr_head ent) Tuple) (!= (expr_size ent) 2))
+            (throw (invalid_argument current_loc (string "Table::from_list requires list of pairs") orig))
+            )
+        (ht_store tbl (expr_arg ent 0) (expr_arg ent 1))
+        (= list (cdr list))
+        ))
+    (return tbl)
+    ))
+
+(export fun setup_table (std) (
+    (var mod (find_module no_loc std (to_sym "Table") @TRUE))
+    (add_builtin_function0 mod (to_sym "new") ht_new 0)
+    (add_builtin_function1 mod (to_sym "new") intT ht_new_with_hint 0)
+    (add_builtin_function1 mod (to_sym "from_list") listT ht_from_list 0)
+    (add_builtin_function2 std (to_sym "at") tableT DontCare ht_at 0)
+    (add_builtin_function3 std (to_sym "store") tableT DontCare DontCare ht_store 0)
+    (add_builtin_function1 std (to_sym "push") tableT ht_push 0)
+    (add_builtin_function1 std (to_sym "pop") tableT ht_pop 0)
+    ))
+
+    ))

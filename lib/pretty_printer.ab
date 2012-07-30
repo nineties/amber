@@ -1,0 +1,63 @@
+# Copyright (C) 2012 nineties
+#
+# $Id: pretty_printer.ab 2012-07-29 00:09:11 nineties $
+
+module pretty_printer {
+    indent_width: 4
+    pprint(io, lines@List): map(lines, l -> {
+                pprint(io, l, 0)
+                puts("")
+            })
+
+    print_indent(io, indent): indent.times(i -> print(io, " "))
+
+    pprint(io, e@Symbol, indent): {
+        print_indent(io, indent)
+        print(io, e)
+    }
+    pprint(io, e@Int, indent): {
+        print_indent(io, indent)
+        print(io, e)
+    }
+    pprint(io, e@Float, indent): {
+        print_indent(io, indent)
+        print(io, e)
+    }
+    pprint(io, e@String, indent): {
+        print_indent(io, indent)
+        print(io, e)
+    }
+    pprint(io, \BlankLine, indent): nil
+    pprint(io, Nested{items}, indent): {
+        iter:
+              [l]        -> pprint(io, l, indent + indent_width)
+            | [l,ls...] -> {
+                pprint(io, l, indent + indent_width)
+                puts("")
+                iter(ls)
+            }
+        iter(items)
+    }
+    pprint(io, NoIndent{item}, indent): pprint(io, item, 0)
+    pprint(io, OneLine{items...}, indent): {
+        print_indent(io, indent)
+        iter:
+            [l]     -> pprint(io, l, 0)
+          | [l,ls...] -> {
+              pprint(io, l, 0)
+              print(io, " ")
+              iter(ls)
+          }
+        iter(items)
+    }
+    pprint(io, NoSpace{items...}, indent): {
+        print_indent(io, indent)
+        iter:
+            [l]     -> pprint(io, l, 0)
+          | [l,ls...] -> {
+              pprint(io, l, 0)
+              iter(ls)
+          }
+        iter(items)
+    }
+}

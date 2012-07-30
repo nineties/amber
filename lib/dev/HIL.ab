@@ -1,0 +1,394 @@
+# Copyright (C) 2012 nineties
+#
+# $Id: HIL.ab 2012-07-30 09:15:52 nineties $
+
+# High-level Intermediate Language
+
+module HIL {
+
+    # syntax definitions
+    statement ::= [multiline]
+        "compile" "(" expr "," string ")" "{"
+            aligned(HIL_statement)
+        "}"
+        { `HILCompile{!$2, !$4, !$7} }
+    
+    HIL_statement ::= statement
+    
+    # invoking compiler
+    HILCompile{io, lang, stmts} => {
+        `HILCompiler(!lang)(!io,
+                \!typing(
+                    flatten_list(
+                    copyprop_list(
+                    flatten_list(
+                    linearize_list(stmts)))))
+                )
+    }
+
+    # default HIL-compiler
+    HILCompiler(lang): throw "HIL Compiler for " + lang + " is not found"
+    
+    #=== flattening ===
+    # flatten nested open blocks
+    # open {
+    #     stmt1
+    #     open {
+    #         stmt2
+    #         stmt3
+    #     }
+    # }
+    #
+    # to
+    #
+    # stmt1
+    # stmt2
+    flatten_list(stmts): concatMap(stmts, flatten)
+    flatten(stmt): [stmt]
+    flatten(Located{loc, stmt}): [`Located{!loc, !flatten_sub(stmt)}]
+    flatten(Located{loc, \nil}): []
+
+    # Since elements of OpenBlock are every Located, drop `loc'.
+    flatten(Located{loc, OpenBlock{stmts...}}): flatten_list(stmts)
+
+    flatten(OpenBlock{stmts...}): flatten_list(stmts)
+    flatten_sub(stmt): stmt
+    flatten_sub(Located{loc, stmt}): `Located{!loc, !flatten_sub(stmt)}
+    flatten_sub(Block{stmts...}): MakeExpr{\Block, flatten_list(stmts)}
+    flatten_sub(OpenBlock{stmts...}): MakeExpr{\OpenBlock, flatten_list(stmts)}
+    flatten_sub(While{cnd, body}): `While{!flatten_sub(cnd), !flatten_sub(body)}
+
+    #=== copy-propagation ===
+    # eliminate unnecessary copies
+    #
+    # x: t
+    # ...
+    # v: x + 1
+    #     
+    # to
+    #
+    # ...
+    # v: t + 1
+    #
+
+    copyprop_list(stmts): {
+        sbstmap: Table::new(stmts.length)
+        copyprop_list(sbstmap, stmts)
+    }
+    copyprop_list(_, []): []
+    copyprop_list(sbst, [e, stmts...]): {
+        x: copyprop(sbst, e)
+        y: copyprop_list(sbst, stmts)
+        cons(x, y)
+    }
+    copyprop_list(sbst, [Located{loc, DefineVariable{x @ Symbol, v @ Symbol}}, stmts...]): {
+        sbst[x] = copyprop(sbst, v)
+        copyprop_list(sbst, stmts)
+    }
+    copyprop(sbst, v @ Symbol): {
+        x: sbst[v]
+        (x == undefined) ? v : x
+    }
+    copyprop(sbst, v @ Int): v
+    copyprop(sbst, v @ Float): v
+    copyprop(sbst, Located{loc, e}):
+        `Located{!loc, !copyprop(sbst, e)}
+    copyprop(sbst, DefineVariable{x, e}):
+        `(!x : !copyprop(sbst, e))
+    copyprop(sbst, While{e, body}):
+        `While{!copyprop(sbst, e), !copyprop(sbst, body)}
+    copyprop(sbst, OpenBlock{stmts...}):
+        MakeExpr{\Block, copyprop_list(sbst, stmts)}
+    copyprop(sbst, Block{stmts...}): {
+        sbst.push()
+        x: copyprop_list(sbst, stmts)
+        sbst.pop()
+        MakeExpr{\Block, x}
+    }
+    copyprop(sbst, + x)   : copyprop_unary(sbst, x, \UnaryPlus)
+    copyprop(sbst, - x)   : copyprop_unary(sbst, x, \UnaryMinus)
+    copyprop(sbst, |x|)   : copyprop_unary(sbst, x, \Absolute)
+    copyprop(sbst, not x) : copyprop_unary(sbst, x, \Not)
+    copyprop_unary(sbst, x, op):
+        MakeExpr{op, [copyprop(sbst, x)]}
+    copyprop(sbst, x + y):  copyprop_binary(sbst, x, y, \Add)
+    copyprop(sbst, x - y):  copyprop_binary(sbst, x, y, \Sub)
+    copyprop(sbst, x * y):  copyprop_binary(sbst, x, y, \Mul)
+    copyprop(sbst, x / y):  copyprop_binary(sbst, x, y, \Div)
+    copyprop(sbst, x % y):  copyprop_binary(sbst, x, y, \Mod)
+    copyprop(sbst, x ^ y):  copyprop_binary(sbst, x, y, \Power)
+    copyprop(sbst, x == y): copyprop_binary(sbst, x, y, \Equal)
+    copyprop(sbst, x != y): copyprop_binary(sbst, x, y, \NotEqual)
+    copyprop(sbst, x < y):  copyprop_binary(sbst, x, y, \LessThan)
+    copyprop(sbst, x > y):  copyprop_binary(sbst, x, y, \GreaterThan)
+    copyprop(sbst, x <= y): copyprop_binary(sbst, x, y, \LessEqual)
+    copyprop(sbst, x >= y): copyprop_binary(sbst, x, y, \GreaterEqual)
+    copyprop_binary(sbst, x, y, op):
+        MakeExpr{op, [copyprop(sbst, x), copyprop(sbst, y)]}
+    copyprop(sbst, x += e): copyprop_assign(sbst, x, e, \AddAssign)
+    copyprop(sbst, x -= e): copyprop_assign(sbst, x, e, \SubAssign)
+    copyprop(sbst, x *= e): copyprop_assign(sbst, x, e, \MulAssign)
+    copyprop(sbst, x /= e): copyprop_assign(sbst, x, e, \DivAssign)
+    copyprop(sbst, x %= e): copyprop_assign(sbst, x, e, \ModAssign)
+    copyprop_assign(sbst, x, e, op):
+        MakeExpr{op, [copyprop(sbst, x), copyprop(sbst, e)]}
+
+    #=== linearization ===
+    # linearize nested expressions.
+    # ret: (x + y) + z
+    #
+    # to
+    #
+    # tmp: x + y
+    # ret: tmp + z
+
+    linearize_list(stmts): map(stmts, s -> linearize(s)[0])
+
+    # linearization of statements
+    linearize(Located{loc, stmt}):   (`Located{!loc, !linearize(stmt)[0]}, nil)
+    linearize(Block{stmts...}):     (MakeExpr{\Block, map(stmts, x -> linearize(x)[0])}, nil)
+    linearize(OpenBlock{stmts...}): (MakeExpr{\OpenBlock, map(stmts, x -> linearize(x)[0])}, nil)
+    linearize(DefineVariable{x, v}): {
+        (stmt, t): linearize(v)
+        (`open {
+            !stmt
+            !x : !t
+        }, x)
+    }
+    linearize(While{e, body}): {
+        (stmt, cnd): linearize_cond(e)
+        (`open {
+            !stmt
+            while (!cnd) {
+                !linearize(body)[0]
+                !stmt
+            }
+        }, nil)
+    }
+
+    # linearization of expressions
+    linearize(x @ Symbol): (nil, x)
+    linearize(x @ Int): (nil, x)
+    linearize(x @ Float): (nil, x)
+
+    linearize(+ x)   : linearize_unary(x, \UnaryPlus)
+    linearize(- x)   : linearize_unary(x, \UnaryMinus)
+    linearize(|x|)   : linearize_unary(x, \Absolute)
+
+    linearize(not x) : linearize_unary(x, \Not)
+    linearize(not (x == y)) : linearize_binary(x, y, \NotEqual)
+    linearize(not (x != y)) : linearize_binary(x, y, \Equal)
+    linearize(not (x < y))  : linearize_binary(x, y, \GreaterEqual)
+    linearize(not (x > y))  : linearize_binary(x, y, \LessEqual)
+    linearize(not (x <= y)) : linearize_binary(x, y, \GreaterThan)
+    linearize(not (x >= y)) : linearize_binary(x, y, \LessThan)
+
+    linearize_unary(e, op): {
+        (stmt, t): linearize(e)
+        v: newSymbol()
+        (`open{
+            !stmt
+            !v : !MakeExpr{op, [t]}
+        }, v)
+    }
+
+    linearize(x + y):  linearize_binary(x, y, \Add)
+    linearize(x - y):  linearize_binary(x, y, \Sub)
+    linearize(x * y):  linearize_binary(x, y, \Mul)
+    linearize(x / y):  linearize_binary(x, y, \Div)
+    linearize(x % y):  linearize_binary(x, y, \Mod)
+    linearize(x ^ y):  linearize_binary(x, y, \Power)
+    linearize(x == y): linearize_binary(x, y, \Equal)
+    linearize(x != y): linearize_binary(x, y, \NotEqual)
+    linearize(x < y):  linearize_binary(x, y, \LessThan)
+    linearize(x > y):  linearize_binary(x, y, \GreaterThan)
+    linearize(x <= y): linearize_binary(x, y, \LessEqual)
+    linearize(x >= y): linearize_binary(x, y, \GreaterEqual)
+    linearize_binary(e1, e2, op): {
+        (stmt1, v1): linearize(e1)
+        (stmt2, v2): linearize(e2)
+        t: newSymbol()
+        (`open {
+            !stmt1
+            !stmt2
+            !t : !MakeExpr{op, [v1, v2]}
+        }, t)
+    } 
+
+    linearize(x += e): linearize_assign(x, e, \AddAssign)
+    linearize(x -= e): linearize_assign(x, e, \SubAssign)
+    linearize(x *= e): linearize_assign(x, e, \MulAssign)
+    linearize(x /= e): linearize_assign(x, e, \DivAssign)
+    linearize(x %= e): linearize_assign(x, e, \ModAssign)
+    linearize_assign(x, e, op): {
+        (stmt, t): linearize(e)
+        (`open {
+            !stmt
+            !MakeExpr{op, [x, t]}
+        }, x)
+    }
+
+    # linearization of conditional expressions
+
+    linearize_cond(not x) : {
+        (stmt, t): linearize(x)
+        (stmt, not t)
+    }
+    linearize_cond(not (x == y)) : linearize_cond_binary(x, y, \NotEqual)
+    linearize_cond(not (x != y)) : linearize_cond_binary(x, y, \Equal)
+    linearize_cond(not (x < y))  : linearize_cond_binary(x, y, \GreaterEqual)
+    linearize_cond(not (x > y))  : linearize_cond_binary(x, y, \LessEqual)
+    linearize_cond(not (x <= y)) : linearize_cond_binary(x, y, \GreaterThan)
+    linearize_cond(not (x >= y)) : linearize_cond_binary(x, y, \LessThan)
+    linearize_cond(x == y)       : linearize_cond_binary(x, y, \Equal)
+    linearize_cond(x != y)       : linearize_cond_binary(x, y, \NotEqual)
+    linearize_cond(x < y)        : linearize_cond_binary(x, y, \LessThan)
+    linearize_cond(x > y)        : linearize_cond_binary(x, y, \GreaterThan)
+    linearize_cond(x <= y)       : linearize_cond_binary(x, y, \LessEqual)
+    linearize_cond(x >= y)       : linearize_cond_binary(x, y, \GreaterEqual)
+    linearize_cond_binary(e1, e2, op): {
+        (stmt1, t1): linearize(e1)
+        (stmt2, t2): linearize(e2)
+        (`open {
+            !stmt1
+            !stmt2
+        }, MakeExpr{op, [t1, t2]})
+    }
+
+    #=== typing ===
+
+    typing(stmts): {
+        tmap: Table::new(stmts.length)
+        map(stmts, s -> typing_stmt(tmap, s))
+    }
+    
+    typing_stmt(tmap, Located{loc, stmt}):
+        `Located{!loc, !typing_stmt(tmap, stmt)}
+
+    typing_stmt(tmap, DefineVariable{x,v}): {
+        (t, e): typing_expr(tmap, v)
+        tmap[x] = t
+        `DefineVariable{!t, !x, !e}
+    }
+
+    typing_stmt(tmap, Block{stmts...}):
+        MakeExpr{\Block, map(stmts, s -> typing_stmt(tmap, s))}
+    typing_stmt(tmap, OpenBlock{stmts...}):
+        MakeExpr{\OpenBlock, map(stmts, s -> typing_stmt(tmap, s))}
+
+    typing_stmt(tmap, While{cnd, body}):
+        `While{!typing_expr(tmap, cnd)[1], !typing_stmt(tmap, body)}
+
+    # mapping from operation and types of arguments to actual instructions
+    instruction_table: Table[
+        # Assignment
+        (\Assign, \Int, \Int)        => \Iasgn,
+        (\Assign, \Float, \Float)    => \Fasgn,
+        (\Assign, \Float, \Int)      => \FIasgn,
+        (\AddAssign, \Int, \Int)     => \Iaddasgn,
+        (\SubAssign, \Int, \Int)     => \Isubasgn,
+        (\MulAssign, \Int, \Int)     => \Imodasgn,
+        (\DivAssign, \Int, \Int)     => \Idivasgn,
+        (\ModAssign, \Int, \Int)     => \Imodasgn,
+        (\AddAssign, \Float, \Float) => \Faddasgn,
+        (\SubAssign, \Float, \Float) => \Fsubasgn,
+        (\MulAssign, \Float, \Float) => \Fmodasgn,
+        (\DivAssign, \Float, \Float) => \Fdivasgn,
+        (\ModAssign, \Float, \Float) => \Fmodasgn,
+
+        # Unary operation
+        (\UnaryMinus, \Int)   => (\Ineg, \Int),
+        (\Absolute, \Int)     => (\Iabs, \Int),
+        (\UnaryMinus, \Float) => (\Fneg, \Float),
+        (\Absolute, \Float)   => (\Fabs, \Float),
+        (\Not, \Bool)         => (\Not, \Bool),
+
+        # Binary operation
+        (\Add, \Int, \Int)     => (\Iadd, \Int),
+        (\Sub, \Int, \Int)     => (\Isbu, \Int),
+        (\Mul, \Int, \Int)     => (\Imul, \Int),
+        (\Div, \Int, \Int)     => (\Idiv, \Int),
+        (\Mod, \Int, \Int)     => (\Imod, \Int),
+        (\Add, \Float, \Float) => (\Fadd, \Float),
+        (\Sub, \Float, \Float) => (\Fsbu, \Float),
+        (\Mul, \Float, \Float) => (\Fmul, \Float),
+        (\Div, \Float, \Float) => (\Fdiv, \Float),
+        (\Mod, \Float, \Float) => (\Fmod, \Float),
+        (\Power, \Int, \Int)     => (\IIpow, \Int),
+        (\Power, \Float, \Int)   => (\FIpow, \Float),
+        (\Power, \Float, \Float) => (\FFpow, \Float),
+
+        # Comparison
+        (\Equal, \Int, \Int)        => (\Ieq, \Bool),
+        (\NotEqual, \Int, \Int)     => (\Ine, \Bool),
+        (\LessThan, \Int, \Int)     => (\Ilt, \Bool),
+        (\GreaterThan, \Int, \Int)  => (\Igt, \Bool),
+        (\LessEqual, \Int, \Int)    => (\Ile, \Bool),
+        (\GreaterEqual, \Int, \Int) => (\Ige, \Bool),
+        (\Equal, \Float, \Float)        => (\Feq, \Bool),
+        (\NotEqual, \Float, \Float)     => (\Fne, \Bool),
+        (\LessThan, \Float, \Float)     => (\Flt, \Bool),
+        (\GreaterThan, \Float, \Float)  => (\Fgt, \Bool),
+        (\LessEqual, \Float, \Float)    => (\Fle, \Bool),
+        (\GreaterEqual, \Float, \Float) => (\Fge, \Bool)
+        ]
+
+    typing_stmt(tmap, x = e):  typing_assign_helper(tmap, x, e, \Assign)
+    typing_stmt(tmap, x += e): typing_assign_helper(tmap, x, e, \AddAssign)
+    typing_stmt(tmap, x -= e): typing_assign_helper(tmap, x, e, \SubAssign)
+    typing_stmt(tmap, x *= e): typing_assign_helper(tmap, x, e, \MulAssign)
+    typing_stmt(tmap, x /= e): typing_assign_helper(tmap, x, e, \DivAssign)
+    typing_stmt(tmap, x %= e): typing_assign_helper(tmap, x, e, \ModAssign)
+    typing_assign_helper(tmap, x, e, op): {
+        (xty, _): typing_expr(tmap, x)
+        (ety, y): typing_expr(tmap, e)
+        typing_assign(x, xty, y, ety, op)
+    }
+    typing_assign(x, xty, e, ety, op): {
+        insn: instruction_table[(op, xty, ety)]
+        if (insn == undefined) throw `UnknownAssignExpr{!op, !xty, !ety}
+        MakeExpr{insn, [x, e]}
+    }
+
+    typing_expr(tmap, x @ Int):     (\Int, x)
+    typing_expr(tmap, x @ Float):   (\Float, x)
+    typing_expr(tmap, x @ Symbol):  (tmap[x], x)
+
+    typing_expr(tmap, + x)   : typing_unary_helper(tmap, x, \UnaryPlus)
+    typing_expr(tmap, - x)   : typing_unary_helper(tmap, x, \UnaryMinus)
+    typing_expr(tmap, |x|)   : typing_unary_helper(tmap, x, \Absolute)
+    typing_expr(tmap, not x) : typing_unary_helper(tmap, x, \Not)
+    typing_unary_helper(tmap, x, op): {
+        (ty, e): typing_expr(tmap, x)
+        typing_unary(e, ty, op)
+    }
+    typing_unary(e, _, \UnaryPlus): typing_expr(tmap, e)
+    typing_unary(e, ty, op): {
+        info: instruction_table[(op, ty)]
+        if (info == undefined) throw `UnknownUnaryExpr{!op, !ty}
+        (info[1], MakeExpr{info[0], [e]})
+    }
+
+    typing_expr(tmap, x + y):  typing_binary_helper(tmap, x, y, \Add)
+    typing_expr(tmap, x - y):  typing_binary_helper(tmap, x, y, \Sub)
+    typing_expr(tmap, x * y):  typing_binary_helper(tmap, x, y, \Mul)
+    typing_expr(tmap, x / y):  typing_binary_helper(tmap, x, y, \Div)
+    typing_expr(tmap, x % y):  typing_binary_helper(tmap, x, y, \Mod)
+    typing_expr(tmap, x ^ y):  typing_binary_helper(tmap, x, y, \Power)
+    typing_expr(tmap, x == y): typing_binary_helper(tmap, x, y, \Equal)
+    typing_expr(tmap, x != y): typing_binary_helper(tmap, x, y, \NotEqual)
+    typing_expr(tmap, x < y):  typing_binary_helper(tmap, x, y, \LessThan)
+    typing_expr(tmap, x > y):  typing_binary_helper(tmap, x, y, \GreaterThan)
+    typing_expr(tmap, x <= y): typing_binary_helper(tmap, x, y, \LessEqual)
+    typing_expr(tmap, x >= y): typing_binary_helper(tmap, x, y, \GreaterEqual)
+    typing_binary_helper(tmap, x, y, op): {
+        (xty, e1): typing_expr(tmap, x)
+        (yty, e2): typing_expr(tmap, y)
+        typing_binary(e1, xty, e2, yty, op)
+    }
+    typing_binary(e1, xty, e2, yty, op): {
+        info: instruction_table[(op, xty, yty)]
+        if (info == undefined) throw `UnknownBinaryExpr{!op, !xty, !yty}
+        (info[1], MakeExpr{info[0], [e1, e2]})
+    }
+}

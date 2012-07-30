@@ -1,19 +1,21 @@
 # Copyright (C) 2012 nineties
 #
-# $Id: io.ab 2012-07-25 16:36:39 nineties $
+# $Id: unittest.ab 2012-07-30 09:07:16 nineties $
 
 module unittest {
     #USAGE :
     #
-    # target "test-target name" {
+    # target "target name" {
     #     test "description" {
-    #         expression    # return true is success)
+    #         expression (return true is success)
     #     }
     # }
 
     statement
-        ::= "test" expr block { `UnitTestTarget{!$1, !$2} }
-          | string block { `UnitTestItem{!$0, !$1} }
+        ::= "test" string block { `UnitTestTarget{!$1, !$2} }
+          | string ":" test_code { `UnitTestItem{!$0, !$2} }
+
+    test_code ::= expr
 
     UnitTestTarget{target, tests} => `{
         printf("=== tests of %s ===\n\n", !target)
@@ -31,4 +33,3 @@ module unittest {
             failed += 1
     }
 }
-

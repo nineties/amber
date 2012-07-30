@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2012-07-24 12:06:08 nineties $
+; $Id: rowl1-packrat.rlc 2012-07-28 03:50:47 nineties $
 ;
 
 ; TODO:
@@ -1284,10 +1284,14 @@
 ; Aligned{ p } is translated to
 ;
 ; elems = []
+; state = copy_parser_state(..)
 ; column = get_column(p)
 ; set_indent(p, column)
 ; v = p
-; if (head(v) == NoParse) return v
+; if (head(v) == NoParse) {
+;     set_parser_state(state)
+;     Parsed{loc, []}
+; }
 ; elems = cons(val(v), elems)
 ; state = copy_parser_state(..)
 ; parse_spaces()
@@ -1334,6 +1338,7 @@
         )
 
     (var body 0)
+    (= body (cons (defvar state (gen_copy_parser_state ParserVar)) body))
     (= body (cons (defvar clmn (apply (to_sym "%get_column") (list1 ParserVar))) body))
     (= body (cons (defvar indent_save (apply (to_sym "%set_indent") (list2 ParserVar clmn))) body))
     (= body (cons (defvar bloc (apply (to_sym "%get_loc") (list1 ParserVar))) body))
@@ -1343,12 +1348,12 @@
     (= body (cons (mkif 
             (make_expr Equal (list2 (make_expr Head (list1 v)) (quote NoParse)))
             (make_expr Block (list2
-                (apply (to_sym "%set_indent") (list2 ParserVar indent_save))
-                (mkreturn v)
+                (gen_set_parser_state ParserVar state)
+                (mkreturn (qquote (make_expr Parsed (list2 (unquote bloc) 0))))
             )))
         body))
     (= body (cons (assign elems (apply (to_sym "cons") (list2 (gen_at v 1) elems))) body))
-    (= body (cons (defvar state (gen_copy_parser_state ParserVar)) body))
+    (= body (cons (gen_set_parser_state state ParserVar) body))
     (if (! space_sensitive_p)
         (= body (cons (apply
             (to_sym "%parse_spaces") (list1 ParserVar)) body))
