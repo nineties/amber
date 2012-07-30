@@ -1,7 +1,7 @@
 ---
 layout: page
 title: "Amber Application Example: N-Body Simulation"
-date: 2012-07-28 08:56
+date: 2012-07-30 09:41
 comments: true
 sharing: true
 footer: true
@@ -123,7 +123,7 @@ koichi:
         { `DiffEqn{!$1, !$4, !$6} }
 
 Douglas:
-> I notice you've added an extra expression (in braces) to each piece of syntax. I'll ask you about that in a minute, but what is the analogous concept for the syntax `1 + 2' which you mentioned previousl?
+> I notice you've added an extra expression (in braces) to each piece of syntax. I'll ask you about that in a minute, but what is the analogous concept for the syntax `1 + 2` which you mentioned previously?
 
 koichi:
 > For example `1 + 2` and `add(1, 2)` have different syntaxes but their internal representation can be same, like `Add{1, 2}`.
@@ -138,12 +138,18 @@ Douglas:
 > OK. Now can you please explain what `` ` `` `!` and `$` mean?
 
 koichi:
-> (WE NEED EXPLANATION)
+> `$n` represents "nth-element of the syntax". For example, when amber parses `d y / d x = ...` using the syntax definition,
+
+    differential_equation ::= "d" symbol "/" "d" symbol "=" expr
+
+> `$0` will be a string `"d"`, `$1` will be a symbol `y`, `$2` will be a string `"/"` and so on.
+
+> `` ` `` and `!` represent operations called quasi-quotation and unquotation. `` `( some expression )`` means "do not evaluate this expression" and `!( some expression )` means "evaluate only this expression". For example, when you write `` `(1 + !(2 + 3)) `` amber evaluates it to `Add{1, 5}`
 
 koichi:
 > Finally, we have to define the meanings attached to these internal representations, like this:
 
-    NbodySim{ini, fin, eqation} => `to_C_program{
+    NbodySim{ini, fin, eqation} => `compile("C") {
         !ini
         while (not !fin) {
             !eqation
@@ -155,9 +161,7 @@ koichi:
     }
 
 koichi:
-> These definitions mean that the patterns on the left hand side of `=>`, like `NbodySim{init, fin, equation}`, will be translated into the corresponding programs on the right. `to_C_program`, from standard library of Amber, translates the program into a C-program.
-
-(WE ALSO NEED EXPLANATION OF QUOTATION AND UNQUOTATION HERE)
+> These definitions mean that the patterns on the left hand side of `=>`, like `NbodySim{init, fin, equation}`, will be translated into the corresponding programs on the right. `compile("C") { ... }`, from standard library of Amber, translates the program into a C-program.
 
 Douglas:
 > How does Amber execute `ini`?
@@ -182,12 +186,11 @@ Koichi:
 
     include "nbody-lib.ab"
     Nbody_simulation {
-        initial: v: Vector(0.0, 1.0, 0.0), x: Vector(1.0, 0.0, 0.0)
+        initial: v: Vector[0.0, 1.0, 0.0], x: Vector[1.0, 0.0, 0.0]
         final:   t >= 1.0
-        equation: {
+        equation:
             d x / d t = v
             d v / d t = - x/|x|^3
-        }
     }
 
 Douglas:
@@ -199,7 +202,8 @@ koichi:
 Douglas:
 > How about `|x|` and `|x|^3`?
 
-(NEEDS TO BE COMPLETED)
+koichi:
+> It's also in a library. `|x|` is the absolute value of the `x`, that is the euclidean norm of the vector `x` in this case. And `|x|^3` is the cube of `|x|`. 
 
 ---------------
 
