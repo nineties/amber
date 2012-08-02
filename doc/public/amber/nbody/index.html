@@ -175,41 +175,163 @@ conditions.</p></blockquote>
 
 <p>Douglas:</p>
 
-<blockquote><p>Is this analogous to a function or subroutine which takes some
-arguments and produces some result?</p></blockquote>
+<blockquote><p>What you wrote above, is that a form of pseudocode, or can Amber directly understand that text, after you add values for the <code>...</code>?</p></blockquote>
 
 <p>Koichi:</p>
 
-<blockquote><p>No, we have to create libraries so that Amber can understand it. For example, if you type <code>1 + 2</code> in amber, there is a little library in Amber which understand the syntax and meaning of <code>1</code> and <code>2</code> and <code>+</code>. So, I first have to define the syntax of this statement in the library. The notation I use is called BNF, and you can read about it at <a href="http://en.wikipedia.org/wiki/Backus-Naur_Form">Backus-Naur Form</a>. The library for this application will contain lines of the following form:</p></blockquote>
+<blockquote><p>It is just a pseudocode and Amber can not understand that text.
+However, we can extend Amber's capability so as to understand our new language.
+Amber supports you to use the most suitable language for writing problems of your domain.</p></blockquote>
 
-<pre><code>statement ::= "Nbody_simulation" "{"
-    initial_condition
-    final_condition
-    equation
-    "}"
+<p>Piet:</p>
 
-initial_condition ::= "initial" ":" expr
-final_condition   ::= "final" ":" expr
-equation ::= "equation" ":" differential_equation
+<blockquote><p>Ah, that is very nice.  Normally when we try to write a new piece of code, we may first scribble a piece of pseudocode on a blackboard.  After that, we translate that into actual lines of code of the computer language we use.  Are you now suggesting to do the exact opposite?  Not changing the pseudocode into code, but extending the language in such a way that it can actually run the pseudocode?</p></blockquote>
 
-differential_equation ::= "d" symbol "/" "d" symbol "=" expr
-</code></pre>
+<p>Koichi:</p>
+
+<blockquote><p>Yes, that's the main idea.  The key here is the development of a Domain Specific Language, or DSL for short.</p></blockquote>
 
 <p>Douglas:</p>
 
-<blockquote><p>What is the status of the word `statement' here?</p></blockquote>
+<blockquote><p>I sort of get it.  Do you have any other examples of DSLs?</p></blockquote>
 
-<p>koichi:</p>
+<p>Koichi:</p>
 
-<blockquote><p>It is a category of the syntax which amber understands. Every Amber programs consist of lines of statements.</p></blockquote>
+<blockquote><p>There are two categories of DSLs.  Originally, a DSL was typically written from scratch, just like any other computer language, but intended for a relatively narrow range of applications, which allows the introduction of specific operations for specialized purposes.  Examples would be <a href="http://en.wikipedia.org/wiki/SQL">SQL</a> for operating relational-database systems and <a href="http://en.wikipedia.org/wiki/Yacc">Yacc</a> for writing parsers.</p>
+
+<p>However, more recently we have begun to use higher level languages to write DSLs directly in terms of those languages themselves.  An example is <a href="http://www.ruby-lang.org/en/">Ruby</a>, that is used to write the killer application <a href="http://rubyonrails.org/">Ruby on Rails</a>, which integrates several DSLs for writing web-application systems easily.</p></blockquote>
+
+<p>Piet:</p>
+
+<blockquote><p>In our case, what is the next step?  Will we stop now what we are doing, as a top-down way of thinking?  And will we now write our new DSL, bottom-up?</p></blockquote>
+
+<p>Koichi:</p>
+
+<blockquote><p>No, the nice thing of writing a DSL in Amber is that we can continue all the way in a top-down fashion.  The next step will be to give Amber a framework in which it can understand the pseudocode.</p></blockquote>
+
+<p>Piet:</p>
+
+<blockquote><p>Very nice!  Let's do it.</p></blockquote>
+
+<p>Koichi:</p>
+
+<blockquote><p>Well, in order for Amber to understand the pseudocode, we first have to define a syntax, in which the pseudocode lines will be valid statements. It can be written like:</p></blockquote>
+
+<pre><code>statement ::= [multiline]
+    "Nbody_simulation" "{"
+        aligned(nbody_simulation_component)
+    "}"
+
+nbody_simulation_component
+    ::= "initial" ":" aligned(statement)
+      | "final" ":" expr
+      | "equation" ":" aligned(differential_equation)
+
+differential_equation  ::= "d" symbol "/" "d" symbol "=" expr
+</code></pre>
+
+<p>Koichi:</p>
+
+<blockquote><p>The notation I use is based on <a href="http://en.wikipedia.org/wiki/Backus-Naur_Form">Backus-Naur Form (BNF)</a> with several extensions.</p></blockquote>
+
+<p>Douglas:</p>
+
+<blockquote><p>What is the status of the word <code>statement</code> here?</p></blockquote>
+
+<p>Koichi:</p>
+
+<blockquote><p>Left-hand side symbols of operator <code>::=</code> is a category of the syntax which Amber understands. Amber adds the right-hand side new syntaxes into the left-hand side categories. Since Amber parses programs as lines of statements, we have to begin with definint our new statement.</p></blockquote>
 
 <p>Douglas:</p>
 
 <blockquote><p>Please explain this particular statement definition.</p></blockquote>
 
-<p>koichi:</p>
+<p>Koichi:</p>
 
-<blockquote><p>Our new statement begins with a string "Nbody_simulation", followed by three elements enclosed within braces: "initial condition", "final condition" and "equation". The initial and final conditions consist of a corresponding header string (e.g., "initial" ":") and an expression. The symbol `Nbody_simulation' is just a unique name of the statement so that Amber can understand the statement. Next, We have to define the internal representation of the new syntaxes.</p></blockquote>
+<blockquote><p>Our new statement begins with a string "Nbody_simulation", followed by a number of elements (<code>nbody_simulation_component</code>) enclosed within bracesk, which constitute the simulation.</p>
+
+<p>Amber's parser distinguish syntax elements based on "indentation-level" and <code>aligned</code> and <code>[multiline]</code> are Amber's extension for defining syntaxes related indentation. <code>aligned(...)</code> parses elements which have same indentation-level and <code>[multiline]</code> tells the parser that some elements of the syntax could be placed in same level. In this case, the string "Nbody_simulation" and the closing brace "}" will be.</p>
+
+<p>The definition of <code>nbody_simulation_component</code> consists of "initial condition", "final condition" and "equation".
+The initial condition consists of a header string "initial", a delimiter ":" and several statements, initialization of variables.
+Definitions of final condition and equation are similar.</p></blockquote>
+
+<p>Piet:</p>
+
+<blockquote><p>It does not seem to be so difficult. So, can Amber understand our pseudocode now?</p></blockquote>
+
+<p>Koichi:</p>
+
+<blockquote><p>Only syntaxes. Because we haven't tell Amber the meaning of our program.
+Well, before going next step, let's see how Amber understand our pseudocode with the current definitions using Amber's interactive shell. Save the definitions above to a file named "nbody-lib.ab" and launch Amber-shell from command-line:</p></blockquote>
+
+<pre><code>$ amber
+amber:1&gt;
+</code></pre>
+
+<blockquote><p>Then, load the "nbody-lib.ab" like this:</p></blockquote>
+
+<pre><code>amber:1&gt; include "nbody-lib.ab";
+=&gt; nil
+amber:2&gt;
+</code></pre>
+
+<blockquote><p>Now, Amber has the capability of understanding our pseudocode. Input a program like this:</p></blockquote>
+
+<pre><code>amber:2&gt; Nbody_simulation {
+amber:2~     initial:
+amber:2~         x: Vector[0.0, 1.0, 0.0]
+amber:2~         v: Vector[1.0, 0.0, 0.0]
+amber:2~         t: 0.0
+amber:2~         dt: 0.01
+amber:2~     final:
+amber:2~         t &gt;= 10.0
+amber:2~     equation:
+amber:2~         d x / d t = v
+amber:2~         d v / d t = -x/|x|^3
+amber:2~ };
+=&gt; ["Nbody_simulation", "{", [["initial", ":", [DefineVariable{x, Vector{0.0, 1.0, 0.0}},
+DefineVariable{v, Vector{1.0, 0.0, 0.0}}, DefineVariable{t, 0.0}, DefineVariable{dt, 0.01}]],
+["final", ":", t &gt;= 1.0.], ["equation", ":", [["d", x, "/", "d", t, "=", v], ["d", v, "/",
+"d", t, "=", -x/|x|^3]]]], "}"]
+</code></pre>
+
+<p>Koichi:</p>
+
+<blockquote><p>You can see that Amber understands our language just as a sequence
+of tokens.</p>
+
+<pre><code>Tokens like "{" or "d" are not necessary for Amber. So it is
+</code></pre>
+
+<p>better to re-form tokens.</p>
+
+<pre><code>Re-formation of tokens can be written like:
+</code></pre></blockquote>
+
+<p>statement ::= [multiline]</p>
+
+<pre><code>"Nbody_simulation" "{"
+    initial_condition
+    final_condition
+    equation
+"}"
+{ `Nbody_simulation{!$2,!$3, !$4} }
+</code></pre>
+
+<p>initial_condition ::= "initial" ":" aligned(statement) { $2 }
+final_condition   ::= "final" ":" expr { $2 }
+equation ::= "equation" ":" aligned(differential_equation) { $2 }</p>
+
+<p>differential_equation</p>
+
+<pre><code>::= "d" symbol "/" "d" symbol "=" expr
+    { `DiffEqn{!$1, !$4, !$6} }
+</code></pre>
+
+<p>(Qs and As)</p>
+
+<p> The initial and final conditions consist of a corresponding header string (e.g., "initial" ":") and an expression. The symbol `Nbody_simulation' is just a unique name of the statement so that Amber can understand the statement. Next, We have to define the internal representation of the new syntaxes.</p>
 
 <pre><code>statement ::= "Nbody_simulation" "{"
     initial_condition
@@ -230,7 +352,7 @@ differential_equation ::= "d" symbol "/" "d" symbol "=" expr
 
 <blockquote><p>I notice you've added an extra expression (in braces) to each piece of syntax. I'll ask you about that in a minute, but what is the analogous concept for the syntax <code>1 + 2</code> which you mentioned previously?</p></blockquote>
 
-<p>koichi:</p>
+<p>Koichi:</p>
 
 <blockquote><p>For example <code>1 + 2</code> and <code>add(1, 2)</code> have different syntaxes but their internal representation can be same, like <code>Add{1, 2}</code>.</p></blockquote>
 
@@ -238,7 +360,7 @@ differential_equation ::= "d" symbol "/" "d" symbol "=" expr
 
 <blockquote><p>So, is <code>Nbody_simulation{...}</code> the internal representation of my problem?.</p></blockquote>
 
-<p>koichi:</p>
+<p>Koichi:</p>
 
 <blockquote><p>Correct.</p></blockquote>
 
@@ -246,7 +368,7 @@ differential_equation ::= "d" symbol "/" "d" symbol "=" expr
 
 <blockquote><p>OK. Now can you please explain what <code>`</code> <code>!</code> and <code>$</code> mean?</p></blockquote>
 
-<p>koichi:</p>
+<p>Koichi:</p>
 
 <blockquote><p><code>$n</code> represents "nth-element of the syntax". For example, when amber parses <code>d y / d x = ...</code> using the syntax definition,</p></blockquote>
 
@@ -257,7 +379,7 @@ differential_equation ::= "d" symbol "/" "d" symbol "=" expr
 
 <p><code>`</code> and <code>!</code> represent operations called quasi-quotation and unquotation. <code>`( some expression )</code> means "do not evaluate this expression" and <code>!( some expression )</code> means "evaluate only this expression". For example, when you write <code>`(1 + !(2 + 3))</code> amber evaluates it to <code>Add{1, 5}</code></p></blockquote>
 
-<p>koichi:</p>
+<p>Koichi:</p>
 
 <blockquote><p>Finally, we have to define the meanings attached to these internal representations, like this:</p></blockquote>
 
@@ -273,7 +395,7 @@ DiffEqn{y, x, fun} =&gt; `{
 }
 </code></pre>
 
-<p>koichi:</p>
+<p>Koichi:</p>
 
 <blockquote><p>These definitions mean that the patterns on the left hand side of <code>=&gt;</code>, like <code>NbodySim{init, fin, equation}</code>, will be translated into the corresponding programs on the right. <code>compile("C") { ... }</code>, from standard library of Amber, translates the program into a C-program.</p></blockquote>
 
@@ -281,7 +403,7 @@ DiffEqn{y, x, fun} =&gt; `{
 
 <blockquote><p>How does Amber execute <code>ini</code>?</p></blockquote>
 
-<p>koichi:</p>
+<p>Koichi:</p>
 
 <blockquote><p>It doesn't: Amber does not execute the actual simulation.  It just generates the code for the simulation.</p></blockquote>
 
@@ -289,7 +411,7 @@ DiffEqn{y, x, fun} =&gt; `{
 
 <blockquote><p>So, what form does <code>ini</code> take?</p></blockquote>
 
-<p>koichi:</p>
+<p>Koichi:</p>
 
 <blockquote><p>It would be easier to explain with a specific N-body problem.  Can you suggest one?</p></blockquote>
 
@@ -318,7 +440,7 @@ Nbody_simulation {
 
 <blockquote><p>I assume that amber has <code>Vector</code> as a built-in type, or in some standard mathematical library?</p></blockquote>
 
-<p>koichi:</p>
+<p>Koichi:</p>
 
 <blockquote><p>It's in a library</p></blockquote>
 
@@ -326,7 +448,7 @@ Nbody_simulation {
 
 <blockquote><p>How about <code>|x|</code> and <code>|x|^3</code>?</p></blockquote>
 
-<p>koichi:</p>
+<p>Koichi:</p>
 
 <blockquote><p>It's also in a library. <code>|x|</code> is the absolute value of the <code>x</code>, that is the euclidean norm of the vector <code>x</code> in this case. And <code>|x|^3</code> is the cube of <code>|x|</code>.</p></blockquote>
 
@@ -336,7 +458,7 @@ Nbody_simulation {
 
 <blockquote><p>That didn't seem too hard.  But remember I am really interested in the general gravitational N-body problem</p></blockquote>
 
-<p>koichi:</p>
+<p>Koichi:</p>
 
 <blockquote><p>Shall we implement it now?</p></blockquote>
 
