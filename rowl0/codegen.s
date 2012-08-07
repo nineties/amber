@@ -10,9 +10,9 @@
 
 .data
 
-.equ DATA_AREA,0
-.equ RODATA_AREA,1
-.equ TEXT_AREA,2
+.set DATA_AREA,0
+.set RODATA_AREA,1
+.set TEXT_AREA,2
 
 area: .long TEXT_AREA
 
@@ -20,7 +20,7 @@ label_idgen: .long 0
 
 .text
 
-.global _new_labelid
+.globl _new_labelid
 _new_labelid:
     movl    label_idgen, %eax
     incl    label_idgen
@@ -38,7 +38,7 @@ _change_area:
 1:
     ret
 
-.global _enter_data_area, _enter_rodata_area, _enter_text_area
+.globl _enter_data_area, _enter_rodata_area, _enter_text_area
 _enter_data_area:
     pushl   $DATA_AREA
     call    _change_area
@@ -59,62 +59,63 @@ _enter_text_area:
 
 
 
-.section .rodata
+.const_data
 area_text: .long data_text, rodata_text, text_text
-data_text:    .string ".data\n"
-rodata_text:  .string ".section .rodata\n"
-text_text:    .string ".text\n"
-global_text:  .string ".global "
-comm_text:    .string ".comm "
-long_text:    .string ".long "
-string_text:  .string ".string "
-equ_text:     .string ".equ "
-include_text: .string ".include "
-ret_text:     .string "\tret"
-movb_text:    .string "\tmovb "
-movl_text:    .string "\tmovl "
-pushl_text:   .string "\tpushl "
-popl_text:    .string "\tpopl "
-leave_text:   .string "\tleave"
-int_text:     .string "\tint "
-addl_text:    .string "\taddl "
-subl_text:    .string "\tsubl "
-imul_text:    .string "\timul "
-idiv_text:    .string "\tidiv "
-negl_text:    .string "\tnegl "
-shrl_text:    .string "\tshrl "
-andl_text:    .string "\tandl "
-orl_text:     .string "\torl "
-xorl_text:    .string "\txorl "
-notl_text:    .string "\tnotl "
-call_text:    .string "\tcall "
-cmpl_text:    .string "\tcmpl "
-jmp_text:     .string "\tjmp "
-je_text:      .string "\tje "
-pushf_text:   .string "\tpushf"
-incl_text:    .string "\tincl "
-decl_text:    .string "\tdecl "
-setg_text:    .string "\tsetg "
-setge_text:   .string "\tsetge "
-setl_text:    .string "\tsetl "
-setle_text:   .string "\tsetle "
-sete_text:    .string "\tsete "
-setne_text:   .string "\tsetne "
-movzbl_text:  .string "\tmovzbl "
-movsbl_text:  .string "\tmovsbl "
-al_text:      .string "%al"
-eax_text:     .string "%eax"
-ebx_text:     .string "%ebx"
-ecx_text:     .string "%ecx"
-edx_text:     .string "%edx"
-esi_text:     .string "%esi"
-edi_text:     .string "%edi"
-esp_text:     .string "%esp"
-ebp_text:     .string "%ebp"
-lbl_text:     .string "_lbl"
+data_text:    .asciz ".data\n"
+rodata_text:  .asciz ".const_data\n"
+text_text:    .asciz ".text\n"
+global_text:  .asciz ".globl "
+comm_text:    .asciz ".comm "
+long_text:    .asciz ".long "
+string_text:  .asciz ".asciz "
+equ_text:     .asciz ".set "
+include_text: .asciz ".include "
+ret_text:     .asciz "\tret"
+movb_text:    .asciz "\tmovb "
+movl_text:    .asciz "\tmovl "
+leal_text:	  .asciz "\tleal "
+pushl_text:   .asciz "\tpushl "
+popl_text:    .asciz "\tpopl "
+leave_text:   .asciz "\tleave"
+sysenter_text: .asciz "\tsysenter "
+addl_text:    .asciz "\taddl "
+subl_text:    .asciz "\tsubl "
+imul_text:    .asciz "\timul "
+idiv_text:    .asciz "\tidiv "
+negl_text:    .asciz "\tnegl "
+shrl_text:    .asciz "\tshrl "
+andl_text:    .asciz "\tandl "
+orl_text:     .asciz "\torl "
+xorl_text:    .asciz "\txorl "
+notl_text:    .asciz "\tnotl "
+call_text:    .asciz "\tcall "
+cmpl_text:    .asciz "\tcmpl "
+jmp_text:     .asciz "\tjmp "
+je_text:      .asciz "\tje "
+pushf_text:   .asciz "\tpushf"
+incl_text:    .asciz "\tincl "
+decl_text:    .asciz "\tdecl "
+setg_text:    .asciz "\tsetg "
+setge_text:   .asciz "\tsetge "
+setl_text:    .asciz "\tsetl "
+setle_text:   .asciz "\tsetle "
+sete_text:    .asciz "\tsete "
+setne_text:   .asciz "\tsetne "
+movzbl_text:  .asciz "\tmovzbl "
+movsbl_text:  .asciz "\tmovsbl "
+al_text:      .asciz "%al"
+eax_text:     .asciz "%eax"
+ebx_text:     .asciz "%ebx"
+ecx_text:     .asciz "%ecx"
+edx_text:     .asciz "%edx"
+esi_text:     .asciz "%esi"
+edi_text:     .asciz "%edi"
+esp_text:     .asciz "%esp"
+ebp_text:     .asciz "%ebp"
+lbl_text:     .asciz "_lbl"
 .text
 
-.global _symbol
+.globl _symbol
 _symbol:
     movl    4(%esp), %eax
     cmpl    %eax, token_tag
@@ -123,7 +124,7 @@ _symbol:
 1:
     call    _syntax_error
 
-.global _ident
+.globl _ident
 _ident:
     cmpl    $TOK_IDENT, token_tag
     jne     1f
@@ -131,7 +132,7 @@ _ident:
 1:
     call    _syntax_error
 
-.global _syntax_error
+.globl _syntax_error
 _syntax_error:
     call    _flush
     pushl   output_fd
@@ -147,8 +148,8 @@ _syntax_error:
     popl    output_fd
     pushl   $1
     call    _exit
-.section .rodata
-errmsg: .string "ERROR: syntax error\n"
+.const_data
+errmsg: .asciz "ERROR: syntax error\n"
 .text
 
 _put_pushl:
@@ -173,7 +174,7 @@ _put_popl:
     addl    $4, %esp
     ret
 
-.global _pushl_eax, _pushl_ebx, _pushl_ecx, _pushl_edx, _pushl_esi, _pushl_edi, _pushl_ebp
+.globl _pushl_eax, _pushl_ebx, _pushl_ecx, _pushl_edx, _pushl_esi, _pushl_edi, _pushl_ebp
 _pushl_eax:
     pushl   $eax_text
     call    _put_pushl
@@ -216,7 +217,7 @@ _pushl_ebp:
     addl    $4, %esp
     ret
 
-.global _popl_eax, _popl_ebx, _popl_ecx, _popl_edx, _popl_esi, _popl_edi, _popl_ebp
+.globl _popl_eax, _popl_ebx, _popl_ecx, _popl_edx, _popl_esi, _popl_edi, _popl_ebp
 _popl_eax:
     pushl   $eax_text
     call    _put_popl
@@ -260,7 +261,7 @@ _popl_ebp:
     ret
 
 /* instructions */ 
-.global _movb, _movl, _addl, _subl, _imul, _idiv, _andl, _orl, _xorl, _notl, _negl, _shrl, _jmp, _je, _cmpl, _call, _ret, _pushl, _popl, _leave, _int, _pushf, _incl, _decl, _setg, _setg, _setge, _setl, _setle, _sete, _setne, _movzbl, _movsbl
+.globl _movb, _movl, _leal, _addl, _subl, _imul, _idiv, _andl, _orl, _xorl, _notl, _negl, _shrl, _jmp, _je, _cmpl, _call, _ret, _pushl, _popl, _leave, _sysenter, _pushf, _incl, _decl, _setg, _setg, _setge, _setl, _setle, _sete, _setne, _movzbl, _movsbl
 _movb:
     pushl   $movb_text
     call    _puts
@@ -269,6 +270,12 @@ _movb:
 
 _movl:
     pushl   $movl_text
+    call    _puts
+    addl    $4, %esp
+    ret
+
+_leal:
+    pushl   $leal_text
     call    _puts
     addl    $4, %esp
     ret
@@ -381,8 +388,8 @@ _leave:
     addl    $4, %esp
     ret
 
-_int:
-    pushl   $int_text
+_sysenter:
+    pushl   $sysenter_text
     call    _puts
     addl    $4, %esp
     ret
@@ -453,7 +460,7 @@ _movsbl:
     ret
 
 /* registers */
-.global _al, _eax, _ebx, _ecx, _edx, _esp, _ebp, _setebp
+.globl _al, _eax, _ebx, _ecx, _edx, _esp, _ebp, _setebp
 _al:
     pushl   $al_text
     call    _puts
@@ -508,7 +515,7 @@ _setebp:
     ret
     
 /* variables */
-.global _xvar, _pvar
+.globl _xvar, _pvar
 _xvar:
     subl    $4, %esp
     movl    $'-, (%esp)
@@ -542,7 +549,7 @@ _pvar:
     ret
 
 /* constants */
-.global _integer
+.globl _integer
 _integer:
     pushl   $'$
     call    _putc
@@ -554,7 +561,7 @@ _integer:
     ret
 
 /* others */
-.global _label, _labeldef, _labeladdr
+.globl _label, _labeldef, _labeladdr
 _label:
     subl    $4, %esp
     movl    $lbl_text, (%esp)
@@ -585,7 +592,7 @@ _labeladdr:
     addl    $4, %esp
     ret
 
-.global _dot_long, _dot_string, _dot_global, _dot_comm, _dot_equ, _dot_include
+.globl _dot_long, _dot_string, _dot_global, _dot_comm, _dot_equ, _dot_include
 _dot_long:
     pushl   $long_text
     call    _puts
@@ -622,7 +629,7 @@ _dot_include:
     addl    $4, %esp
     ret
 
-.global _comma, _space, _tab, _nl
+.globl _comma, _space, _tab, _nl
 _comma:
     pushl   $',
     call    _putc
@@ -636,13 +643,13 @@ _space:
     ret
 
 _tab:
-    pushl   $'\t
+    pushl   $0x09
     call    _putc
     addl    $4, %esp
     ret
 
 _nl:
-    pushl   $'\n
+    pushl   $0x0a
     call    _putc
     addl    $4, %esp
     ret

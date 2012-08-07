@@ -11,9 +11,9 @@ BINDIR = /usr/bin
 LIBDIR = /usr/lib
 
 AS = as
-ASFLAGS = --32
+ASFLAGS = -arch i386
 LD = ld
-LDFLAGS = --nostdlib -m elf_i386 --entry=_start
+LDFLAGS = -e _start -arch i386
 
 RLC0 = $(ROWL0DIR)/rlc
 
@@ -52,7 +52,7 @@ rlci: $(OBJECTS)
 	$(LD) $(OBJECTS) -o $@ $(LDFLAGS)
 
 
-VMLDFLAGS = --nostdlib -m elf_i386 --entry=_start
+VMLDFLAGS = -e _start -arch i386
 VMOBJECTS = vm-main.o\
 		vm-eval.o\
 		vm-gc.o\

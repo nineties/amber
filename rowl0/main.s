@@ -10,10 +10,10 @@
 
 .text
 
-.global _main
+.globl _main
 _main:
-    subl    $4, %esp
-    call    _lex
-    call    _program
-    movl    $0, (%esp)
-    call    _exit
+	subl    $4, %esp
+	call    _lex
+	call    _program
+	movl    $0, (%esp)
+	call    _exit

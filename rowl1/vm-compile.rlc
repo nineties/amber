@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-compile.rlc 2012-01-23 04:39:22 nineties $
+; $Id: vm-compile.rlc 2012-08-07 19:29:16 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -60,7 +60,7 @@
     (cond
         ((int? opd)     (print '$' opd))
         ((== opd '\0')  (print "$0"))
-        ((char? opd)    (print "$'" (escape opd)))
+        ((char? opd)    (print "$" (char2int opd)))
         ((== `%top opd) (print "(%esp)"))
         ((symbol? opd)  (print opd))
         ((== `var (car opd)) (do
@@ -370,18 +370,26 @@
     ))
 
 (define emit_syscall ((syscall . args) dst ret) (do
+	(var exit_lbl (mklabel `sysenter_exit))
     (var regs `(%eax %ebx %ecx %edx %esi %edi %ebp))
     (var narg (length args))
     ; evaculate special purpose registers
     (if (> narg 1) (pushl `%ebx))
     (upto r 4 (- narg 1) (pushl (nth r regs)))
+
+	(= args (reverse args))
     (foreach e args (do
         (emit_expr e `%eax nil)
         (pushl `%eax)
         ))
-    (upto r 1 narg (movl `(deref %esp @(* 4 (- narg r))) (nth (- r 1) regs)))
+	(popl `%eax)
+	(emit "leal -4(%esp), %ecx")
+	(emit "movl $" exit_lbl `%edx)
+	(emit "sysenter")
+	(print_label exit_lbl)
     (drop narg)
-    (emit "int" 0x80)
+	(emit "xorl %edx, %edx")
+
     (if dst (movl `%eax dst))
     ; restore special purpose registers
     (downto r (- narg 1) 4 (popl (nth r regs)))
@@ -678,10 +686,10 @@
 
 (var current_area `text)
 (define emit_area (sym)
-    (println (assoc sym `((text . ".section .text") (data . ".section .data") (rodata . ".section .rodata")))))
+    (println (assoc sym `((text . ".text") (data . ".data") (rodata . ".const_data")))))
 (define change_area (sym) (if (!= sym current_area) (do (emit_area sym) (set current_area sym))))
 
-(define emit_export ((_ name)) (print ".global " name '\n'))
+(define emit_export ((_ name)) (print ".globl " name '\n'))
 
 (define emit_extern ((_ type name)) (add_var name `(global @type @name)))
 
@@ -698,7 +706,7 @@
 (define emit_static_string ((_ sym str)) (do
     (change_area `rodata)
     (print_label sym)
-    (print "\t.string ")
+    (print "\t.asciz ")
     (emit_string str)
     (print '\n')
     (add_var sym `(global string @sym))
@@ -712,7 +720,7 @@
             (var directive (if (== elemsz 4) "\t.long " "\t.byte "))
             (foreach v (car init) (println directive v))
             (var rem (- len (length (car init))))
-            (if (> rem 0) (println "\t.zero " (* elemsz rem)))
+            (if (> rem 0) (println "\t.fill " (* elemsz rem) ",1, 0"))
         )
         (do
             (println ".comm " sym ", " (* len elemsz))

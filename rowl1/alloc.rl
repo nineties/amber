@@ -9,8 +9,8 @@ include(stddef);
 
 export(memalloc, finalize_mem);
 
-SYS_MMAP2  => 192;
-SYS_MUNMAP => 91;
+SYS_MMAP   => 197;
+SYS_MUNMAP => 73;
 PROT_READ  => 1;
 PROT_WRITE => 2;
 PROT_EXEC  => 4;
@@ -21,7 +21,7 @@ MAP_SHARED    => 1;
 MAP_PRIVATE   => 2;
 MAP_TYPE      => 15;
 MAP_FIXED     => 16; (% 0x10 %);
-MAP_ANONYMOUS => 32; (% 0x20 %);
+MAP_ANONYMOUS => 4096; (% 0x1000 %);
 
 BLOCK_SIZE => 1048576;  (% 1Mbyte %);
 BLOCK_MASK => 1048575;  (% BLOCK_SIZE - 1 %);
@@ -34,14 +34,14 @@ num_block : 0;
 free_first : 0;
 free_last  : 0;
 
-(% mmap2(void *addr, int size) %);
-mmap2: (p0, p1) {
+(% mmap(void *addr, int size) %);
+mmap: (p0, p1) {
     allocate(1);
-    x0 = syscall(SYS_MMAP2, p0, p1, PROT_READ|PROT_WRITE|PROT_EXEC,
+    x0 = syscall(SYS_MMAP, p0, p1, PROT_READ|PROT_WRITE|PROT_EXEC,
         MAP_ANONYMOUS|MAP_PRIVATE, -1, 0);
     if (-128 <= x0) {
         if (x0 < 0) {
-            panic("mmap2 failed");
+            panic("mmap failed");
         }
     };
     return x0;
@@ -57,7 +57,7 @@ munmap: (p0, p1) {
 alloc_block: (p0) {
     allocate (2); (% x0: address of new block %);
     p0 = p0 + BLOCK_SIZE;
-    x0 = mmap2(0, p0);
+    x0 = mmap(0, p0);
     x1 = x0 & BLOCK_MASK;
     if (munmap(x0, BLOCK_SIZE - x1) < 0) {
         panic("munmap failed");
@@ -77,7 +77,7 @@ alloc_block_fast: () {
     if (next_addr == 0) {
         x0 = alloc_block(BLOCK_SIZE);
     } else {
-        x0 = mmap2(next_addr, BLOCK_SIZE);
+        x0 = mmap(next_addr, BLOCK_SIZE);
         if (x0 & BLOCK_MASK != 0) {
             if (munmap(x0, BLOCK_SIZE) < 0) {
                 panic("munmap failed");

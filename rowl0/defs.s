@@ -6,9 +6,9 @@
 /* $Id: defs.s 2010-05-31 01:26:00 nineties $ */
 
 /* file descriptors */
-.equ STDIN_FD, 0
-.equ STDOUT_FD, 1
-.equ STDERR_FD, 2
+.set STDIN_FD, 0
+.set STDOUT_FD, 1
+.set STDERR_FD, 2
 
-.equ NULL, 0
-.equ EOF, (-1)
+.set NULL, 0
+.set EOF, (-1)

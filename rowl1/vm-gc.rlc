@@ -8,8 +8,8 @@
 (import "stdlib")
 (import "vm-compile")
 
-(var SYS_MUNMAP  91)
-(var SYS_MMAP2   192)
+(var SYS_MUNMAP  73)
+(var SYS_MMAP    197)
 
 ; mmap options
 (var PROT_READ  0x1)
@@ -21,7 +21,7 @@
 (var MAP_PRIVATE   0x2)
 (var MAP_TYPE      0xf)
 (var MAP_FIXED     0x10)
-(var MAP_ANONYMOUS 0x20)
+(var MAP_ANONYMOUS 0x1000)
 
 (var DEFAULT_NUM_BLOCK 32) ; 32Mbyte
 
@@ -169,10 +169,10 @@
     (incr num_static)
     ))
 
-(fun mmap2 (addr size) (
-    (void* ptr (syscall @SYS_MMAP2 addr size
+(fun mmap (addr size) (
+    (void* ptr (syscall @SYS_MMAP addr size
         @(| PROT_READ PROT_WRITE PROT_EXEC) @(| MAP_ANONYMOUS MAP_PRIVATE) -1 0))
-    (if (&& (<= -128 ptr) (< ptr 0))  ((error "mmap2 failed\n")))
+    (if (&& (<= -128 ptr) (< ptr 0))  ((error "mmap failed\n")))
     (return ptr)
     ))
 
@@ -184,7 +184,7 @@
 (export alloc_block)
 (fun alloc_block (size) (
     (+= size @BLOCK_SIZE)
-    (void* ptr (mmap2 0 size))
+    (void* ptr (mmap 0 size))
     (void* slop (& ptr @BLOCK_MASK))
     (if (< (munmap ptr (- @BLOCK_SIZE slop)) 0) ((error "munmap failed\n")))
     (if (&& (> slop 0) (< (munmap (- (+ ptr size) slop) slop) 0))
@@ -201,7 +201,7 @@
     (if (== next_addr 0)
         ((= addr (alloc_block @BLOCK_SIZE)))
         (
-            (= addr (mmap2 next_addr @BLOCK_SIZE))
+            (= addr (mmap next_addr @BLOCK_SIZE))
             (if (!= (& addr @BLOCK_MASK) 0)
                 (
                     (if (< (munmap addr @BLOCK_SIZE) 0) ((error "munmap failed\n")))

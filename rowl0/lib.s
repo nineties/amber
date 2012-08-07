@@ -8,60 +8,69 @@
 .include "defs.s"
 
 /* system calls */
-.equ SYS_EXIT,  1
-.equ SYS_READ,  3
-.equ SYS_WRITE, 4
+.set SYS_EXIT,  1
+.set SYS_READ,  3
+.set SYS_WRITE, 4
 
-.equ RDBUFSZ,512
-.equ WRBUFSZ,512
+.set RDBUFSZ,262144
+.set WRBUFSZ,262144
 
 .data
 
-.global output_fd
+.globl output_fd
 output_fd: .long STDOUT_FD
 
 /* IO buffers */
-.comm  rdbuf,RDBUFSZ,1
+.comm  rdbuf,RDBUFSZ
 rdbuf_beg: .long 0
 rdbuf_end: .long 0
 
-.comm  wrbuf,WRBUFSZ,1
+.comm  wrbuf,WRBUFSZ
 wrbuf_idx: .long 0
 
 .text
 
 /* void _flush(void); */
-.global _flush
+.globl _flush
 _flush:
     pushl   %ebp
     movl    %esp, %ebp
     cmpl    $0, wrbuf_idx
     je      1f    /* wrbuf is empty */
-    movl    $SYS_WRITE, %eax
-    movl    output_fd, %ebx
-    movl    $wrbuf, %ecx
-    movl    wrbuf_idx, %edx
-    int     $0x80
+	
+	pushl	wrbuf_idx
+	pushl	$wrbuf
+	pushl	output_fd
+	movl	$SYS_WRITE, %eax
+	leal	-4(%esp), %ecx
+	movl	$_flush_exit, %edx
+	sysenter
+_flush_exit:
     movl    $0, wrbuf_idx
 1:
-    popl    %ebp
+	leave
     ret
 
 /* int _getc(void); */
-.global _getc
+.globl _getc
 _getc:
     pushl   %ebp
     movl    %esp, %ebp
+	pushl	%ebx
     movl    rdbuf_beg, %ebx
     cmpl    %ebx, rdbuf_end
     jne     1f
     movl    $0, rdbuf_beg
     movl    $0, rdbuf_end
-    movl    $SYS_READ, %eax
-    movl    $STDIN_FD, %ebx
-    movl    $rdbuf, %ecx
-    movl    $RDBUFSZ, %edx
-    int     $0x80
+
+	pushl	$RDBUFSZ
+	pushl	$rdbuf
+	pushl	$STDIN_FD
+	movl	$SYS_READ, %eax
+	leal	-4(%esp), %ecx
+	movl	$_getc_exit, %edx
+	sysenter
+_getc_exit:
     cmpl    $0, %eax      /* check EOF or error */
     jbe     2f
     movl    %eax, rdbuf_end
@@ -70,48 +79,58 @@ _getc:
     movb    rdbuf(%ebx), %al    /* rdbuf[rdbuf_beg] */
     leal    1(%ebx), %ebx
     movl    %ebx, rdbuf_beg
-    popl    %ebp
+
+	popl	%ebx
+	leave
     ret
 2:  /* EOF or error */
     movl    $EOF, %eax
-    popl    %ebp
+	popl	%ebx
+	leave
     ret
 
 /* int _nextc(void); 
    Looks ahead next character in rdbuf.
  */
-.global _nextc
+.globl _nextc
 _nextc:
     push    %ebp
     movl    %esp, %ebp
+	pushl	%ebx
     movl    rdbuf_beg, %ebx
     cmpl    %ebx, rdbuf_end
     jne     1f
     movl    $0, rdbuf_beg
     movl    $0, rdbuf_end
+	pushl	$RDBUFSZ
+	pushl	$rdbuf
+	pushl	$STDIN_FD
     movl    $SYS_READ, %eax
-    movl    $STDIN_FD, %ebx
-    movl    $rdbuf, %ecx
-    movl    $RDBUFSZ, %edx
-    int     $0x80
+	leal	-4(%esp), %ecx
+	movl	$_nextc_exit, %edx
+	sysenter
+_nextc_exit:
     cmpl    $0, %eax      /* check EOF or error */
     jbe     2f
     movl    %eax, rdbuf_end
 1:
     xorl    %eax, %eax
     movb    rdbuf(%ebx), %al
+	popl	%ebx
     leave
     ret
 2:  /* EOF or error */
     movl    $EOF, %eax
+	popl	%ebx
     leave
     ret
 
 /* int _putc(int c); */
-.global _putc
+.globl _putc
 _putc:
     pushl   %ebp
     movl    %esp, %ebp
+	pushl	%ebx
     movl    8(%ebp), %eax     /* %eax = c */
     movl    wrbuf_idx, %ebx
     movl    %eax, wrbuf(%ebx) /* wrbuf[wrbuf_idx] = c */
@@ -119,20 +138,22 @@ _putc:
     movl    %ebx, wrbuf_idx 
     cmpl    $WRBUFSZ, %ebx
     je      1f
-    cmpb    $'\n, %al
+    cmpb    $0x0a, %al
     je      1f
     jmp     2f
 1:
     call    _flush
 2:
+	popl	%ebx
     leave
     ret
 
 /* void _puts(const char *str); */
-.global _puts
+.globl _puts
 _puts:
     pushl   %ebp
     movl    %esp, %ebp
+	pushl	%ebx
     subl    $16, %esp
     movl    8(%ebp), %ebx   /* %ebx = str */
 1:
@@ -147,16 +168,18 @@ _puts:
     addl    $1, %ebx
     jmp     1b
 2:
+	popl	%ebx
     leave
     ret
 
 /* 32bit decimal integers are less than 11 digits */
-.comm putnum_digits,10,1
+.comm putnum_digits,10
 /* void _putnum(int x) */
-.global _putnum
+.globl _putnum
 _putnum:
     pushl   %ebp
     movl    %esp, %ebp
+	pushl	%ebx
     subl    $16, %esp
     xorl    %ecx, %ecx
     movl    8(%ebp), %eax
@@ -180,10 +203,11 @@ _putnum:
     movl    -4(%ebp), %ecx
     cmpl    $0, %ecx
     jne     2b
+	popl	%ebx
     leave
     ret
 
-.global _strlen
+.globl _strlen
 _strlen:
     xorl    %eax, %eax
     movl    4(%esp), %ebx
@@ -197,7 +221,7 @@ _strlen:
 2:
     ret
 
-.global _strcpy
+.globl _strcpy
 _strcpy:
     pushl   %ebp
     movl    %esp, %ebp
@@ -215,7 +239,7 @@ _strcpy:
     leave
     ret
 
-.global _strcmp
+.globl _strcmp
 _strcmp:
     pushl   %ebp
     movl    %esp, %ebp
@@ -242,12 +266,13 @@ _strcmp:
 
 
 /* void _exit(int status); */
-.global _exit
+.globl _exit
 _exit:
     pushl   %ebp
     movl    %esp, %ebp
-    call    _flush
-    movl    $SYS_EXIT, %eax
-    movl    8(%esp), %ebx
-    int     $0x80
-    ret
+	call	_flush
+	movl	8(%esp), %eax
+	pushl	%eax
+	leal	-4(%esp), %ecx
+	movl	$SYS_EXIT, %eax
+	sysenter

@@ -10,15 +10,15 @@
 
 .data
 
-.equ STRING_BUFFER_LEN, 32768
+.set STRING_BUFFER_LEN, 32768
 .comm string_buffer,STRING_BUFFER_LEN,1
 string_offs: .long 0
 string_buflen: .long 0
 
 .text
 
-.section .rodata
-string_literals_text: .string "_string_literals"
+.const_data
+string_literals_text: .asciz "_string_literals"
 .text
 
 _strlen_with_escape:
@@ -28,7 +28,7 @@ _strlen_with_escape:
     movb    (%ebx), %cl
     cmpb    $0, %cl
     je      2f
-    cmpb    $'\\, %cl
+    cmpb    $0x5c, %cl
     je      3f
     incl    %ebx
     incl    %eax
@@ -144,11 +144,11 @@ _gen_string_literals:
     addl    $8, %esp
     ret
 
-.section .rodata
-string_literals: .string "ERROR: too many string literals\n"
+.const_data
+string_literals: .asciz "ERROR: too many string literals\n"
 .text
 
-.global _program
+.globl _program
 _program:
     call    _enter_text_area
     cmpl    $TOK_END, token_tag
@@ -190,7 +190,7 @@ _external_item:
     call    _item
     ret
 
-.global _item
+.globl _item
 _item:
     cmpl    $TOK_GOTO, token_tag
     je      1f
@@ -435,40 +435,63 @@ _item:
     ret
 
 _syscall:
-    subl    $4, %esp
+	subl	$8, %esp
     call    _pushl_esi
     call    _pushl_edi
     call    _pushl_ebp
     call    _lex
     call    _args
-    cmpl    $7, %eax
-    je      1f
-    cmpl    $6, %eax
-    je      2f
-    cmpl    $5, %eax
-    je      3f
-    cmpl    $4, %eax
-    je      4f
-    cmpl    $3, %eax
-    je      5f
-    cmpl    $2, %eax
-    je      6f
-    jmp     7f
-1:  call    _popl_ebp
-2:  call    _popl_edi
-3:  call    _popl_esi
-4:  call    _popl_edx
-5:  call    _popl_ecx
-6:  call    _popl_ebx
-7:  call    _popl_eax
-    call    _int
-    movl    $128, (%esp)
-    call    _integer
+	movl	%eax, 4(%esp)	/* store number of arguments */
+	movl	%eax, (%esp)
+	call	_push_args
+	call	_popl_eax
+	call	_leal
+	movl	$'-, (%esp)
+	call	_putc
+	movl	$4, (%esp)
+	call	_putnum
+	movl	$'(, (%esp)
+	call	_putc
+	call	_esp
+	movl	$'), (%esp)
+	call	_putc
+	call	_comma
+	call	_ecx
+	call	_nl
+
+	call	_new_labelid
+	movl	%eax, (%esp)
+	call	_movl
+	call	_labeladdr
+	call	_comma
+	call	_edx
+	call	_nl
+	call	_sysenter
+	call	_nl
+	call	_labeldef
+	call	_nl
+
+	/* fix esp */
+	call	_addl
+	movl	4(%esp), %eax
+	imul	$8, %eax
+	movl	%eax, (%esp)
+	call	_integer
+	call	_comma
+	call	_esp
+	call	_nl
+
+    /* clear edx */
+    call    _xorl
+    call    _edx
+    call    _comma
+    call    _edx
     call    _nl
+
     call    _popl_ebp
     call    _popl_edi
     call    _popl_esi
-    addl    $4, %esp
+    addl    $8, %esp
     ret
 
 _args:
@@ -1333,7 +1356,7 @@ _simple_item:
     call    _eax
     call    _nl
     jmp     5b
-12: /* rdch(ary,idx) -> %al = *(ary+idx) */
+12: /* rch(ary,idx) -> %al = *(ary+idx) */
     subl    $4, %esp
     call    _lex
     movl    $'(, (%esp)

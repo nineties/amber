@@ -6,9 +6,9 @@
 # $Id: Makefile 2012-03-15 05:30:38 nineties $
 
 AS = as
-ASFLAGS = --32
+ASFLAGS = -arch i386
 LD = ld
-LDFLAGS = --nostdlib -m elf_i386 --entry=_main
+LDFLAGS = -e _main -arch i386
 
 all: rlc
 

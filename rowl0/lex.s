@@ -22,7 +22,7 @@
  * identifier : {letter}({letter)|{digit})*
  * escape     : \\['"?\\abfnrtv0]
  * character  : \'({escape}|[^\\\'\n])\'
- * string     : \"({escape}|[^\\\"\n])*\"
+ * string    : \"({escape}|[^\\\"\n])*\"
  * comment    : (% [^"%)"]* %)
  * symbol     : . 
  */
@@ -45,23 +45,23 @@
  * CH_SYMBOL    : other characters
  */
 
-.equ CH_NULL,       0
-.equ CH_INVALID,    1
-.equ CH_SPACES,     2
-.equ CH_ZERO,       3
-.equ CH_NONZERO,    4
-.equ CH_NORMALCH,   5
-.equ CH_SPECIALCH,  6
-.equ CH_N,          7
-.equ CH_SQUOTE,     8
-.equ CH_DQUOTE,     9
-.equ CH_BACKSLASH,  10
-.equ CH_QUESTION,   11
-.equ CH_SYMBOL,     12
-.equ CH_NL,         13
-.equ CH_P_OR_X,     14
+.set CH_NULL,       0
+.set CH_INVALID,    1
+.set CH_SPACES,     2
+.set CH_ZERO,       3
+.set CH_NONZERO,    4
+.set CH_NORMALCH,   5
+.set CH_SPECIALCH,  6
+.set CH_N,          7
+.set CH_SQUOTE,     8
+.set CH_DQUOTE,     9
+.set CH_BACKSLASH,  10
+.set CH_QUESTION,   11
+.set CH_SYMBOL,     12
+.set CH_NL,         13
+.set CH_P_OR_X,     14
 
-.section .rodata
+.const_data
 lex_chgroup:
     .long  0,  1,  1,  1,  1,  1,  1,  1,  1,  2, 13,  1,  1,  2,  1,  1
     .long  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1
@@ -141,7 +141,7 @@ lex_chgroup:
  */
 
 /* jump table */
-.section .rodata
+.const_data
 /*
  *              N   I   S   Z   N   N   S   N   S   D   B   Q   S   N   P 
  *              U   N   P   E   O   O   P   :   Q   Q   A   U   Y   L   _ 
@@ -167,23 +167,23 @@ s20_next: .long s16,s15,s16,s20,s20, s3, s3, s3,s16,s16,s16,s16,s16,s16, s3
 .data
 
 .comm token_text,MAX_TOKEN_LEN,1 
-.global token_tag, token_len, token_val
+.globl token_tag, token_len, token_val
 token_tag: .long 0
 token_len: .long 0
 token_val: .long 0
 
 unputted: .long 0
 
-.global srcline
+.globl srcline
 srcline: .long 1
 
-.equ IDENT_STACK_LEN,16
+.set IDENT_STACK_LEN,16
 .comm ident_stack,MAX_TOKEN_LEN*IDENT_STACK_LEN,1
 ident_stack_depth: .long 0
 
 .text
 
-.global _push_ident
+.globl _push_ident
 _push_ident:
     cmpl    $IDENT_STACK_LEN, ident_stack_depth
     je      1f
@@ -209,7 +209,7 @@ _push_ident:
     pushl   $1
     call    _exit
 
-.global _pop_ident
+.globl _pop_ident
 _pop_ident:
     cmpl    $0, ident_stack_depth
     je      1f
@@ -227,7 +227,7 @@ _pop_ident:
     pushl   $1
     call    _exit
 
-.global _get_nth_ident
+.globl _get_nth_ident
 _get_nth_ident:
     movl    4(%esp), %ebx
     cmpl    ident_stack_depth, %ebx
@@ -250,9 +250,9 @@ _get_nth_ident:
     pushl   $1
     call    _exit
 
-.section .rodata
-idstack_overflow: .string "ERROR: Identifier stack overflow\n"
-idstack_empty:    .string "INTERNAL ERROR: Identifier stack is empty\n"
+.const_data
+idstack_overflow: .asciz "ERROR: Identifier stack overflow\n"
+idstack_empty:    .asciz "INTERNAL ERROR: Identifier stack is empty\n"
 .text
 
 _undefined_token:
@@ -300,10 +300,10 @@ _unterminated_comment:
     popl    output_fd
     pushl   $1
     call    _exit
-.section .rodata
-undef_msg:   .string "ERROR: undefined token\n"
-toolong_msg: .string "ERROR: too long token\n"
-unterminated_msg: .string "ERROR: unterminated comment\n"
+.const_data
+undef_msg:   .asciz "ERROR: undefined token\n"
+toolong_msg: .asciz "ERROR: too long token\n"
+unterminated_msg: .asciz "ERROR: unterminated comment\n"
 .text
 
 _lex_lookahead:
@@ -318,7 +318,7 @@ _lex_lookahead:
 
 _lex_consume:
     call    _getc
-    cmpb    $'\n, %al
+    cmpb    $0x0a, %al
     jne     1f
     incl    srcline
 1:
@@ -335,13 +335,13 @@ _lex_consume:
 
 _lex_skip:
     call    _getc
-    cmpb    $'\n, %al
+    cmpb    $0x0a, %al
     jne     1f
     incl    srcline
 1:
     ret
 
-.section .rodata
+.const_data
 /* values of escaped sequences (begins from \") */
 ch2esc:
     /*    \"              \'                         \0                        */
@@ -356,23 +356,23 @@ ch2esc:
 /* reserved words */
 reserved_words:
     .long if_text, else_text, while_text, goto_text, label_text, return_text, syscall_text, export_text, allocate_text, include_text, wch_text, rch_text, int_text, char_text, 0
-if_text:       .string "if"
-else_text:     .string "else"
-while_text:    .string "while"
-goto_text:     .string "goto"
-label_text:    .string "label"
-return_text:   .string "return"
-syscall_text:  .string "syscall"
-export_text:   .string "export"
-allocate_text: .string "allocate"
-include_text:  .string "include"
-wch_text:      .string "wch"
-rch_text:      .string "rch"
-int_text:      .string "int"
-char_text:     .string "char"
+if_text:       .asciz "if"
+else_text:     .asciz "else"
+while_text:    .asciz "while"
+goto_text:     .asciz "goto"
+label_text:    .asciz "label"
+return_text:   .asciz "return"
+syscall_text:  .asciz "syscall"
+export_text:   .asciz "export"
+allocate_text: .asciz "allocate"
+include_text:  .asciz "include"
+wch_text:      .asciz "wch"
+rch_text:      .asciz "rch"
+int_text:      .asciz "int"
+char_text:     .asciz "char"
 .text
 
-.global _lex_unput
+.globl _lex_unput
 _lex_unput:
     cmpl    $0, unputted
     jne     1f
@@ -385,11 +385,11 @@ _lex_unput:
     movl    $1, (%esp)
     call    _exit
 
-.section .rodata
-unput_errmsg: .string "ERROR: try to unput two or more tokens\n"
+.const_data
+unput_errmsg: .asciz "ERROR: try to unput two or more tokens\n"
 .text
 
-.global _lex
+.globl _lex
 _lex:
     pushl   %ebp
     movl    %esp, %ebp
@@ -448,7 +448,7 @@ s7:
     jmp     *%eax
 s8:
     call    _lex_consume
-    subl    $'\", %eax
+    subl    $34, %eax
     movl    ch2esc(,%eax,4), %eax
     movl    %eax, token_val
     call    _lex_lookahead
@@ -641,7 +641,7 @@ _check_macro:
 1:
     ret
 
-.global _print_current_token
+.globl _print_current_token
 _print_current_token:
     pushl   %ebp
     movl    %esp, %ebp
@@ -669,33 +669,33 @@ _print_current_token:
     leave
     ret
 
-.section .rodata
+.const_data
 tag_names:
     .long tag0,tag1,tag2,tag3,tag4,tag5,tag6,tag7,tag8,tag9,tag10,tag11,tag12,tag13,tag14,tag15,tag16,tag17,tag18,tag19,tag20,tag21,tag22,tag23,tag24,tag25
-tag0:   .string "INT"
-tag1:   .string "STRING"
-tag2:   .string "IDENT"
-tag3:   .string "MACRO"
-tag4:   .string "XVAR"
-tag5:   .string "PVAR"
-tag6:   .string "IF"
-tag7:   .string "ELSE"
-tag8:   .string "WHILE"
-tag9:   .string "GOTO"
-tag10:  .string "LABEL"
-tag11:  .string "RETURN"
-tag12:  .string "SYSCALL"
-tag13:  .string "EXPORT"
-tag14:  .string "ALLOCATE"
-tag15:  .string "INCLUDE"
-tag16:  .string "WCH"
-tag17:  .string "RCH"
-tag18:  .string "TINT"
-tag19:  .string "TCHAR"
-tag20:  .string "=="
-tag21:  .string "!="
-tag22:  .string "<="
-tag23:  .string ">="
-tag24:  .string "=>"
-tag25:  .string "END"
-symbol: .string "SYMBOL"
+tag0:   .asciz "INT"
+tag1:   .asciz "STRING"
+tag2:   .asciz "IDENT"
+tag3:   .asciz "MACRO"
+tag4:   .asciz "XVAR"
+tag5:   .asciz "PVAR"
+tag6:   .asciz "IF"
+tag7:   .asciz "ELSE"
+tag8:   .asciz "WHILE"
+tag9:   .asciz "GOTO"
+tag10:  .asciz "LABEL"
+tag11:  .asciz "RETURN"
+tag12:  .asciz "SYSCALL"
+tag13:  .asciz "EXPORT"
+tag14:  .asciz "ALLOCATE"
+tag15:  .asciz "INCLUDE"
+tag16:  .asciz "WCH"
+tag17:  .asciz "RCH"
+tag18:  .asciz "TINT"
+tag19:  .asciz "TCHAR"
+tag20:  .asciz "=="
+tag21:  .asciz "!="
+tag22:  .asciz "<="
+tag23:  .asciz ">="
+tag24:  .asciz "=>"
+tag25:  .asciz "END"
+symbol: .asciz "SYMBOL"
