@@ -101,6 +101,12 @@ Koichi:
 
 > However, more recently we have begun to use higher level languages to write DSLs directly in terms of those languages themselves.  An example is [Ruby](http://www.ruby-lang.org/en/), that is used to write the killer application [Ruby on Rails](http://rubyonrails.org/), which integrates several DSLs for writing web-application systems easily.
 
+Douglas:
+> I've heard of SQL and Yacc, but I've never used them.  Do you know of any DSLs that are scientific applications?  Perhaps Maple would be an example, as well as Mathematica?
+
+Koichi:
+> Yes. There are many kind of DSLs in scientific applications: Formula manipulation languages (e.g., Maple, Mathematica, Maxima), Numerical computation languages (e.g., MATLAB, Scilab, Octable), Statistical computing language (e.g., R) and Data viaualization languages (e.g., gnuplot, graphviz).
+
 Piet:
 > In our case, what is the next step?  Will we stop now what we are doing, as a top-down way of thinking?  And will we now write our new DSL, bottom-up?
 
@@ -125,8 +131,11 @@ Koichi:
     
     differential_equation  ::= "d" symbol "/" "d" symbol "=" expr
 
+Piet:
+> In what context do these lines appear?  Will this be part of Amber?  Or is it part of a new library?  It looks quite different from the first piece of code that you wrote, which was much simpler.
+
 Koichi:
-> The notation I use is based on [Backus-Naur Form (BNF)](http://en.wikipedia.org/wiki/Backus-Naur_Form) with several extensions.
+> It will be part of our new library for N-body simulation. The notation I use is based on [Backus-Naur Form (BNF)](http://en.wikipedia.org/wiki/Backus-Naur_Form) with several extensions, which is commonly-used notation for defining syntaxes of languages.
 
 Douglas:
 > What is the status of the word `statement` here?
