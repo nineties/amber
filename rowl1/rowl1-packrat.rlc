@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2012-08-10 00:38:35 nineties $
+; $Id: rowl1-packrat.rlc 2012-08-10 12:20:10 nineties $
 ;
 
 ; TODO:
@@ -1367,7 +1367,10 @@
         (apply (to_sym "%merge_loc") (list2 bloc eloc))) body))
     (= body (cons (apply (to_sym "%set_indent") (list2 ParserVar indent_save)) body))
     (= body (cons (qquote (parsed (unquote loc) (unquote (apply (to_sym "reverse") (list1 elems))))) body))
-    (return (make_expr Block (list_reverse body)))
+    (return (apply
+        (make_expr Lambda (list2 (make_expr Domain (list2 ParserVar Parser))
+            (make_expr Block (list_reverse body))
+        )) (list1 ParserVar)))
     ))
 
 ; Delimited{ p, delim } is translated to
