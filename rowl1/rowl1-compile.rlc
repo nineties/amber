@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-07-28 12:16:36 nineties $
+; $Id: rowl1-compile.rlc 2012-08-10 22:20:51 nineties $
 ;
 
 (import "rlvm-compile")
@@ -145,7 +145,7 @@
             (return (fv_iter mod (expr_arg expr 0) 0 fv))
             )
         (if (== hd Block) 
-            (return (fv_iter_block mod (expr_args expr) 0 fv))
+            (return (fv_iter_block mod (expr_arg_list expr 0) 0 fv))
             )
         (if (== hd Dynamic)
             (return fv)
@@ -238,7 +238,7 @@
         (return expr)
         ))
     (if (== hd Block) (do
-        (var exprs (expr_args expr))
+        (var exprs (expr_arg_list expr 0))
         (symtable_push tbl)
         (while exprs (do
             (setcar exprs (alpha tbl (car exprs)))
@@ -328,7 +328,7 @@
         (return expr)
         ))
     (if (== hd Block) (do
-        (var exprs (expr_args expr))
+        (var exprs (expr_arg_list expr 0))
         (while exprs (do
             (setcar exprs (scan_clsvars mod (car exprs) tbl))
             (= exprs (cdr exprs))
@@ -414,7 +414,7 @@
         (return expr)
         ))
     (if (== hd Block) (do
-        (var exprs (expr_args expr))
+        (var exprs (expr_arg_list expr 0))
         (while exprs (do
             (setcar exprs (subst_clsvars tbl cls (car exprs)))
             (= exprs (cdr exprs))
@@ -643,7 +643,7 @@
             (= stmts (store_args tbl (cons cls args) stmts))
             )
         (= stmts (cons body stmts))
-        (= body (make_expr Block (list_reverse stmts)))
+        (= body (make_expr Block (list1 (list_reverse stmts))))
         ))
 
     (push_varscope mod)
@@ -1074,7 +1074,7 @@
     ))
 
 (fun compile_block (asm mod expr) (
-    (var exprs (expr_args expr))
+    (var exprs (expr_arg expr 0))
     (var topscope (in_top_scope mod))
     (push_varscope mod)
     (if topscope
@@ -1096,8 +1096,8 @@
     (pop_varscope mod)
     ))
 
-(fun compile_openblock (asm mod expr) (
-    (var exprs (expr_args expr))
+(fun compile_seq (asm mod expr) (
+    (var exprs (expr_arg expr 0))
     (if (in_top_scope mod)
         (do
             (var save_max_lvar_idx max_lvar_idx)
@@ -1118,12 +1118,6 @@
 
 (fun compile_scoped (asm mod expr) (
     (compile asm (expr_arg expr 0) (expr_arg expr 1))
-    ))
-
-(fun compile_seq (asm mod expr) (
-    (compile asm mod (expr_arg expr 0))
-    (put_drop asm)
-    (compile asm mod (expr_arg expr 1))
     ))
 
 (fun put_if_true (asm lbl) (
@@ -1621,7 +1615,6 @@
     ))
 
 (export fun setup_builtin_compilers (mod) (
-    (var blockT (domainP Block))
     (var locT (make_expr Loc (list3 stringT intT intT)))
 
     (add_compiler mod DontCare compile_error)
@@ -1660,12 +1653,11 @@
     (add_compiler mod (domainP List) compile_list)
     (add_compiler mod (domainP Tuple) compile_tuple)
 
-    (add_compiler mod (domainP Block) compile_block)
-    (add_compiler mod (domainP OpenBlock) compile_openblock)
+    (add_compiler mod (make_expr Block (list1 listT)) compile_block)
+    (add_compiler mod (make_expr Seq (list1 listT)) compile_seq)
     (add_compiler mod (make_expr Scoped (list2 (domainP Module) DontCare))
         compile_scoped)
 
-    (add_compiler mod (make_seq DontCare DontCare) compile_seq)
     (add_compiler mod (make_expr If (list2 DontCare DontCare)) compile_if)
 	(add_compiler mod (ifelse DontCare DontCare DontCare) compile_ifelse)
     (add_compiler mod (make_expr While (list2 DontCare DontCare)) compile_while)
