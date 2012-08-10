@@ -9,7 +9,7 @@ statement ::= [multiline]
     { `Nbody_simulation{!$2,!$3, !$4} }
 
 initial_condition ::= "initial" ":" aligned(statement)
-    { MakeExpr{\OpenBlock, $2} }
+    { `Seq{!$2} }
 final_condition   ::= "final" ":" expr
     { $2 }
 equation ::= "equation" ":" aligned(differential_equation) { $2 }
@@ -39,5 +39,5 @@ discretize(equations): {
     body2: List::create(len, i ->`AddAssign{!equations[i][0], Mul{!vars[i], !dvar}})
     body3: [`AddAssign{!equations[0][1], !dvar}]
     
-    MakeExpr{\OpenBlock, append(append(body1, body2), body3)}
+    `Seq{!(body1 + body2 + body3)}
 }
