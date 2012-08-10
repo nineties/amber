@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2012-08-10 12:35:18 nineties $
+; $Id: rowl1-packrat.rlc 2012-08-10 17:11:23 nineties $
 ;
 
 ; TODO:
@@ -198,16 +198,16 @@
 (var multiline_p @FALSE)
 (var shell_mode_p @FALSE)
 (var may_parse @FALSE)
-(var LeftRec (noparse no_loc "Left Recursion Detection"))
+(var LeftRec (noparse no_loc "Left Recursion Detected"))
 
 (extern object current_mod)
 (extern fun set_current_module)
 
 (fun trace (obj) (
-    (return (make_expr Block (list2
+    (return (make_expr Block (list1 (list2
         (apply (to_sym "print") (list2 (to_sym "stderr") obj))
         (apply (to_sym "print") (list2 (to_sym "stderr") (string "\n")))
-        )))
+        ))))
     ))
 
 (export fun set_shell_mode () (
@@ -1127,7 +1127,7 @@
     (= body (cons (qquote (parsed (unquote loc) (unquote (apply (to_sym "reverse") (list1 ret))))) body))
     (return (apply
         (make_expr Lambda (list2 ParserVar
-        (make_expr Block (list_reverse body))))
+        (make_expr Block (list1 (list_reverse body)))))
         (list1 ParserVar)))
     ))
 
@@ -1174,7 +1174,7 @@
     (= body (cons errors body))
 
     (return (apply
-        (make_expr Lambda (list2 ParserVar (make_expr Block (list_reverse body))))
+        (make_expr Lambda (list2 ParserVar (make_expr Block (list1 (list_reverse body)))))
         (list1 ParserVar)
         ))
     ))
@@ -1218,12 +1218,12 @@
     (= body (cons (defvar elems 0) body))
     (= body (cons (defvar state (gen_copy_parser_state ParserVar)) body))
     (= body (cons (make_expr While (list2 true
-            (make_expr Block (list_reverse loop_body)))) body))
+            (make_expr Block (list1 (list_reverse loop_body))))) body))
     (= body (cons (gen_set_parser_state ParserVar state) body))
     (= body (cons (defvar loc
         (apply (to_sym "%merge_loc") (list2 bloc eloc))) body))
     (= body (cons (qquote (parsed (unquote loc) (unquote (apply (to_sym "reverse") (list1 elems))))) body))
-    (return (make_expr Block (list_reverse body)))
+    (return (make_expr Block (list1 (list_reverse body))))
     ))
 
 ; Many1{ p } is translated to
@@ -1273,12 +1273,12 @@
     (= body (cons (assign elems (apply (to_sym "cons") (list2 (gen_at v 1) elems))) body))
     (= body (cons (defvar state (gen_copy_parser_state ParserVar)) body))
     (= body (cons (make_expr While (list2 true
-            (make_expr Block (list_reverse loop_body)))) body))
+            (make_expr Block (list1 (list_reverse loop_body))))) body))
     (= body (cons (gen_set_parser_state ParserVar state) body))
     (= body (cons (defvar loc
         (apply (to_sym "%merge_loc") (list2 bloc eloc))) body))
     (= body (cons (qquote (parsed (unquote loc) (unquote (apply (to_sym "reverse") (list1 elems))))) body))
-    (return (make_expr Block (list_reverse body)))
+    (return (make_expr Block (list1 (list_reverse body))))
     ))
 
 ; Aligned{ p } is translated to
@@ -1348,11 +1348,11 @@
     (= body (cons (defvar v p) body))
     (= body (cons (mkif 
             (make_expr Equal (list2 (make_expr Head (list1 v)) (quote NoParse)))
-            (make_expr Block (list3
+            (make_expr Block (list1 (list3
                 (gen_set_parser_state ParserVar state)
                 (apply (to_sym "%set_indent") (list2 ParserVar indent_save))
                 (mkreturn (qquote (parsed (unquote bloc) 0)))
-            )))
+            ))))
         body))
     (= body (cons (assign elems (apply (to_sym "cons") (list2 (gen_at v 1) elems))) body))
     (= body (cons (gen_set_parser_state state ParserVar) body))
@@ -1361,7 +1361,7 @@
             (to_sym "%parse_spaces") (list1 ParserVar)) body))
         )
     (= body (cons (make_expr While (list2 true
-            (make_expr Block (list_reverse loop_body)))) body))
+            (make_expr Block (list1 (list_reverse loop_body))))) body))
     (= body (cons (gen_set_parser_state ParserVar state) body))
     (= body (cons (defvar loc
         (apply (to_sym "%merge_loc") (list2 bloc eloc))) body))
@@ -1369,7 +1369,7 @@
     (= body (cons (qquote (parsed (unquote loc) (unquote (apply (to_sym "reverse") (list1 elems))))) body))
     (return (apply
         (make_expr Lambda (list2 (make_expr Domain (list2 ParserVar Parser))
-            (make_expr Block (list_reverse body))
+            (make_expr Block (list1 (list_reverse body)))
         )) (list1 ParserVar)))
     ))
 
@@ -1421,7 +1421,7 @@
     (= body (cons (defvar elems 0) body))
     (= body (cons (defvar state (gen_copy_parser_state ParserVar)) body))
     (= body (cons (make_expr While (list2 true
-            (make_expr Block (list_reverse loop_body)))) body))
+            (make_expr Block (list1 (list_reverse loop_body))))) body))
     (= body (cons (gen_set_parser_state ParserVar state) body))
     (= body (cons (defvar loc
         (apply (to_sym "%merge_loc") (list2 bloc eloc))) body))
@@ -1436,7 +1436,7 @@
         )
 
     (= body (cons (qquote (parsed (unquote loc) (unquote (apply (to_sym "reverse") (list1 elems))))) body))
-    (return (make_expr Block (list_reverse body)))
+    (return (make_expr Block (list1 (list_reverse body))))
     ))
 
 ; scope{ p } is translated to
@@ -1451,11 +1451,11 @@
 (fun compile_scoped (mod elem) (
     (var v (unique_sym))
     (var p (compile_parser_element elem))
-    (return (make_expr Block (list3
+    (return (make_expr Block (list1 (list3
         (apply (to_sym "%open_scope") (list1 (quote mod)))
         (defvar v p)
         (apply (to_sym "%close_scope") (list1 v))
-        )))
+        ))))
     ))
 
 ; enter anonymous scope
@@ -1491,7 +1491,7 @@
     (var v (unique_sym))
     (var state (unique_sym))
     (var loc (to_sym "%Loc"))
-    (return (make_expr Block (list4
+    (return (make_expr Block (list1 (list4
         (defvar state (gen_copy_parser_state ParserVar))
         (defvar loc (apply (to_sym "%get_loc") (list1 ParserVar)))
         (defvar v (compile_parser_element p))
@@ -1503,7 +1503,7 @@
                 ))
             (qquote (parsed (unquote (gen_at v 0))
                 (make_expr Some (list1 (unquote (gen_at v 1))))))
-            ))))
+            )))))
             
     ))
 
@@ -1516,11 +1516,11 @@
 (fun compile_and (p) (
     (var state (unique_sym))
     (var v (unique_sym))
-    (return (make_expr Block (list4
+    (return (make_expr Block (list1 (list4
         (defvar state (gen_copy_parser_state ParserVar))
         (defvar v (compile_parser_element p))
         (gen_set_parser_state ParserVar state)
-        v)))
+        v))))
     ))
 
 ; Not{ p } is translated to
@@ -1532,12 +1532,12 @@
 (fun compile_not (p) (
     (var state (unique_sym))
     (var v (unique_sym))
-    (return (make_expr Block (list4
+    (return (make_expr Block (list1 (list4
         (defvar state (gen_copy_parser_state ParserVar))
         (defvar v (compile_parser_element p))
         (gen_set_parser_state ParserVar state)
         (apply (to_sym "%negate") (list2 ParserVar v))
-        )))
+        ))))
     ))
 
 (fun compile_parser_action (elems act) (
@@ -1589,7 +1589,7 @@
         (apply (to_sym "%merge_loc") (list2 bloc eloc))) body))
     (= body (cons (qquote (parsed (unquote loc) (unquote act))) body))
 
-    (= body (make_expr Block (list_reverse body)))
+    (= body (make_expr Block (list1 (list_reverse body))))
     (return (apply
         (make_expr Lambda (list2 (make_expr Domain (list2 ParserVar Parser)) body))
         (list1 ParserVar)
@@ -1633,11 +1633,11 @@
     ; modify parsed expression to Located{...}
     (var return_stmt 0)
     (if (== sym (to_sym "parse_statement_"))
-        (= return_stmt (make_expr Block (list2
+        (= return_stmt (make_expr Block (list1 (list2
             (apply (to_sym "%eval_parser_command") (list1 v))
             (mkreturn 
                 (apply (to_sym "%apply_located") (list1 v))
-            ))))
+            )))))
         (= return_stmt (mkreturn v))
         )
 
@@ -1673,7 +1673,7 @@
         ))
     (= body (cons errors body))
 
-    (return (make_expr Block (list_reverse body)))
+    (return (make_expr Block (list1 (list_reverse body))))
     ))
 
 (extern fun compile_matching)
@@ -1721,14 +1721,14 @@
 (fun bind_parser (old_parser new_parser) (
     (var v (unique_sym))
     (var state (unique_sym))
-    (return (make_expr Block (list5
+    (return (make_expr Block (list1 (list5
         (defvar state (gen_copy_parser_state ParserVar))
         (defvar v new_parser)
         (mkif (make_expr Equal (list2 (make_expr Head (list1 v)) (quote Parsed)))
             (mkreturn v))
         (gen_set_parser_state ParserVar state)
         (apply old_parser (list1 ParserVar))
-        )))
+        ))))
     ))
 
 (fun compile_parser_driver (sym sym_) (
