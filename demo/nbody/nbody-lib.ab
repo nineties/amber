@@ -1,16 +1,27 @@
 include "dev/HIL/C.ab"
 
+nbody_simulation_default_setting: [
+    ("method", \newton),
+    ("output", nil)
+]
+
 statement ::= [multiline]
     "Nbody_simulation" "{"
         aligned(nbody_simulation_component)
     "}"
-    { `Nbody_simulation{!Table::from_list($2)} }
+    {
+        `Nbody_simulation{
+            !Table::from_list(nbody_simulation_default_setting + $2)
+        }
+    }
 
 nbody_simulation_component
     ::= "initial" ":" aligned(statement)    { `("initial", !$2) }
       | "final" ":" expr                    { `("final", !$2) }
       | "equation" ":" aligned(differential_equation)
         { `("equation", !$2) }
+      | "method" ":" symbol                 { `("method", !$2) }
+      | "output" ":" aligned(statement)     { `("output", !$2) }
 
 differential_equation
     ::= "d" symbol "/" "d" symbol "=" expr
@@ -27,7 +38,8 @@ Nbody_simulation{tbl} => `{
         Seq{!tbl["initial"]}
 
         while (not !tbl["final"]) {
-            !discretize(tbl["equation"])
+
+            !discretize(tbl["method"], tbl["equation"])
         }
     }
 }
@@ -48,7 +60,7 @@ Nbody_simulation{tbl} => `{
 #   xi += dxi
 #   ...
 
-discretize(eqns): {
+discretize(\newton, eqns): {
     n: eqns.length
 
     # create temporary variables
