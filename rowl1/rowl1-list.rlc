@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2012-07-28 16:42:55 nineties $
+; $Id: rowl1-list.rlc 2012-08-11 04:33:38 nineties $
 ;
 
 (import "rlvm-compile")
@@ -79,6 +79,17 @@
     (return (list_reverse new_ls))
     ))
 
+(fun ls_map2 (ls1 ls2 f) (
+    (var new_ls 0)
+    (var code (get_bytecode (string "argument for map") f))
+    (while (&& ls1 ls2) (do
+        (= new_ls (cons (byterun code (car ls1) (car ls2)) new_ls))
+        (= ls1 (cdr ls1))
+        (= ls2 (cdr ls2))
+        ))
+    (return (list_reverse new_ls))
+    ))
+
 (fun ls_foldl (ls v f) (
     (var code (get_bytecode (string "argument for foldl") f))
     (while ls (do
@@ -109,6 +120,7 @@
     (add_builtin_function1 std (to_sym "reverse") listT ls_reverse 0)
     (add_builtin_function2 std (to_sym "append") listT listT ls_append 0)
     (add_builtin_function2 std (to_sym "map") listT funT ls_map 0)
+    (add_builtin_function3 std (to_sym "map2") listT listT funT ls_map2 0)
     (add_builtin_function3 std (to_sym "foldl") listT DontCare funT ls_foldl 0)
     (add_builtin_function2 mod (to_sym "create") intT funT ls_create 0)
     ))
