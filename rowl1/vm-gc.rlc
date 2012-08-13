@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2012-07-28 12:17:33 nineties $
+; $Id: vm-gc.rlc 2012-08-12 04:55:04 nineties $
 ;
 
 (import "stdlib")
@@ -373,6 +373,10 @@
             ))
         (return)
         ))
+    (if (== tag @TAG_BIGINT) (
+        (move_object obj)
+        (return)
+        ))
     (error "move_fields: not reachable")
     ))
 
@@ -651,6 +655,17 @@
 (export prim_bytecode_size)
 (fun prim_bytecode_size (obj) (
     (return ([] obj 1))
+    ))
+
+(export prim_allocate_bigint)
+(fun prim_allocate_bigint (len) (
+    (void* ptr (allocate_object 4))
+    @(SET_HEADER ptr TAG_BIGINT 0 4)
+    (+= ptr @WORD_SIZE)
+    ([]= ptr 0 (allocate_iarray len))   ; digits
+    ([]= ptr 1 1)                       ; number of digits and sign
+    ([]= ptr 2 len)                     ; capacity
+    (return ptr)
     ))
 
 (export prim_get_tag)
