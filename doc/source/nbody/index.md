@@ -117,15 +117,45 @@ the killer application [Ruby on Rails](http://rubyonrails.org/), which
 integrates several DSLs for writing web-application systems easily.
 
 Douglas:
-> I've heard of SQL and Yacc, but I've never used them.  Do you know of any DSLs that are scientific applications?  Perhaps Maple would be an example, as well as Mathematica?
+> I've heard of SQL and Yacc, but I've never used them.  Do you know
+of any DSLs that are scientific applications?  Perhaps Maple would be
+an example, as well as Mathematica?
 
 Koichi:
-> Yes. There are many kind of DSLs in scientific applications: Formula manipulation languages (e.g., Maple, Mathematica, Maxima), Numerical computation languages (e.g., MATLAB, Scilab, Octable), Statistical computing language (e.g., R) and Data viaualization languages (e.g., gnuplot, graphviz).
+> Yes. There are many kind of DSLs in scientific applications: Formula
+manipulation languages (e.g., Maple, Mathematica, Maxima), Numerical
+computation languages (e.g., MATLAB, Scilab, Octable), Statistical
+computing language (e.g., R) and Data viaualization languages (e.g.,
+gnuplot, graphviz).
 
 Piet:
-> In our case, what is the next step?  Will we stop now what we are
-doing, as a top-down way of thinking?  And will we now write our new
-DSL, bottom-up?
+> I understand that most DSLs are written from scratch, based on a
+simpler language such as C for example.  Do I understand that Ruby
+is high-level enough, or `meta' enough, to allow a DSL to be written
+directly in Ruby, while retaining the Ruby syntax?
+
+Koichi:
+> Yes.  Examples are Rakefile and Ruby on Rails.  However, at present,
+other modern popular languages don't have enough capabilities to
+implement internal DSLs.  This is the state of things.
+
+Piet:
+> Really?  How about Python?  In may ways Python resembles Ruby, at
+least for the average user.
+
+Koichi:
+
+> in fact, there are no famous "internal" DSLs written in Python,
+because Python's syntax is rather poor in comparison to Ruby.
+Actually, Ruby and LISP are the only ones which support writing
+internal DSLs in powerfully ways -- and now amber is the new one.
+
+Piet:
+> That is very interesting.  I had not realized that.  And I'm excited
+about seeing in practice how you will use a meta-level language like
+Amber to write a DSL for us in Amber!  What is the next step?  Will we
+stop now what we are doing, as a top-down way of thinking?  And will
+we now write our new DSL, bottom-up?
 
 Koichi:
 > No, the nice thing of writing a DSL in Amber is that we can continue
@@ -153,10 +183,16 @@ statements. It can be written like:
     differential_equation  ::= "d" symbol "/" "d" symbol "=" expr
 
 Piet:
-> In what context do these lines appear?  Will this be part of Amber?  Or is it part of a new library?  It looks quite different from the first piece of code that you wrote, which was much simpler.
+> In what context do these lines appear?  Will this be part of Amber?
+Or is it part of a new library?  It looks quite different from the
+first piece of code that you wrote, which was much simpler.
 
 Koichi:
-> It will be part of our new library for N-body simulation. The notation I use is based on [Backus-Naur Form (BNF)](http://en.wikipedia.org/wiki/Backus-Naur_Form) with several extensions, which is commonly-used notation for defining syntaxes of languages.
+> It will be part of our new library for N-body simulation.
+The notation I use is based on
+[Backus-Naur Form (BNF)](http://en.wikipedia.org/wiki/Backus-Naur_Form)
+with several extensions, which is commonly-used notation for defining
+syntaxes of languages.
 
 Douglas:
 > What is the status of the word `statement` here?
