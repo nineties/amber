@@ -1,7 +1,7 @@
 ---
 layout: page
 title: "Amber Application Example: N-Body Simulation"
-date: 2012-07-30 09:41
+date: 2012-08-09 12:00
 comments: true
 sharing: true
 footer: true
@@ -78,40 +78,61 @@ the solution of a differential equation, given initial and final
 conditions.
 
 Douglas:
-> What you wrote above, is that a form of pseudocode, or can Amber directly understand that text, after you add values for the `...`?
+> What you wrote above, is that a form of pseudocode, or can Amber
+directly understand that text, after you add values for the `...`?
 
 Koichi:
 > It is just a pseudocode and Amber can not understand that text.
-However, we can extend Amber's capability so as to understand our new language.
-Amber supports you to use the most suitable language for writing problems of your domain.
+However, we can extend Amber's capability so as to understand our new
+language.  Amber supports you to use the most suitable language for
+writing problems of your domain.
 
 Piet:
-> Ah, that is very nice.  Normally when we try to write a new piece of code, we may first scribble a piece of pseudocode on a blackboard.  After that, we translate that into actual lines of code of the computer language we use.  Are you now suggesting to do the exact opposite?  Not changing the pseudocode into code, but extending the language in such a way that it can actually run the pseudocode?
-
+> Ah, that is very nice.  Normally when we try to write a new piece
+of code, we may first scribble a piece of pseudocode on a blackboard.
+After that, we translate that into actual lines of code of the
+computer language we use.  Are you now suggesting to do the exact
+opposite?  Not changing the pseudocode into code, but extending the
+language in such a way that it can actually run the pseudocode?
 
 Koichi:
-> Yes, that's the main idea.  The key here is the development of a Domain Specific Language, or DSL for short.
-
+> Yes, that's the main idea.  The key here is the development of a
+Domain Specific Language, or DSL for short.
 
 Douglas:
 > I sort of get it.  Do you have any other examples of DSLs?
 
 Koichi:
-> There are two categories of DSLs.  Originally, a DSL was typically written from scratch, just like any other computer language, but intended for a relatively narrow range of applications, which allows the introduction of specific operations for specialized purposes.  Examples would be [SQL](http://en.wikipedia.org/wiki/SQL) for operating relational-database systems and [Yacc](http://en.wikipedia.org/wiki/Yacc) for writing parsers.
-
-> However, more recently we have begun to use higher level languages to write DSLs directly in terms of those languages themselves.  An example is [Ruby](http://www.ruby-lang.org/en/), that is used to write the killer application [Ruby on Rails](http://rubyonrails.org/), which integrates several DSLs for writing web-application systems easily.
+> There are two categories of DSLs.  Originally, a DSL was typically
+written from scratch, just like any other computer language, but
+intended for a more limited range of applications, which allows the
+introduction of specific operations for specialized purposes.
+Examples would be [SQL](http://en.wikipedia.org/wiki/SQL) for
+operating relational-database systems and
+[Yacc](http://en.wikipedia.org/wiki/Yacc) for writing parsers.
+> However, more recently we have begun to use higher level languages
+to write DSLs directly in terms of those languages themselves.  An
+example is [Ruby](http://www.ruby-lang.org/en/), that is used to write
+the killer application [Ruby on Rails](http://rubyonrails.org/), which
+integrates several DSLs for writing web-application systems easily.
 
 Piet:
-> In our case, what is the next step?  Will we stop now what we are doing, as a top-down way of thinking?  And will we now write our new DSL, bottom-up?
+> In our case, what is the next step?  Will we stop now what we are
+doing, as a top-down way of thinking?  And will we now write our new
+DSL, bottom-up?
 
 Koichi:
-> No, the nice thing of writing a DSL in Amber is that we can continue all the way in a top-down fashion.  The next step will be to give Amber a framework in which it can understand the pseudocode.
+> No, the nice thing of writing a DSL in Amber is that we can continue
+all the way in a top-down fashion.  The next step will be to give
+Amber a framework in which it can understand the pseudocode.
 
 Piet:
 > Very nice!  Let's do it.
 
 Koichi:
-> Well, in order for Amber to understand the pseudocode, we first have to define a syntax, in which the pseudocode lines will be valid statements. It can be written like:
+> Well, in order for Amber to understand the pseudocode, we first have
+to define a syntax, in which the pseudocode lines will be valid
+statements. It can be written like:
 
     statement ::= [multiline]
         "Nbody_simulation" "{"
@@ -126,32 +147,52 @@ Koichi:
     differential_equation  ::= "d" symbol "/" "d" symbol "=" expr
 
 Koichi:
-> The notation I use is based on [Backus-Naur Form (BNF)](http://en.wikipedia.org/wiki/Backus-Naur_Form) with several extensions.
+> The notation I use is based on [Backus-Naur Form
+(BNF)](http://en.wikipedia.org/wiki/Backus-Naur_Form) with several
+extensions.
 
 Douglas:
 > What is the status of the word `statement` here?
 
 Koichi:
-> Left-hand side symbols of operator `::=` is a category of the syntax which Amber understands. Amber adds the right-hand side new syntaxes into the left-hand side categories. Since Amber parses programs as lines of statements, we have to begin with definint our new statement.
+> Left-hand side symbols of operator `::=` is a category of the syntax
+which Amber understands. Amber adds the right-hand side new syntaxes
+into the left-hand side categories. Since Amber parses programs as
+lines of statements, we have to begin with definint our new
+statement.
 
 Douglas:
 > Please explain this particular statement definition.
 
 Koichi:
-> Our new statement begins with a string "Nbody_simulation", followed by a number of elements (`nbody_simulation_component`) enclosed within bracesk, which constitute the simulation.
+> Our new statement begins with a string "Nbody_simulation", followed
+by a number of elements (`nbody_simulation_component`) enclosed within
+bracesk, which constitute the simulation.
 
-> Amber's parser distinguish syntax elements based on "indentation-level" and `aligned` and `[multiline]` are Amber's extension for defining syntaxes related indentation. `aligned(...)` parses elements which have same indentation-level and `[multiline]` tells the parser that some elements of the syntax could be placed in same level. In this case, the string "Nbody_simulation" and the closing brace "}" will be.
+> Amber's parser distinguish syntax elements based on "indentation-level"
+and `aligned` and `[multiline]` are Amber's extension for defining
+syntaxes related indentation. `aligned(...)` parses elements which
+have same indentation-level and `[multiline]` tells the parser that
+some elements of the syntax could be placed in same level. In this
+case, the string "Nbody_simulation" and the closing brace "}" will
+be.
 
-> The definition of `nbody_simulation_component` consists of "initial condition", "final condition" and "equation".
-The initial condition consists of a header string "initial", a delimiter ":" and several statements, initialization of variables.
-Definitions of final condition and equation are similar.
+> The definition of `nbody_simulation_component` consists of "initial
+condition", "final condition" and "equation".  The initial condition
+consists of a header string "initial", a delimiter ":" and several
+statements, initialization of variables.  Definitions of final
+condition and equation are similar.
 
 Piet:
-> It does not seem to be so difficult. So, can Amber understand our pseudocode now?
+> It does not seem to be so difficult. So, can Amber understand our
+pseudocode now?
 
 Koichi:
 > Only syntaxes. Because we haven't tell Amber the meaning of our program.
-> Well, before going next step, let's see how Amber understand our pseudocode with the current definitions using Amber's interactive shell. Save the definitions above to a file named "nbody-lib.ab" and launch Amber-shell from command-line:
+> Well, before going next step, let's see how Amber understand our
+pseudocode with the current definitions using Amber's interactive
+shell. Save the definitions above to a file named "nbody-lib.ab" and
+launch Amber-shell from command-line:
 
     $ amber
     amber:1>
@@ -162,7 +203,8 @@ Koichi:
     => nil
     amber:2>
 
-> Now, Amber has the capability of understanding our pseudocode. Input a program like this:
+> Now, Amber has the capability of understanding our pseudocode. Input
+a program like this:
 
 
     amber:2> Nbody_simulation {
@@ -181,8 +223,6 @@ Koichi:
     DefineVariable{v, Vector{1.0, 0.0, 0.0}}, DefineVariable{t, 0.0}, DefineVariable{dt, 0.01}]],
     ["final", ":", t >= 1.0.], ["equation", ":", [["d", x, "/", "d", t, "=", v], ["d", v, "/",
     "d", t, "=", -x/|x|^3]]]], "}"]
-
-
 
 Koichi:
 > You can see that Amber understands our language just as a sequence
