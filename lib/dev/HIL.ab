@@ -1,6 +1,6 @@
 # Copyright (C) 2012 nineties
 #
-# $Id: HIL.ab 2012-07-30 09:15:52 nineties $
+# $Id: HIL.ab 2012-08-11 05:23:03 nineties $
 
 # High-level Intermediate Language
 
@@ -30,10 +30,10 @@ module HIL {
     HILCompiler(lang): throw "HIL Compiler for " + lang + " is not found"
     
     #=== flattening ===
-    # flatten nested open blocks
-    # open {
+    # flatten nested sequences blocks
+    # seq {
     #     stmt1
-    #     open {
+    #     seq {
     #         stmt2
     #         stmt3
     #     }
@@ -48,14 +48,12 @@ module HIL {
     flatten(Located{loc, stmt}): [`Located{!loc, !flatten_sub(stmt)}]
     flatten(Located{loc, \nil}): []
 
-    # Since elements of OpenBlock are every Located, drop `loc'.
-    flatten(Located{loc, OpenBlock{stmts...}}): flatten_list(stmts)
-
-    flatten(OpenBlock{stmts...}): flatten_list(stmts)
+    flatten(Located{loc, Seq{stmts}}): flatten_list(stmts)
+    flatten(Seq{stmts}): flatten_list(stmts)
     flatten_sub(stmt): stmt
     flatten_sub(Located{loc, stmt}): `Located{!loc, !flatten_sub(stmt)}
-    flatten_sub(Block{stmts...}): MakeExpr{\Block, flatten_list(stmts)}
-    flatten_sub(OpenBlock{stmts...}): MakeExpr{\OpenBlock, flatten_list(stmts)}
+    flatten_sub(Block{stmts}): `Block{!flatten_list(stmts)}
+    flatten_sub(Seq{stmts}): `Seq{!flatten_list(stmts)}
     flatten_sub(While{cnd, body}): `While{!flatten_sub(cnd), !flatten_sub(body)}
 
     #=== copy-propagation ===
@@ -97,13 +95,13 @@ module HIL {
         `(!x : !copyprop(sbst, e))
     copyprop(sbst, While{e, body}):
         `While{!copyprop(sbst, e), !copyprop(sbst, body)}
-    copyprop(sbst, OpenBlock{stmts...}):
-        MakeExpr{\Block, copyprop_list(sbst, stmts)}
-    copyprop(sbst, Block{stmts...}): {
+    copyprop(sbst, Seq{stmts}):
+        `Block{!copyprop_list(sbst, stmts)}
+    copyprop(sbst, Block{stmts}): {
         sbst.push()
         x: copyprop_list(sbst, stmts)
         sbst.pop()
-        MakeExpr{\Block, x}
+        `Block{!x}
     }
     copyprop(sbst, + x)   : copyprop_unary(sbst, x, \UnaryPlus)
     copyprop(sbst, - x)   : copyprop_unary(sbst, x, \UnaryMinus)
@@ -125,6 +123,7 @@ module HIL {
     copyprop(sbst, x >= y): copyprop_binary(sbst, x, y, \GreaterEqual)
     copyprop_binary(sbst, x, y, op):
         MakeExpr{op, [copyprop(sbst, x), copyprop(sbst, y)]}
+    copyprop(sbst, x =  e): copyprop_assign(sbst, x, e, \Assign)
     copyprop(sbst, x += e): copyprop_assign(sbst, x, e, \AddAssign)
     copyprop(sbst, x -= e): copyprop_assign(sbst, x, e, \SubAssign)
     copyprop(sbst, x *= e): copyprop_assign(sbst, x, e, \MulAssign)
@@ -146,24 +145,15 @@ module HIL {
 
     # linearization of statements
     linearize(Located{loc, stmt}):   (`Located{!loc, !linearize(stmt)[0]}, nil)
-    linearize(Block{stmts...}):     (MakeExpr{\Block, map(stmts, x -> linearize(x)[0])}, nil)
-    linearize(OpenBlock{stmts...}): (MakeExpr{\OpenBlock, map(stmts, x -> linearize(x)[0])}, nil)
+    linearize(Block{stmts}):     (`Block{!map(stmts, x -> linearize(x)[0])}, nil)
+    linearize(Seq{stmts}): (`Seq{!map(stmts, x -> linearize(x)[0])}, nil)
     linearize(DefineVariable{x, v}): {
         (stmt, t): linearize(v)
-        (`open {
-            !stmt
-            !x : !t
-        }, x)
+        (`(!stmt; !x : !t), x)
     }
     linearize(While{e, body}): {
         (stmt, cnd): linearize_cond(e)
-        (`open {
-            !stmt
-            while (!cnd) {
-                !linearize(body)[0]
-                !stmt
-            }
-        }, nil)
+        (`(!stmt; while (!cnd) { !linearize(body)[0]; !stmt }), nil)
     }
 
     # linearization of expressions
@@ -186,10 +176,7 @@ module HIL {
     linearize_unary(e, op): {
         (stmt, t): linearize(e)
         v: newSymbol()
-        (`open{
-            !stmt
-            !v : !MakeExpr{op, [t]}
-        }, v)
+        (`(!stmt; !v : !MakeExpr{op, [t]}), v)
     }
 
     linearize(x + y):  linearize_binary(x, y, \Add)
@@ -208,13 +195,10 @@ module HIL {
         (stmt1, v1): linearize(e1)
         (stmt2, v2): linearize(e2)
         t: newSymbol()
-        (`open {
-            !stmt1
-            !stmt2
-            !t : !MakeExpr{op, [v1, v2]}
-        }, t)
+        (`(!stmt1; !stmt2; !t : !MakeExpr{op, [v1, v2]}), t)
     } 
 
+    linearize(x  = e): linearize_assign(x, e, \Assign)
     linearize(x += e): linearize_assign(x, e, \AddAssign)
     linearize(x -= e): linearize_assign(x, e, \SubAssign)
     linearize(x *= e): linearize_assign(x, e, \MulAssign)
@@ -222,10 +206,7 @@ module HIL {
     linearize(x %= e): linearize_assign(x, e, \ModAssign)
     linearize_assign(x, e, op): {
         (stmt, t): linearize(e)
-        (`open {
-            !stmt
-            !MakeExpr{op, [x, t]}
-        }, x)
+        (`(!stmt; !MakeExpr{op, [x, t]}), x)
     }
 
     # linearization of conditional expressions
@@ -249,10 +230,7 @@ module HIL {
     linearize_cond_binary(e1, e2, op): {
         (stmt1, t1): linearize(e1)
         (stmt2, t2): linearize(e2)
-        (`open {
-            !stmt1
-            !stmt2
-        }, MakeExpr{op, [t1, t2]})
+        (`(!stmt1; !stmt2), MakeExpr{op, [t1, t2]})
     }
 
     #=== typing ===
@@ -271,10 +249,10 @@ module HIL {
         `DefineVariable{!t, !x, !e}
     }
 
-    typing_stmt(tmap, Block{stmts...}):
-        MakeExpr{\Block, map(stmts, s -> typing_stmt(tmap, s))}
-    typing_stmt(tmap, OpenBlock{stmts...}):
-        MakeExpr{\OpenBlock, map(stmts, s -> typing_stmt(tmap, s))}
+    typing_stmt(tmap, Block{stmts}):
+        `Block{!map(stmts, s -> typing_stmt(tmap, s))}
+    typing_stmt(tmap, Seq{stmts}):
+        `Seq{!map(stmts, s -> typing_stmt(tmap, s))}
 
     typing_stmt(tmap, While{cnd, body}):
         `While{!typing_expr(tmap, cnd)[1], !typing_stmt(tmap, body)}
@@ -333,7 +311,7 @@ module HIL {
         (\GreaterEqual, \Float, \Float) => (\Fge, \Bool)
         ]
 
-    typing_stmt(tmap, x = e):  typing_assign_helper(tmap, x, e, \Assign)
+    typing_stmt(tmap, x  = e): typing_assign_helper(tmap, x, e, \Assign)
     typing_stmt(tmap, x += e): typing_assign_helper(tmap, x, e, \AddAssign)
     typing_stmt(tmap, x -= e): typing_assign_helper(tmap, x, e, \SubAssign)
     typing_stmt(tmap, x *= e): typing_assign_helper(tmap, x, e, \MulAssign)

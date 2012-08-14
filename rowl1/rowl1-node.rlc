@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2012-07-30 00:20:36 nineties $
+; $Id: rowl1-node.rlc 2012-08-12 04:13:23 nineties $
 ;
 
 (import "rlvm-compile")
@@ -30,6 +30,7 @@
 
 (export var Symbol      (to_builtin_sym "Symbol"))
 (export var Int         (to_builtin_sym "Int"))
+(export var BigInt      (to_builtin_sym "BigInt"))
 (export var String      (to_builtin_sym "String"))
 (export var Float       (to_sym "Float"))
 (export var List        (to_sym "List"))
@@ -37,7 +38,6 @@
 (export var Table       (to_sym "Table"))
 (export var Tuple       (to_sym "Tuple"))
 (export var Block       (to_sym "Block"))
-(export var OpenBlock   (to_sym "OpenBlock"))
 (export var Apply       (to_sym "Apply"))
 (export var Subscript   (to_sym "Subscript"))
 (export var Located     (to_sym "Located"))
@@ -191,6 +191,7 @@
     (if (== tag @TAG_VARIANT) (return (field_get obj 0)))
     (if (== tag @TAG_CONS) (return @ListE))
     (if (== tag @TAG_BYTECODE) (return @BytecodeE))
+    (if (== tag @TAG_BIGINT) (return @BigIntE))
     (if (&& (== tag @TAG_SEQUENCE) (== (get_sequence_tag obj) @SEQ_ARRAY))
         (return @ArrayE)
         )
@@ -282,6 +283,7 @@
         (@ModuleE           . (return Module))
         (@ParserE           . (return Parser))
         (@StringIOE         . (return StringIO))
+        (@BigIntE           . (return BigInt))
         (@IntE              . (return Int))
         (@StringE           . (return String))
         (@BuiltinE          . (return Builtin))
@@ -449,10 +451,6 @@
 	(return (make_expr If (list2 cnd then)))
 	))
 
-(export fun make_seq (e1 e2) (
-    (return (make_expr Seq (list2 e1 e2)))
-    ))
-
 (export fun apply (fun args) (
     (return (make_expr Apply (list2 fun args)))
     ))
@@ -515,6 +513,7 @@
         (@ModuleE           . (return (output_string ochan "Module")))
         (@ParserE           . (return (output_string ochan "Parser")))
         (@StringIOE         . (return (output_string ochan "StringIO")))
+        (@BigIntE           . (return (output_string ochan "BigInt")))
         (@IntE              . (return (output_string ochan "Int")))
         (@StringE           . (return (output_string ochan "String")))
         (@BuiltinE          . (return (output_string ochan "Builtin")))
@@ -525,6 +524,7 @@
 (extern fun pp_module)
 (extern fun pp_table)
 (extern fun pp_table_full)
+(extern fun pp_bigint)
 
 (export fun pretty_print (ochan node) (
     (pretty_print_main ochan node)
@@ -546,6 +546,7 @@
         (@ModuleE           . (return (pp_module ochan node)))
         (@ParserE           . (return (pp_parser ochan node)))
         (@StringIOE         . (return (pp_stringio ochan node)))
+        (@BigIntE           . (return (pp_bigint ochan node)))
         (@IntE              . (return (pp_int ochan node)))
         (@StringE           . (return (pp_string ochan node)))
         (@BuiltinE          . (return (pp_builtin ochan node)))
@@ -686,6 +687,7 @@
         (@ModuleE           . (return (pp_module ochan node)))
         (@ParserE           . (return (pp_parser ochan node)))
         (@StringIOE         . (return (pp_stringio ochan node)))
+        (@BigIntE           . (return (pp_bigint ochan node)))
         (@IntE              . (return (pp_int ochan node)))
         (@StringE           . (return (pp_string ochan node)))
         (@BuiltinE          . (return (pp_builtin ochan node)))

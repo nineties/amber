@@ -13,7 +13,7 @@ DefineSyntax{
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2012-07-29 00:07:41 nineties $
+# $Id: syntax.ab 2012-08-11 21:59:16 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -106,9 +106,7 @@ DefineSyntax{
     parser_action_body,
     List{
         Tuple{List{"{", Aligned{statement}, "}"},
-            MakeExpr{Quote{Block}, node1}, multiline},
-        Tuple{List{"{", "}"},
-            MakeExpr{Quote{Block}, List{}}, multiline}
+            QuasiQuote{Block{Unquote{node1}}}, multiline}
     }
 }
 
@@ -150,12 +148,8 @@ DefineSyntax{
 }
 
 ## Expressions
-block_body ::= [multiline] "{" "}"
-                { MakeExpr{Quote{Block}, List{}} }
-             | [multiline] "{" aligned(statement) "}"
-                { MakeExpr{Quote{Block}, node1} }
-             | "{" delimited(statement, ";") "}"
-                { MakeExpr{Quote{Block}, node1} }
+block_body ::= [multiline] "{" aligned(statement) "}"
+                { QuasiQuote{Block{Unquote{node1}}} }
 
 block ::= scoped(block_body)
 
@@ -215,11 +209,11 @@ postfix_expr
       | postfix_expr "." symbol
         { MakeExpr{Quote{Apply}, List{node2, List{node0}}} }
 
-      | postfix_expr "^" secondary_expr
+      | secondary_expr "^" postfix_expr
         { MakeExpr{Quote{Power}, List{node0, node2}} }
-      | "open" block
-        { MakeExpr{Quote{OpenBlock}, Arguments{node1}} }
+
       | node
+
       | secondary_expr
 
 quote_expr
@@ -348,6 +342,10 @@ statement
       | expr "=>" statement
         { `DefineFunction{rewrite, Lambda{!node0, !node2}} }
 
+      | statement ";" statement
+        { `Seq{[!node0, !node2]} }
+
+
 ## Syntax Sugars
 +x     => `uplus(!x)
 -x     => `uminus(!x)
@@ -374,13 +372,10 @@ x[args...] = e => `Apply{store, !cons(x, append(args, [e]))}
 DefineVariable{Tuple{vs...}, v} => {
     t: newSymbol()
     sz: vs.length
-    MakeExpr{\OpenBlock,
-        [`DefineVariable{!t, !v}] +
-            List::create(sz, i -> `DefineVariable{!vs[i], (!t)[!i]})
-    }
+    `Seq{!([`DefineVariable{!t, !v}] + List::create(sz, i -> `DefineVariable{!vs[i], (!t)[!i]}))}
 }
 
 module parser {
-    primary_expr ::= "$" decimal { ("node" + node1).intern }
+    primary_expr ::= "$" decimal { ("node" + node1).to_sym }
                    | "$input"    { \GET_INPUT_TEXT() }
 }
