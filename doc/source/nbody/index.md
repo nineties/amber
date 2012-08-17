@@ -153,7 +153,8 @@ internal DSLs in powerfully ways -- and now amber is the new one.
 Piet:
 > That is very interesting.  I had not realized that.  And I'm excited
 about seeing in practice how you will use a meta-level language like
-Amber to write a DSL for us in Amber!  What is the next step?  Will we
+Amber to write a DSL for us in Amber!
+> What is the next step?  Will we
 stop now what we are doing, as a top-down way of thinking?  And will
 we now write our new DSL, bottom-up?
 
