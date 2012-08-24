@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2012-08-12 04:57:19 nineties $
+; $Id: vm-insn.rlc 2012-08-24 22:45:05 nineties $
 ;
 
 (define gen_field_get (idx) `(
@@ -140,6 +140,229 @@
     (xor    () @true ((vmbin "xorl")))
 
     ; bigint arithmetic
+    ; 1st argument must be big-integer
+    ; 2nd argument must be big-integer or fixed-integer
+    ; no run-time check is performed
+    (badd   () @true (
+        (asm "pushl %ebx")
+
+        (asm "movl (%esi), %eax") ; rhs
+        (asm "movl 4(%esi), %ebx") ; lhs
+        (asm "movl 12(%eax), %eax") ; sign of rhs
+        (asm "cmpl 12(%ebx), %eax")
+        (asm "jne bsub_main") ; if rhs and lhs has different signs, switch to bsub
+        ; compute (stp) += (eax)
+        (asm "badd_main:")
+        (asm "movl (%esi), %eax")
+        (asm "movl 4(%esi), %ebx")
+        (asm "movl 4(%ebx), %ecx")  ; number of digits of lhs
+        (asm "cmpl 4(%eax), %ecx")   
+        (asm "cmovl 4(%eax), %ecx")
+        (asm "incl %ecx") ; ecx = max(lhs.ndigits, rhs.ndigits) + 1
+        (asm "cmpl 8(%ebx), %ecx") ; compare capa of lhs and ecx
+        (asm "jle 2f")
+        ; reserve array of lhs
+        (asm "pushl %eax")
+        (vmsave)
+        (asm "pushl %ecx")
+        (asm "movl 4(%esi), %eax")
+        (asm "pushl %eax")
+        (asm "call prim_resize_bigint")
+        (asm "addl $8, %esp")
+        (vmrestore)
+        (asm "popl %eax")
+        (asm "2:")
+
+        (asm "movl 4(%eax), %ecx")  ; %ecx = number of digits of rhs
+        (asm "movl (%eax), %eax")   ; %eax = digits of rhs
+        (asm "movl (%ebx), %ebx")   ; %ebx = digits of lhs
+
+        ; while ecx > 0 { *ebx++ += *eax++ with carry }
+        (asm "4:")
+        (asm "addl %edx, (%ebx)")
+        (asm "movl (%eax), %edx")
+        (asm "addl %edx, (%ebx)")
+        (asm "movl $0, %edx")
+        (asm "adcl %edx, %edx")
+        (asm "decl %ecx")
+        (asm "addl $4, %eax")
+        (asm "addl $4, %ebx")
+        (asm "test %ecx, %ecx")
+        (asm "jnz 4b")
+        (asm "5:")
+        (asm "addl %edx, (%ebx)")
+        (asm "movl $0, %edx")
+        (asm "adcl %edx, %edx")
+        (asm "addl $4, %ebx")
+        (asm "test %edx, %edx")
+        (asm "jnz 5b")
+
+        ; update number of digits
+        (asm "movl 4(%esi), %ebx")
+        (asm "movl 8(%ebx), %ecx")
+        (asm "movl (%ebx), %ebx")
+        (asm "leal -4(%ebx,%ecx,4), %ebx")
+        (asm "6:")
+        (asm "movl (%ebx), %eax")
+        (asm "test %eax, %eax")
+        (asm "jnz 8f")
+        (asm "decl %ecx")
+        (asm "test %ecx, %ecx")
+        (asm "jz 7f")
+        (asm "subl $4, %ebx")
+        (asm "jmp 6b")
+        (asm "7:")
+        (asm "incl %ecx")
+        (asm "8:")
+        (asm "movl 4(%esi), %ebx")
+        (asm "movl %ecx, 4(%ebx)")
+
+        (asm "xorl %edx, %edx")
+        (asm "addl $4, %esi")
+        (asm "popl %ebx")
+        ))
+    (bsub   () @true (
+        (asm "pushl %ebx")
+
+        (asm "movl (%esi), %eax") ; rhs
+        (asm "movl 4(%esi), %ebx") ; lhs
+        (asm "movl 12(%eax), %eax") ; sign of rhs
+        (asm "cmpl 12(%ebx), %eax")
+        (asm "jne badd_main") ; if rhs and lhs has different signs, switch to badd
+
+        (asm "bsub_main:")
+        (asm "movl (%esi), %eax")
+        (asm "movl 4(%esi), %ebx")
+        (asm "movl 4(%ebx), %ecx")  ; number of digits of lhs
+        (asm "cmpl 4(%eax), %ecx")   
+        (asm "cmovl 4(%eax), %ecx") ; max(lhs.ndigits, rhs.ndigits)
+        (asm "cmpl 8(%ebx), %ecx") ; compare capa of lhs and ecx
+        (asm "jle 2f")
+        ; reserve array of lhs
+        (asm "pushl %eax")
+        (vmsave)
+        (asm "pushl %ecx")
+        (asm "movl 4(%esi), %eax")
+        (asm "pushl %eax")
+        (asm "call prim_resize_bigint")
+        (asm "addl $8, %esp")
+        (vmrestore)
+        (asm "popl %eax")
+        (asm "2:")
+
+        ; === compute (ebx) -= (eax) === 
+        ; 1. compare (ebx) and (eax)
+        (asm "movl 4(%ebx), %ecx")
+        (asm "cmpl 4(%eax), %ecx")
+        (asm "jg 3f")
+        (asm "jl 4f")
+        (asm "movl (%ebx), %ebx")
+        (asm "movl (%eax), %eax")
+        (asm "decl %ecx")
+        (asm "leal (%eax,%ecx,4), %eax")
+        (asm "leal (%ebx,%ecx,4), %ebx")
+        (asm "5:")
+
+        (asm "movl (%eax), %edx")
+        (asm "cmpl (%ebx), %edx")
+        (asm "jl 3f")
+        (asm "jg 4f")
+        (asm "decl %ecx")
+        (asm "test %ecx, %ecx")
+        (asm "jnz 5b")
+
+        ; 2. do computation
+        (asm "3:") ; (ebx).abs >= (eax).abs
+        (asm "movl (%esi), %eax")
+        (asm "movl 4(%esi), %ebx")
+        (asm "movl 4(%eax), %ecx") ; rhs.ndigits
+        (asm "movl (%eax), %eax") ; rhs.digits
+        (asm "movl (%ebx), %ebx") ; lhs.digits
+        (asm "xorl %edx, %edx") ; clear edx
+
+        (asm "6:")
+        (asm "subl %edx, (%ebx)")
+        (asm "movl (%eax), %edx")
+        (asm "subl %edx, (%ebx)")
+        (asm "movl $0, %edx")
+        (asm "adcl %edx, %edx")
+        (asm "decl %ecx")
+        (asm "addl $4, %eax")
+        (asm "addl $4, %ebx")
+        (asm "test %ecx, %ecx")
+        (asm "jnz 6b")
+        (asm "7:")
+        (asm "test %edx, %edx")
+        (asm "jz 8f")
+        (asm "subl %edx, (%ebx)")
+        (asm "movl $0, %edx")
+        (asm "adcl %edx, %edx")
+        (asm "addl $4, %ebx")
+        (asm "jmp 7b")
+
+        (asm "4:") ; (ebx).abs < (eax).abs
+        (asm "movl (%esi), %eax")
+        (asm "movl 4(%esi), %ebx")
+        (asm "negl 12(%ebx)") 
+        (asm "movl 4(%ebx), %ecx") ; lhs.ndigits
+        (asm "movl (%eax), %eax") ; rhs.digits
+        (asm "movl (%ebx), %ebx") ; lhs.digits
+        (asm "xorl %edx, %edx") ; clear edx
+
+        (asm "12:")
+        (asm "subl %edx, (%ebx)")
+        (asm "movl (%eax), %edx")
+        (asm "subl (%ebx), %edx")
+        (asm "movl %edx, (%ebx)")
+        (asm "movl $0, %edx")
+        (asm "adcl %edx, %edx")
+        (asm "decl %ecx")
+        (asm "addl $4, %eax")
+        (asm "addl $4, %ebx")
+        (asm "test %ecx, %ecx")
+        (asm "jnz 12b")
+        (asm "13:")
+        (asm "test %edx, %edx")
+        (asm "jz 8f")
+
+        (asm "movl (%eax), %ecx")
+        (asm "subl %edx, %ecx")
+        (asm "movl %ecx, (%ebx)")
+        (asm "movl $0, %edx")
+        (asm "adcl %edx, %edx")
+        (asm "addl $4, %eax")
+        (asm "addl $4, %ebx")
+        (asm "jmp 13b")
+
+        (asm "8:")
+        ; update number of digits
+        (asm "movl 4(%esi), %ebx")
+        (asm "movl 8(%ebx), %ecx")
+        (asm "movl (%ebx), %ebx")
+        (asm "leal -4(%ebx,%ecx,4), %ebx")
+        (asm "9:")
+        (asm "movl (%ebx), %eax")
+        (asm "test %eax, %eax")
+        (asm "jnz 11f")
+        (asm "decl %ecx")
+        (asm "test %ecx, %ecx")
+        (asm "jz 10f")
+        (asm "subl $4, %ebx")
+        (asm "jmp 9b")
+        (asm "10:")
+        (asm "incl %ecx")
+        (asm "11:")
+        (asm "movl 4(%esi), %ebx")
+        (asm "movl %ecx, 4(%ebx)")
+        (asm "addl $4, %esi")
+        (asm "popl %ebx")
+        ))
+    (bmul   () @true (
+        ))
+    (bdiv   () @true (
+        ))
+    (bmod   () @true (
+        ))
 
     ; allocate cons object
     ; arg0 = cdr object

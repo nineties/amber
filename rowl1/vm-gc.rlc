@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2012-08-12 04:55:04 nineties $
+; $Id: vm-gc.rlc 2012-08-24 13:58:14 nineties $
 ;
 
 (import "stdlib")
@@ -659,13 +659,35 @@
 
 (export prim_allocate_bigint)
 (fun prim_allocate_bigint (len) (
-    (void* ptr (allocate_object 4))
-    @(SET_HEADER ptr TAG_BIGINT 0 4)
+    (void* ptr (allocate_object 5))
+    @(SET_HEADER ptr TAG_BIGINT 0 5)
     (+= ptr @WORD_SIZE)
     ([]= ptr 0 (allocate_iarray len))   ; digits
-    ([]= ptr 1 1)                       ; number of digits and sign
+    ([]= ptr 1 1)                       ; number of digits
     ([]= ptr 2 len)                     ; capacity
+    ([]= ptr 3 0)                       ; sign
     (return ptr)
+    ))
+
+(export prim_resize_bigint)
+(fun prim_resize_bigint (ptr len) (
+    (void* new (allocate_iarray len))
+    (prim_memcpy new ([] ptr 0) (* ([] ptr 1) @WORD_SIZE))
+    ([]= ptr 0 new)
+    ([]= ptr 2 len)
+    (return ptr)
+    ))
+
+(export prim_to_bigint)
+(fun prim_to_bigint (n) (
+    (void* p (prim_allocate_bigint 1))
+    (if (>= n 0)
+        (([]= ([] p 0) 0 n))
+        (
+            ([]= ([] p 0) 0 (neg n))
+            ([]= p 3 1)
+        ))
+    (return p)
     ))
 
 (export prim_get_tag)
