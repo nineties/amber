@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2012-08-24 22:45:05 nineties $
+; $Id: vm-insn.rlc 2012-08-28 08:48:05 nineties $
 ;
 
 (define gen_field_get (idx) `(
@@ -358,6 +358,132 @@
         (asm "popl %ebx")
         ))
     (bmul   () @true (
+        (asm "pushl %ebx")
+
+        (asm "movl (%esi), %eax") ; rhs
+        (asm "movl 4(%esi), %ebx") ; lhs
+        (asm "movl 12(%eax), %eax"); sign of rhs
+        (asm "xorl %eax, 12(%ebx)")
+
+        (asm "movl 4(%ebx), %ecx") ; lhs.ndigits
+        (asm "movl (%esi), %eax")
+        (asm "imul 4(%eax), %ecx")
+        (asm "incl %ecx") ; lhs.ndigits * rhs.ndigits + 1
+        ; allocate array for result
+
+        (vmsave)
+        (asm "pushl %ecx")
+        (asm "call allocate_iarray")
+        (asm "addl $4, %esp")
+        (vmrestore)
+
+        ; setup variables
+        (asm "subl $8, %esp")
+        (asm "pushl %eax")        ; working array
+        (asm "pushl 4(%ebx)")     ; lhs.ndigits
+        (asm "pushl (%ebx)")      ; lhs.digits
+        (asm "movl (%esi), %ebx")
+        (asm "pushl 4(%ebx)")     ; rhs.ndigits
+        (asm "pushl (%ebx)")      ; rhs.digits
+        (asm "pushl $0")          ; index for rhs.digits
+        (asm "pushl $0")          ; index for lhs.digits
+
+        ; variable table
+        ;   (%esp) : (i) index for lhs.digits
+        ;  4(%esp) : (j) index for rhs.digits
+        ;  8(%esp) : (v) rhs.digits
+        ; 12(%esp) : (m) rhs.ndigits
+        ; 16(%esp) : (u) lhs.digits
+        ; 20(%esp) : (n) lhs.ndigits
+        ; 24(%esp) : (w) working array
+        ; 28(%esp) : v[j]
+        ; 32(%esp) : working area
+
+        (asm "1:")
+        (asm "movl 4(%esp), %eax")
+        (asm "cmpl %eax, 12(%esp)")
+        (asm "je 4f") ; exit if j == m
+
+        (asm "movl 8(%esp), %ebx")
+        (asm "leal (%ebx, %eax, 4), %ebx")
+        (asm "movl (%ebx), %ebx") ; ebx = v[j]
+        (asm "movl %ebx, 28(%esp)")
+
+        (asm "movl $0, (%esp)") ; i = 0
+        (asm "xorl %ecx, %ecx")  ; carry = 0
+
+        (asm "2:")
+
+        (asm "movl (%esp), %eax")
+        (asm "cmpl %eax, 20(%esp)")
+        (asm "je 3f") ; exit if i == n
+
+        (asm "movl 16(%esp), %ebx")
+        (asm "leal (%ebx, %eax, 4), %eax")
+        (asm "movl (%eax), %eax") ; eax = u[i]
+        (asm "mull 28(%esp)") ; %edx:%eax = u[i] * v[j]
+        (asm "addl %ecx, %eax") ; add carry
+        (asm "adcl $0, %edx")
+
+        (asm "movl %eax, 32(%esp)")
+
+        (asm "movl (%esp), %eax")
+        (asm "addl 4(%esp), %eax") ; eax = i + j
+        (asm "movl 24(%esp), %ebx")
+        (asm "leal (%ebx,%eax,4), %ecx")
+        (asm "movl (%ecx), %ecx") ; ecx = w[i+j]
+        (asm "addl %ecx, 32(%esp)")
+        (asm "adcl $0, %edx")
+        (asm "movl %edx, %ecx")
+        (asm "movl 32(%esp), %edx")
+        (asm "leal (%ebx, %eax, 4), %eax")
+        (asm "movl %edx, (%eax)")
+
+        (asm "incl (%esp)")
+        (asm "jmp 2b")
+
+        (asm "3:")
+        (asm "movl 4(%esp), %eax")
+        (asm "addl 20(%esp), %eax") ; eax = n + j
+        (asm "movl 24(%esp), %ebx")
+        (asm "leal (%ebx, %eax, 4), %eax")
+        (asm "movl %ecx, (%eax)")
+
+        (asm "incl 4(%esp)")
+        (asm "jmp 1b")
+        (asm "4:")
+
+        ; w is the result
+        (asm "movl 4(%esi), %eax") ; lhs
+        (asm "movl 24(%esp), %ebx")
+        (asm "movl %ebx, (%eax)")
+
+        ; update lhs.ndigits
+        (asm "movl 12(%esp), %ecx")
+        (asm "imul 20(%esp), %ecx")
+        (asm "incl %ecx")
+        (asm "movl %ecx, 8(%eax)")
+
+        (asm "movl (%eax), %eax")
+        (asm "leal -4(%eax,%ecx,4), %ebx")
+        (asm "9:")
+        (asm "movl (%ebx), %eax")
+        (asm "test %eax, %eax")
+        (asm "jnz 11f")
+        (asm "decl %ecx")
+        (asm "test %ecx, %ecx")
+        (asm "jz 10f")
+        (asm "subl $4, %ebx")
+        (asm "jmp 9b")
+        (asm "10:")
+        (asm "incl %ecx")
+        (asm "11:")
+        (asm "movl 4(%esi), %ebx")
+        (asm "movl %ecx, 4(%ebx)")
+
+        (asm "addl $36, %esp")
+        (asm "addl $4, %esi")
+        (asm "popl %ebx")
         ))
     (bdiv   () @true (
         ))
