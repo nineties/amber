@@ -198,7 +198,8 @@ Douglas:
 > What is the status of the word `statement` here?
 
 Koichi:
-> Left-hand side symbols of operator `::=` is a category of the syntax
+> The symbols at the left-hand side of the operator `::=` form a
+category of the syntax
 which Amber understands. Amber adds the right-hand side new syntaxes
 into the left-hand side categories. Since Amber parses programs as
 lines of statements, we have to begin with defining our new
