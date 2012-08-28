@@ -1,7 +1,7 @@
 ---
 layout: page
 title: "Amber Application Example: N-Body Simulation"
-date: 2012-08-09 12:00
+date: 2012-08-28 13:00
 comments: true
 sharing: true
 footer: true
@@ -144,7 +144,6 @@ Piet:
 least for the average user.
 
 Koichi:
-
 > in fact, there are no famous "internal" DSLs written in Python,
 because Python's syntax is rather poor in comparison to Ruby.
 Actually, Ruby and LISP are the only ones which support writing
@@ -202,7 +201,7 @@ Koichi:
 > Left-hand side symbols of operator `::=` is a category of the syntax
 which Amber understands. Amber adds the right-hand side new syntaxes
 into the left-hand side categories. Since Amber parses programs as
-lines of statements, we have to begin with definint our new
+lines of statements, we have to begin with defining our new
 statement.
 
 Douglas:
