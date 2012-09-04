@@ -1,7 +1,7 @@
 ---
 layout: page
 title: "Amber Application Example: N-Body Simulation"
-date: 2012-08-09 12:00
+date: 2012-08-28 13:00
 comments: true
 sharing: true
 footer: true
@@ -144,7 +144,6 @@ Piet:
 least for the average user.
 
 Koichi:
-
 > in fact, there are no famous "internal" DSLs written in Python,
 because Python's syntax is rather poor in comparison to Ruby.
 Actually, Ruby and LISP are the only ones which support writing
@@ -153,7 +152,8 @@ internal DSLs in powerfully ways -- and now amber is the new one.
 Piet:
 > That is very interesting.  I had not realized that.  And I'm excited
 about seeing in practice how you will use a meta-level language like
-Amber to write a DSL for us in Amber!  What is the next step?  Will we
+Amber to write a DSL for us in Amber!
+> What is the next step?  Will we
 stop now what we are doing, as a top-down way of thinking?  And will
 we now write our new DSL, bottom-up?
 
@@ -198,10 +198,12 @@ Douglas:
 > What is the status of the word `statement` here?
 
 Koichi:
-> Left-hand side symbols of operator `::=` is a category of the syntax
-which Amber understands. Amber adds the right-hand side new syntaxes
-into the left-hand side categories. Since Amber parses programs as
-lines of statements, we have to begin with definint our new
+> The symbols at the left-hand side of the operator `::=` are new
+expressions that we can write to extend Amber.  By doing so, we
+extend the Amber syntax.  And by providing new expressions at the
+right-hand side of this operator, we define the meaning of the new
+expressions at the left-hand side.  Since Amber parses programs as
+lines of statements, we have to begin with defining our new
 statement.
 
 Douglas:
