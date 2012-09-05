@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2012-08-28 12:48:35 nineties $
+; $Id: vm-insn.rlc 2012-09-05 18:50:27 nineties $
 ;
 
 (define gen_field_get (idx) `(
@@ -237,7 +237,7 @@
         (asm "cmpl 4(%eax), %ecx")   
         (asm "cmovl 4(%eax), %ecx") ; max(lhs.ndigits, rhs.ndigits)
         (asm "cmpl 8(%ebx), %ecx") ; compare capa of lhs and ecx
-        (asm "jle 2f")
+        (asm "jge 2f")
         ; reserve array of lhs
         (asm "pushl %eax")
         (vmsave)
@@ -250,12 +250,12 @@
         (asm "popl %eax")
         (asm "2:")
 
-        ; === compute (ebx) -= (eax) === 
-        ; 1. compare (ebx) and (eax)
-        (asm "movl 4(%ebx), %ecx")
-        (asm "cmpl 4(%eax), %ecx")
-        (asm "jg 3f")
-        (asm "jl 4f")
+        ; === compute lhs -= rhs) === 
+        ; 1. compare lhs.abs and rhs.abs
+        (asm "movl 4(%ebx), %ecx")  ; ebx = lhs, eax = rhs
+        (asm "cmpl 4(%eax), %ecx")  ; rhs.ndigit <=> lhs.ndigit
+        (asm "jl 3f")
+        (asm "jg 4f")
         (asm "movl (%ebx), %ebx")
         (asm "movl (%eax), %eax")
         (asm "decl %ecx")
@@ -263,8 +263,8 @@
         (asm "leal (%ebx,%ecx,4), %ebx")
         (asm "5:")
 
-        (asm "movl (%eax), %edx")
-        (asm "cmpl (%ebx), %edx")
+        (asm "movl (%ebx), %edx")
+        (asm "cmpl (%eax), %edx")
         (asm "jl 3f")
         (asm "jg 4f")
         (asm "decl %ecx")
@@ -354,6 +354,7 @@
         (asm "11:")
         (asm "movl 4(%esi), %ebx")
         (asm "movl %ecx, 4(%ebx)")
+        (asm "xorl %edx, %edx")
         (asm "addl $4, %esi")
         (asm "popl %ebx")
         ))
@@ -483,13 +484,61 @@
 
         (asm "addl $36, %esp")
         (asm "addl $4, %esi")
+        (asm "xorl %edx, %edx")
         (asm "popl %ebx")
         ))
 
-    (bdiv   () @true (
+    (bcmp () @true (
+        (asm "pushl %ebx")
 
-        ))
-    (bmod   () @true (
+        (asm "movl (%esi), %eax")   ; rhs
+        (asm "movl 4(%esi), %ebx")  ; lhs
+        (asm "movl 12(%eax), %eax") ; rhs.sign
+        (asm "subl 12(%ebx), %eax") ; rhs.sign - lhs.sign
+        (asm "jz 1f")
+        (asm "movl %eax, 4(%esi)")
+        (asm "jmp 2f")
+        (asm "1:") ; rhs.sign == lhs.sign
+        (asm "movl (%esi), %eax")  ; rhs
+        (asm "movl 4(%esi), %ebx") ; lhs
+        (asm "movl 4(%eax), %ecx") ; rhs.ndigits
+        (asm "cmpl 4(%ebx), %ecx") ; lhs.ndigits <=> rhs.ndigits
+        (asm "jl 3f")
+        (asm "jg 4f")
+
+        ; lhs.ndigits == rhs.ndigits
+        (asm "6:")
+        (asm "test %ecx, %ecx")
+        (asm "jz 7f")
+        (asm "decl %ecx")
+        (asm "movl (%esi), %eax")
+        (asm "movl 4(%esi), %ebx")
+        (asm "movl (%eax), %eax") ; rhs.digits
+        (asm "movl (%ebx), %ebx") ; lhs.digits
+        (asm "leal (%eax,%ecx,4), %eax")
+        (asm "leal (%ebx,%ecx,4), %ebx")
+        (asm "movl (%eax), %edx")
+        (asm "cmpl (%ebx), %edx") ; lhs.digit[ecx] <=> rhs.digit[ecx]
+        (asm "jl 3f")
+        (asm "jg 4f")
+        (asm "jmp 6b")
+        (asm "7:")
+        (asm "movl $0, 4(%esi)")
+        (asm "jmp 2f")
+        (asm "3:") ; |lhs| < |rhs|
+        (asm "movl $1, 4(%esi)")
+        (asm "jmp 5f")
+        (asm "4:") ; |rhs| < |lhs|
+        (asm "movl $-1, 4(%esi)")
+        (asm "5:")
+        (asm "movl (%esi), %eax")
+        (asm "cmp $0, 12(%eax)")
+        (asm "je 2f")
+        (asm "negl 4(%esi)")
+        (asm "2:")
+        (asm "addl $4, %esi")
+        (asm "xorl %edx, %edx")
+        (asm "popl %ebx")
         ))
 
     ; allocate cons object
