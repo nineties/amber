@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2012-09-08 01:48:54 nineties $
+; $Id: vm-insn.rlc 2012-09-08 04:11:57 nineties $
 ;
 
 (define gen_field_get (idx) `(
@@ -591,6 +591,8 @@
         (vmrestore)
         (asm "1:")
 
+        (asm "test %ecx, %ecx")
+        (asm "jz 10f") 
         ; shift (%esi) / 32
         (asm "movl 4(%esi), %eax") ; x
         (asm "movl (%eax), %ebx")  ; x.digits
@@ -619,6 +621,7 @@
         (asm "jmp 3b")
         (asm "4:")
         (asm "addl $4, %esp")
+        (asm "10:")
 
         ; shift (%esi) % 32
         (asm "subl $8, %esp")
@@ -679,6 +682,103 @@
         (asm "movl 4(%esi), %ebx")
         (asm "movl %ecx, 4(%ebx)")
         (asm "xorl %edx, %edx")
+        (asm "addl $4, %esi")
+        (asm "popl %ebx")
+        ))
+    (bshr () @true (
+        (asm "pushl %ebx")
+
+        ; shift (%esi) / 32
+        (asm "movl (%esi), %ecx")  ; shift length
+        (asm "shrl $5, %ecx")      ; ecx = ecx/32
+        (asm "test %ecx, %ecx")
+        (asm "jz 1f")
+        (asm "movl 4(%esi), %eax") ; x
+        (asm "movl (%eax), %ebx")  ; x.digits
+        (asm "movl 4(%eax), %edx") ; x.ndigit
+        (asm "subl %ecx, %edx")    ; x.ndigit - ecx
+        (asm "2:")
+        (asm "test %edx, %edx")
+        (asm "jz 3f")
+        (asm "leal (%ebx,%ecx,4), %eax")
+        (asm "movl (%eax), %eax")
+        (asm "movl %eax, (%ebx)")
+        (asm "addl $4, %ebx")
+        (asm "decl %edx")
+        (asm "jmp 2b")
+        (asm "3:")
+
+        ; clear leading words
+        (asm "movl 4(%esi), %eax")  ; x
+        (asm "movl (%eax), %ebx")   ; x.digits
+        (asm "movl 4(%eax), %edx")  ; x.ndigit
+        (asm "4:")
+        (asm "test %ecx, %ecx")
+        (asm "jz 1f")
+        (asm "decl %ecx")
+        (asm "decl %edx")
+        (asm "leal (%ebx,%edx,4), %eax")
+        (asm "movl $0, (%eax)")
+        (asm "jmp 4b")
+        (asm "1:")
+
+        ; shift (%esi) % 32
+        (asm "subl $8, %esp")
+        (asm "movl 4(%esi), %eax")  ; x
+        (asm "movl (%eax), %ebx")   ; x.digits
+        (asm "movl 4(%eax), %edx")  ; x.ndigit
+        (asm "movl (%esi), %ecx")
+        (asm "shrl $5, %ecx")
+        (asm "subl %ecx, %edx")
+        (asm "decl %edx")
+        (asm "movl %edx, 4(%esp)")
+        (asm "movl $0, (%esp)")
+        (asm "movl (%esi), %ecx")
+        (asm "andl $0x1f, %ecx")
+
+        ; (%esp):  index
+        ; 4(%esp): n
+        (asm "5:")
+        (asm "movl (%esp), %edx")
+        (asm "cmpl 4(%esp), %edx")
+        (asm "je 6f")
+        (asm "leal (%ebx,%edx,4), %eax")
+        (asm "leal 4(%ebx,%edx,4), %edx")
+        (asm "movl (%eax), %eax")
+        (asm "movl (%edx), %edx")
+        (asm "shrdl %cl, %edx, %eax")
+        (asm "movl (%esp), %edx")
+        (asm "leal (%ebx,%edx,4), %edx")
+        (asm "movl %eax, (%edx)")
+        (asm "incl (%esp)")
+        (asm "jmp 5b")
+        (asm "6:")
+        (asm "leal (%ebx,%edx,4), %edx")
+        (asm "movl (%edx), %eax")
+        (asm "shrl %cl, %eax")
+        (asm "movl %eax, (%edx)")
+        (asm "addl $8, %esp")
+        
+        ; update number of digits
+        (asm "movl 4(%esi), %ebx")
+        (asm "movl 8(%ebx), %ecx")
+        (asm "movl (%ebx), %ebx")
+        (asm "leal -4(%ebx,%ecx,4), %ebx")
+        (asm "7:")
+        (asm "movl (%ebx), %eax")
+        (asm "test %eax, %eax")
+        (asm "jnz 9f")
+        (asm "decl %ecx")
+        (asm "test %ecx, %ecx")
+        (asm "jz 8f")
+        (asm "subl $4, %ebx")
+        (asm "jmp 7b")
+        (asm "8:")
+        (asm "incl %ecx")
+        (asm "9:")
+        (asm "movl 4(%esi), %ebx")
+        (asm "movl %ecx, 4(%ebx)")
+
         (asm "addl $4, %esi")
         (asm "popl %ebx")
         ))
