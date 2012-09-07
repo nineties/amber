@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-bigint.rlc 2012-09-05 18:52:59 nineties $
+; $Id: rowl1-bigint.rlc 2012-09-08 01:34:28 nineties $
 ;
 
 (import "rlvm-compile")
@@ -23,20 +23,183 @@
     (output_string ochan "BigInt")
     ))
 
+(fun bigint_is_zero (v) (
+    (return (&& (== (field_get v 1) 1) (== (array_get int (field_get v 0) 0) 0)))
+    ))
+
+(fun int_to_bigint (v) (
+    (var b (allocate_bigint 1))
+    (if (>= b 0)
+        (array_set int (field_get b 0) 0 v)
+        (do
+            (array_set int (field_get b 0) 0 (- v))
+            (field_set b 3 1)
+        ))
+    (return b)
+    ))
+
+(fun uint_to_bigint (v) (
+    (var b (allocate_bigint 1))
+    (array_set int (field_get b 0) 0 v)
+    (return b)
+    ))
+
+; assumption: 0 <= u.ndigit - v.ndigit <= 2
+; returns quotient and `u' will be overwritten by remainder
+(fun bigdiv_sub (u v) (
+    (if (== u v) (do
+        (clear_bigint u) ; remainder == 0
+        (return 1)
+        ))
+    (var ulen (field_get u 1))
+    (var vlen (field_get v 1))
+    (var udigits (field_get u 0))
+    (var vdigits (field_get v 0))
+    (var q 0)
+    (if (== ulen vlen)
+        (= q (udiv (array_get int udigits (- ulen 1))
+                (array_get int vdigits (- vlen 1))))
+        (do
+            (var u1 (array_get int udigits (- ulen 1)))
+            (var u0 (array_get int udigits (- ulen 2)))
+            (var v0 (array_get int vdigits (- vlen 1)))
+            (= q (ludiv u1 u0 v0))
+        ))
+
+    (debugs "bigdiv_sub:")
+    (debugx q)
+    (debugs "\n")
+    (var qv (copy_bigint v))
+    (bigmul qv (uint_to_bigint q))
+    (while (< (bigcmp u qv) 0) (do
+        (-= q 1)
+        (bigadd u v)
+        ))
+    (bigsub u qv)
+    (return q)
+    ))
+
+; u = u/v and returns u%v
+(fun bigdiv (u v) (
+    (if (bigint_is_zero v)
+        (throw (division_by_zero current_loc))
+        )
+    (if (== u v) (do
+        (clear_bigint u)
+        (return 1)
+        ))
+    (if (< (bigcmp u v) 0) (do
+        (var r (copy_bigint u))
+        (var udigits (field_get u 0))
+        (memset udigits 0 (* 4 (field_get u 1)))
+        (array_set int udigits 0 1)
+        (field_set u 1 1)
+        (return r)
+        ))
+
+    (var udigit (field_get u 0))
+    (var vdigit (field_get v 0))
+    (var ulen   (field_get u 1))
+    (var vlen   (field_get v 1))
+
+    (var q (allocate_bigint ulen))
+
+    (var r (allocate_bigint (+ vlen 1)))
+    (field_set r 1 (+ vlen 1))
+    (var rdigit (field_get r 0))
+    (var rlen (+ vlen 1))
+    (var p (+ (- ulen vlen) 1))
+    (memcpy rdigit (+ udigit (* 4 p)) (* 4 (- vlen 1)))
+    (array_set int rdigit vlen 0)
+
+    (debugs "poinpoin\n")
+    (debugx (bigdiv_sub r v))
+    (debugs "\n")
+
+    (debugx (field_get r 1)) 
+    (debugs "\n")
+    (debugx (array_get int rdigit 0))
+    (debugs "\n")
+    (debugx (array_get int rdigit 1))
+    (debugs "\n")
+
+    (while (> p 0) (do
+        (-= p 1)
+        (memcpy (+ rdigit 4) rdigit (* 4 vlen))
+        (array_set int rdigit 0 (array_get int udigit p))
+        (field_set r 1 (+ (field_get r 1) 1))
+        
+        (debugs "div!\n")
+        (debugx (field_get r 1))
+        (debugs "\n")
+        (debugx (array_get int rdigit 0)) 
+        (debugs "\n")
+        (debugx (array_get int rdigit 1)) 
+        (debugs "\n")
+        (debugx (array_get int rdigit 2)) 
+        (debugs "\n")
+
+        (debugs "result!\n")
+        (debugx (bigdiv_sub r v))
+        (debugs "\n")
+        (debugx (field_get r 1))
+        (debugs "\n")
+        (debugx (array_get int rdigit 0)) 
+        (debugs "\n")
+        (debugx (array_get int rdigit 1)) 
+        (debugs "\n")
+        (debugx (array_get int rdigit 2)) 
+        (debugs "\n")
+        ))
+    (debugs "result!\n")
+    (debugx (field_get r 1))
+    (debugs "\n")
+    (debugx (array_get int rdigit 0))
+    (debugs "\n")
+    (debugx (array_get int rdigit 1))
+    (debugs "\n")
+    (debugx (array_get int rdigit 2))
+    (debugs "\n")
+    (debugx (array_get int rdigit 3))
+    (debugs "\n")
+    ))
+
 (export fun setup_bigint (std) (
     ; tests
-    (var x (allocate_bigint 2))
+    (var x (allocate_bigint 10))
     (var y (allocate_bigint 10))
-    (field_set x 1 2)
-    (array_set int (field_get x 0) 0 0x3)
-    (array_set int (field_get x 0) 1 0x300003)
+    (field_set x 1 4)
     (field_set x 3 0)
-    (field_set y 1 2)
-    (array_set int (field_get y 0) 0 0x3)
-    (array_set int (field_get y 0) 1 0x300003)
-    (field_set y 3 0)
-    (debugs "hoge\n")
-    (debugi (bigcmp x y))
+    (array_set int (field_get x 0) 3 0x2d08ae2d)
+    (array_set int (field_get x 0) 2 0x08e70933)
+    (array_set int (field_get x 0) 1 0x47c9c2ec)
+    (array_set int (field_get x 0) 0 0x40387341)
+
+    (bigshl x 67)
+
+    (debugi (field_get x 1))
+    (debugs "\n")
+    (debugx (array_get int (field_get x 0) 6))
+    (debugs "\n")
+    (debugx (array_get int (field_get x 0) 5))
+    (debugs "\n")
+    (debugx (array_get int (field_get x 0) 4))
+    (debugs "\n")
+    (debugx (array_get int (field_get x 0) 3))
+    (debugs "\n")
+    (debugx (array_get int (field_get x 0) 2))
+    (debugs "\n")
+    (debugx (array_get int (field_get x 0) 1))
+    (debugs "\n")
+    (debugx (array_get int (field_get x 0) 0))
+    (debugs "\n")
+
+    ;(field_set y 1 2)
+    ;(field_set y 3 0)
+    ;(array_set int (field_get y 0) 0 0x04529392)
+    ;(array_set int (field_get y 0) 1 0x2)
+    ;(bigdiv x y)
     ))
+
 
     ))

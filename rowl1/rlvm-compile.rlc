@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlvm-compile.rlc 2012-09-05 04:32:05 nineties $
+; $Id: rlvm-compile.rlc 2012-09-06 21:59:55 nineties $
 ;
 
 (import "stdlib")
@@ -215,8 +215,8 @@
 
 (var binary_operator
     `((+ . iadd) (- . isub) (* . imul) (/ . idiv) (% . imod) (<< . sal) (>> . sar)
-    (& . and) (| . or) (^ . xor)
-    (bigadd . badd) (bigsub . bsub) (bigmul . bmul) (bigcmp . bcmp)
+    (& . and) (| . or) (^ . xor) (udiv . udiv) (umod . umod)
+    (bigadd . badd) (bigsub . bsub) (bigmul . bmul) (bigcmp . bcmp) (bigshl . bshl) (bigshr . bshr)
     )
     )
 (var unary_operator `((- . ineg) (bsr . bsr)))
@@ -244,6 +244,14 @@
     (var arg (cadr expr))
     (compile_expr arg)
     (emit_insn insn)
+    true
+    ))
+
+(define compile_ludiv (expr) (do
+    (compile_expr (cadr expr))
+    (compile_expr (caddr expr))
+    (compile_expr (cadddr expr))
+    (emit_insn `ludiv)
     true
     ))
 
@@ -845,6 +853,7 @@ a   (emit_insn (label cont_lbl))
         ((== `box (car expr)) (compile_expr `(+ (<< @(cadr expr) 1) 1)))
         ((== `unbox (car expr)) (compile_expr `(>> @(cadr expr) 1)))
         ((== `byterun (car expr)) (compile_byterun expr))
+        ((== `ludiv (car expr)) (compile_ludiv expr))
         ((and (== 3 (length expr)) (binary_operator? (car expr)))
             (compile_binexpr expr))
         ((and (== 2 (length expr)) (unary_operator? (car expr)))

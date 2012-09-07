@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2012-09-05 18:50:27 nineties $
+; $Id: vm-insn.rlc 2012-09-08 01:48:54 nineties $
 ;
 
 (define gen_field_get (idx) `(
@@ -90,20 +90,53 @@
     (iadd1 () @true ((asm "incl (%esi)")))
     (isub1 () @true ((asm "decl (%esi)")))
     (imul      () @true ((vmpop %eax) (asm "imul (%esi), %eax") (asm "movl %eax, (%esi)")))
+
+    ; signed
     (idiv      () @true (
         (vmpop %ecx)
         (vmpop %eax)
-        (asm "idiv %ecx")
+        (asm "idivl %ecx")
         (vmpush %eax)
         (asm "xorl %edx, %edx") ; clear zero register
         ))
     (imod       () @true (
         (vmpop %ecx)
         (vmpop %eax)
-        (asm "idiv %ecx")
+        (asm "idivl %ecx")
         (vmpush %edx)
         (asm "xorl %edx, %edx") ; clear zero register
         ))
+
+    ; unsigned
+    (udiv      () @true (
+        (vmpop %ecx)
+        (vmpop %eax)
+        (asm "divl %ecx")
+        (vmpush %eax)
+        (asm "xorl %edx, %edx") ; clear zero register
+        ))
+    (umod       () @true (
+        (vmpop %ecx)
+        (vmpop %eax)
+        (asm "divl %ecx")
+        (vmpush %edx)
+        (asm "xorl %edx, %edx") ; clear zero register
+        ))
+
+    ; long unsigned division (64-bit)/(32-bit)
+    ; this instruction is required for division of big-integer
+    ; 
+    ; ludiv h l d = floor( (h*2^32 + l)/d )
+    ; quotient must be less than 2^32
+    (ludiv      () @true (
+        (vmpop %ecx)
+        (vmpop %eax)
+        (asm "movl (%esi), %edx")
+        (asm "divl %ecx")
+        (asm "movl %eax, (%esi)")
+        (asm "xorl %edx, %edx")
+        ))
+
     (ineg       () @true ((asm "negl (%esi)")))
     (shl   () @true (
         (vmpop %ecx)
@@ -158,7 +191,7 @@
         (asm "movl 4(%ebx), %ecx")  ; number of digits of lhs
         (asm "cmpl 4(%eax), %ecx")   
         (asm "cmovl 4(%eax), %ecx")
-        (asm "incl %ecx") ; ecx = max(lhs.ndigits, rhs.ndigits) + 1
+        (asm "incl %ecx") ; ecx = max(lhs.ndigit, rhs.ndigit) + 1
         (asm "cmpl 8(%ebx), %ecx") ; compare capa of lhs and ecx
         (asm "jle 2f")
         ; reserve array of lhs
@@ -235,9 +268,9 @@
         (asm "movl 4(%esi), %ebx")
         (asm "movl 4(%ebx), %ecx")  ; number of digits of lhs
         (asm "cmpl 4(%eax), %ecx")   
-        (asm "cmovl 4(%eax), %ecx") ; max(lhs.ndigits, rhs.ndigits)
+        (asm "cmovl 4(%eax), %ecx") ; max(lhs.ndigit, rhs.ndigit)
         (asm "cmpl 8(%ebx), %ecx") ; compare capa of lhs and ecx
-        (asm "jge 2f")
+        (asm "jle 2f")
         ; reserve array of lhs
         (asm "pushl %eax")
         (vmsave)
@@ -254,8 +287,8 @@
         ; 1. compare lhs.abs and rhs.abs
         (asm "movl 4(%ebx), %ecx")  ; ebx = lhs, eax = rhs
         (asm "cmpl 4(%eax), %ecx")  ; rhs.ndigit <=> lhs.ndigit
-        (asm "jl 3f")
-        (asm "jg 4f")
+        (asm "ja 3f")
+        (asm "jb 4f")
         (asm "movl (%ebx), %ebx")
         (asm "movl (%eax), %eax")
         (asm "decl %ecx")
@@ -264,18 +297,18 @@
         (asm "5:")
 
         (asm "movl (%ebx), %edx")
-        (asm "cmpl (%eax), %edx")
-        (asm "jl 3f")
-        (asm "jg 4f")
+        (asm "cmpl (%eax), %edx")   ; rhs.digits[ecx] <=> lhs.digits[ecx] 
+        (asm "ja 3f")
+        (asm "jb 4f")
         (asm "decl %ecx")
         (asm "test %ecx, %ecx")
         (asm "jnz 5b")
 
         ; 2. do computation
-        (asm "3:") ; (ebx).abs >= (eax).abs
+        (asm "3:") ; lhs.abs >= rhs.abs
         (asm "movl (%esi), %eax")
         (asm "movl 4(%esi), %ebx")
-        (asm "movl 4(%eax), %ecx") ; rhs.ndigits
+        (asm "movl 4(%eax), %ecx") ; rhs.ndigit
         (asm "movl (%eax), %eax") ; rhs.digits
         (asm "movl (%ebx), %ebx") ; lhs.digits
         (asm "xorl %edx, %edx") ; clear edx
@@ -300,11 +333,11 @@
         (asm "addl $4, %ebx")
         (asm "jmp 7b")
 
-        (asm "4:") ; (ebx).abs < (eax).abs
+        (asm "4:") ; lhs.abs < rhs.abs
         (asm "movl (%esi), %eax")
         (asm "movl 4(%esi), %ebx")
         (asm "negl 12(%ebx)") 
-        (asm "movl 4(%ebx), %ecx") ; lhs.ndigits
+        (asm "movl 4(%ebx), %ecx") ; lhs.ndigit
         (asm "movl (%eax), %eax") ; rhs.digits
         (asm "movl (%ebx), %ebx") ; lhs.digits
         (asm "xorl %edx, %edx") ; clear edx
@@ -366,10 +399,10 @@
         (asm "movl 12(%eax), %eax"); sign of rhs
         (asm "xorl %eax, 12(%ebx)")
 
-        (asm "movl 4(%ebx), %ecx") ; lhs.ndigits
+        (asm "movl 4(%ebx), %ecx") ; lhs.ndigit
         (asm "movl (%esi), %eax")
         (asm "imul 4(%eax), %ecx")
-        (asm "incl %ecx") ; lhs.ndigits * rhs.ndigits + 1
+        (asm "incl %ecx") ; lhs.ndigit * rhs.ndigit + 1
         ; allocate array for result
 
         (vmsave)
@@ -381,10 +414,10 @@
         ; setup variables
         (asm "subl $8, %esp")
         (asm "pushl %eax")        ; working array
-        (asm "pushl 4(%ebx)")     ; lhs.ndigits
+        (asm "pushl 4(%ebx)")     ; lhs.ndigit
         (asm "pushl (%ebx)")      ; lhs.digits
         (asm "movl (%esi), %ebx")
-        (asm "pushl 4(%ebx)")     ; rhs.ndigits
+        (asm "pushl 4(%ebx)")     ; rhs.ndigit
         (asm "pushl (%ebx)")      ; rhs.digits
         (asm "pushl $0")          ; index for rhs.digits
         (asm "pushl $0")          ; index for lhs.digits
@@ -393,9 +426,9 @@
         ;   (%esp) : (i) index for lhs.digits
         ;  4(%esp) : (j) index for rhs.digits
         ;  8(%esp) : (v) rhs.digits
-        ; 12(%esp) : (m) rhs.ndigits
+        ; 12(%esp) : (m) rhs.ndigit
         ; 16(%esp) : (u) lhs.digits
-        ; 20(%esp) : (n) lhs.ndigits
+        ; 20(%esp) : (n) lhs.ndigit
         ; 24(%esp) : (w) working array
         ; 28(%esp) : v[j]
         ; 32(%esp) : working area
@@ -459,7 +492,7 @@
         (asm "movl 24(%esp), %ebx")
         (asm "movl %ebx, (%eax)")
 
-        ; update lhs.ndigits
+        ; update lhs.ndigit
         (asm "movl 12(%esp), %ecx")
         (asm "imul 20(%esp), %ecx")
         (asm "incl %ecx")
@@ -493,20 +526,20 @@
 
         (asm "movl (%esi), %eax")   ; rhs
         (asm "movl 4(%esi), %ebx")  ; lhs
-        (asm "movl 12(%eax), %eax") ; rhs.sign
-        (asm "subl 12(%ebx), %eax") ; rhs.sign - lhs.sign
+        (asm "movl 12(%ebx), %ebx") ; rhs.sign
+        (asm "subl 12(%eax), %ebx") ; lhs.sign - rhs.sign
         (asm "jz 1f")
-        (asm "movl %eax, 4(%esi)")
+        (asm "movl %ebx, 4(%esi)")
         (asm "jmp 2f")
         (asm "1:") ; rhs.sign == lhs.sign
         (asm "movl (%esi), %eax")  ; rhs
         (asm "movl 4(%esi), %ebx") ; lhs
-        (asm "movl 4(%eax), %ecx") ; rhs.ndigits
-        (asm "cmpl 4(%ebx), %ecx") ; lhs.ndigits <=> rhs.ndigits
-        (asm "jl 3f")
-        (asm "jg 4f")
+        (asm "movl 4(%eax), %ecx") ; rhs.ndigit
+        (asm "cmpl 4(%ebx), %ecx") ; rhs.ndigit - lhs.ndigit
+        (asm "ja 3f")
+        (asm "jb 4f")
 
-        ; lhs.ndigits == rhs.ndigits
+        ; lhs.ndigit == rhs.ndigit
         (asm "6:")
         (asm "test %ecx, %ecx")
         (asm "jz 7f")
@@ -518,18 +551,18 @@
         (asm "leal (%eax,%ecx,4), %eax")
         (asm "leal (%ebx,%ecx,4), %ebx")
         (asm "movl (%eax), %edx")
-        (asm "cmpl (%ebx), %edx") ; lhs.digit[ecx] <=> rhs.digit[ecx]
-        (asm "jl 3f")
-        (asm "jg 4f")
+        (asm "cmpl (%ebx), %edx") ; rhs.digit[ecx] - lhs.digit[ecx]
+        (asm "ja 3f")
+        (asm "jb 4f")
         (asm "jmp 6b")
         (asm "7:")
         (asm "movl $0, 4(%esi)")
         (asm "jmp 2f")
         (asm "3:") ; |lhs| < |rhs|
-        (asm "movl $1, 4(%esi)")
+        (asm "movl $-1, 4(%esi)")
         (asm "jmp 5f")
         (asm "4:") ; |rhs| < |lhs|
-        (asm "movl $-1, 4(%esi)")
+        (asm "movl $1, 4(%esi)")
         (asm "5:")
         (asm "movl (%esi), %eax")
         (asm "cmp $0, 12(%eax)")
@@ -538,6 +571,115 @@
         (asm "2:")
         (asm "addl $4, %esi")
         (asm "xorl %edx, %edx")
+        (asm "popl %ebx")
+        ))
+    (bshl () @true (
+        (asm "pushl %ebx")
+        (asm "movl (%esi), %ecx")  ; shift length
+        (asm "shrl $5, %ecx")      ; ecx = ecx/32
+        (asm "movl 4(%esi), %eax") ; x
+        (asm "movl 4(%eax), %ebx") ; x.ndigit
+        (asm "addl %ecx, %ebx")    ; x.ndigit + ecx
+        (asm "incl %ebx")
+        (asm "cmpl 8(%eax), %ebx") ; (x.ndigit + ecx + 1) <=> x.capa
+        (asm "jbe 1f")
+        (vmsave)
+        (asm "pushl %ebx")
+        (asm "pushl %eax")
+        (asm "call prim_resize_bigint")
+        (asm "addl $8, %esp")
+        (vmrestore)
+        (asm "1:")
+
+        ; shift (%esi) / 32
+        (asm "movl 4(%esi), %eax") ; x
+        (asm "movl (%eax), %ebx")  ; x.digits
+        (asm "movl 4(%eax), %edx") ; x.ndigit
+        (asm "addl %edx, %ecx")
+        (asm "subl $4, %esp") ; copy of edx
+        (asm "movl %edx, (%esp)")
+        (asm "2:")
+        (asm "movl (%esp), %edx")
+        (asm "test %edx, %edx")
+        (asm "jz 3f")
+        (asm "decl (%esp)")
+        (asm "movl (%esp), %edx")
+        (asm "decl %ecx")
+        (asm "leal (%ebx,%edx,4), %edx")
+        (asm "leal (%ebx,%ecx,4), %eax")
+        (asm "movl (%edx), %edx")
+        (asm "movl %edx, (%eax)")
+        (asm "jmp 2b")
+        (asm "3:")
+        (asm "test %ecx, %ecx")
+        (asm "jz 4f")
+        (asm "decl %ecx")
+        (asm "leal (%ebx,%ecx,4), %eax")
+        (asm "movl $0, (%eax)")
+        (asm "jmp 3b")
+        (asm "4:")
+        (asm "addl $4, %esp")
+
+        ; shift (%esi) % 32
+        (asm "subl $8, %esp")
+        (asm "movl 4(%esi), %ebx")
+        (asm "movl (%ebx), %eax")
+        (asm "movl %eax, (%esp)")
+        (asm "movl 4(%ebx), %eax")
+        (asm "movl (%esi), %ecx")
+        (asm "shrl $5, %ecx")
+        (asm "addl %ecx, %eax")
+        (asm "incl %eax")
+        (asm "movl %eax, 4(%esp)")  
+        (asm "movl (%esi), %ecx")
+        (asm "andl $0x1f, %ecx") ; ecx = (shift length) % 32
+
+        ; (%esp) : x.digits
+        ; 4(%esp): x.ndigit
+
+        (asm "5:")
+        (asm "movl 4(%esp), %ebx")
+        (asm "cmpl $1, %ebx")
+        (asm "je 6f")
+        (asm "decl 4(%esp)")
+        (asm "movl 4(%esp), %ebx")
+        (asm "movl (%esp), %edx")
+        (asm "leal (%edx,%ebx,4), %eax")
+        (asm "leal -4(%edx,%ebx,4), %edx")
+        (asm "movl (%eax), %eax")
+        (asm "movl (%edx), %edx")
+        (asm "shldl %cl, %edx, %eax")
+        (asm "movl (%esp), %edx")
+        (asm "leal (%edx,%ebx,4), %edx")
+        (asm "movl %eax, (%edx)")
+        (asm "jmp 5b")
+        (asm "6:")
+        (asm "movl (%esp), %eax")
+        (asm "movl (%eax), %edx")
+        (asm "shll %cl, %edx")
+        (asm "movl %edx, (%eax)")
+        (asm "addl $8, %esp")
+
+        (asm "movl 4(%esi), %ebx")
+        (asm "movl 8(%ebx), %ecx")
+        (asm "movl (%ebx), %ebx")
+        (asm "leal -4(%ebx,%ecx,4), %ebx")
+        (asm "7:")
+        (asm "movl (%ebx), %eax")
+        (asm "test %eax, %eax")
+        (asm "jnz 9f")
+        (asm "decl %ecx")
+        (asm "test %ecx, %ecx")
+        (asm "jz 8f")
+        (asm "subl $4, %ebx")
+        (asm "jmp 7b")
+        (asm "8:")
+        (asm "incl %ecx")
+        (asm "9:")
+        (asm "movl 4(%esi), %ebx")
+        (asm "movl %ecx, 4(%ebx)")
+        (asm "xorl %edx, %edx")
+        (asm "addl $4, %esi")
         (asm "popl %ebx")
         ))
 
