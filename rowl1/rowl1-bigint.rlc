@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-bigint.rlc 2012-09-09 03:05:52 nineties $
+; $Id: rowl1-bigint.rlc 2012-09-09 03:44:19 nineties $
 ;
 
 (import "rlvm-compile")
@@ -19,24 +19,24 @@
 
 (extern object current_loc)
 
-(export fun pp_bigint (ochan n) (
-    (output_string ochan "BigInt")
+(export fun pp_bint (ochan n) (
+    (output_string ochan (bint_to_s n))
     ))
 
-(fun bigint_digit (u i) (
+(fun bint_digit (u i) (
     (return (array_get int (field_get u 0) i))
     ))
 
-(fun bigint_set_digit (u i d) (
+(fun bint_set_digit (u i d) (
     (array_set int (field_get u 0) i d)
     ))
 
-(fun bigint_is_zero (v) (
+(fun bint_is_zero (v) (
     (return (&& (== (field_get v 1) 1) (== (array_get int (field_get v 0) 0) 0)))
     ))
 
-(fun int_to_bigint (v) (
-    (var b (allocate_bigint 1))
+(fun int_to_bint (v) (
+    (var b (allocate_bint 1))
     (if (>= b 0)
         (array_set int (field_get b 0) 0 v)
         (do
@@ -46,8 +46,8 @@
     (return b)
     ))
 
-(fun uint_to_bigint (v) (
-    (var b (allocate_bigint 1))
+(fun uint_to_bint (v) (
+    (var b (allocate_bint 1))
     (array_set int (field_get b 0) 0 v)
     (return b)
     ))
@@ -60,7 +60,7 @@
 ; returns quotient and `u' will be overwritten by remainder
 (fun bigdiv_sub (u v) (
     (if (== u v) (do
-        (clear_bigint u) ; remainder == 0
+        (clear_bint u) ; remainder == 0
         (return 1)
         ))
     (var ulen (field_get u 1))
@@ -78,8 +78,8 @@
             (= q (ludiv u1 u0 v0))
         ))
 
-    (var qv (copy_bigint v))
-    (bigmul qv (uint_to_bigint q))
+    (var qv (copy_bint v))
+    (bigmul qv (uint_to_bint q))
     (while (< (bigcmp u qv) 0) (do
         (-= q 1)
         (bigadd u v)
@@ -90,17 +90,17 @@
 
 ; u = u/v and returns u%v (signs are ignored)
 (fun bigdiv_nat (u v) (
-    (if (bigint_is_zero v)
+    (if (bint_is_zero v)
         (throw (division_by_zero current_loc))
         )
     (if (== u v) (do
-        (clear_bigint u)
+        (clear_bint u)
         (array_set int (field_get u 0) 0 1)
-        (return (uint_to_bigint 0))
+        (return (uint_to_bint 0))
         ))
     
     (if (< (bigcmp u v) 0) (do
-        (var r (copy_bigint u))
+        (var r (copy_bint u))
         (var udigits (field_get u 0))
         (memset udigits 0 (* 4 (field_get u 1)))
         (array_set int udigits 0 0)
@@ -122,10 +122,10 @@
     (var ulen   (field_get u 1))
     (var vlen   (field_get v 1))
 
-    (var q (allocate_bigint (+ (- ulen vlen) 2)))
+    (var q (allocate_bint (+ (- ulen vlen) 2)))
     (var qdigit (field_get q 0))
 
-    (var r (allocate_bigint (+ vlen 1)))
+    (var r (allocate_bint (+ vlen 1)))
     (field_set r 1 (+ vlen 1))
     (var rdigit (field_get r 0))
     (var rlen (+ vlen 1))
@@ -178,13 +178,13 @@
         (bigneg u)
         (var r (bigdiv_nat u v))
         (bigneg u)
-        (if (bigint_is_zero r)
+        (if (bint_is_zero r)
             (do
                 (bigneg u)
-                (return (uint_to_bigint 0))
+                (return (uint_to_bint 0))
             )
             (do
-                (bigadd u (uint_to_bigint 1))
+                (bigadd u (uint_to_bint 1))
                 (bigneg u)
                 (bigneg r)
                 (bigadd r v)
@@ -203,13 +203,13 @@
         (bigneg v)
         (var r (bigdiv_nat u v))
         (bigneg v)
-        (if (bigint_is_zero r)
+        (if (bint_is_zero r)
             (do
                 (bigneg u)
-                (return (uint_to_bigint 0))
+                (return (uint_to_bint 0))
             )
             (do
-                (bigadd u (uint_to_bigint 1))
+                (bigadd u (uint_to_bint 1))
                 (bigneg u)
                 (bigadd r v)
                 (return r)
@@ -225,8 +225,8 @@
         ))
     ))
 
-(fun bigint_to_s (u) (
-    (= u (copy_bigint u))
+(fun bint_to_s (u) (
+    (= u (copy_bint u))
 
     (var udigit (field_get u 0))
     (var ulen (field_get u 1))
@@ -239,11 +239,11 @@
     ; <= ulen + ( ulen * 3/32 ). ceil
     ; = ulen + ( (ulen * 3 + 31) / 32 ).floor
     (var ary  (allocate_iarray (+ ulen (>> (+ (* 3 ulen) 31) 5))))
-    (var base (uint_to_bigint 1000000000))
+    (var base (uint_to_bint 1000000000))
     (var i 0)
-    (while (! (bigint_is_zero u)) (do
+    (while (! (bint_is_zero u)) (do
         (var r (bigdiv u base))
-        (array_set int ary i (bigint_digit r 0))
+        (array_set int ary i (bint_digit r 0))
         (+= i 1)
         ))
 
@@ -298,7 +298,7 @@
     (return str)
     ))
 
-(fun bigint_from_s (str) (
+(fun bint_from_s (str) (
     (var slen (strlen str))
     (var sign 0)
     (var p 0)
@@ -307,15 +307,15 @@
         (+= p 1)
         ))
     ; convert base 10 integer to base 2^32
-    ; number of digits for bigint is
+    ; number of digits for bint is
     ;    ( (slen-p) * log(10)/log(2^32) ).ceil
     ; =  ( (slen-p) * 0.1038... ).ceil
     ; <= ( (slen-p) * 1/8 ).ceil
     ; =  ( (slen-p+7)/8 ).floor
     (var ulen (>> (+ 7 (- slen p)) 3))
-    (var u (allocate_bigint ulen))
-    (var d (allocate_bigint 1))
-    (var b (uint_to_bigint 1000000000))
+    (var u (allocate_bint ulen))
+    (var d (allocate_bint 1))
+    (var b (uint_to_bint 1000000000))
 
     ; construct u by Horner's method with base 10^9
     (var r (% (- slen p) 9))
@@ -330,7 +330,7 @@
             (-= r 1)
             (+= p 1)
             ))
-        (bigint_set_digit d 0 w)
+        (bint_set_digit d 0 w)
         (bigmul u b)
         (bigadd u d)
         (= r 9)
@@ -340,69 +340,76 @@
     (return u)
     ))
 
+(fun norm (n) (
+    (if (!= (field_get n 1) 1) (return n))
+    (var d (bint_digit n 0))
+    (if (& d 0x80000000) (return n))
+    (if (field_get n 3)
+        (return (box (- d)))
+        (return (box d))
+        )
+    ))
+
+(fun bint_uplus (n) (
+    (return (norm n))
+    ))
+(fun bint_uminus (n) (
+    (return (bigneg (copy_bint n)))
+    ))
+(fun bint_mul (a b) (
+    (return (norm (bigmul (copy_bint a) b)))
+    ))
+(fun bint_div (a b) (
+    (= a (copy_bint a))
+    (bigdiv a b)
+    (return (norm a))
+    ))
+(fun bint_mod (a b) (
+    (return (norm (bigdiv (copy_bint a) b)))
+    ))
+(fun bint_add (a b) (
+    (return (norm (bigadd (copy_bint a) b)))
+    ))
+(fun bint_sub (a b) (
+    (return (norm (bigsub (copy_bint a) b)))
+    ))
+(fun bint_lt (a b) ((if (< (bigcmp a b) 0) (return true) (return false))))
+(fun bint_gt (a b) ((if (> (bigcmp a b) 0) (return true) (return false))))
+(fun bint_le (a b) ((if (<= (bigcmp a b) 0) (return true) (return false))))
+(fun bint_ge (a b) ((if (>= (bigcmp a b) 0) (return true) (return false))))
+(fun bint_hash (n) (
+    (var h 0)
+    (var digit (field_get n 0))
+    (var len   (field_get n 1))
+    (for i 0 len (do
+        (= h (+ (* 13 h) (array_get int digit i)))
+        ))
+    (if (== (field_get n 3) 1)
+        (= h (+ (* 13 h) 1))
+        )
+    (return h)
+    ))
+
+(fun bint_to_i (str) (
+    (return (norm (bint_from_s str)))
+    ))
+
 (export fun setup_bigint (std) (
-    ; tests
-    (var x (allocate_bigint 10))
-    ;(var y (allocate_bigint 10))
-    (field_set x 1 4)
-    (field_set x 3 1)
-    (array_set int (field_get x 0) 3 0x2d08ae2d)
-    (array_set int (field_get x 0) 2 0x08e70933)
-    (array_set int (field_get x 0) 1 0x47c9c2ec)
-    (array_set int (field_get x 0) 0 0x40387341)
-    (debugs (bigint_to_s x))
-    (debugs "\n")
-
-    (var y (bigint_from_s "59860330892483026824405433656557466433"))
-    (debugi (field_get x 1))
-    (debugs "\n")
-    (debugi (field_get x 3))
-    (debugs "\n")
-    (debugx (array_get int (field_get x 0) 3))
-    (debugs "\n")
-    (debugx (array_get int (field_get x 0) 2))
-    (debugs "\n")
-    (debugx (array_get int (field_get x 0) 1))
-    (debugs "\n")
-    (debugx (array_get int (field_get x 0) 0))
-    (debugs "\n")
-
-    (debugi (bigcmp x y))
-
-    ;(field_set y 1 2)
-    ;(field_set y 3 1)
-    ;(array_set int (field_get y 0) 0 0x04529392)
-    ;(array_set int (field_get y 0) 1 0x2)
-    ;(var r (bigdiv x y))
-
-    ;(debugi (field_get x 1))
-    ;(debugs "\n")
-    ;(debugi (field_get x 3))
-    ;(debugs "\n")
-    ;(debugx (array_get int (field_get x 0) 2))
-    ;(debugs "\n")
-    ;(debugx (array_get int (field_get x 0) 1))
-    ;(debugs "\n")
-    ;(debugx (array_get int (field_get x 0) 0))
-    ;(debugs "\n")
-
-    ;(debugi (field_get y 1))
-    ;(debugs "\n")
-    ;(debugi (field_get y 3))
-    ;(debugs "\n")
-    ;(debugx (array_get int (field_get y 0) 1))
-    ;(debugs "\n")
-    ;(debugx (array_get int (field_get y 0) 0))
-    ;(debugs "\n")
-    ;(debugi (field_get r 1))
-    ;(debugs "\n")
-    ;(debugi (field_get r 3))
-    ;(debugs "\n")
-    ;(debugx (array_get int (field_get r 0) 1))
-    ;(debugs "\n")
-    ;(debugx (array_get int (field_get r 0) 0))
-    ;(debugs "\n")
-
+    (var mod (find_module no_loc std (to_sym "arithmetic") @TRUE))
+    (add_builtin_function1 mod (to_sym "uplus") bintT bint_uplus 0)
+    (add_builtin_function1 mod (to_sym "uminus") bintT bint_uminus 0)
+    (add_builtin_function2 mod (to_sym "mul") bintT bintT bint_mul 0)
+    (add_builtin_function2 mod (to_sym "div") bintT bintT bint_div 0)
+    (add_builtin_function2 mod (to_sym "mod") bintT bintT bint_mod 0)
+    (add_builtin_function2 mod (to_sym "add") bintT bintT bint_add 0)
+    (add_builtin_function2 mod (to_sym "sub") bintT bintT bint_sub 0)
+    (add_builtin_function2 mod (to_sym "lt") bintT bintT bint_lt 0)
+    (add_builtin_function2 mod (to_sym "gt") bintT bintT bint_gt 0)
+    (add_builtin_function2 mod (to_sym "le") bintT bintT bint_le 0)
+    (add_builtin_function2 mod (to_sym "ge") bintT bintT bint_ge 0)
+    (add_builtin_function1 mod (to_sym "to_s") bintT bint_to_s 0)
+    (add_builtin_function1 mod (to_sym "hash") bintT bint_hash 0)
+    (add_builtin_function1 mod (to_sym "to_i") stringT bint_to_i 0)
     ))
 
 
