@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-bigint.rlc 2012-09-08 15:50:13 nineties $
+; $Id: rowl1-bigint.rlc 2012-09-09 03:05:52 nineties $
 ;
 
 (import "rlvm-compile")
@@ -21,6 +21,14 @@
 
 (export fun pp_bigint (ochan n) (
     (output_string ochan "BigInt")
+    ))
+
+(fun bigint_digit (u i) (
+    (return (array_get int (field_get u 0) i))
+    ))
+
+(fun bigint_set_digit (u i d) (
+    (array_set int (field_get u 0) i d)
     ))
 
 (fun bigint_is_zero (v) (
@@ -42,6 +50,10 @@
     (var b (allocate_bigint 1))
     (array_set int (field_get b 0) 0 v)
     (return b)
+    ))
+
+(fun bigneg (u) (
+    (field_set u 3 (- 1 (field_get u 3)))
     ))
 
 ; assumption: 0 <= u.ndigit - v.ndigit <= 2
@@ -76,20 +88,22 @@
     (return q)
     ))
 
-; u = u/v and returns u%v
-(fun bigdiv (u v) (
+; u = u/v and returns u%v (signs are ignored)
+(fun bigdiv_nat (u v) (
     (if (bigint_is_zero v)
         (throw (division_by_zero current_loc))
         )
     (if (== u v) (do
         (clear_bigint u)
-        (return 1)
+        (array_set int (field_get u 0) 0 1)
+        (return (uint_to_bigint 0))
         ))
+    
     (if (< (bigcmp u v) 0) (do
         (var r (copy_bigint u))
         (var udigits (field_get u 0))
         (memset udigits 0 (* 4 (field_get u 1)))
-        (array_set int udigits 0 1)
+        (array_set int udigits 0 0)
         (field_set u 1 1)
         (return r)
         ))
@@ -103,7 +117,6 @@
         ))
     (bigshl u shift)
     (bigshl v shift)
-
     (var udigit (field_get u 0))
     (var vdigit (field_get v 0))
     (var ulen   (field_get u 1))
@@ -148,24 +161,204 @@
     (return r)
     ))
 
+; u = u/v and returns u%v
+(fun bigdiv (u v) (
+    (var usign (field_get u 3))
+    (var vsign (field_get v 3))
+    (if (&& (== usign 0) (== vsign 0)) (return (bigdiv_nat u v)))
+    (if (&& (== usign 1) (== vsign 0)) (do
+        ; let q, r are numbers such that
+        ; |u| = qv + r    (0 <= r < v)
+        ; if r == 0
+        ;     quotient  => -q
+        ;     remainder => 0
+        ; else
+        ;     quotient  => -(q+1)
+        ;     remainder => v - r
+        (bigneg u)
+        (var r (bigdiv_nat u v))
+        (bigneg u)
+        (if (bigint_is_zero r)
+            (do
+                (bigneg u)
+                (return (uint_to_bigint 0))
+            )
+            (do
+                (bigadd u (uint_to_bigint 1))
+                (bigneg u)
+                (bigneg r)
+                (bigadd r v)
+                (return r)
+            ))
+        ))
+    (if (&& (== usign 0) (== vsign 1)) (do
+        ; let q, r are numbers such that
+        ; u = q|v| + r  (0 <= r < |v|)
+        ; if r == 0
+        ;     quotient  => -q
+        ;     remainder => 0
+        ; else
+        ;     quotient  => -(q+1)
+        ;     remainder => r + v
+        (bigneg v)
+        (var r (bigdiv_nat u v))
+        (bigneg v)
+        (if (bigint_is_zero r)
+            (do
+                (bigneg u)
+                (return (uint_to_bigint 0))
+            )
+            (do
+                (bigadd u (uint_to_bigint 1))
+                (bigneg u)
+                (bigadd r v)
+                (return r)
+            ))
+        ))
+    (if (&& (== usign 1) (== vsign 1)) (do
+        (bigneg u)
+        (bigneg v)
+        (var r (bigdiv_nat u v))
+        (bigneg v)
+        (bigneg r)
+        (return r)
+        ))
+    ))
+
+(fun bigint_to_s (u) (
+    (= u (copy_bigint u))
+
+    (var udigit (field_get u 0))
+    (var ulen (field_get u 1))
+    (var usign (field_get u 3))
+    (field_set u 3 0)
+    ; convert base 2^32 to 10^9
+    ; number of digits in base 10^9 is
+    ;    ( ulen * log(2^32)/log(10^9) ).ceil
+    ; =  ( ulen * 1.070... ).ceil
+    ; <= ulen + ( ulen * 3/32 ). ceil
+    ; = ulen + ( (ulen * 3 + 31) / 32 ).floor
+    (var ary  (allocate_iarray (+ ulen (>> (+ (* 3 ulen) 31) 5))))
+    (var base (uint_to_bigint 1000000000))
+    (var i 0)
+    (while (! (bigint_is_zero u)) (do
+        (var r (bigdiv u base))
+        (array_set int ary i (bigint_digit r 0))
+        (+= i 1)
+        ))
+
+    ; convert base 10^9 integer to string
+    ; length of the string is
+    ;    ( ulen * log(2^32)/log(10) ).ceil
+    ; =  ( ulen * 9.632... ).ceil
+    ; <= 9*ulen + ( ulen * 3/4 ).ceil
+    ; = 9*ulen  + ( (ulen * 3 + 3)/4 ).floor
+    (var slen (+ (* 9 ulen) (/ (+ 3 (* 3 ulen)) 4)))
+    (if usign (+= slen 1)) ; for '-'
+    (var str (allocate_string slen))
+
+    (var p 0) ; position for string
+    (if usign (do
+        (array_set char str 0 '-')
+        (+= p 1)
+        ))
+    (-= i 1)
+
+    ; skip leading zeros
+    (while (== (array_get int ary i) 0) (-= i 1))
+
+    ; skip leading zeros in most significant word
+    (var w (array_get int ary i))
+    (var b 100000000)
+    (while (== (/ w b) 0) (do
+        (/= b 10)
+        ))
+    (while (> b 0) (do
+        (array_set char str p (+ (% (/ w b) 10) '0'))
+        (+= p 1)
+        (/= b 10)
+        ))
+
+    ; fill remaining digits
+    (while (> i 0) (do
+        (-= i 1)
+        (= w (array_get int ary i))
+        (= b 100000000)
+        (while (> b 0) (do
+            (array_set char str p (+ (% (/ w b) 10) '0'))
+            (+= p 1)
+            (/= b 10)
+            ))
+        ))
+    ; fill '\0'
+    (array_set char str p 0)
+
+    ; recover sign of u
+    (field_set u 3 usign)
+    (return str)
+    ))
+
+(fun bigint_from_s (str) (
+    (var slen (strlen str))
+    (var sign 0)
+    (var p 0)
+    (if (== (array_get char str 0) '-') (do
+        (= sign 1)
+        (+= p 1)
+        ))
+    ; convert base 10 integer to base 2^32
+    ; number of digits for bigint is
+    ;    ( (slen-p) * log(10)/log(2^32) ).ceil
+    ; =  ( (slen-p) * 0.1038... ).ceil
+    ; <= ( (slen-p) * 1/8 ).ceil
+    ; =  ( (slen-p+7)/8 ).floor
+    (var ulen (>> (+ 7 (- slen p)) 3))
+    (var u (allocate_bigint ulen))
+    (var d (allocate_bigint 1))
+    (var b (uint_to_bigint 1000000000))
+
+    ; construct u by Horner's method with base 10^9
+    (var r (% (- slen p) 9))
+    (while (< p slen) (do
+        (var w 0)
+        (while (> r 0) (do
+            (var c (array_get char str p))
+            (if (|| (< c '0') (< '9' c))
+                (throw (invalid_format current_loc str))
+                )
+            (= w (+ (* 10 w) (- c '0')))
+            (-= r 1)
+            (+= p 1)
+            ))
+        (bigint_set_digit d 0 w)
+        (bigmul u b)
+        (bigadd u d)
+        (= r 9)
+        ))
+
+    (field_set u 3 sign)
+    (return u)
+    ))
+
 (export fun setup_bigint (std) (
     ; tests
     (var x (allocate_bigint 10))
-    (var y (allocate_bigint 10))
+    ;(var y (allocate_bigint 10))
     (field_set x 1 4)
-    (field_set x 3 0)
+    (field_set x 3 1)
     (array_set int (field_get x 0) 3 0x2d08ae2d)
     (array_set int (field_get x 0) 2 0x08e70933)
     (array_set int (field_get x 0) 1 0x47c9c2ec)
     (array_set int (field_get x 0) 0 0x40387341)
+    (debugs (bigint_to_s x))
+    (debugs "\n")
 
-    (field_set y 1 2)
-    (field_set y 3 0)
-    (array_set int (field_get y 0) 0 0x04529392)
-    (array_set int (field_get y 0) 1 0x2)
-    (var r (bigdiv x y))
-
+    (var y (bigint_from_s "59860330892483026824405433656557466433"))
     (debugi (field_get x 1))
+    (debugs "\n")
+    (debugi (field_get x 3))
+    (debugs "\n")
+    (debugx (array_get int (field_get x 0) 3))
     (debugs "\n")
     (debugx (array_get int (field_get x 0) 2))
     (debugs "\n")
@@ -174,16 +367,41 @@
     (debugx (array_get int (field_get x 0) 0))
     (debugs "\n")
 
-    (debugi (field_get y 1))
-    (debugs "\n")
-    (debugx (array_get int (field_get y 0) 1))
-    (debugs "\n")
-    (debugx (array_get int (field_get y 0) 0))
-    (debugs "\n")
-    (debugi (field_get r 1))
-    (debugs "\n")
-    (debugx (array_get int (field_get r 0) 0))
-    (debugs "\n")
+    (debugi (bigcmp x y))
+
+    ;(field_set y 1 2)
+    ;(field_set y 3 1)
+    ;(array_set int (field_get y 0) 0 0x04529392)
+    ;(array_set int (field_get y 0) 1 0x2)
+    ;(var r (bigdiv x y))
+
+    ;(debugi (field_get x 1))
+    ;(debugs "\n")
+    ;(debugi (field_get x 3))
+    ;(debugs "\n")
+    ;(debugx (array_get int (field_get x 0) 2))
+    ;(debugs "\n")
+    ;(debugx (array_get int (field_get x 0) 1))
+    ;(debugs "\n")
+    ;(debugx (array_get int (field_get x 0) 0))
+    ;(debugs "\n")
+
+    ;(debugi (field_get y 1))
+    ;(debugs "\n")
+    ;(debugi (field_get y 3))
+    ;(debugs "\n")
+    ;(debugx (array_get int (field_get y 0) 1))
+    ;(debugs "\n")
+    ;(debugx (array_get int (field_get y 0) 0))
+    ;(debugs "\n")
+    ;(debugi (field_get r 1))
+    ;(debugs "\n")
+    ;(debugi (field_get r 3))
+    ;(debugs "\n")
+    ;(debugx (array_get int (field_get r 0) 1))
+    ;(debugs "\n")
+    ;(debugx (array_get int (field_get r 0) 0))
+    ;(debugs "\n")
 
     ))
 

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2012-09-08 04:11:57 nineties $
+; $Id: vm-insn.rlc 2012-09-09 03:07:46 nineties $
 ;
 
 (define gen_field_get (idx) `(
@@ -336,7 +336,7 @@
         (asm "4:") ; lhs.abs < rhs.abs
         (asm "movl (%esi), %eax")
         (asm "movl 4(%esi), %ebx")
-        (asm "negl 12(%ebx)") 
+        (asm "xorl $1, 12(%ebx)") 
         (asm "movl 4(%ebx), %ecx") ; lhs.ndigit
         (asm "movl (%eax), %eax") ; rhs.digits
         (asm "movl (%ebx), %ebx") ; lhs.digits
@@ -387,6 +387,7 @@
         (asm "11:")
         (asm "movl 4(%esi), %ebx")
         (asm "movl %ecx, 4(%ebx)")
+
         (asm "xorl %edx, %edx")
         (asm "addl $4, %esi")
         (asm "popl %ebx")
@@ -407,7 +408,7 @@
 
         (vmsave)
         (asm "pushl %ecx")
-        (asm "call allocate_iarray")
+        (asm "call prim_allocate_iarray")
         (asm "addl $4, %esp")
         (vmrestore)
 
@@ -516,6 +517,7 @@
         (asm "movl %ecx, 4(%ebx)")
 
         (asm "addl $36, %esp")
+
         (asm "addl $4, %esi")
         (asm "xorl %edx, %edx")
         (asm "popl %ebx")
@@ -526,10 +528,10 @@
 
         (asm "movl (%esi), %eax")   ; rhs
         (asm "movl 4(%esi), %ebx")  ; lhs
-        (asm "movl 12(%ebx), %ebx") ; rhs.sign
-        (asm "subl 12(%eax), %ebx") ; lhs.sign - rhs.sign
+        (asm "movl 12(%eax), %eax") ; rhs.sign
+        (asm "subl 12(%ebx), %eax") ; rhs.sign - lhs.sign
         (asm "jz 1f")
-        (asm "movl %ebx, 4(%esi)")
+        (asm "movl %eax, 4(%esi)")
         (asm "jmp 2f")
         (asm "1:") ; rhs.sign == lhs.sign
         (asm "movl (%esi), %eax")  ; rhs
@@ -567,8 +569,10 @@
         (asm "movl (%esi), %eax")
         (asm "cmp $0, 12(%eax)")
         (asm "je 2f")
-        (asm "negl 4(%esi)")
+        (asm "movl 4(%esi), %ebx")
+        (asm "xorl $1, 12(%ebx)") 
         (asm "2:")
+
         (asm "addl $4, %esi")
         (asm "xorl %edx, %edx")
         (asm "popl %ebx")
@@ -584,10 +588,12 @@
         (asm "cmpl 8(%eax), %ebx") ; (x.ndigit + ecx + 1) <=> x.capa
         (asm "jbe 1f")
         (vmsave)
+        (asm "pushl %ecx")
         (asm "pushl %ebx")
         (asm "pushl %eax")
         (asm "call prim_resize_bigint")
         (asm "addl $8, %esp")
+        (asm "popl %ecx")
         (vmrestore)
         (asm "1:")
 
@@ -681,6 +687,7 @@
         (asm "9:")
         (asm "movl 4(%esi), %ebx")
         (asm "movl %ecx, 4(%ebx)")
+
         (asm "xorl %edx, %edx")
         (asm "addl $4, %esi")
         (asm "popl %ebx")
@@ -779,6 +786,7 @@
         (asm "movl 4(%esi), %ebx")
         (asm "movl %ecx, 4(%ebx)")
 
+        (asm "xorl %edx, %edx")
         (asm "addl $4, %esi")
         (asm "popl %ebx")
         ))
