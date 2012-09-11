@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2012-09-09 03:21:24 nineties $
+; $Id: rowl1-node.rlc 2012-09-11 05:56:58 nineties $
 ;
 
 (import "rlvm-compile")
@@ -222,29 +222,32 @@
     (error "floating-point literals are not supported yet")
     ))
 
-(export var no_loc (make_loc (string "<internal>") 0 0))
+(export var no_loc (make_loc (string "<internal>") 0 0 0 0))
 
-(export fun make_loc (file begin end) (
-    (return (make_expr Loc (list3 file (box begin) (box end))))
+(export fun make_loc (file bl bc el ec) (
+    (return (make_expr Loc (list5 file (box bl) (box bc) (box el) (box ec))))
     ))
 
-(fun loc_file  (loc) ((return (expr_arg_string loc 0))))
-(fun loc_begin (loc) ((return (expr_arg_int loc 1))))
-(fun loc_end   (loc) ((return (expr_arg_int loc 2))))
+(export fun loc_file   (loc) ((return (expr_arg_string loc 0))))
+(export fun loc_beginL (loc) ((return (expr_arg_int loc 1))))
+(export fun loc_beginC (loc) ((return (expr_arg_int loc 2))))
+(export fun loc_endL   (loc) ((return (expr_arg_int loc 3))))
+(export fun loc_endC   (loc) ((return (expr_arg_int loc 4))))
 
 (export fun merge_loc (loc1 loc2) (
-    (var begin (loc_begin loc1))
-    (var end   (loc_end loc2))
-    (if (== begin end) (return loc1))
-    (return (make_loc (loc_file loc1) begin end))
+    (var el (loc_endL loc2))
+    (var ec (loc_endC loc2))
+    (expr_arg_set loc1 3 (box el))
+    (expr_arg_set loc1 4 (box ec))
+    (return loc1)
     ))
 
 (export fun output_loc (ochan loc) (
     (output_char ochan '[')
     (output_string ochan (loc_file loc))
     (output_char ochan ':')
-    (var begin (loc_begin loc))
-    (var end   (loc_end loc))
+    (var begin (loc_beginL loc))
+    (var end   (loc_endL loc))
     (if (== begin end)
         (output_int ochan begin)
         (do

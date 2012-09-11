@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2012-08-10 17:11:23 nineties $
+; $Id: rowl1-packrat.rlc 2012-09-11 12:22:36 nineties $
 ;
 
 ; TODO:
@@ -64,7 +64,7 @@
             `(do
               (= v (@(s++ `parse_ f) @p))
               (if (== (expr_head v) Parsed) (goto @end_lbl))
-              (= errors (merge_noparse errors v))
+              (= errors (join_noparse errors v))
               (set_parser_state @p state)
              )) ps))
         (= v errors)
@@ -233,19 +233,26 @@
 
 (fun mayparse (loc msg) (
     (= may_parse @TRUE)
-    (return (make_expr NoParse (list1 (list2 loc (string msg)))))
+    (return (make_expr NoParse (list2 loc (string msg))))
     ))
 
 (fun noparse (loc msg) (
-    (return (make_expr NoParse (list1 (list2 loc (string msg)))))
+    (return (make_expr NoParse (list2 loc (string msg))))
     ))
 
-(fun merge_noparse (lhs rhs) (
+(fun join_noparse (lhs rhs) (
     (if (! lhs) (return rhs))
     (if (! rhs) (return lhs))
     (if (== lhs LeftRec) (return rhs))
     (if (== rhs LeftRec) (return lhs))
-    (return (make_expr NoParse (list_append (expr_args lhs) (expr_args rhs))))
+    (var lel (loc_endL (expr_arg lhs 0)))
+    (var rel (loc_endL (expr_arg rhs 0)))
+    (var lec (loc_endC (expr_arg lhs 0)))
+    (var rec (loc_endC (expr_arg rhs 0)))
+    (if (|| (> lel rel) (&& (== lel rel) (> lec rec)))
+        (return lhs)
+        (return rhs)
+        )
     ))
 
 (fun negate (p val) (
@@ -285,7 +292,6 @@
     ; current position in cbuf
     (var pos 0)
     ; offset + pos is the number of total characters from the beginning of parsing
-    (var offset 0)
 
     ; table for memoization
     (var memo (make_memotable 1000))
@@ -318,7 +324,7 @@
     ))
 
 (fun set_parser_state (dst src) (
-    ; NB: indent-level is not copied.
+    ; NB: indent-level must not be copied.
     (memcpy dst src (* 6 @WORD_SIZE))
     ))
 
@@ -345,7 +351,8 @@
 
 (export fun get_loc (p) (
     (var line (field_get p 4))
-    (return (make_loc (field_get p 2) line line))
+    (var clmn (field_get p 5))
+    (return (make_loc (field_get p 2) line clmn line clmn))
     ))
 
 (fun get_column (p) (
@@ -455,8 +462,8 @@
     ))
 
 (fun parse_char (p c) (
-    (var loc (get_loc p))
     (var v (getc p))
+    (var loc (get_loc p))
     (if (< v 0)
         (return (mayparse loc (strcat "expect " (escape_char c))))
         )
@@ -470,8 +477,8 @@
     ))
 
 (fun parse_any_char (p) (
-    (var loc (get_loc p))
     (var c (getc p))
+    (var loc (get_loc p))
     (if (< c 0)
         (return (mayparse loc "end of input stream"))
         (return (parsed loc (ctos c)))
@@ -485,10 +492,10 @@
     (for i 0 len (do
         (var c (array_get char str i))
         (var v (getc p))
-        (if (< v 0) (return (mayparse loc (strcat "expect " str))))
-        (if (!= c v) (return (noparse loc (strcat "expect " str))))
+        (if (< v 0) (return (mayparse (get_loc p) (strcat "expect " str))))
+        (if (!= c v) (return (noparse (get_loc p) (strcat "expect " str))))
         ))
-    (return (parsed loc (string str)))
+    (return (parsed (merge_loc loc (get_loc p)) (string str)))
     ))
 
 ; parse_integers
@@ -497,22 +504,22 @@
     (var loc (get_loc p))
     (var v (getc p))
 
-    (if (< v 0) (return (mayparse p "expect a number")))
+    (if (< v 0) (return (mayparse loc "expect a number")))
         
     (if (&& (== v '0') (is_end_of_token p))
-        (return (parsed loc (box 0)))
+        (return (parsed (merge_loc loc (get_loc p)) (box 0)))
         )
-    (if (! (is_1_9 v)) (return (noparse p "expect 1-9")))
+    (if (! (is_1_9 v)) (return (noparse (get_loc p) "expect 1-9")))
     (var value (- v '0'))
     (while (is_0_9 (lookahead p)) (do
         (= v (- (getc p) '0'))
         (if (> value (/ (- @INTEGER_MAX v) 10))
-            (return (integer_overflow p))
+            (return (integer_overflow (get_loc p)))
             )
         (= value (+ (* value 10) v))
         ))
     (if (is_end_of_token p)
-        (return (parsed loc (box value)))
+        (return (parsed (merge_loc loc (get_loc p)) (box value)))
         )
     (if (== (lookahead p) 'e') (do
         (getc p)
@@ -521,59 +528,59 @@
         (= exp (unbox (expr_arg exp 1)))
         (while (> exp 0) (do
             (if (> value (/ @INTEGER_MAX 10))
-                (return (integer_overflow loc))
+                (return (integer_overflow (get_loc p)))
                 )
             (*= value 10)
             (-= exp 1)
             ))
-        (return (parsed loc (box value)))
+        (return (parsed (merge_loc loc (get_loc p)) (box value)))
         ))
-    (return (junk_letter loc))
+    (return (junk_letter (get_loc p)))
     ))
 @(MEMOIZE decimal)
 
 (fun parse_binary_ (p) (
     (var loc (get_loc p))
     @(CHECK `(parse_text p "0b"))
-    (if (! (is_01 (lookahead p))) (return (noparse loc "expect 0 or 1")))
+    (if (! (is_01 (lookahead p))) (return (noparse (get_loc p) "expect 0 or 1")))
     (var value 0)
     (while (is_01 (lookahead p)) (do
         (var v (- (getc p) '0'))
         (if (> value (/ (- @INTEGER_MAX v) 2))
-            (return (integer_overflow loc))
+            (return (integer_overflow (get_loc p)))
             )
         (= value (| (<< value 1) v))
         ))
     (if (! (is_end_of_token p))
-        (return (junk_letter loc))
+        (return (junk_letter (get_loc p)))
         )
-    (return (parsed loc (box value)))
+    (return (parsed (merge_loc loc (get_loc p)) (box value)))
     ))
 @(MEMOIZE binary)
 
 (fun parse_octal_ (p) (
     (var loc (get_loc p))
     @(CHECK `(parse_text p "0o"))
-    (if (! (is_0_7 (lookahead p))) (return (noparse loc "expect 0-7")))
+    (if (! (is_0_7 (lookahead p))) (return (noparse (get_loc p) "expect 0-7")))
     (var value 0)
     (while (is_0_7 (lookahead p)) (do
         (var v (- (getc p) '0'))
         (if (> value (>> (- @INTEGER_MAX v) 3))
-            (return (integer_overflow loc))
+            (return (integer_overflow (get_loc p)))
             )
         (= value (+ (<< value 3) v))
         ))
     (if (! (is_end_of_token p))
-        (return (junk_letter loc))
+        (return (junk_letter (get_loc p)))
         )
-    (return (parsed loc (box value)))
+    (return (parsed (merge_loc loc (get_loc p)) (box value)))
     ))
 @(MEMOIZE octal)
 
 (fun parse_hex_ (p) (
     (var loc (get_loc p))
     @(CHECK `(parse_text p "0x"))
-    (if (! (is_hexdigit (lookahead p))) (return (noparse loc "expect hex digit")))
+    (if (! (is_hexdigit (lookahead p))) (return (noparse (get_loc p) "expect hex digit")))
     (var value 0)
     (while (is_hexdigit (lookahead p)) (do
         (var v (getc p))
@@ -584,31 +591,28 @@
             (= v (- v '0'))
             ))
         (if (> value (>> (- @INTEGER_MAX v) 4))
-            (return (integer_overflow loc))
+            (return (integer_overflow (get_loc p)))
             )
         (= value (+ (<< value 4) v))
         ))
     (if (! (is_end_of_token p))
-        (return (junk_letter loc))
+        (return (junk_letter (get_loc p)))
         )
-    (return (parsed loc (box value)))
+    (return (parsed (merge_loc loc (get_loc p)) (box value)))
     ))
 @(MEMOIZE hex)
 
 (fun parse_integer_ (p) (
-    (var loc (get_loc p))
-    (var v @(OR p `(decimal hex octal binary)))
-    (if (== (expr_head v) NoParse) (return (noparse loc "expect integer literal")))
-    (return v)
+    (return @(OR p `(decimal hex octal binary)))
     ))
 @(MEMOIZE integer)
 
 (fun parse_blank_ (p) (
     (var loc (get_loc p))
     (var c (getc p))
-    (if (< c 0) (return (mayparse loc "end of input stream")))
-    (if (&& (is_spaces c) (!= c '\n')) (return (parsed loc (ctos c))))
-    (return (noparse loc "expect a blank character"))
+    (if (< c 0) (return (mayparse (get_loc p) "end of input stream")))
+    (if (&& (is_spaces c) (!= c '\n')) (return (parsed (merge_loc loc (get_loc p)) (ctos c))))
+    (return (noparse (get_loc p) "expect a blank character"))
     ))
 @(MEMOIZE blank)
 
@@ -620,7 +624,7 @@
         (set_parser_state state p)
         ))
     (set_parser_state p state)
-    (return (parsed loc nil))
+    (return (parsed (merge_loc loc (get_loc p)) nil))
     ))
 @(MEMOIZE blanks)
 
@@ -639,22 +643,22 @@
         break
         ))
     (if (<= (get_column p) (get_indent p)) (do
-        (return (noparse loc "invalid indentation"))
+        (return (noparse (get_loc p) "invalid indentation"))
         ))
-    (return (parsed loc nil))
+    (return (parsed (merge_loc loc (get_loc p)) nil))
     ))
 @(MEMOIZE spaces)
 
 (fun parse_symbol_ (p) (
     (var loc (get_loc p))
     (var c (lookahead p))
-    (if (< c 0) (return (mayparse loc "expect a symbol")))
-    (if (! (is_letter c)) (return (noparse loc "expect a symbol")))
+    (if (< c 0) (return (mayparse (get_loc p) "expect a symbol")))
+    (if (! (is_letter c)) (return (noparse (get_loc p) "expect a symbol")))
     (var begin (field_get p 3))
     (while (is_identchar (lookahead p)) (do
         (getc p)
         ))
-    (return (parsed loc (to_sym (extract_string p begin (field_get p 3)))))
+    (return (parsed (merge_loc loc (get_loc p)) (to_sym (extract_string p begin (field_get p 3)))))
     ))
 @(MEMOIZE symbol)
 
@@ -663,8 +667,8 @@
 (fun parse_string_s_ (p) (
     (var loc (get_loc p))
     (var v (getc p))
-    (if (< v 0) (return (mayparse loc "expect '")))
-    (if (!= v ''') (return (noparse loc "expect '")))
+    (if (< v 0) (return (mayparse (get_loc p) "expect '")))
+    (if (!= v ''') (return (noparse (get_loc p) "expect '")))
     (var begin (field_get p 3))
     (while (!= (lookahead p) ''') (do
         (var c (getc p))
@@ -673,12 +677,12 @@
     (var end (field_get p 3))
 
     (= v (getc p))
-    (if (< v 0) (return (mayparse loc "expect '")))
-    (if (!= v ''') (return (noparse loc "expect '")))
+    (if (< v 0) (return (mayparse (get_loc p) "expect '")))
+    (if (!= v ''') (return (noparse (get_loc p) "expect '")))
 
     (var str (extract_string p begin end))
     (unescape_string_s str)
-    (return (parsed loc str))
+    (return (parsed (merge_loc loc (get_loc p)) str))
     ))
 @(MEMOIZE string_s)
 
@@ -687,26 +691,26 @@
     (var loc (get_loc p))
 
     (var v (getc p))
-    (if (< v 0) (return (mayparse loc "expect \"")))
-    (if (!= v '"') (return (noparse loc "expect \"")))
+    (if (< v 0) (return (mayparse (get_loc p) "expect \"")))
+    (if (!= v '"') (return (noparse (get_loc p) "expect \"")))
     (var begin (field_get p 3))
     (while (!= (lookahead p) '"') (do
         (var c (getc p))
-        (if (< c 0) (return (mayparse loc "expect character")))
+        (if (< c 0) (return (mayparse (get_loc p) "expect character")))
 
         (if (== c '\\') (do
             (if (! (is_escape_char (getc p)))
-                (return (noparse loc "invalid escape sequence"))
+                (return (noparse (get_loc p) "invalid escape sequence"))
                 )
             ))
         ))
     (var end (field_get p 3))
     (= v (getc p))
-    (if (< v 0) (return (mayparse loc "expect \"")))
-    (if (!= v '"') (return (noparse loc "expect \"")))
+    (if (< v 0) (return (mayparse (get_loc p) "expect \"")))
+    (if (!= v '"') (return (noparse (get_loc p) "expect \"")))
     (var str (extract_string p begin end))
     (unescape_string_d str)
-    (return (parsed loc str))
+    (return (parsed (merge_loc loc (get_loc p)) str))
     ))
 @(MEMOIZE string_d)
 
@@ -714,7 +718,7 @@
     (var loc (get_loc p))
     (var v @(OR p `(string_d string_s)))
     (if (== (expr_head v) NoParse)
-        (return (noparse loc "expect string literal"))
+        (return (noparse (get_loc p) "expect string literal"))
         )
     (return v)
     ))
@@ -754,26 +758,19 @@
 @(MEMOIZE node)
 
 (fun parse_atom_ (p) (
-    (var loc (get_loc p))
-    (var v @(OR p `(
+    (return @(OR p `(
         symbol
         integer
         string
     )))
-    (if (== (expr_head v) NoParse) 
-        (return (noparse loc "expect an atom"))
-        )
-    (return v)
     ))
 @(MEMOIZE atom)
 
 (fun parse_expr_ (p) (
-    (var loc (get_loc p))
-    (var v @(OR p `(
+    (return @(OR p `(
         node
         atom
     )))
-    (return v)
     ))
 @(MEMOIZE expr)
 
@@ -1138,7 +1135,7 @@
 ;     state = copy_parser_state(parser)
 ;     v = p1
 ;     if (head(v) == Parsed) (return v)
-;     errors = merge_noparse(errors, v)
+;     errors = join_noparse(errors, v)
 ;     set_parser_state(parser, state)
 ;     v = p2
 ;     ...
@@ -1167,7 +1164,7 @@
             (mkreturn v)
             ) body))
         (= body (cons (assign errors
-            (apply (to_sym "%merge_noparse") (list2 errors v))) body))
+            (apply (to_sym "%join_noparse") (list2 errors v))) body))
         (= body (cons (gen_set_parser_state ParserVar state) body))
         (= ps (cdr ps))
         ))
@@ -1431,7 +1428,7 @@
                 (list2 (apply (to_sym "length") (list1 elems)))
                     (box minlen))
             (mkreturn 
-                (qquote (make_expr NoParse (list1 (list2 (unquote loc) (string "The number of elements is insufficient"))))))
+                (qquote (make_expr NoParse (list2 (unquote loc) (string "The number of elements is insufficient")))))
             ) body))
         )
 
@@ -1665,7 +1662,7 @@
             return_stmt
             ) body))
         (= body (cons (assign errors
-            (apply (to_sym "%merge_noparse") (list2 errors v))) body))
+            (apply (to_sym "%join_noparse") (list2 errors v))) body))
         (= body (cons (gen_set_parser_state ParserVar state) body))
         (= elems (cdr elems))
 
@@ -1708,9 +1705,12 @@
                 (goto retry_lbl)
             )
             (do
-                ; accept previous try
                 (set_parser_state p (field_get ent 1))
-                (return (field_get ent 0))
+                (var prev (field_get ent 0))
+                (if (== (expr_head prev) Parsed)
+                    (return prev)
+                    (return v)
+                    )
             )))
     ; not left-recursive
     (field_set ent 0 v)
@@ -1780,7 +1780,7 @@
     (add_builtin_function2 mod (to_sym "%set_parser_state") (domainP Parser) (domainP Parser) set_parser_state 0)
     (add_builtin_function3 mod (to_sym "%call_parser") (domainP Parser) (domainP Symbol) (domainP Function) call_parser 0)
 
-    (add_builtin_function2 mod (to_sym "%merge_noparse") DontCare DontCare merge_noparse 0)
+    (add_builtin_function2 mod (to_sym "%join_noparse") DontCare DontCare join_noparse 0)
     (add_builtin_function2 mod (to_sym "%negate") (domainP Parser) DontCare negate 0)
     (add_builtin_function3 mod (to_sym "%oneof") (domainP Parser) stringT stringT oneof 0)
     (add_builtin_function3 mod (to_sym "%noneof") (domainP Parser) stringT stringT noneof 0)
@@ -1824,22 +1824,14 @@
     (add_parser mod (to_sym "parse_statement") parse_statement)
     ))
 
-(export fun output_syntax_errors (e) (
+(export fun output_syntax_error (e) (
     (output_string stderr "Syntax Error ")
-    (var errors (expr_args e))
+    (var error (expr_args e))
     (var multi @FALSE)
-    (if (!= (list_len errors) 1) (do
-        (= multi @TRUE)
-        (output_char stderr '\n'))
-        )
-    (while errors (do
-        (if multi (output_char stderr '\t'))
-        (output_loc stderr (caar errors))
-        (output_string stderr " : ")
-        (output_string stderr (cadar errors))
-        (output_char stderr '\n')
-        (= errors (cdr errors))
-        ))
+    (output_loc stderr (car error))
+    (output_string stderr " : ")
+    (output_string stderr (cadr error))
+    (output_char stderr '\n')
     ))
 
     ))
