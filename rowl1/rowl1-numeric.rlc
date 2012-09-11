@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-numeric.rlc 2012-07-28 16:45:50 nineties $
+; $Id: rowl1-numeric.rlc 2012-09-11 18:12:16 nineties $
 ;
 
 (import "rlvm-compile")
@@ -23,8 +23,30 @@
     (return (+ (- x) 2))
     ))
 
-(fun int_mul (x y) (
+(fun int_add (x y _) (
+    (return (- (+ x y) 1))
+    ))
+
+(fun int_sub (x y _) (
+    (return (+ (- x y) 1))
+    ))
+
+(fun int_mul (x y _) (
     (return (box (* (unbox x) (unbox y))))
+    ))
+
+(fun int_pow (x y _) (
+    (var v 1)
+    (= x (unbox x))
+    (= y (unbox y))
+    (var m 0x40000000)
+    (while (! (& y m)) (>>= m 1))
+    (while (> m 0) (do
+        (*= v v)
+        (if (& y m) (*= v x))
+        (>>= m 1)
+        ))
+    (return (box v))
     ))
 
 (fun nonzero_check (x) (
@@ -36,22 +58,14 @@
         ))
     ))
 
-(fun int_div (x y) (
+(fun int_div (x y _) (
     (nonzero_check y)
     (return (box (/ (unbox x) (unbox y))))
     ))
 
-(fun int_mod (x y) (
+(fun int_mod (x y _) (
     (nonzero_check y)
     (return (box (% (unbox x) (unbox y))))
-    ))
-
-(fun int_add (x y) (
-    (return (- (+ x y) 1))
-    ))
-
-(fun int_sub (x y) (
-    (return (+ (- x y) 1))
     ))
 
 (fun int_lt (x y) ((if (< x y) (return true) (return false))))
@@ -79,11 +93,12 @@
     ; integer arithmetic
     (add_builtin_function1 mod (to_sym "uplus") intT int_uplus 0)
     (add_builtin_function1 mod (to_sym "uminus") intT int_uminus 0)
-    (add_builtin_function2 mod (to_sym "mul") intT intT int_mul 0)
-    (add_builtin_function2 mod (to_sym "div") intT intT int_div 0)
-    (add_builtin_function2 mod (to_sym "mod") intT intT int_mod 0)
-    (add_builtin_function2 mod (to_sym "add") intT intT int_add 0)
-    (add_builtin_function2 mod (to_sym "sub") intT intT int_sub 0)
+    (add_builtin_function3 mod (to_sym "add") intT intT DontCare int_add 0)
+    (add_builtin_function3 mod (to_sym "sub") intT intT DontCare int_sub 0)
+    (add_builtin_function3 mod (to_sym "mul") intT intT DontCare int_mul 0)
+    (add_builtin_function3 mod (to_sym "pow") intT intT DontCare int_pow 0)
+    (add_builtin_function3 mod (to_sym "div") intT intT DontCare int_div 0)
+    (add_builtin_function3 mod (to_sym "mod") intT intT DontCare int_mod 0)
     (add_builtin_function2 mod (to_sym "lt") intT intT int_lt 0)
     (add_builtin_function2 mod (to_sym "gt") intT intT int_gt 0)
     (add_builtin_function2 mod (to_sym "le") intT intT int_le 0)
