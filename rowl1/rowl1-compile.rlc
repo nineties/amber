@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-09-11 06:07:04 nineties $
+; $Id: rowl1-compile.rlc 2012-09-11 13:55:57 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1037,14 +1037,6 @@
     (compile_qquote_main asm mod (expr_arg expr 0) 0)
     ))
 
-(fun compile_int (asm mod val) (
-    (put_imm_int asm val)
-    ))
-
-(fun compile_string (asm mod val) (
-    (put_push asm val)
-    ))
-
 (fun compile_list (asm mod expr) (
     (if (== expr 0)
         (put_zero asm)
@@ -1641,6 +1633,9 @@
     (add_compiler mod (quote false) compile_const)
     (add_compiler mod (quote nil) compile_const)
     (add_compiler mod (quote undefined) compile_const)
+    (add_compiler mod (domainP Int) compile_const)
+    (add_compiler mod (domainP String) compile_const)
+    (add_compiler mod (domainP BigInt) compile_const)
 
     (add_compiler mod (make_expr Apply (list2 DontCare listT)) compile_apply)
     (add_compiler mod (make_expr Subscript (list2 DontCare listT)) compile_subscript)
@@ -1648,8 +1643,6 @@
     (add_compiler mod (qquote (quote (unquote DontCare))) compile_quote)
     (add_compiler mod (qquote (qquote (unquote (unquote DontCare)))) compile_qquote)
 
-    (add_compiler mod (domainP Int) compile_int)
-    (add_compiler mod (domainP String) compile_string)
     (add_compiler mod (domainP List) compile_list)
     (add_compiler mod (domainP Tuple) compile_tuple)
 

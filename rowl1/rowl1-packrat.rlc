@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2012-09-11 12:22:36 nineties $
+; $Id: rowl1-packrat.rlc 2012-09-11 16:11:23 nineties $
 ;
 
 ; TODO:
@@ -843,6 +843,7 @@
     (var state (copy_parser_state p))
     (while @TRUE (do
         (= may_parse @FALSE)
+        (set_indent p 0)
         (parse_spaces p)
 
         (set_indent p (get_column p))
@@ -910,12 +911,12 @@
     (var tmp (unique_sym))
     (if space_sensitive_p (return cont))
     (= cont (cons (defvar tmp (apply (to_sym "%parse_spaces") (list1 ParserVar))) cont))
-    (if (! multiline_p)
+    (if (! multiline_p) (do
         (= cont (cons (mkif 
             (make_expr Equal (list2 (make_expr Head (list1 tmp)) (quote NoParse)))
             (mkreturn tmp)
             ) cont))
-        )
+        ))
     (return cont)
     ))
 
@@ -1488,20 +1489,20 @@
     (var v (unique_sym))
     (var state (unique_sym))
     (var loc (to_sym "%Loc"))
-    (return (make_expr Block (list1 (list4
+    (var body (make_expr Block (list1 (list4
         (defvar state (gen_copy_parser_state ParserVar))
         (defvar loc (apply (to_sym "%get_loc") (list1 ParserVar)))
         (defvar v (compile_parser_element p))
         (ifelse
             (make_expr Equal (list2 (make_expr Head (list1 v)) (quote NoParse)))
-            (make_expr Block (list2
+            (make_expr Block (list1 (list2
                 (gen_set_parser_state ParserVar state)
                 (qquote (parsed (unquote loc) nil))
-                ))
+                )))
             (qquote (parsed (unquote (gen_at v 0))
                 (make_expr Some (list1 (unquote (gen_at v 1))))))
             )))))
-            
+    (return body)
     ))
 
 ; And{ p } is translated to
