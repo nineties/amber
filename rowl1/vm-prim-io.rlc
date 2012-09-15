@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-io.rlc 2012-07-27 14:15:11 nineties $
+; $Id: vm-prim-io.rlc 2012-09-15 09:21:43 nineties $
 ;
 
 (import "stdlib")
@@ -200,6 +200,18 @@
         ))
     ))
 
+(export prim_input_uchar)
+(fun prim_input_uchar (addr ichan) (
+    (fill_ichan ichan 1)
+    (if (== (get ichan 2) (get ichan 3)) (
+        (return -1) ; EOF
+        ))
+    (int c (getu8 (get ichan 0) (get ichan 2)))
+    (set addr 0 c)
+    (set ichan 2 (+ (get ichan 2) 1))
+    (return 0)
+    ))
+
 (export prim_input_char)
 (fun prim_input_char (addr ichan) (
     (fill_ichan ichan 1)
@@ -240,7 +252,7 @@
             (= buf new_buf)
             ))
 
-        (if (< (prim_input_char (address code) ichan) 0) (
+        (if (< (prim_input_uchar (address code) ichan) 0) (
             (set8 buf idx 0)
             (set addr 0 buf)
             (return 0)
@@ -271,7 +283,7 @@
             (= buf new_buf)
             ))
 
-        (if (< (prim_input_char (address code) ichan) 0) (
+        (if (< (prim_input_uchar (address code) ichan) 0) (
             (set8 buf idx 0)
             (set addr 0 buf)
             (return 0)
@@ -349,6 +361,11 @@
 (export prim_output_int)
 (fun prim_output_int (ochan num) (
     (if (< num 0) (
+        (if (== num 0x80000000) (
+            ; neg num == neg
+            (prim_output_string ochan "-2147483648")
+            (return)
+            ))
         (prim_output_char ochan '-')
         (prim_output_int ochan (neg num))
         (return)
@@ -362,7 +379,7 @@
         (/= num 10)
         ))
     (while (>= i 0) (
-        (prim_output_char ochan (get8 output_int_digits i))
+        (prim_output_char ochan (getu8 output_int_digits i))
         (decr i)
         ))
     ))
@@ -372,13 +389,13 @@
 (fun prim_output_hex (ochan num len) (
     (int i 0)
     (while (< i len) (
-        (set8 output_hex_digits i (get8 "0123456789abcdef" (% num 16)))
+        (set8 output_hex_digits i (getu8 "0123456789abcdef" (% num 16)))
         (/= num 16)
         (+= i 1)
         ))
     (-= i 1)
     (while (>= i 0) (
-        (prim_output_char ochan (get8 output_hex_digits i))
+        (prim_output_char ochan (getu8 output_hex_digits i))
         (-= i 1)
         ))
     ))
@@ -386,6 +403,11 @@
 (export prim_read_bytes)
 (fun prim_read_bytes (ptr size) (
     (return (prim_input_bytes stdin ptr size))
+    ))
+
+(export prim_read_uchar)
+(fun prim_read_uchar (addr) (
+    (return (prim_input_uchar addr stdin))
     ))
 
 (export prim_read_char)

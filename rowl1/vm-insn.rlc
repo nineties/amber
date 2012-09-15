@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2012-09-09 03:18:34 nineties $
+; $Id: vm-insn.rlc 2012-09-15 11:13:22 nineties $
 ;
 
 (define gen_field_get (idx) `(
@@ -66,7 +66,7 @@
     ))
 
 (var vm_instructions `(
-    (nop       () @true ())
+    (nop   () @true ())
     (drop  () @true ((asm "addl $4, %esi")))
     (drop2 () @true ((asm "addl $8, %esi")))
     (dup   () @true ((asm "movl (%esi), %eax") (vmpush %eax)))
@@ -852,7 +852,7 @@
     ))
     ; allocate plain object
     ; arg0 = size (in bytes)
-    ; NB: allocated memory is not be zero-cleared
+    ; NB: allocated memory will not be zero-cleared
     (plain (byte) @true (
         (asm "movl (%esi), %eax")
         (vmsave)
@@ -868,7 +868,7 @@
     ; opd0 = # of elements (8bit)
     ; opd1 = # of boxed elements (8bit)
     ; NB:
-    ;  - allocated memory is not be zero-cleared
+    ;  - allocated memory will not be zero-cleared
     ;  - all boxed elements must be placed first
     (struct (byte byte) @true (
         (vmsave)
@@ -880,7 +880,8 @@
         (asm "sall $2, %eax")
         (asm "addl %eax, %esi")
         (call allocate_struct_with_values)
-        (asm "addl $12, %esp")
+        (asm "addl $8, %esp")
+        (asm "popl %esi")
         (vmrestore)
         (vmpush %eax)
         ))
@@ -889,7 +890,7 @@
     ; opd1 = # of elements (8bit)
     ; opd2 = # of boxed elements (8bit)
     ; NB:
-    ;  - allocated memory is not be zero-cleared
+    ;  - allocated memory will not be zero-cleared
     ;  - field0 is for the tag
     ;  - do not rewrite the tag
     ;  - all boxed elements must be placed first
@@ -905,7 +906,8 @@
         (vmushort 1 %eax) ; tag
         (asm "pushl %eax")
         (call allocate_variant_with_values)
-        (asm "addl $16, %esp")
+        (asm "addl $12, %esp")
+        (asm "popl %esi")
         (vmrestore)
         (vmpush %eax)
         ))
@@ -1161,6 +1163,10 @@
         (asm "orl  $0x80000000, %eax") ; set flag
         (vmpush %eax)
         ))
+    (push (object) @true (
+        (vmint 1 %eax)
+        (vmpush %eax)
+        ))
     ; 'call:1' 'relative address of the function:2' 'size of arguments:1'
     (call (addr byte) @nil  (
         (vmubyte 3 %eax)
@@ -1249,12 +1255,8 @@
         ))
     (jjump () @nil (
         (vmpop %ebx)
-        (asm "movl (%ebx), %ebx")
+        (asm "movl (%ebx), %ebx") ; pointer to the bytecode
         (vmfetch)
-        ))
-    (push (object) @true (
-        (vmint 1 %eax)
-        (vmpush %eax)
         ))
     (return () @nil  (
         (asm "movl $0, %ecx") ; return value
@@ -1283,7 +1285,7 @@
         (asm "cmpl %eax, %ecx")
         (asm "cmovle %ecx, %eax")
         (asm "cmpl %eax, %edx")
-        (asm "cmovg %ecx, %eax")
+        (asm "cmova %ecx, %eax")
         (asm "sall $1, %eax")
         (asm "addl $3, %ebx")
         (asm "addl %eax, %ebx")
