@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2012-09-11 16:11:23 nineties $
+; $Id: rowl1-packrat.rlc 2012-09-15 09:40:51 nineties $
 ;
 
 ; TODO:
@@ -59,15 +59,15 @@
    `(do
         (var state (copy_parser_state @p))
         (var v 0)
-        (var errors 0)
+        (var error 0)
         (do . @(map (lambda (f) 
             `(do
               (= v (@(s++ `parse_ f) @p))
               (if (== (expr_head v) Parsed) (goto @end_lbl))
-              (= errors (join_noparse errors v))
+              (= error (join_noparse error v))
               (set_parser_state @p state)
              )) ps))
-        (= v errors)
+        (= v error)
         (label @end_lbl)
         v
     )))
@@ -490,7 +490,7 @@
     (var i 0)
     (var len (strlen str))
     (for i 0 len (do
-        (var c (array_get char str i))
+        (var c (array_get uchar str i))
         (var v (getc p))
         (if (< v 0) (return (mayparse (get_loc p) (strcat "expect " str))))
         (if (!= c v) (return (noparse (get_loc p) (strcat "expect " str))))
@@ -790,6 +790,7 @@
     (var stmts 0)
     (while @TRUE (do
         (if (== (lookahead p) @EOF) break)
+        (set_indent p (box 0))
         (parse_spaces p)
 
         (if (== (lookahead p) '\n') (do
@@ -843,7 +844,7 @@
     (var state (copy_parser_state p))
     (while @TRUE (do
         (= may_parse @FALSE)
-        (set_indent p 0)
+        (set_indent p (box 0))
         (parse_spaces p)
 
         (set_indent p (get_column p))
@@ -1132,11 +1133,11 @@
 ; Choice{ p1, p2, .. } is translated to
 ;
 ; lambda() {
-;     errors = 0
+;     error = 0
 ;     state = copy_parser_state(parser)
 ;     v = p1
 ;     if (head(v) == Parsed) (return v)
-;     errors = join_noparse(errors, v)
+;     error = join_noparse(error, v)
 ;     set_parser_state(parser, state)
 ;     v = p2
 ;     ...
@@ -1152,10 +1153,10 @@
     (var body 0)
     (var state (unique_sym))
     (var v (unique_sym))
-    (var errors (unique_sym))
+    (var error (unique_sym))
 
     (= body (cons (defvar v 0) body))
-    (= body (cons (defvar errors 0) body))
+    (= body (cons (defvar error 0) body))
     (= body (cons (defvar state (gen_copy_parser_state ParserVar)) body))
 
     (while ps (do
@@ -1164,12 +1165,12 @@
             (make_expr Equal (list2 (make_expr Head (list1 v)) (quote Parsed)))
             (mkreturn v)
             ) body))
-        (= body (cons (assign errors
-            (apply (to_sym "%join_noparse") (list2 errors v))) body))
+        (= body (cons (assign error
+            (apply (to_sym "%join_noparse") (list2 error v))) body))
         (= body (cons (gen_set_parser_state ParserVar state) body))
         (= ps (cdr ps))
         ))
-    (= body (cons errors body))
+    (= body (cons error body))
 
     (return (apply
         (make_expr Lambda (list2 ParserVar (make_expr Block (list1 (list_reverse body)))))
@@ -1625,7 +1626,7 @@
     (var body 0)
     (var state (unique_sym))
     (var v (unique_sym))
-    (var errors (unique_sym))
+    (var error (unique_sym))
 
     ; if sym == parse_statement
     ; modify parsed expression to Located{...}
@@ -1640,7 +1641,7 @@
         )
 
     (= body (cons (defvar v 0) body))
-    (= body (cons (defvar errors 0) body))
+    (= body (cons (defvar error 0) body))
     (= body (cons (defvar state (gen_copy_parser_state ParserVar)) body))
     (while elems (do
         (var t (car elems))
@@ -1662,14 +1663,14 @@
             (make_expr Equal (list2 (make_expr Head (list1 v)) (quote Parsed)))
             return_stmt
             ) body))
-        (= body (cons (assign errors
-            (apply (to_sym "%join_noparse") (list2 errors v))) body))
+        (= body (cons (assign error
+            (apply (to_sym "%join_noparse") (list2 error v))) body))
         (= body (cons (gen_set_parser_state ParserVar state) body))
         (= elems (cdr elems))
 
         (clear_options)
         ))
-    (= body (cons errors body))
+    (= body (cons error body))
 
     (return (make_expr Block (list1 (list_reverse body))))
     ))
