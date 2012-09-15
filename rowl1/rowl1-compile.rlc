@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-09-11 13:55:57 nineties $
+; $Id: rowl1-compile.rlc 2012-09-15 22:34:40 nineties $
 ;
 
 (import "rlvm-compile")
@@ -509,23 +509,19 @@
     ))
 
 (fun compile (asm mod expr) (
-    (var code (lookup_func mod Compile))
-    (byterun code asm mod expr)
+    (byterun (lookup_func mod Compile) asm mod expr)
     ))
 
 (export fun call1 (sym arg0) (
-    (var code (lookup_func current_mod sym))
-    (return (byterun code arg0))
+    (return (byterun (lookup_func current_mod sym) arg0))
     ))
 
 (export fun call2 (sym arg0 arg1) (
-    (var code (lookup_func current_mod sym))
-    (return (byterun code arg0 arg1))
+    (return (byterun (lookup_func current_mod sym) arg0 arg1))
     ))
 
 (export fun call3 (sym arg0 arg1 arg2) (
-    (var code (lookup_func current_mod sym))
-    (return (byterun code arg0 arg1 arg2))
+    (return (byterun (lookup_func current_mod sym) arg0 arg1 arg2))
     ))
 
 (fun do_nothing (asm mod expr) (
@@ -1008,6 +1004,8 @@
     (if (== hd Int)
         (return (put_imm_int asm expr)))
     (if (== hd String)
+        (return (put_push asm expr)))
+    (if (is_atom expr)
         (return (put_push asm expr)))
     (if (== hd List) (do
         (if (! expr)
