@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2012-09-15 11:13:22 nineties $
+; $Id: vm-insn.rlc 2012-09-15 11:33:27 nineties $
 ;
 
 (define gen_field_get (idx) `(
@@ -87,8 +87,8 @@
     (imm_int32 (int) @true ((vmint 1 %eax) (vmpush %eax)))
     (iadd      () @true ((vmbin "addl")))
     (isub      () @true ((vmbin "subl")))
-    (iadd1 () @true ((asm "incl (%esi)")))
-    (isub1 () @true ((asm "decl (%esi)")))
+    (iadd1 () @true ((asm "addl $1, (%esi)")))
+    (isub1 () @true ((asm "subl $1, (%esi)")))
     (imul      () @true ((vmpop %eax) (asm "imul (%esi), %eax") (asm "movl %eax, (%esi)")))
 
     ; signed
@@ -191,7 +191,7 @@
         (asm "movl 4(%ebx), %ecx")  ; number of digits of lhs
         (asm "cmpl 4(%eax), %ecx")   
         (asm "cmovl 4(%eax), %ecx")
-        (asm "incl %ecx") ; ecx = max(lhs.ndigit, rhs.ndigit) + 1
+        (asm "addl $1, %ecx") ; ecx = max(lhs.ndigit, rhs.ndigit) + 1
         (asm "cmpl 8(%ebx), %ecx") ; compare capa of lhs and ecx
         (asm "jle 2f")
         ; reserve array of lhs
@@ -217,7 +217,7 @@
         (asm "addl %edx, (%ebx)")
         (asm "movl $0, %edx")
         (asm "adcl %edx, %edx")
-        (asm "decl %ecx")
+        (asm "subl $1, %ecx")
         (asm "addl $4, %eax")
         (asm "addl $4, %ebx")
         (asm "test %ecx, %ecx")
@@ -239,13 +239,13 @@
         (asm "movl (%ebx), %eax")
         (asm "test %eax, %eax")
         (asm "jnz 8f")
-        (asm "decl %ecx")
+        (asm "subl $1, %ecx")
         (asm "test %ecx, %ecx")
         (asm "jz 7f")
         (asm "subl $4, %ebx")
         (asm "jmp 6b")
         (asm "7:")
-        (asm "incl %ecx")
+        (asm "addl $1, %ecx")
         (asm "8:")
         (asm "movl 4(%esi), %ebx")
         (asm "movl %ecx, 4(%ebx)")
@@ -291,7 +291,7 @@
         (asm "jb 4f")
         (asm "movl (%ebx), %ebx")
         (asm "movl (%eax), %eax")
-        (asm "decl %ecx")
+        (asm "subl $1, %ecx")
         (asm "leal (%eax,%ecx,4), %eax")
         (asm "leal (%ebx,%ecx,4), %ebx")
         (asm "5:")
@@ -300,7 +300,7 @@
         (asm "cmpl (%eax), %edx")   ; rhs.digits[ecx] <=> lhs.digits[ecx] 
         (asm "ja 3f")
         (asm "jb 4f")
-        (asm "decl %ecx")
+        (asm "subl $1, %ecx")
         (asm "test %ecx, %ecx")
         (asm "jnz 5b")
 
@@ -319,7 +319,7 @@
         (asm "subl %edx, (%ebx)")
         (asm "movl $0, %edx")
         (asm "adcl %edx, %edx")
-        (asm "decl %ecx")
+        (asm "subl $1, %ecx")
         (asm "addl $4, %eax")
         (asm "addl $4, %ebx")
         (asm "test %ecx, %ecx")
@@ -349,7 +349,7 @@
         (asm "movl %edx, (%ebx)")
         (asm "movl $0, %edx")
         (asm "adcl %edx, %edx")
-        (asm "decl %ecx")
+        (asm "subl $1, %ecx")
         (asm "addl $4, %eax")
         (asm "addl $4, %ebx")
         (asm "test %ecx, %ecx")
@@ -377,13 +377,13 @@
         (asm "movl (%ebx), %eax")
         (asm "test %eax, %eax")
         (asm "jnz 11f")
-        (asm "decl %ecx")
+        (asm "subl $1, %ecx")
         (asm "test %ecx, %ecx")
         (asm "jz 10f")
         (asm "subl $4, %ebx")
         (asm "jmp 9b")
         (asm "10:")
-        (asm "incl %ecx")
+        (asm "addl $1, %ecx")
         (asm "11:")
         (asm "movl 4(%esi), %ebx")
         (asm "movl %ecx, 4(%ebx)")
@@ -403,7 +403,7 @@
         (asm "movl 4(%ebx), %ecx") ; lhs.ndigit
         (asm "movl (%esi), %eax")
         (asm "imul 4(%eax), %ecx")
-        (asm "incl %ecx") ; lhs.ndigit * rhs.ndigit + 1
+        (asm "addl $1, %ecx") ; lhs.ndigit * rhs.ndigit + 1
         ; allocate array for result
 
         (vmsave)
@@ -474,7 +474,7 @@
         (asm "leal (%ebx, %eax, 4), %eax")
         (asm "movl %edx, (%eax)")
 
-        (asm "incl (%esp)")
+        (asm "addl $1, (%esp)")
         (asm "jmp 2b")
 
         (asm "3:")
@@ -484,7 +484,7 @@
         (asm "leal (%ebx, %eax, 4), %eax")
         (asm "movl %ecx, (%eax)")
 
-        (asm "incl 4(%esp)")
+        (asm "addl $1, 4(%esp)")
         (asm "jmp 1b")
         (asm "4:")
 
@@ -496,7 +496,7 @@
         ; update lhs.ndigit
         (asm "movl 12(%esp), %ecx")
         (asm "imul 20(%esp), %ecx")
-        (asm "incl %ecx")
+        (asm "addl $1, %ecx")
         (asm "movl %ecx, 8(%eax)")
 
         (asm "movl (%eax), %eax")
@@ -505,13 +505,13 @@
         (asm "movl (%ebx), %eax")
         (asm "test %eax, %eax")
         (asm "jnz 11f")
-        (asm "decl %ecx")
+        (asm "subl $1, %ecx")
         (asm "test %ecx, %ecx")
         (asm "jz 10f")
         (asm "subl $4, %ebx")
         (asm "jmp 9b")
         (asm "10:")
-        (asm "incl %ecx")
+        (asm "addl $1, %ecx")
         (asm "11:")
         (asm "movl 4(%esi), %ebx")
         (asm "movl %ecx, 4(%ebx)")
@@ -545,7 +545,7 @@
         (asm "6:")
         (asm "test %ecx, %ecx")
         (asm "jz 7f")
-        (asm "decl %ecx")
+        (asm "subl $1, %ecx")
         (asm "movl (%esi), %eax")
         (asm "movl 4(%esi), %ebx")
         (asm "movl (%eax), %eax") ; rhs.digits
@@ -584,7 +584,7 @@
         (asm "movl 4(%esi), %eax") ; x
         (asm "movl 4(%eax), %ebx") ; x.ndigit
         (asm "addl %ecx, %ebx")    ; x.ndigit + ecx
-        (asm "incl %ebx")
+        (asm "addl $1, %ebx")
         (asm "cmpl 8(%eax), %ebx") ; (x.ndigit + ecx + 1) <=> x.capa
         (asm "jbe 1f")
         (vmsave)
@@ -610,9 +610,9 @@
         (asm "movl (%esp), %edx")
         (asm "test %edx, %edx")
         (asm "jz 3f")
-        (asm "decl (%esp)")
+        (asm "subl $1, (%esp)")
         (asm "movl (%esp), %edx")
-        (asm "decl %ecx")
+        (asm "subl $1, %ecx")
         (asm "leal (%ebx,%edx,4), %edx")
         (asm "leal (%ebx,%ecx,4), %eax")
         (asm "movl (%edx), %edx")
@@ -621,7 +621,7 @@
         (asm "3:")
         (asm "test %ecx, %ecx")
         (asm "jz 4f")
-        (asm "decl %ecx")
+        (asm "subl $1, %ecx")
         (asm "leal (%ebx,%ecx,4), %eax")
         (asm "movl $0, (%eax)")
         (asm "jmp 3b")
@@ -638,7 +638,7 @@
         (asm "movl (%esi), %ecx")
         (asm "shrl $5, %ecx")
         (asm "addl %ecx, %eax")
-        (asm "incl %eax")
+        (asm "addl $1, %eax")
         (asm "movl %eax, 4(%esp)")  
         (asm "movl (%esi), %ecx")
         (asm "andl $0x1f, %ecx") ; ecx = (shift length) % 32
@@ -650,7 +650,7 @@
         (asm "movl 4(%esp), %ebx")
         (asm "cmpl $1, %ebx")
         (asm "je 6f")
-        (asm "decl 4(%esp)")
+        (asm "subl $1, 4(%esp)")
         (asm "movl 4(%esp), %ebx")
         (asm "movl (%esp), %edx")
         (asm "leal (%edx,%ebx,4), %eax")
@@ -677,13 +677,13 @@
         (asm "movl (%ebx), %eax")
         (asm "test %eax, %eax")
         (asm "jnz 9f")
-        (asm "decl %ecx")
+        (asm "subl $1, %ecx")
         (asm "test %ecx, %ecx")
         (asm "jz 8f")
         (asm "subl $4, %ebx")
         (asm "jmp 7b")
         (asm "8:")
-        (asm "incl %ecx")
+        (asm "addl $1, %ecx")
         (asm "9:")
         (asm "movl 4(%esi), %ebx")
         (asm "movl %ecx, 4(%ebx)")
@@ -711,7 +711,7 @@
         (asm "movl (%eax), %eax")
         (asm "movl %eax, (%ebx)")
         (asm "addl $4, %ebx")
-        (asm "decl %edx")
+        (asm "subl $1, %edx")
         (asm "jmp 2b")
         (asm "3:")
 
@@ -722,8 +722,8 @@
         (asm "4:")
         (asm "test %ecx, %ecx")
         (asm "jz 1f")
-        (asm "decl %ecx")
-        (asm "decl %edx")
+        (asm "subl $1, %ecx")
+        (asm "subl $1, %edx")
         (asm "leal (%ebx,%edx,4), %eax")
         (asm "movl $0, (%eax)")
         (asm "jmp 4b")
@@ -737,7 +737,7 @@
         (asm "movl (%esi), %ecx")
         (asm "shrl $5, %ecx")
         (asm "subl %ecx, %edx")
-        (asm "decl %edx")
+        (asm "subl $1, %edx")
         (asm "movl %edx, 4(%esp)")
         (asm "movl $0, (%esp)")
         (asm "movl (%esi), %ecx")
@@ -757,7 +757,7 @@
         (asm "movl (%esp), %edx")
         (asm "leal (%ebx,%edx,4), %edx")
         (asm "movl %eax, (%edx)")
-        (asm "incl (%esp)")
+        (asm "addl $1, (%esp)")
         (asm "jmp 5b")
         (asm "6:")
         (asm "leal (%ebx,%edx,4), %edx")
@@ -775,13 +775,13 @@
         (asm "movl (%ebx), %eax")
         (asm "test %eax, %eax")
         (asm "jnz 9f")
-        (asm "decl %ecx")
+        (asm "subl $1, %ecx")
         (asm "test %ecx, %ecx")
         (asm "jz 8f")
         (asm "subl $4, %ebx")
         (asm "jmp 7b")
         (asm "8:")
-        (asm "incl %ecx")
+        (asm "addl $1, %ecx")
         (asm "9:")
         (asm "movl 4(%esi), %ebx")
         (asm "movl %ecx, 4(%ebx)")
@@ -820,7 +820,7 @@
         (asm "cmpl $0, %ecx")
         (asm "je 1f")
         (asm "movl 4(%eax), %eax")
-        (asm "decl %ecx")
+        (asm "subl $1, %ecx")
         (asm "jmp 0b")
         (asm "1:")
         (asm "movl (%eax), %eax")
@@ -833,7 +833,7 @@
         (asm "cmpl $0, %ecx")
         (asm "je 1f")
         (asm "movl 4(%eax), %eax")
-        (asm "decl %ecx")
+        (asm "subl $1, %ecx")
         (asm "jmp 0b")
         (asm "1:")
         (asm "movl %eax, (%esi)")
@@ -845,7 +845,7 @@
         (asm "cmpl $0, %eax")
         (asm "je 1f")
         (asm "movl 4(%eax), %eax")
-        (asm "incl %ecx")
+        (asm "addl $1, %ecx")
         (asm "jmp 0b")
         (asm "1:")
         (asm "movl %ecx, (%esi)")
@@ -1063,29 +1063,29 @@
         (asm "movl (%esi), %ecx")
         (asm "movl %ecx, (%eax)")
         ))
-    (incrl0 () @true ((asm "incl -4(%edi)")))
-    (incrl1 () @true ((asm "incl -8(%edi)")))
-    (incrl2 () @true ((asm "incl -12(%edi)")))
-    (incrl3 () @true ((asm "incl -16(%edi)")))
-    (incrl4 () @true ((asm "incl -20(%edi)")))
-    (incrl5 () @true ((asm "incl -24(%edi)")))
+    (incrl0 () @true ((asm "addl $1, -4(%edi)")))
+    (incrl1 () @true ((asm "addl $1, -8(%edi)")))
+    (incrl2 () @true ((asm "addl $1, -12(%edi)")))
+    (incrl3 () @true ((asm "addl $1, -16(%edi)")))
+    (incrl4 () @true ((asm "addl $1, -20(%edi)")))
+    (incrl5 () @true ((asm "addl $1, -24(%edi)")))
     (incrl (byte) @true (
         (vmsbyte 1 %ecx) ; index
         (asm "movl %edi, %eax")
         (asm "addl %ecx, %eax")
-        (asm "incl (%eax)")
+        (asm "addl $1, (%eax)")
         ))
-    (decrl0 () @true ((asm "decl -4(%edi)")))
-    (decrl1 () @true ((asm "decl -8(%edi)")))
-    (decrl2 () @true ((asm "decl -12(%edi)")))
-    (decrl3 () @true ((asm "decl -16(%edi)")))
-    (decrl4 () @true ((asm "decl -20(%edi)")))
-    (decrl5 () @true ((asm "decl -24(%edi)")))
+    (decrl0 () @true ((asm "subl $1, -4(%edi)")))
+    (decrl1 () @true ((asm "subl $1, -8(%edi)")))
+    (decrl2 () @true ((asm "subl $1, -12(%edi)")))
+    (decrl3 () @true ((asm "subl $1, -16(%edi)")))
+    (decrl4 () @true ((asm "subl $1, -20(%edi)")))
+    (decrl5 () @true ((asm "subl $1, -24(%edi)")))
     (decrl (byte) @true (
         (vmsbyte 1 %ecx) ; index
         (asm "movl %edi, %eax")
         (asm "addl %ecx, %eax")
-        (asm "decl (%eax)")
+        (asm "subl $1, (%eax)")
         ))
     (addrl (byte) @true (
         (vmsbyte 1 %ecx) ; index
@@ -1388,7 +1388,7 @@
         (asm "cmpl $" @TAG_CONS ", %edx")
         (asm "jne 3f")
         (asm "movl 4(%eax), %eax") ; %eax <- cdr %eax
-        (asm "decl %ecx")
+        (asm "subl $1, %ecx")
         (asm "jmp 0b")
         (asm "1:")
         (asm "cmpl $0, %ecx")
@@ -1419,7 +1419,7 @@
         (asm "cmpl $" @TAG_CONS ", %edx")
         (asm "jne 3f")
         (asm "movl 4(%eax), %eax") ; %eax <- cdr %eax
-        (asm "decl %ecx")
+        (asm "subl $1, %ecx")
         (asm "Jmp 0b")
         (asm "1:")
         (asm "cmpl $0, %ecx")
