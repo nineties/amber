@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2012-09-15 22:52:18 nineties $
+; $Id: rowl1-node.rlc 2012-09-19 01:35:28 nineties $
 ;
 
 (import "rlvm-compile")
@@ -63,6 +63,8 @@
 (export var Head      (to_sym "Head"))
 (export var Arguments (to_sym "Arguments"))
 
+(export var FieldRef  (to_sym "%FieldRef")) ; only for internal use
+
 (export var Include        (to_sym "Include"))
 (export var Import         (to_sym "Import"))
 (export var DefSyntax      (to_sym "DefineSyntax"))
@@ -97,9 +99,6 @@
 
 ; for parser
 (export var Parser (to_builtin_sym "Parser"))
-(export var Parsed     (to_sym "Parsed"))   ; Parsed (location node)
-(export var NoParse    (to_sym "NoParse"))  ; NoParse [(location msg)]
-(export var MayParse   (to_sym "MayParse")) ; MayParse (shell mode only)
 
 (export var OneOf      (to_sym "OneOf"))
 (export var NoneOf     (to_sym "NoneOf"))
@@ -457,6 +456,14 @@
 
 (export fun apply (fun args) (
     (return (make_expr Apply (list2 fun args)))
+    ))
+
+(export fun block (stmts) (
+    (return (make_expr Block (list1 stmts)))
+    ))
+
+(export fun lambda (args body) (
+    (return (make_expr Lambda (list2 args body)))
     ))
 
 (export fun assign (v arg) (

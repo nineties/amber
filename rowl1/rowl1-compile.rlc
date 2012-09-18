@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-09-15 22:34:40 nineties $
+; $Id: rowl1-compile.rlc 2012-09-19 03:09:16 nineties $
 ;
 
 (import "rlvm-compile")
@@ -125,6 +125,9 @@
             (var info (lookup_symbol mod expr))
             (if (== (expr_head info) ModuleVariable)
                 ; module-variables are not free-variables.
+                (return fv)
+                )
+            (if (|| (== expr nil) (|| (== expr true) (|| (== expr false) (== expr undefined))))
                 (return fv)
                 )
             (return (cons expr fv))
@@ -1484,6 +1487,19 @@
     (put_fieldset asm (expr_arg_int lhs 1))
     ))
 
+(fun compile_fieldref (asm mod expr) (
+    (compile asm mod (expr_arg expr 0))
+    (put_fieldget asm (expr_arg_int expr 1))
+    ))
+
+(fun compile_fieldref_assign (asm mod expr) (
+    (var lhs (expr_arg expr 0))
+    (var rhs (expr_arg expr 1))
+    (compile asm mod rhs)
+    (compile asm mod (expr_arg lhs 0))
+    (put_fieldset asm (expr_arg_int lhs 1))
+    ))
+
 (export fun compile_simple_function (asm arity func) (
     (var n arity)
     (while (> n 0) (do
@@ -1672,6 +1688,9 @@
 
 
     ; internal expressions
+    (add_compiler mod (make_expr FieldRef (list2 DontCare intT)) compile_fieldref)
+    (add_compiler mod (make_expr Assign (list2 (make_expr FieldRef (list2 DontCare intT)) DontCare)) compile_fieldref_assign)
+
     (add_compiler mod (make_expr AllocClsEnv (list1 intT)) compile_alloc_clsenv)
     (add_compiler mod (make_expr Closure (list2 DontCare DontCare)) compile_closure)
     (add_compiler mod (make_expr Ref (list3 DontCare intT symT)) compile_clsref)

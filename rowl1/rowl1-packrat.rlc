@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2012-09-15 16:38:54 nineties $
+; $Id: rowl1-packrat.rlc 2012-09-19 03:00:34 nineties $
 ;
 
 ; TODO:
@@ -38,20 +38,22 @@
 (var EOF -2)
 
 (define CHGRP (c) `(array_get char chgroup @c))
+(define PARSED (p) `(== (field_get @p 1) true))
+(define TOKEN (p) `(field_get @p 2))
+
 (define MEMOIZE (sym)
     `(export fun @(s++ `parse_ sym) (p) (
         (var s (to_sym @(++ "parse_" sym "_")))
-        (var tbl (field_get (field_get p 1) 2))
-        (var pos (field_get p 3))
+        (var tbl (field_get (field_get p 3) 2))
+        (var pos (field_get p 5))
         (var v (memotable_find tbl s pos))
         (if v (do
-            (set_parser_state p (field_get v 1))
-            (return (field_get v 0))
+            (set_parser_state_all p (field_get v 1))
+            return
             ))
-        (= v (@(s++ `parse_ sym '_') p))
+        (@(s++ `parse_ sym '_') p)
         (var state (copy_parser_state p))
-        (memotable_add tbl s pos (struct 2 v state @FALSE))
-        (return v)
+        (memotable_add tbl s pos (struct 2 @(TOKEN p) state @FALSE @FALSE))
     )))
 
 (define OR (p ps) (do
@@ -59,23 +61,20 @@
    `(do
         (var state (copy_parser_state @p))
         (var v 0)
-        (var error 0)
+        (var error (alloc_error_state @p))
         (do . @(map (lambda (f) 
             `(do
-              (= v (@(s++ `parse_ f) @p))
-              (if (== (expr_head v) Parsed) (goto @end_lbl))
-              (= error (join_noparse error v))
-              (set_parser_state @p state)
+              (@(s++ `parse_ f) @p)
+              (if @(PARSED p) (goto @end_lbl))
+              (join_error_state error p)
+              (set_parser_state_all @p state)
              )) ps))
-        (= v error)
+        (set_error_state @p error)
         (label @end_lbl)
-        v
     )))
-(define CHECK (v)
-    `(do
-        (var s @v)
-        (if (== (expr_head s) NoParse) (return s))
-    ))
+(define CHECK (p)
+    `(if (! @(PARSED p)) return)
+    )
 
 (compile `object `(
 
@@ -198,16 +197,16 @@
 (var multiline_p @FALSE)
 (var shell_mode_p @FALSE)
 (var may_parse @FALSE)
-(var LeftRec (noparse no_loc "Left Recursion Detected"))
+(var left_rec (string "Left Recursion Detected"))
 
 (extern object current_mod)
 (extern fun set_current_module)
 
 (fun trace (obj) (
-    (return (make_expr Block (list1 (list2
+    (return (block (list2
         (apply (to_sym "print") (list2 (to_sym "stderr") obj))
         (apply (to_sym "print") (list2 (to_sym "stderr") (string "\n")))
-        ))))
+        )))
     ))
 
 (export fun set_shell_mode () (
@@ -223,68 +222,91 @@
     ))
 
 (export fun parse (name p) (
-    (var code (lookup_func current_mod (to_sym name)))
-    (return (byterun code p))
+    (return (byterun (lookup_func current_mod (to_sym name)) p))
     ))
 
-(fun parsed (loc val) (
-    (return (make_expr Parsed (list2 loc val)))
+(export fun parse_success (p) (
+    (return @(PARSED p))
+    ))
+(export fun parsed_token (p) (
+    (return @(TOKEN p))
+    ))
+(export fun parser_error (p) (
+    (return @(TOKEN p))
     ))
 
-(fun mayparse (loc msg) (
+(fun parsed (p val) (
+    (field_set p 1 true)
+    (field_set p 2 val)
+    ))
+
+(fun noparse (p msg) (
+    (field_set p 1 false)
+    (field_set p 2 (string msg))
+    ))
+
+(fun mayparse (p msg) (
     (= may_parse @TRUE)
-    (return (make_expr NoParse (list2 loc (string msg))))
+    (field_set p 1 false)
+    (field_set p 2 (string msg))
     ))
 
-(fun noparse (loc msg) (
-    (return (make_expr NoParse (list2 loc (string msg))))
+(fun alloc_error_state (p) (
+    (return (struct 2 0 (field_get p 4) 0 0)) ; msg, file, line, pos
     ))
 
-(fun join_noparse (lhs rhs) (
-    (if (! lhs) (return rhs))
-    (if (! rhs) (return lhs))
-    (if (== lhs LeftRec) (return rhs))
-    (if (== rhs LeftRec) (return lhs))
-    (var lel (loc_endL (expr_arg lhs 0)))
-    (var rel (loc_endL (expr_arg rhs 0)))
-    (var lec (loc_endC (expr_arg lhs 0)))
-    (var rec (loc_endC (expr_arg rhs 0)))
-    (if (|| (> lel rel) (&& (== lel rel) (> lec rec)))
-        (return lhs)
-        (return rhs)
+(fun join_error_state (err p) (
+    (var pos (field_get p 5))
+    (if (<= (field_get err 3) pos) (do
+        (field_set err 0 (field_get p 2))
+        (field_set err 1 (field_get p 4))
+        (field_set err 2 (field_get p 6))
+        (field_set err 3 pos)
+        ))
+    ))
+    
+(fun set_error_state (p err) (
+    (field_set p 1 false)
+    (field_set p 2 (field_get err 0)) 
+    (field_set p 4 (field_get err 1))
+    (field_set p 5 (field_get err 3))
+    (field_set p 6 (field_get err 2))
+    ))
+
+(fun negate (p) (
+    (if @(PARSED p)
+        (do
+            (field_set p 1 false)
+            (field_set p 2 (string "unexpected token"))
         )
+        (do
+            (field_set p 1 true)
+            (field_set p 2 nil)
+        ))
     ))
 
-(fun negate (p val) (
-    (var hd (expr_head val))
-    (var loc (get_loc p))
-    (if (== hd Parsed)
-        (return (noparse loc "unexpected token"))
-        (return (parsed loc nil))
-        )
+(fun apply_located (p) (
+    (field_set p 2 (located (get_loc p) (field_get p 2)))
     ))
 
-(fun apply_located (v) (
-    (expr_arg_set v 1 (located (expr_arg v 0) (expr_arg v 1)))
-    (return v)
+(fun integer_overflow (p) (
+    (return (noparse p "integer literal is too large"))
     ))
 
-(fun integer_overflow (loc) (
-    (return (noparse loc "integer literal is too large"))
-    ))
-
-(fun junk_letter (loc) (
-    (return (noparse loc "junk letter(s) at the end of integer literal"))
+(fun junk_letter (p) (
+    (return (noparse p "junk letter(s) at the end of integer literal"))
     ))
 
 ; structure of parser
 ;   0: head (ParserE)
-;   1: (character buffer, input channel, table for memoization)
-;   2: filename
-;   3: current position in the character buffer
-;   4: line number
-;   5: column number
-;   6: indentation
+;   1: parsed=true, noparse=false
+;   2: parsed token or error message
+;   3: (character buffer, input channel, table for memoization)
+;   4: filename
+;   5: current position in the character buffer
+;   6: line number
+;   7: column number
+;   8: indentation
 
 (export fun init_parser (file ichan) (
     ; character buffer
@@ -297,46 +319,51 @@
     (var memo (make_memotable 1000))
     (var buf (struct 3 cbuf ichan memo))
 
-    (return (variant @ParserE 2 buf (string file) pos 1 1 1))
+    (return (variant @ParserE 4 0 0 buf (string file) pos 1 1 1))
     ))
 
 (export fun flush_parser (p force) (
-    (var buf (field_get p 1))
+    (var buf (field_get p 3))
     (var cbuf (field_get buf 0))
     (var bufsz (cvector_size cbuf))
-    (var pos (field_get p 3))
+    (var pos (field_get p 5))
 
     ; XXX: Not good implementation.
     ; Ring buffer is better.
     (if (|| (>= pos bufsz) force) (do
         (cvector_resize cbuf 0)
-        (field_set p 3 0)
+        (field_set p 5 0)
         ))
 
     (memotable_clear (field_get buf 2))
-    (if shell_mode_p (field_set p 4 (+ (field_get p 4) 1)))
+    (if shell_mode_p (field_set p 6 (+ (field_get p 6) 1)))
     ))
 
 (fun copy_parser_state (p) (
-    (var copy (variant @ParserE 2 0 0 0 0 0 0))
-    (memcpy copy p (* 7 @WORD_SIZE))
+    (var copy (variant @ParserE 4 0 0 0 0 0 0 0 0))
+    (memcpy copy p (* 9 @WORD_SIZE))
     (return copy)
     ))
 
-(fun set_parser_state (dst src) (
+(fun set_parser_state_all (dst src) (
     ; NB: indent-level must not be copied.
-    (memcpy dst src (* 6 @WORD_SIZE))
+    (memcpy dst src (* 8 @WORD_SIZE))
+    ))
+
+(fun set_parser_state (dst src) (
+    ; NB: token info and indent-level must not be copied.
+    (memcpy (+ dst (* 3 @WORD_SIZE)) (+ src (* 3 @WORD_SIZE)) (* 5 @WORD_SIZE))
     ))
 
 (fun clear_parser_state (p state) (
-    (var buf (field_get p 1))
-    (set_parser_state p state)
+    (var buf (field_get p 3))
+    (set_parser_state_all p state)
     (memotable_clear (field_get buf 2))
     ))
 
 (fun extract_string (p begin end) (
     (var len (- end begin))
-    (var vec (field_get (field_get p 1) 0))
+    (var vec (field_get (field_get p 3) 0))
     (return (strndup (+ (cvector_raw vec) begin) len))
     ))
 
@@ -346,32 +373,32 @@
     ))
 
 (export fun get_pos (p) (
-    (return (box (field_get p 3)))
-    ))
-
-(export fun get_loc (p) (
-    (var line (field_get p 4))
-    (var clmn (field_get p 5))
-    (return (make_loc (field_get p 2) line clmn line clmn))
-    ))
-
-(fun get_column (p) (
     (return (box (field_get p 5)))
     ))
 
+(export fun get_loc (p) (
+    (var line (field_get p 6))
+    (var clmn (field_get p 7))
+    (return (make_loc (field_get p 4) line clmn line clmn))
+    ))
+
+(fun get_column (p) (
+    (return (box (field_get p 7)))
+    ))
+
 (fun get_indent (p) (
-    (return (box (field_get p 6)))
+    (return (box (field_get p 8)))
     ))
 
 ; set new indentation-level and return current indentation-level
 (fun set_indent (p c) (
-    (var current_indent (field_get p 6))
-    (field_set p 6 (unbox c))
+    (var current_indent (field_get p 8))
+    (field_set p 8 (unbox c))
     (return (box current_indent))
     ))
 
 (fun reserve (p) (
-    (var buf (field_get p 1))
+    (var buf (field_get p 3))
     (var vec (field_get buf 0))
     (var ichan (field_get buf 1))
     (var line 0)
@@ -384,9 +411,9 @@
     ))
 
 (fun lookahead (p) (
-    (var buf (field_get p 1))
+    (var buf (field_get p 3))
     (var vec (field_get buf 0))
-    (var idx (field_get p 3))
+    (var idx (field_get p 5))
     (if (>= idx (cvector_size vec)) (do
         (if (&& (! shell_mode_p) (< (reserve p) 0))
             (return @EOF)
@@ -404,12 +431,12 @@
     ; update source location
     (if (== c '\n') (do
         (if (! shell_mode_p)
-            (field_set p 4 (+ (field_get p 4) 1))
+            (field_set p 6 (+ (field_get p 6) 1))
             )
-        (field_set p 5 0)
+        (field_set p 7 0)
         ))
-    (field_set p 3 (+ (field_get p 3) 1))
     (field_set p 5 (+ (field_get p 5) 1))
+    (field_set p 7 (+ (field_get p 7) 1))
     (return c)
     ))
 
@@ -463,14 +490,13 @@
 
 (fun parse_char (p c) (
     (var v (getc p))
-    (var loc (get_loc p))
     (if (< v 0)
-        (return (mayparse loc (strcat "expect " (escape_char c))))
+        (return (mayparse p (strcat "expect " (escape_char c))))
         )
     (if (== v c) (do
-        (return (parsed loc (ctos c)))
+        (return (parsed p (ctos c)))
         ))
-    (return (noparse loc 
+    (return (noparse p 
         (strcat "expect " 
         (strcat (escape_char c)
         (strcat " but got " (escape_char v))))))
@@ -478,109 +504,106 @@
 
 (fun parse_any_char (p) (
     (var c (getc p))
-    (var loc (get_loc p))
     (if (< c 0)
-        (return (mayparse loc "end of input stream"))
-        (return (parsed loc (ctos c)))
+        (return (mayparse p "end of input stream"))
+        (return (parsed p (ctos c)))
         )
     ))
 
 (fun parse_text (p str) (
-    (var loc (get_loc p))
     (var i 0)
     (var len (strlen str))
     (for i 0 len (do
         (var c (array_get uchar str i))
         (var v (getc p))
-        (if (< v 0) (return (mayparse (get_loc p) (strcat "expect " str))))
-        (if (!= c v) (return (noparse (get_loc p) (strcat "expect " str))))
+        (if (< v 0) (return (mayparse p (strcat "expect " str))))
+        (if (!= c v) (return (noparse p (strcat "expect " str))))
         ))
-    (return (parsed (merge_loc loc (get_loc p)) (string str)))
+    (return (parsed p (string str)))
     ))
 
 ; parse_integers
 ; multi-precision integer is not supported for now
 (fun parse_decimal_ (p) (
-    (var loc (get_loc p))
     (var v (getc p))
 
-    (if (< v 0) (return (mayparse loc "expect a number")))
+    (if (< v 0) (return (mayparse p "expect a number")))
         
     (if (&& (== v '0') (is_end_of_token p))
-        (return (parsed (merge_loc loc (get_loc p)) (box 0)))
+        (return (parsed p (box 0)))
         )
-    (if (! (is_1_9 v)) (return (noparse (get_loc p) "expect 1-9")))
+    (if (! (is_1_9 v)) (return (noparse p "expect 1-9")))
     (var value (- v '0'))
     (while (is_0_9 (lookahead p)) (do
         (= v (- (getc p) '0'))
         (if (> value (/ (- @INTEGER_MAX v) 10))
-            (return (integer_overflow (get_loc p)))
+            (return (integer_overflow p))
             )
         (= value (+ (* value 10) v))
         ))
     (if (is_end_of_token p)
-        (return (parsed (merge_loc loc (get_loc p)) (box value)))
+        (return (parsed p (box value)))
         )
     (if (== (lookahead p) 'e') (do
         (getc p)
-        (var exp (parse_decimal p))
-        @(CHECK exp)
-        (= exp (unbox (expr_arg exp 1)))
+        (parse_decimal p)
+        @(CHECK p)
+        (var exp (unbox @(TOKEN p)))
         (while (> exp 0) (do
             (if (> value (/ @INTEGER_MAX 10))
-                (return (integer_overflow (get_loc p)))
+                (return (integer_overflow p))
                 )
             (*= value 10)
             (-= exp 1)
             ))
-        (return (parsed (merge_loc loc (get_loc p)) (box value)))
+        (return (parsed p (box value)))
         ))
-    (return (junk_letter (get_loc p)))
+    (return (junk_letter p))
     ))
 @(MEMOIZE decimal)
 
 (fun parse_binary_ (p) (
-    (var loc (get_loc p))
-    @(CHECK `(parse_text p "0b"))
-    (if (! (is_01 (lookahead p))) (return (noparse (get_loc p) "expect 0 or 1")))
+    (parse_text p "0b")
+    @(CHECK p)
+    (if (! (is_01 (lookahead p))) (return (noparse p "expect 0 or 1")))
     (var value 0)
     (while (is_01 (lookahead p)) (do
         (var v (- (getc p) '0'))
         (if (> value (/ (- @INTEGER_MAX v) 2))
-            (return (integer_overflow (get_loc p)))
+            (return (integer_overflow p))
             )
         (= value (| (<< value 1) v))
         ))
     (if (! (is_end_of_token p))
-        (return (junk_letter (get_loc p)))
+        (return (junk_letter p))
         )
-    (return (parsed (merge_loc loc (get_loc p)) (box value)))
+    (return (parsed p (box value)))
     ))
 @(MEMOIZE binary)
 
 (fun parse_octal_ (p) (
-    (var loc (get_loc p))
-    @(CHECK `(parse_text p "0o"))
-    (if (! (is_0_7 (lookahead p))) (return (noparse (get_loc p) "expect 0-7")))
+    (parse_text p "0o")
+    @(CHECK p)
+    (if (! (is_0_7 (lookahead p))) (return (noparse p "expect 0-7")))
     (var value 0)
     (while (is_0_7 (lookahead p)) (do
         (var v (- (getc p) '0'))
         (if (> value (>> (- @INTEGER_MAX v) 3))
-            (return (integer_overflow (get_loc p)))
+            (return (integer_overflow p))
             )
         (= value (+ (<< value 3) v))
         ))
     (if (! (is_end_of_token p))
-        (return (junk_letter (get_loc p)))
+        (return (junk_letter p))
         )
-    (return (parsed (merge_loc loc (get_loc p)) (box value)))
+    (return (parsed p (box value)))
     ))
 @(MEMOIZE octal)
 
 (fun parse_hex_ (p) (
-    (var loc (get_loc p))
-    @(CHECK `(parse_text p "0x"))
-    (if (! (is_hexdigit (lookahead p))) (return (noparse (get_loc p) "expect hex digit")))
+    (parse_text p "0x")
+    @(CHECK p)
+    (if (! (is_hexdigit (lookahead p))) (return (noparse p "expect hex digit")))
     (var value 0)
     (while (is_hexdigit (lookahead p)) (do
         (var v (getc p))
@@ -591,202 +614,197 @@
             (= v (- v '0'))
             ))
         (if (> value (>> (- @INTEGER_MAX v) 4))
-            (return (integer_overflow (get_loc p)))
+            (return (integer_overflow p))
             )
         (= value (+ (<< value 4) v))
         ))
     (if (! (is_end_of_token p))
-        (return (junk_letter (get_loc p)))
+        (return (junk_letter p))
         )
-    (return (parsed (merge_loc loc (get_loc p)) (box value)))
+    (return (parsed p (box value)))
     ))
 @(MEMOIZE hex)
 
 (fun parse_integer_ (p) (
-    (return @(OR p `(decimal hex octal binary)))
+    @(OR p `(decimal hex octal binary))
     ))
 @(MEMOIZE integer)
 
 (fun parse_blank_ (p) (
-    (var loc (get_loc p))
     (var c (getc p))
-    (if (< c 0) (return (mayparse (get_loc p) "end of input stream")))
-    (if (&& (is_spaces c) (!= c '\n')) (return (parsed (merge_loc loc (get_loc p)) (ctos c))))
-    (return (noparse (get_loc p) "expect a blank character"))
+    (if (< c 0) (return (mayparse p "end of input stream")))
+    (if (&& (is_spaces c) (!= c '\n')) (return (parsed p (ctos c))))
+    (return (noparse p "expect a blank character"))
     ))
 @(MEMOIZE blank)
 
 (fun parse_blanks_ (p) (
-    (var loc (get_loc p))
     (var code (lookup_func current_mod (to_sym "parse_blank")))
     (var state (copy_parser_state p))
-    (while (== (expr_head (byterun code p)) Parsed) (do
-        (set_parser_state state p)
+    (while @TRUE (do
+        (set_parser_state_all state p)
+        (byterun code p)
+        (if @(PARSED p) continue)
+        (set_parser_state_all p state)
+        break
         ))
-    (set_parser_state p state)
-    (return (parsed (merge_loc loc (get_loc p)) nil))
+    (return (parsed p (to_sym "blanks")))
     ))
 @(MEMOIZE blanks)
 
 (fun parse_spaces_ (p) (
-    (var loc (get_loc p))
     (var code (lookup_func current_mod (to_sym "parse_blank")))
     (var state (copy_parser_state p))
     (while @TRUE (do
-        (set_parser_state state p)
-        (var v (byterun code p))
-        (if (== (expr_head v) Parsed) continue)
-        (set_parser_state p state)
-        (= v (parse_char p '\n'))
-        (if (== (expr_head v) Parsed) continue)
-        (set_parser_state p state)
+        (set_parser_state_all state p)
+        (byterun code p)
+        (if @(PARSED p) continue)
+        (set_parser_state_all p state)
+        (parse_char p '\n')
+        (if @(PARSED p) continue)
+        (set_parser_state_all p state)
         break
         ))
     (if (<= (get_column p) (get_indent p)) (do
-        (return (noparse (get_loc p) "invalid indentation"))
+        (return (noparse p "invalid indentation"))
         ))
-    (return (parsed (merge_loc loc (get_loc p)) nil))
+    (return (parsed p (to_sym "spaces")))
     ))
 @(MEMOIZE spaces)
 
 (fun parse_symbol_ (p) (
-    (var loc (get_loc p))
     (var c (lookahead p))
-    (if (< c 0) (return (mayparse (get_loc p) "expect a symbol")))
-    (if (! (is_letter c)) (return (noparse (get_loc p) "expect a symbol")))
-    (var begin (field_get p 3))
+    (if (< c 0) (return (mayparse p "expect a symbol")))
+    (if (! (is_letter c)) (return (noparse p "expect a symbol")))
+    (var begin (field_get p 5))
     (while (is_identchar (lookahead p)) (do
         (getc p)
         ))
-    (return (parsed (merge_loc loc (get_loc p)) (to_sym (extract_string p begin (field_get p 3)))))
+    (var s (to_sym (extract_string p begin (field_get p 5))))
+    (return (parsed p s))
     ))
 @(MEMOIZE symbol)
 
 ; single-quoted string literal
 ;   Only escape sequence \' is interpreted.
 (fun parse_string_s_ (p) (
-    (var loc (get_loc p))
     (var v (getc p))
-    (if (< v 0) (return (mayparse (get_loc p) "expect '")))
-    (if (!= v ''') (return (noparse (get_loc p) "expect '")))
-    (var begin (field_get p 3))
+    (if (< v 0) (return (mayparse p "expect '")))
+    (if (!= v ''') (return (noparse p "expect '")))
+    (var begin (field_get p 5))
     (while (!= (lookahead p) ''') (do
         (var c (getc p))
         (if (== c '\\') (getc p))
         ))
-    (var end (field_get p 3))
+    (var end (field_get p 5))
 
     (= v (getc p))
-    (if (< v 0) (return (mayparse (get_loc p) "expect '")))
-    (if (!= v ''') (return (noparse (get_loc p) "expect '")))
+    (if (< v 0) (return (mayparse p "expect '")))
+    (if (!= v ''') (return (noparse p "expect '")))
 
     (var str (extract_string p begin end))
     (unescape_string_s str)
-    (return (parsed (merge_loc loc (get_loc p)) str))
+    (return (parsed p str))
     ))
 @(MEMOIZE string_s)
 
 ; double-quoted string literal
 (fun parse_string_d_ (p) (
-    (var loc (get_loc p))
-
     (var v (getc p))
-    (if (< v 0) (return (mayparse (get_loc p) "expect \"")))
-    (if (!= v '"') (return (noparse (get_loc p) "expect \"")))
-    (var begin (field_get p 3))
+    (if (< v 0) (return (mayparse p "expect \"")))
+    (if (!= v '"') (return (noparse p "expect \"")))
+    (var begin (field_get p 5))
     (while (!= (lookahead p) '"') (do
         (var c (getc p))
-        (if (< c 0) (return (mayparse (get_loc p) "expect character")))
+        (if (< c 0) (return (mayparse p "expect character")))
 
         (if (== c '\\') (do
             (if (! (is_escape_char (getc p)))
-                (return (noparse (get_loc p) "invalid escape sequence"))
+                (return (noparse p "invalid escape sequence"))
                 )
             ))
         ))
-    (var end (field_get p 3))
+    (var end (field_get p 5))
     (= v (getc p))
-    (if (< v 0) (return (mayparse (get_loc p) "expect \"")))
-    (if (!= v '"') (return (noparse (get_loc p) "expect \"")))
+    (if (< v 0) (return (mayparse p "expect \"")))
+    (if (!= v '"') (return (noparse p "expect \"")))
     (var str (extract_string p begin end))
     (unescape_string_d str)
-    (return (parsed (merge_loc loc (get_loc p)) str))
+    (return (parsed p str))
     ))
 @(MEMOIZE string_d)
 
 (fun parse_string_ (p) (
-    (var loc (get_loc p))
-    (var v @(OR p `(string_d string_s)))
-    (if (== (expr_head v) NoParse)
-        (return (noparse (get_loc p) "expect string literal"))
+    @(OR p `(string_d string_s))
+    (if (! @(PARSED p))
+        (return (noparse p "expect string literal"))
         )
-    (return v)
     ))
 @(MEMOIZE string)
 
 (fun parse_node_ (p) (
-    (var hd (parse_symbol p))
-    (var bloc (get_loc p))
-    (if (== (expr_head hd) NoParse)
-        (return (noparse bloc "expect a head symbol"))
+    (parse_symbol p)
+    (if (! @(PARSED p))
+        (return (noparse p "expect a head symbol"))
         )
-    (= hd (expr_arg hd 1))
+    (var hd @(TOKEN p))
 
-    @(CHECK `(parse_spaces p))
-    @(CHECK `(parse_char p '{'))
+    (parse_spaces p)
+    (parse_char p '{')
+    @(CHECK p)
     (parse_spaces p)
 
     (var args 0)
     (if (!= (lookahead p) '}') (do
         (while (> (lookahead p) 0) (do
-            (var v (parse "parse_expr" p))
-            @(CHECK v)
+            (parse "parse_expr" p)
+            @(CHECK p)
+            (= args (cons @(TOKEN p) args))
             (parse_spaces p)
 
-            (= args (cons (expr_arg v 1) args))
             (if (== (lookahead p) '}') break)
-            @(CHECK `(parse_char p ','))
+            (parse_char p ',')
+            @(CHECK p)
             (parse_spaces p)
             ))
         ))
-    @(CHECK `(parse_char p '}'))
-    (var eloc (get_loc p))
+    (parse_char p '}')
+    @(CHECK p)
 
-    (return (parsed (merge_loc bloc eloc)
-        (make_expr_user hd (list_reverse args))))
+    (parsed p (make_expr_user hd (list_reverse args)))
     ))
 @(MEMOIZE node)
 
 (fun parse_atom_ (p) (
-    (return @(OR p `(
+    @(OR p `(
         symbol
         integer
         string
-    )))
+    ))
     ))
 @(MEMOIZE atom)
 
 (fun parse_expr_ (p) (
-    (return @(OR p `(
+    @(OR p `(
         node
         atom
-    )))
+    ))
     ))
 @(MEMOIZE expr)
 
 (fun parse_statement_ (p) (
-    (var v (parse "parse_expr" p))
-    @(CHECK v)
+    (parse "parse_expr" p)
+    @(CHECK p)
 
-    (eval_parser_command v)
-    (var loc (expr_arg v 0))
-    (var stmt (expr_arg v 1))
-    (return (parsed loc (located loc stmt)))
+    (eval_parser_command p)
+    (var loc (get_loc p))
+    (return (parsed p (located loc @(TOKEN p))))
     ))
 @(MEMOIZE statement)
 
 (export fun parse_statements (p) (
-    (if (== (lookahead p) @EOF) (return 0))
+    (parsed p 0)
+    (if (== (lookahead p) @EOF) return)
     (var stmts 0)
     (while @TRUE (do
         (if (== (lookahead p) @EOF) break)
@@ -800,15 +818,16 @@
         (if (== (lookahead p) @EOF) break)
 
         (set_indent p (get_column p))
-        (var v (parse "parse_statement" p))
-        @(CHECK v)
+        (parse "parse_statement" p)
+        @(CHECK p)
+        (var stmt @(TOKEN p))
+        (var loc (get_loc p))
         (parse_blanks p)
 
         (if (== (lookahead p) @EOF) break)
 
-        @(CHECK `(parse_char p '\n'))
-        (var stmt (expr_arg v 1))
-        (var loc (expr_arg v 0))
+        (parse_char p '\n')
+        @(CHECK p)
 
         (if (!= (expr_head stmt) Located) (do
             (output_error stderr loc)
@@ -827,11 +846,11 @@
             break
             )
         ))
-    (return (list_reverse stmts))
+    (parsed p (list_reverse stmts))
     ))
 
 (fun print_prompt (p sign) (
-    (var line (field_get p 4))
+    (var line (field_get p 6))
     (output_string stdout "amber:")
     (output_int stdout line)
     (output_string stdout sign)
@@ -848,20 +867,24 @@
         (parse_spaces p)
 
         (set_indent p (get_column p))
-        (var e (parse "parse_statement" p))
-        (if (== (expr_head e) NoParse) (if may_parse (goto retry) (return e)))
-        (parse_spaces p)
-        (var semi (parse_char p ';'))
-        (if (== (expr_head semi) NoParse) (if may_parse (goto retry) (return semi)))
-        (var nl (parse_char p '\n'))
-        (if (== (expr_head nl) NoParse) (if may_parse (goto retry) (return nl)))
+        (parse "parse_statement" p)
+        (if (! @(PARSED p)) (if may_parse (goto retry) return))
+        (var e @(TOKEN p))
+        (var loc (get_loc p))
 
-        (if (!= (expr_head (expr_arg e 1)) Located) (do
-            (output_error stderr (expr_arg e 0))
+        (parse_spaces p)
+        (parse_char p ';')
+        (if (! @(PARSED p)) (if may_parse (goto retry) return))
+        (parse_char p '\n')
+        (if (! @(PARSED p)) (if may_parse (goto retry) return))
+
+        (if (!= (expr_head e) Located) (do
+            (output_error stderr loc)
             (output_string stderr "parse_statement must returns Located{ ... }\n")
             (exit 1)
             ))
-        (return e)
+        (parsed p e)
+        return
 
         (label retry)
         (clear_parser_state p state)
@@ -870,15 +893,13 @@
         ))
     ))
 
-(fun eval_parser_command (expr) (
-    (if (!= (expr_head expr) Parsed) (return nil))
-    (var loc (expr_arg expr 0))
-    (= expr (expr_arg expr 1))
+(fun eval_parser_command (p) (
+    (if (! @(PARSED p)) (return nil))
+    (var expr @(TOKEN p))
     (var ty (expr_head expr))
     (if (== ty Import) (do
-        (import_module loc current_mod (expr_arg expr 0))
+        (import_module (get_loc p) current_mod (expr_arg expr 0))
         ))
-    (return nil)
     ))
 
 (fun add_parser (mod sym func) (
@@ -893,7 +914,7 @@
     (return (to_sym (strcat "parse_" (strcat (symbol_name sym) "_"))))
     ))
 
-(var ParserVar (to_sym "%Parser")) ; internal use
+(var PVar (to_sym "%Parser")) ; internal use
 (fun make_nodevar (idx) (
     (return (to_sym (strcat "node" (itos idx))))
     ))
@@ -907,29 +928,54 @@
 (fun gen_set_parser_state (dst src) (
     (return (apply (to_sym "%set_parser_state") (list2 dst src)))
     ))
+(fun gen_set_parser_state_all (dst src) (
+    (return (apply (to_sym "%set_parser_state_all") (list2 dst src)))
+    ))
+
+(fun set_parsed (v) (
+    (return (block (list2
+        (make_expr Assign (list2 (make_expr FieldRef (list2 PVar (box 1))) true))
+        (make_expr Assign (list2 (make_expr FieldRef (list2 PVar (box 2))) v))
+        )))
+    ))
+
+(fun set_noparse (v) (
+    (return (block (list2
+        (make_expr Assign (list2 (make_expr FieldRef (list2 PVar (box 1))) false))
+        (make_expr Assign (list2 (make_expr FieldRef (list2 PVar (box 2))) v))
+        )))
+    ))
+
+(fun get_token () (
+    (return (make_expr FieldRef (list2 PVar (box 2))))
+    ))
+
+(fun test_parsed () (
+    (return (make_expr FieldRef (list2 PVar (box 1))))
+    ))
+
+(fun test_noparse () (
+    (return (make_expr Not (list1 (test_parsed))))
+    ))
+
+(fun gen_getloc () (
+    (return (apply (to_sym "%get_loc") (list1 PVar)))
+    ))
 
 (fun gen_parse_spaces (cont) (
-    (var tmp (unique_sym))
     (if space_sensitive_p (return cont))
-    (= cont (cons (defvar tmp (apply (to_sym "%parse_spaces") (list1 ParserVar))) cont))
-    (if (! multiline_p) (do
-        (= cont (cons (mkif 
-            (make_expr Equal (list2 (make_expr Head (list1 tmp)) (quote NoParse)))
-            (mkreturn tmp)
-            ) cont))
-        ))
+    (= cont (cons (apply (to_sym "%parse_spaces") (list1 PVar)) cont))
+    (if (! multiline_p)
+        (= cont (cons (mkif (test_noparse) (mkreturn nil)) cont))
+        )
     (return cont)
     ))
 
 (fun gen_parse_spaces_break (cont) (
-    (var tmp (unique_sym))
     (if space_sensitive_p (return cont))
-    (= cont (cons (defvar tmp (apply (to_sym "%parse_spaces") (list1 ParserVar))) cont))
+    (= cont (cons (apply (to_sym "%parse_spaces") (list1 PVar)) cont))
     (if (! multiline_p)
-        (= cont (cons (mkif 
-            (make_expr Equal (list2 (make_expr Head (list1 tmp)) (quote NoParse)))
-            (make_expr Break 0)
-            ) cont))
+        (= cont (cons (mkif (test_noparse) (make_expr Break 0)) cont))
         )
     (return cont)
     ))
@@ -939,10 +985,10 @@
     (var hd (expr_head pat))
     (if (== hd Symbol)
         (return (apply (dynamic (to_parse pat))
-            (list1 ParserVar))))
+            (list1 PVar))))
     (if (== hd String)
         (return (apply (dynamic (to_sym "parse_text"))
-            (list2 ParserVar pat))))
+            (list2 PVar pat))))
     (if (== hd List)
         (return (compile_seq pat))
         )
@@ -996,30 +1042,28 @@
     ))
 
 (fun oneof (p tbl str) (
-    (var loc (get_loc p))
     (var c (getc p))
     (if (< c 0)
-        (return (mayparse loc (strcat "expect one of " str)))
+        (return (mayparse p (strcat "expect one of " str)))
         )
     (if (array_get char tbl c)
-        (return (parsed loc (ctos c)))
+        (return (parsed p (ctos c)))
         )
-    (return (noparse loc
+    (return (noparse p
         (strcat "expect one of " 
         (strcat str
         (strcat " but got " (escape_char c))))))
     ))
 
 (fun noneof (p tbl str) (
-    (var loc (get_loc p))
     (var c (getc p))
     (if (< c 0)
-        (return (mayparse loc (strcat "expect none of " str)))
+        (return (mayparse p (strcat "expect none of " str)))
         )
     (if (! (array_get char tbl c))
-        (return (parsed loc (ctos c)))
+        (return (parsed p (ctos c)))
         )
-    (return (noparse loc
+    (return (noparse p
         (strcat "expect none of " 
         (strcat str
         (strcat " but got " (escape_char c))))))
@@ -1072,12 +1116,12 @@
 
 (fun compile_oneof (str) (
     (var tbl (compile_character_set str))
-    (return (apply (to_sym "%oneof") (list3 ParserVar tbl str)))
+    (return (apply (to_sym "%oneof") (list3 PVar tbl str)))
     ))
 
 (fun compile_noneof (str) (
     (var tbl (compile_character_set str))
-    (return (apply (to_sym "%noneof") (list3 ParserVar tbl str)))
+    (return (apply (to_sym "%noneof") (list3 PVar tbl str)))
     ))
 
 ; List{ p1, p2, ...} is translated to
@@ -1095,39 +1139,22 @@
 
 (fun compile_seq (elems) (
     (var body 0)
-    (var tmp (unique_sym))
     (var ret (unique_sym))
-    (var bloc (unique_sym))
-    (var eloc (unique_sym))
-    (var loc (to_sym "%Loc"))
-    (var firstp @TRUE)
 
-    (= body (cons (defvar tmp 0) body))
     (= body (cons (defvar ret 0) body))
     (while elems (do
-        (= body (cons (assign tmp (compile_parser_element (car elems))) body))
-        (= body (cons (mkif 
-            (make_expr Equal (list2 (make_expr Head (list1 tmp)) (quote NoParse)))
-            (mkreturn tmp)
-            ) body))
-        (if firstp
-            (= body (cons (defvar bloc (gen_at tmp 0)) body))
-            )
-        (= body (cons (assign ret (apply (to_sym "cons") (list2 (gen_at tmp 1) ret))) body))
+        (= body (cons (compile_parser_element (car elems)) body))
+        (= body (cons (mkif (test_noparse) (mkreturn nil)) body))
+        (= body (cons (assign ret (apply (to_sym "cons") (list2 (get_token) ret))) body))
         (= elems (cdr elems))
         (if elems 
             (= body (gen_parse_spaces body))
-            (= body (cons (defvar eloc (gen_at tmp 0)) body))
             )
-        (= firstp @FALSE)
         ))
-    (= body (cons (defvar loc
-        (apply (to_sym "%merge_loc") (list2 bloc eloc))) body))
-    (= body (cons (qquote (parsed (unquote loc) (unquote (apply (to_sym "reverse") (list1 ret))))) body))
+    (= body (cons (set_parsed (apply (to_sym "reverse") (list1 ret))) body))
     (return (apply
-        (make_expr Lambda (list2 ParserVar
-        (make_expr Block (list1 (list_reverse body)))))
-        (list1 ParserVar)))
+        (lambda PVar (block (list_reverse body)))
+        (list1 PVar)))
     ))
 
 ; Choice{ p1, p2, .. } is translated to
@@ -1137,8 +1164,8 @@
 ;     state = copy_parser_state(parser)
 ;     v = p1
 ;     if (head(v) == Parsed) (return v)
-;     error = join_noparse(error, v)
-;     set_parser_state(parser, state)
+;     error = join_error_state(error, v)
+;     set_parser_state_all(parser, state)
 ;     v = p2
 ;     ...
 ; }(p)
@@ -1152,29 +1179,23 @@
 
     (var body 0)
     (var state (unique_sym))
-    (var v (unique_sym))
     (var error (unique_sym))
 
-    (= body (cons (defvar v 0) body))
-    (= body (cons (defvar error 0) body))
-    (= body (cons (defvar state (gen_copy_parser_state ParserVar)) body))
+    (= body (cons (defvar error (apply (to_sym "%alloc_error_state") (list1 PVar))) body))
+    (= body (cons (defvar state (gen_copy_parser_state PVar)) body))
 
     (while ps (do
-        (= body (cons (assign v (compile_parser_element (car ps))) body))
-        (= body (cons (mkif 
-            (make_expr Equal (list2 (make_expr Head (list1 v)) (quote Parsed)))
-            (mkreturn v)
-            ) body))
-        (= body (cons (assign error
-            (apply (to_sym "%join_noparse") (list2 error v))) body))
-        (= body (cons (gen_set_parser_state ParserVar state) body))
+        (= body (cons (compile_parser_element (car ps)) body))
+        (= body (cons (mkif (test_parsed) (mkreturn nil)) body))
+        (= body (cons (apply (to_sym "%join_error_state") (list2 error PVar)) body))
+        (= body (cons (gen_set_parser_state_all PVar state) body))
         (= ps (cdr ps))
         ))
-    (= body (cons error body))
+    (= body (cons (apply (to_sym "%set_error_state") (list2 PVar error)) body))
 
     (return (apply
-        (make_expr Lambda (list2 ParserVar (make_expr Block (list1 (list_reverse body)))))
-        (list1 ParserVar)
+        (lambda PVar (block (list_reverse body)))
+        (list1 PVar)
         ))
     ))
 
@@ -1186,43 +1207,32 @@
 ;     v = p
 ;     if (head(v) == NoParse) break
 ;     elems = cons(val(v), elems)
-;     set_parser_state(state, p)
+;     set_parser_state_all(state, p)
 ;     parse_spaces()
 ; }
-; set_parser_state(state)
+; set_parser_state_all(state)
 ; Parsed{loc, reverse(elems)}
 
 (fun compile_many (elem) (
-    (var v     (unique_sym))
     (var state (unique_sym))
     (var elems (unique_sym))
-    (var bloc  (unique_sym))
-    (var eloc  (unique_sym))
-    (var loc   (to_sym "%Loc"))
     (var p (compile_parser_element elem))
 
     (var loop_body 0)
-    (= loop_body (cons (defvar v p) loop_body))
-    (= loop_body (cons (mkif 
-            (make_expr Equal (list2 (make_expr Head (list1 v)) (quote NoParse)))
-            (make_expr Break 0)) loop_body))
-    (= loop_body (cons (assign eloc (gen_at v 0)) loop_body))
-    (= loop_body (cons (assign elems (apply (to_sym "cons") (list2 (gen_at v 1) elems))) loop_body))
-    (= loop_body (cons (gen_set_parser_state state ParserVar) loop_body))
+    (= loop_body (cons p loop_body))
+    (= loop_body (cons (mkif (test_noparse) (make_expr Break 0)) loop_body))
+    (= loop_body (cons (assign elems (apply (to_sym "cons") (list2 (get_token) elems))) loop_body))
+    (= loop_body (cons (gen_set_parser_state_all state PVar) loop_body))
     (= loop_body (gen_parse_spaces_break loop_body))
 
     (var body 0)
-    (= body (cons (defvar bloc (apply (to_sym "%get_loc") (list1 ParserVar))) body))
-    (= body (cons (defvar eloc bloc) body))
     (= body (cons (defvar elems 0) body))
-    (= body (cons (defvar state (gen_copy_parser_state ParserVar)) body))
+    (= body (cons (defvar state (gen_copy_parser_state PVar)) body))
     (= body (cons (make_expr While (list2 true
-            (make_expr Block (list1 (list_reverse loop_body))))) body))
-    (= body (cons (gen_set_parser_state ParserVar state) body))
-    (= body (cons (defvar loc
-        (apply (to_sym "%merge_loc") (list2 bloc eloc))) body))
-    (= body (cons (qquote (parsed (unquote loc) (unquote (apply (to_sym "reverse") (list1 elems))))) body))
-    (return (make_expr Block (list1 (list_reverse body))))
+            (block (list_reverse loop_body)))) body))
+    (= body (cons (gen_set_parser_state_all PVar state) body))
+    (= body (cons (set_parsed (apply (to_sym "reverse") (list1 elems))) body))
+    (return (block (list_reverse body)))
     ))
 
 ; Many1{ p } is translated to
@@ -1237,47 +1247,34 @@
 ;     v = p
 ;     if (head(v) == NoParse) break
 ;     elems = cons(val(v), elems)
-;     set_parser_state(state, p)
+;     set_parser_state_all(state, p)
 ; }
-; set_parser_state(state)
+; set_parser_state_all(state)
 ; Parsed{loc, reverse(elems)}
 
 (fun compile_many1 (elem) (
-    (var v     (unique_sym))
     (var state (unique_sym))
     (var elems (unique_sym))
-    (var bloc  (unique_sym))
-    (var eloc  (unique_sym))
-    (var loc   (to_sym "%Loc"))
     (var p (compile_parser_element elem))
 
     (var loop_body 0)
     (= loop_body (gen_parse_spaces_break loop_body))
-    (= loop_body (cons (assign v p) loop_body))
-    (= loop_body (cons (mkif 
-            (make_expr Equal (list2 (make_expr Head (list1 v)) (quote NoParse)))
-            (make_expr Break 0)) loop_body))
-    (= loop_body (cons (assign eloc (gen_at v 0)) loop_body))
-    (= loop_body (cons (assign elems (apply (to_sym "cons") (list2 (gen_at v 1) elems))) loop_body))
-    (= loop_body (cons (gen_set_parser_state state ParserVar) loop_body))
+    (= loop_body (cons p loop_body))
+    (= loop_body (cons (mkif (test_noparse) (make_expr Break 0)) loop_body))
+    (= loop_body (cons (assign elems (apply (to_sym "cons") (list2 (get_token) elems))) loop_body))
+    (= loop_body (cons (gen_set_parser_state_all state PVar) loop_body))
 
     (var body 0)
-    (= body (cons (defvar bloc (apply (to_sym "%get_loc") (list1 ParserVar))) body))
-    (= body (cons (defvar eloc bloc) body))
     (= body (cons (defvar elems 0) body))
-    (= body (cons (defvar v p) body))
-    (= body (cons (mkif 
-            (make_expr Equal (list2 (make_expr Head (list1 v)) (quote NoParse)))
-            (mkreturn v)) body))
-    (= body (cons (assign elems (apply (to_sym "cons") (list2 (gen_at v 1) elems))) body))
-    (= body (cons (defvar state (gen_copy_parser_state ParserVar)) body))
+    (= body (cons p body))
+    (= body (cons (mkif (test_noparse) (mkreturn nil)) body))
+    (= body (cons (assign elems (apply (to_sym "cons") (list2 (get_token) elems))) body))
+    (= body (cons (defvar state (gen_copy_parser_state PVar)) body))
     (= body (cons (make_expr While (list2 true
-            (make_expr Block (list1 (list_reverse loop_body))))) body))
-    (= body (cons (gen_set_parser_state ParserVar state) body))
-    (= body (cons (defvar loc
-        (apply (to_sym "%merge_loc") (list2 bloc eloc))) body))
-    (= body (cons (qquote (parsed (unquote loc) (unquote (apply (to_sym "reverse") (list1 elems))))) body))
-    (return (make_expr Block (list1 (list_reverse body))))
+            (block (list_reverse loop_body)))) body))
+    (= body (cons (gen_set_parser_state_all PVar state) body))
+    (= body (cons (set_parsed (apply (to_sym "reverse") (list1 elems))) body))
+    (return (block (list_reverse body)))
     ))
 
 ; Aligned{ p } is translated to
@@ -1288,88 +1285,76 @@
 ; set_indent(p, column)
 ; v = p
 ; if (head(v) == NoParse) {
-;     set_parser_state(state)
+;     set_parser_state_all(state)
 ;     reset_indent(p)
 ;     return Parsed{loc, []}
 ; }
 ; elems = cons(val(v), elems)
-; set_parser_state(state, p)
+; set_parser_state_all(state, p)
 ; parse_spaces()
 ; while true {
 ;     if (get_column(p) != column) break
 ;     v = p
 ;     if (head(v) == NoParse) break
 ;     elems = cons(val(v), elems)
-;     set_parser_state(state, p)
+;     set_parser_state_all(state, p)
 ;     parse_spaces()
 ; }
-; set_parser_state(state)
+; set_parser_state_all(state)
 ; reset_indent(p)
 ; Parsed{loc, reverse(elems)}
 
 (fun compile_aligned (elem) (
-    (var v     (unique_sym))
     (var state (unique_sym))
     (var elems (unique_sym))
-    (var bloc  (unique_sym))
-    (var eloc  (unique_sym))
     (var clmn  (unique_sym))
     (var indent_save (unique_sym))
-    (var loc   (to_sym "%Loc"))
     (var p (compile_parser_element elem))
 
     (var loop_body 0)
     (= loop_body (cons (mkif 
             (make_expr NotEqual (list2 
-                (apply (to_sym "%get_column") (list1 ParserVar))
+                (apply (to_sym "%get_column") (list1 PVar))
                 clmn
                 ))
             (make_expr Break 0)) loop_body))
-    (= loop_body (cons (assign v p) loop_body))
-    (= loop_body (cons (mkif 
-            (make_expr Equal (list2 (make_expr Head (list1 v)) (quote NoParse)))
-            (make_expr Break 0)) loop_body))
-    (= loop_body (cons (assign eloc (gen_at v 0)) loop_body))
-    (= loop_body (cons (assign elems (apply (to_sym "cons") (list2 (gen_at v 1) elems))) loop_body))
-    (= loop_body (cons (gen_set_parser_state state ParserVar) loop_body))
+    (= loop_body (cons p loop_body))
+    (= loop_body (cons (mkif (test_noparse) (make_expr Break 0)) loop_body))
+    (= loop_body (cons (assign elems (apply (to_sym "cons") (list2 (get_token) elems))) loop_body))
+    (= loop_body (cons (gen_set_parser_state_all state PVar) loop_body))
     (if (! space_sensitive_p)
         (= loop_body (cons (apply
-            (to_sym "%parse_spaces") (list1 ParserVar)) loop_body))
+            (to_sym "%parse_spaces") (list1 PVar)) loop_body))
         )
 
     (var body 0)
-    (= body (cons (defvar state (gen_copy_parser_state ParserVar)) body))
-    (= body (cons (defvar clmn (apply (to_sym "%get_column") (list1 ParserVar))) body))
-    (= body (cons (defvar indent_save (apply (to_sym "%set_indent") (list2 ParserVar clmn))) body))
-    (= body (cons (defvar bloc (apply (to_sym "%get_loc") (list1 ParserVar))) body))
-    (= body (cons (defvar eloc bloc) body))
+    (= body (cons (defvar state (gen_copy_parser_state PVar)) body))
+    (= body (cons (defvar clmn (apply (to_sym "%get_column") (list1 PVar))) body))
+    (= body (cons (defvar indent_save (apply (to_sym "%set_indent") (list2 PVar clmn))) body))
     (= body (cons (defvar elems 0) body))
-    (= body (cons (defvar v p) body))
-    (= body (cons (mkif 
-            (make_expr Equal (list2 (make_expr Head (list1 v)) (quote NoParse)))
-            (make_expr Block (list1 (list3
-                (gen_set_parser_state ParserVar state)
-                (apply (to_sym "%set_indent") (list2 ParserVar indent_save))
-                (mkreturn (qquote (parsed (unquote bloc) 0)))
-            ))))
+    (= body (cons p body))
+    (= body (cons (mkif (test_noparse)
+            (block (list3
+                (gen_set_parser_state_all PVar state)
+                (apply (to_sym "%set_indent") (list2 PVar indent_save))
+                (mkreturn (set_parsed 0))
+            )))
         body))
-    (= body (cons (assign elems (apply (to_sym "cons") (list2 (gen_at v 1) elems))) body))
-    (= body (cons (gen_set_parser_state state ParserVar) body))
+    (= body (cons (assign elems (apply (to_sym "cons") (list2 (get_token) elems))) body))
+    (= body (cons (gen_set_parser_state_all state PVar) body))
     (if (! space_sensitive_p)
         (= body (cons (apply
-            (to_sym "%parse_spaces") (list1 ParserVar)) body))
+            (to_sym "%parse_spaces") (list1 PVar)) body))
         )
     (= body (cons (make_expr While (list2 true
-            (make_expr Block (list1 (list_reverse loop_body))))) body))
-    (= body (cons (gen_set_parser_state ParserVar state) body))
-    (= body (cons (defvar loc
-        (apply (to_sym "%merge_loc") (list2 bloc eloc))) body))
-    (= body (cons (apply (to_sym "%set_indent") (list2 ParserVar indent_save)) body))
-    (= body (cons (qquote (parsed (unquote loc) (unquote (apply (to_sym "reverse") (list1 elems))))) body))
+            (block (list_reverse loop_body)))) body))
+    (= body (cons (gen_set_parser_state_all PVar state) body))
+    (= body (cons (apply (to_sym "%set_indent") (list2 PVar indent_save)) body))
+    (= body (cons (set_parsed (apply (to_sym "reverse") (list1 elems))) body))
     (return (apply
-        (make_expr Lambda (list2 (make_expr Domain (list2 ParserVar Parser))
-            (make_expr Block (list1 (list_reverse body)))
-        )) (list1 ParserVar)))
+        (lambda (make_expr Domain (list2 PVar Parser))
+            (block (list_reverse body))
+        ) (list1 PVar)))
     ))
 
 ; Delimited{ p, delim } is translated to
@@ -1380,62 +1365,48 @@
 ;     v = p
 ;     if (head(v) == NoParse) break
 ;     elems = cons(val(v), elems)
-;     set_parser_state(setate, p)
+;     set_parser_state_all(setate, p)
 ;     parse_spaces()
 ;     v = delim
 ;     if (head(v) == NoParse) break
 ;     parse_spaces()
 ; }
-; set_parser_state(state)
+; set_parser_state_all(state)
 ; Parsed{loc, reverse(elems)}
 
 (fun compile_delimited (p delim minlen) (
-    (var v     (unique_sym))
     (var state (unique_sym))
     (var elems (unique_sym))
-    (var bloc  (unique_sym))
-    (var eloc  (unique_sym))
-    (var loc   (to_sym "%Loc"))
     (= p (compile_parser_element p))
     (= delim (compile_parser_element delim))
 
     (var loop_body 0)
-    (= loop_body (cons (defvar v p) loop_body))
-    (= loop_body (cons (mkif 
-            (make_expr Equal (list2 (make_expr Head (list1 v)) (quote NoParse)))
-            (make_expr Break 0)) loop_body))
-    (= loop_body (cons (assign eloc (gen_at v 0)) loop_body))
-    (= loop_body (cons (assign elems (apply (to_sym "cons") (list2 (gen_at v 1) elems))) loop_body))
-    (= loop_body (cons (gen_set_parser_state state ParserVar) loop_body))
+    (= loop_body (cons p loop_body))
+    (= loop_body (cons (mkif (test_noparse) (make_expr Break 0)) loop_body))
+    (= loop_body (cons (assign elems (apply (to_sym "cons") (list2 (get_token) elems))) loop_body))
+    (= loop_body (cons (gen_set_parser_state_all state PVar) loop_body))
     (= loop_body (gen_parse_spaces_break loop_body))
-    (= loop_body (cons (assign v delim) loop_body))
-    (= loop_body (cons (mkif 
-            (make_expr Equal (list2 (make_expr Head (list1 v)) (quote NoParse)))
-            (make_expr Break 0)) loop_body))
+    (= loop_body (cons delim loop_body))
+    (= loop_body (cons (mkif (test_noparse) (make_expr Break 0)) loop_body))
     (= loop_body (gen_parse_spaces_break loop_body))
 
     (var body 0)
-    (= body (cons (defvar bloc (apply (to_sym "%get_loc") (list1 ParserVar))) body))
-    (= body (cons (defvar eloc bloc) body))
     (= body (cons (defvar elems 0) body))
-    (= body (cons (defvar state (gen_copy_parser_state ParserVar)) body))
+    (= body (cons (defvar state (gen_copy_parser_state PVar)) body))
     (= body (cons (make_expr While (list2 true
-            (make_expr Block (list1 (list_reverse loop_body))))) body))
-    (= body (cons (gen_set_parser_state ParserVar state) body))
-    (= body (cons (defvar loc
-        (apply (to_sym "%merge_loc") (list2 bloc eloc))) body))
+            (block (list_reverse loop_body)))) body))
+    (= body (cons (gen_set_parser_state_all PVar state) body))
     (if (> minlen 0)
         (= body (cons (mkif  
             (apply (to_sym "lt")
                 (list2 (apply (to_sym "length") (list1 elems)))
                     (box minlen))
-            (mkreturn 
-                (qquote (make_expr NoParse (list2 (unquote loc) (string "The number of elements is insufficient")))))
+            (mkreturn (set_noparse (string "The number of elements is insufficient")))
             ) body))
         )
 
-    (= body (cons (qquote (parsed (unquote loc) (unquote (apply (to_sym "reverse") (list1 elems))))) body))
-    (return (make_expr Block (list1 (list_reverse body))))
+    (= body (cons (set_parsed (apply (to_sym "reverse") (list1 elems))) body))
+    (return (block (list_reverse body)))
     ))
 
 ; scope{ p } is translated to
@@ -1448,13 +1419,12 @@
 ; exit module
 ; v
 (fun compile_scoped (mod elem) (
-    (var v (unique_sym))
     (var p (compile_parser_element elem))
-    (return (make_expr Block (list1 (list3
+    (return (block (list3
         (apply (to_sym "%open_scope") (list1 (quote mod)))
-        (defvar v p)
-        (apply (to_sym "%close_scope") (list1 v))
-        ))))
+        p
+        (apply (to_sym "%close_scope") (list1 PVar))
+        )))
     ))
 
 ; enter anonymous scope
@@ -1467,14 +1437,13 @@
     ))
 
 ; exit from anonymous scope
-(fun close_scope (v) (
+(fun close_scope (p) (
     (var ls (imported_modules current_mod))
     (var mod current_mod)
     (set_current_module (super_module current_mod))
-    (if (&& (== (expr_head v) Parsed) ls)
-        (expr_arg_set v 1 (make_expr Scoped (list2 mod (expr_arg v 1))))
+    (if (&& @(PARSED p) ls)
+        (parsed p (make_expr Scoped (list2 mod @(TOKEN p))))
         )
-    (return v)
     ))
 
 ; Option{ p } is translated to
@@ -1482,28 +1451,23 @@
 ; state = copy_parser_state(parser)
 ; v = p
 ; if (head(v) == NoParse) {
-;   set_parser_state(parser, state)
+;   set_parser_state_all(parser, state)
 ;   nil
 ; } else
 ;   Parsed{loc(v), Some{val(v)}}
 (fun compile_option (p) (
-    (var v (unique_sym))
     (var state (unique_sym))
-    (var loc (to_sym "%Loc"))
-    (var body (make_expr Block (list1 (list4
-        (defvar state (gen_copy_parser_state ParserVar))
-        (defvar loc (apply (to_sym "%get_loc") (list1 ParserVar)))
-        (defvar v (compile_parser_element p))
+    (return (block (list3
+        (defvar state (gen_copy_parser_state PVar))
+        (compile_parser_element p)
         (ifelse
-            (make_expr Equal (list2 (make_expr Head (list1 v)) (quote NoParse)))
-            (make_expr Block (list1 (list2
-                (gen_set_parser_state ParserVar state)
-                (qquote (parsed (unquote loc) nil))
-                )))
-            (qquote (parsed (unquote (gen_at v 0))
-                (make_expr Some (list1 (unquote (gen_at v 1))))))
-            )))))
-    (return body)
+            (test_noparse)
+            (block (list2
+                (gen_set_parser_state_all PVar state)
+                (set_parsed nil)
+                ))
+            (set_parsed (qquote (make_expr Some (list1 (unquote (get_token))))))
+            ))))
     ))
 
 ; And{ p } is translated to
@@ -1514,12 +1478,11 @@
 ; v
 (fun compile_and (p) (
     (var state (unique_sym))
-    (var v (unique_sym))
-    (return (make_expr Block (list1 (list4
-        (defvar state (gen_copy_parser_state ParserVar))
-        (defvar v (compile_parser_element p))
-        (gen_set_parser_state ParserVar state)
-        v))))
+    (return (block (list3
+        (defvar state (gen_copy_parser_state PVar))
+        (compile_parser_element p)
+        (gen_set_parser_state PVar state)
+        )))
     ))
 
 ; Not{ p } is translated to
@@ -1530,16 +1493,16 @@
 ; negate(v,p)
 (fun compile_not (p) (
     (var state (unique_sym))
-    (var v (unique_sym))
-    (return (make_expr Block (list1 (list4
-        (defvar state (gen_copy_parser_state ParserVar))
-        (defvar v (compile_parser_element p))
-        (gen_set_parser_state ParserVar state)
-        (apply (to_sym "%negate") (list2 ParserVar v))
-        ))))
+    (return (block (list4
+        (defvar state (gen_copy_parser_state PVar))
+        (compile_parser_element p)
+        (gen_set_parser_state PVar state)
+        (apply (to_sym "%negate") (list2 PVar))
+        )))
     ))
 
 (fun compile_parser_action (elems act) (
+    (var prog elems)
     (if (!= (expr_head elems) List) (do
         (output_error stderr current_loc)
         (output_string stderr "syntax statement must be List{syntax element, ...}: ")
@@ -1550,49 +1513,33 @@
 
     (var idx 0)
     (var body 0)
-    (var bloc (unique_sym))
-    (var eloc (unique_sym))
     (var bpos (unique_sym))
-    (var loc (to_sym "%Loc"))
 
-    (= body (cons (defvar bpos (apply (to_sym "%get_pos") (list1 ParserVar))) body))
+    (= body (cons (defvar bpos (apply (to_sym "%get_pos") (list1 PVar))) body))
     (while elems (do
         (var ndvar (make_nodevar idx))
-        (= body (cons (defvar ndvar (compile_parser_element (car elems))) body))
-        (= body (cons (mkif 
-            (make_expr Equal (list2 (make_expr Head (list1 ndvar)) (quote NoParse)))
-            (mkreturn ndvar)
-            ) body))
-        (if (== idx 0)
-            (= body (cons (defvar bloc (gen_at ndvar 0)) body))
-            )
+        (= body (cons (compile_parser_element (car elems)) body))
+        (= body (cons (mkif (test_noparse) (mkreturn nil)) body))
+        (= body (cons (defvar ndvar (get_token)) body))
         (incr idx)
         (= elems (cdr elems))
         (if elems 
             (= body (gen_parse_spaces body))
-            (= body (cons (defvar eloc (gen_at ndvar 0)) body))
             )
-        (= body (cons (assign ndvar (gen_at ndvar 1)) body))
         ))
 
     (= body (cons (defvar (to_sym "GET_INPUT_TEXT")
-        (make_expr Lambda (list2 (make_expr Tuple 0)
+        (lambda (make_expr Tuple 0)
             (apply (to_sym "%extract_string") (list3
-                ParserVar
+                PVar
                 bpos
-                (apply (to_sym "%get_pos") (list1 ParserVar))
-            )))))
+                (apply (to_sym "%get_pos") (list1 PVar))
+            ))))
         body))
 
-    (= body (cons (defvar loc
-        (apply (to_sym "%merge_loc") (list2 bloc eloc))) body))
-    (= body (cons (qquote (parsed (unquote loc) (unquote act))) body))
-
-    (= body (make_expr Block (list1 (list_reverse body))))
-    (return (apply
-        (make_expr Lambda (list2 (make_expr Domain (list2 ParserVar Parser)) body))
-        (list1 ParserVar)
-        ))
+    (= body (cons (set_parsed act) body))
+    (= body (block (list_reverse body)))
+    (return (apply (lambda (make_expr Domain (list2 PVar Parser)) body) (list1 PVar)))
     ))
 
 (var space_sensitive (to_sym "space_sensitive"))
@@ -1625,24 +1572,21 @@
 
     (var body 0)
     (var state (unique_sym))
-    (var v (unique_sym))
     (var error (unique_sym))
 
     ; if sym == parse_statement
     ; modify parsed expression to Located{...}
     (var return_stmt 0)
     (if (== sym (to_sym "parse_statement_"))
-        (= return_stmt (make_expr Block (list1 (list2
-            (apply (to_sym "%eval_parser_command") (list1 v))
-            (mkreturn 
-                (apply (to_sym "%apply_located") (list1 v))
-            )))))
-        (= return_stmt (mkreturn v))
+        (= return_stmt (block (list2
+            (apply (to_sym "%eval_parser_command") (list1 PVar))
+            (mkreturn (apply (to_sym "%apply_located") (list1 PVar)))
+            )))
+        (= return_stmt (mkreturn nil))
         )
 
-    (= body (cons (defvar v 0) body))
-    (= body (cons (defvar error 0) body))
-    (= body (cons (defvar state (gen_copy_parser_state ParserVar)) body))
+    (= body (cons (defvar error (apply (to_sym "%alloc_error_state") (list1 PVar))) body))
+    (= body (cons (defvar state (gen_copy_parser_state PVar)) body))
     (while elems (do
         (var t (car elems))
         (var size (expr_size t))
@@ -1658,86 +1602,80 @@
             )
 
         (var act (compile_parser_action (expr_arg t 0) (expr_arg t 1)))
-        (= body (cons (assign v act) body))
-        (= body (cons (mkif 
-            (make_expr Equal (list2 (make_expr Head (list1 v)) (quote Parsed)))
-            return_stmt
-            ) body))
-        (= body (cons (assign error
-            (apply (to_sym "%join_noparse") (list2 error v))) body))
-        (= body (cons (gen_set_parser_state ParserVar state) body))
+        (= body (cons act body))
+        (= body (cons (mkif (test_parsed) return_stmt) body))
+        (= body (cons (apply (to_sym "%join_error_state") (list2 error PVar)) body))
+        (= body (cons (gen_set_parser_state_all PVar state) body))
         (= elems (cdr elems))
-
         (clear_options)
         ))
-    (= body (cons error body))
-
-    (return (make_expr Block (list1 (list_reverse body))))
+    (= body (cons (apply (to_sym "%set_error_state") (list2 PVar error)) body))
+    (return (block (list_reverse body)))
     ))
 
 (extern fun compile_matching)
 (fun call_parser (p sym new) (
-    (var tbl (field_get (field_get p 1) 2))
-    (var pos (field_get p 3))
+    (var tbl (field_get (field_get p 3) 2))
+    (var pos (field_get p 5))
     (var v (memotable_find tbl sym pos))
     (if v (do
-        (if (== (field_get v 0) LeftRec) (do
+        (if (== (field_get v 0) left_rec) (do
             ; detected left-recursion
             (field_set v 1 (copy_parser_state (field_get v 1)))
             (field_set v 2 @TRUE)
             ))
-        (set_parser_state p (field_get v 1))
-        (return (field_get v 0))
+        (set_parser_state_all p (field_get v 1))
+        return
         ))
     (var loc (get_loc p))
     (var state (copy_parser_state p))
+    (noparse state left_rec)
 
-    (var ent (struct 2 LeftRec state @FALSE))
+    ; token,state,left-rec detected,parsed
+    (var ent (struct 2 left_rec state @FALSE @FALSE))
     (memotable_add tbl sym pos ent)
     (label retry_lbl)
-    (= v (byterun (compile_matching loc sym new) p))
+    (byterun (compile_matching loc sym new) p)
 
     (if (field_get ent 2)
-        (if (&& (== (expr_head v) Parsed)
-                (> (field_get p 3) (field_get (field_get ent 1) 3)))
+        (if (&& @(PARSED p)
+                (> (field_get p 5) (field_get (field_get ent 1) 5)))
             (do
-                (field_set ent 0 v)
-                (set_parser_state (field_get ent 1) p)
-                (set_parser_state p state)
+                (field_set ent 0 @(TOKEN p))
+                (set_parser_state_all (field_get ent 1) p)
+                (set_parser_state_all p state)
+                (field_set ent 3 @TRUE)
                 (goto retry_lbl)
             )
             (do
-                (set_parser_state p (field_get ent 1))
-                (var prev (field_get ent 0))
-                (if (== (expr_head prev) Parsed)
-                    (return prev)
-                    (return v)
+                (if (field_get ent 3)
+                    (set_parser_state_all p (field_get ent 1))
+                    (set_parser_state p (field_get ent 1))
                     )
+                return
             )))
     ; not left-recursive
-    (field_set ent 0 v)
-    (set_parser_state (field_get ent 1) p)
-    (return v)
+    (field_set ent 0 @(TOKEN p))
+    (field_set ent 3 @TRUE)
+    (set_parser_state_all (field_get ent 1) p)
     ))
 
 (fun bind_parser (old_parser new_parser) (
-    (var v (unique_sym))
     (var state (unique_sym))
-    (return (make_expr Block (list1 (list5
-        (defvar state (gen_copy_parser_state ParserVar))
-        (defvar v new_parser)
-        (mkif (make_expr Equal (list2 (make_expr Head (list1 v)) (quote Parsed)))
-            (mkreturn v))
-        (gen_set_parser_state ParserVar state)
-        (apply old_parser (list1 ParserVar))
-        ))))
+    (return (block (list5
+        (defvar state (gen_copy_parser_state PVar))
+        new_parser
+        (mkif (test_parsed) (mkreturn nil))
+        (gen_set_parser_state_all PVar state)
+        (apply old_parser (list1 PVar))
+        )))
     ))
 
 (fun compile_parser_driver (sym sym_) (
     (return (make_expr DefineFunction (list2 sym
-        (make_expr Lambda (list2 (make_expr Domain (list2 ParserVar Parser))
-        (apply (to_sym "%call_parser") (list3 ParserVar (quote sym) sym_))
-        )))))
+        (lambda (make_expr Domain (list2 PVar Parser))
+        (apply (to_sym "%call_parser") (list3 PVar (quote sym) sym_))
+        ))))
     ))
 
 (export fun compile_define_syntax (sym elems) (
@@ -1752,7 +1690,7 @@
                 (make_expr DefineFunction (list2 copy_sym parser_sym_))
                 (make_expr DefineFunction (list2 parser_sym_
                     (make_expr Lambda (list2
-                        (make_expr Domain (list2 ParserVar Parser))
+                        (make_expr Domain (list2 PVar Parser))
                         (bind_parser copy_sym new_parser)))
                     ))
                 (compile_parser_driver parser_sym parser_sym_)
@@ -1764,7 +1702,7 @@
             (var stmts (list2
                 (make_expr DefineFunction (list2 parser_sym_
                     (make_expr Lambda (list2
-                        (make_expr Domain (list2 ParserVar Parser))
+                        (make_expr Domain (list2 PVar Parser))
                         new_parser))
                     ))
                 (compile_parser_driver parser_sym parser_sym_)
@@ -1777,12 +1715,14 @@
     (add_builtin_function1 mod (to_sym "%get_loc") (domainP Parser) get_loc 0)
     (add_builtin_function1 mod (to_sym "%get_column") (domainP Parser) get_column 0)
     (add_builtin_function2 mod (to_sym "%set_indent") (domainP Parser) (domainP Int) set_indent 0)
-    (add_builtin_function2 mod (to_sym "%merge_loc") (domainP Loc) (domainP Loc) merge_loc 0)
+    (add_builtin_function1 mod (to_sym "%alloc_error_state") (domainP Parser) alloc_error_state 0)
+    (add_builtin_function2 mod (to_sym "%set_error_state") (domainP Parser) DontCare set_error_state 0)
+    (add_builtin_function2 mod (to_sym "%join_error_state") DontCare DontCare join_error_state 0)
     (add_builtin_function1 mod (to_sym "%copy_parser_state") (domainP Parser) copy_parser_state 0)
     (add_builtin_function2 mod (to_sym "%set_parser_state") (domainP Parser) (domainP Parser) set_parser_state 0)
+    (add_builtin_function2 mod (to_sym "%set_parser_state_all") (domainP Parser) (domainP Parser) set_parser_state_all 0)
     (add_builtin_function3 mod (to_sym "%call_parser") (domainP Parser) (domainP Symbol) (domainP Function) call_parser 0)
 
-    (add_builtin_function2 mod (to_sym "%join_noparse") DontCare DontCare join_noparse 0)
     (add_builtin_function2 mod (to_sym "%negate") (domainP Parser) DontCare negate 0)
     (add_builtin_function3 mod (to_sym "%oneof") (domainP Parser) stringT stringT oneof 0)
     (add_builtin_function3 mod (to_sym "%noneof") (domainP Parser) stringT stringT noneof 0)
@@ -1826,13 +1766,11 @@
     (add_parser mod (to_sym "parse_statement") parse_statement)
     ))
 
-(export fun output_syntax_error (e) (
+(export fun output_syntax_error (loc e) (
     (output_string stderr "Syntax Error ")
-    (var error (expr_args e))
-    (var multi @FALSE)
-    (pp_loc stderr (car error))
+    (pp_loc stderr loc)
     (output_string stderr " : ")
-    (output_string stderr (cadr error))
+    (output_string stderr e)
     (output_char stderr '\n')
     ))
 
