@@ -44,7 +44,6 @@ The release version of Amber is currently under development.
 It will be a self-hosting compiler completely from the layer of assembers.
 Current Amber only has capabilities for developing the release version, and it does not support following things:
 
-* multi-precision integer arithmetic
 * floating-point arithmetic
 * multi-byte characters
 * foreign function support
