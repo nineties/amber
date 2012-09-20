@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2012-08-12 04:55:04 nineties $
+; $Id: vm-gc.rlc 2012-09-20 17:24:16 nineties $
 ;
 
 (import "stdlib")
@@ -77,7 +77,7 @@
 
 ; object address to page index
 (define ADDR2BLOCK (addr) `(& @addr @(~ BLOCK_MASK)))
-(define ADDR2PAGE   (obj)  `(& @addr @(~ PAGE_MASK)))
+(define ADDR2PAGE   (obj)  `(& @obj @(~ PAGE_MASK)))
 (define ADDR2PDESCR (obj)
     `(| @(ADDR2BLOCK obj)
         (>> (& @obj @(& BLOCK_MASK (~ PAGE_MASK))) @(- PAGE_SHIFT PDESCR_SHIFT))
@@ -101,7 +101,7 @@
 (var MAX_BLOCKS 4096) ; 4096 is enough for 32-bit machine
 (define BLOCK2BIDX  (addr)  `(>> @addr @BLOCK_SHIFT))
 (define BIDX2BLOCK  (idx)   `(<< @idx @BLOCK_SHIFT))
-(define IS_POINTER_TO_HEAP  (addr)  `(&& (== (& @addr 0x3) 0) (!= @(blockmap->first (BLOCK2BIDX addr)) 0)))
+(define IS_POINTER_TO_HEAP  (addr)  `(!= @(blockmap->first (BLOCK2BIDX addr)) 0))
 
 (define BDESCR2BLOCK (bdescr) `(<< (- @bdescr block_map) @(- BLOCK_SHIFT BDESCR_SHIFT)))
 
@@ -176,6 +176,7 @@
     (return ptr)
     ))
 
+(export munmap)
 (fun munmap (addr size) (
     (syscall @SYS_MUNMAP addr size)
     ))
@@ -290,6 +291,7 @@
     (if (! obj) ((return)))
 
     (if (! @(IS_POINTER_TO_HEAP obj)) ((return)))
+    (if (& obj 1) ((return))) ; boxed integer
 
     ; this object is already in next generation
     (if (== @(pdescr->generation (ADDR2PDESCR obj)) next_gen) ((return)))
@@ -352,8 +354,8 @@
         (return)
         ))
     (if (== tag @TAG_BYTECODE) (
+        (move_object obj) ; bytecode
         (move_object (+ obj @(* 2 WORD_SIZE))) ; addrs
-
         (void* code ([] obj 0))
         (void* reloc ([] obj 2))
         (int n ([] obj 3))
@@ -361,20 +363,10 @@
             (int offs ([] reloc i))
             (move_object (+ code offs))
             ))
-
-        (move_object obj) ; bytecode
-
-        (if (!= code ([] obj 0)) (
-            (= code ([] obj 0))
-            (for i 0 n (
-                (int offs ([] reloc i))
-                (move_object (+ code offs))
-                ))
-            ))
         (return)
         ))
     (if (== tag @TAG_BIGINT) (
-        (move_object obj)
+        (move_object obj) ; array
         (return)
         ))
     (error "move_fields: not reachable")
@@ -392,6 +384,9 @@
     (= num_allocated_pages 0)
 
     ; promote all pages which are refered from machine stack and vm-stack
+    ; NB: scanning from machin register is not necessary because,
+    ;     %ebx (program counter) will be stored in vm-stack and
+    ;     other registers are not callee-save registers.
     (scan_machine_stack)
     (scan_vm_stack)
 
@@ -493,10 +488,9 @@
     ))
 
 (fun allocate_object (words) (
-    (int npage 0)
+    (int npage (= npage (>> (- (+ words @PAGE_WORDS) 1) @PAGE_WORDS_SHIFT)))
     (while (> words free_words) (
         (insert_padding)
-        (= npage (>> (- (+ words @PAGE_WORDS) 1) @PAGE_WORDS_SHIFT))
         (allocate_page npage)
         ))
     (void* obj freep)
@@ -575,8 +569,8 @@
     ))
 
 ; array of integers
-(export allocate_iarray)
-(fun allocate_iarray (len) (
+(export prim_allocate_iarray)
+(fun prim_allocate_iarray (len) (
     (void* p (allocate_pstruct @PLAIN_OTHER (* 4 len)))
     (memset p 0 (* 4 len))
     (return p)
@@ -625,8 +619,7 @@
     (return ptr)
     ))
 
-(export prim_bytecode_set)
-(fun prim_bytecode_set (ptr code len addrs objs nobj) (
+(fun bytecode_set (ptr code len addrs objs nobj) (
     ; this function must be atomic
     (for i 0 nobj (
         (int addr ([] addrs i))
@@ -643,7 +636,7 @@
     (void* ptr (allocate_object 5))
     @(SET_HEADER ptr TAG_BYTECODE 0 5)
     (+= ptr @WORD_SIZE)
-    (prim_bytecode_set ptr code len addrs objs nobj)
+    (bytecode_set ptr code len addrs objs nobj)
     (return ptr)
     ))
 
@@ -657,14 +650,43 @@
     (return ([] obj 1))
     ))
 
-(export prim_allocate_bigint)
-(fun prim_allocate_bigint (len) (
-    (void* ptr (allocate_object 4))
-    @(SET_HEADER ptr TAG_BIGINT 0 4)
+(export prim_allocate_bint)
+(fun prim_allocate_bint (len) (
+    (void* ptr (allocate_object 5))
+    @(SET_HEADER ptr TAG_BIGINT 0 5)
     (+= ptr @WORD_SIZE)
-    ([]= ptr 0 (allocate_iarray len))   ; digits
-    ([]= ptr 1 1)                       ; number of digits and sign
+    ([]= ptr 0 (prim_allocate_iarray len))   ; digits
+    ([]= ptr 1 1)                       ; number of digits
     ([]= ptr 2 len)                     ; capacity
+    ([]= ptr 3 0)                       ; sign
+    (return ptr)
+    ))
+
+(export prim_resize_bint)
+(fun prim_resize_bint (ptr len) (
+    (void* new (prim_allocate_iarray len))
+    (prim_memcpy new ([] ptr 0) (* ([] ptr 1) @WORD_SIZE))
+    ([]= ptr 0 new)
+    ([]= ptr 2 len)
+    (return ptr)
+    ))
+
+(export prim_copy_bint)
+(fun prim_copy_bint (ptr) (
+    (int len ([] ptr 2))
+    (void* new (prim_allocate_bint len))
+    (prim_memcpy ([] new 0) ([] ptr 0) (* len @WORD_SIZE))
+    ([]= new 1 ([] ptr 1))
+    ([]= new 3 ([] ptr 3))
+    (return new)
+    ))
+
+(export prim_clear_bint)
+(fun prim_clear_bint (ptr) (
+    (int len ([] ptr 2))
+    (memset ([] ptr 0) 0 (* len @WORD_SIZE))
+    ([]= ptr 1 1)
+    ([]= ptr 3 0)
     (return ptr)
     ))
 

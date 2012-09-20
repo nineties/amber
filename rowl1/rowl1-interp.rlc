@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2012-08-13 15:58:16 nineties $
+; $Id: rowl1-interp.rlc 2012-09-19 04:52:36 nineties $
 ;
 
 (import "rlvm-compile")
@@ -83,6 +83,7 @@
     (add_include_dir "/usr/lib/amber/")
     (include_file "amber/syntax.ab")
     (include_file "string.ab")
+    (include_file "bigint.ab")
     (include_file "io.ab")
     (include_file "list.ab")
     (include_file "table.ab")
@@ -172,14 +173,13 @@
 
 (fun interpret (p) (
     (while 1 (do
-        (var es (parse_statements p))
-        (if (! es)
-            (return 0)
-            )
-        (if (== (expr_head es) NoParse) (do
-            (output_syntax_errors es)
+        (parse_statements p)
+        (if (! (parse_success p)) (do
+            (output_syntax_error (get_loc p) (parser_error p))
             (exit 1)
             ))
+        (var es (parsed_token p))
+        (if (! es) break)
         (while es (do
             (eval (car es))
             (= es (cdr es))
@@ -192,13 +192,13 @@
 (fun interpret_shell (p) (
     (try 
         (while 1 (do
-            (var e (parse_shell_statement p))
-            (if (== (expr_head e) NoParse) (do
-                (output_syntax_errors e)
+            (parse_shell_statement p)
+            (if (! (parse_success p)) (do
+                (output_syntax_error (get_loc p) (parser_error p))
                 (flush_parser p @TRUE)
                 continue
                 ))
-            (var ret (eval (expr_arg e 1)))
+            (var ret (eval (parsed_token p)))
             (print_result p ret)
             (flush_parser p @FALSE)
             ))
@@ -385,6 +385,7 @@
     (setup_symbol std)
     (setup_numeric std)
     (setup_string std)
+    (setup_bigint std)
     (setup_io std)
     (setup_list std)
     (setup_array std)

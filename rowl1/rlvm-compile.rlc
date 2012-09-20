@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlvm-compile.rlc 2012-07-26 04:40:42 nineties $
+; $Id: rlvm-compile.rlc 2012-09-20 02:40:09 nineties $
 ;
 
 (import "stdlib")
@@ -215,7 +215,9 @@
 
 (var binary_operator
     `((+ . iadd) (- . isub) (* . imul) (/ . idiv) (% . imod) (<< . sal) (>> . sar)
-    (& . and) (| . or) (^ . xor))
+    (& . and) (| . or) (^ . xor) (udiv . udiv) (umod . umod)
+    (bigadd . badd) (bigsub . bsub) (bigmul . bmul) (bigcmp . bcmp) (bigshl . bshl) (bigshr . bshr)
+    )
     )
 (var unary_operator `((- . ineg) (bsr . bsr)))
 (var assignment_operator `((= . nop) (+= . iadd) (-= . isub) (*= . imul)
@@ -242,6 +244,14 @@
     (var arg (cadr expr))
     (compile_expr arg)
     (emit_insn insn)
+    true
+    ))
+
+(define compile_ludiv (expr) (do
+    (compile_expr (cadr expr))
+    (compile_expr (caddr expr))
+    (compile_expr (cadddr expr))
+    (emit_insn `ludiv)
     true
     ))
 
@@ -394,7 +404,7 @@
     ))
 
 (var comparison_operator
-    `((< . if_ge) (> . if_le) (<= . if_gt) (>= . if_lt) (== . if_ne) (!= . if_eq)))
+    `((< . if_ge) (> . if_le) (<= . if_gt) (>= . if_lt) (u< . if_uge) (u> . if_ule) (u<= . if_ugt) (u>= . if_ult) (== . if_ne) (!= . if_eq)))
 (define comparison_expr? (expr) (and (cons? expr) (assoc (car expr) comparison_operator)))
 
 (define compile_comp_if (expr) (do
@@ -843,6 +853,7 @@ a   (emit_insn (label cont_lbl))
         ((== `box (car expr)) (compile_expr `(+ (<< @(cadr expr) 1) 1)))
         ((== `unbox (car expr)) (compile_expr `(>> @(cadr expr) 1)))
         ((== `byterun (car expr)) (compile_byterun expr))
+        ((== `ludiv (car expr)) (compile_ludiv expr))
         ((and (== 3 (length expr)) (binary_operator? (car expr)))
             (compile_binexpr expr))
         ((and (== 2 (length expr)) (unary_operator? (car expr)))

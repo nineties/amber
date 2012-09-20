@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-08-10 22:20:51 nineties $
+; $Id: rowl1-compile.rlc 2012-09-19 04:37:43 nineties $
 ;
 
 (import "rlvm-compile")
@@ -127,6 +127,9 @@
                 ; module-variables are not free-variables.
                 (return fv)
                 )
+            (if (|| (== expr nil) (|| (== expr true) (|| (== expr false) (== expr undefined))))
+                (return fv)
+                )
             (return (cons expr fv))
             ))
         (return fv)
@@ -167,7 +170,13 @@
     ))
 
 ; alpha-conversion
-(fun alpha_args_iter (tbl expr level) (
+
+; this routine also translates
+; f(... x ... x ...) : body
+; to
+; f(... x ... y ...) where x==y : body
+
+(fun alpha_args_iter (tbl chk rep expr level) (
     (var hd (expr_head expr))
     (if (== hd Symbol) (do
         (if (== level 0) (do
@@ -175,10 +184,15 @@
                 (do
                     (var new_sym (unique_sym))
                     (symtable_add tbl expr new_sym)
+                    (if (list_member expr (field_get chk 0)) (do
+                        (field_set rep 0 (cons (struct 2 expr new_sym)
+                            (field_get rep 0)))
+                        ))
                     (return new_sym)
                 )
                 (do
                     (symtable_add tbl expr expr)
+                    (field_set chk 0 (cons expr (field_get chk 0)))
                     (return expr)
                 ))
             ))
@@ -188,28 +202,51 @@
     (if (== hd Quote) (return expr))
     (if (== hd Domain)
         (if (== level 0) (do
-            (expr_arg_set expr 0 (alpha_args_iter tbl (expr_arg expr 0) 0))
+            (expr_arg_set expr 0 (alpha_args_iter tbl chk rep (expr_arg expr 0) 0))
             (return expr)
             ))
     (if (== hd QuasiQuote) (+= level 1)
     (if (== hd Unquote) (-= level 1))))
     (var args (expr_args expr))
     (while args (do
-        (setcar args (alpha_args_iter tbl (car args) level))
+        (setcar args (alpha_args_iter tbl chk rep (car args) level))
         (= args (cdr args))
         ))
     (return expr)
     ))
 
+(fun setup_guard (rep guard) (
+    (var ls (field_get rep 0))
+    (while ls (do
+        (var v1 (field_get (car ls) 0))
+        (var v2 (field_get (car ls) 1))
+        (if (== guard nil)
+            (= guard (make_expr Equal (list2 v1 v2)))
+            (= guard (make_expr SeqAnd (list2 guard (make_expr Equal (list2 v1 v2)))))
+            )
+        (= ls (cdr ls))
+        ))
+    (return guard)
+    ))
+
 (fun alpha_args (tbl args) (
+    (var chk (struct 1 0))
+    (var rep (struct 1 0))
     (if (== (expr_head args) Where)
         (do
-            (expr_arg_set args 0 (alpha_args_iter tbl (expr_arg args 0) 0)) 
-            (expr_arg_set args 1 (alpha tbl (expr_arg args 1)))
+            (expr_arg_set args 0 (alpha_args_iter tbl chk rep (expr_arg args 0) 0)) 
+            (var guard (alpha tbl (expr_arg args 1)))
+            (expr_arg_set args 1 (setup_guard rep guard))
             (return args)
         )
-        (return (alpha_args_iter tbl args 0))
-        )
+        (do
+            (= args (alpha_args_iter tbl chk rep args 0))
+            (var guard (setup_guard rep nil))
+            (if (== guard nil)
+                (return args)
+                (return (make_expr Where (list2 args guard)))
+                )
+        ))
     ))
 
 (fun alpha (tbl expr) (
@@ -509,23 +546,19 @@
     ))
 
 (fun compile (asm mod expr) (
-    (var code (lookup_func mod Compile))
-    (byterun code asm mod expr)
+    (byterun (lookup_func mod Compile) asm mod expr)
     ))
 
 (export fun call1 (sym arg0) (
-    (var code (lookup_func current_mod sym))
-    (return (byterun code arg0))
+    (return (byterun (lookup_func current_mod sym) arg0))
     ))
 
 (export fun call2 (sym arg0 arg1) (
-    (var code (lookup_func current_mod sym))
-    (return (byterun code arg0 arg1))
+    (return (byterun (lookup_func current_mod sym) arg0 arg1))
     ))
 
 (export fun call3 (sym arg0 arg1 arg2) (
-    (var code (lookup_func current_mod sym))
-    (return (byterun code arg0 arg1 arg2))
+    (return (byterun (lookup_func current_mod sym) arg0 arg1 arg2))
     ))
 
 (fun do_nothing (asm mod expr) (
@@ -1009,6 +1042,8 @@
         (return (put_imm_int asm expr)))
     (if (== hd String)
         (return (put_push asm expr)))
+    (if (is_atom expr)
+        (return (put_push asm expr)))
     (if (== hd List) (do
         (if (! expr)
             (put_push asm 0)
@@ -1035,14 +1070,6 @@
 
 (fun compile_qquote (asm mod expr) (
     (compile_qquote_main asm mod (expr_arg expr 0) 0)
-    ))
-
-(fun compile_int (asm mod val) (
-    (put_imm_int asm val)
-    ))
-
-(fun compile_string (asm mod val) (
-    (put_push asm val)
     ))
 
 (fun compile_list (asm mod expr) (
@@ -1494,6 +1521,19 @@
     (put_fieldset asm (expr_arg_int lhs 1))
     ))
 
+(fun compile_fieldref (asm mod expr) (
+    (compile asm mod (expr_arg expr 0))
+    (put_fieldget asm (expr_arg_int expr 1))
+    ))
+
+(fun compile_fieldref_assign (asm mod expr) (
+    (var lhs (expr_arg expr 0))
+    (var rhs (expr_arg expr 1))
+    (compile asm mod rhs)
+    (compile asm mod (expr_arg lhs 0))
+    (put_fieldset asm (expr_arg_int lhs 1))
+    ))
+
 (export fun compile_simple_function (asm arity func) (
     (var n arity)
     (while (> n 0) (do
@@ -1615,7 +1655,7 @@
     ))
 
 (export fun setup_builtin_compilers (mod) (
-    (var locT (make_expr Loc (list3 stringT intT intT)))
+    (var locT (domainP Loc))
 
     (add_compiler mod DontCare compile_error)
 
@@ -1641,6 +1681,9 @@
     (add_compiler mod (quote false) compile_const)
     (add_compiler mod (quote nil) compile_const)
     (add_compiler mod (quote undefined) compile_const)
+    (add_compiler mod (domainP Int) compile_const)
+    (add_compiler mod (domainP String) compile_const)
+    (add_compiler mod (domainP BigInt) compile_const)
 
     (add_compiler mod (make_expr Apply (list2 DontCare listT)) compile_apply)
     (add_compiler mod (make_expr Subscript (list2 DontCare listT)) compile_subscript)
@@ -1648,8 +1691,6 @@
     (add_compiler mod (qquote (quote (unquote DontCare))) compile_quote)
     (add_compiler mod (qquote (qquote (unquote (unquote DontCare)))) compile_qquote)
 
-    (add_compiler mod (domainP Int) compile_int)
-    (add_compiler mod (domainP String) compile_string)
     (add_compiler mod (domainP List) compile_list)
     (add_compiler mod (domainP Tuple) compile_tuple)
 
@@ -1681,6 +1722,9 @@
 
 
     ; internal expressions
+    (add_compiler mod (make_expr FieldRef (list2 DontCare intT)) compile_fieldref)
+    (add_compiler mod (make_expr Assign (list2 (make_expr FieldRef (list2 DontCare intT)) DontCare)) compile_fieldref_assign)
+
     (add_compiler mod (make_expr AllocClsEnv (list1 intT)) compile_alloc_clsenv)
     (add_compiler mod (make_expr Closure (list2 DontCare DontCare)) compile_closure)
     (add_compiler mod (make_expr Ref (list3 DontCare intT symT)) compile_clsref)

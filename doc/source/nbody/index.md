@@ -198,10 +198,11 @@ Douglas:
 > What is the status of the word `statement` here?
 
 Koichi:
-> The symbols at the left-hand side of the operator `::=` form a
-category of the syntax
-which Amber understands. Amber adds the right-hand side new syntaxes
-into the left-hand side categories. Since Amber parses programs as
+> The symbols at the left-hand side of the operator `::=` are new
+expressions that we can write to extend Amber.  By doing so, we
+extend the Amber syntax.  And by providing new expressions at the
+right-hand side of this operator, we define the meaning of the new
+expressions at the left-hand side.  Since Amber parses programs as
 lines of statements, we have to begin with defining our new
 statement.
 

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-eval.rlc 2012-06-14 15:34:22 nineties $
+; $Id: vm-eval.rlc 2012-09-15 11:40:44 nineties $
 ;
 
 ; rowlVM register usage
@@ -45,7 +45,7 @@
     ))
 
 (define emit_vmsucc ((_ len) _ _)
-    (if (== len 1) (emit "incl" `%ebx) (emit "addl" len `%ebx))
+    (emit "addl" len `%ebx)
     )
 
 (define emit_vmfetch ((_) _ _) (do
@@ -57,7 +57,7 @@
     ;(emit "call debugx")
     ;(emit "popl %eax")
     ;(emit "popl %ebx")
-    ;(emit "movl $0, %edx")
+    ;(emit "xorl %edx, %edx")
 
     (emit "jmp *insn_table(,%eax,4)")
     ))
@@ -115,7 +115,7 @@
 
 (define emit_vmrestore ((_) _ _) (do
     (popl `%ebx)
-    (movl 0 `%edx)
+    (emit "xorl %edx, %edx")
     ))
 
 (add_new_expr `vmpush    emit_vmpush)
@@ -164,6 +164,11 @@
 (fun init_vmstack (stsize) (
     (= stack (alloc_block stsize))
     (= stack_size stsize)
+    ))
+
+(export free_vmstack)
+(fun free_vmstack () (
+    (munmap stack stack_size)
     ))
 
 (export vm_eval)
