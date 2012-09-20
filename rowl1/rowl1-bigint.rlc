@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-bigint.rlc 2012-09-11 18:24:06 nineties $
+; $Id: rowl1-bigint.rlc 2012-09-20 13:50:09 nineties $
 ;
 
 (import "rlvm-compile")
@@ -137,6 +137,7 @@
     (array_set int qdigit p (bigdiv_sub r v))
     (while (> p 0) (do
         (-= p 1)
+        (= rdigit (field_get r 0))
         (memcpy (+ rdigit 4) rdigit (* 4 vlen))
         (array_set int rdigit 0 (array_get int udigit p))
         (field_set r 1 (+ (field_get r 1) 1))
@@ -178,7 +179,6 @@
         ;     remainder => v - r
         (bigneg u)
         (var r (bigdiv_nat u v))
-        (bigneg u)
         (if (bint_is_zero r)
             (do
                 (bigneg u)
@@ -275,7 +275,7 @@
         (/= b 10)
         ))
     (while (> b 0) (do
-        (array_set char str p (+ (% (/ w b) 10) '0'))
+        (array_set char str p (+ (umod (/ w b) 10) '0'))
         (+= p 1)
         (/= b 10)
         ))
@@ -286,7 +286,7 @@
         (= w (array_get int ary i))
         (= b 100000000)
         (while (> b 0) (do
-            (array_set char str p (+ (% (/ w b) 10) '0'))
+            (array_set char str p (+ (umod (/ w b) 10) '0'))
             (+= p 1)
             (/= b 10)
             ))
@@ -309,17 +309,17 @@
         ))
     ; convert base 10 integer to base 2^32
     ; number of digits for bint is
-    ;    ( (slen-p) * log(10)/log(2^32) ).ceil
-    ; =  ( (slen-p) * 0.1038... ).ceil
-    ; <= ( (slen-p) * 1/8 ).ceil
-    ; =  ( (slen-p+7)/8 ).floor
-    (var ulen (>> (+ 7 (- slen p)) 3))
+    ;    ( (slen-p+1) * log(10)/log(2^32) ).ceil
+    ; =  ( (slen-p+1) * 0.1038... ).ceil
+    ; <= ( (slen-p+1) * 1/8 ).ceil
+    ; =  ( (slen-p)/8 + 1).floor
+    (var ulen (+ (>> (- slen p) 3) 1))
     (var u (allocate_bint ulen))
     (var d (allocate_bint 1))
     (var b (uint_to_bint 1000000000))
 
     ; construct u by Horner's method with base 10^9
-    (var r (% (- slen p) 9))
+    (var r (umod (- slen p) 9))
     (while (< p slen) (do
         (var w 0)
         (while (> r 0) (do
@@ -336,11 +336,6 @@
         (bigadd u d)
         (= r 9)
         ))
-    (while (== (bint_digit u (- ulen 1)) 0)
-        (-= ulen 1)
-        )
-
-    (field_set u 1 ulen)
     (field_set u 3 sign)
     (return u)
     ))
@@ -366,7 +361,7 @@
     (if (& n 1) (return n))
     (if (!= (field_get n 1) 1) (return n))
     (var d (bint_digit n 0))
-    (if (& d 0x80000000) (return n))
+    (if (u> d @FIXNUM_MAX) (return n))
     (if (field_get n 3)
         (return (box (- d)))
         (return (box d))
