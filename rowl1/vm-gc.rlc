@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2012-09-15 11:12:50 nineties $
+; $Id: vm-gc.rlc 2012-09-20 17:24:16 nineties $
 ;
 
 (import "stdlib")
@@ -291,6 +291,7 @@
     (if (! obj) ((return)))
 
     (if (! @(IS_POINTER_TO_HEAP obj)) ((return)))
+    (if (& obj 1) ((return))) ; boxed integer
 
     ; this object is already in next generation
     (if (== @(pdescr->generation (ADDR2PDESCR obj)) next_gen) ((return)))
@@ -487,10 +488,9 @@
     ))
 
 (fun allocate_object (words) (
-    (int npage 0)
+    (int npage (= npage (>> (- (+ words @PAGE_WORDS) 1) @PAGE_WORDS_SHIFT)))
     (while (> words free_words) (
         (insert_padding)
-        (= npage (>> (- (+ words @PAGE_WORDS) 1) @PAGE_WORDS_SHIFT))
         (allocate_page npage)
         ))
     (void* obj freep)
