@@ -1,0 +1,360 @@
+;
+; rowl - 1st generation
+; Copyright (C) 2012 nineties
+;
+; $Id: rowl1-float.rlc 2012-10-02 14:48:55 nineties $
+;
+
+(import "rlvm-compile")
+(import "rowl1-types")
+
+(compile `object `(
+
+(import "rowl1-util")
+(import "rowl1-node")
+(import "rowl1-module")
+(import "rowl1-compile")
+(import "rowl1-assemble")
+(import "rowl1-error")
+(import "rowl1-numeric")
+(import "rowl1-bigint")
+
+(extern object current_loc)
+
+(export fun pp_float (ochan f) (
+    (output_string ochan (float_to_s f))
+    ))
+
+; ==== utilities ===
+(var overwrite (to_sym "overwrite"))
+(fun add (x y) (
+    (if (&& (& x 1) (& y 1)) (return (int_add2 x y nil)))
+    (return (bint_add x y overwrite))
+    ))
+(fun sub (x y) (
+    (if (&& (& x 1) (& y 1)) (return (int_sub2 x y nil)))
+    (return (bint_sub x y overwrite))
+    ))
+(fun mul (x y) (
+    (if (&& (& x 1) (& y 1)) (return (int_mul2 x y nil)))
+    (return (bint_mul x y overwrite))
+    ))
+
+; ==== translate ascii-string to floating-point number ====
+; XXX: replace this implementation with bellorphon-method in the next version
+; (cf. William D Clinger, "How to Read Floating Point Numbers Accurately")
+
+(var ten^9 (uint_to_bint 1000000000))
+
+(export fun float_from_s (str) (
+    ; "XXXX.YYYYeZZZZ" => f*10^e
+    (var p 0)
+    (var slen (strlen str))
+    (var sign 0)
+    (if (== (array_get char str 0) '-') (do
+        (= sign 1)
+        (+= p 1)
+        ))
+    (var f (box 0))
+    (var e 0)
+
+    (var mlen 0)
+    (var ndigit 0)
+    (while (< mlen slen) (do
+        (var c (array_get char str mlen))
+        (if (== c 'e') break)
+        (if (&& (!= c '.') (|| (> ndigit 0) (&& (<= '1' c) (<= c '9')))) (+= ndigit 1))
+        (+= mlen 1)
+        ))
+
+    (var mlen slen)
+    (while (&& (> mlen 0) (!= (array_get char str (- mlen 1)) 'e')) (-= mlen 1))
+    (if (== mlen 0)
+        (= mlen slen)
+        (-= mlen 1)
+        )
+
+    (var r (umod (- (- mlen p) 1) 9))
+    (while (< p mlen) (do
+        (var w 0)
+        (while (> r 0) (do
+            (var c (array_get char str p))
+            (if (== c '.') (do
+                (= e 0)
+                (+= p 1)
+                continue
+                ))
+            (if (|| (< c '0') (< '9' c))
+                (throw (invalid_format current_loc (string str)))
+                )
+            (= w (+ (* 10 w) (- c '0')))
+            (-= r 1)
+            (+= p 1)
+            (-= e 1)
+            ))
+        (if (!= f 1)
+            (= f (mul f ten^9))
+            )
+        (= f (add f (box w)))
+        (= r 9)
+        ))
+    (if (== (array_get char str p) 'e') (do
+        (+= p 1)
+        (var neg @FALSE)
+        (if (== (array_get char str p) '-') (do (+= p 1) (= neg @TRUE)))
+        (var d 0) 
+        (while (< p slen) (do
+            (var c (array_get char str p))
+            (if (|| (< c '0') (< '9' c))
+                (throw (invalid_format current_loc (string str)))
+                )
+            (= d (+ (* 10 d) (- c '0')))
+            (+= p 1)
+            ))
+        (if neg (= d (- d)))
+        (+= e d)
+        ))
+
+    (if (== f 1) (do (= ndigit 0) (= e 0)))
+    
+    (return (encode_float sign f ndigit e))
+    ))
+
+; translate f*10^e to IEEE754 floating point
+(fun encode_float (sign f n e) (
+    (if (bint_is_zero f) (do
+        (var float (allocate_float))
+        (field_set float 0 0)
+        (field_set float 1 0)
+        (return float)
+        ))
+
+    (var shift 0)
+    (if (>= (+ n e) 1)
+        (= shift (- 56 (* 3 (+ n e))))
+        (= shift (- 57 (* 4 (+ n e))))
+        )
+
+    (= f (bint_shiftL f (box shift) overwrite))
+
+    ; here f has more than 53 bits (so, it is a bigint)
+    (var rem 0)
+    (if (> e 0) (do
+        (var b (uint_to_bint 1))
+        (while (> e 0) (do
+            (= b (mul b (box 10)))
+            (-= e 1)
+            ))
+        (= f (mul f b)) 
+        )
+    (if (< e 0) (do
+        (var b (uint_to_bint 1))
+        (while (< e 0) (do
+            (= b (mul b (box 10)))
+            (+= e 1)
+            ))
+        (var r (bigdiv f (to_bint b)))
+        (if (! (bint_is_zero r)) (= rem 1))
+        )))
+
+    (var nd (bint_ndigits2 f))
+    (var exp (- (- nd 1) shift))
+    (var offs (- nd 53))
+
+    (var w (bint_digit f 0))
+    (var ulp (& (>> w offs) 1))
+    (var G (& (>> w (- offs 1)) 1))
+    (var R 0)
+    (if (|| rem (& w (- (<< 1 offs) 1))) (= R 1))
+    (= f (bint_shiftR f (box offs) overwrite))
+    (if (&& G (|| ulp R))
+        (= f (add f (box 1)))
+        (if (== (bint_digit f 1) 0x00100000)
+            (+= exp 1) ; carry
+            )
+        )
+
+    (= w (bint_digit f 1))
+    (= w (| (& w 0xfffff) (<< (& (+ exp 1023) 0x7ff) 20)))
+    (if sign (= w (| w 0x80000000)))
+    (bint_set_digit f 1 w)
+
+    (var float (allocate_float))
+    (field_set float 0 (bint_digit f 0))
+    (field_set float 1 (bint_digit f 1))
+    (return float)
+    ))
+
+; ==== translate floating-point number to ascii-string ====
+; XXX: replace this implementation with faster version in
+; Robert G. Burger: "Printing Floating-Point Numbers Quickly and Accurately"
+(fun float_to_s (f) (
+    (var sign 0)
+    (if (< (field_get f 1) 0) (= sign 1))
+    (var exp (- (- (& (>> (field_get f 1) 20) 0x7ff) 1023) 52))
+    (var man (allocate_bint 2))
+    (field_set man 1 2)
+    (bint_set_digit man 0 (field_get f 0))
+    (bint_set_digit man 1 (| (& (field_get f 1) 0xfffff) (<< 1 20)))
+    (return (decode_float sign man exp))
+    ))
+
+(var ten^15 (mul (uint_to_bint 1000000000) (uint_to_bint 1000000)))
+(fun decode_float (sign man e) (
+    (var p 0)
+    (if (>= e -52)
+        (= p (- (/ (+ (* 3 e) 6) 10)))
+        (= p (- -5 (/ (+ (* 4 e) 4) 5)))
+        )
+    (var d (uint_to_bint 1))
+    (if (>= p 0)
+        (for i 0 p (= d (mul d (box 10))))
+        (for i 0 (- p) (= d (mul d (box 10))))
+        )
+    (if (> e 0) (= man (bint_shiftL man (box e) overwrite)))
+    (if (> p 0) (= man (mul man d)))
+    (if (&& (<= e 0) (<= p 0)) (do
+        (= d (mul d (box (- e))))
+        (bint_div man d overwrite)
+        )
+    (if (< e 0) (= man (bint_shiftR man (box (- e))))
+    (if (< p 0) (bint_div man d overwrite)
+        )))
+
+    (= d (uint_to_bint 10))
+    (var round 0)
+    (while (== (bint_ge man ten^15) true) (do
+        (-= p 1)
+        (var r (norm (bigdiv man d)))
+        (if (>= r 5)
+            (= round 1)
+            (= round 0)
+            )
+        ))
+    (if round (= man (add man (box 1))))
+    (return (to_string sign man (- 14 p)))
+    ))
+
+(fun to_string (sign man e) (
+    (var mans (bint_to_s man))
+    (var es (itos e))
+    (var len 0)
+    (if sign (+= len 1))
+    (+= len (strlen mans))
+    (+= len 1) ; '.'
+    (if (!= e 0) (do
+        (+= len 1) ; 'e'
+        (+= len (strlen es))
+        ))
+    
+    (var str (allocate_string len))
+    (var p 0)
+    (if sign (do
+        (array_set char str 0 '-')
+        (+= p 1)
+        ))
+    (array_set char str p (array_get char mans 0))
+    (+= p 1)
+    (array_set char str p '.')
+    (+= p 1)
+    (for i 1 (strlen mans) (do
+        (array_set char str p (array_get char mans i))
+        (+= p 1)
+        ))
+    (if (!= e 0) (do
+        (array_set char str p 'e')
+        (+= p 1)
+        (for i 0 (strlen es) (do
+            (array_set char str p (array_get char es i))
+            (+= p 1)
+            ))
+        ))
+    (return str)
+    ))
+
+(fun float_uplus (f) (
+    (return f)
+    ))
+
+(fun float_uminus (f) (
+    (return (f- (copy_float f)))
+    ))
+
+(fun float_hash (f) (
+    (var w0 (field_get f 0))
+    (var w1 (field_get f 1))
+    (return (box (+ w1 (* 7 w0))))
+    ))
+
+(fun float_to_i (f) (
+    (var w0 (field_get f 0))
+    (var w1 (field_get f 1))
+    (var sign 0)
+    (if (& w1 0x80000000) (= sign 1))
+    (var e (- (& (>> w1 20) 0x7ff) 1023))
+    (= w1 (| (& w1 0xfffff) 0x100000))
+    (if (< e 0) (return (box 0)))
+    (var shift (- 52 e))
+    (var b (allocate_bint 2))
+    (bint_set_digit b 0 w0)
+    (bint_set_digit b 1 w1)
+    (field_set b 1 2)
+    (if sign (bigneg b))
+    (return (bint_shiftR b (box shift) overwrite))
+    ))
+
+(fun float_to_f (n) (
+    (return (itof (unbox n)))
+    ))
+
+(fun float_add (a b f) (
+    (if (!= f overwrite) (= a (copy_float a)))
+    (return (fadd a b))
+    ))
+(fun float_sub (a b f) (
+    (if (!= f overwrite) (= a (copy_float a)))
+    (return (fsub a b))
+    ))
+(fun float_mul (a b f) (
+    (if (!= f overwrite) (= a (copy_float a)))
+    (return (fmul a b))
+    ))
+(fun float_div (a b f) (
+    (if (!= f overwrite) (= a (copy_float a)))
+    (return (fdiv a b))
+    ))
+(fun float_lt (a b) ((if (f< a b) (return true) (return false))))
+(fun float_gt (a b) ((if (f> a b) (return true) (return false))))
+(fun float_le (a b) ((if (f<= a b) (return true) (return false))))
+(fun float_ge (a b) ((if (f>= a b) (return true) (return false))))
+(fun float_eq (a b) ((if (f== a b) (return true) (return false))))
+
+
+(fun if_coerce (a b) ((return (list2 (itof (unbox a)) b))))
+(fun fi_coerce (a b) ((return (list2 a (itof (unbox b))))))
+
+(export fun setup_float (std) (
+    (add_builtin_function1 std (to_sym "uplus") floatT float_uplus 0)
+    (add_builtin_function1 std (to_sym "uminus") floatT float_uminus 0)
+    (add_builtin_function1 std (to_sym "to_s") floatT float_to_s 0)
+    (add_builtin_function1 std (to_sym "hash") floatT float_hash 0)
+    (add_builtin_function1 std (to_sym "to_i") stringT float_to_i 0)
+    (add_builtin_function1 std (to_sym "to_f") intT float_to_f 0)
+    
+    (add_builtin_function3 std (to_sym "add") floatT floatT DontCare float_add 0)
+    (add_builtin_function3 std (to_sym "sub") floatT floatT DontCare float_sub 0)
+    (add_builtin_function3 std (to_sym "mul") floatT floatT DontCare float_mul 0)
+    ;(add_builtin_function3 std (to_sym "pow") floatT floatT float_pow 0)
+    (add_builtin_function3 std (to_sym "div") floatT floatT DontCare float_div 0)
+    (add_builtin_function2 std (to_sym "lt") floatT floatT float_lt 0)
+    (add_builtin_function2 std (to_sym "gt") floatT floatT float_gt 0)
+    (add_builtin_function2 std (to_sym "le") floatT floatT float_le 0)
+    (add_builtin_function2 std (to_sym "ge") floatT floatT float_ge 0)
+    (add_builtin_function2 std (to_sym "equal") floatT floatT float_eq 0)
+
+
+    (add_builtin_function2 std (to_sym "coerce") intT floatT if_coerce 0)
+    (add_builtin_function2 std (to_sym "coerce") floatT intT fi_coerce 0)
+    ))
+
+   ))

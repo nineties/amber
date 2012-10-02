@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2012-09-20 23:07:34 nineties $
+; $Id: vm-insn.rlc 2012-10-01 02:47:34 nineties $
 ;
 
 (define gen_field_get (idx) `(
@@ -34,6 +34,23 @@
     (asm "movl $3, %eax")
     (vmsshort 1 %ecx)
     (asm @cmovname " %ecx, %eax")
+    (vmsucc %eax)
+    (vmfetch)
+    ))
+
+(define gen_comparison3 (jmpname) `(
+    (vmpop %eax)
+    (vmpop %ecx)
+    (asm "fldl (%ecx)")
+    (asm "fldl (%eax)")
+    (asm "fucompp")
+    (asm "fnstsw %ax")
+    (asm "sahf")
+    (asm @jmpname " 1f")
+    (vmsucc 3)
+    (vmfetch)
+    (asm "1:")
+    (vmsshort 1 %eax)
     (vmsucc %eax)
     (vmfetch)
     ))
@@ -731,8 +748,8 @@
         (asm "movl 4(%eax), %edx") ; x.ndigit
         (asm "subl %ecx, %edx")    ; x.ndigit - ecx
         (asm "2:")
-        (asm "testl %edx, %edx")
-        (asm "jz 3f")
+        (asm "cmpl $0, %edx")
+        (asm "jle 3f")
         (asm "leal (%ebx,%ecx,4), %eax")
         (asm "movl (%eax), %eax")
         (asm "movl %eax, (%ebx)")
@@ -770,11 +787,11 @@
         (asm "andl $0x1f, %ecx")
 
         ; (%esp):  index
-        ; 4(%esp): n
+        ; 4(%esp): n-1
         (asm "5:")
         (asm "movl (%esp), %edx")
         (asm "cmpl 4(%esp), %edx")
-        (asm "je 6f")
+        (asm "jge 6f")
         (asm "leal (%ebx,%edx,4), %eax")
         (asm "leal 4(%ebx,%edx,4), %edx")
         (asm "movl (%eax), %eax")
@@ -791,7 +808,7 @@
         (asm "shrl %cl, %eax")
         (asm "movl %eax, (%edx)")
         (asm "addl $8, %esp")
-        
+
         ; update number of digits
         (asm "movl 4(%esi), %ebx")
         (asm "movl 8(%ebx), %ecx")
@@ -815,6 +832,54 @@
         (asm "xorl %edx, %edx")
         (asm "addl $4, %esi")
         (asm "popl %ebx")
+        ))
+
+    (fneg () @true (
+        (asm "movl (%esi), %eax")
+        (asm "fldl (%eax)")
+        (asm "fchs")
+        (asm "fstpl (%eax)")
+        ))
+    (fadd () @true (
+        (vmpop %ecx)
+        (asm "movl (%esi), %eax")
+        (asm "fldl (%eax)")
+        (asm "fldl (%ecx)")
+        (asm "faddp %st, %st(1)")
+        (asm "fstpl (%eax)")
+        ))
+    (fsub () @true (
+        (vmpop %ecx)
+        (asm "movl (%esi), %eax")
+        (asm "fldl (%eax)")
+        (asm "fldl (%ecx)")
+        (asm "fsubp %st, %st(1)")
+        (asm "fstpl (%eax)")
+        ))
+    (fmul () @true (
+        (vmpop %ecx)
+        (asm "movl (%esi), %eax")
+        (asm "fldl (%eax)")
+        (asm "fldl (%ecx)")
+        (asm "fmulp %st, %st(1)")
+        (asm "fstpl (%eax)")
+        ))
+    (fdiv () @true (
+        (vmpop %ecx)
+        (asm "movl (%esi), %eax")
+        (asm "fldl (%eax)")
+        (asm "fldl (%ecx)")
+        (asm "fdivp %st, %st(1)")
+        (asm "fstpl (%eax)")
+        ))
+    ; integer to float
+    (itof () @true (
+        (vmsave)
+        (call prim_allocate_float)
+        (vmrestore)
+        (asm "fildl (%esi)")
+        (asm "fstpl (%eax)")
+        (asm "movl %eax, (%esi)")
         ))
 
     ; allocate cons object
@@ -1349,6 +1414,13 @@
     (if_uge     (addr) @nil @(gen_comparison2 "cmovae"))
     (if_ult     (addr) @nil @(gen_comparison2 "cmovb"))
     (if_ule     (addr) @nil @(gen_comparison2 "cmovbe"))
+
+    (if_feq     (addr) @nil @(gen_comparison3 "jne"))
+    (if_fne     (addr) @nil @(gen_comparison3 "je"))
+    (if_fgt     (addr) @nil @(gen_comparison3 "jle"))
+    (if_fge     (addr) @nil @(gen_comparison3 "jl"))
+    (if_flt     (addr) @nil @(gen_comparison3 "jge"))
+    (if_fle     (addr) @nil @(gen_comparison3 "jge"))
 
     ; instructions for handling exceptions.
     ; push unwind stack
