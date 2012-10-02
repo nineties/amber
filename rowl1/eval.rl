@@ -2,7 +2,7 @@
  % rowl - 1st generation
  % Copyright (C) 2010 nineties
  %
- % $Id: eval.rl 2010-10-26 11:35:55 nineties $
+ % $Id: eval.rl 2012-09-26 20:15:39 nineties $
  %);
 
 include(stddef,code);
@@ -304,7 +304,7 @@ eval_applambda: (p0, p1) {
 
 (% p0: macro, p1: params %);
 eval_appmacro: (p0, p1) {
-    allocate(3);
+    allocate(1);
     scope_push();
     match_args(macro_params(p0), p1, p0);
     x0 = eval_sexp(macro_body(p0));

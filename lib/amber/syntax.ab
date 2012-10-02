@@ -13,7 +13,7 @@ DefineSyntax{
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2012-09-11 17:34:40 nineties $
+# $Id: syntax.ab 2012-09-22 16:41:33 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -173,10 +173,6 @@ primary_expr
         { MakeExpr{Quote{Absolute}, List{node1}} } 
 
       | block
-      | decimal "." decimal
-        { QuasiQuote{Float{Unquote{Apply{GET_INPUT_TEXT, List{}}}}} }
-      | decimal "." ("0"*) decimal
-        { QuasiQuote{Float{Unquote{Apply{GET_INPUT_TEXT, List{}}}}} }
       | atom
       | "..."   { Quote{Ellipsis{nil}} }
 
@@ -247,14 +243,19 @@ additive_expr
       | additive_expr '-' multiplicative_expr { `Sub{!node0, !node2} }
       | multiplicative_expr
 
-rel_expr
-    ::= additive_expr "<"  additive_expr { `LessThan{!node0, !node2} }
-      | additive_expr "<=" additive_expr { `LessEqual{!node0, !node2} }
-      | additive_expr ">"  additive_expr { `GreaterThan{!node0, !node2} }
-      | additive_expr ">=" additive_expr { `GreaterEqual{!node0, !node2} }
-      | additive_expr "==" additive_expr { `Equal{!node0, !node2} }
-      | additive_expr "!=" additive_expr { `NotEqual{!node0, !node2} }
+shift_expr
+    ::= shift_expr "<<" additive_expr    { `ShiftL{!node0, !node2} }
+      | shift_expr ">>" additive_expr    { `ShiftR{!node0, !node2} }
       | additive_expr
+
+rel_expr
+    ::= shift_expr "<"  shift_expr { `LessThan{!node0, !node2} }
+      | shift_expr "<=" shift_expr { `LessEqual{!node0, !node2} }
+      | shift_expr ">"  shift_expr { `GreaterThan{!node0, !node2} }
+      | shift_expr ">=" shift_expr { `GreaterEqual{!node0, !node2} }
+      | shift_expr "==" shift_expr { `Equal{!node0, !node2} }
+      | shift_expr "!=" shift_expr { `NotEqual{!node0, !node2} }
+      | shift_expr
 
 seqand_expr
     ::= rel_expr  "&&" seqand_expr { `SeqAnd{!node0, !node2} }
@@ -284,13 +285,15 @@ multi_lambda_expr
       | lambda_expr
 
 assign_expr
-    ::= pattern "=" assign_expr  { `Assign{!node0, !node2} }
-      | pattern "+=" assign_expr { `AddAssign{!node0, !node2} }
-      | pattern "-=" assign_expr { `SubAssign{!node0, !node2} }
-      | pattern "*=" assign_expr { `MulAssign{!node0, !node2} }
-      | pattern "^=" assign_expr { `PowAssign{!node0, !node2} }
-      | pattern "/=" assign_expr { `DivAssign{!node0, !node2} }
-      | pattern "%=" assign_expr { `ModAssign{!node0, !node2} }
+    ::= pattern "=" assign_expr   { `Assign{!node0, !node2} }
+      | pattern "+=" assign_expr  { `AddAssign{!node0, !node2} }
+      | pattern "-=" assign_expr  { `SubAssign{!node0, !node2} }
+      | pattern "*=" assign_expr  { `MulAssign{!node0, !node2} }
+      | pattern "^=" assign_expr  { `PowAssign{!node0, !node2} }
+      | pattern "/=" assign_expr  { `DivAssign{!node0, !node2} }
+      | pattern "%=" assign_expr  { `ModAssign{!node0, !node2} }
+      | pattern "<<=" assign_expr { `ShiftLAssign{!node0, !node2} }
+      | pattern ">>=" assign_expr { `ShiftRAssign{!node0, !node2} }
       | multi_lambda_expr
 
 expr ::= assign_expr
@@ -348,26 +351,30 @@ statement
 
 
 ## Syntax Sugars
-+x     => `uplus(!x)
--x     => `uminus(!x)
-x + y  => `add(!x, !y, nil)
-x - y  => `sub(!x, !y, nil)
-x * y  => `mul(!x, !y, nil)
-x ^ y  => `pow(!x, !y, nil)
-x / y  => `div(!x, !y, nil)
-x % y  => `mod(!x, !y, nil)
-x += y => `(!x = add(!x, !y, \LhsRewritable))
-x -= y => `(!x = sub(!x, !y, \LhsRewritable))
-x *= y => `(!x = mul(!x, !y, \LhsRewritable))
-x ^= y => `(!x = pow(!x, !y, \LhsRewritable))
-x /= y => `(!x = div(!x, !y, \LhsRewritable))
-x %= y => `(!x = mod(!x, !y, \LhsRewritable))
-x < y  => `lt(!x, !y)
-x > y  => `gt(!x, !y)
-x <= y => `le(!x, !y)
-x >= y => `ge(!x, !y)
-x == y => `equal(!x, !y)
-x != y => `(not equal(!x, !y))
++x      => `uplus(!x)
+-x      => `uminus(!x)
+x + y   => `add(!x, !y, nil)
+x - y   => `sub(!x, !y, nil)
+x * y   => `mul(!x, !y, nil)
+x ^ y   => `pow(!x, !y, nil)
+x / y   => `div(!x, !y, nil)
+x % y   => `mod(!x, !y, nil)
+x << y  => `shiftL(!x, !y, nil)
+x >> y  => `shiftR(!x, !y, nil)
+x += y  => `(!x = add(!x, !y, \overwrite))
+x -= y  => `(!x = sub(!x, !y, \overwrite))
+x *= y  => `(!x = mul(!x, !y, \overwrite))
+x ^= y  => `(!x = pow(!x, !y, \overwrite))
+x /= y  => `(!x = div(!x, !y, \overwrite))
+x %= y  => `(!x = mod(!x, !y, \overwrite))
+x <<= y => `(!x = shiftL(!x, !y, \overwrite))
+x >>= y => `(!x = shiftR(!x, !y, \overwrite))
+x < y   => `lt(!x, !y)
+x > y   => `gt(!x, !y)
+x <= y  => `le(!x, !y)
+x >= y  => `ge(!x, !y)
+x == y  => `equal(!x, !y)
+x != y  => `(not equal(!x, !y))
 x[args...]     => `Apply{at, !cons(x, args)}
 x[args...] = e => `Apply{store, !cons(x, append(args, [e]))}
 

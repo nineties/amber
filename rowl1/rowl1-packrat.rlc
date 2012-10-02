@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2012-09-20 13:50:33 nineties $
+; $Id: rowl1-packrat.rlc 2012-10-02 12:58:21 nineties $
 ;
 
 ; TODO:
@@ -526,9 +526,15 @@
 ; multi-precision integer is not supported for now
 (fun parse_decimal_ (p) (
     (var v (getc p))
+    (var sign 1)
 
     (if (< v 0) (return (mayparse p "expect a number")))
         
+    (if (== v '-') (do
+        (= sign -1)
+        (= v (getc p))
+        ))
+
     (if (&& (== v '0') (is_end_of_token p))
         (return (parsed p (box 0)))
         )
@@ -542,7 +548,7 @@
         (= value (+ (* value 10) v))
         ))
     (if (is_end_of_token p)
-        (return (parsed p (box value)))
+        (return (parsed p (box (* sign value))))
         )
     (if (== (lookahead p) 'e') (do
         (getc p)
@@ -556,7 +562,7 @@
             (*= value 10)
             (-= exp 1)
             ))
-        (return (parsed p (box value)))
+        (return (parsed p (box (* sign value))))
         ))
     (return (junk_letter p))
     ))
@@ -629,6 +635,25 @@
     @(OR p `(decimal hex octal binary))
     ))
 @(MEMOIZE integer)
+
+(extern fun float_from_s)
+(fun parse_float_ (p) (
+    (var begin (field_get p 5))
+    (parse_decimal p)
+    @(CHECK p)
+    (if (!= (lookahead p) '.') (return (noparse p "expect '.'")))
+    (getc p)
+    (while (is_0_9 (lookahead p)) (getc p))
+    (if (== (lookahead p) 'e') (do
+        (getc p)
+        (if (== (lookahead p) '-') (getc p))
+        (if (! (is_0_9 (lookahead p))) (return (noparse p "expect a number")))
+        (getc p)
+        (while (is_0_9 (lookahead p)) (getc p))
+        ))
+    (return (parsed p (float_from_s (extract_string p begin (field_get p 5)))))
+    ))
+@(MEMOIZE float)
 
 (fun parse_blank_ (p) (
     (var c (getc p))
@@ -778,6 +803,7 @@
 (fun parse_atom_ (p) (
     @(OR p `(
         symbol
+        float
         integer
         string
     ))
@@ -1744,6 +1770,7 @@
     (add_parser mod (to_sym "parse_octal_") parse_octal_)
     (add_parser mod (to_sym "parse_hex_") parse_hex_)
     (add_parser mod (to_sym "parse_integer_") parse_integer_)
+    (add_parser mod (to_sym "parse_float_") parse_float_)
     (add_parser mod (to_sym "parse_string_") parse_string_)
     (add_parser mod (to_sym "parse_symbol_") parse_symbol_)
     (add_parser mod (to_sym "parse_atom_") parse_atom_)
@@ -1758,6 +1785,7 @@
     (add_parser mod (to_sym "parse_octal") parse_octal)
     (add_parser mod (to_sym "parse_hex") parse_hex)
     (add_parser mod (to_sym "parse_integer") parse_integer)
+    (add_parser mod (to_sym "parse_float") parse_float)
     (add_parser mod (to_sym "parse_string") parse_string)
     (add_parser mod (to_sym "parse_symbol") parse_symbol)
     (add_parser mod (to_sym "parse_atom") parse_atom)
