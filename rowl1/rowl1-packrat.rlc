@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2012-10-02 12:58:21 nineties $
+; $Id: rowl1-packrat.rlc 2012-10-02 20:27:24 nineties $
 ;
 
 ; TODO:
@@ -673,7 +673,7 @@
         (set_parser_state_all p state)
         break
         ))
-    (return (parsed p (to_sym "blanks")))
+    (return (parsed p nil))
     ))
 @(MEMOIZE blanks)
 
@@ -693,9 +693,21 @@
     (if (<= (get_column p) (get_indent p)) (do
         (return (noparse p "invalid indentation"))
         ))
-    (return (parsed p (to_sym "spaces")))
+    (return (parsed p nil))
     ))
 @(MEMOIZE spaces)
+
+(fun parse_shell_style_comment_ (p) (
+    (var v (getc p))
+    (if (< v 0) (return (mayparse p (string "expect '#'"))))
+    (if (!= v '#') (return (noparse p (string "expect '#'"))))
+    (while @TRUE (do
+        (var c (getc p))
+        (if (|| (== c '\n') (< c 0)) break)
+        ))
+    (return (parsed p nil))
+    ))
+@(MEMOIZE shell_style_comment)
 
 (fun parse_symbol_ (p) (
     (var c (lookahead p))
@@ -1765,6 +1777,7 @@
     (add_builtin_function2 mod (to_sym "parse_text") (domainP Parser) stringT parse_text 0)
     (add_parser mod (to_sym "parse_any_") parse_any_char)
     (add_parser mod (to_sym "parse_blank_") parse_blank_)
+    (add_parser mod (to_sym "parse_shell_style_comment_") parse_shell_style_comment_)
     (add_parser mod (to_sym "parse_decimal_") parse_decimal_)
     (add_parser mod (to_sym "parse_binary_") parse_binary_)
     (add_parser mod (to_sym "parse_octal_") parse_octal_)
@@ -1780,6 +1793,7 @@
 
     (add_parser mod (to_sym "parse_any") parse_any_char)
     (add_parser mod (to_sym "parse_blank") parse_blank)
+    (add_parser mod (to_sym "parse_shell_style_comment") parse_shell_style_comment)
     (add_parser mod (to_sym "parse_decimal") parse_decimal)
     (add_parser mod (to_sym "parse_binary") parse_binary)
     (add_parser mod (to_sym "parse_octal") parse_octal)
