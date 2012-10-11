@@ -4,7 +4,7 @@ DefineSyntax{
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2012-10-02 20:23:29 nineties $
+# $Id: syntax.ab 2012-10-04 01:55:43 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -144,8 +144,8 @@ block_body ::= [multiline] "{" aligned(statement) "}"
 
 block ::= scoped(block_body)
 
-qualified_expr
-    ::= symbol "::" qualified_expr
+qualified_symbol
+    ::= symbol "::" qualified_symbol
         { MakeExpr{Quote{Qualified}, List{node0, node2}} }
       | symbol
 
@@ -168,7 +168,7 @@ primary_expr
       | "..."   { Quote{Ellipsis{nil}} }
 
 secondary_expr
-    ::= qualified_expr
+    ::= qualified_symbol
       | primary_expr
 
 postfix_expr
@@ -297,12 +297,12 @@ arguments
         { MakeExpr{\Tuple, node1} }
 
 statement
-    ::= "module" qualified_expr "{"
+    ::= "module" qualified_symbol "{"
         { `BeginModule{!node1} }
       | "}"
         { \EndModule{} }
 
-      | "import" qualified_expr
+      | "import" qualified_symbol
         { `Import{!node1} }
       | "include" expr
         { `Include{!node1} }

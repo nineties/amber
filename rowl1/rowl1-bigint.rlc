@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-bigint.rlc 2012-10-02 19:57:32 nineties $
+; $Id: rowl1-bigint.rlc 2012-10-04 01:24:17 nineties $
 ;
 
 (import "rlvm-compile")
@@ -364,6 +364,21 @@
     (return (norm (parse_bint str)))
     ))
 
+(fun bint_to_f (b) (
+    (= b (copy_bint b))
+    (var f (allocate_float))
+    (var n (bint_ndigits2 b))
+    (var e (- n 1))
+    (= b (bint_shiftR b (box (- n 53))))
+    (field_set f 0 (bint_digit b 0))
+    (var s (field_get b 3))
+    (field_set f 1
+        (| (<< s 31)
+        (| (<< (& (+ e 1023) 0x7ff) 20)
+           (& (bint_digit b 1) 0xfffff))))
+    (return f)
+    ))
+
 (export fun norm (n) (
     (if (& n 1) (return n))
     (if (!= (field_get n 1) 1) (return n))
@@ -547,6 +562,8 @@
 
 (fun ib_coerce (a b) ((return (list2 (int_to_bint (unbox a)) b))))
 (fun bi_coerce (a b) ((return (list2 a (int_to_bint (unbox b))))))
+(fun fb_coerce (a b) ((return (list2 a (bint_to_f b)))))
+(fun bf_coerce (a b) ((return (list2 (bint_to_f a) b))))
 
 (export fun setup_bigint (std) (
     (var mod (find_module no_loc std (to_sym "bigint") @TRUE))
@@ -555,6 +572,7 @@
     (add_builtin_function1 mod (to_sym "to_s") bintT bint_to_s 0)
     (add_builtin_function1 mod (to_sym "hash") bintT bint_hash 0)
     (add_builtin_function1 mod (to_sym "to_i") stringT bint_to_i 0)
+    (add_builtin_function1 mod (to_sym "to_f") bintT bint_to_f 0)
 
     (add_builtin_function3 mod (to_sym "add") bintT bintT DontCare bint_add 0)
     (add_builtin_function3 mod (to_sym "sub") bintT bintT DontCare bint_sub 0)
@@ -580,6 +598,8 @@
 
     (add_builtin_function2 mod (to_sym "coerce") intT bintT ib_coerce 0)
     (add_builtin_function2 mod (to_sym "coerce") bintT intT bi_coerce 0)
+    (add_builtin_function2 mod (to_sym "coerce") floatT bintT fb_coerce 0)
+    (add_builtin_function2 mod (to_sym "coerce") bintT floatT bf_coerce 0)
     ))
 
     ))
