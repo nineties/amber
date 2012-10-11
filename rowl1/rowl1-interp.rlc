@@ -2,7 +2,11 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
+<<<<<<< HEAD
 ; $Id: rowl1-interp.rlc 2012-10-03 14:39:38 nineties $
+=======
+; $Id: rowl1-interp.rlc 2012-10-04 01:32:05 nineties $
+>>>>>>> ff5f69c
 ;
 
 (import "rlvm-compile")
@@ -337,7 +341,12 @@
     (exit 1)
     ))
 
-(export fun eval_include (expr) (
+(fun eval_import (expr) (
+    (import_module current_loc current_mod (expr_arg expr 0))
+    (return nil)
+    ))
+
+(fun eval_include (expr) (
     (var path (expr_arg_string expr 0))
     (include_file path)
     (return nil)
@@ -353,6 +362,8 @@
     (add_builtin_function1 mod Rewrite (domainP Located) rewrite_located 0)
     (add_builtin_function1 mod Eval DontCare default_eval 0)
     (add_builtin_function1 mod Eval (domainP Located) eval_located 0)
+    (add_builtin_function1 mod Eval (make_expr Import (list1 DontCare))
+        eval_import 0)
     (add_builtin_function1 mod Eval (make_expr Include (list1 stringT))
         eval_include 0)
     (add_builtin_function1 mod Eval (make_expr BeginModule (list1 symT))

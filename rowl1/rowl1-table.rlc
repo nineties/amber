@@ -192,13 +192,13 @@
     (output_string ochan "}")
     ))
 
-(fun ht_from_list (list) (
+(fun ht_create (list) (
     (var orig list)
     (var tbl (ht_new_with_hint (list_len list)))
     (while list (do
         (var ent (car list))
         (if (|| (!= (expr_head ent) Tuple) (!= (expr_size ent) 2))
-            (throw (invalid_argument current_loc (string "Table::from_list requires list of pairs") orig))
+            (throw (invalid_argument current_loc (string "Table::create requires list of pairs") orig))
             )
         (ht_store tbl (expr_arg ent 0) (expr_arg ent 1))
         (= list (cdr list))
@@ -210,7 +210,7 @@
     (var mod (find_module no_loc std (to_sym "Table") @TRUE))
     (add_builtin_function0 mod (to_sym "new") ht_new 0)
     (add_builtin_function1 mod (to_sym "new") intT ht_new_with_hint 0)
-    (add_builtin_function1 mod (to_sym "from_list") listT ht_from_list 0)
+    (add_builtin_function1 mod (to_sym "create") listT ht_create 0)
     (add_builtin_function2 std (to_sym "at") tableT DontCare ht_at 0)
     (add_builtin_function3 std (to_sym "store") tableT DontCare DontCare ht_store 0)
     (add_builtin_function1 std (to_sym "push") tableT ht_push 0)
