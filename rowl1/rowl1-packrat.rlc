@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2012-10-03 04:06:19 nineties $
+; $Id: rowl1-packrat.rlc 2012-10-18 03:49:40 nineties $
 ;
 
 ; TODO:
@@ -145,7 +145,7 @@
     (var num_ent  (vector_size (field_get table 1)))
     (if (>= num_ent old_size) (do
         (var new_size (array_get int prime_numbers (bsr num_ent)))
-        (if (! new_size) (error "rehash: too many entries"))
+        (if (! new_size) return)
         (var bucket (make_vector new_size))
         (var entries (field_get table 1))
         (for i 0 (vector_size entries) (do
@@ -165,13 +165,22 @@
     (var bucket (field_get table 0))
     (var entries (field_get table 1))
     (var size (vector_size bucket))
-    (var h (hash sym pos))
+    (var h_orig (hash sym pos))
 
-    (var ent (struct 3 sym obj 0 pos h))
-    (= h (umod h size))
+    (var h (umod h_orig size))
+    (var entry (vector_at bucket h))
+    (while entry (do
+        (var e_sym (field_get entry 0))
+        (var e_pos (field_get entry 3))
+        (if (&& (== e_sym sym) (== e_pos pos)) (do
+            (field_set entry 1 obj)
+            return
+            ))
+        (= entry (field_get entry 2))
+        ))
 
+    (var ent (struct 3 sym obj 0 pos h_orig))
     (vector_pushback entries ent)
-
     (field_set ent 2 (vector_at bucket h))
     (vector_put bucket h ent)
     ))
@@ -524,9 +533,12 @@
 
 ; parse_integers
 ; multi-precision integer is not supported for now
+(extern fun parse_bint)
 (fun parse_decimal_ (p) (
-    (var v (getc p))
     (var sign 1)
+    (var big_p @FALSE)
+    (var begin (field_get p 5))
+    (var v (getc p))
 
     (if (< v 0) (return (mayparse p "expect a number")))
         
@@ -543,12 +555,15 @@
     (while (is_0_9 (lookahead p)) (do
         (= v (- (getc p) '0'))
         (if (> value (/ (- @INTEGER_MAX v) 10))
-            (return (integer_overflow p))
+            (= big_p @TRUE)
             )
         (= value (+ (* value 10) v))
         ))
     (if (is_end_of_token p)
-        (return (parsed p (box (* sign value))))
+        (if big_p
+            (return (parsed p (parse_bint (extract_string p begin (field_get p 5)))))
+            (return (parsed p (box (* sign value))))
+            )
         )
     (if (== (lookahead p) 'e') (do
         (getc p)
@@ -557,18 +572,23 @@
         (var exp (unbox @(TOKEN p)))
         (while (> exp 0) (do
             (if (> value (/ @INTEGER_MAX 10))
-                (return (integer_overflow p))
+                (= big_p @TRUE)
                 )
             (*= value 10)
             (-= exp 1)
             ))
-        (return (parsed p (box (* sign value))))
+        (if big_p
+            (return (parsed p (parse_bint (extract_string p begin (field_get p 5)))))
+            (return (parsed p (box (* sign value))))
+            )
         ))
     (return (junk_letter p))
     ))
 @(MEMOIZE decimal)
 
 (fun parse_binary_ (p) (
+    (var big_p @FALSE)
+    (var begin (field_get p 5))
     (parse_text p "0b")
     @(CHECK p)
     (if (! (is_01 (lookahead p))) (return (noparse p "expect 0 or 1")))
@@ -576,18 +596,23 @@
     (while (is_01 (lookahead p)) (do
         (var v (- (getc p) '0'))
         (if (> value (/ (- @INTEGER_MAX v) 2))
-            (return (integer_overflow p))
+            (= big_p @TRUE)
             )
         (= value (| (<< value 1) v))
         ))
     (if (! (is_end_of_token p))
         (return (junk_letter p))
         )
-    (return (parsed p (box value)))
+    (if big_p
+        (return (parsed p (parse_bint (extract_string p begin (field_get p 5)))))
+        (return (parsed p (box value)))
+        )
     ))
 @(MEMOIZE binary)
 
 (fun parse_octal_ (p) (
+    (var big_p @FALSE)
+    (var begin (field_get p 5))
     (parse_text p "0o")
     @(CHECK p)
     (if (! (is_0_7 (lookahead p))) (return (noparse p "expect 0-7")))
@@ -595,18 +620,23 @@
     (while (is_0_7 (lookahead p)) (do
         (var v (- (getc p) '0'))
         (if (> value (>> (- @INTEGER_MAX v) 3))
-            (return (integer_overflow p))
+            (= big_p @TRUE)
             )
         (= value (+ (<< value 3) v))
         ))
     (if (! (is_end_of_token p))
         (return (junk_letter p))
         )
-    (return (parsed p (box value)))
+    (if big_p
+        (return (parsed p (parse_bint (extract_string p begin (field_get p 5)))))
+        (return (parsed p (box value)))
+        )
     ))
 @(MEMOIZE octal)
 
 (fun parse_hex_ (p) (
+    (var big_p @FALSE)
+    (var begin (field_get p 5))
     (parse_text p "0x")
     @(CHECK p)
     (if (! (is_hexdigit (lookahead p))) (return (noparse p "expect hex digit")))
@@ -620,14 +650,17 @@
             (= v (- v '0'))
             ))
         (if (> value (>> (- @INTEGER_MAX v) 4))
-            (return (integer_overflow p))
+            (= big_p @TRUE)
             )
         (= value (+ (<< value 4) v))
         ))
     (if (! (is_end_of_token p))
         (return (junk_letter p))
         )
-    (return (parsed p (box value)))
+    (if big_p
+        (return (parsed p (parse_bint (extract_string p begin (field_get p 5)))))
+        (return (parsed p (box value)))
+        )
     ))
 @(MEMOIZE hex)
 
@@ -637,6 +670,8 @@
     (parse_decimal p)
     @(CHECK p)
     (if (!= (lookahead p) '.') (return (noparse p "expect '.'")))
+    (getc p)
+    (if (! (is_0_9 (lookahead p))) (return (noparse p "expect digits after the decimal point")))
     (getc p)
     (while (is_0_9 (lookahead p)) (getc p))
     (if (== (lookahead p) 'e') (do
@@ -807,6 +842,19 @@
     ))
 @(MEMOIZE node)
 
+(fun parse_integer_ (p) (
+    @(OR p `(
+        decimal
+        hex
+        octal
+        binary
+        ))
+    (if (! @(PARSED p))
+        (return (noparse p "expect an integer"))
+        )
+    ))
+@(MEMOIZE integer)
+
 (fun parse_atom_ (p) (
     @(OR p `(
         symbol
@@ -823,8 +871,7 @@
 (fun parse_expr_ (p) (
     @(OR p `(
         node
-        symbol
-        string
+        atom
     ))
     ))
 @(MEMOIZE expr)
@@ -832,12 +879,39 @@
 (fun parse_statement_ (p) (
     (parse "parse_expr" p)
     @(CHECK p)
-
-    (eval_parser_command p)
     (var loc (get_loc p))
     (return (parsed p (located loc @(TOKEN p))))
     ))
 @(MEMOIZE statement)
+
+(fun parse_begin_module (p) (
+    (parse_text p "module") 
+    (var loc (get_loc p))
+    @(CHECK p)
+    (parse_spaces p)
+    (parse "parse_qualified_symbol" p)
+    @(CHECK p)
+    (var mod @(TOKEN p))
+    (parse_spaces p)
+    (parse_char p '{')
+    @(CHECK p)
+    (return (parsed p (located loc (make_expr BeginModule (list1 mod)))))
+    ))
+
+(fun parse_toplevel_statement (p) (
+    (var state (copy_parser_state p))
+    (parse_begin_module p)
+    (if @(PARSED p) return)
+    (set_parser_state_all p state)
+
+    (parse "parse_statement" p)
+    (if @(PARSED p) return)
+
+    (set_parser_state_all p state)
+    (parse_char p '}')
+    @(CHECK p)
+    (parsed p (located (get_loc p) (make_expr EndModule 0)))
+    ))
 
 (export fun parse_statements (p) (
     (parsed p 0)
@@ -855,22 +929,21 @@
         (if (== (lookahead p) @EOF) break)
 
         (set_indent p (get_column p))
-        (parse "parse_statement" p)
+        (parse_toplevel_statement p)
         @(CHECK p)
         (var stmt @(TOKEN p))
-        (var loc (get_loc p))
+
         (parse_blanks p)
-
-        (if (== (lookahead p) @EOF) break)
-
         (parse_char p '\n')
         @(CHECK p)
 
-        (if (!= (expr_head stmt) Located) (do
-            (output_error stderr loc)
-            (output_string stderr "parse_statement must returns Located{ ... }\n")
-            (exit 1)
-            ))
+        (if (!= (expr_head stmt) Located) (throw
+            (unexpected_error (get_loc p)
+                (string "parse_statement must returns Locate{...}")
+                stmt))
+            )
+
+        (flush_parser p @FALSE)
 
         (= stmts (cons stmt stmts))
 
@@ -879,7 +952,8 @@
         (if (|| (== hd BeginModule)
             (|| (== hd EndModule)
             (|| (== hd Include)
-            (== hd DefSyntax))))
+            (|| (== hd Import)
+            (== hd DefSyntax)))))
             break
             )
         ))
@@ -904,7 +978,7 @@
         (parse_spaces p)
 
         (set_indent p (get_column p))
-        (parse "parse_statement" p)
+        (parse_toplevel_statement p)
         (if (! @(PARSED p)) (if may_parse (goto retry) return))
         (var e @(TOKEN p))
         (var loc (get_loc p))
@@ -915,11 +989,11 @@
         (parse_char p '\n')
         (if (! @(PARSED p)) (if may_parse (goto retry) return))
 
-        (if (!= (expr_head e) Located) (do
-            (output_error stderr loc)
-            (output_string stderr "parse_statement must returns Located{ ... }\n")
-            (exit 1)
-            ))
+        (if (!= (expr_head e) Located) (throw
+            (unexpected_error (get_loc p)
+                (string "parse_statement must returns Locate{...}")
+                e))
+            )
         (parsed p e)
         return
 
@@ -927,15 +1001,6 @@
         (clear_parser_state p state)
         (print_prompt p "~ ")
         (reserve p)
-        ))
-    ))
-
-(fun eval_parser_command (p) (
-    (if (! @(PARSED p)) (return nil))
-    (var expr @(TOKEN p))
-    (var ty (expr_head expr))
-    (if (&& (== ty Import) (is_anonymous_module current_mod)) (do
-        (import_module (get_loc p) current_mod (expr_arg expr 0))
         ))
     ))
 
@@ -1615,10 +1680,9 @@
     ; modify parsed expression to Located{...}
     (var return_stmt 0)
     (if (== sym (to_sym "parse_statement_"))
-        (= return_stmt (block (list2
-            (apply (to_sym "%eval_parser_command") (list1 PVar))
+        (= return_stmt
             (mkreturn (apply (to_sym "%apply_located") (list1 PVar)))
-            )))
+            )
         (= return_stmt (mkreturn nil))
         )
 
@@ -1764,7 +1828,6 @@
     (add_builtin_function3 mod (to_sym "%oneof") (domainP Parser) stringT stringT oneof 0)
     (add_builtin_function3 mod (to_sym "%noneof") (domainP Parser) stringT stringT noneof 0)
     (add_builtin_function1 mod (to_sym "%apply_located") DontCare apply_located 0)
-    (add_builtin_function1 mod (to_sym "%eval_parser_command") DontCare eval_parser_command 0)
     (add_builtin_function1 mod (to_sym "%open_scope") DontCare open_scope 0)
     (add_builtin_function1 mod (to_sym "%close_scope") DontCare close_scope 0)
     (add_builtin_function1 mod (to_sym "%get_pos") (domainP Parser) get_pos 0)
@@ -1781,9 +1844,11 @@
     (add_parser mod (to_sym "parse_binary_") parse_binary_)
     (add_parser mod (to_sym "parse_octal_") parse_octal_)
     (add_parser mod (to_sym "parse_hex_") parse_hex_)
+    (add_parser mod (to_sym "parse_integer_") parse_integer_)
     (add_parser mod (to_sym "parse_float_") parse_float_)
     (add_parser mod (to_sym "parse_string_") parse_string_)
     (add_parser mod (to_sym "parse_symbol_") parse_symbol_)
+    (add_parser mod (to_sym "parse_atom_") parse_atom_)
     (add_parser mod (to_sym "parse_node_") parse_node_)
     (add_parser mod (to_sym "parse_expr_") parse_expr_)
     (add_parser mod (to_sym "parse_statement_") parse_statement_)
@@ -1795,9 +1860,11 @@
     (add_parser mod (to_sym "parse_binary") parse_binary)
     (add_parser mod (to_sym "parse_octal") parse_octal)
     (add_parser mod (to_sym "parse_hex") parse_hex)
+    (add_parser mod (to_sym "parse_integer") parse_integer)
     (add_parser mod (to_sym "parse_float") parse_float)
     (add_parser mod (to_sym "parse_string") parse_string)
     (add_parser mod (to_sym "parse_symbol") parse_symbol)
+    (add_parser mod (to_sym "parse_atom") parse_atom)
     (add_parser mod (to_sym "parse_node") parse_node)
     (add_parser mod (to_sym "parse_expr") parse_expr)
     (add_parser mod (to_sym "parse_statement") parse_statement)

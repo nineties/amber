@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2012-10-03 14:39:38 nineties $
+; $Id: rowl1-interp.rlc 2012-10-18 02:59:58 nineties $
 ;
 
 (import "rlvm-compile")
@@ -184,7 +184,6 @@
             (eval (car es))
             (= es (cdr es))
             ))
-        (flush_parser p @FALSE)
         ))
     (= current_loc no_loc)
     ))
@@ -239,6 +238,9 @@
     ))
 
 (fun eval_end_module (expr) (
+    (if (== current_mod global_mod)
+        (throw (exception current_mod (string "there is no module to close")))
+        )
     (if (! (in_top_scope current_mod))
         (throw (exception current_mod (string "module definition in sub-scope is not allowed")))
         )

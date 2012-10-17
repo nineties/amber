@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-10-02 13:01:02 nineties $
+; $Id: rowl1-compile.rlc 2012-10-18 01:07:34 nineties $
 ;
 
 (import "rlvm-compile")
@@ -561,8 +561,10 @@
     (return (byterun (lookup_func current_mod sym) arg0 arg1 arg2))
     ))
 
-(fun do_nothing (asm mod expr) (
-    (put_push asm nil)
+(fun topscope_only (asm mod expr) (
+    (throw (unexpected_error current_loc
+        (string "Allowed only in top-level scope")
+        expr))
     ))
 
 (fun check_arg_size (name size expr) (
@@ -1662,8 +1664,8 @@
     (add_compiler mod (make_expr Located (list2 locT DontCare)) compile_located)
 
     ; These commands have been evaluated in parsing phase.
-    (add_compiler mod (make_expr Import (list1 DontCare)) do_nothing)
-    (add_compiler mod (make_expr Include (list1 DontCare)) do_nothing)
+    (add_compiler mod (make_expr Import (list1 DontCare)) topscope_only)
+    (add_compiler mod (make_expr Include (list1 DontCare)) topscope_only)
 
     (add_compiler mod (make_expr Qualified (list2 symT DontCare)) compile_qualified)
 
