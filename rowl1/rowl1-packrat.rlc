@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2012-10-18 03:49:40 nineties $
+; $Id: rowl1-packrat.rlc 2012-10-18 14:24:54 nineties $
 ;
 
 ; TODO:
@@ -732,8 +732,9 @@
     (if (< v 0) (return (mayparse p (string "expect '#'"))))
     (if (!= v '#') (return (noparse p (string "expect '#'"))))
     (while @TRUE (do
-        (var c (getc p))
+        (var c (lookahead p))
         (if (|| (== c '\n') (< c 0)) break)
+        (getc p)
         ))
     (return (parsed p nil))
     ))
@@ -1523,7 +1524,7 @@
 (fun compile_scoped (mod elem) (
     (var p (compile_parser_element elem))
     (return (block (list3
-        (apply (to_sym "%open_scope") (list1 (quote mod)))
+        (apply (to_sym "%open_scope") (list1 mod))
         p
         (apply (to_sym "%close_scope") (list1 PVar))
         )))
@@ -1540,10 +1541,9 @@
 
 ; exit from anonymous scope
 (fun close_scope (p) (
-    (var ls (imported_modules current_mod))
     (var mod current_mod)
     (set_current_module (super_module current_mod))
-    (if (&& @(PARSED p) ls)
+    (if @(PARSED p)
         (parsed p (make_expr Scoped (list2 mod @(TOKEN p))))
         )
     ))

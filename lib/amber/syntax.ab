@@ -4,7 +4,7 @@ DefineSyntax{
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2012-10-18 03:18:37 nineties $
+# $Id: syntax.ab 2012-10-18 12:05:23 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -76,8 +76,8 @@ DefineSyntax{
             QuasiQuote{Delimited1{Unquote{node2}, Unquote{node4}}}, multiline},
         Tuple{List{"delimited2", "(", syntax_element, ",", syntax_element, ")"},
             QuasiQuote{Delimited2{Unquote{node2}, Unquote{node4}}}, multiline},
-        Tuple{List{"scoped", "(", syntax_element, ")"},
-            QuasiQuote{Scoped{nil, Unquote{node2}}}, multiline},
+        Tuple{List{"scoped", "(", expr, ",", syntax_element, ")"},
+            QuasiQuote{Scoped{Unquote{node2}, Unquote{node4}}}, multiline},
         Tuple{List{primary_syntax_element}, node0}
     }
 }
@@ -103,7 +103,7 @@ DefineSyntax{
 
 DefineSyntax{
     parser_action,
-    List{Tuple{List{Scoped{parser, parser_action_body}}, node0}}
+    List{Tuple{List{Scoped{Quote{parser}, parser_action_body}}, node0}}
 }
 
 DefineSyntax{
@@ -139,18 +139,21 @@ DefineSyntax{
 }
 
 ## Expressions
-block_body ::= [multiline] "{" aligned(statement) "}"
-                { QuasiQuote{Block{Unquote{node1}}} }
-
-block ::= scoped(block_body)
-
 qualified_symbol
     ::= symbol "::" qualified_symbol
         { MakeExpr{Quote{Qualified}, List{node0, node2}} }
       | symbol
 
+block_body ::= aligned(statement) { QuasiQuote{Block{Unquote{node0}}} }
+block ::= [multiline] "{" block_body "}" { node1 }
+        # Block with module imports
+        | [multiline] "(" qualified_symbol ")" "{" scoped(node1, block_body) "}"
+            { node4 }
+
 primary_expr
-    ::= [multiline] "(" expr ")"                  { node1 } 
+    ::= block
+
+      | [multiline] "(" expr ")"                  { node1 } 
       | [multiline] "(" statement ")"             { node1 }
       | [multiline] "[" delimited(expr, ",") "]"  { node1 } # List literal
 
@@ -163,7 +166,6 @@ primary_expr
       | "|" expr "|"
         { MakeExpr{Quote{Absolute}, List{node1}} } 
 
-      | block
       | atom
       | "..."   { Quote{Ellipsis{nil}} }
 
