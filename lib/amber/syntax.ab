@@ -4,7 +4,7 @@ DefineSyntax{
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2012-10-18 12:05:23 nineties $
+# $Id: syntax.ab 2012-10-20 01:30:10 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -163,9 +163,6 @@ primary_expr
       | [multiline] "(" delimited2(expr, ",") ")"
         { MakeExpr{Quote{Tuple}, node1} }
 
-      | "|" expr "|"
-        { MakeExpr{Quote{Absolute}, List{node1}} } 
-
       | atom
       | "..."   { Quote{Ellipsis{nil}} }
 
@@ -247,15 +244,15 @@ rel_expr
       | shift_expr ">"  shift_expr { `GreaterThan{!node0, !node2} }
       | shift_expr ">=" shift_expr { `GreaterEqual{!node0, !node2} }
       | shift_expr "==" shift_expr { `Equal{!node0, !node2} }
-      | shift_expr "!=" shift_expr { `NotEqual{!node0, !node2} }
+      | shift_expr "/=" shift_expr { `NotEqual{!node0, !node2} }
       | shift_expr
 
 seqand_expr
-    ::= rel_expr  "&&" seqand_expr { `SeqAnd{!node0, !node2} }
+    ::= rel_expr "and" seqand_expr { `SeqAnd{!node0, !node2} }
       | rel_expr
 
 seqor_expr
-    ::= seqand_expr "||" seqor_expr { `SeqOr{!node0, !node2} }
+    ::= seqand_expr "or" seqor_expr { `SeqOr{!node0, !node2} }
       | seqand_expr
 
 ternary_expr
@@ -299,12 +296,7 @@ arguments
         { MakeExpr{\Tuple, node1} }
 
 statement
-    ::= "module" qualified_symbol "{"
-        { `BeginModule{!node1} }
-      | "}"
-        { \EndModule{} }
-
-      | "import" qualified_symbol
+    ::= "import" qualified_symbol
         { `Import{!node1} }
       | "include" expr
         { `Include{!node1} }
@@ -367,7 +359,7 @@ x > y   => `gt(!x, !y)
 x <= y  => `le(!x, !y)
 x >= y  => `ge(!x, !y)
 x == y  => `equal(!x, !y)
-x != y  => `(not equal(!x, !y))
+x /= y  => `(not equal(!x, !y))
 x[args...]     => `Apply{at, !cons(x, args)}
 x[args...] = e => `Apply{store, !cons(x, append(args, [e]))}
 
