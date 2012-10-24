@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-float.rlc 2012-10-03 14:28:00 nineties $
+; $Id: rowl1-float.rlc 2012-10-24 22:15:44 nineties $
 ;
 
 (import "rlvm-compile")
@@ -190,12 +190,16 @@
 ; Robert G. Burger: "Printing Floating-Point Numbers Quickly and Accurately"
 (fun float_to_s (f) (
     (var sign 0)
-    (if (< (field_get f 1) 0) (= sign 1))
-    (var exp (- (- (& (>> (field_get f 1) 20) 0x7ff) 1023) 52))
+    (var f0 (field_get f 0))
+    (var f1 (field_get f 1))
+    (if (&& (== f0 0) (|| (== f1 0) (== f1 0x80000000))) (return (string "0.0")))
+
+    (if (< f1 0) (= sign 1))
+    (var exp (- (- (& (>> f1 20) 0x7ff) 1023) 52))
     (var man (allocate_bint 2))
     (field_set man 1 2)
-    (bint_set_digit man 0 (field_get f 0))
-    (bint_set_digit man 1 (| (& (field_get f 1) 0xfffff) (<< 1 20)))
+    (bint_set_digit man 0 f0)
+    (bint_set_digit man 1 (| (& f1 0xfffff) (<< 1 20)))
     (return (decode_float sign man exp))
     ))
 
