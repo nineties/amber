@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2012-10-24 22:07:36 nineties $
+; $Id: vm-insn.rlc 2012-10-24 23:48:35 nineties $
 ;
 
 (define gen_field_get (idx) `(
@@ -41,10 +41,10 @@
 (define gen_comparison3 (jmpname) `(
     (vmpop %eax)
     (vmpop %ecx)
-    (asm "fldl (%ecx)")
     (asm "fldl (%eax)")
-    (asm "fucompp")
-    (asm "fnstsw %ax")
+    (asm "fldl (%ecx)")
+    (asm "fcompp")
+    (asm "fstsw %ax")
     (asm "sahf")
     (asm @jmpname " 1f")
     (vmsucc 3)
@@ -1415,12 +1415,12 @@
     (if_ult     (addr) @nil @(gen_comparison2 "cmovb"))
     (if_ule     (addr) @nil @(gen_comparison2 "cmovbe"))
 
-    (if_feq     (addr) @nil @(gen_comparison3 "jne"))
-    (if_fne     (addr) @nil @(gen_comparison3 "je"))
-    (if_fgt     (addr) @nil @(gen_comparison3 "jle"))
-    (if_fge     (addr) @nil @(gen_comparison3 "jl"))
-    (if_flt     (addr) @nil @(gen_comparison3 "jge"))
-    (if_fle     (addr) @nil @(gen_comparison3 "jg"))
+    (if_feq     (addr) @nil @(gen_comparison3 "je"))
+    (if_fne     (addr) @nil @(gen_comparison3 "jne"))
+    (if_fgt     (addr) @nil @(gen_comparison3 "ja"))
+    (if_fge     (addr) @nil @(gen_comparison3 "jae"))
+    (if_flt     (addr) @nil @(gen_comparison3 "jb"))
+    (if_fle     (addr) @nil @(gen_comparison3 "jbe"))
 
     ; instructions for handling exceptions.
     ; push unwind stack
