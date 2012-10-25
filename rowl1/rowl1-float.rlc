@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-float.rlc 2012-10-24 22:15:44 nineties $
+; $Id: rowl1-float.rlc 2012-10-25 22:10:48 nineties $
 ;
 
 (import "rlvm-compile")
@@ -333,6 +333,25 @@
 (fun float_ge (a b) ((if (f>= a b) (return true) (return false))))
 (fun float_eq (a b) ((if (f== a b) (return true) (return false))))
 
+(fun float_abs (n) (
+    (if (>= (field_get n 1) 0)
+        (return n)
+        (return (float_uminus n))
+        )
+    ))
+
+(fun float_ipow (f n _) (
+    (var v (itof 1))
+    (= n (unbox n))
+    (var m 0x40000000)
+    (while (! (& n m)) (>>= m 1))
+    (while (> m 0) (do
+        (fmul v v)
+        (if (& n m) (fmul v f))
+        (>>= m 1)
+        ))
+    (return v)
+    ))
 
 (fun if_coerce (a b) ((return (list2 (itof (unbox a)) b))))
 (fun fi_coerce (a b) ((return (list2 a (itof (unbox b))))))
@@ -348,14 +367,14 @@
     (add_builtin_function3 std (to_sym "add") floatT floatT DontCare float_add 0)
     (add_builtin_function3 std (to_sym "sub") floatT floatT DontCare float_sub 0)
     (add_builtin_function3 std (to_sym "mul") floatT floatT DontCare float_mul 0)
-    ;(add_builtin_function3 std (to_sym "pow") floatT floatT float_pow 0)
     (add_builtin_function3 std (to_sym "div") floatT floatT DontCare float_div 0)
     (add_builtin_function2 std (to_sym "lt") floatT floatT float_lt 0)
     (add_builtin_function2 std (to_sym "gt") floatT floatT float_gt 0)
     (add_builtin_function2 std (to_sym "le") floatT floatT float_le 0)
     (add_builtin_function2 std (to_sym "ge") floatT floatT float_ge 0)
     (add_builtin_function2 std (to_sym "equal") floatT floatT float_eq 0)
-
+    (add_builtin_function1 std (to_sym "abs") floatT float_abs 0)
+    (add_builtin_function3 std (to_sym "pow") floatT intT DontCare float_ipow 0)
 
     (add_builtin_function2 std (to_sym "coerce") intT floatT if_coerce 0)
     (add_builtin_function2 std (to_sym "coerce") floatT intT fi_coerce 0)
