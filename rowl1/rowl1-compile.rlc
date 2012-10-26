@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-10-19 22:11:03 nineties $
+; $Id: rowl1-compile.rlc 2012-10-26 15:55:31 nineties $
 ;
 
 (import "rlvm-compile")
@@ -100,7 +100,10 @@
     ))
 
 (fun delete_args (expr fv) (
-    (return (iter_args delete_var expr fv 0))
+    (if (== (expr_head expr) Where)
+        (return (iter_args delete_var (expr_arg expr 0) fv 0))
+        (return (iter_args delete_var expr fv 0))
+        )
     ))
 
 (fun add_var (sym list) (
@@ -108,7 +111,10 @@
     ))
 
 (fun collect_args (args) (
-    (return (iter_args add_var args 0 0))
+    (if (== (expr_head args) Where)
+        (return (iter_args add_var (expr_arg args 0) 0 0))
+        (return (iter_args add_var args 0 0))
+        )
     ))
 
 (fun fv_iter_block (mod exprs fv) (
@@ -142,6 +148,10 @@
             ))
         (if (== hd Lambda) (do
             (= fv (fv_iter mod (expr_arg expr 1) 0 fv))
+            (var arg (expr_arg expr 0))
+            (if (== (expr_head arg) Where)
+                (= fv (fv_iter mod (expr_arg arg 1) 0 fv))
+                )
             (return (delete_args (expr_arg expr 0) fv))
             ))
         (if (== hd Ref)
@@ -1482,10 +1492,19 @@
     (var body (field_get lam 3))
     (var guard (field_get lam 4))
     (var asm (make_assembler))
-    (put_push asm clos)
-    (put_push asm body)
-    (put_jjump asm)
-    (return (alloc_function args (get_code asm) guard))
+    (if guard
+        (do
+            (put_push asm clos)
+            ; This implementation is not good (the cost of copy might be large)
+            (put_code asm guard)
+            (return (alloc_function args body (get_code asm)))
+        )
+        (do
+            (put_push asm clos)
+            (put_push asm body)
+            (put_jjump asm)
+            (return (alloc_function args (get_code asm) guard))
+        ))
     ))
 
 (fun compile_closure (asm mod expr) (
