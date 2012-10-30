@@ -4,7 +4,7 @@ DefineSyntax{
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2012-10-20 01:30:10 nineties $
+# $Id: syntax.ab 2012-10-30 21:06:14 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -202,25 +202,25 @@ postfix_expr
 
       | secondary_expr
 
-quote_expr
-    ::= "\\" quote_expr
+term
+    ::= "\\" term
         { MakeExpr{Quote{Quote}, List{node1}} }
-      | "`"  quote_expr
+      | "`"  term
         { MakeExpr{Quote{QuasiQuote}, List{node1}} }
-      | "!"  quote_expr
+      | "!"  term
         { MakeExpr{Quote{Unquote}, List{node1}} }
       | postfix_expr
 
-pattern ::= quote_expr
+pattern ::= term
 
 # enable use of quotation expressions for following definitions.
-expr ::= quote_expr
+expr ::= term
 
 prefix_expr
-    ::= "+"   quote_expr    { `UnaryPlus{!node1} }
-      | "-"   quote_expr    { `UnaryMinus{!node1} }
-      | "not" quote_expr    { `Not{!node1} }
-      | quote_expr
+    ::= "+"   term    { `UnaryPlus{!node1} }
+      | "-"   term    { `UnaryMinus{!node1} }
+      | "not" term    { `Not{!node1} }
+      | term
 
 multiplicative_expr
     ::= multiplicative_expr '*' prefix_expr { `Mul{!node0, !node2} }
@@ -301,12 +301,12 @@ statement
       | "include" expr
         { `Include{!node1} }
 
-      | [multiline] "if" quote_expr statement "else" statement
+      | [multiline] "if" term statement "else" statement
         { `IfElse{!node1, !node2, !node4} }
-      | "if" quote_expr statement
+      | "if" term statement
         { `If{!node1, !node2} }
 
-      | "while" quote_expr statement
+      | "while" term statement
         { `While{!node1, !node2} }
       | "continue"
         { `Continue{} }
