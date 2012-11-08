@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2012-10-18 02:59:58 nineties $
+; $Id: rowl1-interp.rlc 2012-11-08 11:40:50 nineties $
 ;
 
 (import "rlvm-compile")
@@ -82,6 +82,9 @@
 
     (add_include_dir "/usr/lib/amber/")
     (include_file "amber/syntax.ab")
+    (if (in_shell_mode)
+        (import_module current_loc global_mod (to_sym "shell_syntax"))
+        )
     (include_file "string.ab")
     (include_file "bigint.ab")
     (include_file "io.ab")
@@ -188,26 +191,35 @@
     (= current_loc no_loc)
     ))
 
+(extern fun ary_new)
+(extern fun ary_store)
+(extern fun ary_push)
 (fun interpret_shell (p) (
-    (try 
-        (while 1 (do
-            (parse_shell_statement p)
-            (if (! (parse_success p)) (do
-                (output_syntax_error (get_loc p) (parser_error p))
-                (flush_parser p @TRUE)
-                continue
+    (var outputs (ary_new))
+    (add_module_variable global_mod (to_sym "shell_outputs") outputs true)
+    (ary_push outputs undefined)
+    (while 1 (do
+        (try 
+            (while 1 (do
+                (parse_shell_statement p)
+                (if (! (parse_success p)) (do
+                    (output_syntax_error (get_loc p) (parser_error p))
+                    (flush_parser p @TRUE)
+                    continue
+                    ))
+                (var ret (eval (parsed_token p)))
+                (print_result p ret)
+                (flush_parser p @FALSE)
+                (ary_store outputs (box 0) ret)
+                (ary_push outputs ret)
                 ))
-            (var ret (eval (parsed_token p)))
-            (print_result p ret)
-            (flush_parser p @FALSE)
-            ))
-    (catch e (do
-        (output_string stderr "Error: ")
-        (pretty_print stderr e)
-        (output_string stderr "\n")
-        (flush_parser p @TRUE)
-        (interpret_shell p)
-        )))
+        (catch e (do
+            (output_string stderr "Error: ")
+            (pretty_print stderr e)
+            (output_string stderr "\n")
+            (flush_parser p @TRUE)
+            (ary_push outputs e)
+        )))))
     ))
 
 (fun print_result (p val) (
@@ -355,6 +367,11 @@
     
     (add_module_variable mod (to_sym "LOCATION") current_loc false)
     (add_module_variable mod (to_sym "MODULE") current_mod false)
+
+    (if (in_shell_mode)
+        (add_module_variable mod (to_sym "shell_mode") true true)
+        (add_module_variable mod (to_sym "shell_mode") false true)
+        )
     
     (add_builtin_function1 mod Rewrite DontCare default_rewrite 0)
     (add_builtin_function1 mod Rewrite (domainP Located) rewrite_located 0)

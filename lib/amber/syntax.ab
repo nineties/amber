@@ -4,7 +4,7 @@ DefineSyntax{
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2012-10-30 21:06:14 nineties $
+# $Id: syntax.ab 2012-11-08 11:40:06 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -334,7 +334,6 @@ statement
       | statement ";" statement
         { `Seq{[!node0, !node2]} }
 
-
 ## Syntax Sugars
 +x      => `uplus(!x)
 -x      => `uminus(!x)
@@ -373,4 +372,9 @@ DefineVariable{Tuple{vs...}, v} => {
 module parser {
     primary_expr ::= "$" decimal { ("node" + node1).to_sym }
                    | "$input"    { \GET_INPUT_TEXT() }
+}
+
+module shell_syntax {
+    primary_expr ::= "%" decimal { `shell_outputs[!$1] }
+                   | "%"         { `shell_outputs[0] }
 }

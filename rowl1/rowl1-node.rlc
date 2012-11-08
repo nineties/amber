@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2012-10-01 03:12:02 nineties $
+; $Id: rowl1-node.rlc 2012-11-08 02:02:23 nineties $
 ;
 
 (import "rlvm-compile")
@@ -192,9 +192,6 @@
     (if (== tag @TAG_CONS) (return @ListE))
     (if (== tag @TAG_BYTECODE) (return @BytecodeE))
     (if (== tag @TAG_BIGINT) (return @BigIntE))
-    (if (&& (== tag @TAG_SEQUENCE) (== (get_sequence_tag obj) @SEQ_ARRAY))
-        (return @ArrayE)
-        )
     (return @BuiltinE)
     ))
 
@@ -603,9 +600,10 @@
 
 (fun pp_array (ochan ary) (
     (output_string ochan "Array [")
-    (var size (array_size ary))
+    (var buf (field_get ary 1))
+    (var size (field_get ary 2))
     (for i 0 size (do
-        (pretty_print ochan (array_get object ary i))
+        (pretty_print ochan (array_get object buf i))
         (if (< i (- size 1)) (output_string ochan ", "))
         ))
     (output_char ochan ']')
