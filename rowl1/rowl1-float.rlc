@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-float.rlc 2012-10-25 22:10:48 nineties $
+; $Id: rowl1-float.rlc 2012-11-13 03:05:12 nineties $
 ;
 
 (import "rlvm-compile")
@@ -241,39 +241,77 @@
 
 (fun to_string (sign man e) (
     (var mans (bint_to_s man))
-    (var es (itos e))
-    (var len 0)
-    (if sign (+= len 1))
-    (+= len (strlen mans))
-    (+= len 1) ; '.'
-    (if (!= e 0) (do
-        (+= len 1) ; 'e'
-        (+= len (strlen es))
-        ))
-    
-    (var str (allocate_string len))
-    (var p 0)
-    (if sign (do
-        (array_set char str 0 '-')
-        (+= p 1)
-        ))
-    (array_set char str p (array_get char mans 0))
-    (+= p 1)
-    (array_set char str p '.')
-    (+= p 1)
-    (for i 1 (strlen mans) (do
-        (array_set char str p (array_get char mans i))
-        (+= p 1)
-        ))
-    (if (!= e 0) (do
-        (array_set char str p 'e')
-        (+= p 1)
-        (for i 0 (strlen es) (do
-            (array_set char str p (array_get char es i))
-            (+= p 1)
+    (var len (strlen mans))
+    (while (== (array_get char mans (- len 1)) '0') (-= len 1))
+    (if (== e 0) (do
+        (var str (allocate_string (+ len 2)))
+        (var j 0)
+        (if sign (do
+            (array_set char str 0 '-')
+            (+= j 1)
             ))
-        ))
-    (return str)
+        (array_set char str j (array_get char mans 0))
+        (array_set char str (+ j 1) '.')
+        (+= j 2)
+        (for i 1 len (do
+            (array_set char str j (array_get char mans i))
+            (+= j 1)
+            ))
+        (return str)
+        )
+    (if (> e 0) (do
+        (var str (allocate_string (+ e 3)))
+        (var j 0)
+        (if sign (do
+            (array_set char str 0 '-')
+            (+= j 1)
+            ))
+        (var i 0)
+        (while (>= e 0) (do
+            (if (< i len)
+                (array_set char str j (array_get char mans i))
+                (array_set char str j '0')
+                )
+            (+= i 1)
+            (+= j 1)
+            (-= e 1)
+            ))
+        (array_set char str j '.')
+        (+= j 1)
+        (if (== i len) (do
+            (array_set char str j '0')
+            (return str)
+            ))
+        (while (< i len) (do
+            (array_set char str j (array_get char mans i))
+            (+= i 1)
+            (+= j 1)
+            ))
+        (return str)
+        )
+        (do
+        (var str (allocate_string (+ (+ (- e) len) 2)))
+        (var j 0)
+        (if sign (do
+            (array_set char str 0 '-')
+            (+= j 1)
+            ))
+        (array_set char str j '0')
+        (array_set char str (+ j 1) '.')
+        (+= j 2)
+        (+= e 1)
+        (while (< e 0) (do
+            (array_set char str j '0')
+            (+= j 1)
+            (+= e 1)
+            ))
+        (var i 0)
+        (for i 0 len (do
+            (array_set char str j (array_get char mans i))
+            (+= j 1)
+            ))
+        (return str)
+        )))
     ))
 
 (fun float_uplus (f) (
