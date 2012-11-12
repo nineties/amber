@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2012-11-08 11:40:50 nineties $
+; $Id: rowl1-interp.rlc 2012-11-13 00:31:32 nineties $
 ;
 
 (import "rlvm-compile")
@@ -37,7 +37,7 @@
 (export fun eval_shell () (
     (set_shell_mode)
     (try
-        (return (eval_main "amber" stdin))
+        (return (eval_main "amber" stdin 0 0))
         (catch e (do
             (output_string stderr "Uncaught exception: ")
             (pretty_print stderr e)
@@ -46,11 +46,11 @@
         )))
     ))
 
-(export fun eval_file (path) (
+(export fun eval_file (path argc argv) (
     (var r 0)
     (var ichan (open_in path))
     (try
-        (= r (eval_main path ichan))
+        (= r (eval_main path ichan argc argv))
         (catch e (do
             (output_string stderr "Exception: ")
             (pretty_print stderr e)
@@ -61,7 +61,7 @@
     (return r)
     ))
 
-(export fun eval_main (file ichan) (
+(export fun eval_main (file ichan argc argv) (
     ;(var start (gettimeofday))
 
     (= global_mod (make_module (to_sym "%global") 0))
@@ -69,6 +69,7 @@
 
     (= current_loc no_loc)
 
+    (setup_argv argc argv)
     (setup_globals global_mod)
     (setup_builtin_compilers global_mod)
     (init_stdlib global_mod)
@@ -360,6 +361,15 @@
     (var path (expr_arg_string expr 0))
     (include_file path)
     (return nil)
+    ))
+
+(fun setup_argv (argc argv) (
+    (var ARGV (ary_new))
+    (add_module_variable global_mod (to_sym "ARGV") ARGV true)
+    (if (== argc 0) return)
+    (for i 1 argc (do
+        (ary_push ARGV (string (array_get string argv i)))
+        ))
     ))
 
 (fun setup_globals (mod) (
