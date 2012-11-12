@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-array.rlc 2012-11-08 02:33:49 nineties $
+; $Id: rowl1-array.rlc 2012-11-13 01:21:52 nineties $
 ;
 
 (import "rlvm-compile")
@@ -34,7 +34,7 @@
     ))
 
 (export fun ary_size (ary) (
-    (return (field_get ary 2))
+    (return (box (field_get ary 2)))
     ))
 
 (fun ary_resize (ary new_size) (
@@ -64,14 +64,14 @@
 
 (export fun ary_at (ary i) (
     (= i (unbox i))
-    (var size (ary_size ary))
+    (var size (unbox (ary_size ary)))
     (if (< i size) (return (array_get object (field_get ary 1) i)))
     (index_out_of_range)
     ))
 
 (export fun ary_store (ary i v) (
     (= i (unbox i))
-    (var size (ary_size ary))
+    (var size (unbox (ary_size ary)))
     (if (< i size) (do
         (array_set object (field_get ary 1) i v)
         (return v)
@@ -82,7 +82,7 @@
     ))
 
 (export fun ary_push (ary v) (
-    (ary_store ary (box (ary_size ary)) v)
+    (ary_store ary (ary_size ary) v)
     (return ary)
     ))
 
