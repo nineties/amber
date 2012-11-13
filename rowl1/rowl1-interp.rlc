@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2012-11-14 01:49:18 nineties $
+; $Id: rowl1-interp.rlc 2012-11-14 04:54:10 nineties $
 ;
 
 (import "rlvm-compile")
@@ -81,7 +81,7 @@
     (= current_mod global_mod)
     (= current_loc no_loc)
 
-    (add_include_dir "/usr/lib/amber/")
+    (add_import_dir "/usr/lib/amber/")
     (import_file "amber/syntax.ab")
     (if (in_shell_mode)
         (open_module current_loc global_mod (to_sym "shell_syntax"))
@@ -92,8 +92,8 @@
     (import_file "list.ab")
     (import_file "table.ab")
 
-    (add_include_dir (get_directory file))
-    (add_include_dir "./")
+    (add_import_dir (get_directory file))
+    (add_import_dir "./")
 
     ;(var end (gettimeofday))
     ;(var diff (timeval_sub end start))
@@ -208,6 +208,7 @@
                     (flush_parser p @TRUE)
                     continue
                     ))
+                (parsed_token p)
                 (var ret (eval (parsed_token p)))
                 (print_result p ret)
                 (flush_parser p @FALSE)
@@ -292,20 +293,20 @@
     (exit 0)
     ))
 
-(var include_dirs null)
-(var included_modules null)
+(var import_dirs null)
+(var importd_modules null)
 
-(fun add_include_dir (path) (
-    (= include_dirs (cons path include_dirs))
+(fun add_import_dir (path) (
+    (= import_dirs (cons path import_dirs))
     ))
 
-(fun add_included_file (path) (
+(fun add_importd_file (path) (
     ; XXX: fixme. canonicalize the `path'
-    (= included_modules (cons path included_modules))
+    (= importd_modules (cons path importd_modules))
     ))
 
-(fun is_already_included (path) (
-    (var list included_modules)
+(fun is_already_importd (path) (
+    (var list importd_modules)
     (while list (do
         (if (streq path (car list))
             (return @TRUE)
@@ -316,14 +317,14 @@
     ))
 
 (fun import_file (path) (
-    (var dir include_dirs)
+    (var dir import_dirs)
     (while dir (do
         (var fullpath (build_path (car dir) path ""))
         (if (file_exists fullpath) (do
-            (if (is_already_included fullpath)
+            (if (is_already_importd fullpath)
                 (return nil)
                 )
-            (add_included_file fullpath)
+            (add_importd_file fullpath)
 
             (var ichan (open_in fullpath))
             (var fd (open "."))
@@ -362,10 +363,10 @@
     (var path (string ""))
     (while syms (do
         (= path (strcat path (symbol_name (car syms))))
-        (= path (strcat path "."))
         (= syms (cdr syms))
+        (if syms (= path (strcat path "/")))
         ))
-    (= path (strcat path "ab"))
+    (= path (strcat path ".ab"))
     (import_file path)
     (return nil)
     ))
