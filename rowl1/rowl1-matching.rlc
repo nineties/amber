@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2012-07-27 13:20:27 nineties $
+; $Id: rowl1-matching.rlc 2012-11-13 19:50:54 nineties $
 ;
 
 (import "rlvm-compile")
@@ -681,29 +681,8 @@
         (expand_composite_pat (cdr pats))))
     ))
 
-(var arity_max 8)
 (fun compile_matching_error (asm obj) (
-    ; construct list of arguments
-    (var end_lbl (fresh_label asm))
-    (var case_lbls (array int arity_max))
-    (for i 0 arity_max
-        (array_set int case_lbls i (fresh_label asm))
-        )
-
-    (put_imm_i0 asm) ; null list
-    (put_arity asm)
-    (put_tswitch asm arity_max)
-    (for i 0 arity_max
-        (emit_tswitch_label asm (array_get int case_lbls i))
-        )
-    (emit_tswitch_label asm end_lbl)
-    (set_label asm end_lbl)
-    (for i 0 arity_max (do
-        (var arg_idx (- (- arity_max i) 1))
-        (put_arg asm arg_idx)
-        (put_cons asm)
-        (set_label asm (array_get int case_lbls arg_idx))
-        ))
+    (put_args asm)
     (put_push asm obj)
     (compile_simple_call asm 2 matching_failed)
     (put_throw asm)
