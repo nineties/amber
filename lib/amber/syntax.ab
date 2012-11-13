@@ -4,7 +4,7 @@ DefineSyntax{
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2012-11-08 11:40:06 nineties $
+# $Id: syntax.ab 2012-11-14 01:48:43 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -295,11 +295,13 @@ arguments
       | "(" delimited(expr, ",") ")"
         { MakeExpr{\Tuple, node1} }
 
+package ::= delimited(symbol, ".")
+
 statement
-    ::= "import" qualified_symbol
+    ::= "open" qualified_symbol
+        { `Open{!node1} }
+      | "import" package
         { `Import{!node1} }
-      | "include" expr
-        { `Include{!node1} }
 
       | [multiline] "if" term statement "else" statement
         { `IfElse{!node1, !node2, !node4} }
