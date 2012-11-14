@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2012-11-14 04:54:10 nineties $
+; $Id: rowl1-interp.rlc 2012-11-14 17:21:17 nineties $
 ;
 
 (import "rlvm-compile")
@@ -289,8 +289,20 @@
     (return nil)
     ))
 
+(var atexit_list null)
+
 (fun eval_exit (expr) (
+    (= atexit_list (list_reverse atexit_list))
+    (while atexit_list (do
+        (byterun (get_bytecode (string "argument for atexit") (car atexit_list)))
+        (= atexit_list (cdr atexit_list))
+        ))
     (exit 0)
+    ))
+
+(export fun at_exit (fun) (
+    (= atexit_list (cons fun atexit_list))
+    (return nil)
     ))
 
 (var import_dirs null)
@@ -410,6 +422,8 @@
 
     (add_builtin_function1 mod Eval (quote (to_sym "exit"))
         eval_exit 0)
+
+    (add_builtin_function1 mod (to_sym "atexit") funT at_exit 0)
     ))
 
 (extern fun setup_base)
