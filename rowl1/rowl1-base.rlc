@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-base.rlc 2012-09-20 13:49:52 nineties $
+; $Id: rowl1-base.rlc 2012-11-15 15:04:23 nineties $
 ;
 
 (import "rlvm-compile")
@@ -58,15 +58,34 @@
 
 (fun _at (obj i) (
     (= i (unbox i))
-    (var size (expr_size obj))
-    (if (< i size) (return (expr_arg obj i)))
-    (throw (out_of_range current_loc))
+    (var args (expr_args obj))
+    (while (> i 0) (do
+        (if (! args) break)
+        (= args (cdr args))
+        (-= i 1)
+        ))
+    (if (! args) (throw (out_of_range current_loc)))
+    (return (car args))
+    ))
+
+(fun _store (obj i v) (
+    (= i (unbox i))
+    (var args (expr_args obj))
+    (while (> i 0) (do
+        (if (! args) break)
+        (= args (cdr args))
+        (-= i 1)
+        ))
+    (if (! args) (throw (out_of_range current_loc)))
+    (setcar args v)
+    (return v)
     ))
 
 (export fun setup_base (mod) (
     (add_builtin_function2 mod (to_sym "equal") DontCare DontCare _equal 0)
     (add_builtin_function1 mod (to_sym "hash") DontCare _hash 0)
     (add_builtin_function2 mod (to_sym "at") DontCare intT _at 0)
+    (add_builtin_function3 mod (to_sym "store") DontCare intT DontCare _store 0)
     ))
 
     ))

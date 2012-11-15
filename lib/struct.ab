@@ -1,0 +1,83 @@
+# Copyright (C) 2012 nineties
+#
+# $Id: struct.ab 2012-11-15 15:58:37 nineties $
+
+### Simple struct declaration
+# 
+# Declaration:
+#
+#   struct Foo
+#   struct Foo, Bar, ..
+#
+# Usage:
+#
+#   Foo{arg0, arg1, ...}
+#
+### Declaration with fields
+#
+# Declaration:
+#
+# struct Foo {
+#     name1:   default_value1
+#     name2:   default_value2
+#     ...
+# }
+#
+# Usage:
+#
+#   Foo{ name: value, name: value, ... }    # arbitrary order
+#
+
+module struct::impl {
+    simple_decl_single(sym):`(!MakeExpr{sym, [\(args...)]} => `MakeExpr{\!!sym, !!\!args})
+    gen_simple_decls(syms): `Seq{!syms.map(simple_decl_single)}
+
+
+    gen_create_struct(head, names, values): {
+        `(!MakeExpr{head, [\(args...)]} => `{
+            obj: MakeExpr{\!!head, !!values}
+            !!\!args.map(Field{x,v} -> `Apply{!("set_" + x).to_sym, [obj, !v]})
+            obj
+        })
+    }
+
+    gen_getters(_, head, []): []
+    gen_getters(i, head, [x,xs...]): {
+        getter: `DefineFunction{!x, Lambda{Domain{obj, !head}, obj[!i]}}
+        cons(getter, gen_getters(i+1, head, xs))
+    }
+
+    gen_setters(_, head, []): []
+    gen_setters(i, head, [x,xs...]): {
+        setter: `DefineFunction{!("set_" + x).to_sym, Lambda{Tuple{Domain{obj, !head}, val}, obj[!i] = val}}
+        cons(setter, gen_setters(i+1, head, xs))
+    }
+
+    gen_struct_decl(head, fields): {
+        names:  fields.map(f -> f[0])
+        values: fields.map(f -> f[1])
+
+        code1: gen_getters(0, head, names)
+        code2: gen_setters(0, head, names)
+        code3: gen_create_struct(head, names, values)
+        `Seq{[Seq{!code1}, Seq{!code2}, !code3]}
+    }
+}
+
+field_declaration
+    ::= symbol ":" expr     { `Field{!$0, !$2} }
+
+field_declarations
+    ::= [multiline] "{" aligned(field_declaration) "}"      { $1 }
+
+struct_declaration
+    ::= "struct" symbol field_declarations  { struct::impl::gen_struct_decl($1, $2) }
+      | "struct" delimited1(symbol, ",")    { struct::impl::gen_simple_decls($1) }
+
+struct_creation
+    ::= symbol "{" delimited(field_declaration, ",") "}" { MakeExpr{$0, $2} }
+
+statement ::= struct_declaration
+term ::= struct_creation
+
+
