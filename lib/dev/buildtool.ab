@@ -1,0 +1,48 @@
+# Copyright (C) 2012 nineties
+#
+# $Id: buildtool.ab 2012-11-17 21:59:57 nineties $
+
+struct Task {
+    path: ""
+    deps: []      # Pathes which this task depends.
+    code: nil     # The action of this task 
+    done: false   # true if this task is finished
+}
+
+module buildtool_impl {
+    target: (ARGV.size == 0) ? "default" : ARGV[0]
+    tasks: Table[]
+
+    lookup(path): {
+        t: tasks[path]
+        if (t == undefined) throw "Task \""+path+"\" is not found"
+        t
+    }
+
+    define_task(t): tasks[t.path] = t
+    is_finished(path): lookup(path).done
+    execute_task(path): {
+        t: lookup(path)
+        if t.done return
+        t.deps.map(p -> execute_task(p))
+        eval(t.code)
+        t.done = true
+    }
+
+    atexit(() -> execute_task(target))
+}
+
+
+# Syntax
+pathname ::= [space_sensitive] [0-9a-zA-Z_.]+ { $input }
+
+target
+    ::= delimited1(pathname, "/")       { $input }
+      | delimited1(pathname, "/") "/"   { `Dir{!$input} }
+
+task_definition
+    ::= "task" target ":" target* block {
+            `buildtool_impl::define_task(Task{path:!$1, deps:!$3, code:\!$4})
+        }
+
+statement ::= task_definition

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2012-11-14 05:44:03 nineties $
+; $Id: vm-insn.rlc 2012-11-16 10:40:23 nineties $
 ;
 
 (define gen_field_get (idx) `(
@@ -1170,8 +1170,7 @@
     (loadl5 () @true ((asm "movl -24(%edi), %eax") (vmpush %eax)))
     (loadl (byte) @true (
         (vmsbyte 1 %ecx) ; offset
-        (asm "movl %edi, %eax")
-        (asm "addl %ecx, %eax")
+        (asm "leal (%edi,%ecx,1), %eax")
         (asm "movl (%eax), %eax")
         (vmpush %eax)
         ))
@@ -1184,8 +1183,7 @@
     (storel5 () @true ((asm "movl (%esi), %eax") (asm "movl %eax, -24(%edi)")))
     (storel (byte) @true (
         (vmsbyte 1 %ecx) ; index
-        (asm "movl %edi, %eax")
-        (asm "addl %ecx, %eax")
+        (asm "leal (%edi,%ecx,1), %eax")
         (asm "movl (%esi), %ecx")
         (asm "movl %ecx, (%eax)")
         ))
@@ -1197,8 +1195,7 @@
     (incrl5 () @true ((asm "addl $1, -24(%edi)")))
     (incrl (byte) @true (
         (vmsbyte 1 %ecx) ; index
-        (asm "movl %edi, %eax")
-        (asm "addl %ecx, %eax")
+        (asm "leal (%edi,%ecx,1), %eax")
         (asm "addl $1, (%eax)")
         ))
     (decrl0 () @true ((asm "subl $1, -4(%edi)")))
@@ -1209,14 +1206,12 @@
     (decrl5 () @true ((asm "subl $1, -24(%edi)")))
     (decrl (byte) @true (
         (vmsbyte 1 %ecx) ; index
-        (asm "movl %edi, %eax")
-        (asm "addl %ecx, %eax")
+        (asm "leal (%edi,%ecx,1), %eax")
         (asm "subl $1, (%eax)")
         ))
     (addrl (byte) @true (
         (vmsbyte 1 %ecx) ; index
-        (asm "movl %edi, %eax")
-        (asm "addl %ecx, %eax")
+        (asm "leal (%edi,%ecx,1), %eax")
         (vmpush %eax)
         ))
     ; load byte from value area

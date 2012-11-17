@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-11-14 04:50:10 nineties $
+; $Id: rowl1-compile.rlc 2012-11-16 22:43:36 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1138,26 +1138,13 @@
 
 (fun compile_seq (asm mod expr) (
     (var exprs (expr_arg expr 0))
-    (if (in_top_scope mod)
-        (do
-            (var save_max_lvar_idx max_lvar_idx)
-            (= max_lvar_idx 0)
-            (reset_variable_count mod)
-
-            (var cnt_addr (get_address asm))
-            (put_allocate asm 0)
-            (compile_block_body asm mod exprs)
-            (put_operand_byte asm (+ cnt_addr 1) (+ max_lvar_idx 1))
-
-            (= max_lvar_idx save_max_lvar_idx)
-        )
-        (do
-            (compile_block_body asm mod exprs)
-        ))
+    (compile_block_body asm mod exprs)
     ))
 
 (fun compile_scoped (asm mod expr) (
-    (compile asm (expr_arg expr 0) (expr_arg expr 1))
+    (var scope (expr_arg expr 0))
+    (set_variable_count scope (get_variable_count mod))
+    (compile asm scope (expr_arg expr 1))
     ))
 
 (fun put_if_true (asm lbl) (
