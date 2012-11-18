@@ -1,6 +1,6 @@
 # Copyright (C) 2012 nineties
 #
-# $Id: buildtool.ab 2012-11-17 21:59:57 nineties $
+# $Id: buildtool.ab 2012-11-18 09:14:53 nineties $
 
 struct Task {
     path: ""
@@ -9,7 +9,7 @@ struct Task {
     done: false   # true if this task is finished
 }
 
-module buildtool_impl {
+module buildtool {
     target: (ARGV.size == 0) ? "default" : ARGV[0]
     tasks: Table[]
 
@@ -20,7 +20,6 @@ module buildtool_impl {
     }
 
     define_task(t): tasks[t.path] = t
-    is_finished(path): lookup(path).done
     execute_task(path): {
         t: lookup(path)
         if t.done return
@@ -42,7 +41,7 @@ target
 
 task_definition
     ::= "task" target ":" target* block {
-            `buildtool_impl::define_task(Task{path:!$1, deps:!$3, code:\!$4})
+            `buildtool::define_task(Task{path:!$1, deps:!$3, code:\!$4})
         }
 
 statement ::= task_definition
