@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-11-20 18:00:00 nineties $
+; $Id: rowl1-compile.rlc 2012-11-20 21:58:40 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1323,6 +1323,52 @@
     (delete_symbol mod BreakLabel)
     ))
 
+; translate for(i: a..b) body to
+;
+; i: a
+; while (i <= b) {
+;     body
+;     i += 1
+; }
+;
+
+(fun compile_range_for (asm mod expr) (
+    (var def (expr_arg expr 0))
+    (var i (expr_arg def 0))
+    (var rng (expr_arg def 1))
+    (var a (expr_arg rng 0))
+    (var b (expr_arg rng 1))
+    (var body (expr_arg expr 1))
+    (var cnd (apply (to_sym "le") (list2 i b)))
+
+    (var exit_lbl (fresh_label asm))
+    (var head_lbl (fresh_label asm))
+
+    (add_symbol mod BreakLabel (make_label exit_lbl))
+    (add_symbol mod ContinueLabel (make_label head_lbl))
+
+    (compile asm mod (defvar i a))
+    (compile asm mod cnd)
+
+    (put_if_false asm exit_lbl)
+    (set_label asm head_lbl)
+    
+    (compile asm mod body)
+    (put_drop asm)
+    (compile asm mod (make_expr Assign 
+        (list2 i (apply (to_sym "add") (list3 i (box 1) (quote (to_sym "overwrite"))))))
+        )
+    (put_drop asm)
+
+    (compile asm mod cnd)
+    (put_if_true asm head_lbl)
+    (set_label asm exit_lbl)
+    (put_push asm nil)
+
+    (delete_symbol mod ContinueLabel)
+    (delete_symbol mod BreakLabel)
+    ))
+
 (fun compile_break (asm mod expr) (
     (var lbl (lookup_symbol mod BreakLabel))
     (if (! lbl)
@@ -1714,6 +1760,11 @@
     (add_compiler mod (make_expr If (list2 DontCare DontCare)) compile_if)
 	(add_compiler mod (ifelse DontCare DontCare DontCare) compile_ifelse)
     (add_compiler mod (make_expr While (list2 DontCare DontCare)) compile_while)
+    (add_compiler mod (make_expr For (list2 
+        (make_expr DefineVariable (list2 symT
+        (make_expr Range (list2 intT intT))))
+        DontCare)) compile_range_for)
+
     (add_compiler mod (make_expr Break 0) compile_break) 
     (add_compiler mod (make_expr Continue 0) compile_continue)
     (add_compiler mod (make_expr Return (list1 DontCare)) compile_return)

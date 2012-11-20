@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2012-11-14 01:49:32 nineties $
+; $Id: rowl1-packrat.rlc 2012-11-20 21:57:44 nineties $
 ;
 
 ; TODO:
@@ -295,7 +295,9 @@
     ))
 
 (fun apply_located (p) (
-    (field_set p 2 (located (get_loc p) (field_get p 2)))
+    (if @(PARSED p)
+        (field_set p 2 (located (get_loc p) (field_get p 2)))
+        )
     ))
 
 (fun integer_overflow (p) (
@@ -879,15 +881,11 @@
 
 (fun parse_statement_ (p) (
     (parse "parse_expr" p)
-    @(CHECK p)
-    (var loc (get_loc p))
-    (return (parsed p (located loc @(TOKEN p))))
     ))
 @(MEMOIZE statement)
 
 (fun parse_begin_module (p) (
     (parse_text p "module") 
-    (var loc (get_loc p))
     @(CHECK p)
     (parse_spaces p)
     (parse "parse_qualified_symbol" p)
@@ -896,7 +894,7 @@
     (parse_spaces p)
     (parse_char p '{')
     @(CHECK p)
-    (return (parsed p (located loc (make_expr BeginModule (list1 mod)))))
+    (return (parsed p (make_expr BeginModule (list1 mod))))
     ))
 
 (fun parse_toplevel_statement (p) (
@@ -911,7 +909,7 @@
     (set_parser_state_all p state)
     (parse_char p '}')
     @(CHECK p)
-    (parsed p (located (get_loc p) (make_expr EndModule 0)))
+    (parsed p (make_expr EndModule 0))
     ))
 
 (export fun parse_statements (p) (
@@ -932,6 +930,7 @@
         (set_indent p (get_column p))
         (parse_toplevel_statement p)
         @(CHECK p)
+        (apply_located p)
         (var stmt @(TOKEN p))
 
         (parse_blanks p)
@@ -981,6 +980,7 @@
         (set_indent p (get_column p))
         (parse_toplevel_statement p)
         (if (! @(PARSED p)) (if may_parse (goto retry) return))
+        (apply_located p)
 
         (var e @(TOKEN p))
         (var loc (get_loc p))
@@ -1109,6 +1109,10 @@
     (if (== hd Delimited2) (do
         (if (!= len 2) (goto compile_error))
         (return (compile_delimited (expr_arg pat 0) (expr_arg pat 1) 2))
+        ))
+    (if (== hd Located) (do
+        (if (!= len 1) (goto compile_error))
+        (return (compile_located (expr_arg pat 0)))
         ))
     (if (== hd Scoped) (do
         (if (!= len 2) (goto compile_error))
@@ -1511,6 +1515,16 @@
     (return (block (list_reverse body)))
     ))
 
+; Located{ p } is translated to
+;
+; v = p
+; if (head(v) == NoParse) return
+; Parsed{loc, Located{loc, v}}
+(fun compile_located (p) (
+    (= p (compile_parser_element p))
+    (return (block (list2 p (apply (to_sym "%apply_located") (list1 PVar)))))
+    ))
+
 ; scope{ p } is translated to
 ;
 ; module = new anonymous module
@@ -1675,16 +1689,6 @@
     (var state (unique_sym))
     (var error (unique_sym))
 
-    ; if sym == parse_statement
-    ; modify parsed expression to Located{...}
-    (var return_stmt 0)
-    (if (== sym (to_sym "parse_statement_"))
-        (= return_stmt
-            (mkreturn (apply (to_sym "%apply_located") (list1 PVar)))
-            )
-        (= return_stmt (mkreturn nil))
-        )
-
     (= body (cons (defvar error (apply (to_sym "%alloc_error_state") (list1 PVar))) body))
     (= body (cons (defvar state (gen_copy_parser_state PVar)) body))
     (while elems (do
@@ -1703,7 +1707,7 @@
 
         (var act (compile_parser_action (expr_arg t 0) (expr_arg t 1)))
         (= body (cons act body))
-        (= body (cons (mkif (test_parsed) return_stmt) body))
+        (= body (cons (mkif (test_parsed) (mkreturn nil)) body))
         (= body (cons (apply (to_sym "%join_error_state") (list2 error PVar)) body))
         (= body (cons (gen_set_parser_state_all PVar state) body))
         (= elems (cdr elems))
