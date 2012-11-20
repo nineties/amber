@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-11-21 00:57:10 nineties $
+; $Id: rowl1-compile.rlc 2012-11-21 01:08:49 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1321,12 +1321,13 @@
 ; translate for(i: a..b) body to
 ;
 ; i: a
-; tmp; b
-; while (i <= tmp) {
-;     body
-;     i += 1
+; {
+;     tmp; b
+;     while (i <= tmp) {
+;         body
+;         i += 1
+;     }
 ; }
-;
 
 (fun compile_range_for (asm mod expr) (
     (var def (expr_arg expr 0))
@@ -1337,26 +1338,28 @@
     (var body (expr_arg expr 1))
     (var tmp (unique_sym))
 
-    (compile asm mod (block (list3
+    (compile asm mod (seq (list2
         (defvar i a)
-        (defvar tmp b)
-        (make_expr While (list2
-            (apply (to_sym "le") (list2 i tmp))
-            (seq (list2
-                body
-                (assign i (apply (to_sym "add") (list3 i (box 1) (quote (to_sym "overwrite")))))))
-        )))))
+        (block (list2
+            (defvar tmp b)
+            (make_expr While (list2
+                (apply (to_sym "le") (list2 i tmp))
+                (seq (list2
+                    body
+                    (assign i (apply (to_sym "add") (list3 i (box 1) (quote (to_sym "overwrite")))))))
+        )))))))
     ))
 
 ; translate revfor(i: a..b) body to
 ;
 ; i: b
-; tmp; a
-; while (i >= tmp) {
-;     body
-;     i -= 1
+; {
+;     tmp; a
+;     while (i >= tmp) {
+;         body
+;         i -= 1
+;     }
 ; }
-;
 
 (fun compile_range_revfor (asm mod expr) (
     (var def (expr_arg expr 0))
@@ -1367,15 +1370,16 @@
     (var body (expr_arg expr 1))
     (var tmp (unique_sym))
 
-    (compile asm mod (block (list3
+    (compile asm mod (seq (list2
         (defvar i b)
-        (defvar tmp a)
-        (make_expr While (list2
-            (apply (to_sym "ge") (list2 i tmp))
-            (seq (list2
-                body
-                (assign i (apply (to_sym "sub") (list3 i (box 1) (quote (to_sym "overwrite")))))))
-        )))))
+        (block (list2
+            (defvar tmp a)
+            (make_expr While (list2
+                (apply (to_sym "ge") (list2 i tmp))
+                (seq (list2
+                    body
+                    (assign i (apply (to_sym "sub") (list3 i (box 1) (quote (to_sym "overwrite")))))))
+        )))))))
     ))
 
 (fun compile_break (asm mod expr) (
