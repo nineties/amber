@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-11-20 21:58:40 nineties $
+; $Id: rowl1-compile.rlc 2012-11-21 00:50:43 nineties $
 ;
 
 (import "rlvm-compile")
@@ -893,12 +893,10 @@
                     (= idx (get_variable_count mod))
                     (if (>= idx max_lvar_idx) (= max_lvar_idx (+ idx 1)))
                     (incr_variable_count mod)
+                    (if compiling_closure (+= idx 1))
                     (add_symbol mod sym (make_lvar idx))
                 ))
-            (if compiling_closure
-                (put_store_lvar asm (+ idx 1))
-                (put_store_lvar asm idx)
-                )
+            (put_store_lvar asm idx)
         )))
     ))
 
@@ -946,10 +944,7 @@
         return
         ))
     (if (== ty LocalVariable) (do
-        (if compiling_closure
-            (put_load_lvar asm (+ (expr_arg_int opd 0) 1))
-            (put_load_lvar asm (expr_arg_int opd 0))
-            )
+        (put_load_lvar asm (expr_arg_int opd 0))
         return
         ))
     (if (== ty Arity) (do
@@ -1326,7 +1321,8 @@
 ; translate for(i: a..b) body to
 ;
 ; i: a
-; while (i <= b) {
+; tmp; b
+; while (i <= tmp) {
 ;     body
 ;     i += 1
 ; }
@@ -1339,34 +1335,47 @@
     (var a (expr_arg rng 0))
     (var b (expr_arg rng 1))
     (var body (expr_arg expr 1))
-    (var cnd (apply (to_sym "le") (list2 i b)))
+    (var tmp (unique_sym))
 
-    (var exit_lbl (fresh_label asm))
-    (var head_lbl (fresh_label asm))
+    (compile asm mod (block (list3
+        (defvar i a)
+        (defvar tmp b)
+        (make_expr While (list2
+            (apply (to_sym "le") (list2 i tmp))
+            (seq (list2
+                body
+                (assign i (apply (to_sym "add") (list3 i (box 1) (quote (to_sym "overwrite")))))))
+        )))))
+    ))
 
-    (add_symbol mod BreakLabel (make_label exit_lbl))
-    (add_symbol mod ContinueLabel (make_label head_lbl))
+; translate revfor(i: a..b) body to
+;
+; i: b
+; tmp; a
+; while (i >= tmp) {
+;     body
+;     i -= 1
+; }
+;
 
-    (compile asm mod (defvar i a))
-    (compile asm mod cnd)
+(fun compile_range_revfor (asm mod expr) (
+    (var def (expr_arg expr 0))
+    (var i (expr_arg def 0))
+    (var rng (expr_arg def 1))
+    (var a (expr_arg rng 0))
+    (var b (expr_arg rng 1))
+    (var body (expr_arg expr 1))
+    (var tmp (unique_sym))
 
-    (put_if_false asm exit_lbl)
-    (set_label asm head_lbl)
-    
-    (compile asm mod body)
-    (put_drop asm)
-    (compile asm mod (make_expr Assign 
-        (list2 i (apply (to_sym "add") (list3 i (box 1) (quote (to_sym "overwrite"))))))
-        )
-    (put_drop asm)
-
-    (compile asm mod cnd)
-    (put_if_true asm head_lbl)
-    (set_label asm exit_lbl)
-    (put_push asm nil)
-
-    (delete_symbol mod ContinueLabel)
-    (delete_symbol mod BreakLabel)
+    (compile asm mod (block (list3
+        (defvar i b)
+        (defvar tmp a)
+        (make_expr While (list2
+            (apply (to_sym "ge") (list2 i tmp))
+            (seq (list2
+                body
+                (assign i (apply (to_sym "sub") (list3 i (box 1) (quote (to_sym "overwrite")))))))
+        )))))
     ))
 
 (fun compile_break (asm mod expr) (
@@ -1409,10 +1418,7 @@
         return
         )
     (if (== vty LocalVariable) (do
-        (if compiling_closure
-            (put_store_lvar asm (+ (expr_arg_int v 0) 1))
-            (put_store_lvar asm (expr_arg_int v 0))
-            )
+        (put_store_lvar asm (expr_arg_int v 0))
         return
         )
     (if (== vty Argument) (do
@@ -1764,6 +1770,10 @@
         (make_expr DefineVariable (list2 symT
         (make_expr Range (list2 intT intT))))
         DontCare)) compile_range_for)
+    (add_compiler mod (make_expr RevFor (list2 
+        (make_expr DefineVariable (list2 symT
+        (make_expr Range (list2 intT intT))))
+        DontCare)) compile_range_revfor)
 
     (add_compiler mod (make_expr Break 0) compile_break) 
     (add_compiler mod (make_expr Continue 0) compile_continue)
