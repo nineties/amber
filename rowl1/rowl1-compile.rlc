@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-11-21 13:22:08 nineties $
+; $Id: rowl1-compile.rlc 2012-11-21 15:54:06 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1035,10 +1035,6 @@
     (put_jcall asm (* 4 arity))
     ))
 
-(fun compile_subscript (asm mod expr) (
-    (compile_apply asm mod (make_expr Apply (list2 (to_sym "at") (cons (expr_arg expr 0) (expr_arg expr 1)))))
-    ))
-
 (fun compile_quote (asm mod expr) (
     (put_push asm (expr_arg expr 0))
     ))
@@ -1320,14 +1316,13 @@
 
 ; translate for(i: ary) body to
 ;
-; i: {
+; {
 ;     iter: ary.each
 ;     i: iter()
 ;     while (i != undefined) {
 ;         body
 ;         i = iter()
 ;     }
-;     i
 ; }
 
 (fun compile_for (asm mod expr) (
@@ -1337,7 +1332,7 @@
     (var body (expr_arg expr 1))
     (var iter (unique_sym))
     (compile asm mod
-        (defvar i (block (list4
+        (block (list3
             (defvar iter (apply (to_sym "each") (list1 ary)))
             (defvar i (apply iter 0))
             (make_expr While (list2
@@ -1346,8 +1341,7 @@
                     body
                     (assign i (apply iter 0))
                     ))))
-            i
-            ))))
+            )))
     ))
 
 (fun compile_revfor (asm mod expr) (
@@ -1357,7 +1351,7 @@
     (var body (expr_arg expr 1))
     (var iter (unique_sym))
     (compile asm mod
-        (defvar i (block (list4
+        (block (list3
             (defvar iter (apply (to_sym "reverse_each") (list1 ary)))
             (assign i (apply iter 0))
             (make_expr While (list2
@@ -1366,8 +1360,7 @@
                     body
                     (assign i (apply iter 0))
                     ))))
-            i
-            ))))
+            )))
     ))
 
 ; translate for(i: a..b) body to
@@ -1392,7 +1385,7 @@
     (var tmp (unique_sym))
 
     (compile asm mod 
-        (defvar i (block (list4
+        (block (list3
             (defvar i a)
             (defvar tmp b)
             (make_expr While (list2
@@ -1400,8 +1393,7 @@
                 (seq (list2
                     body
                     (assign i (apply (to_sym "add") (list3 i (box 1) (quote (to_sym "overwrite")))))))))
-            i
-            ))))
+            )))
     ))
 
 ; translate revfor(i: a..b) body to
@@ -1426,7 +1418,7 @@
     (var tmp (unique_sym))
 
     (compile asm mod
-        (defvar i (block (list4
+        (block (list3
             (defvar i b)
             (defvar tmp a)
             (make_expr While (list2
@@ -1434,8 +1426,7 @@
                 (seq (list2
                     body
                     (assign i (apply (to_sym "sub") (list3 i (box 1) (quote (to_sym "overwrite")))))))))
-            i
-            ))))
+            )))
     ))
 
 (fun compile_break (asm mod expr) (
@@ -1810,7 +1801,6 @@
     (add_compiler mod (domainP Float) compile_const)
 
     (add_compiler mod (make_expr Apply (list2 DontCare listT)) compile_apply)
-    (add_compiler mod (make_expr Subscript (list2 DontCare listT)) compile_subscript)
 
     (add_compiler mod (qquote (quote (unquote DontCare))) compile_quote)
     (add_compiler mod (qquote (qquote (unquote (unquote DontCare)))) compile_qquote)

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2012-10-19 17:11:32 nineties $
+; $Id: rowl1-list.rlc 2012-11-21 15:48:28 nineties $
 ;
 
 (import "rlvm-compile")
@@ -18,6 +18,7 @@
 (import "rowl1-error")
 
 (extern object current_loc)
+(extern object current_mod)
 
 (fun index_out_of_range () (
     (throw (out_of_range current_loc))
@@ -99,6 +100,15 @@
     (return v)
     ))
 
+(fun ls_contain (ls v) (
+    (var f (lookup_func current_mod (to_sym "equal")))
+    (while ls (do
+        (if (== (byterun f v (car ls)) true) (return true))
+        (= ls (cdr ls))
+        ))
+    (return false)
+    ))
+
 (fun ls_create (n f) (
     (var new_ls 0)
     (var code (get_bytecode (string "argument for create") f))
@@ -122,6 +132,7 @@
     (add_builtin_function2 std (to_sym "map") listT funT ls_map 0)
     (add_builtin_function3 std (to_sym "map2") listT listT funT ls_map2 0)
     (add_builtin_function3 std (to_sym "foldl") listT DontCare funT ls_foldl 0)
+    (add_builtin_function2 std (to_sym "contain") listT DontCare ls_contain 0)
     (add_builtin_function2 mod (to_sym "create") intT funT ls_create 0)
     ))
 
