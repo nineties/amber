@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2012-11-21 01:21:25 nineties $
+; $Id: rowl1-interp.rlc 2012-11-21 13:13:00 nineties $
 ;
 
 (import "rlvm-compile")
@@ -292,6 +292,15 @@
     (return nil)
     ))
 
+(fun eval_seq (expr) (
+    (var stmts (expr_arg expr 0))
+    (while stmts (do
+        (eval (car stmts))
+        (= stmts (cdr stmts))
+        ))
+    (return nil)
+    ))
+
 (var atexit_list null)
 
 (fun eval_exit (expr) (
@@ -422,6 +431,7 @@
     (add_builtin_function1 mod Eval
         (make_expr DefSyntax (list2 symT DontCare))
         eval_define_syntax 0)
+    (add_builtin_function1 mod Eval (make_expr Seq (list1 listT)) eval_seq 0)
 
     (add_builtin_function1 mod Eval (quote (to_sym "exit"))
         eval_exit 0)

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-11-21 01:08:49 nineties $
+; $Id: rowl1-compile.rlc 2012-11-21 13:22:08 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1318,15 +1318,68 @@
     (delete_symbol mod BreakLabel)
     ))
 
+; translate for(i: ary) body to
+;
+; i: {
+;     iter: ary.each
+;     i: iter()
+;     while (i != undefined) {
+;         body
+;         i = iter()
+;     }
+;     i
+; }
+
+(fun compile_for (asm mod expr) (
+    (var def (expr_arg expr 0))
+    (var i (expr_arg def 0))
+    (var ary (expr_arg def 1))
+    (var body (expr_arg expr 1))
+    (var iter (unique_sym))
+    (compile asm mod
+        (defvar i (block (list4
+            (defvar iter (apply (to_sym "each") (list1 ary)))
+            (defvar i (apply iter 0))
+            (make_expr While (list2
+                (make_expr Not (list1 (apply (to_sym "equal") (list2 i undefined))))
+                (seq (list2
+                    body
+                    (assign i (apply iter 0))
+                    ))))
+            i
+            ))))
+    ))
+
+(fun compile_revfor (asm mod expr) (
+    (var def (expr_arg expr 0))
+    (var i (expr_arg def 0))
+    (var ary (expr_arg def 1))
+    (var body (expr_arg expr 1))
+    (var iter (unique_sym))
+    (compile asm mod
+        (defvar i (block (list4
+            (defvar iter (apply (to_sym "reverse_each") (list1 ary)))
+            (assign i (apply iter 0))
+            (make_expr While (list2
+                (make_expr Not (list1 (apply (to_sym "equal") (list2 i undefined))))
+                (seq (list2
+                    body
+                    (assign i (apply iter 0))
+                    ))))
+            i
+            ))))
+    ))
+
 ; translate for(i: a..b) body to
 ;
-; i: a
-; {
-;     tmp; b
+; i: {
+;     i: a
+;     tmp: b
 ;     while (i <= tmp) {
 ;         body
 ;         i += 1
 ;     }
+;     i
 ; }
 
 (fun compile_range_for (asm mod expr) (
@@ -1338,27 +1391,29 @@
     (var body (expr_arg expr 1))
     (var tmp (unique_sym))
 
-    (compile asm mod (seq (list2
-        (defvar i a)
-        (block (list2
+    (compile asm mod 
+        (defvar i (block (list4
+            (defvar i a)
             (defvar tmp b)
             (make_expr While (list2
                 (apply (to_sym "le") (list2 i tmp))
                 (seq (list2
                     body
-                    (assign i (apply (to_sym "add") (list3 i (box 1) (quote (to_sym "overwrite")))))))
-        )))))))
+                    (assign i (apply (to_sym "add") (list3 i (box 1) (quote (to_sym "overwrite")))))))))
+            i
+            ))))
     ))
 
 ; translate revfor(i: a..b) body to
 ;
-; i: b
-; {
-;     tmp; a
+; i: {
+;     i: b
+;     tmp: a
 ;     while (i >= tmp) {
 ;         body
 ;         i -= 1
 ;     }
+;     i
 ; }
 
 (fun compile_range_revfor (asm mod expr) (
@@ -1370,16 +1425,17 @@
     (var body (expr_arg expr 1))
     (var tmp (unique_sym))
 
-    (compile asm mod (seq (list2
-        (defvar i b)
-        (block (list2
+    (compile asm mod
+        (defvar i (block (list4
+            (defvar i b)
             (defvar tmp a)
             (make_expr While (list2
                 (apply (to_sym "ge") (list2 i tmp))
                 (seq (list2
                     body
-                    (assign i (apply (to_sym "sub") (list3 i (box 1) (quote (to_sym "overwrite")))))))
-        )))))))
+                    (assign i (apply (to_sym "sub") (list3 i (box 1) (quote (to_sym "overwrite")))))))))
+            i
+            ))))
     ))
 
 (fun compile_break (asm mod expr) (
@@ -1770,13 +1826,20 @@
     (add_compiler mod (make_expr If (list2 DontCare DontCare)) compile_if)
 	(add_compiler mod (ifelse DontCare DontCare DontCare) compile_ifelse)
     (add_compiler mod (make_expr While (list2 DontCare DontCare)) compile_while)
+
+    (add_compiler mod (make_expr For (list2
+        (defvar symT DontCare) DontCare))
+        compile_for
+        )
+    (add_compiler mod (make_expr RevFor (list2
+        (defvar symT DontCare) DontCare)) 
+        compile_revfor
+        )
     (add_compiler mod (make_expr For (list2 
-        (make_expr DefineVariable (list2 symT
-        (make_expr Range (list2 DontCare DontCare))))
+        (defvar symT (make_expr Range (list2 DontCare DontCare)))
         DontCare)) compile_range_for)
     (add_compiler mod (make_expr RevFor (list2 
-        (make_expr DefineVariable (list2 symT
-        (make_expr Range (list2 DontCare DontCare))))
+        (defvar symT (make_expr Range (list2 DontCare DontCare)))
         DontCare)) compile_range_revfor)
 
     (add_compiler mod (make_expr Break 0) compile_break) 
