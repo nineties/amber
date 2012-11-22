@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2012-11-21 14:48:43 nineties $
+; $Id: rowl1-interp.rlc 2012-11-22 09:50:57 nineties $
 ;
 
 (import "rlvm-compile")
@@ -119,7 +119,9 @@
     ))
 
 (fun rewrite (expr) (
-    (= expr (call1 Rewrite expr))
+    (var new_expr (call1 Rewrite expr))
+    (if (!= new_expr expr) (return (rewrite new_expr)))
+    (= expr new_expr)
     (if (is_atom expr)
         (return expr)
         )
@@ -294,11 +296,12 @@
 
 (fun eval_seq (expr) (
     (var stmts (expr_arg expr 0))
+    (var v nil)
     (while stmts (do
-        (eval (car stmts))
+        (= v (eval (car stmts)))
         (= stmts (cdr stmts))
         ))
-    (return nil)
+    (return v)
     ))
 
 (var atexit_list null)

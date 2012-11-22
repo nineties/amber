@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-11-21 15:54:06 nineties $
+; $Id: rowl1-compile.rlc 2012-11-22 17:25:07 nineties $
 ;
 
 (import "rlvm-compile")
@@ -447,7 +447,7 @@
     (var hd (expr_head expr))
     (if (== hd Symbol) (do
         (var v (symtable_find tbl expr))
-        (if (&& v (!= v maybe)) (return v))
+        (if (&& v (!= v maybe)) (return (copy_clsent v)))
         (return expr)
         ))
     (if (is_atom expr) (return expr))
@@ -459,7 +459,7 @@
         (expr_arg_set expr 1 (subst_clsvars tbl cls (expr_arg expr 1)))
         (var sym (expr_arg_symbol expr 0))
         (var v (symtable_find tbl sym))
-        (if (&& v (!= v maybe)) (expr_arg_set expr 0 v))
+        (if (&& v (!= v maybe)) (expr_arg_set expr 0 (copy_clsent v)))
         (return expr)
         ))
     (if (== hd Block) (do
@@ -633,13 +633,17 @@
     (put_list_at asm)
     ))
 
+(fun copy_clsent (cls) (
+    (return (make_expr Ref (expr_args cls)))
+    ))
+
 (fun store_args (tbl args stmts) (
     (var vars (collect_args args))
     (while vars (do
         (var s (symtable_find tbl (car vars)))
         (if (&& s (!= s maybe)) (do 
             ; this argument is a closure-variable.
-            (= stmts (cons (make_expr Assign (list2 s (car vars))) stmts))
+            (= stmts (cons (make_expr Assign (list2 (copy_clsent s) (car vars))) stmts))
             ))
         (= vars (cdr vars))
         ))
