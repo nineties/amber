@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-11-22 17:25:07 nineties $
+; $Id: rowl1-compile.rlc 2012-11-22 21:44:47 nineties $
 ;
 
 (import "rlvm-compile")
@@ -923,6 +923,12 @@
         ))
     ))
 
+(fun load_module_variable (sym disp) (
+    (var v (caar disp))
+    (if (== v uninitialized) (throw (uninitialized_var current_loc sym)))
+    (return v)
+    ))
+
 (export fun compile_operand (asm opd sym) (
     (if (== sym compiling_closure) (do
         (put_load_lvar asm 0)
@@ -933,18 +939,8 @@
     (if (== ty ModuleVariable) (do
         (var lbl (fresh_label asm))
         (put_push asm (expr_args opd)) ; variable-display
-        (put_car asm)
-        (put_car asm)
-
-        ; check if initialized
-        (put_dup asm)
-        (put_push asm uninitialized)
-        (put_if_ne asm lbl)
         (put_push asm sym)
-        (put_push asm current_loc)
-        (compile_simple_call asm 2 uninitialized_var)
-        (put_throw asm)
-        (set_label asm lbl)
+        (compile_simple_call asm 2 load_module_variable)
         return
         ))
     (if (== ty LocalVariable) (do
