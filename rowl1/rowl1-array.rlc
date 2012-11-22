@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-array.rlc 2012-11-20 18:07:02 nineties $
+; $Id: rowl1-array.rlc 2012-11-22 00:34:31 nineties $
 ;
 
 (import "rlvm-compile")
@@ -31,6 +31,24 @@
         (array_set object buf i undefined)
         ))
     (return (variant @ArrayE 1 buf 0 capa))
+    ))
+
+(export fun ary_new2 (len) (
+    (= len (unbox len))
+    (var buf (allocate_array len))
+    (for i 0 len (do
+        (array_set object buf i undefined)
+        ))
+    (return (variant @ArrayE 1 buf len len))
+    ))
+
+(export fun ary_new3 (len v) (
+    (= len (unbox len))
+    (var buf (allocate_array len))
+    (for i 0 len (do
+        (array_set object buf i v)
+        ))
+    (return (variant @ArrayE 1 buf len len))
     ))
 
 (export fun ary_size (ary) (
@@ -109,6 +127,8 @@
 (export fun setup_array (std) (
     (var ModArray (find_module no_loc std (to_sym "Array") @TRUE))
     (add_builtin_function0 ModArray (to_sym "new") ary_new 0)
+    (add_builtin_function1 ModArray (to_sym "new") intT ary_new2 0)
+    (add_builtin_function2 ModArray (to_sym "new") intT DontCare ary_new3 0)
     (add_builtin_function1 std (to_sym "length") arrayT ary_size 0)
     (add_builtin_function1 std (to_sym "size") arrayT ary_size 0)
     (add_builtin_function2 std (to_sym "at") arrayT intT ary_at 0)
