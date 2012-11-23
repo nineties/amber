@@ -1,35 +1,33 @@
 # Copyright (C) 2012 nineties
 #
-# $Id: unittest.ab 2012-07-30 09:07:16 nineties $
+# $Id: unittest.ab 2012-11-23 12:04:09 nineties $
 
-module unittest {
-    #USAGE :
-    #
-    # target "target name" {
-    #     test "description" {
-    #         expression (return true is success)
-    #     }
-    # }
+#USAGE :
+#
+# target "target name" {
+#     test "description" {
+#         expression (return true is success)
+#     }
+# }
 
-    statement
-        ::= "test" string block { `UnitTestTarget{!$1, !$2} }
-          | string ":" test_code { `UnitTestItem{!$0, !$2} }
+statement
+    ::= "test" string block  { `UnitTestTarget{!$1, !$2} }
+      | string ":" test_code { `UnitTestItem{!$0, !$2} }
 
-    test_code ::= expr
+test_code ::= expr
 
-    UnitTestTarget{target, tests} => `{
-        printf("=== tests of %s ===\n\n", !target)
-        success: 0
-        failed:  0
-        !tests
-        printf("\n[success %d, failed %d]\n", success, failed)
-    }
-    UnitTestItem{description, code} => `{
-        v: !code
-        printf("    %s ... %s\n", !description, v == true ? "OK" : "failed")
-        if (v == true)
-            success += 1
-        else
-            failed += 1
-    }
+UnitTestTarget{target, tests} => `{
+    printf("=== tests of %s ===\n\n", !target)
+    success: 0
+    failed:  0
+    !tests
+    printf("\n[success %d, failed %d]\n", success, failed)
+}
+UnitTestItem{description, code} => `{
+    v: !code
+    printf("    %s ... %s\n", !description, v == true ? "OK" : "failed")
+    if (v == true)
+        success += 1
+    else
+        failed += 1
 }
