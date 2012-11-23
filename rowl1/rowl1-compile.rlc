@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-11-22 21:44:47 nineties $
+; $Id: rowl1-compile.rlc 2012-11-23 11:55:57 nineties $
 ;
 
 (import "rlvm-compile")
@@ -696,7 +696,6 @@
         (= stmts (cons body stmts))
         (= body (make_expr Block (list1 (list_reverse stmts))))
         ))
-
     (push_varscope mod)
     (setup_args (get_vartable mod) args)
 
@@ -712,7 +711,6 @@
     (reset_variable_count mod)
 
     (compile asm_body mod body)
-    (put_ireturn asm_body)
     (if compiling_closure
         (put_operand_byte asm_body (+ cnt_addr 1) (+ max_lvar_idx 1))
     (if (> max_lvar_idx 0)
@@ -1105,27 +1103,15 @@
         ))
     ))
 
+(fun compile_block_top  (asm mod expr) (
+    (compile_function asm 0 mod 0 expr noguard nil)
+    ))
+
 (fun compile_block (asm mod expr) (
+    (if (in_top_scope mod) (return (compile_block_top asm mod expr)))
     (var exprs (expr_arg expr 0))
-    (var topscope (in_top_scope mod))
     (push_varscope mod)
-    (if topscope
-        (do
-            (var save_max_lvar_idx max_lvar_idx)
-            (= max_lvar_idx 0)
-            (reset_variable_count mod)
-
-            (var cnt_addr (get_address asm))
-            (put_allocate asm 0)
-            (compile_block_body asm mod exprs)
-            (put_deallocate asm max_lvar_idx)
-            (put_operand_byte asm (+ cnt_addr 1) max_lvar_idx)
-
-            (= max_lvar_idx save_max_lvar_idx)
-        )
-        (do
-            (compile_block_body asm mod exprs)
-        ))
+    (compile_block_body asm mod exprs)
     (pop_varscope mod)
     ))
 
@@ -1543,10 +1529,12 @@
         (do
             (var asm_guard (make_assembler))
             (compile_function asm_body asm_guard mod args body guard cls)
+            (put_ireturn asm_body)
             (put_push asm (make_function args (get_code asm_body) (get_code asm_guard)))
         )
         (do
             (compile_function asm_body 0 mod args body noguard cls)
+            (put_ireturn asm_body)
             (put_push asm (make_function args (get_code asm_body) 0))
         ))
     ))
