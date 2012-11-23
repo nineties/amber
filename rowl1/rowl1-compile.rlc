@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-11-23 14:41:45 nineties $
+; $Id: rowl1-compile.rlc 2012-11-23 22:23:52 nineties $
 ;
 
 (import "rlvm-compile")
@@ -855,6 +855,11 @@
         )
     (var lhs (expr_arg expr 0))
     (var rhs (expr_arg expr 1))
+
+    (if (== (expr_head lhs) Ref)
+        (return (compile_define_clsref asm mod lhs rhs overwrite))
+        )
+
     (if (in_top_scope mod)
         (compile_define_variable_top   asm mod lhs rhs overwrite)
         (compile_define_variable_local asm mod lhs rhs overwrite)
@@ -897,10 +902,9 @@
     (throw (string "not implemented"))
     ))
 
-(fun compile_define_clsref (asm mod expr) (
-    (var clsref (expr_arg expr 0))
-    (var val (expr_arg expr 1))
-    (compile asm mod (assign clsref val))
+(fun compile_define_clsref (asm mod clsref rhs overwrite) (
+    (if (== overwrite false) (add_symbol mod (expr_arg_symbol clsref 2) clsref))
+    (compile asm mod (assign clsref rhs))
     ))
 
 (fun check_redefinition (mod sym) (
@@ -1776,7 +1780,7 @@
 
     (add_compiler mod (make_expr DefineVariable (list2 DontCare DontCare)) compile_define_variable)
     (add_compiler mod (make_expr DefineVariable (list3 DontCare DontCare (quote (to_sym "overwrite")))) compile_define_variable)
-    (add_compiler mod (make_expr DefineVariable (list2 (make_expr Ref (list3 DontCare intT DontCare)) DontCare)) compile_define_clsref)
+
     (add_compiler mod (make_expr DefineFunction (list2 DontCare DontCare)) compile_define_function)
 
     (add_compiler mod (domainP Symbol) compile_var)
