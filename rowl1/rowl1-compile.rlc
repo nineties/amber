@@ -142,7 +142,7 @@
         ))
     (if (is_atom expr) (return fv))
     (if (== level 0) (do
-        (if (|| (== hd DefineVariable) (== hd DefineFunction)) (do
+        (if (|| (== hd DefVariable) (== hd DefFunction)) (do
             (= fv (fv_iter mod (expr_arg expr 1) 0 fv))
             (return (list_delete (expr_arg_symbol expr 0) fv))
             ))
@@ -273,7 +273,7 @@
         (expr_arg_set expr 1 (alpha tbl (expr_arg expr 1)))
         (return expr)
         ))
-    (if (|| (== hd DefineVariable) (== hd DefineFunction)) (do
+    (if (|| (== hd DefVariable) (== hd DefFunction)) (do
         (var sym (expr_arg_symbol expr 0))
         (if (&& (symtable_find tbl sym) (! (symtable_find_local tbl sym)))
             (do
@@ -368,7 +368,7 @@
         (expr_arg_set expr 1 (scan_clsvars mod (expr_arg expr 1) tbl))
         (return expr)
         ))
-    (if (|| (== hd DefineVariable) (== hd DefineFunction)) (do
+    (if (|| (== hd DefVariable) (== hd DefFunction)) (do
         (var sym (defined_symbol expr))
         (if (! (symtable_find tbl sym)) (do
             (symtable_add tbl sym maybe)
@@ -455,7 +455,7 @@
         (expr_arg_set expr 1 (subst_clsvars tbl cls (expr_arg expr 1)))
         (return expr)
         ))
-    (if (|| (== hd DefineVariable) (== hd DefineFunction)) (do
+    (if (|| (== hd DefVariable) (== hd DefFunction)) (do
         (expr_arg_set expr 1 (subst_clsvars tbl cls (expr_arg expr 1)))
         (var sym (expr_arg_symbol expr 0))
         (var v (symtable_find tbl sym))
@@ -1711,14 +1711,14 @@
     (var info (lookup_symbol_local mod sym))
     (if (is_defined_locally info)
         (return (compile asm mod
-            (make_expr DefineVariable (list3 lhs (make_expr Bind (list2 fun lhs)) (to_sym "overwrite")))))
+            (make_expr DefVariable (list3 lhs (make_expr Bind (list2 fun lhs)) (to_sym "overwrite")))))
         )
     (= info (lookup_effective_symbol mod sym))
     (if info 
         (return (compile asm mod
-            (make_expr DefineVariable (list2 lhs (make_expr Bind (list2 fun lhs))))))
+            (make_expr DefVariable (list2 lhs (make_expr Bind (list2 fun lhs))))))
         (return (compile asm mod
-            (make_expr DefineVariable (list2 lhs fun))))
+            (make_expr DefVariable (list2 lhs fun))))
         )
     ))
 
@@ -1781,10 +1781,10 @@
     (add_compiler mod (make_expr Head (list1 DontCare)) compile_head)
     (add_compiler mod (make_expr Arguments (list1 DontCare)) compile_arguments)
 
-    (add_compiler mod (make_expr DefineVariable (list2 DontCare DontCare)) compile_define_variable)
-    (add_compiler mod (make_expr DefineVariable (list3 DontCare DontCare (quote (to_sym "overwrite")))) compile_define_variable)
+    (add_compiler mod (make_expr DefVariable (list2 DontCare DontCare)) compile_define_variable)
+    (add_compiler mod (make_expr DefVariable (list3 DontCare DontCare (quote (to_sym "overwrite")))) compile_define_variable)
 
-    (add_compiler mod (make_expr DefineFunction (list2 DontCare DontCare)) compile_define_function)
+    (add_compiler mod (make_expr DefFunction (list2 DontCare DontCare)) compile_define_function)
 
     (add_compiler mod (domainP Symbol) compile_var)
     (add_compiler mod (make_expr Dynamic (list1 symT)) compile_dynamic_var)
