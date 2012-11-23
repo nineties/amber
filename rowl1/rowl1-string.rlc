@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-string.rlc 2012-09-11 18:03:20 nineties $
+; $Id: rowl1-string.rlc 2012-11-24 01:09:09 nineties $
 ;
 
 (import "rlvm-compile")
@@ -14,6 +14,9 @@
 (import "rowl1-node")
 (import "rowl1-module")
 (import "rowl1-compile")
+(import "rowl1-error")
+
+(extern object current_loc)
 
 (fun s_equal (a b) (
     (if (streq a b)
@@ -52,6 +55,22 @@
     (return s)
     ))
 
+(fun s_code (s) (
+    (var len (strlen s))
+    (if (!= len 1) (throw (invalid_argument current_loc
+        (string "`code' requires a string of length 1")
+        s)))
+    (return (box (array_get char s 0)))
+    ))
+
+(fun s_char (i) (
+    (= i (unbox i))
+    (if (& i 0xffffff00) (throw (invalid_argument current_loc
+        (string "`char' requires number between 0 and 255")
+        (box i))))
+    (return (ctos i))
+    ))
+
 ;; StringIO
 (fun new_sio () (
     (return (variant @StringIOE 1 (make_sio)))
@@ -85,8 +104,12 @@
     (add_builtin_function3 std (to_sym "add") stringT DontCare DontCare s_add2 0)
     (add_builtin_function3 std (to_sym "add") DontCare stringT DontCare s_add2 0)
 
+    (add_builtin_function1 std (to_sym "char") intT s_char 0)
+    (add_builtin_function1 std (to_sym "code") stringT s_code 0) 
+
     (add_builtin_function1 std (to_sym "unescape") stringT s_unescape 0)
 
+    ; StringIO module
     (var sioT (domainP StringIO))
     (var SIO (find_module no_loc std (to_sym "StringIO") @TRUE))
 
