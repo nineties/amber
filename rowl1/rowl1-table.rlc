@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-table.rlc 2012-11-23 13:12:19 nineties $
+; $Id: rowl1-table.rlc 2012-11-23 13:35:51 nineties $
 ;
 
 (import "rlvm-compile")
@@ -27,7 +27,7 @@
 (fun ht_new_with_hint (hint) (
     (var size (array_get int prime_numbers (bsr hint)))
     (var tbl (variant @TableE 3 (make_vector size) (make_vector 0) (make_ivector 0)))
-    (ht_push tbl)
+    (ht_enter tbl)
     (return tbl)
     ))
 
@@ -35,13 +35,13 @@
     (return (ht_new_with_hint 10))
     ))
 
-(fun ht_push (tbl) (
+(fun ht_enter (tbl) (
     (var display (field_get tbl 3))
     (ivector_pushback display 0)
     (return nil)
     ))
 
-(fun ht_pop (tbl) (
+(fun ht_exit (tbl) (
     (var display (field_get tbl 3))
     (var entries (field_get tbl 2))
     (var bucket (field_get tbl 1))
@@ -162,6 +162,39 @@
     (return undefined)
     ))
 
+(fun ht_keys (tbl) (
+    (var keys 0)
+    (var entries (field_get tbl 2))
+    (for i 0 (vector_size entries) (do
+        (var entry (vector_at entries i))
+        (if (! entry) continue)
+        (= keys (cons (field_get entry 0) keys))
+        ))
+    (return keys)
+    ))
+
+(fun ht_values (tbl) (
+    (var values 0)
+    (var entries (field_get tbl 2))
+    (for i 0 (vector_size entries) (do
+        (var entry (vector_at entries i))
+        (if (! entry) continue)
+        (= values (cons (field_get entry 1) values))
+        ))
+    (return values)
+    ))
+
+(fun ht_entries (tbl) (
+    (var ents 0)
+    (var entries (field_get tbl 2))
+    (for i 0 (vector_size entries) (do
+        (var entry (vector_at entries i))
+        (if (! entry) continue)
+        (= ents (cons (make_expr Tuple (list2 (field_get entry 0) (field_get entry 1))) ents))
+        ))
+    (return ents)
+    ))
+
 (export fun pp_table (ochan tbl) (
     (var entries (field_get tbl 2))
     (var size (vector_size entries))
@@ -213,8 +246,14 @@
     (add_builtin_function1 ModTable (to_sym "from_list") listT ht_from_list 0)
     (add_builtin_function2 std (to_sym "at") tableT DontCare ht_at 0)
     (add_builtin_function3 std (to_sym "store") tableT DontCare DontCare ht_store 0)
-    (add_builtin_function1 std (to_sym "push") tableT ht_push 0)
-    (add_builtin_function1 std (to_sym "pop") tableT ht_pop 0)
+
+    (add_builtin_function1 std (to_sym "keys") tableT ht_keys 0) 
+    (add_builtin_function1 std (to_sym "values") tableT ht_values 0)
+    (add_builtin_function1 std (to_sym "entries") tableT ht_entries 0)
+
+    (add_builtin_function1 std (to_sym "enter") tableT ht_enter 0)
+    (add_builtin_function1 std (to_sym "exit") tableT ht_exit 0)
+
     ))
 
     ))
