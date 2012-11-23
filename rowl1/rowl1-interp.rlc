@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2012-11-24 01:54:34 nineties $
+; $Id: rowl1-interp.rlc 2012-11-24 02:47:51 nineties $
 ;
 
 (import "rlvm-compile")
@@ -296,6 +296,13 @@
     (return nil)
     ))
 
+(fun eval_replace_syntax (expr) (
+    (var lhs (expr_arg_symbol expr 0))
+    (var rhs (expr_arg_symbol expr 1))
+    (eval (compile_replace_syntax lhs rhs))
+    (return nil)
+    ))
+
 (fun eval_seq (expr) (
     (var stmts (expr_arg expr 0))
     (var v nil)
@@ -439,23 +446,17 @@
     (add_builtin_function1 mod Rewrite (domainP Located) rewrite_located 0)
     (add_builtin_function1 mod Eval DontCare default_eval 0)
     (add_builtin_function1 mod Eval (domainP Located) eval_located 0)
-    (add_builtin_function1 mod Eval (make_expr Open (list1 DontCare))
-        eval_open 0)
+    (add_builtin_function1 mod Eval (make_expr Open (list1 DontCare)) eval_open 0)
     (add_builtin_function1 mod Eval (make_expr Import (list1 listT)) eval_import 0)
-    (add_builtin_function1 mod Eval (make_expr BeginModule (list1 symT))
-        eval_begin_module 0)
-    (add_builtin_function1 mod Eval (make_expr BeginModule (list1 (domainP Qualified)))
-        eval_begin_module 0)
-    (add_builtin_function1 mod Eval (make_expr EndModule 0)
-        eval_end_module 0)
-    (add_builtin_function1 mod Eval
-        (make_expr DefSyntax (list2 symT DontCare))
-        eval_define_syntax 0)
+    (add_builtin_function1 mod Eval (make_expr BeginModule (list1 symT)) eval_begin_module 0)
+    (add_builtin_function1 mod Eval (make_expr BeginModule (list1 (domainP Qualified))) eval_begin_module 0)
+    (add_builtin_function1 mod Eval (make_expr EndModule 0) eval_end_module 0)
     (add_builtin_function1 mod Eval (make_expr Seq (list1 listT)) eval_seq 0)
 
-    (add_builtin_function1 mod Eval (quote (to_sym "exit"))
-        eval_exit 0)
+    (add_builtin_function1 mod Eval (make_expr DefSyntax (list2 symT DontCare)) eval_define_syntax 0)
+    (add_builtin_function1 mod Eval (make_expr RepSyntax (list2 symT symT)) eval_replace_syntax 0)
 
+    (add_builtin_function1 mod Eval (quote (to_sym "exit")) eval_exit 0)
     (add_builtin_function1 mod (to_sym "atexit") funT at_exit 0)
     ))
 
