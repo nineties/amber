@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-11-24 00:22:25 nineties $
+; $Id: rowl1-compile.rlc 2012-11-24 03:22:47 nineties $
 ;
 
 (import "rlvm-compile")
@@ -851,6 +851,13 @@
     ))
 
 (fun compile_define_variable (asm mod expr) (
+    (var rhs_head (expr_head (expr_arg expr 1)))
+    (if (|| (== rhs_head Lambda) (== rhs_head Bind))
+        (compile_define_function asm mod expr)
+        (compile_define_variable_ asm mod expr)
+        )
+    ))
+(fun compile_define_variable_ (asm mod expr) (
     (var overwrite false)
     (if (&& (== (expr_size expr) 3)
             (== (expr_arg expr 2) (to_sym "overwrite")))
@@ -1693,7 +1700,7 @@
     (add_module_variable mod sym newfunc false)
     ))
 
-; AppendFunction{sym, fun} is equivalent to:
+; DefineFunction{sym, fun} is equivalent to:
 ; sym: fun                   (when `sym' is not defined)
 ; sym: fun | sym             (when `sym' is defined in outer scope)
 ; sym: fun | sym (overwrite) (when `sym' is defined in local scope)
@@ -1710,14 +1717,14 @@
     (var fun (expr_arg expr 1))
     (var info (lookup_symbol_local mod sym))
     (if (is_defined_locally info)
-        (return (compile asm mod
+        (return (compile_define_variable_ asm mod
             (make_expr DefVariable (list3 lhs (make_expr Bind (list2 fun lhs)) (to_sym "overwrite")))))
         )
     (= info (lookup_effective_symbol mod sym))
     (if info 
-        (return (compile asm mod
+        (return (compile_define_variable_ asm mod
             (make_expr DefVariable (list2 lhs (make_expr Bind (list2 fun lhs))))))
-        (return (compile asm mod
+        (return (compile_define_variable_ asm mod
             (make_expr DefVariable (list2 lhs fun))))
         )
     ))
