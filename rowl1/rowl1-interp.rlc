@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2012-11-22 09:50:57 nineties $
+; $Id: rowl1-interp.rlc 2012-11-24 01:54:34 nineties $
 ;
 
 (import "rlvm-compile")
@@ -95,6 +95,8 @@
 
     (add_import_dir (get_directory file))
     (add_import_dir "./")
+
+    (pre_import_module)
 
     ;(var end (gettimeofday))
     ;(var diff (timeval_sub end start))
@@ -378,6 +380,21 @@
     (output_string stderr path)
     (output_string stderr "' was not found\n")
     (exit 1)
+    ))
+
+(var pre_imports null)
+(export fun set_pre_imports (sym) (
+    (= pre_imports (string sym))
+    ))
+
+(fun pre_import_module () (
+    (if (! pre_imports) return)
+    (for i 0 (strlen pre_imports) (do
+        (if (== (load char pre_imports i) '.')
+            (store char pre_imports i '/')
+            )
+        ))
+    (import_file (strcat pre_imports ".ab"))
     ))
 
 (fun eval_open (expr) (

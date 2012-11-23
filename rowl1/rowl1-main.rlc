@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-main.rlc 2012-11-13 00:29:14 nineties $
+; $Id: rowl1-main.rlc 2012-11-24 01:51:09 nineties $
 ;
 
 (import "rlvm-compile")
@@ -12,8 +12,36 @@
 
 (import "rowl1-node")
 (import "rowl1-interp")
+(import "rowl1-util")
+
+(fun parse_options (argcp argvp) (
+    (var argc (car argcp))
+    (var argv (car argvp))
+    (var i 0)
+    (var j 0)
+    (while (< i argc) (do
+        (var arg (array_get string argv i))
+        (if (== (load char arg 0) '-') (do
+            (if (streq "-m" arg) (do
+                (+= i 1)
+                (set_pre_imports (array_get string argv i))
+                )
+                (throw (make_expr (to_sym "UnknownOption")
+                    (list1 (string arg))))
+                )
+            (+= i 1)
+            (-= argc 2)
+            continue
+            ))
+        (array_set string argv j arg)
+        (+= j 1)
+        (+= i 1)
+        ))
+    (setcar argcp argc)
+    ))
 
 (fun main (argc argv) (
+    (parse_options (address argc) (address argv))
     (if (== argc 0) (do
         (return (eval_shell))
         ))

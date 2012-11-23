@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2012-11-24 01:09:23 nineties $
+# $Id: Makefile 2012-11-24 01:43:38 nineties $
 
 TOPDIR = ..
 ROWL0DIR = $(TOPDIR)/rowl0
@@ -109,7 +109,7 @@ RLVMCOMPILER = rlci\
 		   vm-prim-inc.rlc
 
 startup.rlo		: $(RLVMCOMPILER)
-rowl1-main.rlo	 : $(RLVMCOMPILER) rowl1-types.rlc rowl1-node.rlo rowl1-interp.rlo
+rowl1-main.rlo	 : $(RLVMCOMPILER) rowl1-types.rlc rowl1-node.rlo rowl1-interp.rlo rowl1-util.rlo
 rowl1-util.rlo	 : $(RLVMCOMPILER) rowl1-types.rlc
 rowl1-packrat.rlo	: $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-assemble.rlo rowl1-compile.rlo rowl1-module.rlo rowl1-error.rlo
 rowl1-node.rlo	 : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-symtable.rlo
