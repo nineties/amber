@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-11-23 11:55:57 nineties $
+; $Id: rowl1-compile.rlc 2012-11-23 14:41:45 nineties $
 ;
 
 (import "rlvm-compile")
@@ -853,53 +853,54 @@
             (== (expr_arg expr 2) (to_sym "overwrite")))
         (= overwrite true)
         )
-    (var size (expr_size expr))
-    (var clsref nil)
-    (var sym nil)
     (var lhs (expr_arg expr 0))
-    (if (== (expr_head lhs) Ref) (do
-        (= clsref lhs)
-        (= sym (expr_arg_symbol lhs 2))
-        )
-    (if (== (expr_head lhs) Symbol)
-        (= sym lhs)
-        (throw (type_error current_loc (string "a symbol") lhs))
-        ))
-
-    (var val (expr_arg expr 1))
-    (var tbl (get_vartable mod))
-    (if (== overwrite false) (check_redefinition mod sym))
-
+    (var rhs (expr_arg expr 1))
     (if (in_top_scope mod)
-        (do
-            (put_push asm overwrite)
-            (compile asm mod val)
-            (put_push asm sym)
-            (put_push asm mod)
-            (compile_simple_call asm 4 add_module_variable)
+        (compile_define_variable_top   asm mod lhs rhs overwrite)
+        (compile_define_variable_local asm mod lhs rhs overwrite)
         )
-    (if (!= clsref nil)
-        (do
-            (if (== overwrite false) (add_symbol mod sym clsref))
-            (compile asm mod (make_expr Assign (list2 clsref val)))
-        )
-        (do
-            (compile asm mod val)
-            (var idx 0)
-            (if (== overwrite true)
-                (do
-                    (var info (lookup_symbol mod sym))
-                    (= idx (expr_arg_int info 0))
-                )
-                (do
-                    (= idx (get_variable_count mod))
-                    (if (>= idx max_lvar_idx) (= max_lvar_idx (+ idx 1)))
-                    (incr_variable_count mod)
-                    (if compiling_closure (+= idx 1))
-                    (add_symbol mod sym (make_lvar idx))
-                ))
-            (put_store_lvar asm idx)
-        )))
+    ))
+
+(fun compile_define_variable_top (asm mod lhs rhs overwrite) (
+    (if (== (expr_head lhs) Symbol) (do
+        (if (== overwrite false) (check_redefinition mod lhs))
+        (put_push asm overwrite)
+        (compile asm mod rhs)
+        (put_push asm lhs)
+        (put_push asm mod)
+        (compile_simple_call asm 4 add_module_variable)
+        return
+        ))
+    (throw (string "not implemented"))
+    ))
+
+(fun compile_define_variable_local (asm mod lhs rhs overwrite) (
+    (if (== (expr_head lhs) Symbol) (do
+        (var idx 0)
+        (if (== overwrite true)
+            (do
+                (var info (lookup_symbol mod lhs))
+                (= idx (expr_arg_int info 0))
+            )
+            (do
+                (check_redefinition mod lhs)
+                (= idx (get_variable_count mod))
+                (if (>= idx max_lvar_idx) (= max_lvar_idx (+ idx 1)))
+                (incr_variable_count mod)
+                (if compiling_closure (+= idx 1))
+                (add_symbol mod lhs (make_lvar idx))
+            ))
+        (compile asm mod rhs)
+        (put_store_lvar asm idx)
+        return
+        ))
+    (throw (string "not implemented"))
+    ))
+
+(fun compile_define_clsref (asm mod expr) (
+    (var clsref (expr_arg expr 0))
+    (var val (expr_arg expr 1))
+    (compile asm mod (assign clsref val))
     ))
 
 (fun check_redefinition (mod sym) (
@@ -1775,6 +1776,7 @@
 
     (add_compiler mod (make_expr DefineVariable (list2 DontCare DontCare)) compile_define_variable)
     (add_compiler mod (make_expr DefineVariable (list3 DontCare DontCare (quote (to_sym "overwrite")))) compile_define_variable)
+    (add_compiler mod (make_expr DefineVariable (list2 (make_expr Ref (list3 DontCare intT DontCare)) DontCare)) compile_define_clsref)
     (add_compiler mod (make_expr DefineFunction (list2 DontCare DontCare)) compile_define_function)
 
     (add_compiler mod (domainP Symbol) compile_var)
