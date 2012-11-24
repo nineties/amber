@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-11-25 01:42:46 nineties $
+; $Id: rowl1-compile.rlc 2012-11-25 01:55:06 nineties $
 ;
 
 (import "rlvm-compile")
@@ -213,6 +213,10 @@
     (if (== hd Domain)
         (if (== level 0) (do
             (expr_arg_set expr 0 (alpha_args_iter tbl chk rep (expr_arg expr 0) 0))
+            (var dom (expr_arg expr 1))
+            (if (!= (expr_head dom) Symbol)
+                (expr_arg_set expr 1 (alpha_args_iter tbl chk rep dom 0))
+                )
             (return expr)
             ))
     (if (== hd QuasiQuote) (+= level 1)
@@ -734,9 +738,12 @@
         ))
     (if (== argty Domain) (do
         (if (== level 0) (do
-            (var head (expr_arg_symbol arg 1))
             (var v (expr_arg_symbol arg 0))
             (symtable_add tbl v obj)
+            (var dom (expr_arg arg 1))
+            (if (!= (expr_head dom) Symbol)
+                (setup_arg tbl obj dom 0)
+                )
             return
             ))
         ))

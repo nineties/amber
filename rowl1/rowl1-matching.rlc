@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2012-11-20 18:03:32 nineties $
+; $Id: rowl1-matching.rlc 2012-11-25 02:26:25 nineties $
 ;
 
 (import "rlvm-compile")
@@ -21,7 +21,7 @@
 (var dontcareP (to_sym "%DontCare"))
 (var ellipsisP (to_sym "%Ellipsis"))
 (var varP      (to_sym "%Var"))
-(var headP     (to_sym "%HeadPattern"))
+(var domP      (to_sym "%Domain"))
 
 (extern object current_loc)
 (export fun compile_matching (loc obj def) (
@@ -118,7 +118,10 @@
     (if (== hd Domain) (do
         (var lhs (setup_pat (expr_arg pat 0)))
         (var dom (expr_arg pat 1))
-        (return (make_expr headP (list2 lhs dom)))
+        (if (== (expr_head dom) Symbol)
+            (return (make_expr domP (list2 lhs dom)))
+            (return (setup_pat dom))
+            )
         ))
     (if (== hd Ellipsis)
         (return ellipsisP)
@@ -246,7 +249,7 @@
         (set_label asm check_failed)
         return
         ))
-    (if (== hd headP) (do
+    (if (== hd domP) (do
         (var pat (expr_arg_symbol p 1))
         (var check_failed (fresh_label asm))
         (compile_operand asm (car args) nil)
@@ -533,7 +536,7 @@
     (var hd (expr_head p))
     (if (== hd Int) (return (split_int_pat pats)))
     (if (== hd String) (return (split_string_pat pats)))
-    (if (== hd headP) (return (split_head_pat (expr_arg_symbol p 1) pats)))
+    (if (== hd domP) (return (split_head_pat (expr_arg_symbol p 1) pats)))
     (if (== hd Symbol) (return (split_symbol_pat 0 pats)))
     (if (== hd List) (return (split_list_pat pats)))
     (return (split_composite_pat pats))
@@ -576,7 +579,7 @@
     ))
 
 (fun head_check (hd node) (
-    (if (&& (== (expr_head node) headP) (== (expr_arg_symbol node 1) hd))
+    (if (&& (== (expr_head node) domP) (== (expr_arg_symbol node 1) hd))
         (return @TRUE)
         (return @FALSE)
         )
