@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-11-24 03:22:47 nineties $
+; $Id: rowl1-compile.rlc 2012-11-24 23:46:19 nineties $
 ;
 
 (import "rlvm-compile")
@@ -20,6 +20,7 @@
 (var Closure       (to_sym "%Closure"))
 (var AllocClsEnv   (to_sym "%AllocClosureEnv"))
 (var Ref           (to_sym "%Ref"))
+(var Decons        (to_sym "%Decons"))
 (var uninitialized (to_sym "%uninitialized"))
 (var noguard       (to_sym "%noguard"))
 (var closed        (to_sym "%closed"))
@@ -144,7 +145,7 @@
     (if (== level 0) (do
         (if (|| (== hd DefVariable) (== hd DefFunction)) (do
             (= fv (fv_iter mod (expr_arg expr 1) 0 fv))
-            (return (list_delete (expr_arg_symbol expr 0) fv))
+            (return (delete_args (expr_arg expr 0) fv))
             ))
         (if (== hd Lambda) (do
             (= fv (fv_iter mod (expr_arg expr 1) 0 fv))
@@ -274,15 +275,7 @@
         (return expr)
         ))
     (if (|| (== hd DefVariable) (== hd DefFunction)) (do
-        (var sym (expr_arg_symbol expr 0))
-        (if (&& (symtable_find tbl sym) (! (symtable_find_local tbl sym)))
-            (do
-                (var new_sym (unique_sym))
-                (expr_arg_set expr 0 new_sym)
-                (symtable_add tbl sym new_sym)
-            )
-            (symtable_add tbl sym sym)
-            )
+        (expr_arg_set expr 0 (alpha_args tbl (expr_arg expr 0)))
         (expr_arg_set expr 1 (alpha tbl (expr_arg expr 1)))
         (return expr)
         ))
@@ -457,9 +450,7 @@
         ))
     (if (|| (== hd DefVariable) (== hd DefFunction)) (do
         (expr_arg_set expr 1 (subst_clsvars tbl cls (expr_arg expr 1)))
-        (var sym (expr_arg_symbol expr 0))
-        (var v (symtable_find tbl sym))
-        (if (&& v (!= v maybe)) (expr_arg_set expr 0 (copy_clsent v)))
+        (expr_arg_set expr 0 (subst_clsvars tbl cls (expr_arg expr 0)))
         (return expr)
         ))
     (if (== hd Block) (do
@@ -869,6 +860,9 @@
     (if (== (expr_head lhs) Ref)
         (return (compile_define_clsref asm mod lhs rhs overwrite))
         )
+    (if (!= (expr_head lhs) Symbol)
+        (return (compile_define_multi_variable asm mod lhs rhs overwrite))
+        )
 
     (if (in_top_scope mod)
         (compile_define_variable_top   asm mod lhs rhs overwrite)
@@ -876,11 +870,43 @@
         )
     ))
 
+; translate
+;
+; Foo{x, y, Bar{z}} : e
+;
+; to
+;
+; tmp: (Foo{x, y, Bar{z}} -> [x,y,z])(e)
+; x: car(tmp)
+; y: cadr(tmp)
+; z: caadr(tmp)
+(fun compile_define_multi_variable (asm mod lhs rhs overwrite) (
+    (var vars (collect_args lhs))
+    (compile asm mod (apply (make_expr Lambda (list2 (make_expr Tuple (list1 lhs)) vars)) (list1 rhs)))
+
+    (while vars (do
+        (var def nil)
+        (if (== overwrite true)
+            (= def (make_expr DefVariable (list3 (car vars) Decons (to_sym "overwrite"))))
+            (= def (make_expr DefVariable (list2 (car vars) Decons)))
+            )
+        (compile_define_variable asm mod def)
+        (put_drop asm)
+
+        (= vars (cdr vars))
+        ))
+    (put_push asm nil)
+    ))
+
+(fun compile_decons (asm mod expr) (
+    (put_decons asm)
+    ))
+
 (fun compile_define_variable_top (asm mod lhs rhs overwrite) (
     (if (== (expr_head lhs) Symbol) (do
         (if (== overwrite false) (check_redefinition mod lhs))
-        (put_push asm overwrite)
         (compile asm mod rhs)
+        (put_push asm overwrite)
         (put_push asm lhs)
         (put_push asm mod)
         (compile_simple_call asm 4 add_module_variable)
@@ -1697,7 +1723,7 @@
                 (= newfunc (make_bound newfunc func))
                 )
         ))
-    (add_module_variable mod sym newfunc false)
+    (add_module_variable mod sym false newfunc)
     ))
 
 ; DefineFunction{sym, fun} is equivalent to:
@@ -1865,6 +1891,7 @@
     (add_compiler mod (make_expr Assign
         (list2 (make_expr Ref (list3 DontCare intT symT)) DontCare)) compile_clsref_assign)
     (add_compiler mod (make_expr ExprAt (list2 DontCare intT)) compile_exprat)
+    (add_compiler mod (quote Decons) compile_decons)
     ))
 
 (export fun add_compiler (mod pat func) (

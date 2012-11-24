@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-main.rlc 2012-11-24 02:53:46 nineties $
+; $Id: rowl1-main.rlc 2012-11-24 13:22:10 nineties $
 ;
 
 (import "rlvm-compile")
@@ -24,10 +24,18 @@
         (if (== (load char arg 0) '-') (do
             (if (streq "-m" arg) (do
                 (+= i 1)
+                (if (== i argc) (do
+                    (output_string stderr "Missing option for -m\n")
+                    (exit 1)
+                    ))
                 (set_pre_imports (array_get string argv i))
                 )
-                (throw (make_expr (to_sym "UnknownOption")
-                    (list1 (string arg))))
+                (do
+                    (output_string stderr "Unknown option: ")
+                    (output_string stderr arg)
+                    (output_string stderr "\n")
+                    (exit 1)
+                )
                 )
             (+= i 1)
             continue

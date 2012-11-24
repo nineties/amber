@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2012-11-24 02:47:51 nineties $
+; $Id: rowl1-interp.rlc 2012-11-24 23:43:34 nineties $
 ;
 
 (import "rlvm-compile")
@@ -24,14 +24,14 @@
 (export var current_mod null)
 (export fun set_loc (loc) (
     (= current_loc loc)
-    (add_module_variable global_mod (to_sym "LOCATION") loc true)
+    (add_module_variable global_mod (to_sym "LOCATION") true loc)
     ))
 
 (var module_stack null)
 
 (export fun set_current_module (mod) (
     (= current_mod mod)
-    (add_module_variable global_mod (to_sym "MODULE") mod true)
+    (add_module_variable global_mod (to_sym "MODULE") true mod)
     ))
 
 (export fun eval_shell () (
@@ -204,7 +204,7 @@
 (extern fun ary_push)
 (fun interpret_shell (p) (
     (var outputs (ary_new))
-    (add_module_variable global_mod (to_sym "shell_outputs") outputs true)
+    (add_module_variable global_mod (to_sym "shell_outputs") true outputs)
     (ary_push outputs undefined)
     (while 1 (do
         (try 
@@ -424,7 +424,7 @@
 
 (fun setup_argv (argc argv) (
     (var ARGV (ary_new))
-    (add_module_variable global_mod (to_sym "ARGV") ARGV true)
+    (add_module_variable global_mod (to_sym "ARGV") true ARGV)
     (if (== argc 0) return)
     (for i 1 argc (do
         (ary_push ARGV (string (array_get string argv i)))
@@ -434,12 +434,12 @@
 (fun setup_globals (mod) (
     (var symT (domainP Symbol))
     
-    (add_module_variable mod (to_sym "LOCATION") current_loc false)
-    (add_module_variable mod (to_sym "MODULE") current_mod false)
+    (add_module_variable mod (to_sym "LOCATION") false current_loc)
+    (add_module_variable mod (to_sym "MODULE") false current_mod)
 
     (if (in_shell_mode)
         (add_module_variable mod (to_sym "shell_mode") true true)
-        (add_module_variable mod (to_sym "shell_mode") false true)
+        (add_module_variable mod (to_sym "shell_mode") true false)
         )
     
     (add_builtin_function1 mod Rewrite DontCare default_rewrite 0)
