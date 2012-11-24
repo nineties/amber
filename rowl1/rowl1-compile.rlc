@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-11-25 00:26:04 nineties $
+; $Id: rowl1-compile.rlc 2012-11-25 01:23:56 nineties $
 ;
 
 (import "rlvm-compile")
@@ -43,13 +43,11 @@
     ))
 
 (export fun must_be_module_variable (sym val) (
-    (if (!= (expr_head val) ModuleVariable) (do
-        (output_error stderr current_loc)
-        (output_char stderr '`')
-        (output_symbol stderr sym)
-        (output_string stderr "' must be a module variable\n")
-        (exit 1)
-        ))
+    (if (!= (expr_head val) ModuleVariable)
+        (throw (unexpected_error current_loc
+            (string "module variable is required")
+            sym))
+        )
     ))
 
 (fun is_identifier (expr) (

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2012-11-24 02:26:45 nineties $
+; $Id: rowl1-node.rlc 2012-11-25 01:33:16 nineties $
 ;
 
 (import "rlvm-compile")
@@ -98,6 +98,8 @@
 (export var StringIO         (to_builtin_sym "StringIO"))
 (export var Module           (to_builtin_sym "Module"))
 
+(export var Exception   (to_sym "Exception"))
+
 (export var Eval        (to_sym "eval"))
 (export var Compile     (to_sym "compile"))
 (export var Rewrite     (to_sym "rewrite"))
@@ -133,6 +135,10 @@
 (export var ListFrom       (to_sym "%ListFrom"))
 (export var ExprAt         (to_sym "%ExprAt"))
 (export var ExprFrom       (to_sym "%ExprFrom"))
+
+(extern fun exception)
+(extern fun out_of_range)
+(extern fun type_error)
 
 (export fun to_builtin_sym (name) (
     (var sym (idtable_find symbol_table name))
@@ -212,19 +218,6 @@
 
 (export fun is_atom (obj) (
     (return (is_atom_type (node_type obj)))
-    ))
-
-; XXX: output precise information
-(export fun check_type (name type obj) (
-    (if (|| (! obj) (!= (node_type obj) type)) (do
-        (output_string stderr name)
-        (output_string stderr ": invalid argument\n")
-        (exit 1)
-        ))
-    ))
-
-(export fun make_float_from_string (str) (
-    (error "floating-point literals are not supported yet")
     ))
 
 (export var no_loc (make_loc (string "<internal>") 0 0 0 0))
@@ -317,31 +310,18 @@
         (= args (cdr args))
         (decr i)
         ))
-    (if (! args) (do
-        (output_error stderr current_loc)
-        (output_string stderr "`")
-        (pretty_print stderr expr)
-        (output_string stderr "' does not have ")
-        (output_ordinal stderr (+ idx 1))
-        (output_string stderr " parameter\n")
-        (exit 1)
-        ))
+    (if (! args)
+        (throw (out_of_range current_loc expr (box (+ idx 1))))
+        )
     (return (car args))
     ))
 
 (fun expr_arg_check (expr type idx) (
     (var arg (expr_arg expr idx))
-    (if (!= (node_type arg) type) (do
-        (output_error stderr current_loc)
-        (output_string stderr "the ")
-        (output_ordinal stderr (+ idx 1))
-        (output_string stderr " parameter of `")
-        (pretty_print stderr expr)
-        (output_string stderr "' must be ")
-        (output_type stderr type)
-        (output_string stderr "\n")
-        (exit 1)
-        ))
+    (if (!= (node_type arg) type)
+        (throw (type_error current_loc
+            (type_string type) (type_string (node_type arg))))
+        )
     (return arg)
     ))
 
@@ -362,34 +342,13 @@
     (return (expr_arg_check expr @ListE idx))
     ))
 
-(export fun expr_arg_head (expr head idx) (
-    (var arg (expr_arg expr idx))
-    (if (!= (expr_head arg) head) (do
-        (output_error stderr current_loc)
-        (output_string stderr "the head of ")
-        (output_ordinal stderr (+ idx 1))
-        (output_string stderr " parameter of `")
-        (pretty_print stderr expr)
-        (output_string stderr "' must be `")
-        (pretty_print stderr head)
-        (output_string stderr "'\n")
-        (exit 1)
-        ))
-    (return arg)
-    ))
-
 (export fun expr_arg_set (expr idx val) (
     (var args (expr_args expr))
     (while (> idx 0) (do
-        (if (! args) (do
-            (output_error stderr current_loc)
-            (output_string stderr "`")
-            (pretty_print stderr expr)
-            (output_string stderr "' does not have ")
-            (output_ordinal stderr (+ idx 1))
-            (output_string stderr " parameter\n")
-            (exit 1)
-            ))
+        (if (! args)
+            (throw (out_of_range current_loc
+                expr (box (+ idx 1))))
+            )
         (= args (cdr args))
         (decr idx)
         ))
@@ -405,23 +364,17 @@
     ))
 
 (export fun make_expr_user (head args) (
-    (if (!= (node_type head) @SymbolE) (do
-        (output_error stderr current_loc)
-        (output_string stderr "the 1st argument of MakeExpr must be a Symbol\n")
-        (exit 1)
-        ))
-    (if (is_builtin_sym head) (do
-        (output_error stderr current_loc)
-        (output_string stderr "can not create builtin object: ")
-        (pretty_print stderr head)
-        (output_string stderr "{..}\n")
-        (exit 1)
-        ))
-    (if (!= (node_type args) @ListE) (do
-        (output_error stderr current_loc)
-        (output_string stderr "the 2nd argument of MakeExpr must be a List\n")
-        (exit 1)
-        ))
+    (if (!= (node_type head) @SymbolE)
+        (throw (exception current_loc (string "the 1st argument of MakeExpr must be a Symbol")))
+        )
+    (if (is_builtin_sym head)
+        (throw (make_expr Exception (list2
+            (string "Can not create builtin object")
+            head)))
+        )
+    (if (!= (node_type args) @ListE)
+        (throw (exception current_loc (string "the 2nd argument of MakeExpr must be a List")))
+        )
 
     (if (== head List)
         (return args)
@@ -521,28 +474,28 @@
     (output_string ochan "th")
     ))
 
-(fun output_type (ochan type) (
+(fun type_string (type) (
     (tswitch type (
-        (@SymbolE           . (return (output_string ochan "Symbol")))
-        (@ExprE             . (return (output_string ochan "composite expression")))
-        (@ListE             . (return (output_string ochan "List")))
-        (@ArrayE            . (return (output_string ochan "Array")))
-        (@TableE            . (return (output_string ochan "Table")))
-        (@AssemblerE        . (return (output_string ochan "Assembler")))
-        (@BytecodeE         . (return (output_string ochan "Bytecode")))
-        (@FunctionE         . (return (output_string ochan "Function")))
-        (@BoundFunctionE    . (return (output_string ochan "Function")))
-        (@InputFileStreamE  . (return (output_string ochan "InputFileStream")))
-        (@OutputFileStreamE . (return (output_string ochan "OutputFileStream")))
-        (@ModuleE           . (return (output_string ochan "Module")))
-        (@ParserE           . (return (output_string ochan "Parser")))
-        (@StringIOE         . (return (output_string ochan "StringIO")))
-        (@BigIntE           . (return (output_string ochan "BigInt")))
-        (@LocE              . (return (output_string ochan "Loc")))
-        (@IntE              . (return (output_string ochan "Int")))
-        (@StringE           . (return (output_string ochan "String")))
-        (@FloatE            . (return (output_string ochan "Float")))
-        (@BuiltinE          . (return (output_string ochan "Builtin")))
+        (@SymbolE           . (return (string "Symbol")))
+        (@ExprE             . (return (string "composite expression")))
+        (@ListE             . (return (string "List")))
+        (@ArrayE            . (return (string "Array")))
+        (@TableE            . (return (string "Table")))
+        (@AssemblerE        . (return (string "Assembler")))
+        (@BytecodeE         . (return (string "Bytecode")))
+        (@FunctionE         . (return (string "Function")))
+        (@BoundFunctionE    . (return (string "Function")))
+        (@InputFileStreamE  . (return (string "InputFileStream")))
+        (@OutputFileStreamE . (return (string "OutputFileStream")))
+        (@ModuleE           . (return (string "Module")))
+        (@ParserE           . (return (string "Parser")))
+        (@StringIOE         . (return (string "StringIO")))
+        (@BigIntE           . (return (string "BigInt")))
+        (@LocE              . (return (string "Loc")))
+        (@IntE              . (return (string "Int")))
+        (@StringE           . (return (string "String")))
+        (@FloatE            . (return (string "Float")))
+        (@BuiltinE          . (return (string "Builtin")))
         (default            . (not_reachable "output_type"))
         ))
     ))

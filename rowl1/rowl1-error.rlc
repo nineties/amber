@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2012-11-15 03:20:10 nineties $
+; $Id: rowl1-node.rlc 2012-11-25 01:10:52 nineties $
 ;
 
 (import "rlvm-compile")
@@ -16,7 +16,7 @@
 (extern object current_loc)
 
 (export fun exception (loc msg) (
-    (return (make_expr (to_sym "Exception") (list2 loc msg)))
+    (return (make_expr Exception (list2 loc msg)))
     ))
 
 (export fun type_error (loc required actual) (
@@ -26,8 +26,11 @@
         )))
     ))
 
-(export fun out_of_range (loc) (
-    (return (make_expr (to_sym "IndexOutOfRange") (list1 loc)))
+(export fun out_of_range (loc obj idx) (
+    (return (make_expr (to_sym "IndexOutOfRange") (list3 loc
+        (make_expr (to_sym "object") (list1 obj))
+        (make_expr (to_sym "index") (list1 idx))
+        )))
     ))
 
 (export fun invalid_argument (loc msg val) (

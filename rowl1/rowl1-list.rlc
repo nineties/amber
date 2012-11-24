@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2012-11-21 15:48:28 nineties $
+; $Id: rowl1-list.rlc 2012-11-25 01:14:28 nineties $
 ;
 
 (import "rlvm-compile")
@@ -20,27 +20,29 @@
 (extern object current_loc)
 (extern object current_mod)
 
-(fun index_out_of_range () (
-    (throw (out_of_range current_loc))
+(fun index_out_of_range (list idx) (
+    (throw (out_of_range current_loc list (box idx)))
     ))
 
 (fun ls_at (ls i) (
-    (= i (unbox i))
-    (while (&& (> i 0) ls) (do
-        (-= i 1)
+    (var orig ls)
+    (var j (unbox i))
+    (while (&& (> j 0) ls) (do
+        (-= j 1)
         (= ls (cdr ls))
         ))
-    (if (! ls) (index_out_of_range))
+    (if (! ls) (index_out_of_range orig (unbox i)))
     (return (car ls))
     ))
 
 (fun ls_store (ls i v) (
-    (= i (unbox i))
-    (while (&& (> i 0) ls) (do
-        (-= i 1)
+    (var orig ls)
+    (var j (unbox i))
+    (while (&& (> j 0) ls) (do
+        (-= j 1)
         (= ls (cdr ls))
         ))
-    (if (! ls) (index_out_of_range))
+    (if (! ls) (index_out_of_range orig (unbox i)))
     (setcar ls v)
     (return v)
     ))
@@ -54,11 +56,11 @@
     ))
 
 (fun ls_car (a) (
-    (if (! a) (index_out_of_range))
+    (if (! a) (index_out_of_range a 0))
     (return (car a))
     ))
 (fun ls_cdr (a) (
-    (if (! a) (index_out_of_range))
+    (if (! a) (index_out_of_range a 1))
     (return (cdr a))
     ))
 

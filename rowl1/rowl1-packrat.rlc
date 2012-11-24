@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2012-11-24 13:16:02 nineties $
+; $Id: rowl1-packrat.rlc 2012-11-25 01:28:41 nineties $
 ;
 
 ; TODO:
@@ -1290,11 +1290,11 @@
 ; }(p)
 
 (fun compile_choice (ps) (
-    (if (< (list_len ps) 2) (do
-        (output_error stderr current_loc)
-        (output_string stderr "Choice must have more than 1 argument.\n")
-        (exit 1)
-        ))
+    (if (< (list_len ps) 2)
+        (throw (unexpected_error current_loc
+            (string "require more than 1 arguments")
+            (make_expr Choice ps)
+            )))
 
     (var body 0)
     (var state (unique_sym))
@@ -1631,13 +1631,10 @@
 
 (fun compile_parser_action (elems act) (
     (var prog elems)
-    (if (!= (expr_head elems) List) (do
-        (output_error stderr current_loc)
-        (output_string stderr "syntax statement must be List{syntax element, ...}: ")
-        (pretty_print stderr elems)
-        (output_string stderr "\n")
-        (exit 1)
-        ))
+    (if (!= (expr_head elems) List)
+        (throw (unexpected_error current_loc
+            (string "syntax elements must be a List")
+            elems)))
 
     (var idx 0)
     (var body 0)
@@ -1707,13 +1704,11 @@
     (while elems (do
         (var t (car elems))
         (var size (expr_size t))
-        (if (|| (!= (expr_head t) Tuple) (|| (< size 2) (> size 3))) (do
-            (output_error stderr current_loc)
-            (output_string stderr "parser element must be form of Tuple{parser, action, [options]}:")
-            (pretty_print stderr t)
-            (output_string stderr "\n")
-            (exit 1)
-            ))
+        (if (|| (!= (expr_head t) Tuple) (|| (< size 2) (> size 3)))
+            (throw (unexpected_error current_loc
+                (string "entries of syntax definition must be form of Tuple{parser, action, [options]}")
+                t))
+            )
         (if (== size 3)
             (setup_options (expr_arg t 2))
             )
