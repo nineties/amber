@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-11-24 23:46:19 nineties $
+; $Id: rowl1-compile.rlc 2012-11-25 00:26:04 nineties $
 ;
 
 (import "rlvm-compile")
@@ -877,9 +877,9 @@
 ; to
 ;
 ; tmp: (Foo{x, y, Bar{z}} -> [x,y,z])(e)
-; x: car(tmp)
-; y: cadr(tmp)
-; z: caadr(tmp)
+; x: decons(tmp)
+; y: decons(tmp)
+; z: decons(tmp)
 (fun compile_define_multi_variable (asm mod lhs rhs overwrite) (
     (var vars (collect_args lhs))
     (compile asm mod (apply (make_expr Lambda (list2 (make_expr Tuple (list1 lhs)) vars)) (list1 rhs)))
@@ -895,6 +895,7 @@
 
         (= vars (cdr vars))
         ))
+    (put_drop asm)
     (put_push asm nil)
     ))
 
@@ -1483,6 +1484,10 @@
 (fun compile_assign (asm mod expr) (
     (var lhs (expr_arg expr 0))
     (var rhs (expr_arg expr 1))
+    (if (!= (expr_head lhs) Symbol)
+        (return (compile_multi_assign asm mod lhs rhs))
+        )
+
     (compile asm mod rhs)
     (var v (lookup_symbol mod lhs))
     (if (! v)
@@ -1507,6 +1512,29 @@
     (pretty_print stderr lhs)
     (output_string stderr " is not lvalue\n")
     (exit 1)
+    ))
+
+; translate
+;
+; Foo{x, y, Bar{z}} = e
+;
+; to
+;
+; tmp: (Foo{x, y, Bar{z}} -> [x,y,z])(e)
+; x = decons(tmp)
+; y = decons(tmp)
+; z = decons(tmp)
+(fun compile_multi_assign (asm mod lhs rhs) (
+    (var vars (collect_args lhs))
+    (compile asm mod (apply (make_expr Lambda (list2 (make_expr Tuple (list1 lhs)) vars)) (list1 rhs)))
+
+    (while vars (do
+        (compile_assign asm mod (assign (car vars) Decons))
+        (put_drop asm)
+        (= vars (cdr vars))
+        ))
+    (put_drop asm)
+    (put_push asm nil)
     ))
 
 (fun compile_return (asm mod expr) (
@@ -1874,9 +1902,7 @@
 	(add_compiler mod (make_expr SeqAnd (list2 DontCare DontCare)) compile_logical)
 	(add_compiler mod (make_expr SeqOr (list2 DontCare DontCare)) compile_logical)
 
-    (add_compiler mod (make_expr Assign (list2 symT DontCare)) compile_assign)
-    (add_compiler mod (make_expr Assign (list2 (qualified DontCare DontCare) DontCare))
-         compile_assign)
+    (add_compiler mod (make_expr Assign (list2 DontCare DontCare)) compile_assign)
     (add_compiler mod (make_expr Lambda (list2 DontCare DontCare)) compile_lambda)
     (add_compiler mod (make_expr Bind (list2 DontCare DontCare)) compile_bind)
 
