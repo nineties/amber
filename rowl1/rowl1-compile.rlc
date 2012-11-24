@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-11-25 01:55:06 nineties $
+; $Id: rowl1-compile.rlc 2012-11-25 02:34:37 nineties $
 ;
 
 (import "rlvm-compile")
@@ -881,13 +881,17 @@
 ;
 ; to
 ;
-; tmp: (Foo{x, y, Bar{z}} -> [x,y,z])(e)
+; tmp: (t@Foo{x, y, Bar{z}} -> [x,y,z,t])(e)
 ; x: decons(tmp)
 ; y: decons(tmp)
 ; z: decons(tmp)
+; car(tmp)
 (fun compile_define_multi_variable (asm mod lhs rhs overwrite) (
     (var vars (collect_args lhs))
-    (compile asm mod (apply (make_expr Lambda (list2 (make_expr Tuple (list1 lhs)) vars)) (list1 rhs)))
+    (var t (unique_sym))
+    (compile asm mod (apply (lambda
+        (make_expr Tuple (list1 (make_expr Domain (list2 t lhs))))
+        (list_append vars (list1 t))) (list1 rhs)))
 
     (while vars (do
         (var def nil)
@@ -900,8 +904,7 @@
 
         (= vars (cdr vars))
         ))
-    (put_drop asm)
-    (put_push asm nil)
+    (put_car asm)
     ))
 
 (fun compile_decons (asm mod expr) (
@@ -1522,21 +1525,24 @@
 ;
 ; to
 ;
-; tmp: (Foo{x, y, Bar{z}} -> [x,y,z])(e)
+; tmp: (t@Foo{x, y, Bar{z}} -> [x,y,z,t])(e)
 ; x = decons(tmp)
 ; y = decons(tmp)
 ; z = decons(tmp)
+; car(tmp)
 (fun compile_multi_assign (asm mod lhs rhs) (
     (var vars (collect_args lhs))
-    (compile asm mod (apply (make_expr Lambda (list2 (make_expr Tuple (list1 lhs)) vars)) (list1 rhs)))
+    (var t (unique_sym))
+    (compile asm mod (apply (lambda
+        (make_expr Tuple (list1 (make_expr Domain (list2 t lhs))))
+        (list_append vars (list1 t))) (list1 rhs)))
 
     (while vars (do
         (compile_assign asm mod (assign (car vars) Decons))
         (put_drop asm)
         (= vars (cdr vars))
         ))
-    (put_drop asm)
-    (put_push asm nil)
+    (put_car asm)
     ))
 
 (fun compile_return (asm mod expr) (
