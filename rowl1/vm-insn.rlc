@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2012-11-16 10:40:23 nineties $
+; $Id: vm-insn.rlc 2012-11-25 12:44:48 nineties $
 ;
 
 (define gen_field_get (idx) `(
@@ -106,6 +106,8 @@
     (isub      () @true ((vmbin "subl")))
     (iadd1 () @true ((asm "addl $1, (%esi)")))
     (isub1 () @true ((asm "subl $1, (%esi)")))
+
+    (ineg       () @true ((asm "negl (%esi)")))
     (imul      () @true ((vmpop %eax) (asm "imul (%esi), %eax") (asm "movl %eax, (%esi)")))
 
     ; signed
@@ -172,7 +174,6 @@
         (asm "xorl %edx, %edx")
         ))
 
-    (ineg       () @true ((asm "negl (%esi)")))
     (shl   () @true (
         (vmpop %ecx)
         (vmpop %eax)
@@ -206,6 +207,14 @@
     (and    () @true ((vmbin "andl")))
     (or     () @true ((vmbin "orl")))
     (xor    () @true ((vmbin "xorl")))
+
+    (box       () @true (
+        (asm "sall $1, (%esi)")
+        (asm "addl $1, (%esi)")
+        ))
+    (unbox     () @true (
+        (asm "sarl $1, (%esi)")
+        ))
 
     ; bigint arithmetic
     ; 1st argument must be big-integer
