@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-table.rlc 2012-11-23 13:35:51 nineties $
+; $Id: rowl1-table.rlc 2012-11-25 22:27:25 nineties $
 ;
 
 (import "rlvm-compile")
@@ -15,6 +15,7 @@
 (import "rowl1-module")
 (import "rowl1-compile")
 (import "rowl1-error")
+(import "rowl1-pprint")
 
 (extern object current_mod)
 (extern object current_loc)
@@ -198,28 +199,13 @@
 (export fun pp_table (ochan tbl) (
     (var entries (field_get tbl 2))
     (var size (vector_size entries))
-    (output_string ochan "{")
+    (output_string ochan "Table {")
     (for i 0 size (do
         (var entry (vector_at entries i))
         (if (! entry) continue)
-        (pretty_print ochan (field_get entry 0))
+        (pprint ochan (field_get entry 0))
         (output_string ochan " => ")
-        (pretty_print ochan (field_get entry 1))
-        (if (< i (- size 1)) (output_string ochan ", "))
-        ))
-    (output_string ochan "}")
-    ))
-
-(export fun pp_table_full (ochan tbl) (
-    (var entries (field_get tbl 2))
-    (var size (vector_size entries))
-    (output_string ochan "{")
-    (for i 0 size (do
-        (var entry (vector_at entries i))
-        (if (! entry) continue)
-        (pretty_print_full ochan (field_get entry 0))
-        (output_string ochan " => ")
-        (pretty_print_full ochan (field_get entry 1))
+        (pprint ochan (field_get entry 1))
         (if (< i (- size 1)) (output_string ochan ", "))
         ))
     (output_string ochan "}")

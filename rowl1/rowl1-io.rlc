@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-io.rlc 2012-11-25 01:46:58 nineties $
+; $Id: rowl1-io.rlc 2012-11-26 01:08:29 nineties $
 ;
 
 (import "rlvm-compile")
@@ -13,8 +13,9 @@
 (import "rowl1-node")
 (import "rowl1-module")
 (import "rowl1-compile")
+(import "rowl1-pprint")
 
-(fun make_ifstream (path in) (
+(export fun make_ifstream (path in) (
     (return (variant @InputFileStreamE 2 path in))
     ))
 
@@ -26,7 +27,7 @@
     (close_in (field_get st 2))
     ))
 
-(fun make_ofstream (path out) (
+(export fun make_ofstream (path out) (
     (return (variant @OutputFileStreamE 2 path out))
     ))
 
@@ -39,7 +40,7 @@
     ))
 
 (fun io_print (f s) (
-    (pretty_print (field_get f 2) s)
+    (pprint (field_get f 2) s)
     (return nil)
     ))
 
@@ -54,8 +55,7 @@
     ))
 
 (fun io_print_full (f flag obj) (
-    (pretty_print_full (field_get f 2) obj)
-    (return nil)
+    (throw (string "not implemented: print_full"))
     ))
 
 ; single character is represented as a string of one character
@@ -113,6 +113,8 @@
     (add_builtin_function1 IO (to_sym "read_string") (domainP InputFileStream) io_read_string 0)
     (add_builtin_function1 IO (to_sym "read_line") (domainP InputFileStream) io_read_line 0)
     (add_builtin_function1 IO (to_sym "read_int") (domainP InputFileStream) io_read_int 0)
+
+    (setup_pprint std IO)
     ))
 
     ))
