@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2012-11-25 01:28:41 nineties $
+; $Id: rowl1-packrat.rlc 2012-11-26 06:27:43 nineties $
 ;
 
 ; TODO:
@@ -1340,7 +1340,7 @@
     (var loop_body 0)
     (= loop_body (cons p loop_body))
     (= loop_body (cons (mkif (test_noparse) (make_expr Break 0)) loop_body))
-    (= loop_body (cons (assign elems (apply (to_sym "cons") (list2 (get_token) elems))) loop_body))
+    (= loop_body (cons (assign elems (apply (to_sym "%cons") (list2 (get_token) elems))) loop_body))
     (= loop_body (cons (gen_set_parser_state_all state PVar) loop_body))
     (= loop_body (gen_parse_spaces_break loop_body))
 
@@ -1668,6 +1668,7 @@
     ))
 
 (var space_sensitive (to_sym "space_sensitive"))
+(var nospace (to_sym "nospace"))
 (var multiline (to_sym "multiline"))
 (fun setup_options (opts) (
     (if (!= (expr_head opts) List)
@@ -1675,7 +1676,7 @@
         )
     (while opts (do
         (var opt (car opts))
-        (if (== opt space_sensitive)
+        (if (|| (== opt space_sensitive) (== opt nospace))
             (= space_sensitive_p @TRUE)
         (if (== opt multiline)
             (= multiline_p @TRUE)
