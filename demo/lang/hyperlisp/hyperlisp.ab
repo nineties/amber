@@ -1,0 +1,248 @@
+#!/usr/bin/amber -m
+# Copyright (C) 2012 nineties
+#
+# $Id: hyperlisp.ab 2012-11-27 17:15:02 nineties $
+
+module Hyperlisp {
+    # Core
+    cons(x, y): `Cons{!x, !y}
+    cons(0, 0): 0
+    snoc(x, y): `Snoc{!x, !y}
+
+    #TODO: OR-pattern will be implemented in future version.
+    # car(Cons{x, _} or Snoc{x, _}): x
+
+    car(Cons{x, _}): x
+    car(Snoc{x, _}): x
+
+    car(0): 0
+    car(1): 0
+
+    cdr(Cons{_, y}): y
+    cdr(Snoc{_, y}): y
+    cdr(0): 0
+    cdr(1): 0
+
+    cons_list([x, xs...]): cons(x, cons_list(xs))
+    cons_list([]): 0
+    snoc_list([x, xs...]): snoc(x, snoc_list(xs))
+    snoc_list([]): 0
+
+    quote(e): snoc_list([1, e])
+
+    # e[i] can be used as a syntax sugar of at(e, i)
+    at(e@Cons, i): at(cdr(e), i-1)
+    at(e@Cons, 0): car(e)
+    at(e@Snoc, i): at(cdr(e), i-1)
+    at(e@Snoc, 0): car(e)
+
+    is_atom(_)        : false
+    is_atom(e@Snoc)   : true
+    is_atom(1)        : true
+    is_atom(e@Symbol) : true
+
+    # Universal function
+    eval(Cons{f, args}): apply(f, evlis(args))
+    eval(Snoc{f, args}): apply(f, args)
+    eval(0): 0
+
+    evlis(0): 0
+    evlis(1): 0
+    evlis(Cons{a, as}): cons(eval(a), evlis(as))
+    evlis(Snoc{a, as}): cons(a, evlis(as))
+
+    # Functions
+    # XXX: length of arguments are not checked.
+    apply(\cons, args): cons(args[0], args[1])
+    apply(\snoc, args): snoc(args[0], args[1])
+    apply(\car, args): car(args[0])
+    apply(\cdr, args): cdr(args[0])
+    apply(1, args): args[0]
+    apply(\eq, args): args[0] == args[1] ? 1 : 0
+    apply(\cond, args): {
+        if is_atom(eval(args[0][0]))
+            eval(args[0][1])
+        else
+            apply(\cond, cdr(args))
+    }
+    apply(\null, args): args[0] == 0 ? 1 : 0
+    apply(\atom, args): is_atom(args[0]) ? 1 : 0
+
+    # Lambda abstraction
+
+    create_map(args): throw `InvalidArgument{!args}
+    create_map(Snoc{x, xs}):
+        map(create_map(x),  ((v, pos)) -> (v, cons(pos, 0))) +
+        map(create_map(xs), ((v, pos)) -> (v, cons(0, pos)))
+    create_map(Cons{x, xs}):
+        map(create_map(x),  ((v, pos)) -> (v, cons(pos, 0))) +
+        map(create_map(xs), ((v, pos)) -> (v, cons(0, pos)))
+    create_map(Snoc{Snoc{\eq, Snoc{x, Snoc{y, 0}}}, xs}):
+        map(create_map(x),  ((v, pos)) -> (v, cons(pos, 0))) +
+        map(create_map(y),  ((v, pos)) -> (v, cons(pos, 0))) +
+        map(create_map(xs), ((v, pos)) -> (v, cons(0, pos)))
+    create_map(Meta{x}): [(x, 1)]
+    create_map(0): []
+
+    create_lambda(tbl, Cons{x, y}): {
+        (mx, lx): create_lambda(tbl, x)
+        (my, ly): create_lambda(tbl, y)
+        (cons(mx, my), cons(lx, ly))
+    }
+    create_lambda(tbl, Snoc{x, y}): {
+        (mx, lx): create_lambda(tbl, x)
+        (my, ly): create_lambda(tbl, y)
+        (cons(mx, my), snoc(lx, ly))
+    }
+    create_lambda(tbl, 0):          (0, 0)
+    create_lambda(tbl, 1):          (0, 1)
+    create_lambda(tbl, x@Symbol):   (0, x)
+    create_lambda(tbl, Meta{x}):    (tbl[x], 0)
+
+    syntax_sugar(e): e
+    syntax_sugar(Cons{Meta{\Lambda}, Cons{args, Cons{body, 0}}}): {
+        arg_map: Table::from_list(
+             map( create_map(args) , ((v, pos)) -> (v, snoc(pos, 0)) )
+            )
+        (args_, body_): create_lambda(arg_map, body)
+        quote(cons_list([\lambda, args_, body_]))
+    }
+
+    # XXX: Scoped-syntax like:
+    # apply((hl_expr){ 1[(\lambda, map body)] }): ...
+    # will be implemented.
+    apply(Snoc{1, Snoc{Cons{\lambda, Cons{map, Cons{body, 0}}}, 0}}, args):
+        eval(subst(body, map, args))
+
+    subst(e, 0, _): e
+    subst(Cons{e1, e2}, Cons{m1, m2}, args):
+        cons(subst(e1, m1, args), subst(e2, m2, args))
+    subst(Snoc{e1, e2}, Cons{m1, m2}, args):
+        snoc(subst(e1, m1, args), subst(e2, m2, args))
+    subst(0, Cons{m1, m2}, args):
+        cons(subst(0, m1, args), subst(0, m2, args))
+    subst(0, map@Snoc, args): get_arg(car(map), args)
+
+    get_arg(Cons{m1, _}, args): get_arg(m1, car(args))
+    get_arg(Cons{0, m2}, args): get_arg(m2, cdr(args))
+    get_arg(1, arg): arg
+
+    # Function definition
+    apply(\define, args): `InvalidDefinition{!args}
+    apply(\define, Snoc{Snoc{\eq, Snoc{lhs, Snoc{body, 0}}}, 0}): {
+        fun: car(lhs)
+        params: cdr(lhs)
+
+        lam: syntax_sugar(cons_list([\Meta{Lambda}, params, body]))
+
+        # update "apply" function in top-level
+        eval(`Qualified{Hyperlisp, DefineFunction{apply, (\!fun, args) -> apply(\!lam, args)}})
+        fun
+    }
+
+    # Pretty-Printer
+    is_list(_): false
+    is_list(0): true
+    is_list(Cons{x, y}): is_list(y)
+    is_list(Snoc{x, y}): is_list(y)
+
+    # XXX: This implementation will be refined using format-string.
+    # pprint(io, Cons{x, y}): pprint(io, "(%o . %o)", x, y)
+
+    pprint(io, Cons{x, y}): {
+        pprint(io, "(")
+        pprint(io, x)
+        pprint(io, " . ")
+        pprint(io, y)
+        pprint(io, ")")
+    }
+    pprint(io, Snoc{x, y}): {
+        pprint(io, "[")
+        pprint(io, x)
+        pprint(io, " . ")
+        pprint(io, y)
+        pprint(io, "]")
+    }
+    pprint(io, e@Cons) where is_list(e) : {
+        pprint(io, "(")
+        pprint_cons_list(io, e)
+        pprint(io, ")")
+    }
+    pprint(io, e@Snoc) where is_list(e) : {
+        pprint(io, "[")
+        pprint_snoc_list(io, e)
+        pprint(io, "]")
+    }
+    pprint_cons_list(io, Cons{x, y}): {
+        pprint(io, x)
+        pprint(io, ", ")
+        pprint_cons_list(io, y)
+    }
+    pprint_cons_list(io, Snoc{x, y}): {
+        pprint(io, "'")
+        pprint(io, x)
+        pprint(io, ", ")
+        pprint_cons_list(io, y)
+    }
+    pprint_cons_list(io, Cons{x, 0}): pprint(io, x)
+    pprint_cons_list(io, Snoc{x, 0}): {
+        pprint(io, "'")
+        pprint(io, x)
+    }
+
+    pprint_snoc_list(io, Snoc{x, y}): {
+        pprint(io, x)
+        pprint(io, ", ")
+        pprint_snoc_list(io, y)
+    }
+    pprint_snoc_list(io, Cons{x, y}): {
+        pprint(io, "'")
+        pprint(io, x)
+        pprint(io, ", ")
+        pprint_snoc_list(io, y)
+    }
+    pprint_snoc_list(io, Snoc{x, 0}): pprint(io, x)
+    pprint_snoc_list(io, Cons{x, 0}): {
+        pprint(io, "'")
+        pprint(io, x)
+    }
+
+    # Syntax
+    hl_literal ::= [nospace] [a-z][a-zA-Z0-9_]* { $input.to_sym }
+                 | [nospace] [A-Z][a-zA-Z0-9_]* { `Meta{!$input.to_sym} }
+                 | "0"      { 0 }
+                 | "1"      { 1 }
+
+    hl_cons_list ::= hl_expr [,;] hl_cons_list      { cons($0, $2) }
+                   | "'" hl_expr [,;] hl_cons_list  { snoc($1, $3) }
+                   | "'" hl_expr                    { snoc($0, 0) }
+                   | hl_expr                        { cons($0, 0) }
+    hl_snoc_list ::= hl_expr [,;] hl_snoc_list      { snoc($0, $2) }
+                   | "'" hl_expr [,;] hl_snoc_list  { cons($1, $3) }
+                   | "'" hl_expr                    { cons($0, 0) }
+                   | hl_expr                        { snoc($0, 0) }
+    hl_simpl_expr ::= "(" hl_expr "." hl_expr ")"  { cons($1, $3) }
+                    | "[" hl_expr "." hl_expr "]"  { snoc($1, $3) }
+                    | "(" hl_cons_list ")"         { $1 }
+                    | "[" hl_snoc_list "]"         { $1 }
+                    | "(" ")"                      { 0 }
+                    | "[" "]"                      { 0 }
+                    | hl_literal
+    hl_expr ::= hl_expr ":" hl_expr          { cons_list([$0, $2]) }
+              | hl_expr "=" hl_expr          { snoc_list([\eq, $0, $2]) }
+              | hl_expr "(" hl_cons_list ")" { syntax_sugar(cons($0, $2)) }
+              | hl_expr "[" hl_snoc_list "]" { syntax_sugar(snoc($0, $2)) }
+              | "\"" hl_simpl_expr           { snoc_list([1, $1]) }
+              | hl_simpl_expr
+
+    hl_statement ::= "#" hl_expr { snoc_list([\define, $1]) }
+                   | hl_expr
+
+    hl_comment ::= [space_sensitive] "//" [^\n]*    { $input }
+
+    PROMPT = "hyperlisp"
+}
+
+open Hyperlisp
+ReplaceSyntax{comment, hl_comment}
+ReplaceSyntax{statement, hl_statement}
