@@ -3,7 +3,7 @@
 # Copyright (C) 2009 nineties
 #
 
-# $Id: Makefile 2012-06-11 16:16:00 nineties $
+# $Id: Makefile 2012-11-27 17:46:29 nineties $
 
 LIBDIR = /usr/lib
 
@@ -15,6 +15,7 @@ install:
 	cd rowl1; $(MAKE) install_binaries install_libraries
 	mkdir -p /usr/lib/amber
 	cp -r lib/* /usr/lib/amber/
+	cp -r demo /usr/lib/amber/
 
 doc-preview:
 	cd doc; jekyll --server
