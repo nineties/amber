@@ -4,7 +4,7 @@ DefineSyntax{
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2012-11-27 00:16:30 nineties $
+# $Id: syntax.ab 2012-11-27 01:09:51 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -200,7 +200,7 @@ postfix_expr
         # e.s and e.s(a,b,c) are just syntax-sugars of s(e) and s(e,a,b,c)
       | postfix_expr "." symbol "(" delimited(expr, ",") ")"
         { MakeExpr{Quote{Apply}, List{node2,
-            Apply{cons, List{node0, node4}}}} }
+            Apply{Qualified{std, cons}, List{node0, node4}}}} }
       | postfix_expr "." symbol
         { MakeExpr{Quote{Apply}, List{node2, List{node0}}} }
 
@@ -381,8 +381,8 @@ x <= y  => `le(!x, !y)
 x >= y  => `ge(!x, !y)
 x == y  => `equal(!x, !y)
 x != y  => `(not equal(!x, !y))
-x[args...]     => `Apply{at, !cons(x, args)}
-x[args...] = e => `Apply{store, !cons(x, append(args, [e]))}
+x[args...]     => `Apply{at, !std::cons(x, args)}
+x[args...] = e => `Apply{store, !std::cons(x, std::append(args, [e]))}
 x.s = e => `Apply{!("set_" + s).to_sym, ![x, e]}
 
 module parser {
