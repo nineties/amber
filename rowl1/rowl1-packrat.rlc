@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2012-11-26 06:27:43 nineties $
+; $Id: rowl1-packrat.rlc 2012-11-27 17:26:10 nineties $
 ;
 
 ; TODO:
@@ -210,6 +210,7 @@
 
 (extern object current_mod)
 (extern fun set_current_module)
+(extern fun prompt_string)
 
 (fun __cons (a b) (
     (return (cons a b))
@@ -273,7 +274,10 @@
     ))
 
 (fun alloc_error_state (p) (
-    (return (struct 2 0 (field_get p 4) 0 0)) ; msg, file, line, pos
+    (if (in_shell_mode)
+        (return (struct 2 0 prompt_string 0 0)) ; msg, file, line, pos
+        (return (struct 2 0 (field_get p 4) 0 0)) ; msg, file, line, pos
+        )
     ))
 
 (fun join_error_state (err p) (
@@ -402,7 +406,10 @@
 (export fun get_loc (p) (
     (var line (field_get p 6))
     (var clmn (field_get p 7))
-    (return (make_loc (field_get p 4) line clmn line clmn))
+    (if (in_shell_mode)
+        (return (make_loc (prompt_string) line clmn line clmn))
+        (return (make_loc (field_get p 4) line clmn line clmn))
+        )
     ))
 
 (fun get_column (p) (
@@ -523,6 +530,10 @@
         (strcat "expect " 
         (strcat (escape_char c)
         (strcat " but got " (escape_char v))))))
+    ))
+ 
+(fun parse_fail (p) (
+    (return (noparse p nil))
     ))
 
 (fun parse_any_char (p) (
@@ -708,11 +719,15 @@
 @(MEMOIZE blank)
 
 (fun parse_blanks_ (p) (
-    (var code (lookup_func current_mod (to_sym "parse_blank")))
+    (var blank   (lookup_func current_mod (to_sym "parse_blank")))
+    (var comment (lookup_func current_mod (to_sym "parse_comment")))
     (var state (copy_parser_state p))
     (while @TRUE (do
         (set_parser_state_all state p)
-        (byterun code p)
+        (byterun blank p)
+        (if @(PARSED p) continue)
+        (set_parser_state_all p state)
+        (byterun comment p)
         (if @(PARSED p) continue)
         (set_parser_state_all p state)
         break
@@ -722,14 +737,18 @@
 @(MEMOIZE blanks)
 
 (fun parse_spaces_ (p) (
-    (var code (lookup_func current_mod (to_sym "parse_blank")))
+    (var blank   (lookup_func current_mod (to_sym "parse_blank")))
+    (var comment (lookup_func current_mod (to_sym "parse_comment")))
     (var state (copy_parser_state p))
     (while @TRUE (do
         (set_parser_state_all state p)
-        (byterun code p)
+        (byterun blank p)
         (if @(PARSED p) continue)
         (set_parser_state_all p state)
         (parse_char p '\n')
+        (if @(PARSED p) continue)
+        (set_parser_state_all p state)
+        (byterun comment p)
         (if @(PARSED p) continue)
         (set_parser_state_all p state)
         break
@@ -975,7 +994,8 @@
 
 (fun print_prompt (p sign) (
     (var line (field_get p 6))
-    (output_string stdout "amber:")
+    (output_string stdout (prompt_string))
+    (output_char stdout ':')
     (output_int stdout line)
     (output_string stdout sign)
     (flush stdout)
@@ -1862,6 +1882,7 @@
     (add_builtin_function2 mod (to_sym "parse_text") (domainP Parser) stringT parse_text 0)
     (add_parser mod (to_sym "parse_any_") parse_any_char)
     (add_parser mod (to_sym "parse_blank_") parse_blank_)
+    (add_parser mod (to_sym "parse_comment_") parse_fail)
     (add_parser mod (to_sym "parse_shell_style_comment_") parse_shell_style_comment_)
     (add_parser mod (to_sym "parse_decimal_") parse_decimal_)
     (add_parser mod (to_sym "parse_binary_") parse_binary_)
@@ -1878,6 +1899,7 @@
 
     (add_parser mod (to_sym "parse_any") parse_any_char)
     (add_parser mod (to_sym "parse_blank") parse_blank)
+    (add_parser mod (to_sym "parse_comment") parse_fail)
     (add_parser mod (to_sym "parse_shell_style_comment") parse_shell_style_comment)
     (add_parser mod (to_sym "parse_decimal") parse_decimal)
     (add_parser mod (to_sym "parse_binary") parse_binary)

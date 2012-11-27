@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-module.rlc 2012-11-24 23:42:11 nineties $
+; $Id: rowl1-module.rlc 2012-11-27 17:09:10 nineties $
 ;
 
 ; Module can be considered as a re-entrant scope.
@@ -282,7 +282,20 @@
         ))
     ))
 
-(extern fun must_be_module_variable)
+(export fun get_module_variable (mod sig) (
+    (var info (lookup_effective_symbol mod sig))
+    (must_be_module_variable sig info)
+    (return (car (expr_arg info 0)))
+    ))
+
+(export fun must_be_module_variable (sym val) (
+    (if (!= (expr_head val) ModuleVariable)
+        (throw (unexpected_error current_loc
+            (string "module variable is required")
+            sym))
+        )
+    ))
+
 (export fun find_module (loc curmod sig createp) (
     (var hd (expr_head sig))
     (if (== hd Symbol) (do
