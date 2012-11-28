@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2012-11-25 12:44:48 nineties $
+; $Id: vm-insn.rlc 2012-11-29 00:33:47 nineties $
 ;
 
 (define gen_field_get (idx) `(
@@ -1121,13 +1121,6 @@
         (asm "sall $2, %eax")
         (asm "subl %eax, %esi")
         ))
-    (deallocate (byte) @true (
-        (vmubyte 1 %eax)
-        (asm "movl (%esi), %ecx")
-        (asm "movl %ecx, (%esi, %eax, 4)")
-        (asm "sall $2, %eax")
-        (asm "addl %eax, %esi")
-        ))
     ; number of arguments
     (arity () @true (
         (asm "movl 8(%edi), %eax") ; %eax = 4 * arity
@@ -1138,7 +1131,7 @@
     (args () @true (
         (asm "subl $12, %esp")
         (asm "movl 8(%edi), %ecx") ; %ecx = 4 * arity
-        (asm "leal 8(%edi,%ecx,1), %eax")
+        (asm "leal 12(%edi,%ecx,1), %eax")
         (asm "movl %eax, (%esp)")
         (asm "shrl $2, %ecx")
         (asm "movl %ecx, 8(%esp)")
@@ -1165,11 +1158,11 @@
         (asm "xorl %edx, %edx")
         (vmpush %eax)
         ))
-    (arg0 () @true ((asm "movl 12(%edi), %eax") (vmpush %eax)))
-    (arg1 () @true ((asm "movl 16(%edi), %eax") (vmpush %eax)))
-    (arg2 () @true ((asm "movl 20(%edi), %eax") (vmpush %eax)))
-    (arg3 () @true ((asm "movl 24(%edi), %eax") (vmpush %eax)))
-    (arg4 () @true ((asm "movl 28(%edi), %eax") (vmpush %eax)))
+    (arg0 () @true ((asm "movl 16(%edi), %eax") (vmpush %eax)))
+    (arg1 () @true ((asm "movl 20(%edi), %eax") (vmpush %eax)))
+    (arg2 () @true ((asm "movl 24(%edi), %eax") (vmpush %eax)))
+    (arg3 () @true ((asm "movl 28(%edi), %eax") (vmpush %eax)))
+    (arg4 () @true ((asm "movl 32(%edi), %eax") (vmpush %eax)))
     ; load word from local
     (loadl0 () @true ((asm "movl -4(%edi), %eax") (vmpush %eax)))
     (loadl1 () @true ((asm "movl -8(%edi), %eax") (vmpush %eax)))
@@ -1299,6 +1292,7 @@
         ))
     ; 'call:1' 'relative address of the function:2' 'size of arguments:1'
     (call (addr byte) @nil  (
+        (asm "subl $4, %esi")   ; for closure-frame
         (vmubyte 3 %eax)
         (vmpush %eax) ; store size of arguments
         (asm "movl %ebx, %eax")
@@ -1312,6 +1306,7 @@
         ))
     ; 'lcall:1' 'relative address of the function:4' 'size of arguments:1'
     (lcall (laddr byte) @nil (
+        (asm "subl $4, %esi")   ; for closure-frame
         (vmubyte 5 %eax)
         (vmpush %eax) ; store size of arguments
         (asm "movl %ebx, %eax")
@@ -1362,6 +1357,7 @@
                 (asm "addl $2, %ecx")
                 (vmubyte 1 %eax)
                 (vmpop %ebx)
+                (asm "subl $4, %esi")   ; for closure-frame
                 (vmpush %eax) ; store size of arguments
                 (vmpush %ecx) ; store return point
                 (vmpush %edi) ; store base pointer
@@ -1376,6 +1372,7 @@
         (asm "addl $2, %ecx")
         (vmubyte 1 %eax)
         (vmpop %ebx)
+        (asm "subl $4, %esi") ; for closure-frame
         (asm "movl (%ebx), %ebx") ; pointer to the bytecode
         (vmpush %eax) ; store size of arguments
         (vmpush %ecx) ; store return point
@@ -1394,6 +1391,7 @@
         (vmpop %edi) ; base pointer
         (vmpop %ebx) ; return address
         (vmpop %eax) ; total size of arguments
+        (asm "addl $4, %esi") ; closure-frame
         (asm "addl %eax, %esi")
         (vmpush %ecx) ; push return value
         (vmfetch)
@@ -1404,6 +1402,7 @@
         (vmpop %edi) ; base pointer
         (vmpop %ebx) ; return address
         (vmpop %eax) ; total size of arguments
+        (asm "addl $4, %esi") ; closure-frame
         (asm "addl %eax, %esi")
         (vmpush %ecx) ; push return value
         (vmfetch)

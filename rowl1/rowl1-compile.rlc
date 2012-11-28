@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-11-27 17:08:12 nineties $
+; $Id: rowl1-compile.rlc 2012-11-29 00:55:15 nineties $
 ;
 
 (import "rlvm-compile")
@@ -538,6 +538,8 @@
     (return (compile_matching current_loc obj func))
     ))
 
+(var closure_frame null)
+
 (export fun compile_main (mod expr) (
     (var asm (make_assembler))
     (compile asm mod (alpha (make_symtable 10) expr))
@@ -651,7 +653,6 @@
     (return count)
     ))
 
-(var compiling_closure null)
 (var max_lvar_idx 0)
 (fun compile_function (asm_body asm_guard mod args body guard cls) (
     ;; closure conversion
@@ -698,11 +699,7 @@
     (reset_variable_count mod)
 
     (compile asm_body mod body)
-    (if compiling_closure
-        (put_operand_byte asm_body (+ cnt_addr 1) (+ max_lvar_idx 1))
-    (if (> max_lvar_idx 0)
-        (put_operand_byte asm_body (+ cnt_addr 1) max_lvar_idx)
-        ))
+    (put_operand_byte asm_body (+ cnt_addr 1) max_lvar_idx)
     (pop_varscope mod)
     (= max_lvar_idx save_max_lvar_idx)
     ))
@@ -928,7 +925,6 @@
                 (= idx (get_variable_count mod))
                 (if (>= idx max_lvar_idx) (= max_lvar_idx (+ idx 1)))
                 (incr_variable_count mod)
-                (if compiling_closure (+= idx 1))
                 (add_symbol mod lhs (make_lvar idx))
             ))
         (compile asm mod rhs)
@@ -969,8 +965,8 @@
     ))
 
 (export fun compile_operand (asm opd sym) (
-    (if (== sym compiling_closure) (do
-        (put_load_lvar asm 0)
+    (if (== sym closure_frame) (do
+        (put_load_closure asm)
         return
         ))
 
@@ -1021,7 +1017,6 @@
         (put_list_from asm)
         return
         ))
-    (throw opd)
     (not_reachable "compile_operand")
     ))
 
@@ -1638,32 +1633,25 @@
     (var args (field_get lam 2))
     (var body (field_get lam 3))
     (var guard (field_get lam 4))
+    ; XXX: this is heavy
     (var asm (make_assembler))
-    (if guard
-        (do
-            (put_push asm clos)
-            ; This implementation is not good (the cost of copy might be large)
-            (put_code asm guard)
-            (return (alloc_function args body (get_code asm)))
-        )
-        (do
-            (put_push asm clos)
-            (put_push asm body)
-            (put_jjump asm)
-            (return (alloc_function args (get_code asm) guard))
-        ))
+    (put_push asm clos)
+    (put_store_closure asm)
+    (put_push asm body)
+    (put_jjump asm)
+    (return (alloc_function args (get_code asm) guard))
     ))
 
 (fun compile_closure (asm mod expr) (
     (compile asm mod (expr_arg expr 0))
 
-    (var save_compiling_closure compiling_closure)
-    (= compiling_closure (expr_arg expr 0))
+    (var save_closure_frame closure_frame)
+    (= closure_frame (expr_arg expr 0))
 
     (compile_lambda_ asm mod (expr_arg expr 1) (expr_arg expr 0))
     (compile_simple_call asm 2 build_closure)
 
-    (= compiling_closure save_compiling_closure)
+    (= closure_frame save_closure_frame)
     ))
 
 (fun compile_alloc_clsenv (asm mod expr) (
