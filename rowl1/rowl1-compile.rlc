@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-11-29 02:20:36 nineties $
+; $Id: rowl1-compile.rlc 2012-11-29 12:12:39 nineties $
 ;
 
 (import "rlvm-compile")
@@ -654,6 +654,13 @@
     ))
 
 (var max_lvar_idx 0)
+(fun get_lvar_idx (mod) (
+    (var idx (get_variable_count mod))
+    (if (>= idx max_lvar_idx) (= max_lvar_idx (+ idx 1)))
+    (incr_variable_count mod)
+    (return idx)
+    ))
+
 (fun compile_function (asm_body asm_guard mod args body guard cls) (
     ;; closure conversion
     (var tbl (make_symtable 10))
@@ -685,7 +692,7 @@
         (= body (make_expr Block (list1 (list_reverse stmts))))
         ))
     (push_varscope mod)
-    (setup_args (get_vartable mod) args)
+    (var arg_copy (setup_args (get_vartable mod) args))
 
     (if (!= guard noguard)
         (compile asm_guard mod guard)
@@ -698,41 +705,59 @@
     (= max_lvar_idx 0)
     (reset_variable_count mod)
 
+    (var arg_decls 0)
+    (while arg_copy (do
+        (var e (car arg_copy))
+        (= arg_decls (cons (defvar (car e) (cadr e)) arg_decls))
+        (= arg_copy (cdr arg_copy))
+        ))
+
+    (= body (block (list2
+        (seq arg_decls)
+        body
+        )))
     (compile asm_body mod body)
+
     (put_operand_byte asm_body (+ cnt_addr 1) max_lvar_idx)
     (pop_varscope mod)
     (= max_lvar_idx save_max_lvar_idx)
     ))
 
 (fun setup_args (tbl args) (
-    (var orig args)
+    (var arg_copy 0)
     (var idx 0)
     (while args (do
-        (setup_arg tbl (make_arg idx) (car args) 0)
+        (= arg_copy (setup_arg tbl (make_arg idx) (car args) 0 arg_copy))
         (= args (cdr args))
         (+= idx 1)
         ))
-    (return orig)
+    (return arg_copy)
     ))
 
-(fun setup_arg (tbl obj arg level) (
+(fun setup_arg (tbl obj arg level cl) (
     (var argty (expr_head arg))
     (if (|| (== argty Int) (== argty String))
-        return
+        (return cl)
         )
     (if (== argty Symbol) (do
-        (if (== level 0) (symtable_add tbl arg obj))
-        return
+        (if (== level 0) (do
+            (var t (unique_sym))
+            (symtable_add tbl t obj)
+            (= cl (cons (list2 arg t) cl))
+            ))
+        (return cl)
         ))
     (if (== argty Domain) (do
         (if (== level 0) (do
             (var v (expr_arg_symbol arg 0))
-            (symtable_add tbl v obj)
+            (var t (unique_sym))
+            (symtable_add tbl t obj)
+            (= cl (cons (list2 v t) cl))
             (var dom (expr_arg arg 1))
             (if (!= (expr_head dom) Symbol)
-                (setup_arg tbl obj dom 0)
+                (= cl (setup_arg tbl obj dom 0 cl))
                 )
-            return
+            (return cl)
             ))
         ))
     (if (== argty List) (do
@@ -745,24 +770,26 @@
                     )
                 (if (> (expr_size a) 0) (do
                     (var v (expr_arg_symbol a 0))
-                    (symtable_add tbl v (make_list_from obj idx))
+                    (var t (unique_sym))
+                    (symtable_add tbl t (make_list_from obj idx))
+                    (= cl (cons (list2 v t) cl))
                     ))
-                return
+                (return cl)
                 ))
-            (setup_arg tbl (make_list_at obj idx) a level)
+            (= cl (setup_arg tbl (make_list_at obj idx) a level cl))
             (= arg (cdr arg))
             (incr idx)
             ))
-        return
+        (return cl)
         ))
     (if (== argty Quote)
-        return
+        (return cl)
         )
     (if (== argty Unquote) 
-        (return (setup_arg tbl obj (expr_arg arg 0) (- level 1)))
+        (return (setup_arg tbl obj (expr_arg arg 0) (- level 1) cl))
         )
     (if (== argty QuasiQuote)
-        (return (setup_arg tbl obj (expr_arg arg 0) (+ level 1)))
+        (return (setup_arg tbl obj (expr_arg arg 0) (+ level 1) cl))
         )
     (if (== argty Ellipsis)
         (throw (exception current_loc (string "Variable-length arguments is not allowed")))
@@ -777,14 +804,17 @@
                 )
             (if (> (expr_size a) 0) (do
                 (var v (expr_arg_symbol a 0))
-                (symtable_add tbl v (make_expr_from obj idx))
+                (var t (unique_sym))
+                (symtable_add tbl t (make_expr_from obj idx))
+                (= cl (cons (list2 v t) cl))
                 ))
-            return
+            (return cl)
             ))
-        (setup_arg tbl (make_expr_at obj idx) (car args) level)
+        (= cl (setup_arg tbl (make_expr_at obj idx) (car args) level cl))
         (= args (cdr args))
         (incr idx)
         ))
+    (return cl)
     ))
 
 (fun var_loc (info) (
@@ -922,9 +952,7 @@
             )
             (do
                 (check_redefinition mod lhs)
-                (= idx (get_variable_count mod))
-                (if (>= idx max_lvar_idx) (= max_lvar_idx (+ idx 1)))
-                (incr_variable_count mod)
+                (= idx (get_lvar_idx mod))
                 (add_symbol mod lhs (make_lvar idx))
             ))
         (compile asm mod rhs)
