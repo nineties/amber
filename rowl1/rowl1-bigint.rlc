@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-bigint.rlc 2012-10-18 03:12:42 nineties $
+; $Id: rowl1-bigint.rlc 2012-11-30 14:19:24 nineties $
 ;
 
 (import "rlvm-compile")
@@ -403,55 +403,35 @@
         )
     ))
 
-(var overwrite (to_sym "overwrite"))
-
 (export fun bint_uplus (n) (
     (return (norm n))
     ))
 (export fun bint_uminus (n) (
     (return (bigneg (to_bint_copy n)))
     ))
-(export fun bint_add (a b f) (
-    (if (== f overwrite)
-        (= a (to_bint a))
-        (= a (to_bint_copy a))
-        )
+(export fun bint_add (a b) (
+    (= a (to_bint_copy a))
     (return (norm (bigadd a (to_bint b))))
     ))
-(export fun bint_sub (a b f) (
-    (if (== f overwrite)
-        (= a (to_bint a))
-        (= a (to_bint_copy a))
-        )
+(export fun bint_sub (a b) (
+    (= a (to_bint_copy a))
     (return (norm (bigsub a (to_bint b))))
     ))
-(export fun bint_mul (a b f) (
-    (if (== f overwrite)
-        (= a (to_bint a))
-        (= a (to_bint_copy a))
-        )
+(export fun bint_mul (a b) (
+    (= a (to_bint_copy a))
     (return (norm (bigmul a (to_bint b))))
     ))
-(export fun bint_div (a b f) (
-    (if (== f overwrite)
-        (= a (to_bint a))
-        (= a (to_bint_copy a))
-        )
+(export fun bint_div (a b) (
+    (= a (to_bint_copy a))
     (bigdiv a (to_bint b))
     (return (norm a))
     ))
-(export fun bint_mod (a b f) (
-    (if (== f overwrite)
-        (= a (to_bint a))
-        (= a (to_bint_copy a))
-        )
+(export fun bint_mod (a b) (
+    (= a (to_bint_copy a))
     (return (norm (bigdiv a (to_bint b))))
     ))
-(export fun bint_shiftL (a b f) (
-    (if (== f overwrite)
-        (= a (to_bint a))
-        (= a (to_bint_copy a))
-        )
+(export fun bint_shiftL (a b) (
+    (= a (to_bint_copy a))
     (= b (norm b))
     (if (== (node_type b) @BigIntE)
         (throw (invalid_argument current_loc (string "shift length is too long") b))
@@ -464,11 +444,8 @@
         (return (norm (bigshr a (- b))))
         ))
     ))
-(export fun bint_shiftR (a b f) (
-    (if (== f overwrite)
-        (= a (to_bint a))
-        (= a (to_bint_copy a))
-        )
+(export fun bint_shiftR (a b) (
+    (= a (to_bint_copy a))
     (= b (norm b))
     (if (== (node_type b) @BigIntE)
         (throw (invalid_argument current_loc (string "shift length is too long") b))
@@ -508,7 +485,7 @@
     ))
 
 ; comput a^n by binary method
-(export fun bint_pow (a n _) (
+(export fun bint_pow (a n) (
     (= n (norm n))
     (if (== (node_type n) @BigIntE)
         (throw (invalid_argument current_loc (string "exponent is too big") n))
@@ -530,7 +507,7 @@
     (return (norm v))
     ))
 
-(export fun int_mul2 (a b _) (
+(export fun int_mul2 (a b) (
     (if (== b 1) (return b))    ; 1 == box(0)
     (if (== a 1) (return a))    ; 1 == box(0)
 
@@ -545,14 +522,14 @@
         )
     (return (bigmul (int_to_bint a) (int_to_bint b)))
     ))
-(export fun int_add2 (a b _) (
+(export fun int_add2 (a b) (
     (var c (+ (unbox a) (unbox b)))
     (if (&& (<= c @FIXNUM_MAX) (>= c @FIXNUM_MIN))
         (return (box c))
         (return (int_to_bint c))
         )
     ))
-(export fun int_sub2 (a b _) (
+(export fun int_sub2 (a b) (
     (var c (- (unbox a) (unbox b)))
     (if (&& (<= c @FIXNUM_MAX) (>= c @FIXNUM_MIN))
         (return (box c))
@@ -574,28 +551,28 @@
     (add_builtin_function1 mod (to_sym "to_i") stringT bint_to_i 0)
     (add_builtin_function1 mod (to_sym "to_f") bintT bint_to_f 0)
 
-    (add_builtin_function3 mod (to_sym "add") bintT bintT DontCare bint_add 0)
-    (add_builtin_function3 mod (to_sym "sub") bintT bintT DontCare bint_sub 0)
-    (add_builtin_function3 mod (to_sym "mul") bintT bintT DontCare bint_mul 0)
-    (add_builtin_function3 mod (to_sym "pow") bintT bintT DontCare bint_pow 0)
-    (add_builtin_function3 mod (to_sym "div") bintT bintT DontCare bint_div 0)
-    (add_builtin_function3 mod (to_sym "mod") bintT bintT DontCare bint_mod 0)
+    (add_builtin_function2 mod (to_sym "add") bintT bintT bint_add 0)
+    (add_builtin_function2 mod (to_sym "sub") bintT bintT bint_sub 0)
+    (add_builtin_function2 mod (to_sym "mul") bintT bintT bint_mul 0)
+    (add_builtin_function2 mod (to_sym "pow") bintT bintT bint_pow 0)
+    (add_builtin_function2 mod (to_sym "div") bintT bintT bint_div 0)
+    (add_builtin_function2 mod (to_sym "mod") bintT bintT bint_mod 0)
     (add_builtin_function2 mod (to_sym "lt") bintT bintT bint_lt 0)
     (add_builtin_function2 mod (to_sym "gt") bintT bintT bint_gt 0)
     (add_builtin_function2 mod (to_sym "le") bintT bintT bint_le 0)
     (add_builtin_function2 mod (to_sym "ge") bintT bintT bint_ge 0)
     (add_builtin_function2 mod (to_sym "equal") bintT bintT bint_eq 0)
-    (add_builtin_function3 mod (to_sym "shiftL") bintT intT DontCare bint_shiftL 0)
-    (add_builtin_function3 mod (to_sym "shiftR") bintT intT DontCare bint_shiftR 0)
+    (add_builtin_function2 mod (to_sym "shiftL") bintT intT bint_shiftL 0)
+    (add_builtin_function2 mod (to_sym "shiftR") bintT intT bint_shiftR 0)
     
 
     ; overwrite operations between int and int
-    (add_builtin_function3 mod (to_sym "add") intT intT DontCare int_add2 0)
-    (add_builtin_function3 mod (to_sym "sub") intT intT DontCare int_sub2 0)
-    (add_builtin_function3 mod (to_sym "mul") intT intT DontCare int_mul2 0)
-    (add_builtin_function3 mod (to_sym "pow") intT intT DontCare bint_pow 0)
-    (add_builtin_function3 mod (to_sym "shiftL") intT intT DontCare bint_shiftL 0)
-    (add_builtin_function3 mod (to_sym "shiftR") intT intT DontCare bint_shiftR 0)
+    (add_builtin_function2 mod (to_sym "add") intT intT int_add2 0)
+    (add_builtin_function2 mod (to_sym "sub") intT intT int_sub2 0)
+    (add_builtin_function2 mod (to_sym "mul") intT intT int_mul2 0)
+    (add_builtin_function2 mod (to_sym "pow") intT intT bint_pow 0)
+    (add_builtin_function2 mod (to_sym "shiftL") intT intT bint_shiftL 0)
+    (add_builtin_function2 mod (to_sym "shiftR") intT intT bint_shiftR 0)
 
     (add_builtin_function2 mod (to_sym "coerce") intT bintT ib_coerce 0)
     (add_builtin_function2 mod (to_sym "coerce") bintT intT bi_coerce 0)

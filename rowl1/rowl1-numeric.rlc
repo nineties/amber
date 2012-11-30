@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-numeric.rlc 2012-11-25 01:29:15 nineties $
+; $Id: rowl1-numeric.rlc 2012-11-30 14:20:32 nineties $
 ;
 
 (import "rlvm-compile")
@@ -27,29 +27,29 @@
     (return r)
     ))
 
-(fun num_add (a b f) (
+(fun num_add (a b) (
     (var r (do_coerce a b))
-    (return (byterun (lookup_func current_mod (to_sym "add")) (car r) (cadr r) f))
+    (return (byterun (lookup_func current_mod (to_sym "add")) (car r) (cadr r)))
     ))
-(fun num_sub (a b f) (
+(fun num_sub (a b) (
     (var r (do_coerce a b))
-    (return (byterun (lookup_func current_mod (to_sym "sub")) (car r) (cadr r) f))
+    (return (byterun (lookup_func current_mod (to_sym "sub")) (car r) (cadr r)))
     ))
-(fun num_mul (a b f) (
+(fun num_mul (a b) (
     (var r (do_coerce a b))
-    (return (byterun (lookup_func current_mod (to_sym "mul")) (car r) (cadr r) f))
+    (return (byterun (lookup_func current_mod (to_sym "mul")) (car r) (cadr r)))
     ))
-(fun num_div (a b f) (
+(fun num_div (a b) (
     (var r (do_coerce a b))
-    (return (byterun (lookup_func current_mod (to_sym "div")) (car r) (cadr r) f))
+    (return (byterun (lookup_func current_mod (to_sym "div")) (car r) (cadr r)))
     ))
-(fun num_mod (a b f) (
+(fun num_mod (a b) (
     (var r (do_coerce a b))
-    (return (byterun (lookup_func current_mod (to_sym "mod")) (car r) (cadr r) f))
+    (return (byterun (lookup_func current_mod (to_sym "mod")) (car r) (cadr r)))
     ))
-(fun num_pow (a b f) (
+(fun num_pow (a b) (
     (var r (do_coerce a b))
-    (return (byterun (lookup_func current_mod (to_sym "pow")) (car r) (cadr r) f))
+    (return (byterun (lookup_func current_mod (to_sym "pow")) (car r) (cadr r)))
     ))
 (fun num_lt (a b) (
     (var r (do_coerce a b))
@@ -78,19 +78,19 @@
     (return (+ (- x) 2))
     ))
 
-(fun int_add (x y _) (
+(fun int_add (x y) (
     (return (- (+ x y) 1))
     ))
 
-(fun int_sub (x y _) (
+(fun int_sub (x y) (
     (return (+ (- x y) 1))
     ))
 
-(fun int_mul (x y _) (
+(fun int_mul (x y) (
     (return (box (* (unbox x) (unbox y))))
     ))
 
-(fun int_pow (x y _) (
+(fun int_pow (x y) (
     (var v 1)
     (= x (unbox x))
     (= y (unbox y))
@@ -110,17 +110,17 @@
         )
     ))
 
-(fun int_div (x y _) (
+(fun int_div (x y) (
     (nonzero_check y)
     (return (box (/ (unbox x) (unbox y))))
     ))
 
-(fun int_mod (x y _) (
+(fun int_mod (x y) (
     (nonzero_check y)
     (return (box (% (unbox x) (unbox y))))
     ))
 
-(fun int_shiftL (x y _) (
+(fun int_shiftL (x y) (
     (if (< y 0) (return (int_shiftR x (+ (- y) 2))))
     (= y (unbox y))
     (if (>= y 32) (return (box 0)))
@@ -131,7 +131,7 @@
         )
     ))
 
-(fun int_shiftR (x y _) (
+(fun int_shiftR (x y) (
     (if (< y 0) (return (int_shiftL x (+ (- y) 2))))
     (= y (unbox y))
     (if (>= y 32) (return (box 0)))
@@ -172,12 +172,12 @@
 
 (export fun setup_numeric (mod) (
     ; default implementations using coerce
-    (add_builtin_function3 mod (to_sym "add") DontCare DontCare DontCare num_add 0) 
-    (add_builtin_function3 mod (to_sym "sub") DontCare DontCare DontCare num_sub 0)
-    (add_builtin_function3 mod (to_sym "mul") DontCare DontCare DontCare num_mul 0)
-    (add_builtin_function3 mod (to_sym "div") DontCare DontCare DontCare num_div 0)
-    (add_builtin_function3 mod (to_sym "mod") DontCare DontCare DontCare num_mod 0)
-    (add_builtin_function3 mod (to_sym "pow") DontCare DontCare DontCare num_pow 0)
+    (add_builtin_function2 mod (to_sym "add") DontCare DontCare num_add 0) 
+    (add_builtin_function2 mod (to_sym "sub") DontCare DontCare num_sub 0)
+    (add_builtin_function2 mod (to_sym "mul") DontCare DontCare num_mul 0)
+    (add_builtin_function2 mod (to_sym "div") DontCare DontCare num_div 0)
+    (add_builtin_function2 mod (to_sym "mod") DontCare DontCare num_mod 0)
+    (add_builtin_function2 mod (to_sym "pow") DontCare DontCare num_pow 0)
     (add_builtin_function2 mod (to_sym "lt") DontCare DontCare num_lt 0)
     (add_builtin_function2 mod (to_sym "gt") DontCare DontCare num_gt 0)
     (add_builtin_function2 mod (to_sym "le") DontCare DontCare num_le 0)
@@ -186,14 +186,14 @@
     ; integer arithmetic
     (add_builtin_function1 mod (to_sym "uplus") intT int_uplus 0)
     (add_builtin_function1 mod (to_sym "uminus") intT int_uminus 0)
-    (add_builtin_function3 mod (to_sym "add") intT intT DontCare int_add 0)
-    (add_builtin_function3 mod (to_sym "sub") intT intT DontCare int_sub 0)
-    (add_builtin_function3 mod (to_sym "mul") intT intT DontCare int_mul 0)
-    (add_builtin_function3 mod (to_sym "pow") intT intT DontCare int_pow 0)
-    (add_builtin_function3 mod (to_sym "div") intT intT DontCare int_div 0)
-    (add_builtin_function3 mod (to_sym "mod") intT intT DontCare int_mod 0)
-    (add_builtin_function3 mod (to_sym "shiftL") intT intT DontCare int_shiftL 0)
-    (add_builtin_function3 mod (to_sym "shiftR") intT intT DontCare int_shiftR 0)
+    (add_builtin_function2 mod (to_sym "add") intT intT int_add 0)
+    (add_builtin_function2 mod (to_sym "sub") intT intT int_sub 0)
+    (add_builtin_function2 mod (to_sym "mul") intT intT int_mul 0)
+    (add_builtin_function2 mod (to_sym "pow") intT intT int_pow 0)
+    (add_builtin_function2 mod (to_sym "div") intT intT int_div 0)
+    (add_builtin_function2 mod (to_sym "mod") intT intT int_mod 0)
+    (add_builtin_function2 mod (to_sym "shiftL") intT intT int_shiftL 0)
+    (add_builtin_function2 mod (to_sym "shiftR") intT intT int_shiftR 0)
     (add_builtin_function2 mod (to_sym "lt") intT intT int_lt 0)
     (add_builtin_function2 mod (to_sym "gt") intT intT int_gt 0)
     (add_builtin_function2 mod (to_sym "le") intT intT int_le 0)

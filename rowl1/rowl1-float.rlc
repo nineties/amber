@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-float.rlc 2012-11-13 03:05:12 nineties $
+; $Id: rowl1-float.rlc 2012-11-30 14:17:47 nineties $
 ;
 
 (import "rlvm-compile")
@@ -26,18 +26,17 @@
     ))
 
 ; ==== utilities ===
-(var overwrite (to_sym "overwrite"))
 (fun add (x y) (
-    (if (&& (& x 1) (& y 1)) (return (int_add2 x y nil)))
-    (return (bint_add x y overwrite))
+    (if (&& (& x 1) (& y 1)) (return (int_add2 x y)))
+    (return (bint_add x y))
     ))
 (fun sub (x y) (
-    (if (&& (& x 1) (& y 1)) (return (int_sub2 x y nil)))
-    (return (bint_sub x y overwrite))
+    (if (&& (& x 1) (& y 1)) (return (int_sub2 x y)))
+    (return (bint_sub x y))
     ))
 (fun mul (x y) (
-    (if (&& (& x 1) (& y 1)) (return (int_mul2 x y nil)))
-    (return (bint_mul x y overwrite))
+    (if (&& (& x 1) (& y 1)) (return (int_mul2 x y)))
+    (return (bint_mul x y))
     ))
 
 ; ==== translate ascii-string to floating-point number ====
@@ -135,7 +134,7 @@
         (= shift (- 57 (* 4 (+ n e))))
         )
 
-    (= f (bint_shiftL f (box shift) overwrite))
+    (= f (bint_shiftL f (box shift)))
 
     ; here f has more than 53 bits (so, it is a bigint)
     (var rem 0)
@@ -166,7 +165,7 @@
     (var G (& (>> w (- offs 1)) 1))
     (var R 0)
     (if (|| rem (& w (- (<< 1 offs) 1))) (= R 1))
-    (= f (bint_shiftR f (box offs) overwrite))
+    (= f (bint_shiftR f (box offs)))
     (if (&& G (|| ulp R))
         (= f (add f (box 1)))
         (if (== (bint_digit f 1) 0x00200000)
@@ -215,14 +214,14 @@
         (for i 0 p (= d (mul d (box 10))))
         (for i 0 (- p) (= d (mul d (box 10))))
         )
-    (if (> e 0) (= man (bint_shiftL man (box e) overwrite)))
+    (if (> e 0) (= man (bint_shiftL man (box e))))
     (if (> p 0) (= man (mul man d)))
     (if (&& (<= e 0) (<= p 0)) (do
         (= d (mul d (box (- e))))
-        (bint_div man d overwrite)
+        (bint_div man d)
         )
     (if (< e 0) (= man (bint_shiftR man (box (- e))))
-    (if (< p 0) (bint_div man d overwrite)
+    (if (< p 0) (bint_div man d)
         )))
 
     (= d (uint_to_bint 10))
@@ -342,27 +341,27 @@
     (bint_set_digit b 1 w1)
     (field_set b 1 2)
     (if sign (bigneg b))
-    (return (bint_shiftR b (box shift) overwrite))
+    (return (bint_shiftR b (box shift)))
     ))
 
 (fun float_to_f (n) (
     (return (itof (unbox n)))
     ))
 
-(fun float_add (a b f) (
-    (if (!= f overwrite) (= a (copy_float a)))
+(fun float_add (a b) (
+    (= a (copy_float a))
     (return (fadd a b))
     ))
-(fun float_sub (a b f) (
-    (if (!= f overwrite) (= a (copy_float a)))
+(fun float_sub (a b) (
+    (= a (copy_float a))
     (return (fsub a b))
     ))
-(fun float_mul (a b f) (
-    (if (!= f overwrite) (= a (copy_float a)))
+(fun float_mul (a b) (
+    (= a (copy_float a))
     (return (fmul a b))
     ))
-(fun float_div (a b f) (
-    (if (!= f overwrite) (= a (copy_float a)))
+(fun float_div (a b) (
+    (= a (copy_float a))
     (return (fdiv a b))
     ))
 (fun float_lt (a b) ((if (f< a b) (return true) (return false))))
@@ -378,7 +377,7 @@
         )
     ))
 
-(fun float_ipow (f n _) (
+(fun float_ipow (f n) (
     (var v (itof 1))
     (= n (unbox n))
     (var m 0x40000000)
@@ -402,17 +401,17 @@
     (add_builtin_function1 std (to_sym "to_i") stringT float_to_i 0)
     (add_builtin_function1 std (to_sym "to_f") intT float_to_f 0)
     
-    (add_builtin_function3 std (to_sym "add") floatT floatT DontCare float_add 0)
-    (add_builtin_function3 std (to_sym "sub") floatT floatT DontCare float_sub 0)
-    (add_builtin_function3 std (to_sym "mul") floatT floatT DontCare float_mul 0)
-    (add_builtin_function3 std (to_sym "div") floatT floatT DontCare float_div 0)
+    (add_builtin_function2 std (to_sym "add") floatT floatT float_add 0)
+    (add_builtin_function2 std (to_sym "sub") floatT floatT float_sub 0)
+    (add_builtin_function2 std (to_sym "mul") floatT floatT float_mul 0)
+    (add_builtin_function2 std (to_sym "div") floatT floatT float_div 0)
     (add_builtin_function2 std (to_sym "lt") floatT floatT float_lt 0)
     (add_builtin_function2 std (to_sym "gt") floatT floatT float_gt 0)
     (add_builtin_function2 std (to_sym "le") floatT floatT float_le 0)
     (add_builtin_function2 std (to_sym "ge") floatT floatT float_ge 0)
     (add_builtin_function2 std (to_sym "equal") floatT floatT float_eq 0)
     (add_builtin_function1 std (to_sym "abs") floatT float_abs 0)
-    (add_builtin_function3 std (to_sym "pow") floatT intT DontCare float_ipow 0)
+    (add_builtin_function2 std (to_sym "pow") floatT intT float_ipow 0)
 
     (add_builtin_function2 std (to_sym "coerce") intT floatT if_coerce 0)
     (add_builtin_function2 std (to_sym "coerce") floatT intT fi_coerce 0)
