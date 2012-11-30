@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2012-11-25 12:44:06 nineties $
+; $Id: rowl1-matching.rlc 2012-11-30 10:42:14 nineties $
 ;
 
 (import "rlvm-compile")
@@ -91,8 +91,9 @@
     (var args (field_get def 2))
     (var code (field_get def 3))
     (var guard (field_get def 4))
+    (var copy (field_get def 5))
     (= args (setup_args len args))
-    (return (list3 args code guard))
+    (return (list4 args code guard copy))
     ))
 
 (fun setup_args (len args) (
@@ -179,6 +180,17 @@
         (var func (car pats))
         (var code (list_at func 1))
         (var guard (list_at func 2))
+        (var copy (list_at func 3))
+
+        ; copy interior parameters of nodes.
+        (var idx 0)
+        (while copy (do
+            (compile_operand asm (car copy) nil)
+            (put_store_lvar asm idx)
+            (+= idx 1)
+            (= copy (cdr copy))
+            ))
+
         (if guard
             (do
                 (var guard_failed (fresh_label asm))

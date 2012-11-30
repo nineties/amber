@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-11-29 12:12:39 nineties $
+; $Id: rowl1-compile.rlc 2012-11-30 10:53:12 nineties $
 ;
 
 (import "rlvm-compile")
@@ -327,14 +327,14 @@
     (return expr)
     ))
 
-(fun alloc_function (args code guard) (
-    (return (variant @FunctionE 4 0 args code guard))
+(fun alloc_function (args code guard need_copy) (
+    (return (variant @FunctionE 5 0 args code guard need_copy))
     ))
 
-(fun make_function (args code guard) (
+(fun make_function (args code guard need_copy) (
     (var arity (list_len args))
     (= args (cons (box arity) args))
-    (return (alloc_function args code guard))
+    (return (alloc_function args code guard need_copy))
     ))
 
 (fun make_bound (fun1 fun2) (
@@ -692,7 +692,11 @@
         (= body (make_expr Block (list1 (list_reverse stmts))))
         ))
     (push_varscope mod)
-    (var arg_copy (setup_args (get_vartable mod) args))
+
+    ; interior parameters of Nodes like x of "f(\Foo{x}): ..."
+    ; needs to be copied to VM-stack so as it can be accessed same as
+    ; local variables or non-interior parameters.
+    (var need_copy (setup_args (get_vartable mod) args))
 
     (if (!= guard noguard)
         (compile asm_guard mod guard)
@@ -705,59 +709,67 @@
     (= max_lvar_idx 0)
     (reset_variable_count mod)
 
-    (var arg_decls 0)
-    (while arg_copy (do
-        (var e (car arg_copy))
-        (= arg_decls (cons (defvar (car e) (cadr e)) arg_decls))
-        (= arg_copy (cdr arg_copy))
+    (var tmp_need_copy need_copy)
+    (while tmp_need_copy (do
+        (var idx (get_lvar_idx mod))
+        (add_symbol mod (caar tmp_need_copy) (make_lvar idx))
+        (setcar tmp_need_copy (cadar tmp_need_copy))
+        (= tmp_need_copy (cdr tmp_need_copy))
         ))
 
-    (= body (block (list2
-        (seq arg_decls)
-        body
-        )))
     (compile asm_body mod body)
 
     (put_operand_byte asm_body (+ cnt_addr 1) max_lvar_idx)
     (pop_varscope mod)
     (= max_lvar_idx save_max_lvar_idx)
+    (return need_copy)
     ))
 
 (fun setup_args (tbl args) (
-    (var arg_copy 0)
+    (var need_copy 0)
     (var idx 0)
     (while args (do
-        (= arg_copy (setup_arg tbl (make_arg idx) (car args) 0 arg_copy))
+        (= need_copy (setup_arg tbl (make_arg idx) (car args) 0 need_copy))
         (= args (cdr args))
         (+= idx 1)
         ))
-    (return arg_copy)
+    (return need_copy)
     ))
 
-(fun setup_arg (tbl obj arg level cl) (
+(fun setup_arg (tbl obj arg level nc) (
     (var argty (expr_head arg))
     (if (|| (== argty Int) (== argty String))
-        (return cl)
+        (return nc)
         )
     (if (== argty Symbol) (do
         (if (== level 0) (do
-            (var t (unique_sym))
-            (symtable_add tbl t obj)
-            (= cl (cons (list2 arg t) cl))
+            (if (== (expr_head obj) Argument)
+                ; need no copy
+                (symtable_add tbl arg obj)
+                (do
+                    (var t (unique_sym))
+                    (symtable_add tbl t obj)
+                    (= nc (cons (list2 arg obj) nc))
+                ))
             ))
-        (return cl)
+        (return nc)
         ))
     (if (== argty Domain) (do
         (if (== level 0) (do
             (var v (expr_arg_symbol arg 0))
-            (var t (unique_sym))
-            (symtable_add tbl t obj)
-            (= cl (cons (list2 v t) cl))
+            (if (== (expr_head obj) Argument)
+                ; need no copy
+                (symtable_add tbl v obj)
+                (do
+                    (var t (unique_sym))
+                    (symtable_add tbl t obj)
+                    (= nc (cons (list2 v obj) nc))
+                ))
             (var dom (expr_arg arg 1))
             (if (!= (expr_head dom) Symbol)
-                (= cl (setup_arg tbl obj dom 0 cl))
+                (= nc (setup_arg tbl obj dom 0 nc))
                 )
-            (return cl)
+            (return nc)
             ))
         ))
     (if (== argty List) (do
@@ -771,25 +783,26 @@
                 (if (> (expr_size a) 0) (do
                     (var v (expr_arg_symbol a 0))
                     (var t (unique_sym))
-                    (symtable_add tbl t (make_list_from obj idx))
-                    (= cl (cons (list2 v t) cl))
+                    (= obj (make_list_from obj idx))
+                    (symtable_add tbl t obj)
+                    (= nc (cons (list2 v obj) nc))
                     ))
-                (return cl)
+                (return nc)
                 ))
-            (= cl (setup_arg tbl (make_list_at obj idx) a level cl))
+            (= nc (setup_arg tbl (make_list_at obj idx) a level nc))
             (= arg (cdr arg))
             (incr idx)
             ))
-        (return cl)
+        (return nc)
         ))
     (if (== argty Quote)
-        (return cl)
+        (return nc)
         )
     (if (== argty Unquote) 
-        (return (setup_arg tbl obj (expr_arg arg 0) (- level 1) cl))
+        (return (setup_arg tbl obj (expr_arg arg 0) (- level 1) nc))
         )
     (if (== argty QuasiQuote)
-        (return (setup_arg tbl obj (expr_arg arg 0) (+ level 1) cl))
+        (return (setup_arg tbl obj (expr_arg arg 0) (+ level 1) nc))
         )
     (if (== argty Ellipsis)
         (throw (exception current_loc (string "Variable-length arguments is not allowed")))
@@ -805,16 +818,17 @@
             (if (> (expr_size a) 0) (do
                 (var v (expr_arg_symbol a 0))
                 (var t (unique_sym))
-                (symtable_add tbl t (make_expr_from obj idx))
-                (= cl (cons (list2 v t) cl))
+                (= obj (make_expr_from obj idx))
+                (symtable_add tbl t obj)
+                (= nc (cons (list2 v obj) nc))
                 ))
-            (return cl)
+            (return nc)
             ))
-        (= cl (setup_arg tbl (make_expr_at obj idx) (car args) level cl))
+        (= nc (setup_arg tbl (make_expr_at obj idx) (car args) level nc))
         (= args (cdr args))
         (incr idx)
         ))
-    (return cl)
+    (return nc)
     ))
 
 (fun var_loc (info) (
@@ -1617,14 +1631,16 @@
     (if (!= guard noguard)
         (do
             (var asm_guard (make_assembler))
-            (compile_function asm_body asm_guard mod args body guard cls)
+            (var need_copy (compile_function
+                asm_body asm_guard mod args body guard cls))
             (put_ireturn asm_body)
-            (put_push asm (make_function args (get_code asm_body) (get_code asm_guard)))
+            (put_push asm (make_function args (get_code asm_body) (get_code asm_guard) need_copy))
         )
         (do
-            (compile_function asm_body 0 mod args body noguard cls)
+            (var need_copy (compile_function
+                asm_body 0 mod args body noguard cls))
             (put_ireturn asm_body)
-            (put_push asm (make_function args (get_code asm_body) 0))
+            (put_push asm (make_function args (get_code asm_body) 0 need_copy))
         ))
     ))
 
@@ -1661,12 +1677,13 @@
     (var args (field_get lam 2))
     (var body (field_get lam 3))
     (var guard (field_get lam 4))
+    (var copy (field_get lam 5))
     (var asm (make_assembler))
     (put_push asm clos)
     (put_store_closure asm)
     (put_push asm body)
     (put_jjump asm)
-    (return (alloc_function args (get_code asm) guard))
+    (return (alloc_function args (get_code asm) guard copy))
     ))
 
 (fun compile_closure (asm mod expr) (
@@ -1799,42 +1816,42 @@
     (var asm (make_assembler))
     (compile_simple_function asm 1 func)
     (var code (get_code asm))
-    (append_function mod sym (make_function 0 code guard))
+    (append_function mod sym (make_function 0 code guard 0))
     ))
 
 (export fun add_builtin_function1 (mod sym pat func guard) (
     (var asm (make_assembler))
     (compile_simple_function asm 1 func)
     (var code (get_code asm))
-    (append_function mod sym (make_function (list1 pat) code guard))
+    (append_function mod sym (make_function (list1 pat) code guard 0))
     ))
 
 (export fun add_builtin_function2 (mod sym pat1 pat2 func guard) (
     (var asm (make_assembler))
     (compile_simple_function asm 2 func)
     (var code (get_code asm))
-    (append_function mod sym (make_function (list2 pat1 pat2) code guard))
+    (append_function mod sym (make_function (list2 pat1 pat2) code guard 0))
     ))
 
 (export fun add_builtin_function3 (mod sym pat1 pat2 pat3 func guard) (
     (var asm (make_assembler))
     (compile_simple_function asm 3 func)
     (var code (get_code asm))
-    (append_function mod sym (make_function (list3 pat1 pat2 pat3) code guard))
+    (append_function mod sym (make_function (list3 pat1 pat2 pat3) code guard 0))
     ))
 
 (export fun add_builtin_function4 (mod sym pat1 pat2 pat3 pat4 func guard) (
     (var asm (make_assembler))
     (compile_simple_function asm 4 func)
     (var code (get_code asm))
-    (append_function mod sym (make_function (list4 pat1 pat2 pat3 pat4) code guard))
+    (append_function mod sym (make_function (list4 pat1 pat2 pat3 pat4) code guard 0))
     ))
 
 (export fun add_builtin_function5 (mod sym pat1 pat2 pat3 pat4 pat5 func guard) (
     (var asm (make_assembler))
     (compile_simple_function asm 5 func)
     (var code (get_code asm))
-    (append_function mod sym (make_function (list5 pat1 pat2 pat3 pat4 pat5) code guard))
+    (append_function mod sym (make_function (list5 pat1 pat2 pat3 pat4 pat5) code guard 0))
     ))
 
 (export fun setup_builtin_compilers (mod) (
