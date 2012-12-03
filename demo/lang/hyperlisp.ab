@@ -1,7 +1,7 @@
 #!/usr/bin/amber -m
 # Copyright (C) 2012 nineties
 #
-# $Id: hyperlisp.ab 2012-12-03 15:44:34 nineties $
+# $Id: hyperlisp.ab 2012-12-04 08:10:00 nineties $
 
 module Hyperlisp {
     # Core
@@ -35,6 +35,7 @@ module Hyperlisp {
     at(Cons{x, _}, 0): x
     at(Snoc{_, x}, i): at(x, i-1)
     at(Snoc{x, _}, 0): x
+    at(0, i): 0
 
     is_atom(_)        : false
     is_atom(e@Snoc)   : true
@@ -243,6 +244,8 @@ module Hyperlisp {
                     | hl_literal
     hl_expr ::= hl_expr ":" hl_expr          { cons_list([$0, $2]) }
               | hl_expr "=" hl_expr          { snoc_list([\eq, $0, $2]) }
+              | hl_expr "(" ")"              { syntax_sugar(cons($0, 0)) }
+              | hl_expr "[" "]"              { syntax_sugar(snoc($0, 0)) }
               | hl_expr "(" hl_cons_list ")" { syntax_sugar(cons($0, $2)) }
               | hl_expr "[" hl_snoc_list "]" { syntax_sugar(snoc($0, $2)) }
               | "\"" hl_simpl_expr           { snoc_list([1, $1]) }
