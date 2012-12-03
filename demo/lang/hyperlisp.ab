@@ -1,7 +1,7 @@
 #!/usr/bin/amber -m
 # Copyright (C) 2012 nineties
 #
-# $Id: hyperlisp.ab 2012-11-27 17:43:02 nineties $
+# $Id: hyperlisp.ab 2012-12-03 15:44:34 nineties $
 
 module Hyperlisp {
     # Core
@@ -107,12 +107,26 @@ module Hyperlisp {
         (args_, body_): create_lambda(arg_map, body)
         quote(cons_list([\lambda, args_, body_]))
     }
+    syntax_sugar(Cons{Meta{\Lambda}, Cons{args, Cons{body, 0}}}): {
+        arg_map: Table::from_list(
+             map( create_map(args) , ((v, pos)) -> (v, snoc(pos, 0)) )
+            )
+        (args_, body_): create_lambda(arg_map, body)
+        quote(cons_list([\lambda, args_, body_]))
+    }
+
+    # case of body == 0
+    syntax_sugar(Cons{Meta{\Lambda}, Cons{args, 0}}):
+        quote(cons_list([\lambda]))
 
     # XXX: Scoped-syntax like:
     # apply((hl_expr){ 1[(\lambda, map body)] }): ...
     # will be implemented.
     apply(Snoc{1, Snoc{Cons{\lambda, Cons{map, Cons{body, 0}}}, 0}}, args):
         eval(subst(body, map, args))
+
+    # case of body == 0
+    apply(Snoc{1, Snoc{Cons{\lambda, 0}, 0}}, args): 0
 
     subst(e, 0, _): e
     subst(Cons{e1, e2}, Cons{m1, m2}, args):
@@ -128,7 +142,6 @@ module Hyperlisp {
     get_arg(1, arg): arg
 
     # Function definition
-    apply(\define, args): `InvalidDefinition{!args}
     apply(\define, Snoc{Snoc{\eq, Snoc{lhs, Snoc{body, 0}}}, 0}): {
         fun: car(lhs)
         params: cdr(lhs)
