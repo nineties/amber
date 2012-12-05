@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2012-11-27 17:26:10 nineties $
+; $Id: rowl1-packrat.rlc 2012-12-05 15:51:17 nineties $
 ;
 
 ; TODO:
@@ -64,7 +64,7 @@
         (var error (alloc_error_state @p))
         (do . @(map (lambda (f) 
             `(do
-              (@(s++ `parse_ f) @p)
+              (parse @(++ `parse_ f) @p)
               (if @(PARSED p) (goto @end_lbl))
               (join_error_state error p)
               (set_parser_state_all @p state)
@@ -202,13 +202,14 @@
     (return 0)
     ))
 
-(var space_sensitive_p @FALSE)
+(var nospace_p @FALSE)
 (var multiline_p @FALSE)
 (var shell_mode_p @FALSE)
 (var may_parse @FALSE)
 (var left_rec (string "Left Recursion Detected"))
 
 (extern object current_mod)
+(extern object current_loc)
 (extern fun set_current_module)
 (extern fun prompt_string)
 
@@ -257,9 +258,16 @@
     (return @(TOKEN p))
     ))
 
+(fun set_newline (p) (
+    (field_set p 6 @TRUE)
+    ))
+
 (fun parsed (p val) (
     (field_set p 1 true)
     (field_set p 2 val)
+    (if (> (field_get p 8) (field_get p 9)) (do
+        (field_set p 6 @FALSE)
+        ))
     ))
 
 (fun noparse (p msg) (
@@ -285,7 +293,7 @@
     (if (<= (field_get err 3) pos) (do
         (field_set err 0 (field_get p 2))
         (field_set err 1 (field_get p 4))
-        (field_set err 2 (field_get p 6))
+        (field_set err 2 (field_get p 7))
         (field_set err 3 pos)
         ))
     ))
@@ -295,7 +303,7 @@
     (field_set p 2 (field_get err 0)) 
     (field_set p 4 (field_get err 1))
     (field_set p 5 (field_get err 3))
-    (field_set p 6 (field_get err 2))
+    (field_set p 7 (field_get err 2))
     ))
 
 (fun negate (p) (
@@ -331,9 +339,10 @@
 ;   3: (character buffer, input channel, table for memoization)
 ;   4: filename
 ;   5: current position in the character buffer
-;   6: line number
-;   7: column number
-;   8: indentation
+;   6: newline-flag
+;   7: line number
+;   8: column number
+;   9: indentation
 
 (export fun init_parser (file ichan) (
     ; character buffer
@@ -346,7 +355,7 @@
     (var memo (make_memotable 1000))
     (var buf (struct 3 cbuf ichan memo))
 
-    (return (variant @ParserE 4 0 0 buf (string file) pos 1 1 1))
+    (return (variant @ParserE 4 0 0 buf (string file) pos @FALSE 1 1 1))
     ))
 
 (export fun flush_parser (p force) (
@@ -363,23 +372,23 @@
         ))
 
     (memotable_clear (field_get buf 2))
-    (if shell_mode_p (field_set p 6 (+ (field_get p 6) 1)))
+    (if shell_mode_p (field_set p 7 (+ (field_get p 7) 1)))
     ))
 
 (fun copy_parser_state (p) (
-    (var copy (variant @ParserE 4 0 0 0 0 0 0 0 0))
-    (memcpy copy p (* 9 @WORD_SIZE))
+    (var copy (variant @ParserE 4 0 0 0 0 0 0 0 0 0))
+    (memcpy copy p (* 10 @WORD_SIZE))
     (return copy)
     ))
 
 (fun set_parser_state_all (dst src) (
     ; NB: indent-level must not be copied.
-    (memcpy dst src (* 8 @WORD_SIZE))
+    (memcpy dst src (* 9 @WORD_SIZE))
     ))
 
 (fun set_parser_state (dst src) (
     ; NB: token info and indent-level must not be copied.
-    (memcpy (+ dst (* 3 @WORD_SIZE)) (+ src (* 3 @WORD_SIZE)) (* 5 @WORD_SIZE))
+    (memcpy (+ dst (* 3 @WORD_SIZE)) (+ src (* 3 @WORD_SIZE)) (* 6 @WORD_SIZE))
     ))
 
 (fun clear_parser_state (p state) (
@@ -404,8 +413,8 @@
     ))
 
 (export fun get_loc (p) (
-    (var line (field_get p 6))
-    (var clmn (field_get p 7))
+    (var line (field_get p 7))
+    (var clmn (field_get p 8))
     (if (in_shell_mode)
         (return (make_loc (prompt_string) line clmn line clmn))
         (return (make_loc (field_get p 4) line clmn line clmn))
@@ -413,18 +422,22 @@
     ))
 
 (fun get_column (p) (
-    (return (box (field_get p 7)))
-    ))
-
-(fun get_indent (p) (
     (return (box (field_get p 8)))
     ))
 
 ; set new indentation-level and return current indentation-level
 (fun set_indent (p c) (
-    (var current_indent (field_get p 8))
-    (field_set p 8 (unbox c))
+    (var current_indent (field_get p 9))
+    (field_set p 9 (unbox c))
     (return (box current_indent))
+    ))
+
+(fun check_indent (p) (
+    (if (field_get p 6) (return true))
+    (if (<= (field_get p 8) (field_get p 9))
+        (return false)
+        (return true)
+        )
     ))
 
 (fun reserve (p) (
@@ -461,12 +474,12 @@
     ; update source location
     (if (== c '\n') (do
         (if (! shell_mode_p)
-            (field_set p 6 (+ (field_get p 6) 1))
+            (field_set p 7 (+ (field_get p 7) 1))
             )
-        (field_set p 7 0)
+        (field_set p 8 0)
         ))
     (field_set p 5 (+ (field_get p 5) 1))
-    (field_set p 7 (+ (field_get p 7) 1))
+    (field_set p 8 (+ (field_get p 8) 1))
     (return c)
     ))
 
@@ -753,9 +766,6 @@
         (set_parser_state_all p state)
         break
         ))
-    (if (<= (get_column p) (get_indent p)) (do
-        (return (noparse p "invalid indentation"))
-        ))
     (return (parsed p nil))
     ))
 @(MEMOIZE spaces)
@@ -917,6 +927,7 @@
 @(MEMOIZE statement)
 
 (fun parse_begin_module (p) (
+    (set_newline p)
     (parse_text p "module") 
     @(CHECK p)
     (parse_spaces p)
@@ -935,6 +946,7 @@
     (if @(PARSED p) return)
     (set_parser_state_all p state)
 
+    (set_newline p)
     (parse "parse_statement" p)
     (if @(PARSED p) return)
 
@@ -960,6 +972,7 @@
         (if (== (lookahead p) @EOF) break)
 
         (set_indent p (get_column p))
+        (set_newline p)
         (parse_toplevel_statement p)
         @(CHECK p)
         (apply_located p)
@@ -985,7 +998,8 @@
             (|| (== hd EndModule)
             (|| (== hd Import)
             (|| (== hd Open)
-            (== hd DefSyntax)))))
+            (|| (== hd DefSyntax)
+                (== hd RepSyntax))))))
             break
             )
         ))
@@ -993,7 +1007,7 @@
     ))
 
 (fun print_prompt (p sign) (
-    (var line (field_get p 6))
+    (var line (field_get p 7))
     (output_string stdout (prompt_string))
     (output_char stdout ':')
     (output_int stdout line)
@@ -1068,17 +1082,11 @@
     ))
 
 (fun set_parsed (v) (
-    (return (block (list2
-        (make_expr Assign (list2 (make_expr FieldRef (list2 PVar (box 1))) true))
-        (make_expr Assign (list2 (make_expr FieldRef (list2 PVar (box 2))) v))
-        )))
+    (return (apply (to_sym "%parsed") (list2 PVar v)))
     ))
 
 (fun set_noparse (v) (
-    (return (block (list2
-        (make_expr Assign (list2 (make_expr FieldRef (list2 PVar (box 1))) false))
-        (make_expr Assign (list2 (make_expr FieldRef (list2 PVar (box 2))) v))
-        )))
+    (return (apply (to_sym "%noparse") (list2 PVar v)))
     ))
 
 (fun get_token () (
@@ -1093,88 +1101,79 @@
     (return (make_expr Not (list1 (test_parsed))))
     ))
 
-(fun gen_getloc () (
-    (return (apply (to_sym "%get_loc") (list1 PVar)))
-    ))
-
-(fun gen_parse_spaces (cont) (
-    (if space_sensitive_p (return cont))
-    (= cont (cons (apply (to_sym "%parse_spaces") (list1 PVar)) cont))
-    (if (! multiline_p)
-        (= cont (cons (mkif (test_noparse) (mkreturn nil)) cont))
+(fun parse_with_check (p ws) (
+    (var code 0)
+    (if (&& ws (! nospace_p))
+        (= code (cons (apply (to_sym "parse_spaces") (list1 PVar)) code))
         )
-    (return cont)
-    ))
-
-(fun gen_parse_spaces_break (cont) (
-    (if space_sensitive_p (return cont))
-    (= cont (cons (apply (to_sym "%parse_spaces") (list1 PVar)) cont))
-    (if (! multiline_p)
-        (= cont (cons (mkif (test_noparse) (make_expr Break 0)) cont))
+    (if multiline_p
+        (= code (cons p code))
+        (= code (cons (ifelse (apply (to_sym "%check_indent") (list1 PVar))
+            p
+            (set_noparse (string "Invalid indentation"))) code))
         )
-    (return cont)
+    (return (seq (list_reverse code)))
     ))
 
-(extern object current_loc)
-(fun compile_parser_element (pat) (
+(fun compile_parser_element (pat ws) (
     (var hd (expr_head pat))
     (if (== hd Symbol)
-        (return (apply (dynamic (to_parse pat))
-            (list1 PVar))))
+        (return (parse_with_check
+            (apply (dynamic (to_parse pat)) (list1 PVar)) ws)))
     (if (== hd String)
-        (return (apply (dynamic (to_sym "parse_text"))
-            (list2 PVar pat))))
+        (return (parse_with_check
+            (apply (dynamic (to_sym "parse_text")) (list2 PVar pat)) ws)))
     (if (== hd List)
-        (return (compile_seq pat))
+        (return (compile_seq pat ws))
         )
     (if (== hd Choice)
-        (return (compile_choice (expr_args pat)))
+        (return (compile_choice (expr_args pat) ws))
         )
     (var len (list_len (expr_args pat)))
     (if (== hd Delimited) (do
         (if (!= len 2) (goto compile_error))
-        (return (compile_delimited (expr_arg pat 0) (expr_arg pat 1) 0))
+        (return (compile_delimited0 (expr_arg pat 0) (expr_arg pat 1) 0 ws))
         ))
     (if (== hd Delimited1) (do
         (if (!= len 2) (goto compile_error))
-        (return (compile_delimited (expr_arg pat 0) (expr_arg pat 1) 1))
+        (return (compile_delimited (expr_arg pat 0) (expr_arg pat 1) 1 ws))
         ))
     (if (== hd Delimited2) (do
         (if (!= len 2) (goto compile_error))
-        (return (compile_delimited (expr_arg pat 0) (expr_arg pat 1) 2))
+        (return (compile_delimited (expr_arg pat 0) (expr_arg pat 1) 2 ws))
         ))
     (if (== hd Located) (do
         (if (!= len 1) (goto compile_error))
-        (return (compile_located (expr_arg pat 0)))
+        (return (compile_located (expr_arg pat 0) ws))
         ))
     (if (== hd Scoped) (do
         (if (!= len 2) (goto compile_error))
-        (return (compile_scoped (expr_arg pat 0) (expr_arg pat 1)))
+        (return (compile_scoped (expr_arg pat 0) (expr_arg pat 1) ws))
         ))
     (if (!= len 1) (goto compile_error))
     (if (== hd OneOf)
-        (return (compile_oneof (expr_arg pat 0)))
+        (return (compile_oneof (expr_arg pat 0) ws))
         )
     (if (== hd NoneOf)
-        (return (compile_noneof (expr_arg pat 0)))
+        (return (compile_noneof (expr_arg pat 0) ws))
         )
     (if (== hd Many)
-        (return (compile_many (expr_arg pat 0)))
+        (return (compile_many (expr_arg pat 0) ws))
         )
     (if (== hd Many1)
-        (return (compile_many1 (expr_arg pat 0)))
+        (return (compile_many1 (expr_arg pat 0) ws))
         )
     (if (== hd Option)
-        (return (compile_option (expr_arg pat 0)))
+        (return (compile_option (expr_arg pat 0) ws))
         )
     (if (== hd And)
-        (return (compile_and (expr_arg pat 0)))
+        (return (compile_and (expr_arg pat 0) ws))
         )
     (if (== hd Not)
-        (return (compile_not (expr_arg pat 0)))
+        (return (compile_not (expr_arg pat 0) ws))
         )
     (if (== hd Aligned)
-        (return (compile_aligned (expr_arg pat 0)))
+        (return (compile_aligned (expr_arg pat 0) ws))
         )
     (label compile_error)
     (throw (exception current_loc (list2 (string "invalid syntax element") pat)))
@@ -1253,14 +1252,16 @@
         ))
     ))
 
-(fun compile_oneof (str) (
+(fun compile_oneof (str ws) (
     (var tbl (compile_character_set str))
-    (return (apply (to_sym "%oneof") (list3 PVar tbl str)))
+    (return (parse_with_check
+        (apply (to_sym "%oneof") (list3 PVar tbl str)) ws))
     ))
 
-(fun compile_noneof (str) (
+(fun compile_noneof (str ws) (
     (var tbl (compile_character_set str))
-    (return (apply (to_sym "%noneof") (list3 PVar tbl str)))
+    (return (parse_with_check
+        (apply (to_sym "%noneof") (list3 PVar tbl str)) ws))
     ))
 
 ; List{ p1, p2, ...} is translated to
@@ -1276,19 +1277,21 @@
 ; ...
 ; return Parsed{merge{loc(p1), loc(pn)}, reverse(elems)}
 
-(fun compile_seq (elems) (
+(fun compile_seq (elems ws) (
+    (if (! elems)
+        (throw (exception current_loc (string "[] is not valid syntax element")))
+        )
+
     (var body 0)
     (var ret (unique_sym))
 
     (= body (cons (defvar ret 0) body))
     (while elems (do
-        (= body (cons (compile_parser_element (car elems)) body))
+        (= body (cons (compile_parser_element (car elems) ws) body))
+        (= ws @TRUE)
         (= body (cons (mkif (test_noparse) (mkreturn nil)) body))
         (= body (cons (assign ret (apply (to_sym "%cons") (list2 (get_token) ret))) body))
         (= elems (cdr elems))
-        (if elems 
-            (= body (gen_parse_spaces body))
-            )
         ))
     (= body (cons (set_parsed (apply (to_sym "%reverse") (list1 ret))) body))
     (return (apply
@@ -1309,7 +1312,7 @@
 ;     ...
 ; }(p)
 
-(fun compile_choice (ps) (
+(fun compile_choice (ps ws) (
     (if (< (list_len ps) 2)
         (throw (unexpected_error current_loc
             (string "require more than 1 arguments")
@@ -1324,7 +1327,7 @@
     (= body (cons (defvar state (gen_copy_parser_state PVar)) body))
 
     (while ps (do
-        (= body (cons (compile_parser_element (car ps)) body))
+        (= body (cons (compile_parser_element (car ps) ws) body))
         (= body (cons (mkif (test_parsed) (mkreturn nil)) body))
         (= body (cons (apply (to_sym "%join_error_state") (list2 error PVar)) body))
         (= body (cons (gen_set_parser_state_all PVar state) body))
@@ -1342,35 +1345,47 @@
 ;
 ; elems = []
 ; state = copy_parser_state(..)
+; v = p
+; if (head(v) == NoParse) {
+;     set_parser_state_all(state)
+;     return Parsed{loc, 0}
+; }
+; elems = cons(val(v), elems)
 ; while true {
-;     v = p
+;     set_parser_state_all(state, p)
+;     v = p(with spaces)
 ;     if (head(v) == NoParse) break
 ;     elems = cons(val(v), elems)
-;     set_parser_state_all(state, p)
-;     parse_spaces()
 ; }
 ; set_parser_state_all(state)
 ; Parsed{loc, reverse(elems)}
 
-(fun compile_many (elem) (
+(fun compile_many (elem ws) (
     (var state (unique_sym))
     (var elems (unique_sym))
-    (var p (compile_parser_element elem))
 
     (var loop_body 0)
-    (= loop_body (cons p loop_body))
+    (= loop_body (cons (gen_set_parser_state_all state PVar) loop_body))
+    (= loop_body (cons (compile_parser_element elem @TRUE) loop_body))
     (= loop_body (cons (mkif (test_noparse) (make_expr Break 0)) loop_body))
     (= loop_body (cons (assign elems (apply (to_sym "%cons") (list2 (get_token) elems))) loop_body))
-    (= loop_body (cons (gen_set_parser_state_all state PVar) loop_body))
-    (= loop_body (gen_parse_spaces_break loop_body))
 
     (var body 0)
     (= body (cons (defvar elems 0) body))
     (= body (cons (defvar state (gen_copy_parser_state PVar)) body))
-    (= body (cons (make_expr While (list2 true
-            (block (list_reverse loop_body)))) body))
-    (= body (cons (gen_set_parser_state_all PVar state) body))
-    (= body (cons (set_parsed (apply (to_sym "%reverse") (list1 elems))) body))
+    (= body (cons (compile_parser_element elem ws) body))
+    (= body (cons (ifelse (test_noparse)
+        (block (list2
+            (gen_set_parser_state_all PVar state)
+            (set_parsed 0)
+            ))
+        (block (list4
+            (assign elems (apply (to_sym "%cons") (list2 (get_token) elems)))
+            (make_expr While (list2 true (block (list_reverse loop_body))))
+            (gen_set_parser_state_all PVar state)
+            (set_parsed (apply (to_sym "%reverse") (list1 elems)))
+            ))
+        ) body))
     (return (block (list_reverse body)))
     ))
 
@@ -1382,8 +1397,7 @@
 ; elems = cons(val(v), elems)
 ; state = copy_parser_state(..)
 ; while true {
-;     parse_spaces()
-;     v = p
+;     v = p(with_spaces)
 ;     if (head(v) == NoParse) break
 ;     elems = cons(val(v), elems)
 ;     set_parser_state_all(state, p)
@@ -1391,28 +1405,26 @@
 ; set_parser_state_all(state)
 ; Parsed{loc, reverse(elems)}
 
-(fun compile_many1 (elem) (
+(fun compile_many1 (elem ws) (
     (var state (unique_sym))
     (var elems (unique_sym))
-    (var p (compile_parser_element elem))
 
     (var loop_body 0)
-    (= loop_body (gen_parse_spaces_break loop_body))
-    (= loop_body (cons p loop_body))
+    (= loop_body (cons (compile_parser_element elem @TRUE) loop_body))
     (= loop_body (cons (mkif (test_noparse) (make_expr Break 0)) loop_body))
     (= loop_body (cons (assign elems (apply (to_sym "%cons") (list2 (get_token) elems))) loop_body))
     (= loop_body (cons (gen_set_parser_state_all state PVar) loop_body))
 
     (var body 0)
     (= body (cons (defvar elems 0) body))
-    (= body (cons p body))
-    (= body (cons (mkif (test_noparse) (mkreturn nil)) body))
-    (= body (cons (assign elems (apply (to_sym "%cons") (list2 (get_token) elems))) body))
-    (= body (cons (defvar state (gen_copy_parser_state PVar)) body))
-    (= body (cons (make_expr While (list2 true
-            (block (list_reverse loop_body)))) body))
-    (= body (cons (gen_set_parser_state_all PVar state) body))
-    (= body (cons (set_parsed (apply (to_sym "%reverse") (list1 elems))) body))
+    (= body (cons (compile_parser_element elem ws) body))
+    (= body (cons (mkif (test_parsed) (block (list5
+        (assign elems (apply (to_sym "%cons") (list2 (get_token) elems)))
+        (defvar state (gen_copy_parser_state PVar))
+        (make_expr While (list2 true (block (list_reverse loop_body))))
+        (gen_set_parser_state_all PVar state)
+        (set_parsed (apply (to_sym "%reverse") (list1 elems)))
+        ))) body))
     (return (block (list_reverse body)))
     ))
 
@@ -1422,56 +1434,61 @@
 ; state = copy_parser_state(..)
 ; column = get_column(p)
 ; set_indent(p, column)
+; set_newline(p)
 ; v = p
 ; if (head(v) == NoParse) {
 ;     set_parser_state_all(state)
 ;     reset_indent(p)
 ;     return Parsed{loc, []}
 ; }
-; elems = cons(val(v), elems)
-; set_parser_state_all(state, p)
-; parse_spaces()
 ; while true {
-;     if (get_column(p) != column) break
-;     v = p
-;     if (head(v) == NoParse) break
 ;     elems = cons(val(v), elems)
 ;     set_parser_state_all(state, p)
 ;     parse_spaces()
+;     if (get_column(p) != column) break
+;     set_newline(p)
+;     v = p
+;     if (head(v) == NoParse) break
 ; }
 ; set_parser_state_all(state)
 ; reset_indent(p)
 ; Parsed{loc, reverse(elems)}
 
-(fun compile_aligned (elem) (
+(fun compile_aligned (elem ws) (
     (var state (unique_sym))
     (var elems (unique_sym))
     (var clmn  (unique_sym))
     (var indent_save (unique_sym))
-    (var p (compile_parser_element elem))
 
     (var loop_body 0)
+    (= loop_body (cons (assign elems (apply (to_sym "%cons") (list2 (get_token) elems))) loop_body))
+    (= loop_body (cons (gen_set_parser_state_all state PVar) loop_body))
+    (if (! nospace_p)
+        (= loop_body (cons (apply
+            (to_sym "parse_spaces") (list1 PVar)) loop_body))
+        )
     (= loop_body (cons (mkif 
             (make_expr NotEqual (list2 
                 (apply (to_sym "%get_column") (list1 PVar))
                 clmn
                 ))
             (make_expr Break 0)) loop_body))
-    (= loop_body (cons p loop_body))
+    (= loop_body (cons (apply (to_sym "%set_newline") (list1 PVar)) loop_body))
+    (= loop_body (cons (compile_parser_element elem @FALSE) loop_body))
     (= loop_body (cons (mkif (test_noparse) (make_expr Break 0)) loop_body))
-    (= loop_body (cons (assign elems (apply (to_sym "%cons") (list2 (get_token) elems))) loop_body))
-    (= loop_body (cons (gen_set_parser_state_all state PVar) loop_body))
-    (if (! space_sensitive_p)
-        (= loop_body (cons (apply
-            (to_sym "%parse_spaces") (list1 PVar)) loop_body))
-        )
 
     (var body 0)
     (= body (cons (defvar state (gen_copy_parser_state PVar)) body))
+
+    (if (|| ws (! nospace_p))
+        (= body (cons (apply (to_sym "parse_spaces") (list1 PVar)) body))
+        )
+
     (= body (cons (defvar clmn (apply (to_sym "%get_column") (list1 PVar))) body))
     (= body (cons (defvar indent_save (apply (to_sym "%set_indent") (list2 PVar clmn))) body))
     (= body (cons (defvar elems 0) body))
-    (= body (cons p body))
+    (= body (cons (apply (to_sym "%set_newline") (list1 PVar)) body))
+    (= body (cons (compile_parser_element elem @FALSE) body))
     (= body (cons (mkif (test_noparse)
             (block (list3
                 (gen_set_parser_state_all PVar state)
@@ -1479,12 +1496,6 @@
                 (mkreturn (set_parsed 0))
             )))
         body))
-    (= body (cons (assign elems (apply (to_sym "%cons") (list2 (get_token) elems))) body))
-    (= body (cons (gen_set_parser_state_all state PVar) body))
-    (if (! space_sensitive_p)
-        (= body (cons (apply
-            (to_sym "%parse_spaces") (list1 PVar)) body))
-        )
     (= body (cons (make_expr While (list2 true
             (block (list_reverse loop_body)))) body))
     (= body (cons (gen_set_parser_state_all PVar state) body))
@@ -1500,49 +1511,84 @@
 ;
 ; elems = []
 ; state = copy_parser_state(..)
-; while true {
-;     v = p
-;     if (head(v) == NoParse) break
-;     elems = cons(val(v), elems)
-;     set_parser_state_all(setate, p)
-;     parse_spaces()
-;     v = delim
-;     if (head(v) == NoParse) break
-;     parse_spaces()
+; v = p
+; if (head(v) == NoParse) {
+;     set_parser_state_all(state)
+;     Parsed{loc, 0}
+; } else {
+;     elem = cons(val(v), elems)
+;     while true {
+;         set_parse_state_all(state, p)
+;         v = delim(with spaces)
+;         if (head(v) == NoParse) break
+;         v = p(with spaces)
+;         if (head(v) == NoParse) break
+;         elems = cons(v, elems)
+;     }
+;     set_parser_state_al(state)
+;     Parsed{loc, reverse(elems)}
 ; }
-; set_parser_state_all(state)
-; Parsed{loc, reverse(elems)}
 
-(fun compile_delimited (p delim minlen) (
+(fun compile_delimited0 (p delim minlen ws) (
     (var state (unique_sym))
     (var elems (unique_sym))
-    (= p (compile_parser_element p))
-    (= delim (compile_parser_element delim))
 
     (var loop_body 0)
-    (= loop_body (cons p loop_body))
+    (= loop_body (cons (gen_set_parser_state_all state PVar) loop_body))
+    (= loop_body (cons (compile_parser_element delim @TRUE) loop_body))
+    (= loop_body (cons (mkif (test_noparse) (make_expr Break 0)) loop_body))
+    (= loop_body (cons (compile_parser_element p @TRUE) loop_body))
     (= loop_body (cons (mkif (test_noparse) (make_expr Break 0)) loop_body))
     (= loop_body (cons (assign elems (apply (to_sym "%cons") (list2 (get_token) elems))) loop_body))
-    (= loop_body (cons (gen_set_parser_state_all state PVar) loop_body))
-    (= loop_body (gen_parse_spaces_break loop_body))
-    (= loop_body (cons delim loop_body))
-    (= loop_body (cons (mkif (test_noparse) (make_expr Break 0)) loop_body))
-    (= loop_body (gen_parse_spaces_break loop_body))
 
     (var body 0)
     (= body (cons (defvar elems 0) body))
     (= body (cons (defvar state (gen_copy_parser_state PVar)) body))
-    (= body (cons (make_expr While (list2 true
-            (block (list_reverse loop_body)))) body))
-    (= body (cons (gen_set_parser_state_all PVar state) body))
-    (if (> minlen 0)
-        (= body (cons (mkif  
-            (apply (to_sym "lt")
-                (list2 (apply (to_sym "%length") (list1 elems)))
-                    (box minlen))
+    (= body (cons (compile_parser_element p ws) body))
+    (= body (cons (ifelse (test_noparse)
+        (block (list2
+            (gen_set_parser_state_all PVar state)
+            (set_parsed 0)
+            ))
+        (block (list4
+            (assign elems (apply (to_sym "%cons") (list2 (get_token) elems)))
+            (make_expr While (list2 true (block (list_reverse loop_body))))
+            (gen_set_parser_state_all PVar state)
+            (set_parsed (apply (to_sym "%reverse") (list1 elems)))
+            ))) body))
+    (return (block (list_reverse body)))
+    ))
+
+(fun compile_delimited (p delim minlen ws) (
+    (var state (unique_sym))
+    (var elems (unique_sym))
+
+    (var loop_body 0)
+    (= loop_body (cons (gen_set_parser_state_all state PVar) loop_body))
+    (= loop_body (cons (compile_parser_element delim @TRUE) loop_body))
+    (= loop_body (cons (mkif (test_noparse) (make_expr Break 0)) loop_body))
+    (= loop_body (cons (compile_parser_element p @TRUE) loop_body))
+    (= loop_body (cons (mkif (test_noparse) (make_expr Break 0)) loop_body))
+    (= loop_body (cons (assign elems (apply (to_sym "%cons") (list2 (get_token) elems))) loop_body))
+
+    (var body 0)
+    (= body (cons (defvar elems 0) body))
+    (= body (cons (defvar state (gen_copy_parser_state PVar)) body))
+    (= body (cons (compile_parser_element p ws) body))
+        (= body (cons (mkif (test_noparse)
             (mkreturn (set_noparse (string "The number of elements is insufficient")))
             ) body))
-        )
+
+    (= body (cons (assign elems (apply (to_sym "%cons") (list2 (get_token) elems))) body))
+    (= body (cons (make_expr While (list2 true
+        (block (list_reverse loop_body)))) body))
+    (= body (cons (gen_set_parser_state_all PVar state) body))
+    (= body (cons (mkif  
+        (apply (to_sym "lt")
+            (list2 (apply (to_sym "%length") (list1 elems)))
+                (box minlen))
+        (mkreturn (set_noparse (string "The number of elements is insufficient")))
+        ) body))
 
     (= body (cons (set_parsed (apply (to_sym "%reverse") (list1 elems))) body))
     (return (block (list_reverse body)))
@@ -1553,8 +1599,8 @@
 ; v = p
 ; if (head(v) == NoParse) return
 ; Parsed{loc, Located{loc, v}}
-(fun compile_located (p) (
-    (= p (compile_parser_element p))
+(fun compile_located (p ws) (
+    (= p (compile_parser_element p ws))
     (return (block (list2 p (apply (to_sym "%apply_located") (list1 PVar)))))
     ))
 
@@ -1567,8 +1613,8 @@
 ; execute `post`
 ; exit module
 ; v
-(fun compile_scoped (mod elem) (
-    (var p (compile_parser_element elem))
+(fun compile_scoped (mod elem ws) (
+    (var p (compile_parser_element elem ws))
     (return (block (list3
         (apply (to_sym "%open_scope") (list1 mod))
         p
@@ -1603,11 +1649,11 @@
 ;   nil
 ; } else
 ;   Parsed{loc(v), Some{val(v)}}
-(fun compile_option (p) (
+(fun compile_option (p ws) (
     (var state (unique_sym))
     (return (block (list3
         (defvar state (gen_copy_parser_state PVar))
-        (compile_parser_element p)
+        (compile_parser_element p ws)
         (ifelse
             (test_noparse)
             (block (list2
@@ -1624,11 +1670,11 @@
 ; v = p
 ; set_parser_state(parser, state)
 ; v
-(fun compile_and (p) (
+(fun compile_and (p ws) (
     (var state (unique_sym))
     (return (block (list3
         (defvar state (gen_copy_parser_state PVar))
-        (compile_parser_element p)
+        (compile_parser_element p ws)
         (gen_set_parser_state PVar state)
         )))
     ))
@@ -1639,11 +1685,11 @@
 ; v = p
 ; set_parser_state(parser, state)
 ; negate(v,p)
-(fun compile_not (p) (
+(fun compile_not (p ws) (
     (var state (unique_sym))
     (return (block (list4
         (defvar state (gen_copy_parser_state PVar))
-        (compile_parser_element p)
+        (compile_parser_element p ws)
         (gen_set_parser_state PVar state)
         (apply (to_sym "%negate") (list2 PVar))
         )))
@@ -1661,16 +1707,19 @@
     (var bpos (unique_sym))
 
     (= body (cons (defvar bpos (apply (to_sym "%get_pos") (list1 PVar))) body))
+
+    (var with_spaces @FALSE)
     (while elems (do
         (var ndvar (make_nodevar idx))
-        (= body (cons (compile_parser_element (car elems)) body))
+        (= body (cons (compile_parser_element (car elems) with_spaces)
+            body))
+
+        (if (! nospace_p) (= with_spaces @TRUE))
+
         (= body (cons (mkif (test_noparse) (mkreturn nil)) body))
         (= body (cons (defvar ndvar (get_token)) body))
         (incr idx)
         (= elems (cdr elems))
-        (if elems 
-            (= body (gen_parse_spaces body))
-            )
         ))
 
     (= body (cons (defvar (to_sym "GET_INPUT_TEXT")
@@ -1697,7 +1746,7 @@
     (while opts (do
         (var opt (car opts))
         (if (|| (== opt space_sensitive) (== opt nospace))
-            (= space_sensitive_p @TRUE)
+            (= nospace_p @TRUE)
         (if (== opt multiline)
             (= multiline_p @TRUE)
             (throw (unexpected_error current_loc
@@ -1707,7 +1756,7 @@
         ))
     ))
 (fun clear_options () (
-    (= space_sensitive_p @FALSE)
+    (= nospace_p @FALSE)
     (= multiline_p @FALSE)
     ))
 
@@ -1851,9 +1900,12 @@
     ))
 
 (export fun init_parser_funcs (mod) (
-    (add_builtin_function1 mod (to_sym "%get_loc") (domainP Parser) get_loc 0)
     (add_builtin_function1 mod (to_sym "%get_column") (domainP Parser) get_column 0)
+    (add_builtin_function1 mod (to_sym "%set_newline") (domainP Parser) set_newline 0)
     (add_builtin_function2 mod (to_sym "%set_indent") (domainP Parser) (domainP Int) set_indent 0)
+    (add_builtin_function1 mod (to_sym "%check_indent") (domainP Parser) check_indent 0)
+    (add_builtin_function2 mod (to_sym "%parsed") (domainP Parser) DontCare parsed 0)
+    (add_builtin_function2 mod (to_sym "%noparse") (domainP Parser) DontCare noparse 0)
     (add_builtin_function1 mod (to_sym "%alloc_error_state") (domainP Parser) alloc_error_state 0)
     (add_builtin_function2 mod (to_sym "%set_error_state") (domainP Parser) DontCare set_error_state 0)
     (add_builtin_function2 mod (to_sym "%join_error_state") DontCare DontCare join_error_state 0)
@@ -1877,7 +1929,8 @@
     (add_builtin_function1 mod (to_sym "%reverse") listT __reverse 0)
     (add_builtin_function1 mod (to_sym "%length") listT __length 0)
 
-    (add_parser mod (to_sym "%parse_spaces") parse_spaces)
+    (add_parser mod (to_sym "parse_spaces") parse_spaces)
+    (add_parser mod (to_sym "parse_blanks") parse_blanks)
 
     (add_builtin_function2 mod (to_sym "parse_text") (domainP Parser) stringT parse_text 0)
     (add_parser mod (to_sym "parse_any_") parse_any_char)
@@ -1891,6 +1944,8 @@
     (add_parser mod (to_sym "parse_integer_") parse_integer_)
     (add_parser mod (to_sym "parse_float_") parse_float_)
     (add_parser mod (to_sym "parse_string_") parse_string_)
+    (add_parser mod (to_sym "parse_string_d_") parse_string_d_)
+    (add_parser mod (to_sym "parse_string_s_") parse_string_s_)
     (add_parser mod (to_sym "parse_symbol_") parse_symbol_)
     (add_parser mod (to_sym "parse_atom_") parse_atom_)
     (add_parser mod (to_sym "parse_node_") parse_node_)
@@ -1908,6 +1963,8 @@
     (add_parser mod (to_sym "parse_integer") parse_integer)
     (add_parser mod (to_sym "parse_float") parse_float)
     (add_parser mod (to_sym "parse_string") parse_string)
+    (add_parser mod (to_sym "parse_string_d") parse_string_d)
+    (add_parser mod (to_sym "parse_string_s") parse_string_s)
     (add_parser mod (to_sym "parse_symbol") parse_symbol)
     (add_parser mod (to_sym "parse_atom") parse_atom)
     (add_parser mod (to_sym "parse_node") parse_node)
