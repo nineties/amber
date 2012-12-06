@@ -1,10 +1,8 @@
-DefineSyntax{
-    comment, List{Tuple{List{shell_style_comment}, Quote{nil}}}
-}
+ReplaceSyntax{comment, shell_style_comment}
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2012-11-30 14:15:49 nineties $
+# $Id: syntax.ab 2012-12-07 01:31:57 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -33,6 +31,7 @@ DefineSyntax{
 # delimited2(p, d) : sequence of p delimited by d (two or many)
 # located(p)       : parse p with location
 # scoped(m, p)     : parse p within module m
+# nospace(p1, ..)  : parse p1, .. without parsing spaces between them
 
 DefineSyntax{
     character_set,
@@ -83,6 +82,8 @@ DefineSyntax{
             QuasiQuote{Located{Unquote{node2}}}, multiline},
         Tuple{List{"scoped", "(", expr, ",", syntax_element, ")"},
             QuasiQuote{Scoped{Unquote{node2}, Unquote{node4}}}, multiline},
+        Tuple{List{"nospace", "(", Many1{syntax_element}, ")"},
+            QuasiQuote{NoSpace{Unquote{node2}}}, multiline},
         Tuple{List{primary_syntax_element}, node0}
     }
 }
@@ -154,38 +155,33 @@ qualified_symbol
 
 block_body ::= aligned(located(statement))
                 { QuasiQuote{Block{Unquote{node0}}} }
-block ::= [multiline] "{" block_body "}" { node1 }
+primaryblock
+    ::= [multiline] "{" block_body "}" { node1 }
         # Block with module imports
-        | [multiline] "(" qualified_symbol ")" "{" scoped(node1, block_body) "}"
-            { node4 }
+      | [multiline] "(" qualified_symbol ")" "{" scoped(node1, block_body) "}"
+        { node4 }
+
+block ::= primaryblock
+        | block_body
 
 primary_expr
-    ::= block
+    ::= primaryblock
 
       | [multiline] "(" expr ")"                  { node1 } 
       | [multiline] "(" statement ")"             { node1 }
       | [multiline] "[" delimited(expr, ",") "]"  { node1 } # List literal
 
-      # Tuple literals
-      | [multiline] "(" ")"
-        { MakeExpr{Quote{Tuple}, List{}} }
+      # Tuple literal
       | [multiline] "(" delimited2(expr, ",") ")"
         { MakeExpr{Quote{Tuple}, node1} }
 
+      | qualified_symbol
       | atom
       | "..."   { Quote{Ellipsis{nil}} }
 
-secondary_expr
-    ::= qualified_symbol
-      | primary_expr
-
 postfix_expr
-        # Function Application
-    ::= postfix_expr "(" delimited(expr, ",") ")"
-        { MakeExpr{Quote{Apply}, List{node0, node2}} }
-
         # Subscription
-      | postfix_expr "[" delimited(expr, ",") "]"
+    ::= postfix_expr nospace("[") delimited(expr, ",") "]"
         { MakeExpr{Quote{Subscript}, List{node0, node2}} }
 
       | # Ellipsis Pattern
@@ -193,44 +189,46 @@ postfix_expr
         { MakeExpr{Quote{Ellipsis}, List{node0}} }
 
         # Domain Pattern
-      | secondary_expr "@" postfix_expr
+      | primary_expr "@" postfix_expr
         { MakeExpr{Quote{Domain}, List{node0, node2}} }
 
-        # Message Passing Style
-        # e.s and e.s(a,b,c) are just syntax-sugars of s(e) and s(e,a,b,c)
-      | postfix_expr "." symbol "(" delimited(expr, ",") ")"
-        { MakeExpr{Quote{Apply}, List{node2,
-            Apply{Qualified{std, cons}, List{node0, node4}}}} }
       | postfix_expr "." symbol
         { MakeExpr{Quote{Apply}, List{node2, List{node0}}} }
 
-      | secondary_expr "^" postfix_expr
+      | primary_expr "^" postfix_expr
         { MakeExpr{Quote{Power}, List{node0, node2}} }
 
       | node
 
-      | secondary_expr
+      | primary_expr
 
-term
-    ::= "\\" term
+quote_expr
+    ::= "\\" quote_expr
         { MakeExpr{Quote{Quote}, List{node1}} }
-      | "`"  term
+      | "`"  quote_expr
         { MakeExpr{Quote{QuasiQuote}, List{node1}} }
-      | "!"  term
+      | "!"  quote_expr
         { MakeExpr{Quote{Unquote}, List{node1}} }
       | postfix_expr
 
-pattern ::= "(" term ")"    { MakeExpr{Quote{Tuple}, List{node1}} }
-          | term
+apply_expr
+    ::= quote_expr "(" ")"
+        { MakeExpr{Quote{Apply}, List{node0, List{}}} }
+      | quote_expr quote_expr+
+        { MakeExpr{Quote{Apply}, List{node0, node1}} }
+      | quote_expr
+
+pattern ::= quote_expr
+term    ::= primary_expr
 
 # enable use of quotation expressions for following definitions.
-expr ::= term
+ReplaceSyntax{expr, apply_expr}
 
 prefix_expr
-    ::= "+"   term    { `UnaryPlus{!node1} }
-      | "-"   term    { `UnaryMinus{!node1} }
-      | "not" term    { `Not{!node1} }
-      | term
+    ::= "+"   apply_expr    { `UnaryPlus{!node1} }
+      | "-"   apply_expr    { `UnaryMinus{!node1} }
+      | "not" apply_expr    { `Not{!node1} }
+      | apply_expr
 
 multiplicative_expr
     ::= multiplicative_expr '*' prefix_expr { `Mul{!node0, !node2} }
@@ -276,11 +274,15 @@ ternary_expr
 
 guard_expr ::= ternary_expr
 
+arguments
+    ::= "(" ")" "where" guard_expr  { `Where{List{}, !node3} }
+      | "(" ")"                     { List{} }
+      | pattern+ "where" guard_expr { `Where{!node0, !node2} }
+      | pattern+                    { node0 }
+
 lambda_expr
-    ::= pattern "->" lambda_expr
+    ::= arguments "->" lambda_expr
         { `Lambda{!node0, !node2} }
-      | pattern "where" guard_expr "->" lambda_expr
-        { `Lambda{Where{!node0, !node2}, !node4} }
       | ternary_expr
 
 multi_lambda_expr
@@ -300,15 +302,9 @@ assign_expr
       | pattern ">>=" assign_expr { `ShiftRAssign{!node0, !node2} }
       | multi_lambda_expr
 
-expr ::= assign_expr
+ReplaceSyntax{expr, assign_expr}
 
 ### Statements
-arguments
-    ::= "(" delimited(expr, ",") ")" "where" guard_expr
-        { `Where{!MakeExpr{\Tuple, node1}, !node4} }
-      | "(" delimited(expr, ",") ")"
-        { MakeExpr{\Tuple, node1} }
-
 package ::= delimited(symbol, ".")
 
 statement
@@ -317,20 +313,20 @@ statement
       | "import" package
         { `Import{!node1} }
 
-      | [multiline] "if" term statement "else" statement
+      | [multiline] "if" term block "else" block
         { `IfElse{!node1, !node2, !node4} }
-      | "if" term statement
+      | "if" term block
         { `If{!node1, !node2} }
 
       | [multiline] "case" term "of" multi_lambda_expr
         { `Apply{!node3, [!node1]} }
 
-      | "while" term statement
+      | "while" term block
         { `While{!node1, !node2} }
-      | "for" statement statement
-        { `For{!node1, !node2} }
-      | "reverse_for" statement statement
-        { `RevFor{!node1, !node2} }
+      | "for" pattern "in" term block
+        { `For{!node1, !node3, !node4} }
+      | "reverse_for" pattern "in" term block
+        { `RevFor{!node1, !node3, !node4} }
       | "continue"
         { `Continue{} }
       | "break"
@@ -343,10 +339,10 @@ statement
 
       | "throw" expr
         { `Throw{!node1} }
-      | [multiline] "try" statement "catch" multi_lambda_expr
+      | [multiline] "try" block "catch" multi_lambda_expr
         { `Try{!node1, !node3} }
 
-      | symbol arguments ":" statement
+      | symbol arguments ":" block
         { `DefineFunction{!node0, Lambda{!node1, !node3}} }
       | pattern ":" expr
         { `DefineVariable{!node0, !node2} }
@@ -357,38 +353,44 @@ statement
       | statement ";" statement
         { `Seq{[!node0, !node2]} }
 
+## Reserved Keywords
+ReserveSymbol{not, and, or, where, open, import, if, else, case, of,
+    while, for, reverse_for, in, continue, break, return,
+    throw, try, catch
+}
+
 ## Syntax Sugars
-+x      => `uplus(!x)
--x      => `uminus(!x)
-x + y   => `add(!x, !y)
-x - y   => `sub(!x, !y)
-x * y   => `mul(!x, !y)
-x ^ y   => `pow(!x, !y)
-x / y   => `div(!x, !y)
-x % y   => `mod(!x, !y)
-x << y  => `shiftL(!x, !y)
-x >> y  => `shiftR(!x, !y)
-x += y  => `(!x = add(!x, !y))
-x -= y  => `(!x = sub(!x, !y))
-x *= y  => `(!x = mul(!x, !y))
-x ^= y  => `(!x = pow(!x, !y))
-x /= y  => `(!x = div(!x, !y))
-x %= y  => `(!x = mod(!x, !y))
-x <<= y => `(!x = shiftL(!x, !y))
-x >>= y => `(!x = shiftR(!x, !y))
-x < y   => `lt(!x, !y)
-x > y   => `gt(!x, !y)
-x <= y  => `le(!x, !y)
-x >= y  => `ge(!x, !y)
-x == y  => `equal(!x, !y)
-x != y  => `(not equal(!x, !y))
-x[args...]     => `Apply{at, !std::cons(x, args)}
-x[args...] = e => `Apply{store, !std::cons(x, std::append(args, [e]))}
++x      => `(uplus !x)
+-x      => `(uminus !x)
+x + y   => `(add !x !y)
+x - y   => `(sub !x !y)
+x * y   => `(mul !x !y)
+x ^ y   => `(pow !x !y)
+x / y   => `(div !x !y)
+x % y   => `(mod !x !y)
+x << y  => `(shiftL !x !y)
+x >> y  => `(shiftR !x !y)
+x += y  => `(!x = add !x !y)
+x -= y  => `(!x = sub !x !y)
+x *= y  => `(!x = mul !x !y)
+x ^= y  => `(!x = pow !x !y)
+x /= y  => `(!x = div !x !y)
+x %= y  => `(!x = mod !x !y)
+x <<= y => `(!x = shiftL !x !y)
+x >>= y => `(!x = shiftR !x !y)
+x < y   => `(lt !x !y)
+x > y   => `(gt !x !y)
+x <= y  => `(le !x !y)
+x >= y  => `(ge !x !y)
+x == y  => `(equal !x !y)
+x != y  => `(not equal !x !y)
+x[args...]     => `Apply{at, !(std::cons x args)}
+x[args...] = e => `Apply{store, !(std::cons x (std::append args [e]))}
 x.s = e => `Apply{!("set_" + s).to_sym, ![x, e]}
 
 module parser {
     primary_expr ::= "$" decimal { ("node" + node1).to_sym }
-                   | "$input"    { \GET_INPUT_TEXT() }
+                   | "$input"    { \(GET_INPUT_TEXT()) }
 }
 
 module shell_syntax {

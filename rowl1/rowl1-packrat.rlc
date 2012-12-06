@@ -2,12 +2,8 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2012-12-05 15:51:17 nineties $
+; $Id: rowl1-packrat.rlc 2012-12-07 01:22:44 nineties $
 ;
-
-; TODO:
-; parse_statement and `scoped' syntax elements may have side-effects.
-; Further validation is required.
 
 (import "rlvm-compile")
 (import "rowl1-types")
@@ -546,7 +542,7 @@
     ))
  
 (fun parse_fail (p) (
-    (return (noparse p nil))
+    (return (noparse p "fail"))
     ))
 
 (fun parse_any_char (p) (
@@ -564,7 +560,10 @@
         (var c (array_get uchar str i))
         (var v (getc p))
         (if (< v 0) (return (mayparse p (strcat "expect " str))))
-        (if (!= c v) (return (noparse p (strcat "expect " str))))
+        (if (!= c v) (return (noparse p
+            (strcat "expect "
+            (strcat str
+            (strcat " but got " (escape_char v)))))))
         ))
     (return (parsed p (string str)))
     ))
@@ -772,8 +771,8 @@
 
 (fun parse_shell_style_comment_ (p) (
     (var v (getc p))
-    (if (< v 0) (return (mayparse p (string "expect '#'"))))
-    (if (!= v '#') (return (noparse p (string "expect '#'"))))
+    (if (< v 0) (return (mayparse p "expect '#'")))
+    (if (!= v '#') (return (noparse p "expect '#'")))
     (while @TRUE (do
         (var c (lookahead p))
         (if (|| (== c '\n') (< c 0)) break)
@@ -783,6 +782,7 @@
     ))
 @(MEMOIZE shell_style_comment)
 
+(var reserved_symbols null)
 (fun parse_symbol_ (p) (
     (var c (lookahead p))
     (if (< c 0) (return (mayparse p "expect a symbol")))
@@ -792,6 +792,11 @@
         (getc p)
         ))
     (var s (to_sym (extract_string p begin (field_get p 5))))
+
+    (if (list_member s reserved_symbols)
+        (return (noparse p (strcat "reserved symbol: " (symbol_name s))))
+        )
+ 
     (return (parsed p s))
     ))
 @(MEMOIZE symbol)
@@ -860,8 +865,6 @@
         (return (noparse p "expect a head symbol"))
         )
     (var hd @(TOKEN p))
-
-    (parse_spaces p)
     (parse_char p '{')
     @(CHECK p)
     (parse_spaces p)
@@ -999,7 +1002,8 @@
             (|| (== hd Import)
             (|| (== hd Open)
             (|| (== hd DefSyntax)
-                (== hd RepSyntax))))))
+            (|| (== hd RepSyntax)
+                (== hd ReserveSymbol)))))))
             break
             )
         ))
@@ -1119,7 +1123,8 @@
     (var hd (expr_head pat))
     (if (== hd Symbol)
         (return (parse_with_check
-            (apply (dynamic (to_parse pat)) (list1 PVar)) ws)))
+            (apply (dynamic (to_parse pat)) (list1 PVar)) ws))
+        )
     (if (== hd String)
         (return (parse_with_check
             (apply (dynamic (to_sym "parse_text")) (list2 PVar pat)) ws)))
@@ -1174,6 +1179,9 @@
         )
     (if (== hd Aligned)
         (return (compile_aligned (expr_arg pat 0) ws))
+        )
+    (if (== hd NoSpace)
+        (return (compile_nospace (expr_arg_list pat 0) ws))
         )
     (label compile_error)
     (throw (exception current_loc (list2 (string "invalid syntax element") pat)))
@@ -1698,9 +1706,8 @@
 (fun compile_parser_action (elems act) (
     (var prog elems)
     (if (!= (expr_head elems) List)
-        (throw (unexpected_error current_loc
-            (string "syntax elements must be a List")
-            elems)))
+        (= elems (list1 elems))
+        )
 
     (var idx 0)
     (var body 0)
@@ -1723,7 +1730,7 @@
         ))
 
     (= body (cons (defvar (to_sym "GET_INPUT_TEXT")
-        (lambda (make_expr Tuple 0)
+        (lambda 0
             (apply (to_sym "%extract_string") (list3
                 PVar
                 bpos
@@ -1736,8 +1743,14 @@
     (return (apply (lambda (make_expr Domain (list2 PVar Parser)) body) (list1 PVar)))
     ))
 
-(var space_sensitive (to_sym "space_sensitive"))
-(var nospace (to_sym "nospace"))
+(fun compile_nospace (elems ws) (
+    (var save_nospace_p nospace_p)
+    (= nospace_p @TRUE)
+    (var p (compile_seq elems ws))
+    (= nospace_p save_nospace_p)
+    (return p)
+    ))
+
 (var multiline (to_sym "multiline"))
 (fun setup_options (opts) (
     (if (!= (expr_head opts) List)
@@ -1745,13 +1758,11 @@
         )
     (while opts (do
         (var opt (car opts))
-        (if (|| (== opt space_sensitive) (== opt nospace))
-            (= nospace_p @TRUE)
         (if (== opt multiline)
             (= multiline_p @TRUE)
             (throw (unexpected_error current_loc
                 (string "unknown parser option") opt))
-            ))
+            )
         (= opts (cdr opts))
         ))
     ))
@@ -1762,7 +1773,7 @@
 
 (fun compile_parser (sym elems) (
     (if (!= (expr_head elems) List)
-        (throw (exception current_loc (string "invalid syntax declaration")))
+        (= elems (list1 elems))
         )
 
     (var body 0)
@@ -1897,6 +1908,10 @@
 ; parse_lhs = parse_rhs
 (export fun compile_replace_syntax (lhs rhs) (
     (return (assign (to_parse lhs) (to_parse rhs)))
+    ))
+
+(export fun add_reserve_symbols (syms) (
+    (= reserved_symbols (list_append syms reserved_symbols))
     ))
 
 (export fun init_parser_funcs (mod) (

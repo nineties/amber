@@ -1,32 +1,33 @@
 # Copyright (C) 2012 nineties
 #
-# $Id: list.ab 2012-11-21 16:55:54 nineties $
+# $Id: list.ab 2012-12-06 15:20:46 nineties $
 
 module std {
     head: car
     tail: cdr
 
-    add(list1@List, list2@List, _): append(list1, list2)
-    concat(list@List): foldl(list, [], append)
-    concatMap(list@List, fun@Function): concat(map(list, fun))
+    add ls1@List ls2@List: append ls1 ls2
 
-    delete([], _): []
-    delete([v, vs...], x): cons(v, delete(vs, x))
-    delete([v, vs...], x) where x == v : delete(vs, x)
+    concat ls@List: foldl ls [] append
 
-    uniq([]): []
-    uniq([v, vs...]): cons(v, uniq(delete(v, vs)))
+    concatMap ls@List fun@Function: concat (map ls fun)
 
-    intersperse([l, ls...], d): l.cons(d).cons(intersperse(ls, d))
-    intersperse([a], _): [a]
-    intersperse([], _): []
+    delete: [] _         -> []
+          | [v, vs...] x -> (x == v) ? delete vs x : cons v (delete vs x)
+
+    uniq: []         -> []
+        | [v, vs...] -> cons v (uniq (delete v vs))
+
+    intersperse: [] _         -> []
+               | [a] _        -> [a]
+               | [l, ls...] d -> cons l (cons d (intersperse ls d))
         
-    each(list@List): {
-        () -> {
-            if (list == []) return undefined
-            v: car(list)
-            list = cdr(list)
-            v
-        }
+    each ls@List: () -> {
+        if (ls == []) return undefined
+        v: car(ls)
+        ls = cdr(ls)
+        v
     }
+
+    reverse_each ls@List: each (reverse ls)
 }

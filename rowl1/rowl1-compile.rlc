@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-11-30 14:21:08 nineties $
+; $Id: rowl1-compile.rlc 2012-12-07 01:53:38 nineties $
 ;
 
 (import "rlvm-compile")
@@ -148,8 +148,8 @@
         (if (== hd Ref)
             (return (fv_iter mod (expr_arg expr 0) 0 fv))
             )
-        (if (== hd Block) 
-            (return (fv_iter_block mod (expr_arg_list expr 0) 0 fv))
+        (if (== hd Block)
+            (return (fv_iter_block mod (expr_arg_list expr 0) fv))
             )
         (if (== hd Dynamic)
             (return fv)
@@ -1109,6 +1109,10 @@
     (put_jcall asm (* 4 arity))
     ))
 
+(fun compile_unquote (asm mod expr) (
+    (throw (exception current_loc (string "unquotation outside quasi-quotation")))
+    ))
+
 (fun compile_quote (asm mod expr) (
     (put_push asm (expr_arg expr 0))
     ))
@@ -1376,7 +1380,7 @@
     (delete_symbol mod BreakLabel)
     ))
 
-; translate for(i: ary) body to
+; translate for i in ary body to
 ;
 ; {
 ;     iter: ary.each
@@ -1388,10 +1392,9 @@
 ; }
 
 (fun compile_for (asm mod expr) (
-    (var def (expr_arg expr 0))
-    (var i (expr_arg def 0))
-    (var ary (expr_arg def 1))
-    (var body (expr_arg expr 1))
+    (var i (expr_arg expr 0))
+    (var ary (expr_arg expr 1))
+    (var body (expr_arg expr 2))
     (var iter (unique_sym))
     (compile asm mod
         (block (list3
@@ -1407,15 +1410,14 @@
     ))
 
 (fun compile_revfor (asm mod expr) (
-    (var def (expr_arg expr 0))
-    (var i (expr_arg def 0))
-    (var ary (expr_arg def 1))
-    (var body (expr_arg expr 1))
+    (var i (expr_arg expr 0))
+    (var ary (expr_arg expr 1))
+    (var body (expr_arg expr 2))
     (var iter (unique_sym))
     (compile asm mod
         (block (list3
             (defvar iter (apply (to_sym "reverse_each") (list1 ary)))
-            (assign i (apply iter 0))
+            (defvar i (apply iter 0))
             (make_expr While (list2
                 (make_expr Not (list1 (apply (to_sym "equal") (list2 i undefined))))
                 (seq (list2
@@ -1425,7 +1427,7 @@
             )))
     ))
 
-; translate for(i: a..b) body to
+; translate for i in a..b body to
 ;
 ; i: {
 ;     i: a
@@ -1438,12 +1440,11 @@
 ; }
 
 (fun compile_range_for (asm mod expr) (
-    (var def (expr_arg expr 0))
-    (var i (expr_arg def 0))
-    (var rng (expr_arg def 1))
+    (var i (expr_arg expr 0))
+    (var rng (expr_arg expr 1))
     (var a (expr_arg rng 0))
     (var b (expr_arg rng 1))
-    (var body (expr_arg expr 1))
+    (var body (expr_arg expr 2))
     (var tmp (unique_sym))
 
     (compile asm mod 
@@ -1458,7 +1459,7 @@
             )))
     ))
 
-; translate revfor(i: a..b) body to
+; translate revfor i in a..b body to
 ;
 ; i: {
 ;     i: b
@@ -1471,12 +1472,11 @@
 ; }
 
 (fun compile_range_revfor (asm mod expr) (
-    (var def (expr_arg expr 0))
-    (var i (expr_arg def 0))
-    (var rng (expr_arg def 1))
+    (var i (expr_arg expr 0))
+    (var rng (expr_arg expr 1))
     (var a (expr_arg rng 0))
     (var b (expr_arg rng 1))
-    (var body (expr_arg expr 1))
+    (var body (expr_arg expr 2))
     (var tmp (unique_sym))
 
     (compile asm mod
@@ -1577,8 +1577,8 @@
     ))
 
 ; handler must be a lambda
-(var default_hdler (make_expr Lambda (list2 (to_sym "x")
-    (make_expr Throw (list1 (to_sym "x"))))))
+(var default_hdler (lambda (to_sym "x")
+    (make_expr Throw (list1 (to_sym "x")))))
 (fun compile_try (asm mod expr) (
     (var stmt (expr_arg expr 0))
     (var hdlr (expr_arg expr 1))
@@ -1648,19 +1648,17 @@
     (var lhs (expr_arg expr 0))
     (var body (expr_arg expr 1))
     (var hd (expr_head lhs))
-    (if (== hd Tuple)
-        (compile_lambda_main asm mod (expr_args lhs) body noguard cls)
-    (if (!= hd Where)
-        (compile_lambda_main asm mod (list1 lhs) body noguard cls)
+    (if (== hd List)
+        (compile_lambda_main asm mod lhs body noguard cls)
+    (if (== hd Where)
         (do
             (var guard (expr_arg lhs 1))
-            (= lhs (expr_arg lhs 0))
+            (var args (expr_arg lhs 0))
             (= hd (expr_head lhs))
-            (if (== hd Tuple)
-                (compile_lambda_main asm mod (expr_args lhs) body guard cls)
-                (compile_lambda_main asm mod (list1 lhs) body guard cls)
-                )
-        )))
+            (compile_lambda_main asm mod args body guard cls)
+        )
+        (compile_lambda_main asm mod (list1 lhs) body noguard cls)
+        ))
     ))
 
 (fun compile_lambda (asm mod expr) (
@@ -1889,6 +1887,7 @@
 
     (add_compiler mod (make_expr Apply (list2 DontCare listT)) compile_apply)
 
+    (add_compiler mod (qquote (unquote (unquote DontCare))) compile_unquote)
     (add_compiler mod (qquote (quote (unquote DontCare))) compile_quote)
     (add_compiler mod (qquote (qquote (unquote (unquote DontCare)))) compile_qquote)
 
@@ -1904,20 +1903,18 @@
 	(add_compiler mod (ifelse DontCare DontCare DontCare) compile_ifelse)
     (add_compiler mod (make_expr While (list2 DontCare DontCare)) compile_while)
 
-    (add_compiler mod (make_expr For (list2
-        (defvar symT DontCare) DontCare))
+    (add_compiler mod (make_expr For (list3 DontCare DontCare DontCare))
         compile_for
         )
-    (add_compiler mod (make_expr RevFor (list2
-        (defvar symT DontCare) DontCare)) 
+    (add_compiler mod (make_expr RevFor (list3 DontCare DontCare DontCare))
         compile_revfor
         )
-    (add_compiler mod (make_expr For (list2 
-        (defvar symT (make_expr Range (list2 DontCare DontCare)))
-        DontCare)) compile_range_for)
-    (add_compiler mod (make_expr RevFor (list2 
-        (defvar symT (make_expr Range (list2 DontCare DontCare)))
-        DontCare)) compile_range_revfor)
+    (add_compiler mod (make_expr For (list3 DontCare
+        (make_expr Range (list2 DontCare DontCare)) DontCare))
+        compile_range_for)
+    (add_compiler mod (make_expr RevFor (list3 DontCare
+        (make_expr Range (list2 DontCare DontCare)) DontCare))
+        compile_range_revfor)
 
     (add_compiler mod (make_expr Break 0) compile_break) 
     (add_compiler mod (make_expr Continue 0) compile_continue)
