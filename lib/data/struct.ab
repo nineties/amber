@@ -1,6 +1,6 @@
 # Copyright (C) 2012 nineties
 #
-# $Id: struct.ab 2012-12-06 16:40:55 nineties $
+# $Id: struct.ab 2012-12-08 04:07:19 nineties $
 
 ### Simple struct declaration
 # 
@@ -28,41 +28,42 @@
 #   Foo{ name: value, name: value, ... }    # arbitrary order
 #
 
-module struct::impl {
-    simple_decl_single sym:
-        `(!MakeExpr{sym, [\(args...)]} => `MakeExpr{\!!sym, !!\!args})
-    gen_simple_decls syms: `Seq{!(map syms simple_decl_single)}
+module std {
+    module impl {
+        simple_decl_single sym:
+            `(!MakeExpr{sym, [\(args...)]} => `MakeExpr{\!!sym, !!\!args})
+        gen_simple_decls syms: `Seq{!(map syms simple_decl_single)}
 
 
-    gen_create_struct head names values:
-        `(!MakeExpr{head, [\(args...)]} => `{
-            obj: MakeExpr{\!!head, !!values}
-            !!\Seq{!(map args (Field{x,v} -> `Apply{!("set_" + x).to_sym, [obj, !v]}))}
-            obj
-        })
+        gen_create_struct head names values:
+            `(!MakeExpr{head, [\(args...)]} => `{
+                obj: MakeExpr{\!!head, !!values}
+                !!\Seq{!(map args (Field{x,v} -> `Apply{!("set_" + x).to_sym, [obj, !v]}))}
+                obj
+            })
 
-    gen_getters _ head []: []
-    gen_getters i head [x,xs...]: {
-        getter: `DefineFunction{!x, Lambda{Domain{obj, !head}, _at obj !i}}
-        cons getter (gen_getters (i+1) head xs)
+        gen_getters _ head []: []
+        gen_getters i head [x,xs...]: {
+            getter: `DefineFunction{!x, Lambda{Domain{obj, !head}, _at obj !i}}
+            cons getter (gen_getters (i+1) head xs)
+        }
+
+        gen_setters _ head []: []
+        gen_setters i head [x,xs...]: {
+            setter: `DefineFunction{!("set_" + x).to_sym, Lambda{[Domain{obj, !head}, val], _store obj !i val}}
+            cons setter (gen_setters (i+1) head xs)
+        }
+
+        gen_struct_decl head fields: {
+            names:  map fields (f -> f[0])
+            values: map fields (f -> f[1])
+
+            code1: gen_getters 0 head names
+            code2: gen_setters 0 head names
+            code3: gen_create_struct head names values
+            `Seq{[Seq{!code1}, Seq{!code2}, !code3]}
+        }
     }
-
-    gen_setters _ head []: []
-    gen_setters i head [x,xs...]: {
-        setter: `DefineFunction{!("set_" + x).to_sym, Lambda{[Domain{obj, !head}, val], _store obj !i val}}
-        cons setter (gen_setters (i+1) head xs)
-    }
-
-    gen_struct_decl head fields: {
-        names:  map fields (f -> f[0])
-        values: map fields (f -> f[1])
-
-        code1: gen_getters 0 head names
-        code2: gen_setters 0 head names
-        code3: gen_create_struct head names values
-        `Seq{[Seq{!code1}, Seq{!code2}, !code3]}
-    }
-}
 
 field_declaration
     ::= symbol ":" expr
@@ -74,13 +75,15 @@ field_declarations
 
 struct_declaration
     ::= "struct" symbol field_declarations
-        { struct::impl::gen_struct_decl $1 $2 }
+        { impl::gen_struct_decl $1 $2 }
       | "struct" delimited1(symbol, ",")
-        { struct::impl::gen_simple_decls $1 }
+        { impl::gen_simple_decls $1 }
 
 struct_creation
-    ::= symbol "{" delimited(field_declaration, ",") "}"
+    ::= symbol nospace("{") delimited(field_declaration, ",") "}"
         { MakeExpr{$0, $2} }
 
 statement ::= struct_declaration
 postfix_expr ::= struct_creation
+
+}

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2012-12-07 01:22:44 nineties $
+; $Id: rowl1-packrat.rlc 2012-12-08 03:48:29 nineties $
 ;
 
 (import "rlvm-compile")
@@ -200,6 +200,7 @@
 
 (var nospace_p @FALSE)
 (var multiline_p @FALSE)
+(var withblank_p @FALSE)
 (var shell_mode_p @FALSE)
 (var may_parse @FALSE)
 (var left_rec (string "Left Recursion Detected"))
@@ -731,6 +732,7 @@
 @(MEMOIZE blank)
 
 (fun parse_blanks_ (p) (
+    (var pos (get_pos p))
     (var blank   (lookup_func current_mod (to_sym "parse_blank")))
     (var comment (lookup_func current_mod (to_sym "parse_comment")))
     (var state (copy_parser_state p))
@@ -744,11 +746,15 @@
         (set_parser_state_all p state)
         break
         ))
-    (return (parsed p nil))
+    (if (== (get_pos p) pos)
+        (return (noparse p "expect blank"))
+        (return (parsed p nil))
+        )
     ))
 @(MEMOIZE blanks)
 
 (fun parse_spaces_ (p) (
+    (var pos (get_pos p))
     (var blank   (lookup_func current_mod (to_sym "parse_blank")))
     (var comment (lookup_func current_mod (to_sym "parse_comment")))
     (var state (copy_parser_state p))
@@ -765,7 +771,10 @@
         (set_parser_state_all p state)
         break
         ))
-    (return (parsed p nil))
+    (if (== (get_pos p) pos)
+        (return (noparse p "expect blank"))
+        (return (parsed p nil))
+        )
     ))
 @(MEMOIZE spaces)
 
@@ -1107,9 +1116,12 @@
 
 (fun parse_with_check (p ws) (
     (var code 0)
-    (if (&& ws (! nospace_p))
-        (= code (cons (apply (to_sym "parse_spaces") (list1 PVar)) code))
-        )
+    (if (&& ws (! nospace_p)) (do
+        (= code (cons (gen_parse_spaces) code))
+        (if withblank_p
+            (= p (mkif (test_parsed) p))
+            )
+        ))
     (if multiline_p
         (= code (cons p code))
         (= code (cons (ifelse (apply (to_sym "%check_indent") (list1 PVar))
@@ -1117,6 +1129,10 @@
             (set_noparse (string "Invalid indentation"))) code))
         )
     (return (seq (list_reverse code)))
+    ))
+
+(fun gen_parse_spaces () (
+    (return (apply (to_sym "parse_spaces") (list1 PVar)))
     ))
 
 (fun compile_parser_element (pat ws) (
@@ -1181,7 +1197,10 @@
         (return (compile_aligned (expr_arg pat 0) ws))
         )
     (if (== hd NoSpace)
-        (return (compile_nospace (expr_arg_list pat 0) ws))
+        (return (compile_nospace (expr_arg pat 0) ws))
+        )
+    (if (== hd WithBlank)
+        (return (compile_withblank (expr_arg pat 0) ws))
         )
     (label compile_error)
     (throw (exception current_loc (list2 (string "invalid syntax element") pat)))
@@ -1472,8 +1491,7 @@
     (= loop_body (cons (assign elems (apply (to_sym "%cons") (list2 (get_token) elems))) loop_body))
     (= loop_body (cons (gen_set_parser_state_all state PVar) loop_body))
     (if (! nospace_p)
-        (= loop_body (cons (apply
-            (to_sym "parse_spaces") (list1 PVar)) loop_body))
+        (= loop_body (cons (gen_parse_spaces) loop_body))
         )
     (= loop_body (cons (mkif 
             (make_expr NotEqual (list2 
@@ -1489,7 +1507,7 @@
     (= body (cons (defvar state (gen_copy_parser_state PVar)) body))
 
     (if (|| ws (! nospace_p))
-        (= body (cons (apply (to_sym "parse_spaces") (list1 PVar)) body))
+        (= body (cons (gen_parse_spaces) body))
         )
 
     (= body (cons (defvar clmn (apply (to_sym "%get_column") (list1 PVar))) body))
@@ -1743,11 +1761,19 @@
     (return (apply (lambda (make_expr Domain (list2 PVar Parser)) body) (list1 PVar)))
     ))
 
-(fun compile_nospace (elems ws) (
+(fun compile_nospace (elem ws) (
     (var save_nospace_p nospace_p)
     (= nospace_p @TRUE)
-    (var p (compile_seq elems ws))
+    (var p (compile_parser_element elem ws))
     (= nospace_p save_nospace_p)
+    (return p)
+    ))
+
+(fun compile_withblank (elem ws) (
+    (var save_withblank_p withblank_p)
+    (= withblank_p @TRUE)
+    (var p (compile_parser_element elem ws))
+    (= withblank_p save_withblank_p)
     (return p)
     ))
 
@@ -1769,6 +1795,7 @@
 (fun clear_options () (
     (= nospace_p @FALSE)
     (= multiline_p @FALSE)
+    (= withblank_p @FALSE)
     ))
 
 (fun compile_parser (sym elems) (
