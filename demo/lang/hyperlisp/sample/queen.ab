@@ -1,0 +1,59 @@
+# Eight-Queen Solver by Prof. Masahiko Sato.
+
+import demo.lang.hyperlisp
+
+// 0 <= I, D <= 7 value is between 0 and 8, 8 means out of range
+
+#eight[] = '[0, 0, 0, 0, 0, 0, 0, 0];
+#seven[] = '[0, 0, 0, 0, 0, 0, 0];
+
+#length[X = [X1 . X2]] =
+  cond[eq[X, 0] : 0; 
+       '1 : snoc(0, length[X2])];
+
+#snocnew[X, Y] = cond[eq(X, eight[]) : 'Y;
+                      member[X, Y] : 'Y; 
+                      '1 : snoc[X, Y]];
+
+#minus[I = [I1. I2], D = [D1 . D2]] =
+  cond[eq[D, 0] : 'I;
+       eq[I, 0] : eight[];
+       '1 : minus[I2, D2]];
+
+#plus[I = [I1. I2], D] =
+  cond[eq[I, 0] : 'D;
+       eq('D, eight[]) : eight[];
+       '1 : snoc(0, plus[I2, D])];
+
+#member[I, L = [L1 . L2]] =
+  cond[null[L] : 0;
+       eq[I, L1] : '1;
+       '1 : member[I, L2]];
+
+#configcomp[Config, Result, I] =
+  cond[eq('I, eight[]) : 'Result;
+       member[I, Config] : configcomp('Config, 'Result, snoc[0, I]);
+       '1 : configcomp('Config, snocnew[I, Result], snoc[0, I])];
+
+#configclosure[Config = [C1 . C2], Depth, Result] =
+  cond['Config : configclosure('C2, plus('1, 'Depth), 
+                   snocnew(minus('C1, 'Depth), 
+                           snocnew(plus('C1, 'Depth), 'Result)));
+       '1 : 'Result];
+
+#solveeight[Count, Config = [C1 . C2], 
+            CoConfig = [Co1 . Co2], CoConfigStack = [S1 . S2]] =
+  cond['CoConfig :
+       solveeight(cond[eq(length[Config], seven[]) : snoc(0, 'Count); 
+                       '1 : 'Count],
+                   snoc[Co1, Config],
+                   configcomp(
+                     configclosure(snoc[Co1, Config], '1, snoc[Co1, Config]),
+                     [], 0),
+                   snoc[Co2, CoConfigStack]);
+       eq[CoConfigStack, 0] : 'Count;
+       '1 : solveeight('Count, 'C2, 'S1, 'S2)];
+
+// CoConfig = [7, 6, 5, 4, 3, 2, 1, 0] initially
+//
+// Usage: puts( solveeight(0, 0, configcomp(), 0) )

@@ -1,0 +1,184 @@
+# Copyright (C) 2012 nineties
+#
+# $Id: hyperlisp/symbol.ab 2012-12-11 14:19:11 nineties $
+
+# Reference
+#   Masahiko Sato and Masami Hagiya: HyperLisp, Algorithmic Languages
+#   (J.W. de Bakker and J.C. van Vliet eds.), North-Holland, 1981,
+#   pp.251-269.
+
+import core
+
+module HyperLisp {
+    # Metaliteral
+    hl_metaliteral ::= nospace( ([A-Z][A-Za-z0-9]*) )
+                       { `Meta{!$input.to_sym} }
+
+    # pprint(io, Meta{x}): pprint(io, x)
+
+    hl_simple_expr ::= hl_metaliteral
+    hl_expr ::= hl_simple_expr "=" hl_simple_expr
+            { `Eq{!$0, !$2} }
+          | "." hl_expr
+            { `Whole{!$1} }
+
+    # Create sexp which represents the position of metaliteral X
+    point: (X, X)      -> one
+         | (Y@Meta, X) -> zero
+         | (z, X) where z == zero -> zero
+         | (Eq{x, y}, X) -> {
+               px: point(x, X)
+               py: point(y, X)
+               if (px == zero) return py
+               if (py == zero) return px
+               throw `DuplicatedParameter{!X}
+           }
+         | (x, X) where Head{car(x)} == \Whole -> { # [.x] or (.x)
+               point(car(x)[0], X)
+           }
+         | (x, X) -> { # [x,y,z] or (x,y,z)
+               px:  point(car(x), X)
+               pxs: point(cdr(x), X)
+               if (px != zero and pxs != zero)
+                   throw `DuplicatedParameter{!X}
+               cons(px, pxs)
+           }
+
+    compile_as_sexp
+        : (p, z) where z == zero -> (zero, zero)
+        | (p, X@Meta) -> {
+              pos: point(p, X)
+              if (pos == zero) return (zero, X)
+              (snoc(pos, zero), zero)
+          }
+        | (p, x) where atom(x) -> {
+              (p1, b1): compile_as_sexp(p, car(x))
+              (p2, b2): compile_as_sexp(p, cdr(x))
+              (cons(p1, p2), snoc(b1, b2))
+          }
+        | (p, x) -> {
+              (p1, b1): compile_as_sexp(p, car(x))
+              (p2, b2): compile_as_sexp(p, cdr(x))
+              (cons(p1, p2), cons(b1, b2))
+          }
+
+    compile_arg: (p, x) where p == zero -> zero
+               | (p, x) where p == one  -> x
+               | (p, x) -> {
+                     p1: compile_arg(car(p), `car(!x))
+                     if (p1 != zero) return p1
+                     return compile_arg(cdr(p), `cdr(!x))
+                 }
+
+    compile_eval
+        : (p, x) where atom(p) -> compile_arg(car(p), \x)
+        | (p, x@Meta)   -> `\!x[0]
+        | (p, x@Symbol) -> `\!x
+        | (p, x) where atom(x)
+          -> `apply(!compile_obj(car(p), car(x)),
+                    !compile_obj(cdr(p), cdr(x)))
+        | (p, x)
+          -> `apply(!compile_obj(car(p), car(x)),
+                    !compile_evlis(cdr(p), cdr(x)))
+
+    compile_evlis
+        : (p, x) where atom(p) -> compile_arg(car(p), \x)
+        | (p, x) where x == zero -> \zero
+        | (p, x) -> `cons(!compile_eval(car(p), car(x)),
+                          !compile_evlis(p, cdr(x)))
+    compile_obj
+        : (p, x) where atom(p) -> compile_arg(car(p), \x)
+        | (p, x@Meta)   -> `\!x[0]
+        | (p, x@Symbol) -> `\!x
+        | (p, x) where x == zero -> \zero
+        | (p, x@Cons)
+          -> `cons(!compile_obj(car(p), car(x)),
+                   !compile_obj(cdr(p), cdr(x)))
+        | (p, x@Snoc)
+          -> `snoc(!compile_obj(car(p), car(x)),
+                   !compile_obj(cdr(p), cdr(x)))
+
+    params(x): car(cdr(x))
+    body(x)  : car(cdr(cdr(x)))
+
+    # compile lambda-abstraction as a sexp.
+    compile_lambda(x):
+        (p, b): compile_as_sexp(params(x), body(x))
+        cons_list([\lambda, p, b])
+
+    # compile lambda-abstraction as a native function of Amber.
+    compile_lambda_jit(x):
+        amber::compile(`Lambda{x, !compile_eval(params(x), body(x))})
+
+    # compile label-expression as a sexp.
+    compile_label(x):
+        (p, b): compile_as_sexp(params(x), body(x))
+        cons_list([\label, p, b])
+
+    # compile label-expression as a native function of Amber.
+    replace_label: (n, p, b) where p == zero -> b
+                 | (n, p, b) where atom(p)   -> n
+                 | (n, p, b@Cons)
+                   -> cons(replace_label(n, car(p), car(b)),
+                           replace_label(n, cdr(p), cdr(b)))
+                 | (n, p, b@Snoc)
+                   -> snoc(replace_label(n, car(p), car(b)),
+                           replace_label(n, cdr(p), cdr(b)))
+
+    compile_label_jit(x):
+        # Remove heads "Meta" and compile as a usual lambda.
+        name: gensym("lbl")
+        lam:  replace_label(name, params(x), body(x))
+        fun : compile_eval(params(lam), body(lam))
+        # register compiled function to the function table.
+        function[name] = amber::compile(`Lambda{x, !fun})
+
+    ## Function definition
+
+    # The symbol '#' is used for start symbol of comments in
+    # Amber's default syntax. 
+    hl_comment ::= C_style_comment
+
+    hl_expr ::= [multiline]
+                "#" hl_literal hl_simple_expr "=" hl_expr ";"
+                { cons_list([\Meta{Delta}, $1,
+                      cons_list([\Meta{Lambda}, $2, $4])]) }
+
+    # Extend eval and apply
+    eval_define(x): {
+        sym: car(cdr(x))
+        lam: car(cdr(cdr(x)))
+        function[sym] = compile_lambda_jit(lam)
+        sym
+    }
+    eval_(x) where car(x) == \Meta{Delta}: eval_define(x)
+
+    apply(f, x) where car(f) == \lambda: {
+        fun: function[f]
+        if (fun != undefined) return fun(x)
+        fun = function[f] = compile_lambda_jit(f)
+        fun(x)
+    }
+    apply(f, x) where car(f) == \label: {
+        fun: function[f]
+        if (fun != undefined) return fun(x)
+        fun = function[f] = compile_label_jit(f)
+        fun(x)
+    }
+
+    eval_(x@Meta): throw `UndefinedMetaLiteral{!x}
+    apply(f@Meta, x): throw `UndefinedMetaLiteral{!f}
+
+    # lambda-abstraction and label-expression is just a syntax sugar.
+    # Therefore, they should be translated to sexp before evaluation.
+    parse_old_hl_expr: parse_hl_expr
+    hl_expr_macro ::= old_hl_expr { macro($0) }
+    ReplaceSyntax{hl_expr, hl_expr_macro}
+
+    macro: x@Cons where car(x) == \Meta{Lambda} -> compile_lambda(x)
+         | x@Cons where car(x) == \Meta{Label}  -> compile_label(x)
+         | x where x == zero -> zero
+         | x@Cons -> cons(macro(car(x)), macro(cdr(x)))
+         | x@Snoc -> snoc(macro(car(x)), macro(cdr(x)))
+         | x -> x
+}
