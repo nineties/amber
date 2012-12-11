@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-table.rlc 2012-12-08 03:59:42 nineties $
+; $Id: rowl1-table.rlc 2012-12-11 00:41:39 nineties $
 ;
 
 (import "rlvm-compile")
@@ -25,15 +25,24 @@
     0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
     ))
 
-(fun ht_new_with_hint (hint) (
+(fun ht_new_with_hint (hint hash equal) (
     (var size (array_get int prime_numbers (bsr hint)))
-    (var tbl (variant @TableE 3 (make_vector size) (make_vector 0) (make_ivector 0)))
+    (var tbl (variant @TableE 5 (make_vector size) (make_vector 0) (make_ivector 0) hash equal))
     (ht_enter tbl)
     (return tbl)
     ))
 
-(fun ht_new () (
-    (return (ht_new_with_hint 10))
+(export fun ht_new () (
+    (return (ht_new_with_hint 10
+        (lookup_func current_mod (to_sym "hash"))
+        (lookup_func current_mod (to_sym "equal"))
+        ))
+    ))
+
+(export fun ht_new2 (hash equal) (
+    (= hash  (get_bytecode hash))
+    (= equal (get_bytecode equal))
+    (return (ht_new_with_hint 10 hash equal))
     ))
 
 (fun ht_enter (tbl) (
@@ -122,8 +131,8 @@
     ))
 
 (fun ht_store (tbl key val) (
-    (var hash (lookup_func current_mod (to_sym "hash")))
-    (var eql  (lookup_func current_mod (to_sym "equal")))
+    (var hash (field_get tbl 4))
+    (var eql  (field_get tbl 5))
 
     (var bucket (field_get tbl 1))
     (var entries (field_get tbl 2))
@@ -144,8 +153,8 @@
     ))
 
 (fun ht_at (tbl key) (
-    (var hash (lookup_func current_mod (to_sym "hash")))
-    (var eql  (lookup_func current_mod (to_sym "equal")))
+    (var hash (field_get tbl 4))
+    (var eql  (field_get tbl 5))
 
     (var bucket (field_get tbl 1))
     (var display (field_get tbl 3))
@@ -213,7 +222,7 @@
 
 (fun ht_from_list (list) (
     (var orig list)
-    (var tbl (ht_new_with_hint (list_len list)))
+    (var tbl (ht_new))
     (while list (do
         (var ent (car list))
         (if (|| (!= (expr_head ent) Tuple) (!= (expr_size ent) 2))
@@ -228,7 +237,7 @@
 (export fun setup_table (std) (
     (var ModTable (find_module no_loc std (to_sym "Table") @TRUE))
     (add_builtin_function0 ModTable (to_sym "new") ht_new 0)
-    (add_builtin_function1 ModTable (to_sym "new") intT ht_new_with_hint 0)
+    (add_builtin_function2 ModTable (to_sym "new") funT funT ht_new2 0)
     (add_builtin_function1 ModTable (to_sym "from_list") listT ht_from_list 0)
     (add_builtin_function2 std (to_sym "at") tableT DontCare ht_at 0)
     (add_builtin_function3 std (to_sym "store") tableT DontCare DontCare ht_store 0)

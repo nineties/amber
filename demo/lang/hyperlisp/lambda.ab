@@ -1,0 +1,186 @@
+# Copyright (C) 2012 nineties
+#
+# $Id: hyperlisp/symbol.ab 2012-12-11 09:55:21 nineties $
+
+# Reference
+#   Masahiko Sato and Masami Hagiya: HyperLisp, Algorithmic Languages
+#   (J.W. de Bakker and J.C. van Vliet eds.), North-Holland, 1981,
+#   pp.251-269.
+
+import core
+
+module HyperLisp {
+    # Metaliteral
+    hl_metaliteral ::= nospace( ([A-Z][A-Za-z0-9]*) )
+                       { `Meta{!$input.to_sym} }
+
+    pprint(io, Meta{x}): pprint(io, x)
+
+    hl_metaterm_item
+        ::= "[" hl_metaterm_item "." hl_metaterm_item "]"
+            { `(!$1, !$3) }
+          | hl_metaterm_item "=" hl_metaterm_item
+            { `Eq{!$0, !$2} }
+          | "." hl_metaterm_item
+            { `Whole{!$1} }
+          | hl_metaliteral
+
+    hl_metaterm
+        ::= "[" delimited(hl_metaterm_item, ",") "]" { $1 }
+
+    hl_simple_expr ::= hl_metaterm
+                     | hl_metaliteral
+
+    # Create sexp which represents the position of metaliteral X
+    point: (X, X)      -> one
+         | (Y@Meta, X) -> zero
+         | ([], X)     -> zero
+         | ([x, xs...], X) -> {
+               px:  point(x, X)
+               pxs: point(xs, X)
+               if (px != zero and pxs != zero)
+                   throw `DuplicatedParameter{!X}
+               cons(px, pxs)
+           }
+         | ((x, y), X)     -> {
+               px: point(x, X)
+               py: point(y, X)
+               if (px != zero and py != zero)
+                   throw `DuplicatedParameter{!X}
+               cons(px, py)
+           }
+         | (Eq{x, y}, X)   -> {
+               px: point(x, X)
+               py: point(y, X)
+               if (px == zero) return py
+               if (py == zero) return px
+               throw `DuplicatedParameter{!X}
+           }
+
+    compile_as_sexp
+        : (p, z) where z == zero -> (zero, zero)
+        | (p, X@Meta) -> {
+              pos: point(p, X)
+              #if (pos == zero) throw `UndefinedParameter{!X}
+              if (pos == zero) return (zero, X)
+              (snoc(pos, zero), zero)
+          }
+        | (p, x) where atom(x) -> {
+              (p1, b1): compile_as_sexp(p, car(x))
+              (p2, b2): compile_as_sexp(p, cdr(x))
+              (cons(p1, p2), snoc(b1, b2))
+          }
+        | (p, x) -> {
+              (p1, b1): compile_as_sexp(p, car(x))
+              (p2, b2): compile_as_sexp(p, cdr(x))
+              (cons(p1, p2), cons(b1, b2))
+          }
+
+    point2: (a, b, X, X)      -> a
+          | (a, b, Y@Meta, X) -> zero
+          | (a, b, [], X)     -> zero
+          | (a, b, [x, xs...], X) -> {
+                p1: point2(`car(!a), a, x, X)
+                p2: point2(`cdr(!a), a, xs, X)
+                if (p1 != zero and p2 != zero)
+                    throw `DuplicatedParameter{!X}
+                if (p1 != zero) return p1
+                if (p2 != zero) return p2
+                zero
+            }
+          | (a, b, (x, y), X)     -> {
+                p1: point2(`car(!a), a, x, X)
+                p2: point2(`cdr(!a), a, y, X)
+                if (p1 != zero and p2 != zero)
+                    throw `DuplicatedParameter{!X}
+                if (p1 != zero) return p1
+                if (p2 != zero) return p2
+                zero
+            }
+          | (a, b, Eq{x, y}, X)   -> {
+                px: point2(a, b, x, X)
+                py: point2(a, b, y, X)
+                if (px == zero) return py
+                if (py == zero) return px
+                throw `DuplicatedParameter{!X}
+            }
+          | (a, b, Whole{Y}, X)   -> point2(b, b, Y, X)
+
+    compile_eval
+        : (p, x@Meta)
+          -> compile_obj(p, x)
+        | (p, x) where atom(x)
+          -> `apply(!compile_obj(p, car(x)), !compile_obj(p, cdr(x)))
+        | (p, x)
+          -> `apply(!compile_obj(p, car(x)), !compile_evlis(p, cdr(x)))
+    compile_evlis
+        : (p, x) where x == zero -> \zero
+        | (p, x) -> `cons(!compile_eval(p, car(x)), !compile_evlis(p, cdr(x)))
+    compile_obj
+        : (p, x@Meta)   -> {
+              pos: point2(\x, \x, p, x)
+              if (pos == zero) return `\!x[0]
+              pos
+          }
+        | (p, x@Symbol) -> `\!x
+        | (p, x) where x == zero -> \zero
+        | (p, x@Cons)
+          -> `cons(!compile_obj(p, car(x)), !compile_obj(p, cdr(x)))
+        | (p, x@Snoc)
+          -> `snoc(!compile_obj(p, car(x)), !compile_obj(p, cdr(x)))
+
+    params(x): car(cdr(x))
+    body(x)  : car(cdr(cdr(x)))
+
+    # compile lambda-abstraction as a sexp.
+    compile_lambda(x):
+        (p, b): compile_as_sexp(params(x), body(x))
+        cons_list([\lambda, p, b])
+
+    # compile lambda-abstraction as a native function of Amber.
+    compile_lambda_jit(x):
+        amber::compile(`Lambda{x, !compile_eval(params(x), body(x))})
+
+    # compile label-expression as a sexp.
+    compile_label(x):
+        (p, b): compile_as_sexp(params(x), compile_lambda(body(x)))
+        cons_list([\label, p, b])
+
+    # compile label-expression as a native function of Amber.
+    compile_label_jit(x):
+        # Remove heads "Meta" and compile as a usual lambda.
+        name: params(x)[0] # ..[0] for remove the head "Meta"
+        lam : body(x)
+        fun : compile_eval(params(lam), body(lam))
+        fun = subst(fun, Meta{x} -> x | x -> x)
+
+        # register compiled function to the function table.
+        function[name] = amber::compile(`Lambda{x, !fun})
+
+    ## Extend eval and apply
+    eval_(x) where car(x) == \lambda: compile_lambda(x)
+    eval_(x) where car(x) == \Meta{Label}: compile_label(x)
+
+    apply(f, x) where car(f) == \lambda: compile_lambda_jit(f)(x)
+    apply(f, x) where car(f) == \Meta{Label}: compile_label_jit(f)(x)
+
+    ## Function definition
+
+    # The symbol '#' is used for start symbol of comments in
+    # Amber's default syntax. 
+    hl_comment ::= C_style_comment
+
+    hl_expr ::= [multiline]
+                "#" hl_simple_expr hl_metaterm "=" hl_expr ";"
+                { cons_list([\Meta{Delta}, $1, cons_list([\lambda, $2, $4])]) }
+
+    # Extend eval
+    eval_define(x): {
+        puts(x)
+        sym: car(cdr(x))
+        lam: car(cdr(cdr(x)))
+        function[sym] = compile_lambda_jit(lam)
+        sym
+    }
+    eval_(x) where car(x) == \Meta{Delta}: eval_define(x)
+}

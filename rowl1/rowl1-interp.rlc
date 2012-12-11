@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2012-12-07 01:26:33 nineties $
+; $Id: rowl1-interp.rlc 2012-12-11 02:39:57 nineties $
 ;
 
 (import "rlvm-compile")
@@ -20,19 +20,20 @@
 (import "rowl1-error")
 (import "rowl1-pprint")
 
-(export var global_mod null)
+(export var amber_mod null)
+(export var amber_mod null)
 (export var current_loc null)
 (export var current_mod null)
 (export fun set_loc (loc) (
     (= current_loc loc)
-    (add_module_variable global_mod (to_sym "LOCATION") true loc)
+    (add_module_variable amber_mod (to_sym "LOCATION") true loc)
     ))
 
 (var module_stack null)
 
 (export fun set_current_module (mod) (
     (= current_mod mod)
-    (add_module_variable global_mod (to_sym "MODULE") true mod)
+    (add_module_variable amber_mod (to_sym "MODULE") true mod)
     ))
 
 (export fun eval_shell () (
@@ -65,37 +66,38 @@
 (export fun eval_main (file ichan argc argv) (
     ;(var start (gettimeofday))
 
-    (= global_mod (make_module (to_sym "%global") 0))
-    (= module_stack (cons global_mod 0))
+    (= amber_mod (make_module (to_sym "amber") 0))
+    (= module_stack (cons amber_mod 0))
 
     (= current_loc no_loc)
 
     (setup_argv argc argv)
-    (setup_globals global_mod)
-    (setup_builtin_compilers global_mod)
-    (init_stdlib global_mod)
-    (open_module current_loc global_mod (to_sym "std"))
-    (open_module current_loc global_mod (qualified "std" (to_sym "IO")))
+    (setup_globals amber_mod)
+    (setup_builtin_compilers amber_mod)
+    (init_stdlib amber_mod)
+    (open_module current_loc amber_mod (to_sym "std"))
+    (open_module current_loc amber_mod (qualified "std" (to_sym "IO")))
 
-    (init_parser_funcs global_mod)
+    (init_parser_funcs amber_mod)
 
-    (= current_mod global_mod)
+    (= current_mod amber_mod)
     (= current_loc no_loc)
 
-    (add_import_dir "/usr/lib/amber/")
+    (push_import_dir "/usr/lib/amber/")
     (import_file "amber/syntax.ab")
     (if (in_shell_mode)
-        (open_module current_loc global_mod (to_sym "shell_syntax"))
+        (open_module current_loc amber_mod (to_sym "shell_syntax"))
         )
     (import_file "data/string.ab")
     (import_file "io.ab")
+    (import_file "printf.ab")
     (import_file "data/list.ab")
     (import_file "data/array.ab")
     (import_file "data/struct.ab")
     (import_file "data/table.ab")
 
-    (add_import_dir (get_directory file))
-    (add_import_dir "./")
+    (push_import_dir (get_directory file))
+    (push_import_dir (get_env "PWD"))
 
     (pre_import_module)
 
@@ -205,7 +207,7 @@
 (extern fun ary_push)
 (fun interpret_shell (p) (
     (var outputs (ary_new))
-    (add_module_variable global_mod (to_sym "shell_outputs") true outputs)
+    (add_module_variable amber_mod (to_sym "shell_outputs") true outputs)
     (ary_push outputs undefined)
     (while 1 (do
         (try 
@@ -260,7 +262,7 @@
     ))
 
 (fun eval_end_module (expr) (
-    (if (== current_mod global_mod)
+    (if (== current_mod amber_mod)
         (throw (exception current_mod (string "there is no module to close")))
         )
     (if (! (in_top_scope current_mod))
@@ -324,7 +326,7 @@
 (fun eval_exit (expr) (
     (= atexit_list (list_reverse atexit_list))
     (while atexit_list (do
-        (byterun (get_bytecode (string "argument for atexit") (car atexit_list)))
+        (byterun (get_bytecode (car atexit_list)))
         (= atexit_list (cdr atexit_list))
         ))
     (exit 0)
@@ -338,8 +340,12 @@
 (var import_dirs null)
 (var importd_modules null)
 
-(fun add_import_dir (path) (
+(fun push_import_dir (path) (
     (= import_dirs (cons path import_dirs))
+    ))
+
+(fun pop_import_dir (path) (
+    (= import_dirs (cdr import_dirs))
     ))
 
 (fun add_importd_file (path) (
@@ -347,7 +353,7 @@
     (= importd_modules (cons path importd_modules))
     ))
 
-(fun is_already_importd (path) (
+(fun is_already_imported (path) (
     (var list importd_modules)
     (while list (do
         (if (streq path (car list))
@@ -363,15 +369,17 @@
     (while dir (do
         (var fullpath (build_path (car dir) path ""))
         (if (file_exists fullpath) (do
-            (if (is_already_importd fullpath)
+            (if (is_already_imported fullpath)
                 (return nil)
                 )
             (add_importd_file fullpath)
 
             (var ichan (open_in fullpath))
             (var fd (open "."))
-            (chdir (get_directory fullpath))
-        
+            (var dir (get_directory fullpath))
+            (chdir dir)
+            (push_import_dir dir)
+
             (var p (init_parser fullpath ichan))
             (set_loc (get_loc p))
 
@@ -379,6 +387,8 @@
             (unset_shell_mode)
             (interpret p)
             (if shell_mode_p (set_shell_mode))
+
+            (pop_import_dir)
 
             (fchdir fd)
             (close_in ichan)
@@ -421,7 +431,7 @@
 
 (fun setup_argv (argc argv) (
     (var ARGV (ary_new))
-    (add_module_variable global_mod (to_sym "ARGV") true ARGV)
+    (add_module_variable amber_mod (to_sym "ARGV") true ARGV)
     (if (== argc 0) return)
     (for i 1 argc (do
         (ary_push ARGV (string (array_get string argv i)))
@@ -435,6 +445,7 @@
 (fun setup_globals (mod) (
     (var symT (domainP Symbol))
     
+    (add_module_variable mod (to_sym "amber") false mod)
     (add_module_variable mod (to_sym "LOCATION") false current_loc)
     (add_module_variable mod (to_sym "MODULE") false current_mod)
     (add_module_variable mod (to_sym "PROMPT") false (string "amber"))
@@ -463,6 +474,7 @@
     (add_builtin_function1 mod (to_sym "atexit") funT at_exit 0)
     ))
 
+(extern fun setup_pprint)
 (extern fun setup_base)
 (extern fun setup_symbol)
 (extern fun setup_numeric)
@@ -476,6 +488,7 @@
 
 (fun init_stdlib (mod) (
     (var std (find_module no_loc mod (to_sym "std") @TRUE))
+    (setup_pprint std)
     (setup_base std)
     (setup_symbol std)
     (setup_numeric std)

@@ -1,53 +1,25 @@
-# Copyright (C) 2010 nineties
+# Copyright (C) 2012 nineties
 #
-# $Id: string.ab 2012-12-06 16:56:15 nineties $
+# $Id: string.ab 2012-12-08 13:04:16 nineties $
 
 module std {
-    ### Format string
-    
-    format_string_element
-        ::= "%s"    { \String }
-          | "%S"    { \Symbol }
-          | "%d"    { \Decimal }
-          | "%x"    { \Hexadecimal }
-          | "%o"    { \Octal }
-          | "%b"    { \Binary }
-          | "%" .   { throw `SyntaxError{!LOCATION,
-                        "Invalid format string", !($0 + $1)}
-                    }
-          | nospace( [^%\""]+ ) { $input.unescape }
-    
-    format_string
-        ::= nospace( '"' format_string_element* '"' ) { $0[1] }
-    
-    module String {
-        compile_printf io fmt args:
-            loop: [] [] ls
-                    -> `Block{!ls.reverse}
-                | [f@String, fs...] args ls
-                    -> loop fs args (cons `(print !io !f) ls)
-                | [\String, fs...] [s, ss...] ls
-                    -> loop fs ss (cons `(print !io !s) ls)
-                | [\Symbol, fs...] [s, ss...] ls
-                    -> loop fs ss (cons `(print !io !s) ls)
-                | [\Decimal, fs...] [s, ss...] ls
-                    -> loop fs ss (cons `(print !io !s) ls)
-            loop fmt args []
-
-        compile_format fmt args:
-            `{
-                io: StringIO::new()
-                !(compile_printf \io fmt args)
-                io.to_s
-             }
+    each(str@String): {
+        i: 0
+        n: str.size
+        () -> {
+            if (i >= n) return undefined
+            v: str[i]
+            i += 1
+            v
+        }
     }
-    
-    # XXX: Not good implementation (should not define new syntax)
-    postfix_expr
-        ::= "printf" format_string quote_expr* 
-            { String::compile_printf \stdout $1 $2 }
-          | "printf" quote_expr format_string quote_expr*
-            { String::compile_printf $1 $2 $3 }
-          | "format" format_string quote_expr*
-            { String::compile_format $1 $2 }
+
+    reverse_each(str@String): {
+        i: str.size
+        () -> {
+            if (i == 0) return undefined
+            i -= 1
+            str[i]
+        }
+    }
 }

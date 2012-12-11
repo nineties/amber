@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2012-12-08 03:48:29 nineties $
+; $Id: rowl1-packrat.rlc 2012-12-11 04:41:34 nineties $
 ;
 
 (import "rlvm-compile")
@@ -780,7 +780,6 @@
 
 (fun parse_shell_style_comment_ (p) (
     (var v (getc p))
-    (if (< v 0) (return (mayparse p "expect '#'")))
     (if (!= v '#') (return (noparse p "expect '#'")))
     (while @TRUE (do
         (var c (lookahead p))
@@ -790,6 +789,18 @@
     (return (parsed p nil))
     ))
 @(MEMOIZE shell_style_comment)
+
+(fun parse_C_style_comment_ (p) (
+    (parse_text p "//")
+    (if (! @(PARSED p)) (return (noparse p "expect '//'")))
+    (while @TRUE (do
+        (var c (lookahead p))
+        (if (|| (== c '\n') (< c 0)) break)
+        (getc p)
+        ))
+    (return (parsed p nil))
+    ))
+@(MEMOIZE C_style_comment)
 
 (var reserved_symbols null)
 (fun parse_symbol_ (p) (
@@ -1979,6 +1990,7 @@
     (add_parser mod (to_sym "parse_blank_") parse_blank_)
     (add_parser mod (to_sym "parse_comment_") parse_fail)
     (add_parser mod (to_sym "parse_shell_style_comment_") parse_shell_style_comment_)
+    (add_parser mod (to_sym "parse_C_style_comment_") parse_C_style_comment_)
     (add_parser mod (to_sym "parse_decimal_") parse_decimal_)
     (add_parser mod (to_sym "parse_binary_") parse_binary_)
     (add_parser mod (to_sym "parse_octal_") parse_octal_)
@@ -1998,6 +2010,7 @@
     (add_parser mod (to_sym "parse_blank") parse_blank)
     (add_parser mod (to_sym "parse_comment") parse_fail)
     (add_parser mod (to_sym "parse_shell_style_comment") parse_shell_style_comment)
+    (add_parser mod (to_sym "parse_C_style_comment") parse_C_style_comment)
     (add_parser mod (to_sym "parse_decimal") parse_decimal)
     (add_parser mod (to_sym "parse_binary") parse_binary)
     (add_parser mod (to_sym "parse_octal") parse_octal)

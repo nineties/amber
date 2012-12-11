@@ -2,7 +2,7 @@ ReplaceSyntax{comment, shell_style_comment}
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2012-12-08 03:51:01 nineties $
+# $Id: syntax.ab 2012-12-11 02:33:40 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -183,8 +183,12 @@ primary_expr
       | "..."   { Quote{Ellipsis{nil}} }
 
 postfix_expr
+        # Function Application
+    ::= postfix_expr "(" delimited(expr, ",") ")"
+        { MakeExpr{Quote{Apply}, List{node0, node2}} }
+
         # Subscription
-    ::= postfix_expr nospace("[") delimited(expr, ",") "]"
+      | postfix_expr "[" delimited(expr, ",") "]"
         { MakeExpr{Quote{Subscript}, List{node0, node2}} }
 
       | # Ellipsis Pattern
@@ -195,6 +199,11 @@ postfix_expr
       | primary_expr "@" postfix_expr
         { MakeExpr{Quote{Domain}, List{node0, node2}} }
 
+        # Message Passing Style
+        # e.s and e.s(a,b,c) are just syntax-sugars of s(e) and s(e,a,b,c)
+      | postfix_expr "." symbol "(" delimited(expr, ",") ")"
+        { MakeExpr{Quote{Apply}, List{node2,
+            Apply{Qualified{std, cons}, List{node0, node4}}}} }
       | postfix_expr "." symbol
         { MakeExpr{Quote{Apply}, List{node2, List{node0}}} }
 
@@ -214,26 +223,17 @@ quote_expr
         { MakeExpr{Quote{Unquote}, List{node1}} }
       | postfix_expr
 
-apply_expr
-    ::= quote_expr withblank( quote_expr+ )
-        { MakeExpr{Quote{Apply}, List{node0, node1}} }
-      | quote_expr "(" ")"
-        { MakeExpr{Quote{Apply}, List{node0, List{}}} }
-      | quote_expr &"(" quote_expr
-        { MakeExpr{Quote{Apply}, List{node0, List{node2}}} }
-      | quote_expr
-
 pattern ::= quote_expr
-term    ::= primary_expr
+term    ::= quote_expr
 
 # enable use of quotation expressions for following definitions.
-ReplaceSyntax{expr, apply_expr}
+ReplaceSyntax{expr, quote_expr}
 
 prefix_expr
-    ::= "+"   apply_expr    { `UnaryPlus{!node1} }
-      | "-"   apply_expr    { `UnaryMinus{!node1} }
-      | "not" apply_expr    { `Not{!node1} }
-      | apply_expr
+    ::= "+"   quote_expr    { `UnaryPlus{!node1} }
+      | "-"   quote_expr    { `UnaryMinus{!node1} }
+      | "not" quote_expr    { `Not{!node1} }
+      | quote_expr
 
 multiplicative_expr
     ::= multiplicative_expr '*' prefix_expr { `Mul{!node0, !node2} }
@@ -280,21 +280,24 @@ ternary_expr
 guard_expr ::= ternary_expr
 
 arguments
-    ::= "(" ")" "where" guard_expr  { `Where{List{}, !node3} }
-      | "(" ")"                     { List{} }
-      | withblank(pattern+) "where" guard_expr
-        { `Where{!node0, !node2} }
-      | withblank(pattern+)
+    ::= "(" delimited(pattern, ",") ")" "where" guard_expr
+        { `Where{!node1, !node4} }
+      | "(" delimited(pattern, ",") ")"
+        { node1 }
+      | pattern "where" guard_expr
+        { `Where{List{!node0}, !node2} }
+      | pattern
+        { List{node0} }
 
 lambda_expr
     ::= arguments "->" block
         { `Lambda{!node0, !node2} }
-      | ternary_expr
 
 multi_lambda_expr
     ::= lambda_expr "|" multi_lambda_expr
         { `Bind{!node0, !node2} }
       | lambda_expr
+      | ternary_expr
 
 assign_expr
     ::= pattern "=" assign_expr   { `Assign{!node0, !node2} }
@@ -348,11 +351,8 @@ statement
       | [multiline] "try" block "catch" multi_lambda_expr
         { `Try{!node1, !node3} }
 
-      | symbol &"(" arguments ":" block
-        { `DefineFunction{!node0, Lambda{!node2, !node4}} }
-      | symbol withblank( arguments ) ":" block
+      | symbol arguments ":" block
         { `DefineFunction{!node0, Lambda{!node1, !node3}} }
-
       | pattern ":" expr
         { `DefineVariable{!node0, !node2} }
 
@@ -369,40 +369,40 @@ ReserveSymbol{not, and, or, where, open, import, if, else, case, of,
 }
 
 ## Syntax Sugars
-+x      => `(uplus !x)
--x      => `(uminus !x)
-x + y   => `(add !x !y)
-x - y   => `(sub !x !y)
-x * y   => `(mul !x !y)
-x ^ y   => `(pow !x !y)
-x / y   => `(div !x !y)
-x % y   => `(mod !x !y)
-x << y  => `(shiftL !x !y)
-x >> y  => `(shiftR !x !y)
-x += y  => `(!x = add !x !y)
-x -= y  => `(!x = sub !x !y)
-x *= y  => `(!x = mul !x !y)
-x ^= y  => `(!x = pow !x !y)
-x /= y  => `(!x = div !x !y)
-x %= y  => `(!x = mod !x !y)
-x <<= y => `(!x = shiftL !x !y)
-x >>= y => `(!x = shiftR !x !y)
-x < y   => `(lt !x !y)
-x > y   => `(gt !x !y)
-x <= y  => `(le !x !y)
-x >= y  => `(ge !x !y)
-x == y  => `(equal !x !y)
-x != y  => `(not equal !x !y)
-x[args...]     => `Apply{at, !(std::cons x args)}
-x[args...] = e => `Apply{store, !(std::cons x (std::append args [e]))}
++x      => `uplus(!x)
+-x      => `uminus(!x)
+x + y   => `add(!x, !y)
+x - y   => `sub(!x, !y)
+x * y   => `mul(!x, !y)
+x ^ y   => `pow(!x, !y)
+x / y   => `div(!x, !y)
+x % y   => `mod(!x, !y)
+x << y  => `shiftL(!x, !y)
+x >> y  => `shiftR(!x, !y)
+x += y  => `(!x = add(!x, !y))
+x -= y  => `(!x = sub(!x, !y))
+x *= y  => `(!x = mul(!x, !y))
+x ^= y  => `(!x = pow(!x, !y))
+x /= y  => `(!x = div(!x, !y))
+x %= y  => `(!x = mod(!x, !y))
+x <<= y => `(!x = shiftL(!x, !y))
+x >>= y => `(!x = shiftR(!x, !y))
+x < y   => `lt(!x, !y)
+x > y   => `gt(!x, !y)
+x <= y  => `le(!x, !y)
+x >= y  => `ge(!x, !y)
+x == y  => `equal(!x, !y)
+x != y  => `(not equal(!x, !y))
+x[args...]     => `Apply{at, !std::cons(x, args)}
+x[args...] = e => `Apply{store, !std::cons(x, std::append(args, [e]))}
 x.s = e => `Apply{!("set_" + s).to_sym, ![x, e]}
 
 module parser {
     primary_expr ::= "$" decimal { ("node" + node1).to_sym }
-                   | "$input"    { \(GET_INPUT_TEXT()) }
+                   | "$input"    { \GET_INPUT_TEXT() }
 }
 
 module shell_syntax {
-    primary_expr ::= "%" decimal { `shell_outputs[!$1] }
-                   | "%"         { `shell_outputs[0] }
+    primary_expr ::= "%" nospace(decimal) { `shell_outputs[!$1] }
+                   | "%"                  { `shell_outputs[0] }
 }

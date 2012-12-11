@@ -1,0 +1,86 @@
+# Copyright (C) 2012 nineties
+#
+# $Id: hyperlisp/core.ab 2012-12-08 16:47:01 nineties $
+
+# Reference
+#   Masahiko Sato and Masami Hagiya: HyperLisp, Algorithmic Languages
+#   (J.W. de Bakker and J.C. van Vliet eds.), North-Holland, 1981,
+#   pp.251-269.
+
+module HyperLisp {
+    # Implementation using Hash-consing
+    #
+    # Since Amber uses Copying-GC, addresses of objects can not be
+    # used as keys of hashing. Therefore this implementation assigns
+    # unique identificatino number for each objects.
+
+    struct Cons{
+        car: 0
+        cdr: 0
+        id: 0
+    }
+
+    struct Snoc{
+        car: 0
+        cdr: 0
+        id: 0
+    }
+
+    hash: x@Cons -> hash(x.id)
+        | x@Snoc -> hash(x.id)
+
+    equal: (x@Cons, y@Cons) -> x.id == y.id
+         | (x@Snoc, y@Snoc) -> x.id == y.id
+
+    # Zero
+
+    zero: Cons{car: undefined, cdr: undefined, id: 0}
+    zero.car = zero
+    zero.cdr = zero
+
+    # Constructors
+    cons_tbl: Table::new(hash, equal)
+    cons_id: 1  # id 0 is for "zero"
+
+    cons_tbl[(zero, zero)] = zero
+
+    make_cons(x, y): {
+        e: Cons{car:x, cdr:y, id:cons_id}
+        cons_id += 1
+        return e
+    }
+
+    cons(x, y): {
+        e: cons_tbl[(x, y)]
+        if (e != undefined) return e
+        cons_tbl[(x, y)] = make_cons(x, y)
+    }
+
+    snoc_tbl: Table::new(hash, equal)
+    snoc_id: 0
+
+    make_snoc(x, y): {
+        e: Snoc{car:x, cdr:y, id:snoc_id}
+        snoc_id += 1
+        return e
+    }
+
+    snoc(x, y): {
+        e: snoc_tbl[(x, y)]
+        if (e != undefined) return e
+        snoc_tbl[(x, y)] = make_snoc(x, y)
+    }
+
+    cons_list: []        -> zero
+             | [x,xs...] -> cons(x, cons_list(xs))
+
+    snoc_list: []        -> zero
+             | [x,xs...] -> snoc(x, snoc_list(xs))
+
+    one: snoc(zero, zero)
+
+    ## Recognizer
+    atom: x@Cons -> false
+        | x@Snoc -> true
+        | x -> throw `UnknownExpression{!LOCATION, !x}
+}

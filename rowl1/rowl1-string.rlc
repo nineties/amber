@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-string.rlc 2012-11-30 14:23:17 nineties $
+; $Id: rowl1-string.rlc 2012-12-08 13:06:10 nineties $
 ;
 
 (import "rlvm-compile")
@@ -17,6 +17,10 @@
 (import "rowl1-error")
 
 (extern object current_loc)
+
+(fun s_size (s) (
+    (return (box (strlen s)))
+    ))
 
 (fun s_equal (a b) (
     (if (streq a b)
@@ -71,6 +75,45 @@
     (return (ctos i))
     ))
 
+(fun s_at (s i) (
+    (= i (unbox i))
+    (var len (strlen s))
+    (if (< i 0) (+= i len))
+    (if (|| (>= i len) (< i 0))
+        (throw (out_of_range current_loc s (box i))))
+    (return (ctos (array_get char s i)))
+    ))
+
+(fun s_store (s i c) (
+    (if (!= (strlen c) 1)
+        (throw (invalid_argument current_loc (string "2nd argument of store for String must be one character") c))
+        )
+    (= i (unbox i))
+    (var len (strlen s))
+    (if (< i 0) (+= i len))
+    (if (|| (>= i len) (< i 0))
+        (throw (out_of_range current_loc s (box i))))
+    (array_set char s i (array_get char c 0))
+    (return c)
+    ))
+
+(fun s_at_range (s r) (
+    (var b (expr_arg_int r 0))
+    (var e (expr_arg_int r 1))
+    (var len (strlen s))
+    (if (< b 0) (+= b len))
+    (if (< e 0) (+= e len))
+    (if (> b e)
+        (throw (invalid_argument current_loc (string "Not valid range") r))
+        )
+    (if (|| (>= e len) (< b 0))
+        (throw (out_of_range current_loc s r))
+        )
+    (var str (allocate_string (+ (- e b) 1)))
+    (memcpy str (+ s b) (+ (- e b) 1))
+    (return str)
+    ))
+
 ;; StringIO
 (fun new_sio () (
     (return (variant @StringIOE 1 (make_sio)))
@@ -96,7 +139,7 @@
     ))
 
 (export fun setup_string (std) (
-
+    (add_builtin_function1 std (to_sym "size") stringT s_size 0)
     (add_builtin_function2 std (to_sym "equal") stringT stringT s_equal 0)
     (add_builtin_function1 std (to_sym "hash") stringT s_hash 0)
     (add_builtin_function1 std (to_sym "to_s") stringT s_to_s 0)
@@ -106,6 +149,10 @@
 
     (add_builtin_function1 std (to_sym "char") intT s_char 0)
     (add_builtin_function1 std (to_sym "code") stringT s_code 0) 
+
+    (add_builtin_function2 std (to_sym "at") stringT intT s_at 0)
+    (add_builtin_function2 std (to_sym "at") stringT irangeT s_at_range 0)
+    (add_builtin_function3 std (to_sym "store") stringT intT stringT s_store 0)
 
     (add_builtin_function1 std (to_sym "unescape") stringT s_unescape 0)
 

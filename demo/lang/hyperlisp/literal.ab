@@ -1,0 +1,55 @@
+# Copyright (C) 2012 nineties
+#
+# $Id: hyperlisp/symbol.ab 2012-12-11 09:50:16 nineties $
+
+# Reference
+#   Masahiko Sato and Masami Hagiya: HyperLisp, Algorithmic Languages
+#   (J.W. de Bakker and J.C. van Vliet eds.), North-Holland, 1981,
+#   pp.251-269.
+
+import core
+import syntax
+
+module HyperLisp {
+    # Literals are represented as Amber's symbols internally.
+
+    # Table of characters
+    encode_byte n: {
+        sexp: zero
+        8.times( _ -> {
+            sexp = snoc((n % 2 == 0) ? zero : one, sexp)
+            n /= 2
+        } )
+        sexp
+    }
+
+    char_tbl: Table::new(hash, equal)
+    for c in "abcdefghijklmnopqrstuvwxyz"
+        char_tbl[ encode_byte(c.code) ] = c
+    
+    is_char(sexp): char_tbl[sexp] != undefined
+
+    pprint(io, x) where is_char(x):
+        pprint(io, char_tbl[x])
+
+    # Extend Recognizer
+    atom(x@Symbol): true
+
+    # Extend Constructors
+    make_snoc(x, y) where is_char(x) and y == zero : char_tbl[x].to_sym
+    make_snoc(x, y@Symbol) where is_char(x) : (char_tbl[x] + y).to_sym
+
+    # Extend Selectors
+    car(x@Symbol): encode_byte( x.to_s[0].code )
+    cdr(x@Symbol): {
+        s: x.to_s
+        (s.size == 1) ? zero : s[1..-1].to_sym
+    }
+
+    # Extend Syntax
+    #
+    # A literal is a nonempty sequence of lowercase letters
+    hl_simple_expr ::= nospace( [a-z]+ )  { $input.to_sym }
+
+    # Use Amber's default pretty-printer
+}

@@ -1,33 +1,34 @@
 # Copyright (C) 2012 nineties
 #
-# $Id: list.ab 2012-12-07 22:51:00 nineties $
+# $Id: list.ab 2012-12-08 12:30:10 nineties $
 
 module std {
     head: car
     tail: cdr
 
-    add ls1@List ls2@List: append ls1 ls2
+    add(ls1@List, ls2@List): append(ls1, ls2)
 
-    concat ls@List: foldl ls [] append
+    concat(ls@List): foldl(ls, [], append)
 
-    concatMap ls@List fun@Function: concat (map ls fun)
+    concatMap(ls@List, fun@Function): concat(map(ls, fun))
 
-    delete: [] _         -> []
-          | [v, vs...] x -> (x == v) ? delete vs x : cons v (delete vs x)
+    delete: ([], _) -> []
+          | ([v, vs...], x)
+            -> (x == v) ? delete(vs, x) : cons(v, delete(vs, x))
 
     uniq: []         -> []
-        | [v, vs...] -> cons v (uniq (delete v vs))
+        | [v, vs...] -> cons(v, uniq(delete(v, vs)))
 
-    intersperse: [] _         -> []
-               | [a] _        -> [a]
-               | [l, ls...] d -> cons l (cons d (intersperse ls d))
+    intersperse: ([], _)         -> []
+               | ([a], _)        -> [a]
+               | ([l, ls...], d) -> cons(l, cons(d, intersperse(ls, d)))
         
-    each ls@List: () -> {
+    each(ls@List): () -> {
         if (ls == []) return undefined
-        v: car ls
-        ls = cdr ls
+        v: car(ls)
+        ls = cdr(ls)
         v
     }
 
-    reverse_each ls@List: each (reverse ls)
+    reverse_each(ls@List): each(reverse(ls))
 }
