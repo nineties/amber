@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2012-11-29 00:33:47 nineties $
+; $Id: vm-insn.rlc 2012-12-11 22:38:08 nineties $
 ;
 
 (define gen_field_get (idx) `(
@@ -64,7 +64,7 @@
     (asm "movl -4(%eax), %eax")
     ; XXX: should not hardcode the layout of object header.
     (asm "andl $" @(- (<< 1 11) 1) ", %eax")
-    (asm "cmpl $" @(| (<< type 3) TAG_PSTRUCT) ", %eax")
+    (asm "cmpl $" @(| (<< type 4) TAG_PSTRUCT) ", %eax")
     (asm "je 2f")
     (asm "1:")
     (vmsshort 1 %ecx)
@@ -1524,7 +1524,7 @@
         (asm "testl $1, %eax") ; if 1 & %eax != 0 then %eax is a boxed integer.
         (asm "jnz 3f")
         (asm "movl -4(%eax), %edx") ; %edx <- header of %eax
-        (asm "andl $7, %edx")
+        (asm "andl $15, %edx")
         (asm "cmpl $" @TAG_CONS ", %edx")
         (asm "jne 3f")
         (asm "movl 4(%eax), %eax") ; %eax <- cdr %eax
@@ -1555,7 +1555,7 @@
         (asm "testl $1, %eax") ; if 1 & %eax != 0 then %eax is a boxed integer.
         (asm "jnz 3f")
         (asm "movl -4(%eax), %edx") ; %edx <- header of %eax
-        (asm "andl $7, %edx")
+        (asm "andl $15, %edx")
         (asm "cmpl $" @TAG_CONS ", %edx")
         (asm "jne 3f")
         (asm "movl 4(%eax), %eax") ; %eax <- cdr %eax
