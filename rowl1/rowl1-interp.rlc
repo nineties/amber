@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2012-12-12 10:07:55 nineties $
+; $Id: rowl1-interp.rlc 2012-12-12 21:38:55 nineties $
 ;
 
 (import "rlvm-compile")
@@ -350,16 +350,20 @@
 (var importd_modules null)
 
 (fun push_import_dir (path) (
+    (if (== (array_get char path (- (strlen path) 1)) '/')
+        (= path (string path))
+        (= path (strcat path "/"))
+        )
     (= import_dirs (cons path import_dirs))
     ))
 
-(fun pop_import_dir (path) (
+(fun pop_import_dir () (
     (= import_dirs (cdr import_dirs))
     ))
 
 (fun add_importd_file (path) (
     ; XXX: fixme. canonicalize the `path'
-    (= importd_modules (cons path importd_modules))
+    (= importd_modules (cons (string path) importd_modules))
     ))
 
 (fun is_already_imported (path) (
