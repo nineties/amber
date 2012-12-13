@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-table.rlc 2012-12-11 00:41:39 nineties $
+; $Id: rowl1-table.rlc 2012-12-13 21:55:44 nineties $
 ;
 
 (import "rlvm-compile")
@@ -25,9 +25,27 @@
     0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
     ))
 
-(fun ht_new_with_hint (hint hash equal) (
+; Fields of hashtable
+; 0: TableE
+; 1: bucket
+; 2: hash-function
+; 3: equal-function to compare key
+; 4: kill-function to detect entries which can be killed.
+; 5: list of entries
+; 6: depth of stacking
+; 7: # of entries
+
+; Fields of hash entries
+; 0: the key
+; 1: the value
+; 2: pointer to the next entry in bucket
+; 3: pointer to the next entry in list of entries
+; 4: the depth
+; 5: the hash value
+
+(fun ht_new_with_hint (hint hash equal kill) (
     (var size (array_get int prime_numbers (bsr hint)))
-    (var tbl (variant @TableE 5 (make_vector size) (make_vector 0) (make_ivector 0) hash equal))
+    (var tbl (variant @TableE 5 (allocate_array size) hash equal kill 0 0 0))
     (ht_enter tbl)
     (return tbl)
     ))
@@ -36,111 +54,148 @@
     (return (ht_new_with_hint 10
         (lookup_func current_mod (to_sym "hash"))
         (lookup_func current_mod (to_sym "equal"))
+        0
         ))
     ))
 
 (export fun ht_new2 (hash equal) (
     (= hash  (get_bytecode hash))
     (= equal (get_bytecode equal))
-    (return (ht_new_with_hint 10 hash equal))
+    (return (ht_new_with_hint 10 hash equal 0))
+    ))
+
+(export fun ht_new3 (hash equal kill) (
+    (= hash  (get_bytecode hash))
+    (= equal (get_bytecode equal))
+    (= kill (get_bytecode kill))
+    (return (ht_new_with_hint 10 hash equal kill))
     ))
 
 (fun ht_enter (tbl) (
-    (var display (field_get tbl 3))
-    (ivector_pushback display 0)
+    (field_set tbl 6 (+ (field_get tbl 6) 1))
     (return nil)
     ))
 
 (fun ht_exit (tbl) (
-    (var display (field_get tbl 3))
-    (var entries (field_get tbl 2))
     (var bucket (field_get tbl 1))
-    (var size (vector_size bucket))
-
-    (var depth (ivector_size display))
-    (var npop  (ivector_at display (- depth 1)))
-    (ivector_resize display (- depth 1))
-
-    (var end (vector_size entries))
-    (var begin (- end npop))
-    (while (< begin end) (do
-        (var entry (vector_at entries begin))
-        (if entry (do
-            (var h (% (field_get entry 3) size))
-            (var e (vector_at bucket h))
-            (if (== e entry)
-                (vector_put bucket h (field_get e 2))
-                (while e (do
-                    (var next (field_get e 2))
-                    (if (== entry next) (do
-                        (field_set e 2 (field_get next 2))
-                        break
-                        ))
-                    (= e next)
-                    ))
-                )
-            ))
-        (incr begin)
+    (var bucket_size (array_size bucket))
+    (var entry (field_get tbl 5))
+    (var depth (field_get tbl 6))
+    (if (== depth 0) (throw
+        (exception current_loc (string "Depth of table is zero"))
         ))
-    (vector_resize entries (- end npop))
+    (var count 0)
+    (while entry (do
+        (if (!= (field_get entry 4) depth) break)
+        ; remove the ehtry
+        (var h (% (field_get entry 5) bucket_size))
+        (array_set object bucket h (field_get entry 2))
+        (+= count 1)
+        (= entry (field_get entry 3))
+        ))
+    (field_set tbl 5 entry)
+    (field_set tbl 6 (- (field_get tbl 6) 1))
+    (field_set tbl 7 (- (field_get tbl 7) count))
     (return nil)
     ))
 
-(fun rehash (tbl) (
-    (var old_size (vector_size (field_get tbl 1)))
-    (var num_ent  (vector_size (field_get tbl 2)))
-    (if (>= num_ent old_size) (do
-        (var new_size (array_get int prime_numbers (bsr num_ent)))
-        (if (! new_size) (error "rehash: too many entries"))
-        (var bucket (make_vector new_size))
-        (var entries (field_get tbl 2))
-        (for i 0 (vector_size entries) (do
-            (var entry (vector_at entries i))
-            (if (! entry) continue)
-            (var h (% (field_get entry 3) new_size))
-            (field_set entry 2 (vector_at bucket h))
-            (vector_put bucket h entry)
+; Remove entries iff kill-function returns true.
+(fun cleanup_table (tbl) (
+    (var kill (field_get tbl 4))
+    (var bucket (field_get tbl 1))
+    (var bucket_size (array_size bucket))
+    (var entry (field_get tbl 5))
+    (var prev 0)
+    (var count 0)
+    (while entry (do
+        (var key (field_get entry 0))
+        (var val (field_get entry 1))
+        (if (== (byterun kill key val) true) (do
+            (+= count 1)
+            (var h (% (field_get entry 5) bucket_size))
+            (var e (array_get object bucket h))
+            (var p 0)
+            (while e (do
+                (if (== e entry) (do
+                    (if p
+                        (field_set p 2 (field_get e 2))
+                        (array_set object bucket h (field_get e 2))
+                        )
+                    break
+                    ))
+                (= p e)
+                (= e (field_get e 2))
+                ))
+
+            (if prev
+                (field_set prev 3 (field_get entry 3))
+                (field_set tbl 5 (field_get entry 3))
+                )
+            (= entry (field_get entry 3))
+            continue
             ))
-        (field_set tbl 1 bucket)
+        (= entry (field_get entry 3))
+        (= prev entry)
+        ))
+    (field_set tbl 7 (- (field_get tbl 7) count))
+    (return nil)
+    ))
+
+; resize bucket
+(fun rehash (tbl) (
+    (var num_ent (field_get tbl 7))
+    (if (field_get tbl 4) (do
+        (cleanup_table tbl)
+        (var old_size (array_size (field_get tbl 1)))
+        (= num_ent (field_get tbl 7))
+        (if (< num_ent old_size) return)
+        ))
+    (var new_size (array_get int prime_numbers (bsr num_ent)))
+    (if (! new_size)(throw
+        (exception current_loc (string "rehash: too many entries"))))
+    (var bucket (allocate_array new_size))
+    (var entry (field_get tbl 5))
+    (while entry (do
+        (var h (% (field_get entry 5) new_size))
+        (field_set entry 2 (array_get object bucket h))
+        (array_set object bucket h entry)
+        (= entry (field_get entry 3))
         ))
     ))
 
-(fun ht_add (tbl key val hash) (
-    (rehash tbl)
-
+(fun ht_add (tbl h key val hash) (
+    (var buf_size (array_size (field_get tbl 1)))
+    (var num_ent  (field_get tbl 7))
+    (if (>= num_ent buf_size) (rehash tbl))
+    
     (var bucket (field_get tbl 1))
-    (var entries (field_get tbl 2))
-    (var display (field_get tbl 3))
-    (var size (vector_size bucket))
-    (var h (unbox (byterun hash key)))
-    (var depth (ivector_size display))
-
-    (if (== depth 0) (error "symtable_add: no namespace"))
-
-    (var ent (struct 3 key val 0 h depth (vector_size entries)))
+    (var size   (array_size bucket))
+    (var depth  (field_get tbl 6))
+    (var entry (struct 4 key val 0 0 depth h))
     (%= h size)
 
-    (vector_pushback entries ent)
+    ; add new entry to the list
+    (field_set entry 3 (field_get tbl 5))
+    (field_set tbl 5 entry)
 
-    (field_set ent 2 (vector_at bucket h))
-    (vector_put bucket h ent)
+    ; add new entry to the bucket
+    (field_set entry 2 (array_get object bucket h))
+    (array_set object bucket h entry)
 
-    ; increment a counter in display
-    (var n (ivector_at display (- depth 1)))
-    (ivector_put display (- depth 1) (+ n 1))
+    ; increment the counter
+    (field_set tbl 7 (+ (field_get tbl 7) 1))
     ))
 
 (fun ht_store (tbl key val) (
-    (var hash (field_get tbl 4))
-    (var eql  (field_get tbl 5))
-
+    (var hash (field_get tbl 2))
+    (var eql  (field_get tbl 3))
     (var bucket (field_get tbl 1))
-    (var entries (field_get tbl 2))
-    (var size (vector_size bucket))
-    (var h (unbox (byterun hash key)))
-    (%= h size)
-    (var entry (vector_at bucket h))
-    (while entry (do
+    (var size (array_size bucket))
+
+    (var hash_value (unbox (byterun hash key)))
+    (var h (% hash_value size))
+    (var entry (array_get object bucket h))
+    (while entry (do    
         (var e_key (field_get entry 0))
         (if (== (byterun eql e_key key) true) (do
             (field_set entry 1 val)
@@ -148,20 +203,18 @@
             ))
         (= entry (field_get entry 2))
         ))
-    (ht_add tbl key val hash)
+    (ht_add tbl hash_value key val hash)
     (return val)
     ))
 
 (fun ht_at (tbl key) (
-    (var hash (field_get tbl 4))
-    (var eql  (field_get tbl 5))
-
+    (var hash (field_get tbl 2))
+    (var eql  (field_get tbl 3))
     (var bucket (field_get tbl 1))
-    (var display (field_get tbl 3))
-    (var size (vector_size bucket))
+    (var size (array_size bucket))
     (var h (unbox (byterun hash key)))
     (%= h size)
-    (var entry (vector_at bucket h))
+    (var entry (array_get object bucket h))
     (while entry (do
         (var e_key (field_get entry 0))
         (if (== (byterun eql e_key key) true)
@@ -174,48 +227,44 @@
 
 (fun ht_keys (tbl) (
     (var keys 0)
-    (var entries (field_get tbl 2))
-    (for i 0 (vector_size entries) (do
-        (var entry (vector_at entries i))
-        (if (! entry) continue)
-        (= keys (cons (field_get entry 0) keys))
+    (var entries (field_get tbl 5))
+    (while entries (do
+        (= keys (cons (field_get entries 0) keys))
+        (= entries (field_get entries 3))
         ))
-    (return keys)
+    (return (list_reverse keys))
     ))
 
 (fun ht_values (tbl) (
     (var values 0)
-    (var entries (field_get tbl 2))
-    (for i 0 (vector_size entries) (do
-        (var entry (vector_at entries i))
-        (if (! entry) continue)
-        (= values (cons (field_get entry 1) values))
+    (var entries (field_get tbl 5))
+    (while entries (do
+        (= values (cons (field_get entries 1) values))
+        (= entries (field_get entries 3))
         ))
-    (return values)
+    (return (list_reverse values))
     ))
 
 (fun ht_entries (tbl) (
-    (var ents 0)
-    (var entries (field_get tbl 2))
-    (for i 0 (vector_size entries) (do
-        (var entry (vector_at entries i))
-        (if (! entry) continue)
-        (= ents (cons (make_expr Tuple (list2 (field_get entry 0) (field_get entry 1))) ents))
+    (var es 0)
+    (var entry (field_get tbl 5))
+    (while entry (do
+        (= es (cons (make_expr Tuple (list2
+            (field_get entry 0) (field_get entry 1))) es))
+        (= entry (field_get entry 3))
         ))
-    (return ents)
+    (return (list_reverse es))
     ))
 
 (export fun pp_table (ochan tbl) (
-    (var entries (field_get tbl 2))
-    (var size (vector_size entries))
+    (var entry (field_get tbl 5))
     (output_string ochan "Table{")
-    (for i 0 size (do
-        (var entry (vector_at entries i))
-        (if (! entry) continue)
+    (while entry (do
         (pprint ochan (field_get entry 0))
         (output_string ochan " => ")
         (pprint ochan (field_get entry 1))
-        (if (< i (- size 1)) (output_string ochan ", "))
+        (= entry (field_get entry 3))
+        (if entry (output_string ochan ", "))
         ))
     (output_string ochan "}")
     ))
@@ -235,10 +284,11 @@
     ))
 
 (export fun setup_table (std) (
-    (var ModTable (find_module no_loc std (to_sym "Table") @TRUE))
-    (add_builtin_function0 ModTable (to_sym "new") ht_new 0)
-    (add_builtin_function2 ModTable (to_sym "new") funT funT ht_new2 0)
-    (add_builtin_function1 ModTable (to_sym "from_list") listT ht_from_list 0)
+    (var mod (find_module no_loc std (to_sym "Table") @TRUE))
+    (add_builtin_function0 mod (to_sym "new") ht_new 0)
+    (add_builtin_function2 mod (to_sym "new") funT funT ht_new2 0)
+    (add_builtin_function3 mod (to_sym "new") funT funT funT ht_new3 0)
+    (add_builtin_function1 mod (to_sym "from_list") listT ht_from_list 0)
     (add_builtin_function2 std (to_sym "at") tableT DontCare ht_at 0)
     (add_builtin_function3 std (to_sym "store") tableT DontCare DontCare ht_store 0)
 

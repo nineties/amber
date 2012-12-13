@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-gc.rlc 2012-12-12 15:22:23 nineties $
+; $Id: rowl1-gc.rlc 2012-12-13 15:43:39 nineties $
 ;
 
 ; weak reference and soft reference
@@ -16,6 +16,10 @@
 (import "rowl1-node")
 (import "rowl1-compile")
 (import "rowl1-module")
+(import "rowl1-symbol")
+
+(extern object current_mod)
+(extern object current_loc)
 
 (fun gc_start () (
     (garbage_collect)
@@ -49,6 +53,17 @@
     (return nil)
     ))
 
+(fun wr_hash (ref) (
+    (var hash (lookup_func current_mod (to_sym "hash")))
+    (var h (byterun hash (wr_get ref)))
+    (return (+ (* (sym_hash WeakRef) 13) h))
+    ))
+
+(fun wr_equal (ref1 ref2) (
+    (var equal (lookup_func current_mod (to_sym "equal")))
+    (return (byterun equal (wr_get ref1) (wr_get ref2)))
+    ))
+
 (export fun setup_gc (std) (
     (var GC (find_module no_loc std (to_sym "GC") @TRUE))
     (var weakT (domainP WeakRef))
@@ -58,6 +73,8 @@
     (add_builtin_function1 std (to_sym "weak") DontCare make_weakref 0)
     (add_builtin_function1 std (to_sym "alive") weakT wr_alive 0)
     (add_builtin_function1 std (to_sym "get") weakT wr_get 0)
+    (add_builtin_function1 std (to_sym "hash") weakT wr_hash 0)
+    (add_builtin_function2 std (to_sym "equal") weakT weakT wr_equal 0)
     ))
 
     ))
