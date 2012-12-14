@@ -1,6 +1,6 @@
 # Copyright (C) 2012 nineties
 #
-# $Id: hyperlisp/symbol.ab 2012-12-14 17:19:56 nineties $
+# $Id: hyperlisp/symbol.ab 2012-12-14 23:02:33 nineties $
 
 # Reference
 #   Masahiko Sato and Masami Hagiya: HyperLisp, Algorithmic Languages
@@ -91,7 +91,7 @@ module HyperLisp {
     compile_apply(p, x, f) where car(x) == \cons: {
         a: compile_(car(cdr(p)), car(cdr(x)), f)
         b: compile_(car(cdr(cdr(p))), car(cdr(cdr(x))), f)
-        `Cons{!a,!b}
+        `cons(!a,!b)
     }
     compile_apply(p, x, f) where car(x) == \snoc: {
         a: compile_(car(cdr(p)), car(cdr(x)), f)
@@ -101,12 +101,10 @@ module HyperLisp {
     compile_apply(p, x, f) where car(x) == \car: {
         a: compile_(car(cdr(p)), car(cdr(x)), f)
         `at(!a, 0)
-        #`car(!a)
     }
     compile_apply(p, x, f) where car(x) == \cdr: {
         a: compile_(car(cdr(p)), car(cdr(x)), f)
         `at(!a, 1)
-        #`cdr(!a)
     }
     compile_apply(p, x, f) where car(x) == \eq: {
         a: compile_(car(cdr(p)), car(cdr(x)), f)
@@ -222,26 +220,10 @@ module HyperLisp {
         lam: car(cdr(cdr(x)))
         fun: compile_lambda_jit(lam)
         amber::define_global_variable(sym, fun)
-        #function[sym] = compile_lambda_jit(lam)
         sym
     }
     eval_(x) where car(x) == \Meta{Delta}: eval_define(x)
-
-    apply(f, x) where car(f) == \lambda: {
-        fun: function[f]
-        if (fun != undefined) return fun(x)
-        fun = function[f] = compile_lambda_jit(f)
-        fun(x)
-    }
-    apply(f, x) where car(f) == \label: {
-        fun: function[f]
-        if (fun != undefined) return fun(x)
-        fun = function[f] = compile_label_jit(f)
-        fun(x)
-    }
-
     eval_(x@Meta): throw `UndefinedMetaLiteral{!x}
-    apply(f@Meta, x): throw `UndefinedMetaLiteral{!f}
 
     # lambda-abstraction and label-expression is just a syntax sugar.
     # Therefore, they should be translated to sexp before evaluation.

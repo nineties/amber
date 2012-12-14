@@ -1,6 +1,6 @@
 # Copyright (C) 2012 nineties
 #
-# $Id: hyperlisp/core.ab 2012-12-14 17:18:56 nineties $
+# $Id: hyperlisp/core.ab 2012-12-14 23:01:05 nineties $
 
 # Reference
 #   Masahiko Sato and Masami Hagiya: HyperLisp, Algorithmic Languages
@@ -14,47 +14,4 @@ module HyperLisp {
     eval_(expr):
         fun: compile_lambda_jit(cons_list([\lambda, zero, expr]))
         fun(zero)
-
-    #eval_: x where x == zero -> x
-    #     | x where atom(x) -> apply(car(x), cdr(x))
-    #     | x               -> apply(car(x), evlis(cdr(x)))
-    #evlis: x where x == zero -> zero
-    #     | x                 -> cons(eval_(car(x)), evlis(cdr(x)))
-
-    evcon: x where x == zero -> zero
-         | x -> {
-               y: eval_(car(car(x)))
-               if atom(y)
-                   eval_(car(cdr(car(x))))
-               else
-                   evcon(cdr(x))
-           }
-
-    # Builtin Functions
-    function: Table::new(hash, equal)
-
-    apply(f, x): {
-        g: function[f]
-        if (g == undefined) {
-            # rule (acA)
-            return apply(eval_(f), x)
-        }
-        g(x)
-    }
-    # rule (acM)
-    apply(f, x) where not atom(f): apply(eval_(f), x)
-    apply(f, x) where f == zero: zero
-
-    function[zero]  = _ -> zero
-    function[one]   = car
-    function[\eq]   = x -> (car(x) == car(cdr(x))) ? one : zero
-    function[\cond] = evcon
-    function[\atom] = x -> atom(car(x)) ? one : zero
-    function[\null] = x -> (car(x) == zero) ? one : zero
-    function[\car]  = x -> car(car(x))
-    function[\cdr]  = x -> cdr(car(x))
-    function[\cons] = x -> cons(car(x), car(cdr(x)))
-    function[\snoc] = x -> snoc(car(x), car(cdr(x)))
-    function[\exit] = _ -> exit(0)
-    function[\puts] = x -> puts(car(x)); zero
 }
