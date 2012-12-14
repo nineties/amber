@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2012-12-11 22:56:12 nineties $
+; $Id: rowl1-node.rlc 2012-12-14 13:58:27 nineties $
 ;
 
 (import "rlvm-compile")
@@ -136,6 +136,7 @@
 (export var Argument       (to_sym "%Argument"))
 (export var ListAt         (to_sym "%ListAt"))
 (export var ListFrom       (to_sym "%ListFrom"))
+(export var TupleAt        (to_sym "%TupleAt"))
 (export var ExprAt         (to_sym "%ExprAt"))
 (export var ExprFrom       (to_sym "%ExprFrom"))
 
@@ -214,11 +215,13 @@
     (if (== tag @TAG_BYTECODE) (return @BytecodeE))
     (if (== tag @TAG_BIGINT) (return @BigIntE))
     (if (== tag @TAG_WEAKREF) (return @WeakRefE))
+    (if (&& (== tag @TAG_SEQUENCE) (== (get_sequence_tag obj) @SEQ_TUPLE))
+        (return @TupleE))
     (return @BuiltinE)
     ))
 
 (fun is_atom_type (ty) (
-    (if (|| (== ty @ExprE) (|| (== ty @ListE) (== ty @ArrayE)))
+    (if (|| (== ty @ExprE) (|| (== ty @ListE) (|| (== ty @TupleE) (== ty @ArrayE))))
         (return @FALSE)
         (return @TRUE)
         )
@@ -283,6 +286,7 @@
         (@BigIntE           . (return BigInt))
         (@LocE              . (return Loc))
         (@WeakRefE          . (return WeakRef))
+        (@TupleE            . (return Tuple))
         (@IntE              . (return Int))
         (@StringE           . (return String))
         (@FloatE            . (return Float))
@@ -292,15 +296,25 @@
     ))
 
 (extern fun ary_to_list)
+(extern fun tuple_to_list)
 (export fun expr_args (expr) (
     (var ty (node_type expr))
     (if (is_atom_type ty) (return (cons expr 0)))
     (if (== ty @ListE) (return expr))
+    (if (== ty @TupleE) (return (tuple_to_list expr)))
     (if (== ty @ArrayE) (return (ary_to_list expr)))
     (return (field_get expr @ExprArgs))
     ))
 
 (export fun expr_arg (expr idx) (
+    (if (== (expr_head expr) Tuple) (do
+        (var n (tuple_size expr))
+        (if (>= idx n)
+            (throw (out_of_range current_loc expr (box (+ idx 1))))
+            )
+        (return (array_get object expr idx))
+        ))
+
     (var args (expr_args expr))
     (var i idx)
     (while (&& (> i 0) args) (do
@@ -340,6 +354,9 @@
     ))
 
 (export fun expr_arg_set (expr idx val) (
+    (if (== (expr_head expr) Tuple) (do
+        (throw (string "Rewriting of tuple object is not supported"))
+        ))
     (var args (expr_args expr))
     (while (> idx 0) (do
         (if (! args)
@@ -353,13 +370,18 @@
     ))
 
 (export fun expr_size (expr) (
-    (return (list_len (expr_args expr)))
+    (var hd (expr_head expr))
+    (if (== hd Tuple)
+        (return (tuple_size expr))
+        (return (list_len (expr_args expr)))
+        )
     ))
 
 (export fun make_expr (head args) (
     (return (variant @ExprE 2 head args))
     ))
 
+(extern fun list_to_tuple)
 (export fun make_expr_user (head args) (
     (if (!= (node_type head) @SymbolE)
         (throw (exception current_loc (string "the 1st argument of MakeExpr must be a Symbol")))
@@ -376,6 +398,11 @@
     (if (== head List)
         (return args)
         )
+
+    (if (== head Tuple)
+        (return (list_to_tuple args))
+        )
+
     (return (variant @ExprE 2 head args))
     ))
 
@@ -491,6 +518,7 @@
         (@BigIntE           . (return (string "BigInt")))
         (@LocE              . (return (string "Loc")))
         (@WeakRefE          . (return (string "WeakRef")))
+        (@TupleE            . (return (string "Tuple")))
         (@IntE              . (return (string "Int")))
         (@StringE           . (return (string "String")))
         (@FloatE            . (return (string "Float")))

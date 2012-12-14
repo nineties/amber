@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-array.rlc 2012-12-11 22:56:47 nineties $
+; $Id: rowl1-array.rlc 2012-12-14 13:39:46 nineties $
 ;
 
 (import "rlvm-compile")
@@ -62,6 +62,7 @@
         (@BigIntE           . (return (pp_bint ochan obj)))
         (@LocE              . (return (pp_loc ochan obj)))
         (@WeakRefE          . (return (pp_weak ochan obj)))
+        (@TupleE            . (return (pp_tuple ochan obj)))
         (@IntE              . (return (pp_int ochan obj)))
         (@StringE           . (return (pp_string ochan obj)))
         (@FloatE            . (return (pp_float ochan obj)))
@@ -93,12 +94,12 @@
     (return nil)
     ))
 
-(fun pp_tuple (ochan args) (
+(fun pp_tuple (ochan obj) (
+    (var size (tuple_size obj))
     (output_char ochan '(')
-    (while args (do
-        (pprint ochan (car args))
-        (= args (cdr args))
-        (if args (output_string ochan ", "))
+    (for i 0 size (do
+        (pprint ochan (array_get object obj i))
+        (if (!= i (- size 1)) (output_string ochan ", "))
         ))
     (output_char ochan ')')
     (return nil)

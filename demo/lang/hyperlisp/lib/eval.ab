@@ -1,6 +1,6 @@
 # Copyright (C) 2012 nineties
 #
-# $Id: hyperlisp/core.ab 2012-12-11 17:48:40 nineties $
+# $Id: hyperlisp/core.ab 2012-12-14 17:18:56 nineties $
 
 # Reference
 #   Masahiko Sato and Masami Hagiya: HyperLisp, Algorithmic Languages
@@ -11,11 +11,15 @@ module HyperLisp {
     hl_eval(Located{loc, expr}): eval_(expr)
 
     # Use "_" prefix so as not to overwrite Amber's builtin "eval"
-    eval_: x where x == zero -> x
-         | x where atom(x) -> apply(car(x), cdr(x))
-         | x               -> apply(car(x), evlis(cdr(x)))
-    evlis: x where x == zero -> zero
-         | x                 -> cons(eval_(car(x)), evlis(cdr(x)))
+    eval_(expr):
+        fun: compile_lambda_jit(cons_list([\lambda, zero, expr]))
+        fun(zero)
+
+    #eval_: x where x == zero -> x
+    #     | x where atom(x) -> apply(car(x), cdr(x))
+    #     | x               -> apply(car(x), evlis(cdr(x)))
+    #evlis: x where x == zero -> zero
+    #     | x                 -> cons(eval_(car(x)), evlis(cdr(x)))
 
     evcon: x where x == zero -> zero
          | x -> {
@@ -53,5 +57,4 @@ module HyperLisp {
     function[\snoc] = x -> snoc(car(x), car(cdr(x)))
     function[\exit] = _ -> exit(0)
     function[\puts] = x -> puts(car(x)); zero
-
 }

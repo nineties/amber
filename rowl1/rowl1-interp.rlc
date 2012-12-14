@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2012-12-13 23:08:47 nineties $
+; $Id: rowl1-interp.rlc 2012-12-14 17:16:53 nineties $
 ;
 
 (import "rlvm-compile")
@@ -155,6 +155,15 @@
         (return expr)
         ))
 
+    (if (== hd Tuple) (do
+        (var n (tuple_size expr))
+        (for i 0 n (do
+            (array_set object expr i (rewrite
+                (array_get object expr i)))
+            ))
+        (return expr)
+        ))
+
     (var args (expr_args expr))
     (while args (do
         (setcar args (rewrite (car args)))
@@ -177,6 +186,16 @@
     (if (== hd QuasiQuote)
         (+= level 1)
         ))
+
+    (if (== hd Tuple) (do
+        (var n (tuple_size expr))
+        (for i 0 n (do
+            (array_set object expr i
+                (rewrite_qquote (array_get object expr i) level))
+            ))
+        (return expr)
+        ))
+
     (var args (expr_args expr))
     (while args (do
         (setcar args (rewrite_qquote (car args) level))
@@ -461,6 +480,11 @@
     (return (get_module_variable current_mod (to_sym "PROMPT")))
     ))
 
+(fun def_global_var (sym val) (
+    (add_module_variable current_mod sym false val)
+    (return val)
+    ))
+
 (fun setup_globals (mod) (
     (var symT (domainP Symbol))
     
@@ -492,6 +516,9 @@
     (add_builtin_function1 mod Eval (quote (to_sym "exit")) eval_exit 0)
     (add_builtin_function1 mod (to_sym "exit") intT exit_ 0)
     (add_builtin_function1 mod (to_sym "atexit") funT at_exit 0)
+
+    (add_builtin_function2 mod (to_sym "define_global_variable")
+        symT DontCare def_global_var 0)
     ))
 
 (extern fun setup_pprint)
@@ -503,6 +530,7 @@
 (extern fun setup_string)
 (extern fun setup_io)
 (extern fun setup_list)
+(extern fun setup_tuple)
 (extern fun setup_array)
 (extern fun setup_table)
 (extern fun setup_gc)
@@ -518,6 +546,7 @@
     (setup_bigint std)
     (setup_io std)
     (setup_list std)
+    (setup_tuple std)
     (setup_array std)
     (setup_table std)
     (setup_gc std)

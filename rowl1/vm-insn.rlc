@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2012-12-11 22:38:08 nineties $
+; $Id: vm-insn.rlc 2012-12-14 16:17:50 nineties $
 ;
 
 (define gen_field_get (idx) `(
@@ -327,7 +327,7 @@
         (asm "popl %eax")
         (asm "2:")
 
-        ; === compute lhs -= rhs) === 
+        ; === compute lhs -= rhs === 
         ; 1. compare lhs.abs and rhs.abs
         (asm "movl 4(%ebx), %ecx")  ; ebx = lhs, eax = rhs
         (asm "cmpl 4(%eax), %ecx")  ; rhs.ndigit <=> lhs.ndigit
@@ -1038,6 +1038,16 @@
         (asm "movl (%esi), %eax")
         (asm "movl %eax, (%ecx)")
         ))
+    ; tuple nelem
+    (tuple () @true (
+        (asm "movl (%esi), %eax") ; # of elements
+        (vmsave)
+        (asm "pushl %eax")
+        (call prim_allocate_tuple)
+        (asm "addl $4, %esp")
+        (vmrestore)
+        (asm "movl %eax, (%esi)")
+        ))
     ; array nelem
     (array () @true (
         (asm "movl (%esi), %eax") ; # of elements
@@ -1572,6 +1582,28 @@
         (asm "xorl %edx, %edx")
         (vmsshort 1 %ecx)
         (vmsucc %ecx)
+        (vmfetch)
+        ))
+    (check_tuple (addr int) @nil (
+        (vmpop %eax)
+        (vmint 3 %ecx)
+        (asm "testl $1, %eax")
+        (asm "jnz 1f")
+        (asm "testl %eax, %eax")
+        (asm "jz 1f")
+        ; XXX: shoud not hardcode the layout of object header.
+        (asm "movl -4(%eax), %eax")
+        (asm "addl $1, %ecx")
+        (asm "shll $11, %ecx")
+        (asm "orl $" @(| (<< SEQ_TUPLE 4) TAG_SEQUENCE) ", %ecx")
+        (asm "cmpl %ecx, %eax")
+        (asm "je 2f")
+        (asm "1:")
+        (vmsshort 1 %ecx)
+        (vmsucc %ecx)
+        (vmfetch)
+        (asm "2:")
+        (vmsucc 7)
         (vmfetch)
         ))
     ))

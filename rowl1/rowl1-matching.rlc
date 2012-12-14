@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2012-11-30 10:42:14 nineties $
+; $Id: rowl1-matching.rlc 2012-12-14 16:27:59 nineties $
 ;
 
 (import "rlvm-compile")
@@ -130,6 +130,9 @@
     (if (== hd List)
         (return (setup_pat_list pat))
         )
+    (if (== hd Tuple)
+        (return (setup_pat_tuple pat))
+        )
     (if (== hd Quote)
         (return (expr_arg pat 0))
         )
@@ -145,6 +148,15 @@
     (return (cons (setup_pat (car list)) (setup_pat_list (cdr list))))
     ))
 
+(fun setup_pat_tuple (t) (
+    (var n (tuple_size t))
+    (var p (allocate_tuple n))
+    (for i 0 n (do
+        (array_set object p i (setup_pat (array_get object t i)))
+        ))
+    (return p)
+    ))
+
 (fun qquote_pat_list (pat level) (
     (var ret 0)
     (while pat (do
@@ -154,6 +166,15 @@
     (return (list_reverse ret))
     ))
 
+(fun qquote_pat_tuple (pat level) (
+    (var n (tuple_size pat))
+    (var p (allocate_tuple n))
+    (for i 0 n (do
+        (array_set object p i (qquote_pat (array_get object pat i) level))
+        ))
+    (return p)
+    ))
+
 (fun qquote_pat (pat level) (
     (var hd (expr_head pat))
     (if (|| (== hd Symbol) (|| (== hd Int) (== hd String)))
@@ -161,6 +182,9 @@
         )
     (if (== hd List)
         (return (qquote_pat_list pat level))
+        )
+    (if (== hd Tuple)
+        (return (qquote_pat_tuple pat level))
         )
     (if (== hd Unquote) (do
         (if (== level 0)
@@ -313,6 +337,27 @@
                 (compile_matching_main asm args pats)
                 (set_label asm check_failed)
             ))
+        return
+        ))
+    (if (== hd Tuple) (do
+        (var len (tuple_size p))
+        (var check_failed (fresh_label asm))
+        (compile_operand asm (car args) nil)
+        (put_check_tuple asm check_failed len)
+
+        ; flatten tuple pattern
+        (= pats (expand_tuple_pat pats))
+
+        ; add list elements to args
+        (var ls (car args))
+        (= args (cdr args))
+        (while (> len 0) (do
+            (decr len)
+            (= args (cons (make_tuple_at ls len) args))
+            ))
+
+        (compile_matching_main asm args pats)
+        (set_label asm check_failed)
         return
         ))
 
@@ -688,6 +733,13 @@
 (fun expand_list_pat (pats) (
     (if (== pats 0) (return 0))
     (return (cons (cons (list_append (caaar pats) (cdaar pats)) (cdar pats))
+        (expand_list_pat (cdr pats))))
+    ))
+
+(extern fun tuple_to_list)
+(fun expand_tuple_pat (pats) (
+    (if (== pats 0) (return 0))
+    (return (cons (cons (list_append (tuple_to_list (caaar pats)) (cdaar pats)) (cdar pats))
         (expand_list_pat (cdr pats))))
     ))
 

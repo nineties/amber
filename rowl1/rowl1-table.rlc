@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-table.rlc 2012-12-13 21:55:44 nineties $
+; $Id: rowl1-table.rlc 2012-12-14 21:02:53 nineties $
 ;
 
 (import "rlvm-compile")
@@ -100,6 +100,7 @@
     ))
 
 ; Remove entries iff kill-function returns true.
+(extern fun wr_alive)
 (fun cleanup_table (tbl) (
     (var kill (field_get tbl 4))
     (var bucket (field_get tbl 1))
@@ -110,7 +111,8 @@
     (while entry (do
         (var key (field_get entry 0))
         (var val (field_get entry 1))
-        (if (== (byterun kill key val) true) (do
+        (var v (byterun kill key val))
+        (if (== v true) (do
             (+= count 1)
             (var h (% (field_get entry 5) bucket_size))
             (var e (array_get object bucket h))
@@ -161,6 +163,7 @@
         (array_set object bucket h entry)
         (= entry (field_get entry 3))
         ))
+    (field_set tbl 1 bucket)
     ))
 
 (fun ht_add (tbl h key val hash) (
@@ -298,7 +301,7 @@
 
     (add_builtin_function1 std (to_sym "enter") tableT ht_enter 0)
     (add_builtin_function1 std (to_sym "exit") tableT ht_exit 0)
-
+    (add_builtin_function1 std (to_sym "cleanup") tableT cleanup_table 0)
     ))
 
     ))

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-12-11 02:48:30 nineties $
+; $Id: rowl1-compile.rlc 2012-12-14 17:16:47 nineties $
 ;
 
 (import "rlvm-compile")
@@ -78,6 +78,13 @@
     (if (== hd Quote) (return arg))
     (if (== hd QuasiQuote) (+= level 1))
     (if (== hd Unquote) (-= level 1))
+    (if (== hd Tuple) (do
+        (var n (tuple_size expr))
+        (for i 0 n (do
+            (= arg (iter_args f (array_get object expr i) arg level))
+            ))
+        (return arg)
+        ))
     (var args (expr_args expr))
     (while args (do
         (= arg (iter_args f (car args) arg level))
@@ -158,6 +165,14 @@
     (if (== hd Quote) (return fv))
     (if (== hd QuasiQuote) (+= level 1)
     (if (== hd Unquote) (-= level 1)))
+    (if (== hd Tuple) (do
+        (var n (tuple_size expr))
+        (for i 0 n (do
+            (= fv (fv_iter mod (array_get object expr i) level fv))
+            ))
+        (return fv)
+        ))
+
     (var args (expr_args expr))
     (while args (do
         (= fv (fv_iter mod (car args) level fv))
@@ -213,6 +228,14 @@
             ))
     (if (== hd QuasiQuote) (+= level 1)
     (if (== hd Unquote) (-= level 1))))
+    (if (== hd Tuple) (do
+        (var n (tuple_size expr))
+        (for i 0 n (do
+            (array_set object expr i (alpha_args_iter tbl chk rep
+                (array_get object expr i) level))
+            ))
+        (return expr)
+        ))
     (var args (expr_args expr))
     (while args (do
         (setcar args (alpha_args_iter tbl chk rep (car args) level))
@@ -298,6 +321,14 @@
     (if (== hd Dynamic)
         (return expr)
         )
+    (if (== hd Tuple) (do
+        (var n (tuple_size expr))
+        (for i 0 n (do
+            (array_set object expr i (alpha tbl
+                (array_get object expr i)))
+            ))
+        (return expr)
+        ))
     (var args (expr_args expr))
     (while args (do
         (setcar args (alpha tbl (car args)))
@@ -318,6 +349,14 @@
         )
     (if (== hd QuasiQuote)
         (+= level 1)
+        ))
+    (if (== hd Tuple) (do
+        (var n (tuple_size expr))
+        (for i 0 n (do
+            (array_set object expr i (alpha_qquote tbl
+                (array_get object expr i) level))
+            ))
+        (return expr)
         ))
     (var args (expr_args expr))
     (while args (do
@@ -401,6 +440,14 @@
     (if (== hd Dynamic)
         (return expr)
         )
+    (if (== hd Tuple) (do
+        (var n (tuple_size expr))
+        (for i 0 n (do
+            (array_set object expr i (scan_clsvars mod
+                (array_get object expr i) tbl))
+            ))
+        (return expr)
+        ))
     (var args (expr_args expr))
     (while args (do
         (setcar args (scan_clsvars mod (car args) tbl))
@@ -421,6 +468,14 @@
         )
     (if (== hd QuasiQuote) 
         (+= level 1)
+        ))
+    (if (== hd Tuple) (do
+        (var n (tuple_size expr))
+        (for i 0 n (do
+            (array_set object expr i (scan_clsvars_qquote mod
+                (array_get object expr i) tbl level))
+            ))
+        (return expr)
         ))
     (var args (expr_args expr))
     (while args (do
@@ -488,6 +543,14 @@
         ; The binding of a dynamic variable is resolved at run-time.
         (return expr)
         )
+    (if (== hd Tuple) (do
+        (var n (tuple_size expr))
+        (for i 0 n (do
+            (array_set object expr i (subst_clsvars tbl cls
+                (array_get object expr i)))
+            ))
+        (return expr)
+        ))
     (var args (expr_args expr))
     (while args (do
         (setcar args (subst_clsvars tbl cls (car args)))
@@ -508,6 +571,14 @@
         )
     (if (== hd QuasiQuote) 
         (+= level 1)
+        ))
+    (if (== hd Tuple) (do
+        (var n (tuple_size expr))
+        (for i 0 n (do
+            (array_set object expr i (subst_clsvars_qquote tbl cls
+                (array_get object expr i) level))
+            ))
+        (return expr)
         ))
     (var args (expr_args expr))
     (while args (do
@@ -542,7 +613,8 @@
 
 (export fun compile_main (mod expr) (
     (var asm (make_assembler))
-    (compile asm mod (alpha (make_symtable 10) expr))
+    (var a (alpha (make_symtable 10) expr))
+    (compile asm mod a)
     (put_ireturn asm)
     (return (get_code asm))
     ))
@@ -713,6 +785,7 @@
         (= tmp_need_copy (cdr tmp_need_copy))
         ))
 
+
     (if (!= guard noguard)
         (compile asm_guard mod guard)
         )
@@ -807,6 +880,14 @@
     (if (== argty Ellipsis)
         (throw (exception current_loc (string "Variable-length arguments is not allowed")))
         )
+    (if (== argty Tuple) (do
+        (var n (tuple_size arg))
+        (for i 0 n (do
+            (= nc (setup_arg tbl (make_tuple_at obj i)
+                (array_get object arg i) level nc))
+            ))
+        (return nc)
+        ))
     (var idx 0)
     (var args (expr_args arg))
     (while args (do
@@ -868,6 +949,10 @@
 
 (export fun make_list_from (obj idx) (
     (return (make_expr ListFrom (list2 obj (box idx))))
+    ))
+
+(export fun make_tuple_at (obj idx) (
+    (return (make_expr TupleAt (list2 obj (box idx))))
     ))
 
 (export fun make_expr_at (obj idx) (
@@ -1045,6 +1130,12 @@
         (put_list_from asm)
         return
         ))
+    (if (== ty TupleAt) (do
+        (compile_operand asm (expr_arg opd 0) sym)
+        (put_imm_int asm (expr_arg_int opd 1))
+        (put_array_get32 asm)
+        return
+        ))
     (if (== ty ExprAt) (do
         (compile_operand asm (expr_arg opd 0) sym)
         (put_field_get2 asm)
@@ -1117,6 +1208,11 @@
     (put_push asm (expr_arg expr 0))
     ))
 
+(extern fun tuple2)
+(extern fun tuple3)
+(extern fun tuple4)
+(extern fun tuple5)
+
 (export fun compile_qquote_main (asm mod expr level) (
     (var hd (expr_head expr))
     (if (== hd Symbol)
@@ -1146,6 +1242,19 @@
     (if (== hd QuasiQuote)
         (+= level 1)
         ))
+    (if (== hd Tuple) (do
+        (var size (tuple_size expr))
+        (rfor i 0 size (do
+            (compile_qquote_main asm mod (array_get object expr i))
+            ))
+        (if (== size 2) (compile_simple_call asm 2 tuple2)
+        (if (== size 3) (compile_simple_call asm 3 tuple3)
+        (if (== size 4) (compile_simple_call asm 4 tuple4)
+        (if (== size 5) (compile_simple_call asm 5 tuple5)
+            (throw (exception (string "Unsupported size of tuple") expr))
+            ))))
+        return
+        ))
     (compile_qquote_main asm mod (expr_args expr) level)
     (put_push asm (expr_head expr))
     (compile_simple_call asm 2 make_expr_user)
@@ -1166,9 +1275,19 @@
     ))
 
 (fun compile_tuple (asm mod expr) (
-    (compile_list asm mod (expr_args expr))
-    (put_push asm Tuple)
-    (compile_simple_call asm 2 make_expr_user)
+    (var args (expr_args expr))
+    (var size (list_len args))
+    (= args (list_reverse args))
+    (while args (do
+        (compile asm mod (car args))
+        (= args (cdr args))
+        ))
+    (if (== size 2) (compile_simple_call asm 2 tuple2)
+    (if (== size 3) (compile_simple_call asm 3 tuple3)
+    (if (== size 4) (compile_simple_call asm 4 tuple4)
+    (if (== size 5) (compile_simple_call asm 5 tuple5)
+        (throw (exception (string "Unsupported size of tuple") expr))
+        ))))
     ))
 
 (fun compile_range (asm mod expr) (
