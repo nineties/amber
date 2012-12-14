@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2012-12-14 17:16:53 nineties $
+; $Id: rowl1-interp.rlc 2012-12-14 21:28:09 nineties $
 ;
 
 (import "rlvm-compile")
@@ -455,14 +455,17 @@
     ))
 
 (fun eval_import (expr) (
-    (var syms (expr_arg expr 0))
-    (var path (string ""))
-    (while syms (do
-        (= path (strcat path (symbol_name (car syms))))
-        (= syms (cdr syms))
-        (if syms (= path (strcat path "/")))
+    (var path (expr_arg expr 0))
+    (if (== (expr_head path) List) (do
+        (var syms path)
+        (= path (string ""))
+        (while syms (do
+            (= path (strcat path (symbol_name (car syms))))
+            (= syms (cdr syms))
+            (if syms (= path (strcat path "/")))
+            ))
+        (= path (strcat path ".ab"))
         ))
-    (= path (strcat path ".ab"))
     (import_file path)
     (return nil)
     ))
@@ -504,6 +507,7 @@
     (add_builtin_function1 mod Eval (domainP Located) eval_located 0)
     (add_builtin_function1 mod Eval (make_expr Open (list1 DontCare)) eval_open 0)
     (add_builtin_function1 mod Eval (make_expr Import (list1 listT)) eval_import 0)
+    (add_builtin_function1 mod Eval (make_expr Import (list1 stringT)) eval_import 0)
     (add_builtin_function1 mod Eval (make_expr BeginModule (list1 symT)) eval_begin_module 0)
     (add_builtin_function1 mod Eval (make_expr BeginModule (list1 (domainP Qualified))) eval_begin_module 0)
     (add_builtin_function1 mod Eval (make_expr EndModule 0) eval_end_module 0)
