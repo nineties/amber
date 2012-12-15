@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2012-12-16 02:10:16 nineties $
+; $Id: rowl1-matching.rlc 2012-12-16 02:31:37 nineties $
 ;
 
 (import "rlvm-compile")
@@ -349,13 +349,21 @@
     (compile_operand asm (car args) nil)
 
     (compile_head_check asm hd check_failed)
-    (compile_operand asm (car args) nil)
-    (compile_simple_call asm 1 node_size)
-    (put_imm_int asm size)
+
     (if (is_ellipsis_node p size)
-        (put_if_ge asm check_failed)
-        (put_if_ne asm check_failed)
-        )
+        (if (> size 1) (do
+            (compile_operand asm (car args) nil)
+            (compile_simple_call asm 1 node_size)
+            (put_imm_int asm (- size 1))
+            (put_if_lt asm check_failed)
+            ))
+        (do
+            (compile_operand asm (car args) nil)
+            (compile_simple_call asm 1 node_size)
+            (put_imm_int asm size)
+            (put_if_ne asm check_failed)
+        ))
+
     ; flatten expression pattern
     (= pats (expand_composite_pat pats))
     ; add arguments to args

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-12-16 01:52:09 nineties $
+; $Id: rowl1-compile.rlc 2012-12-16 03:03:20 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1026,7 +1026,6 @@
 
     (var ty (node_head opd))
     (if (== ty ModuleVariable) (do
-        (var lbl (fresh_label asm))
         (put_push asm opd)
         (put_push asm sym)
         (compile_simple_call asm 2 load_module_variable)
@@ -1564,7 +1563,7 @@
 (fun compile_assign (asm mod expr) (
     (var lhs (node_arg expr 0))
     (var rhs (node_arg expr 1))
-    (if (!= (node_head lhs) Symbol)
+    (if (&& (! (is_symbol lhs)) (!= (node_head lhs) Qualified))
         (return (compile_multi_assign asm mod lhs rhs))
         )
 
@@ -1917,7 +1916,7 @@
 
     (add_compiler mod (make_node2 Qualified symT DontCare) compile_qualified)
 
-    (add_compiler mod (make_node2 MakeExpr DontCare DontCare) compile_make_node)
+    (add_compiler mod (make_node2 MakeNode DontCare DontCare) compile_make_node)
     (add_compiler mod (make_node1 Head DontCare) compile_head)
     (add_compiler mod (make_node1 Arguments DontCare) compile_arguments)
 

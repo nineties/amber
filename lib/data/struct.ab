@@ -31,13 +31,13 @@
 module std {
     module impl {
         simple_decl_single(sym):
-            `(!MakeExpr{sym, [\(args...)]} => `MakeExpr{\!!sym, !!\!args})
+            `(!MakeNode{sym, [\(args...)]} => `MakeNode{\!!sym, !!\!args})
         gen_simple_decls(syms): `Seq{!map(syms, simple_decl_single)}
 
 
         gen_create_struct(head, names, values):
-            `(!MakeExpr{head, [\(args...)]} => `{
-                obj: MakeExpr{\!!head, !!values}
+            `(!MakeNode{head, [\(args...)]} => `{
+                obj: MakeNode{\!!head, !!values}
                 !!\Seq{!map(args, (Field{x,v} -> `Apply{!("set_" + x).to_sym, [obj, !v]}))}
                 obj
             })
@@ -81,7 +81,7 @@ struct_declaration
 
 struct_creation
     ::= symbol nospace("{") delimited(field_declaration, ",") "}"
-        { MakeExpr{$0, $2} }
+        { MakeNode{$0, $2} }
 
 statement ::= struct_declaration
 postfix_expr ::= struct_creation
