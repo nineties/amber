@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-array.rlc 2012-12-14 13:39:46 nineties $
+; $Id: rowl1-array.rlc 2012-12-16 02:10:58 nineties $
 ;
 
 (import "rlvm-compile")
@@ -95,7 +95,7 @@
     ))
 
 (fun pp_tuple (ochan obj) (
-    (var size (tuple_size obj))
+    (var size (seq_size obj))
     (output_char ochan '(')
     (for i 0 size (do
         (pprint ochan (array_get object obj i))
@@ -133,22 +133,19 @@
     ))
 
 (fun pp_expr (ochan node) (
-    (var head (expr_head node))
-    (var args (expr_args node))
-
-    (output_symbol ochan head)
+    (output_symbol ochan (node_head node))
     (output_char ochan '{')
-    (while args (do
-        (pprint ochan (car args))
-        (= args (cdr args))
-        (if args (output_string ochan ", "))
+    (var n (node_size node))
+    (for i 0 n (do
+        (pprint ochan (node_arg node i))
+        (if (!= i (- n 1)) (output_string ochan ", "))
         ))
     (output_char ochan '}')
     (return nil)
     ))
 
 (export fun setup_pprint (std IO) (
-    (add_builtin_function2 std (to_sym "pprint") (domainP OutputFileStream) DontCare pprint_ 0)
+    (add_function2 std (to_sym "pprint") (domainP OutputFileStream) DontCare pprint_ 0)
     ))
 
     ))

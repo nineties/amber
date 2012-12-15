@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2012-12-14 13:58:27 nineties $
+; $Id: rowl1-node.rlc 2012-12-15 22:16:36 nineties $
 ;
 
 (import "rlvm-compile")
@@ -137,8 +137,9 @@
 (export var ListAt         (to_sym "%ListAt"))
 (export var ListFrom       (to_sym "%ListFrom"))
 (export var TupleAt        (to_sym "%TupleAt"))
+(export var ArrayAt        (to_sym "%ArrayAt"))
 (export var ExprAt         (to_sym "%ExprAt"))
-(export var ExprFrom       (to_sym "%ExprFrom"))
+(export var RestOf         (to_sym "%RestOf"))
 
 (extern fun exception)
 (extern fun out_of_range)
@@ -212,12 +213,29 @@
     (if (== tag @TAG_PSTRUCT) (return (+ (get_pstruct_tag obj) @PLAIN_TYPE_OFFSET)))
     (if (== tag @TAG_VARIANT) (return (field_get obj 0)))
     (if (== tag @TAG_CONS) (return @ListE))
+    (if (== tag @TAG_EXPR) (return @ExprE))
     (if (== tag @TAG_BYTECODE) (return @BytecodeE))
     (if (== tag @TAG_BIGINT) (return @BigIntE))
     (if (== tag @TAG_WEAKREF) (return @WeakRefE))
     (if (&& (== tag @TAG_SEQUENCE) (== (get_sequence_tag obj) @SEQ_TUPLE))
         (return @TupleE))
     (return @BuiltinE)
+    ))
+
+(export fun is_symbol (obj) (
+    (if (== (node_type obj) @SymbolE) (return @TRUE) (return @FALSE))
+    ))
+(export fun is_list (obj) (
+    (if (== (node_type obj) @ListE) (return @TRUE) (return @FALSE))
+    ))
+(export fun is_tuple (obj) (
+    (if (== (node_type obj) @TupleE) (return @TRUE) (return @FALSE))
+    ))
+(export fun is_array (obj) (
+    (if (== (node_type obj) @ArrayE) (return @TRUE) (return @FALSE))
+    ))
+(export fun is_expr (obj) (
+    (if (== (node_type obj) @ExprE) (return @TRUE) (return @FALSE))
     ))
 
 (fun is_atom_type (ty) (
@@ -267,10 +285,10 @@
     (output_char ochan ']')
     ))
 
-(export fun expr_head (node) (
+(export fun node_head (node) (
     (tswitch (node_type node) (
         (@SymbolE           . (return Symbol))
-        (@ExprE             . (return (field_get node @ExprHead)))
+        (@ExprE             . (return (field_get node 0)))
         (@ListE             . (return List))
         (@ArrayE            . (return Array))
         (@TableE            . (return Table))
@@ -291,184 +309,246 @@
         (@StringE           . (return String))
         (@FloatE            . (return Float))
         (@BuiltinE          . (return Builtin))
-        (default            . (not_reachable "expr_head"))
+        (default            . (not_reachable "node_head"))
         ))
     ))
 
-(extern fun ary_to_list)
+; number of arguments
+(extern fun array_size)
+(export fun node_size (expr) (
+    (if (is_atom expr) (return 0))
+    (if (is_list expr) (return (list_len expr)))
+    (if (is_tuple expr) (return (seq_size expr)))
+    (if (is_array expr) (return (array_size expr)))
+    (return (expr_size expr))
+    ))
+
 (extern fun tuple_to_list)
-(export fun expr_args (expr) (
-    (var ty (node_type expr))
-    (if (is_atom_type ty) (return (cons expr 0)))
-    (if (== ty @ListE) (return expr))
-    (if (== ty @TupleE) (return (tuple_to_list expr)))
-    (if (== ty @ArrayE) (return (ary_to_list expr)))
-    (return (field_get expr @ExprArgs))
-    ))
-
-(export fun expr_arg (expr idx) (
-    (if (== (expr_head expr) Tuple) (do
-        (var n (tuple_size expr))
-        (if (>= idx n)
-            (throw (out_of_range current_loc expr (box (+ idx 1))))
-            )
-        (return (array_get object expr idx))
-        ))
-
-    (var args (expr_args expr))
-    (var i idx)
-    (while (&& (> i 0) args) (do
-        (= args (cdr args))
-        (decr i)
-        ))
-    (if (! args)
-        (throw (out_of_range current_loc expr (box (+ idx 1))))
+(extern fun ary_to_list)
+(export fun node_args (expr) (
+    (if (is_atom expr) (return 0))
+    (if (is_list expr) (return expr))
+    (if (is_tuple expr) (return (tuple_to_list expr)))
+    (if (is_array expr) (return (ary_to_list expr)))
+    (var args 0)
+    (rfor i 0 (node_size expr)
+        (= args (cons (node_arg expr i) args))
         )
-    (return (car args))
+    (return args)
     ))
 
-(fun expr_arg_check (expr type idx) (
-    (var arg (expr_arg expr idx))
+(extern fun tuple_restof)
+(extern fun array_restof)
+(export fun node_restof (expr i) (
+    (if (is_atom expr)
+        (if (== i 0)
+            (return 0)
+            (throw (out_of_range current_loc expr (box (+ i 1))))
+            )) 
+    (if (is_list expr) (do
+        (for j 0 i (= expr (cdr expr)))
+        (return expr)
+        ))
+    (if (is_tuple expr) (return (tuple_restof expr i)))
+    (if (is_array expr) (return (array_restof expr i)))
+    (var args 0)
+    (rfor j i (node_size expr)
+        (= args (cons (node_arg expr j) args))
+        )
+    (return args)
+    ))
+
+(extern fun list_at_check)
+(extern fun tuple_at)
+(extern fun array_at)
+(export fun node_arg (expr idx) (
+    (if (is_atom expr)
+        (throw (invalid_argument current_loc
+        (string "Can't access fields of builtin object") expr)))
+    (if (is_list expr)  (return (list_at_check expr idx)))
+    (if (is_tuple expr) (return (tuple_at expr idx)))
+    (if (is_array expr) (return (array_at expr idx)))
+
+    (if (>= idx (expr_size expr))
+        (throw (out_of_range current_loc expr (box (+ idx 1)))))
+    (return (array_get object expr (+ idx 1)))
+    ))
+
+(fun node_arg_check (expr type idx) (
+    (var arg (node_arg expr idx))
     (if (!= (node_type arg) type)
-        (throw (type_error current_loc
-            (type_string type) arg))
+        (throw (type_error current_loc (type_string type) arg))
         )
     (return arg)
     ))
 
-(export fun expr_arg_int (expr idx) (
-    (var v (expr_arg_check expr @IntE idx))
+(export fun node_arg_int (expr idx) (
+    (var v (node_arg_check expr @IntE idx))
     (return (unbox v))
     ))
 
-(export fun expr_arg_symbol (expr idx) (
-    (return (expr_arg_check expr @SymbolE idx))
+(export fun node_arg_symbol (expr idx) (
+    (return (node_arg_check expr @SymbolE idx))
     ))
 
-(export fun expr_arg_string (expr idx) (
-    (return (expr_arg_check expr @StringE idx))
+(export fun node_arg_string (expr idx) (
+    (return (node_arg_check expr @StringE idx))
     ))
 
-(export fun expr_arg_list (expr idx) (
-    (return (expr_arg_check expr @ListE idx))
+(export fun node_arg_list (expr idx) (
+    (return (node_arg_check expr @ListE idx))
     ))
 
-(export fun expr_arg_set (expr idx val) (
-    (if (== (expr_head expr) Tuple) (do
-        (throw (string "Rewriting of tuple object is not supported"))
-        ))
-    (var args (expr_args expr))
-    (while (> idx 0) (do
-        (if (! args)
-            (throw (out_of_range current_loc
-                expr (box (+ idx 1))))
-            )
-        (= args (cdr args))
-        (decr idx)
-        ))
-    (setcar args val)
+(extern fun list_store_check)
+(extern fun tuple_store)
+(extern fun array_store)
+(export fun node_arg_set (expr idx val) (
+    (if (is_atom expr)
+        (throw (invalid_argument current_loc
+        (string "Can't access fields of builtin object") expr)))
+    (if (is_list expr)  (return (list_store_check expr idx val)))
+    (if (is_tuple expr) (return (tuple_store expr idx val)))
+    (if (is_array expr) (return (array_store expr idx val)))
+    (var n (expr_size expr))
+    (if (>= idx n) (throw (out_of_range current_loc expr (box (+ idx 1)))))
+    (array_set object expr (+ idx 1) val)
     ))
 
-(export fun expr_size (expr) (
-    (var hd (expr_head expr))
-    (if (== hd Tuple)
-        (return (tuple_size expr))
-        (return (list_len (expr_args expr)))
-        )
+(export fun make_node0 (head) (
+    (var e (allocate_expr 0))
+    (field_set e 0 head)
+    (return e)
     ))
 
-(export fun make_expr (head args) (
-    (return (variant @ExprE 2 head args))
+(export fun make_node1 (head a) (
+    (var e (allocate_expr 1))
+    (field_set e 0 head)
+    (field_set e 1 a)
+    (return e)
+    ))
+
+(export fun make_node2 (head a b) (
+    (var e (allocate_expr 2))
+    (field_set e 0 head)
+    (field_set e 1 a)
+    (field_set e 2 b)
+    (return e)
+    ))
+
+(export fun make_node3 (head a b c) (
+    (var e (allocate_expr 3))
+    (field_set e 0 head)
+    (field_set e 1 a)
+    (field_set e 2 b)
+    (field_set e 3 c)
+    (return e)
+    ))
+
+(export fun make_node4 (head a b c d) (
+    (var e (allocate_expr 4))
+    (field_set e 0 head)
+    (field_set e 1 a)
+    (field_set e 2 b)
+    (field_set e 3 c)
+    (field_set e 4 d)
+    (return e)
     ))
 
 (extern fun list_to_tuple)
-(export fun make_expr_user (head args) (
+(extern fun list_to_ary)
+(export fun make_node (head args) (
+    (if (! (is_symbol head)) (throw (string "Hoge")))
     (if (!= (node_type head) @SymbolE)
         (throw (exception current_loc (string "the 1st argument of MakeExpr must be a Symbol")))
-        )
-    (if (is_builtin_sym head)
-        (throw (make_expr Exception (list2
-            (string "Can not create builtin object")
-            head)))
         )
     (if (!= (node_type args) @ListE)
         (throw (exception current_loc (string "the 2nd argument of MakeExpr must be a List")))
         )
 
-    (if (== head List)
-        (return args)
+    (if (is_builtin_sym head)
+        (throw (make_node Exception (list2
+            (string "Can not create builtin object")
+            head)))
         )
 
-    (if (== head Tuple)
-        (return (list_to_tuple args))
-        )
+    ; following three objects uses special data structure
+    (if (== head List)  (return args))
+    (if (== head Tuple) (return (list_to_tuple args)))
+    (if (== head Array) (return (list_to_ary args)))
 
-    (return (variant @ExprE 2 head args))
+    (var size (list_len args))
+    (var expr (allocate_expr size))
+    (field_set expr 0 head)
+    (for i 1 (+ size 1) (do
+        (array_set object expr i (car args))
+        (= args (cdr args))
+        ))
+    (return expr)
     ))
 
 (export fun qualified (outer inner) (
-    (return (make_expr Qualified (list2 (to_sym outer) inner)))
+    (return (make_node2 Qualified (to_sym outer) inner))
     ))
 
 (export fun located (loc expr) (
-    (return (make_expr Located (list2 loc expr)))
+    (return (make_node2 Located loc expr))
     ))
 
 (export fun quote (expr) (
-    (return (make_expr Quote (list1 expr)))
+    (return (make_node1 Quote expr))
     ))
 
 (export fun qquote (expr) (
-    (return (make_expr QuasiQuote (list1 expr)))
+    (return (make_node1 QuasiQuote expr))
     ))
 
 (export fun unquote (expr) (
-    (return (make_expr Unquote (list1 expr)))
+    (return (make_node1 Unquote expr))
     ))
 
 (export fun dynamic (sym) (
-    (return (make_expr Dynamic (list1 sym)))
+    (return (make_node1 Dynamic sym))
     ))
 
 (export fun ifelse (cnd then else) (
-	(return (make_expr IfElse (list3 cnd then else)))
+    (return (make_node3 IfElse cnd then else))
 	))
 
 (export fun mkif (cnd then) (
-	(return (make_expr If (list2 cnd then)))
+    (return (make_node2 If cnd then))
 	))
 
 (export fun apply (fun args) (
-    (return (make_expr Apply (list2 fun args)))
+    (return (make_node2 Apply fun args))
     ))
 
 (export fun block (stmts) (
-    (return (make_expr Block (list1 stmts)))
+    (return (make_node1 Block stmts))
     ))
 
 (export fun seq (stmts) (
-    (return (make_expr Seq (list1 stmts)))
+    (return (make_node1 Seq stmts))
     ))
 
 (export fun lambda (args body) (
-    (return (make_expr Lambda (list2 args body)))
+    (return (make_node2 Lambda args body))
     ))
 
 (export fun assign (v arg) (
-    (return (make_expr Assign (list2 v arg)))
+    (return (make_node2 Assign v arg))
     ))
 
 (export fun mkreturn (v) (
-    (return (make_expr Return (list1 v)))
+    (return (make_node1 Return v))
     ))
 
 (export fun defvar (v arg) (
-    (return (make_expr DefVariable (list2 v arg)))
+    (return (make_node2 DefVariable v arg))
     ))
 
 ; patterns
 (export fun domainP (sym) (
-    (return (make_expr Domain (list2 DontCare sym)))
+    (return (make_node2 Domain DontCare sym))
     ))
 
 (export fun output_symbol (ochan sym) (
@@ -486,7 +566,7 @@
 (export var tableT     (domainP Table))
 (export var tupleT     (domainP Tuple))
 (export var funT       (domainP Function))
-(export var irangeT    (make_expr Range (list2 intT intT)))
+(export var irangeT    (make_node2 Range intT intT))
 
 ; printing functions
 (fun output_ordinal (ochan idx) (

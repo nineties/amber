@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2012-12-11 00:41:09 nineties $
+; $Id: rowl1-list.rlc 2012-12-15 09:10:51 nineties $
 ;
 
 (import "rlvm-compile")
@@ -24,27 +24,35 @@
     (throw (out_of_range current_loc list (box idx)))
     ))
 
-(fun ls_at (ls i) (
+(export fun list_at_check (ls i) (
     (var orig ls)
-    (var j (unbox i))
+    (var j i)
     (while (&& (> j 0) ls) (do
         (-= j 1)
         (= ls (cdr ls))
         ))
-    (if (! ls) (index_out_of_range orig (unbox i)))
+    (if (! ls) (index_out_of_range orig (box (+ i 1))))
     (return (car ls))
     ))
 
-(fun ls_store (ls i v) (
+(fun ls_at (ls i) (
+    (return (list_at_check ls (unbox i)))
+    ))
+
+(export fun list_store_check (ls i v) (
     (var orig ls)
-    (var j (unbox i))
+    (var j i)
     (while (&& (> j 0) ls) (do
         (-= j 1)
         (= ls (cdr ls))
         ))
-    (if (! ls) (index_out_of_range orig (unbox i)))
+    (if (! ls) (index_out_of_range orig (box (+ i 1))))
     (setcar ls v)
     (return v)
+    ))
+
+(fun ls_store (ls i v) (
+    (return (list_store_check ls (unbox i) v))
     ))
 
 (fun ls_length (ls) (
@@ -158,23 +166,23 @@
 
 (export fun setup_list (std) (
     (var mod (find_module no_loc std (to_sym "List") @TRUE))
-    (add_builtin_function1 std (to_sym "length") listT ls_length 0)
-    (add_builtin_function1 std (to_sym "size") listT ls_length 0)
-    (add_builtin_function2 std (to_sym "cons") DontCare listT ls_cons 0)
-    (add_builtin_function1 std (to_sym "car") listT ls_car 0)
-    (add_builtin_function1 std (to_sym "cdr") listT ls_cdr 0)
-    (add_builtin_function2 std (to_sym "at") listT intT ls_at 0)
-    (add_builtin_function3 std (to_sym "store") listT intT DontCare ls_store 0)
-    (add_builtin_function1 std (to_sym "reverse") listT ls_reverse 0)
-    (add_builtin_function2 std (to_sym "append") listT listT ls_append 0)
-    (add_builtin_function2 std (to_sym "map") listT funT ls_map 0)
-    (add_builtin_function3 std (to_sym "map2") listT listT funT ls_map2 0)
-    (add_builtin_function3 std (to_sym "foldl") listT DontCare funT ls_foldl 0)
-    (add_builtin_function3 std (to_sym "foldr") listT DontCare funT ls_foldr 0)
-    (add_builtin_function2 std (to_sym "foldl1") listT funT ls_foldl1 0)
-    (add_builtin_function2 std (to_sym "foldr1") listT funT ls_foldr1 0)
-    (add_builtin_function2 std (to_sym "contain") listT DontCare ls_contain 0)
-    (add_builtin_function2 mod (to_sym "create") intT funT ls_create 0)
+    (add_function1 std (to_sym "length") listT ls_length 0)
+    (add_function1 std (to_sym "size") listT ls_length 0)
+    (add_function2 std (to_sym "cons") DontCare listT ls_cons 0)
+    (add_function1 std (to_sym "car") listT ls_car 0)
+    (add_function1 std (to_sym "cdr") listT ls_cdr 0)
+    (add_function2 std (to_sym "at") listT intT ls_at 0)
+    (add_function3 std (to_sym "store") listT intT DontCare ls_store 0)
+    (add_function1 std (to_sym "reverse") listT ls_reverse 0)
+    (add_function2 std (to_sym "append") listT listT ls_append 0)
+    (add_function2 std (to_sym "map") listT funT ls_map 0)
+    (add_function3 std (to_sym "map2") listT listT funT ls_map2 0)
+    (add_function3 std (to_sym "foldl") listT DontCare funT ls_foldl 0)
+    (add_function3 std (to_sym "foldr") listT DontCare funT ls_foldr 0)
+    (add_function2 std (to_sym "foldl1") listT funT ls_foldl1 0)
+    (add_function2 std (to_sym "foldr1") listT funT ls_foldr1 0)
+    (add_function2 std (to_sym "contain") listT DontCare ls_contain 0)
+    (add_function2 mod (to_sym "create") intT funT ls_create 0)
     ))
 
     ))

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-table.rlc 2012-12-14 21:02:53 nineties $
+; $Id: rowl1-table.rlc 2012-12-15 10:53:37 nineties $
 ;
 
 (import "rlvm-compile")
@@ -78,7 +78,7 @@
 
 (fun ht_exit (tbl) (
     (var bucket (field_get tbl 1))
-    (var bucket_size (array_size bucket))
+    (var bucket_size (seq_size bucket))
     (var entry (field_get tbl 5))
     (var depth (field_get tbl 6))
     (if (== depth 0) (throw
@@ -104,7 +104,7 @@
 (fun cleanup_table (tbl) (
     (var kill (field_get tbl 4))
     (var bucket (field_get tbl 1))
-    (var bucket_size (array_size bucket))
+    (var bucket_size (seq_size bucket))
     (var entry (field_get tbl 5))
     (var prev 0)
     (var count 0)
@@ -148,7 +148,7 @@
     (var num_ent (field_get tbl 7))
     (if (field_get tbl 4) (do
         (cleanup_table tbl)
-        (var old_size (array_size (field_get tbl 1)))
+        (var old_size (seq_size (field_get tbl 1)))
         (= num_ent (field_get tbl 7))
         (if (< num_ent old_size) return)
         ))
@@ -167,12 +167,12 @@
     ))
 
 (fun ht_add (tbl h key val hash) (
-    (var buf_size (array_size (field_get tbl 1)))
+    (var buf_size (seq_size (field_get tbl 1)))
     (var num_ent  (field_get tbl 7))
     (if (>= num_ent buf_size) (rehash tbl))
     
     (var bucket (field_get tbl 1))
-    (var size   (array_size bucket))
+    (var size   (seq_size bucket))
     (var depth  (field_get tbl 6))
     (var entry (struct 4 key val 0 0 depth h))
     (%= h size)
@@ -193,7 +193,7 @@
     (var hash (field_get tbl 2))
     (var eql  (field_get tbl 3))
     (var bucket (field_get tbl 1))
-    (var size (array_size bucket))
+    (var size (seq_size bucket))
 
     (var hash_value (unbox (byterun hash key)))
     (var h (% hash_value size))
@@ -214,7 +214,7 @@
     (var hash (field_get tbl 2))
     (var eql  (field_get tbl 3))
     (var bucket (field_get tbl 1))
-    (var size (array_size bucket))
+    (var size (seq_size bucket))
     (var h (unbox (byterun hash key)))
     (%= h size)
     (var entry (array_get object bucket h))
@@ -248,12 +248,13 @@
     (return (list_reverse values))
     ))
 
+(extern fun tuple2)
 (fun ht_entries (tbl) (
     (var es 0)
     (var entry (field_get tbl 5))
     (while entry (do
-        (= es (cons (make_expr Tuple (list2
-            (field_get entry 0) (field_get entry 1))) es))
+        (= es (cons (tuple2 (field_get entry 0)
+            (field_get entry 1)) es))
         (= entry (field_get entry 3))
         ))
     (return (list_reverse es))
@@ -277,10 +278,10 @@
     (var tbl (ht_new))
     (while list (do
         (var ent (car list))
-        (if (|| (!= (expr_head ent) Tuple) (!= (expr_size ent) 2))
+        (if (|| (!= (node_head ent) Tuple) (!= (node_size ent) 2))
             (throw (invalid_argument current_loc (string "Table::create requires list of pairs") orig))
             )
-        (ht_store tbl (expr_arg ent 0) (expr_arg ent 1))
+        (ht_store tbl (node_arg ent 0) (node_arg ent 1))
         (= list (cdr list))
         ))
     (return tbl)
@@ -288,20 +289,20 @@
 
 (export fun setup_table (std) (
     (var mod (find_module no_loc std (to_sym "Table") @TRUE))
-    (add_builtin_function0 mod (to_sym "new") ht_new 0)
-    (add_builtin_function2 mod (to_sym "new") funT funT ht_new2 0)
-    (add_builtin_function3 mod (to_sym "new") funT funT funT ht_new3 0)
-    (add_builtin_function1 mod (to_sym "from_list") listT ht_from_list 0)
-    (add_builtin_function2 std (to_sym "at") tableT DontCare ht_at 0)
-    (add_builtin_function3 std (to_sym "store") tableT DontCare DontCare ht_store 0)
+    (add_function0 mod (to_sym "new") ht_new 0)
+    (add_function2 mod (to_sym "new") funT funT ht_new2 0)
+    (add_function3 mod (to_sym "new") funT funT funT ht_new3 0)
+    (add_function1 mod (to_sym "from_list") listT ht_from_list 0)
+    (add_function2 std (to_sym "at") tableT DontCare ht_at 0)
+    (add_function3 std (to_sym "store") tableT DontCare DontCare ht_store 0)
 
-    (add_builtin_function1 std (to_sym "keys") tableT ht_keys 0) 
-    (add_builtin_function1 std (to_sym "values") tableT ht_values 0)
-    (add_builtin_function1 std (to_sym "entries") tableT ht_entries 0)
+    (add_function1 std (to_sym "keys") tableT ht_keys 0) 
+    (add_function1 std (to_sym "values") tableT ht_values 0)
+    (add_function1 std (to_sym "entries") tableT ht_entries 0)
 
-    (add_builtin_function1 std (to_sym "enter") tableT ht_enter 0)
-    (add_builtin_function1 std (to_sym "exit") tableT ht_exit 0)
-    (add_builtin_function1 std (to_sym "cleanup") tableT cleanup_table 0)
+    (add_function1 std (to_sym "enter") tableT ht_enter 0)
+    (add_function1 std (to_sym "exit") tableT ht_exit 0)
+    (add_function1 std (to_sym "cleanup") tableT cleanup_table 0)
     ))
 
     ))

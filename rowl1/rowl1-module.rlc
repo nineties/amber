@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-module.rlc 2012-11-27 17:09:10 nineties $
+; $Id: rowl1-module.rlc 2012-12-15 10:22:58 nineties $
 ;
 
 ; Module can be considered as a re-entrant scope.
@@ -58,9 +58,9 @@
 
 (export fun is_defined_locally (v) (
     (if (! v) (return @FALSE))
-    (if (&& (== (expr_head v) ModuleVariable)
-        (|| (== (expr_arg v 1) false)
-            (== (expr_arg v 2) true)
+    (if (&& (== (node_head v) ModuleVariable)
+        (|| (== (node_arg v 1) false)
+            (== (node_arg v 2) true)
         ))
         (return @FALSE)
         )
@@ -69,7 +69,7 @@
 
 (fun is_effective_variable (v) (
     (if (! v) (return @FALSE))
-    (if (&& (== (expr_head v) ModuleVariable) (== (expr_arg v 1) false))
+    (if (&& (== (node_head v) ModuleVariable) (== (node_arg v 1) false))
         (return @FALSE)
         )
     (return @TRUE)
@@ -100,9 +100,9 @@
         (var ent (vector_at entries i))
         (if (! ent) continue)
         (var info (field_get ent 1))
-        (if (!= (expr_head info) ModuleVariable) continue)
+        (if (!= (node_head info) ModuleVariable) continue)
         (var mark (fresh_mark))
-        (update_module_variable mark curmod (field_get ent 0) (expr_arg info 0))
+        (update_module_variable mark curmod (field_get ent 0) (node_arg info 0))
         ))
     ))
 
@@ -115,12 +115,12 @@
     ))
 
 (export fun lookup_symbol (mod sig) (
-    (var hd (expr_head sig))
+    (var hd (node_head sig))
     (if (== hd Symbol)
         (return (lookup_symbol_iter (fresh_mark) mod sig @FALSE))
     (if (== hd Qualified)
         (return (lookup_symbol
-            (find_module current_loc mod (expr_arg sig 0) @FALSE) (expr_arg sig 1)))
+            (find_module current_loc mod (node_arg sig 0) @FALSE) (node_arg sig 1)))
         ))
     (throw (type_error current_loc
         (string "module signature")
@@ -129,12 +129,12 @@
     ))
 
 (export fun lookup_effective_symbol (mod sig) (
-    (var hd (expr_head sig))
+    (var hd (node_head sig))
     (if (== hd Symbol)
         (return (lookup_symbol_iter (fresh_mark) mod sig @TRUE))
     (if (== hd Qualified)
         (return (lookup_symbol
-            (find_module current_loc mod (expr_arg sig 0) @FALSE) (expr_arg sig 1)))
+            (find_module current_loc mod (node_arg sig 0) @FALSE) (node_arg sig 1)))
         ))
     (throw (type_error current_loc
         (string "module signature")
@@ -205,20 +205,20 @@
     (var ent (lookup_symbol_local mod sym))
     (if (! ent) (do
         (= box (struct 2 val current_loc))
-        (= ent (make_expr ModuleVariable (list3 box true false)))
+        (= ent (make_node3 ModuleVariable box true false))
         (symtable_add_to_global (field_get mod 6) sym ent)
         (goto update_displays)
         ))
     (if (&& (== overwrite false)
-        (&& (== (expr_arg ent 1) true)
-            (== (expr_arg ent 2) false))) (do
-        (var prev_loc (field_get (expr_arg ent 0) 1))
+        (&& (== (node_arg ent 1) true)
+            (== (node_arg ent 2) false))) (do
+        (var prev_loc (field_get (node_arg ent 0) 1))
         (throw (redefined_var current_loc prev_loc sym))
         ))
     (= box (struct 2 val current_loc))
-    (expr_arg_set ent 0 box)
-    (expr_arg_set ent 1 true)
-    (expr_arg_set ent 2 false)
+    (node_arg_set ent 0 box)
+    (node_arg_set ent 1 true)
+    (node_arg_set ent 2 false)
     ; update variable-displays
     (label update_displays)
     (var mark (fresh_mark))
@@ -239,7 +239,7 @@
 (export fun add_module_variable_display (mod sym box) (
     (var ent (lookup_symbol_local mod sym))
     (if (! ent) (do
-        (= ent (make_expr ModuleVariable (list3 box false false)))
+        (= ent (make_node3 ModuleVariable box false false))
         (symtable_add_to_global (field_get mod 6) sym ent)
         ))
     (return ent)
@@ -252,12 +252,12 @@
     (var ent (symtable_find_global vtbl sym))
     (if ent
         (do
-            (expr_arg_set ent 0 box)
-            (expr_arg_set ent 1 true)
-            (expr_arg_set ent 2 true)
+            (node_arg_set ent 0 box)
+            (node_arg_set ent 1 true)
+            (node_arg_set ent 2 true)
         )
         (do
-            (= ent (make_expr ModuleVariable (list3 box true true)))
+            (= ent (make_node3 ModuleVariable box true true))
             (symtable_add_to_global (field_get mod 6) sym ent)
         ))
     (var children (field_get mod 5))
@@ -272,8 +272,8 @@
     (field_set mod 8 mark)
     (var vtbl (field_get mod 6))
     (var display (symtable_find_global vtbl sym))
-    (if (&& display (== (expr_arg display 1) false)) (do
-        (expr_arg_set display 0 box)
+    (if (&& display (== (node_arg display 1) false)) (do
+        (node_arg_set display 0 box)
         ))
     (var children (field_get mod 5))
     (while children (do
@@ -285,11 +285,11 @@
 (export fun get_module_variable (mod sig) (
     (var info (lookup_effective_symbol mod sig))
     (must_be_module_variable sig info)
-    (return (car (expr_arg info 0)))
+    (return (car (node_arg info 0)))
     ))
 
 (export fun must_be_module_variable (sym val) (
-    (if (!= (expr_head val) ModuleVariable)
+    (if (!= (node_head val) ModuleVariable)
         (throw (unexpected_error current_loc
             (string "module variable is required")
             sym))
@@ -297,13 +297,13 @@
     ))
 
 (export fun find_module (loc curmod sig createp) (
-    (var hd (expr_head sig))
+    (var hd (node_head sig))
     (if (== hd Symbol) (do
         (var mod (lookup_effective_symbol curmod sig))
         (if mod (do
             (must_be_module_variable sig mod)
-            (= mod (car (expr_arg mod 0)))
-            (if (!= (expr_head mod) Module)
+            (= mod (car (node_arg mod 0)))
+            (if (!= (node_head mod) Module)
                 (throw (type_error loc (string "module") mod))
                 )
             (return mod)
@@ -315,8 +315,8 @@
         ))
     (if (== hd Qualified)
         (return (find_module loc
-             (find_module loc curmod (expr_arg_symbol sig 0) createp)
-                 (expr_arg sig 1) createp))
+             (find_module loc curmod (node_arg_symbol sig 0) createp)
+                 (node_arg sig 1) createp))
         )
     (throw (type_error current_loc
         (string "module signature")

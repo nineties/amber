@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2012-12-14 12:11:23 nineties $
+; $Id: vm-gc.rlc 2012-12-16 01:48:58 nineties $
 ;
 
 (import "stdlib")
@@ -122,6 +122,7 @@
 ; bytecode : |  --  |     5 |    0 | 0b0110 |
 ; bigint   : |  --  |     5 |    0 | 0b0111 |
 ; weakref  : |  --  |     2 | flag | 0b1000 |
+; expr     : |  --  |  size |    0 | 0b1001
 
 (define OBJECT_WORDS (addr)  `(& (>> ([] @addr 0) 11) @(- (<< 1 20) 1)))
 (define OBJECT_TAG (addr)    `(& ([] @addr 0) @(- (<< 1 4) 1)))
@@ -380,6 +381,15 @@
     (if (== tag @TAG_WEAKREF) (
         (return)
         ))
+    (if (== tag @TAG_EXPR) (
+        (int len (- @(OBJECT_WORDS head) 1)) ; -1 for the header
+        (while (> len 0) (
+            (move_object obj)
+            (+= obj @WORD_SIZE)
+            (decr len)
+            ))
+        (return)
+        ))
     (error "move_fields: not reachable")
     ))
 
@@ -560,6 +570,16 @@
     (return obj)
     ))
 
+(export prim_clone)
+(fun prim_clone (obj) (
+    (-= obj 4)
+    (int words @(OBJECT_WORDS obj))
+    (void* new_obj (allocate_object words))
+    (copy_object new_obj obj words)
+    (+= new_obj @WORD_SIZE)
+    (return new_obj)
+    ))
+
 (export allocate_cons)
 (fun allocate_cons () (
     (void* ptr (allocate_object 3))
@@ -679,8 +699,8 @@
     (return (allocate_sequence @SEQ_TUPLE nelem))
     ))
 
-(export prim_tuple_size)
-(fun prim_tuple_size (ary) (
+(export prim_seq_size)
+(fun prim_seq_size (ary) (
     (-= ary @WORD_SIZE)
     (return (- @(OBJECT_WORDS ary) 1)) ; -1 for header
     ))
@@ -690,10 +710,19 @@
     (return (allocate_sequence @SEQ_ARRAY nelem))
     ))
 
-(export prim_array_size)
-(fun prim_array_size (ary) (
-    (-= ary @WORD_SIZE)
-    (return (- @(OBJECT_WORDS ary) 1)) ; -1 for header
+(export prim_allocate_expr)
+(fun prim_allocate_expr (nelem) (
+    (int size (+ nelem 2)) ; +2 for header and head of the expr
+    (void* ptr (allocate_object size))
+    @(SET_HEADER ptr TAG_EXPR 0 size)
+    (+= ptr @WORD_SIZE)
+    (return ptr)
+    ))
+
+(export prim_expr_size)
+(fun prim_expr_size (expr) (
+    (-= expr @WORD_SIZE)
+    (return (- @(OBJECT_WORDS expr) 2))
     ))
 
 ; bytecode

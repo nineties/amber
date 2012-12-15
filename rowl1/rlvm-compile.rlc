@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlvm-compile.rlc 2012-11-28 23:47:42 nineties $
+; $Id: rlvm-compile.rlc 2012-12-15 08:41:29 nineties $
 ;
 
 (import "stdlib")
@@ -558,6 +558,22 @@
     nil
     ))
 
+(define compile_list_for ((_ it ls body)) (do
+    (push_exit_label)
+    (if (compile_block `(
+            (var tmp @ls)
+            (while tmp (do
+                (var @it (car tmp))
+                @body
+                (= tmp (cdr tmp))
+                ))
+        ))
+        (emit_insn `drop)
+        )
+    (pop_exit_label)
+    nil
+    ))
+
 (define compile_tswitch ((_ e cases)) (do
     (var ncase (length cases))
     (var idx 0)
@@ -813,6 +829,7 @@ a   (emit_insn (label cont_lbl))
         ((== `while (car expr)) (compile_while expr))
         ((== `for (car expr)) (compile_for expr))
         ((== `rfor (car expr)) (compile_rfor expr))
+        ((== `lfor (car expr)) (compile_list_for expr))
         ((== `tswitch (car expr)) (compile_tswitch expr))
         ((== `lswitch (car expr)) (compile_lswitch expr))
         ((and (== `try (car expr)) (== `catch (caaddr expr))) (compile_try expr))

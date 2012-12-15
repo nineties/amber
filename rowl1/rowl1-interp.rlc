@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2012-12-14 21:28:09 nineties $
+; $Id: rowl1-interp.rlc 2012-12-16 02:07:47 nineties $
 ;
 
 (import "rlvm-compile")
@@ -127,59 +127,62 @@
     (var new_expr (call1 Rewrite expr))
     (if (!= new_expr expr) (return (rewrite new_expr)))
     (= expr new_expr)
-    (if (is_atom expr)
+    (if (is_atom expr) (return expr))
+    (if (is_list expr) (do
+        (var ls expr)
+        (while ls (do
+            (setcar ls (rewrite (car ls)))
+            (= ls (cdr ls))
+            ))
         (return expr)
-        )
-    (var hd (expr_head expr))
+        ))
+    (var hd (node_head expr))
     (if (== hd Quote) (return expr))
     (if (== hd QuasiQuote) (do
-        (expr_arg_set expr 0 (rewrite_qquote (expr_arg expr 0) 0))
+        (node_arg_set expr 0 (rewrite_qquote (node_arg expr 0) 0))
         (return expr)
         ))
 
     ; Don't rewrite patterns
     (if (== hd DefVariable) (do
-        (expr_arg_set expr 1 (rewrite (expr_arg expr 1)))
+        (node_arg_set expr 1 (rewrite (node_arg expr 1)))
         (return expr)
         ))
     (if (== hd DefFunction) (do
-        (expr_arg_set expr 1 (rewrite (expr_arg expr 1)))
+        (node_arg_set expr 1 (rewrite (node_arg expr 1)))
         (return expr)
         ))
     (if (== hd Lambda) (do
-        (var lhs (expr_arg expr 0))
-        (if (== (expr_head lhs) Where)
-            (expr_arg_set lhs 1 (rewrite (expr_arg lhs 1)))
+        (var lhs (node_arg expr 0))
+        (if (== (node_head lhs) Where)
+            (node_arg_set lhs 1 (rewrite (node_arg lhs 1)))
             )
-        (expr_arg_set expr 1 (rewrite (expr_arg expr 1)))
+        (node_arg_set expr 1 (rewrite (node_arg expr 1)))
         (return expr)
         ))
 
-    (if (== hd Tuple) (do
-        (var n (tuple_size expr))
-        (for i 0 n (do
-            (array_set object expr i (rewrite
-                (array_get object expr i)))
-            ))
-        (return expr)
-        ))
-
-    (var args (expr_args expr))
-    (while args (do
-        (setcar args (rewrite (car args)))
-        (= args (cdr args))
-        ))
+    (for i 0 (node_size expr)
+        (node_arg_set expr i (rewrite (node_arg expr i)))
+        )
     (return expr)
     ))
 
 (fun rewrite_qquote (expr level) (
     (if (is_atom expr) (return expr))
-    (var hd (expr_head expr))
+    (if (is_list expr) (do
+        (var ls expr)
+        (while ls (do
+            (setcar ls (rewrite_qquote (car ls) level))
+            (= ls (cdr ls))
+            ))
+        (return expr)
+        ))
+    (var hd (node_head expr))
     (if (== hd Unquote) (do
         (if (== level 0)
-            (expr_arg_set expr 0 (rewrite (expr_arg expr 0)))
-            (expr_arg_set expr 0
-                (rewrite_qquote (expr_arg expr 0) (- level 1)))
+            (node_arg_set expr 0 (rewrite (node_arg expr 0)))
+            (node_arg_set expr 0
+                (rewrite_qquote (node_arg expr 0) (- level 1)))
             )
         (return expr)
         )
@@ -187,20 +190,10 @@
         (+= level 1)
         ))
 
-    (if (== hd Tuple) (do
-        (var n (tuple_size expr))
-        (for i 0 n (do
-            (array_set object expr i
-                (rewrite_qquote (array_get object expr i) level))
-            ))
-        (return expr)
-        ))
-
-    (var args (expr_args expr))
-    (while args (do
-        (setcar args (rewrite_qquote (car args) level))
-        (= args (cdr args))
-        ))
+    (for i 0 (node_size expr)
+        (node_arg_set expr i
+            (rewrite_qquote (node_arg expr i) level))
+        )
     (return expr)
     ))
 
@@ -264,15 +257,15 @@
     ))
 
 (fun eval_located (expr) (
-    (set_loc (expr_arg expr 0))
-    (return (eval (expr_arg expr 1)))
+    (set_loc (node_arg expr 0))
+    (return (eval (node_arg expr 1)))
     ))
 
 (fun eval_begin_module (expr) (
     (if (! (in_top_scope current_mod))
         (throw (exception current_mod (string "module definition in sub-scope is not allowed\n")))
         )
-    (var modsig (expr_arg expr 0))
+    (var modsig (node_arg expr 0))
     (var save_current_mod current_mod)
     (var module (find_module current_loc current_mod modsig @TRUE))
     (= module_stack (cons module module_stack))
@@ -303,13 +296,13 @@
 
 
 (fun rewrite_located (expr) (
-    (expr_arg_set expr 1 (rewrite (expr_arg expr 1)))
+    (node_arg_set expr 1 (rewrite (node_arg expr 1)))
     (return expr)
     ))
 
 (fun eval_define_syntax (expr) (
-    (var sym (expr_arg expr 0))
-    (var elm (expr_arg expr 1))
+    (var sym (node_arg expr 0))
+    (var elm (node_arg expr 1))
     (var stmts (compile_define_syntax sym elm))
     (while stmts (do
         (eval (car stmts))
@@ -319,19 +312,21 @@
     ))
 
 (fun eval_replace_syntax (expr) (
-    (var lhs (expr_arg_symbol expr 0))
-    (var rhs (expr_arg_symbol expr 1))
+    (var lhs (node_arg_symbol expr 0))
+    (var rhs (node_arg_symbol expr 1))
     (eval (compile_replace_syntax lhs rhs))
     (return nil)
     ))
 
 (fun eval_reserve_symbol (expr) (
-    (add_reserve_symbols (expr_args expr))
+    (for i 0 (node_size expr)
+        (add_reserve_symbol (node_arg expr i))
+        )
     (return nil)
     ))
 
 (fun eval_seq (expr) (
-    (var stmts (expr_arg expr 0))
+    (var stmts (node_arg expr 0))
     (var v nil)
     (while stmts (do
         (= v (eval (car stmts)))
@@ -450,13 +445,13 @@
     ))
 
 (fun eval_open (expr) (
-    (open_module current_loc current_mod (expr_arg expr 0))
+    (open_module current_loc current_mod (node_arg expr 0))
     (return nil)
     ))
 
 (fun eval_import (expr) (
-    (var path (expr_arg expr 0))
-    (if (== (expr_head path) List) (do
+    (var path (node_arg expr 0))
+    (if (== (node_head path) List) (do
         (var syms path)
         (= path (string ""))
         (while syms (do
@@ -501,27 +496,27 @@
         (add_module_variable mod (to_sym "shell_mode") true false)
         )
     
-    (add_builtin_function1 mod Rewrite DontCare default_rewrite 0)
-    (add_builtin_function1 mod Rewrite (domainP Located) rewrite_located 0)
-    (add_builtin_function1 mod Eval DontCare default_eval 0)
-    (add_builtin_function1 mod Eval (domainP Located) eval_located 0)
-    (add_builtin_function1 mod Eval (make_expr Open (list1 DontCare)) eval_open 0)
-    (add_builtin_function1 mod Eval (make_expr Import (list1 listT)) eval_import 0)
-    (add_builtin_function1 mod Eval (make_expr Import (list1 stringT)) eval_import 0)
-    (add_builtin_function1 mod Eval (make_expr BeginModule (list1 symT)) eval_begin_module 0)
-    (add_builtin_function1 mod Eval (make_expr BeginModule (list1 (domainP Qualified))) eval_begin_module 0)
-    (add_builtin_function1 mod Eval (make_expr EndModule 0) eval_end_module 0)
-    (add_builtin_function1 mod Eval (make_expr Seq (list1 listT)) eval_seq 0)
+    (add_function1 mod Rewrite DontCare default_rewrite 0)
+    (add_function1 mod Rewrite (domainP Located) rewrite_located 0)
+    (add_function1 mod Eval DontCare default_eval 0)
+    (add_function1 mod Eval (domainP Located) eval_located 0)
+    (add_function1 mod Eval (make_node1 Open DontCare) eval_open 0)
+    (add_function1 mod Eval (make_node1 Import listT) eval_import 0)
+    (add_function1 mod Eval (make_node1 Import stringT) eval_import 0)
+    (add_function1 mod Eval (make_node1 BeginModule symT) eval_begin_module 0)
+    (add_function1 mod Eval (make_node1 BeginModule (domainP Qualified)) eval_begin_module 0)
+    (add_function1 mod Eval (make_node0 EndModule) eval_end_module 0)
+    (add_function1 mod Eval (make_node1 Seq listT) eval_seq 0)
 
-    (add_builtin_function1 mod Eval (make_expr DefSyntax (list2 symT DontCare)) eval_define_syntax 0)
-    (add_builtin_function1 mod Eval (make_expr RepSyntax (list2 symT symT)) eval_replace_syntax 0)
-    (add_builtin_function1 mod Eval (domainP ReserveSymbol) eval_reserve_symbol 0)
+    (add_function1 mod Eval (make_node2 DefSyntax symT DontCare) eval_define_syntax 0)
+    (add_function1 mod Eval (make_node2 RepSyntax symT symT) eval_replace_syntax 0)
+    (add_function1 mod Eval (domainP ReserveSymbol) eval_reserve_symbol 0)
 
-    (add_builtin_function1 mod Eval (quote (to_sym "exit")) eval_exit 0)
-    (add_builtin_function1 mod (to_sym "exit") intT exit_ 0)
-    (add_builtin_function1 mod (to_sym "atexit") funT at_exit 0)
+    (add_function1 mod Eval (quote (to_sym "exit")) eval_exit 0)
+    (add_function1 mod (to_sym "exit") intT exit_ 0)
+    (add_function1 mod (to_sym "atexit") funT at_exit 0)
 
-    (add_builtin_function2 mod (to_sym "define_global_variable")
+    (add_function2 mod (to_sym "define_global_variable")
         symT DontCare def_global_var 0)
     ))
 

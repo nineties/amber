@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-array.rlc 2012-11-25 01:11:38 nineties $
+; $Id: rowl1-array.rlc 2012-12-16 02:08:18 nineties $
 ;
 
 (import "rlvm-compile")
@@ -51,7 +51,11 @@
     (return (variant @ArrayE 1 buf len len))
     ))
 
-(export fun ary_size (ary) (
+(export fun array_size (ary) (
+    (return (field_get ary 2))
+    ))
+
+(fun ary_size (ary) (
     (return (box (field_get ary 2)))
     ))
 
@@ -80,15 +84,17 @@
     (return ary)
     ))
 
-(export fun ary_at (ary i) (
-    (= i (unbox i))
+(export fun array_at (ary i) (
     (var size (unbox (ary_size ary)))
     (if (< i size) (return (array_get object (field_get ary 1) i)))
     (index_out_of_range ary i)
     ))
 
-(export fun ary_store (ary i v) (
-    (= i (unbox i))
+(fun ary_at (ary i) (
+    (return (array_at ary (unbox i)))
+    ))
+
+(export fun array_store (ary i v) (
     (var size (unbox (ary_size ary)))
     (if (< i size) (do
         (array_set object (field_get ary 1) i v)
@@ -99,9 +105,23 @@
     (return v)
     ))
 
+(export fun ary_store (ary i v) (
+    (return (array_store ary (unbox i) v))
+    ))
+
 (export fun ary_push (ary v) (
     (ary_store ary (ary_size ary) v)
     (return ary)
+    ))
+
+(export fun array_restof (ary i) (
+    (var ls 0)
+    (var size (field_get ary 2))
+    (var buf (field_get ary 1))
+    (rfor j i size (do
+        (= ls (cons (array_get object buf j) ls))
+        ))
+    (return ls)
     ))
 
 (export fun ary_to_list (ary) (
@@ -127,17 +147,17 @@
 (export fun setup_array (std) (
     (var ModArray (find_module no_loc std (to_sym "Array") @TRUE))
     (var ModList  (find_module no_loc std (to_sym "List") @TRUE))
-    (add_builtin_function0 ModArray (to_sym "new") ary_new 0)
-    (add_builtin_function1 ModArray (to_sym "new") intT ary_new2 0)
-    (add_builtin_function2 ModArray (to_sym "new") intT DontCare ary_new3 0)
-    (add_builtin_function1 ModArray (to_sym "from_list") listT list_to_ary 0)
-    (add_builtin_function1 ModList  (to_sym "from_array") arrayT ary_to_list 0)
+    (add_function0 ModArray (to_sym "new") ary_new 0)
+    (add_function1 ModArray (to_sym "new") intT ary_new2 0)
+    (add_function2 ModArray (to_sym "new") intT DontCare ary_new3 0)
+    (add_function1 ModArray (to_sym "from_list") listT list_to_ary 0)
+    (add_function1 ModList  (to_sym "from_array") arrayT ary_to_list 0)
 
-    (add_builtin_function1 std (to_sym "length") arrayT ary_size 0)
-    (add_builtin_function1 std (to_sym "size") arrayT ary_size 0)
-    (add_builtin_function2 std (to_sym "at") arrayT intT ary_at 0)
-    (add_builtin_function3 std (to_sym "store") arrayT intT DontCare ary_store 0)
-    (add_builtin_function2 std (to_sym "push") arrayT DontCare ary_push 0)
+    (add_function1 std (to_sym "length") arrayT ary_size 0)
+    (add_function1 std (to_sym "size") arrayT ary_size 0)
+    (add_function2 std (to_sym "at") arrayT intT ary_at 0)
+    (add_function3 std (to_sym "store") arrayT intT DontCare ary_store 0)
+    (add_function2 std (to_sym "push") arrayT DontCare ary_push 0)
 
     ))
 

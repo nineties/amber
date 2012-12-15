@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2012-12-14 16:33:18 nineties $
+; $Id: rowl1-list.rlc 2012-12-15 22:16:26 nineties $
 ;
 
 (import "rlvm-compile")
@@ -55,12 +55,12 @@
     ))
 
 (fun tp_length (t) (
-    (return (box (tuple_size t)))
+    (return (box (seq_size t)))
     ))
 
 (fun tp_hash (t) (
     (var f (lookup_func current_mod (to_sym "hash")))
-    (var n (tuple_size t))
+    (var n (seq_size t))
     (var h 0)
     (for i 0 n (do
         (= h (+ (* h 13) (unbox (byterun f (array_get object t i)))))
@@ -69,8 +69,8 @@
     ))
 
 (fun tp_equal (t1 t2) (
-    (var n (tuple_size t1))
-    (if (!= (tuple_size t2) n) (return false))
+    (var n (seq_size t1))
+    (if (!= (seq_size t2) n) (return false))
     (var f (lookup_func current_mod (to_sym "equal")))
     (for i 0 n (do
         (if (== (byterun f
@@ -80,9 +80,39 @@
     (return true)
     ))
 
+(export fun tuple_at (t i) (
+    (var n (seq_size t))
+    (if (>= i n) (throw (out_of_range current_loc t (box (+ i 1)))))
+    (return (array_get object t i))
+    ))
+
+(fun tp_at (t i) (
+    (return (tuple_at t (unbox i)))
+    ))
+
+(export fun tuple_store (t i v) (
+    (var n (seq_size t))
+    (if (>= i n) (throw (out_of_range current_loc t (box (+ i 1)))))
+    (array_set object t i v)
+    (return v)
+    ))
+
+(fun tp_store (t i v) (
+    (return (tuple_store t (unbox i) v))
+    ))
+
+(export fun tuple_restof (tup i) (
+    (var ls 0)
+    (var size (seq_size tup))
+    (rfor j i size (do
+        (= ls (cons (array_get object tup j) ls))
+        ))
+    (return ls)
+    ))
+
 (export fun tuple_to_list (tup) (
     (var ls 0)
-    (var size (tuple_size tup))
+    (var size (seq_size tup))
     (rfor i 0 size (do
         (= ls (cons (array_get object tup i) ls))
         ))
@@ -100,10 +130,12 @@
     ))
 
 (export fun setup_tuple (std) (
-    (add_builtin_function1 std (to_sym "length") tupleT tp_length 0)
-    (add_builtin_function1 std (to_sym "size") tupleT tp_length 0)
-    (add_builtin_function1 std (to_sym "hash") tupleT tp_hash 0)
-    (add_builtin_function2 std (to_sym "equal") tupleT tupleT tp_equal 0)
+    (add_function1 std (to_sym "length") tupleT tp_length 0)
+    (add_function1 std (to_sym "size") tupleT tp_length 0)
+    (add_function1 std (to_sym "hash") tupleT tp_hash 0)
+    (add_function2 std (to_sym "equal") tupleT tupleT tp_equal 0)
+    (add_function2 std (to_sym "at") tupleT intT tp_at 0)
+    (add_function3 std (to_sym "store") tupleT intT DontCare tp_store 0)
     ))
 
     ))

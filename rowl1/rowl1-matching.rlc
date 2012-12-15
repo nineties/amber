@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2012-12-14 16:27:59 nineties $
+; $Id: rowl1-matching.rlc 2012-12-16 02:10:16 nineties $
 ;
 
 (import "rlvm-compile")
@@ -106,7 +106,7 @@
     (if (== pat DontCare)
         (return dontcareP)
         )
-    (var hd (expr_head pat))
+    (var hd (node_head pat))
     (if (is_special_symbol pat)
         (return pat)
         )
@@ -117,10 +117,10 @@
         (return pat)
         )
     (if (== hd Domain) (do
-        (var lhs (setup_pat (expr_arg pat 0)))
-        (var dom (expr_arg pat 1))
-        (if (== (expr_head dom) Symbol)
-            (return (make_expr domP (list2 lhs dom)))
+        (var lhs (setup_pat (node_arg pat 0)))
+        (var dom (node_arg pat 1))
+        (if (== (node_head dom) Symbol)
+            (return (make_node2 domP lhs dom))
             (return (setup_pat dom))
             )
         ))
@@ -134,13 +134,15 @@
         (return (setup_pat_tuple pat))
         )
     (if (== hd Quote)
-        (return (expr_arg pat 0))
+        (return (node_arg pat 0))
         )
     (if (== hd QuasiQuote)
-        (return (qquote_pat (expr_arg pat 0) 0))
+        (return (qquote_pat (node_arg pat 0) 0))
         )
-    (var args (expr_args pat))
-    (return (make_expr_user hd (setup_pat_list args)))
+    (for i 0 (node_size pat)
+        (node_arg_set pat i (setup_pat (node_arg pat i)))
+        )
+    (return pat)
     ))
 
 (fun setup_pat_list (list) (
@@ -149,7 +151,7 @@
     ))
 
 (fun setup_pat_tuple (t) (
-    (var n (tuple_size t))
+    (var n (seq_size t))
     (var p (allocate_tuple n))
     (for i 0 n (do
         (array_set object p i (setup_pat (array_get object t i)))
@@ -167,7 +169,7 @@
     ))
 
 (fun qquote_pat_tuple (pat level) (
-    (var n (tuple_size pat))
+    (var n (seq_size pat))
     (var p (allocate_tuple n))
     (for i 0 n (do
         (array_set object p i (qquote_pat (array_get object pat i) level))
@@ -176,7 +178,7 @@
     ))
 
 (fun qquote_pat (pat level) (
-    (var hd (expr_head pat))
+    (var hd (node_head pat))
     (if (|| (== hd Symbol) (|| (== hd Int) (== hd String)))
         (return pat)
         )
@@ -188,15 +190,17 @@
         )
     (if (== hd Unquote) (do
         (if (== level 0)
-            (return (setup_pat (expr_arg pat 0)))
-            (return (qquote_pat (expr_arg pat 0) (- level 1)))
+            (return (setup_pat (node_arg pat 0)))
+            (return (qquote_pat (node_arg pat 0) (- level 1)))
             )
         )
     (if (== hd QuasiQuote)
         (+= level 1)
         ))
-    (var args (expr_args pat))
-    (return (make_expr_user hd (qquote_pat_list args level)))
+    (for i 0 (node_size pat)
+        (node_arg_set pat i (qquote_pat (node_arg pat i) level))
+        )
+    (return pat)
     ))
 
 (fun compile_matching_main (asm args pats) (
@@ -240,7 +244,6 @@
 
 (fun compile_matching_single (asm args pats) (
     (var p (caaar pats))
-    (var hd (expr_head p))
     (if (== p dontcareP) (do
         (= pats (shift_pat pats))
         (compile_matching_main asm (cdr args) pats)
@@ -256,6 +259,7 @@
         (compile_matching_main asm args pats)
         return
         ))
+    (var hd (node_head p))
     (if (== hd Symbol) (do
         (var check_failed (fresh_label asm))
         (compile_operand asm (car args) nil)
@@ -286,7 +290,7 @@
         return
         ))
     (if (== hd domP) (do
-        (var pat (expr_arg_symbol p 1))
+        (var pat (node_arg_symbol p 1))
         (var check_failed (fresh_label asm))
         (compile_operand asm (car args) nil)
         (compile_head_check asm pat check_failed)
@@ -339,72 +343,29 @@
             ))
         return
         ))
-    (if (== hd Tuple) (do
-        (var len (tuple_size p))
-        (var check_failed (fresh_label asm))
-        (compile_operand asm (car args) nil)
-        (put_check_tuple asm check_failed len)
-
-        ; flatten tuple pattern
-        (= pats (expand_tuple_pat pats))
-
-        ; add list elements to args
-        (var ls (car args))
-        (= args (cdr args))
-        (while (> len 0) (do
-            (decr len)
-            (= args (cons (make_tuple_at ls len) args))
-            ))
-
-        (compile_matching_main asm args pats)
-        (set_label asm check_failed)
-        return
-        ))
 
     (var check_failed (fresh_label asm))
-    (var size (expr_size p))
+    (var size (node_size p))
     (compile_operand asm (car args) nil)
 
     (compile_head_check asm hd check_failed)
     (compile_operand asm (car args) nil)
-    (put_field_get2 asm)
-    
-    (if (is_ellipsis_list (expr_args p))
-        (do
-            (-= size 1)
-            (put_check_list2 asm check_failed size)
-
-            ; flattern expression pattern
-            (= pats (expand_composite_pat pats))
-
-            ; add list elements to args
-            (var expr (car args))
-            (= args (cdr args))
-            (while (> size 0) (do
-                (decr size)
-                (= args (cons (make_expr_at expr size) args))
-                ))
-
-            (compile_matching_main asm args pats)
-            (set_label asm check_failed)
+    (compile_simple_call asm 1 node_size)
+    (put_imm_int asm size)
+    (if (is_ellipsis_node p size)
+        (put_if_ge asm check_failed)
+        (put_if_ne asm check_failed)
         )
-        (do
-            (put_check_list asm check_failed size)
-
-            ; flattern expression pattern
-            (= pats (expand_composite_pat pats))
-
-            ; add list elements to args
-            (var expr (car args))
-            (= args (cdr args))
-            (while (> size 0) (do
-                (decr size)
-                (= args (cons (make_expr_at expr size) args))
-                ))
-
-            (compile_matching_main asm args pats)
-            (set_label asm check_failed)
-        ))
+    ; flatten expression pattern
+    (= pats (expand_composite_pat pats))
+    ; add arguments to args
+    (var expr (car args))
+    (= args (cdr args))
+    (rfor i 0 size
+        (= args (cons (make_node_at p expr i) args))
+        )
+    (compile_matching_main asm args pats)
+    (set_label asm check_failed)
     ))
 
 (fun is_ellipsis_list (pats) (
@@ -418,6 +379,13 @@
     (return @FALSE)
     ))
 
+(fun is_ellipsis_node (expr size) (
+    (if (== (node_arg expr (- size 1)) ellipsisP)
+        (return @TRUE)
+        (return @FALSE)
+        )
+    ))
+
 (fun compile_head_check (asm ty exit_lbl) (
     (if (== ty Int) (do
         (put_check_int asm exit_lbl)
@@ -428,7 +396,7 @@
         return
         ))
 
-    (put_imm_int32 asm expr_head)
+    (put_imm_int32 asm node_head)
     (put_dcall asm 4)
     (put_push asm ty)
     (put_if_ne asm exit_lbl)
@@ -588,10 +556,10 @@
 (fun split_pattern_matrix (pats) (
     (var p (caaar pats))
     (if (== p varP) (return (split_any pats)))
-    (var hd (expr_head p))
+    (var hd (node_head p))
     (if (== hd Int) (return (split_int_pat pats)))
     (if (== hd String) (return (split_string_pat pats)))
-    (if (== hd domP) (return (split_head_pat (expr_arg_symbol p 1) pats)))
+    (if (== hd domP) (return (split_head_pat (node_arg_symbol p 1) pats)))
     (if (== hd Symbol) (return (split_symbol_pat 0 pats)))
     (if (== hd List) (return (split_list_pat pats)))
     (return (split_composite_pat pats))
@@ -634,7 +602,7 @@
     ))
 
 (fun head_check (hd node) (
-    (if (&& (== (expr_head node) domP) (== (expr_arg_symbol node 1) hd))
+    (if (&& (== (node_head node) domP) (== (node_arg_symbol node 1) hd))
         (return @TRUE)
         (return @FALSE)
         )
@@ -652,7 +620,7 @@
     ))
 
 (fun same_symbol_pat (sym node) (
-    (var hd (expr_head node))
+    (var hd (node_head node))
     (if (&& (== hd Symbol) (== node sym))
         (return @TRUE)
         (return @FALSE)
@@ -678,7 +646,7 @@
     (= pats (cdr pats))
     (while pats (do
         (var nd (caaar pats))
-        (if (|| (!= (expr_head nd) List) (!= (list_len nd) len)) break)
+        (if (|| (!= (node_head nd) List) (!= (list_len nd) len)) break)
         (= pats (cdr pats))
         (incr n)
         ))
@@ -699,8 +667,8 @@
     (if (! pats) (return (cons p 0)))
     (var a (caar p))
     (var b (caaar pats))
-    (if (!= (expr_head a) List) (return (cons (car pats) (insert_list_pat p (cdr pats)))))
-    (if (!= (expr_head b) List) (return (cons p pats)))
+    (if (!= (node_head a) List) (return (cons (car pats) (insert_list_pat p (cdr pats)))))
+    (if (!= (node_head b) List) (return (cons p pats)))
     (var alen (list_len a))
     (var blen (list_len b))
     (if (<= alen blen)
@@ -713,12 +681,12 @@
     (var n 1)
     (var orig pats)
     (var p (caaar pats))
-    (var hd (expr_head p))
-    (var size (expr_size p))
+    (var hd (node_head p))
+    (var size (node_size p))
     (= pats (cdr pats))
     (while pats (do
         (var nd (caaar pats))
-        (if (|| (!= (expr_head nd) hd) (!= (expr_size nd) size)) break)
+        (if (|| (!= (node_head nd) hd) (!= (node_size nd) size)) break)
         (= pats (cdr pats))
         (incr n)
         ))
@@ -745,7 +713,7 @@
 
 (fun expand_composite_pat (pats) (
     (if (== pats 0) (return 0))
-    (return (cons (cons (list_append (expr_args (caaar pats)) (cdaar pats)) (cdar pats))
+    (return (cons (cons (list_append (node_args (caaar pats)) (cdaar pats)) (cdar pats))
         (expand_composite_pat (cdr pats))))
     ))
 

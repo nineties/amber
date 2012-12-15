@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-base.rlc 2012-12-11 03:23:12 nineties $
+; $Id: rowl1-base.rlc 2012-12-15 11:15:28 nineties $
 ;
 
 (import "rlvm-compile")
@@ -27,18 +27,18 @@
 (fun _equal_sub (a b eql) (
     (if (== a b) (return true))
     (if (|| (is_atom a) (is_atom b)) (return false))
-    (var hd1 (expr_head a))
-    (var hd2 (expr_head b))
+    (var hd1 (node_head a))
+    (var hd2 (node_head b))
     (if (!= hd1 hd2) (return false))
-    (var args1 (expr_args a))
-    (var args2 (expr_args b))
-    (if (!= (list_len args1) (list_len args2)) (return false))
-    (while args1 (do
-        (var v1 (car args1))
-        (var v2 (car args2))
-        (if (&& (!= v1 v2) (== (byterun eql v1 v2) false)) (return false))
-        (= args1 (cdr args1))
-        (= args2 (cdr args2))
+    (var n1 (node_size a))
+    (var n2 (node_size b))
+    (if (!= n1 n2) (return false))
+    (for i 0 n1 (do
+        (var v1 (node_arg a i))
+        (var v2 (node_arg b i))
+        (if (&& (!= v1 v2) (== (byterun eql v1 v2) false))
+            (return false)
+            )
         ))
     (return true)
     ))
@@ -46,39 +46,20 @@
 (fun _hash (obj) (
     (if (is_atom obj) (return (box (umod obj 65537))))
     (var hash (lookup_func current_mod (to_sym "hash")))
-    (var vars (expr_args obj))
     (var val 0)
-    (while vars (do
-        (+= val (* (unbox (byterun hash (car vars))) 13))
-        (= vars (cdr vars))
-        ))
-    (+= val (unbox (byterun hash (expr_head obj))))
+    (for i 0 (node_size obj)
+        (+= val (* (unbox (byterun hash (node_arg obj i))) 13))
+        )
+    (+= val (unbox (byterun hash (node_head obj))))
     (return (box val))
     ))
 
 (fun _at (obj i) (
-    (var j (unbox i))
-    (var args (expr_args obj))
-    (while (> j 0) (do
-        (if (! args) break)
-        (= args (cdr args))
-        (-= j 1)
-        ))
-    (if (! args) (throw (out_of_range current_loc obj i)))
-    (return (car args))
+    (return (node_arg obj (unbox i)))
     ))
 
 (fun _store (obj i v) (
-    (var j (unbox i))
-    (var args (expr_args obj))
-    (while (> j 0) (do
-        (if (! args) break)
-        (= args (cdr args))
-        (-= j 1)
-        ))
-    ;(if (! args) (throw (out_of_range current_loc obj i)))
-    (if (! args) (throw (box 1)))
-    (setcar args v)
+    (node_arg_set obj (unbox i) v)
     (return v)
     ))
 
@@ -91,11 +72,17 @@
         (goto again)
         ))
     (if (is_atom obj) (return obj))
-    (var args (expr_args obj))
-    (while args (do
-        (setcar args (_subst_loop (car args) code))
-        (= args (cdr args))
+    (if (is_list obj) (do   
+        (var ls obj)
+        (while ls (do
+            (setcar ls (_subst_loop (car ls) code))
+            (= ls (cdr ls))
+            ))
+        (return obj)
         ))
+    (for i 0 (node_size obj)
+        (node_arg_set obj i (_subst_loop (node_arg obj i) code))
+        )
     (return obj)
     ))
 
@@ -105,15 +92,15 @@
     ))
 
 (export fun setup_base (mod) (
-    (add_builtin_function2 mod (to_sym "equal") DontCare DontCare _equal 0)
-    (add_builtin_function1 mod (to_sym "hash") DontCare _hash 0)
-    (add_builtin_function2 mod (to_sym "at") DontCare intT _at 0)
-    (add_builtin_function3 mod (to_sym "store") DontCare intT DontCare _store 0)
+    (add_function2 mod (to_sym "equal") DontCare DontCare _equal 0)
+    (add_function1 mod (to_sym "hash") DontCare _hash 0)
+    (add_function2 mod (to_sym "at") DontCare intT _at 0)
+    (add_function3 mod (to_sym "store") DontCare intT DontCare _store 0)
 
-    (add_builtin_function2 mod (to_sym "_at") DontCare intT _at 0)
-    (add_builtin_function3 mod (to_sym "_store") DontCare intT DontCare _store 0)
+    (add_function2 mod (to_sym "_at") DontCare intT _at 0)
+    (add_function3 mod (to_sym "_store") DontCare intT DontCare _store 0)
 
-    (add_builtin_function2 mod (to_sym "subst") DontCare funT _subst 0)
+    (add_function2 mod (to_sym "subst") DontCare funT _subst 0)
     ))
 
     ))
