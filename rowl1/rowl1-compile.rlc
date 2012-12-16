@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-12-16 03:03:20 nineties $
+; $Id: rowl1-compile.rlc 2012-12-16 21:43:19 nineties $
 ;
 
 (import "rlvm-compile")
@@ -61,8 +61,9 @@
     ))
 
 (export fun callable (expr) (
-    (if (== (node_type expr) @FunctionE) (return @TRUE)
-    (if (== (node_type expr) @BoundFunctionE) (return @TRUE)
+    (var ty (node_type expr))
+    (if (== ty @FunctionE) (return @TRUE)
+    (if (== ty @BoundFunctionE) (return @TRUE)
         (return @FALSE)))
     ))
 
@@ -563,8 +564,7 @@
 
 (export fun compile_main (mod expr) (
     (var asm (make_assembler))
-    (var a (alpha (make_symtable 10) expr))
-    (compile asm mod a)
+    (compile asm mod (alpha (make_symtable 10) expr))
     (put_ireturn asm)
     (return (get_code asm))
     ))

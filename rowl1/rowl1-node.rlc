@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2012-12-15 22:16:36 nineties $
+; $Id: rowl1-node.rlc 2012-12-16 21:41:18 nineties $
 ;
 
 (import "rlvm-compile")
@@ -203,7 +203,11 @@
     ))
 
 (export fun is_special_symbol (sym) (
-    (return (|| (|| (|| (== sym true) (== sym false)) (== sym DontCare)) (== sym undefined)))
+    (return (|| (== sym true)
+            (|| (== sym false)
+            (|| (== sym nil)
+            (|| (== sym DontCare)
+                (== sym undefined))))))
     ))
 
 (export fun node_type (obj) (
@@ -343,7 +347,7 @@
     (if (is_atom expr)
         (if (== i 0)
             (return 0)
-            (throw (out_of_range current_loc expr (box (+ i 1))))
+            (throw (out_of_range current_loc expr (box i)))
             )) 
     (if (is_list expr) (do
         (for j 0 i (= expr (cdr expr)))
@@ -370,7 +374,7 @@
     (if (is_array expr) (return (array_at expr idx)))
 
     (if (>= idx (expr_size expr))
-        (throw (out_of_range current_loc expr (box (+ idx 1)))))
+        (throw (out_of_range current_loc expr (box idx))))
     (return (array_get object expr (+ idx 1)))
     ))
 
@@ -410,7 +414,7 @@
     (if (is_tuple expr) (return (tuple_store expr idx val)))
     (if (is_array expr) (return (array_store expr idx val)))
     (var n (expr_size expr))
-    (if (>= idx n) (throw (out_of_range current_loc expr (box (+ idx 1)))))
+    (if (>= idx n) (throw (out_of_range current_loc expr (box idx))))
     (array_set object expr (+ idx 1) val)
     ))
 
@@ -457,7 +461,6 @@
 (extern fun list_to_tuple)
 (extern fun list_to_ary)
 (export fun make_node (head args) (
-    (if (! (is_symbol head)) (throw (string "Hoge")))
     (if (!= (node_type head) @SymbolE)
         (throw (exception current_loc (string "the 1st argument of MakeNode must be a Symbol")))
         )
