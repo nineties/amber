@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-12-16 21:43:19 nineties $
+; $Id: rowl1-compile.rlc 2012-12-16 23:01:41 nineties $
 ;
 
 (import "rlvm-compile")
@@ -43,8 +43,8 @@
     ))
 
 (fun is_identifier (expr) (
+    (if (is_symbol expr) (return @TRUE))
     (var hd (node_head expr))
-    (if (== hd Symbol) (return @TRUE))
     (if (&& (== hd Qualified) (== (node_size expr) 2)) (do
         (if (! (is_symbol (node_arg expr 0))) (return @FALSE))
         (return (is_identifier (node_arg expr 1)))
@@ -54,8 +54,8 @@
 
 (fun defined_symbol (expr) (
     (var lhs (node_arg expr 0))
+    (if (is_symbol lhs) (return lhs))
     (var hd (node_head lhs))
-    (if (== hd Symbol) (return lhs))
     (if (== hd Ref) (return (node_arg lhs 2)))
     (return nil)
     ))
@@ -756,11 +756,7 @@
     ))
 
 (fun setup_arg (tbl obj arg level nc) (
-    (var argty (node_head arg))
-    (if (|| (== argty Int) (== argty String))
-        (return nc)
-        )
-    (if (== argty Symbol) (do
+    (if (is_symbol arg) (do
         (if (== level 0) (do
             (if (|| (== (node_head obj) Argument) (== arg DontCare))
                 ; need no copy
@@ -773,6 +769,8 @@
             ))
         (return nc)
         ))
+    (if (is_atom arg) (return nc))
+    (var argty (node_head arg))
     (if (== argty Domain) (do
         (if (== level 0) (do
             (var v (node_arg_symbol arg 0))
@@ -785,7 +783,7 @@
                     (= nc (cons (list2 v obj) nc))
                 ))
             (var dom (node_arg arg 1))
-            (if (!= (node_head dom) Symbol)
+            (if (is_symbol dom)
                 (= nc (setup_arg tbl obj dom 0 nc))
                 )
             (return nc)
@@ -969,7 +967,7 @@
     ))
 
 (fun compile_define_variable_local (asm mod lhs rhs overwrite) (
-    (if (== (node_head lhs) Symbol) (do
+    (if (is_symbol lhs) (do
         (var idx 0)
         (if (== overwrite true)
             (do
@@ -1834,7 +1832,7 @@
     (var sym nil)
     (if (== (node_head lhs) Ref)
         (= sym (node_arg_symbol lhs 2))
-    (if (== (node_head lhs) Symbol)
+    (if (is_symbol lhs)
         (= sym lhs)
         (throw (type_error current_loc (string "a symbol") lhs))
         ))
