@@ -105,15 +105,17 @@
 ; value: (node, parser state)
 ;
 ; structure of tables
-;   0 : bucket (vector)
-;   1 : entries (vector)
+;   0 : bucket (array)
+;   1 : list of entries
+;   2 : number of entries
 ;   
 ; structure of entries
 ;   0 : symbol
 ;   1 : expr
 ;   2 : pointer to the next entry
-;   3 : position value
-;   4 : hash value
+;   3 : pointer to the next entry in entry list
+;   4 : position value
+;   5 : hash value
 
 (array int prime_numbers (
     5 11 17 37 67 131 257 521 1031 2053 4099 8209 16411 32771 65537 131101
@@ -122,12 +124,12 @@
 
 (fun make_memotable (hint) (
     (var size (array_get int prime_numbers (bsr hint)))
-    (return (struct 2 (make_vector size) (make_vector 0)))
+    (return (struct 2 (allocate_array size) 0 0))
     ))
 
 (fun memotable_clear (table) (
-    (vector_clear (field_get table 0))
-    (vector_resize (field_get table 1) 0)
+    (seq_clear (field_get table 0))
+    (field_set table 1 0)
     ))
 
 (fun hash (sym pos) (
@@ -137,19 +139,18 @@
     ))
 
 (fun rehash (table) (
-    (var old_size (vector_size (field_get table 0)))
-    (var num_ent  (vector_size (field_get table 1)))
+    (var old_size (seq_size (field_get table 0)))
+    (var num_ent  (field_get table 2))
     (if (>= num_ent old_size) (do
         (var new_size (array_get int prime_numbers (bsr num_ent)))
         (if (! new_size) return)
-        (var bucket (make_vector new_size))
-        (var entries (field_get table 1))
-        (for i 0 (vector_size entries) (do
-            (var entry (vector_at entries i))
-            (if (! entry) continue)
-            (var h (umod (field_get entry 4) new_size))
-            (field_set entry 2 (vector_at bucket h))
-            (vector_put bucket h entry)
+        (var bucket (allocate_array new_size))
+        (var entry (field_get table 1))
+        (while entry (do
+            (var h (umod (field_get entry 5) new_size))
+            (field_set entry 2 (array_get object bucket h))
+            (array_set object bucket h entry)
+            (= entry (field_get entry 3))
             ))
         (field_set table 0 bucket)
         ))
@@ -159,15 +160,14 @@
     (rehash table)
 
     (var bucket (field_get table 0))
-    (var entries (field_get table 1))
-    (var size (vector_size bucket))
+    (var size (seq_size bucket))
     (var h_orig (hash sym pos))
 
     (var h (umod h_orig size))
-    (var entry (vector_at bucket h))
+    (var entry (array_get object bucket h))
     (while entry (do
         (var e_sym (field_get entry 0))
-        (var e_pos (field_get entry 3))
+        (var e_pos (field_get entry 4))
         (if (&& (== e_sym sym) (== e_pos pos)) (do
             (field_set entry 1 obj)
             return
@@ -175,21 +175,25 @@
         (= entry (field_get entry 2))
         ))
 
-    (var ent (struct 3 sym obj 0 pos h_orig))
-    (vector_pushback entries ent)
-    (field_set ent 2 (vector_at bucket h))
-    (vector_put bucket h ent)
+    (var ent (struct 4 sym obj 0 0 pos h_orig))
+    (field_set ent 2 (array_get object bucket h))
+    (array_set object bucket h ent)
+
+    (field_set ent 3 (field_get table 1))
+    (field_set table 1 ent)
+
+    (field_set table 2 (+ (field_get table 2) 1))
     ))
 
 (fun memotable_find (table sym pos) (
     (var bucket (field_get table 0))
-    (var size (vector_size bucket))
+    (var size (seq_size bucket))
     (var h (hash sym pos))
     (= h (umod h size))
-    (var entry (vector_at bucket h))
+    (var entry (array_get object bucket h))
     (while entry (do
         (var e_sym (field_get entry 0))
-        (var e_pos (field_get entry 3))
+        (var e_pos (field_get entry 4))
         (if (&& (== e_sym sym) (== e_pos pos))
             (return (field_get entry 1))
             )
@@ -349,7 +353,7 @@
     ; offset + pos is the number of total characters from the beginning of parsing
 
     ; table for memoization
-    (var memo (make_memotable 1000))
+    (var memo (make_memotable 10))
     (var buf (struct 3 cbuf ichan memo))
 
     (return (variant @ParserE 4 0 0 buf (string file) pos @FALSE 1 1 1))
