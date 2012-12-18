@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2012-12-16 23:01:41 nineties $
+; $Id: rowl1-compile.rlc 2012-12-17 10:34:08 nineties $
 ;
 
 (import "rlvm-compile")
@@ -783,7 +783,7 @@
                     (= nc (cons (list2 v obj) nc))
                 ))
             (var dom (node_arg arg 1))
-            (if (is_symbol dom)
+            (if (! (is_symbol dom))
                 (= nc (setup_arg tbl obj dom 0 nc))
                 )
             (return nc)
@@ -1213,6 +1213,13 @@
         ))
     (put_push asm Array)
     (compile_simple_call asm 2 make_node)
+    ))
+
+(fun compile_range (asm mod expr) (
+    (compile asm mod (node_arg expr 1))
+    (compile asm mod (node_arg expr 0))
+    (put_push asm Range)
+    (compile_simple_call asm 3 make_node2)
     ))
 
 (fun compile_block_body (asm mod exprs) (
@@ -1943,6 +1950,7 @@
     (add_compiler mod (domainP List)  compile_list)
     (add_compiler mod (domainP Tuple) compile_tuple)
     (add_compiler mod (domainP Array) compile_array)
+    (add_compiler mod (domainP Range) compile_range)
 
     (add_compiler mod (make_node1 Block listT) compile_block)
     (add_compiler mod (make_node1 Seq listT) compile_seq)
