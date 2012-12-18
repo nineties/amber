@@ -1326,14 +1326,12 @@
     (while elems (do
         (= body (cons (compile_parser_element (car elems) ws) body))
         (= ws @TRUE)
-        (= body (cons (mkif (test_noparse) (mkreturn nil)) body))
+        (= body (cons (mkif (test_noparse) (make_node0 Break)) body))
         (= body (cons (assign ret (apply (to_sym "%cons") (list2 (get_token) ret))) body))
         (= elems (cdr elems))
         ))
     (= body (cons (set_parsed (apply (to_sym "%reverse") (list1 ret))) body))
-    (return (apply
-        (lambda PVar (block (list_reverse body)))
-        (list1 PVar)))
+    (return (breakable (list_reverse body)))
     ))
 
 ; Choice{ p1, p2, .. } is translated to
@@ -1365,17 +1363,14 @@
 
     (while ps (do
         (= body (cons (compile_parser_element (car ps) ws) body))
-        (= body (cons (mkif (test_parsed) (mkreturn nil)) body))
+        (= body (cons (mkif (test_parsed) (make_node0 Break)) body))
         (= body (cons (apply (to_sym "%join_error_state") (list2 error PVar)) body))
         (= body (cons (gen_set_parser_state_all PVar state) body))
         (= ps (cdr ps))
         ))
     (= body (cons (apply (to_sym "%set_error_state") (list2 PVar error)) body))
 
-    (return (apply
-        (lambda PVar (block (list_reverse body)))
-        (list1 PVar)
-        ))
+    (return (breakable (list_reverse body)))
     ))
 
 ; Many{ p } is translated to
@@ -1526,10 +1521,11 @@
     (= body (cons (apply (to_sym "%set_newline") (list1 PVar)) body))
     (= body (cons (compile_parser_element elem @FALSE) body))
     (= body (cons (mkif (test_noparse)
-            (block (list3
+            (block (list4
                 (gen_set_parser_state_all PVar state)
                 (apply (to_sym "%set_indent") (list2 PVar indent_save))
-                (mkreturn (set_parsed 0))
+                (set_parsed 0)
+                (make_node0 Break)
             )))
         body))
     (= body (cons (make_node2 While true
@@ -1537,10 +1533,7 @@
     (= body (cons (gen_set_parser_state_all PVar state) body))
     (= body (cons (apply (to_sym "%set_indent") (list2 PVar indent_save)) body))
     (= body (cons (set_parsed (apply (to_sym "%reverse") (list1 elems))) body))
-    (return (apply
-        (lambda (make_node2 Domain PVar Parser)
-            (block (list_reverse body))
-        ) (list1 PVar)))
+    (return (breakable (list_reverse body)))
     ))
 
 ; Delimited{ p, delim } is translated to
@@ -1611,23 +1604,25 @@
     (= body (cons (defvar elems 0) body))
     (= body (cons (defvar state (gen_copy_parser_state PVar)) body))
     (= body (cons (compile_parser_element p ws) body))
-        (= body (cons (mkif (test_noparse)
-            (mkreturn (set_noparse (string "The number of elements is insufficient")))
-            ) body))
+    (= body (cons (mkif (test_noparse) (block (list2
+        (set_noparse (string "The number of elements is insufficient"))
+        (make_node0 Break)
+        ))) body))
 
     (= body (cons (assign elems (apply (to_sym "%cons") (list2 (get_token) elems))) body))
     (= body (cons (make_node2 While true
         (block (list_reverse loop_body))) body))
     (= body (cons (gen_set_parser_state_all PVar state) body))
-    (= body (cons (mkif  
+    (= body (cons (mkif
         (apply (to_sym "lt")
             (list2 (apply (to_sym "%length") (list1 elems)))
-                (box minlen))
-        (mkreturn (set_noparse (string "The number of elements is insufficient")))
-        ) body))
+                (box minlen)) (block (list2
+        (set_noparse (string "The number of elements is insufficient"))
+        (make_node0 Break)
+        ))) body))
 
     (= body (cons (set_parsed (apply (to_sym "%reverse") (list1 elems))) body))
-    (return (block (list_reverse body)))
+    (return (breakable (list_reverse body)))
     ))
 
 ; Located{ p } is translated to
@@ -1751,7 +1746,7 @@
 
         (if (! nospace_p) (= with_spaces @TRUE))
 
-        (= body (cons (mkif (test_noparse) (mkreturn nil)) body))
+        (= body (cons (mkif (test_noparse) (make_node0 Break)) body))
         (= body (cons (defvar ndvar (get_token)) body))
         (incr idx)
         (= elems (cdr elems))
@@ -1767,8 +1762,7 @@
         body))
 
     (= body (cons (set_parsed act) body))
-    (= body (block (list_reverse body)))
-    (return (apply (lambda (make_node2 Domain PVar Parser) body) (list1 PVar)))
+    (return (breakable (list_reverse body)))
     ))
 
 (fun compile_nospace (elem ws) (
@@ -1833,14 +1827,14 @@
 
         (var act (compile_parser_action (node_arg t 0) (node_arg t 1)))
         (= body (cons act body))
-        (= body (cons (mkif (test_parsed) (mkreturn nil)) body))
+        (= body (cons (mkif (test_parsed) (make_node0 Break)) body))
         (= body (cons (apply (to_sym "%join_error_state") (list2 error PVar)) body))
         (= body (cons (gen_set_parser_state_all PVar state) body))
         (= elems (cdr elems))
         (clear_options)
         ))
     (= body (cons (apply (to_sym "%set_error_state") (list2 PVar error)) body))
-    (return (block (list_reverse body)))
+    (return (breakable (list_reverse body)))
     ))
 
 (extern fun compile_matching)

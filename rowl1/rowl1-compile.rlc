@@ -145,7 +145,7 @@
         (if (== hd Ref)
             (return (fv_iter mod (node_arg expr 0) 0 fv))
             )
-        (if (== hd Block)
+        (if (|| (== hd Block) (== hd Breakable))
             (return (fv_iter_block mod (node_arg_list expr 0) fv))
             )
         (if (== hd Dynamic)
@@ -284,7 +284,7 @@
         (node_arg_set expr 1 (alpha tbl (node_arg expr 1)))
         (return expr)
         ))
-    (if (== hd Block) (do
+    (if (|| (== hd Block) (== hd Breakable)) (do
         (var exprs (node_arg_list expr 0))
         (symtable_push tbl)
         (while exprs (do
@@ -386,7 +386,7 @@
         (node_arg_set expr 1 (scan_clsvars mod (node_arg expr 1) tbl))
         (return expr)
         ))
-    (if (== hd Block) (do
+    (if (|| (== hd Block) (== hd Breakable)) (do
         (var exprs (node_arg_list expr 0))
         (while exprs (do
             (setcar exprs (scan_clsvars mod (car exprs) tbl))
@@ -476,7 +476,7 @@
         (node_arg_set expr 0 (subst_clsvars tbl cls (node_arg expr 0)))
         (return expr)
         ))
-    (if (== hd Block) (do
+    (if (|| (== hd Block) (== hd Breakable)) (do
         (var exprs (node_arg_list expr 0))
         (while exprs (do
             (setcar exprs (subst_clsvars tbl cls (car exprs)))
@@ -672,6 +672,9 @@
     ))
 
 (var max_lvar_idx 0)
+(var break_labels null)
+(var continue_labels null)
+
 (fun get_lvar_idx (mod) (
     (var idx (get_variable_count mod))
     (if (>= idx max_lvar_idx) (= max_lvar_idx (+ idx 1)))
@@ -720,7 +723,12 @@
     (put_allocate asm_body 0)
 
     (var save_max_lvar_idx max_lvar_idx)
+    (var save_break_labels break_labels)
+    (var save_continue_labels continue_labels)
     (= max_lvar_idx 0)
+    (= break_labels 0)
+    (= continue_labels 0)
+
     (reset_variable_count mod)
 
     (var tmp_need_copy need_copy)
@@ -740,7 +748,11 @@
 
     (put_operand_byte asm_body (+ cnt_addr 1) max_lvar_idx)
     (pop_varscope mod)
+
     (= max_lvar_idx save_max_lvar_idx)
+    (= break_labels save_break_labels)
+    (= continue_labels save_continue_labels)
+
     (return need_copy)
     ))
 
@@ -860,10 +872,6 @@
 
 (fun make_lvar (idx) (
     (return (make_node2 LocalVariable (box idx) current_loc))
-    ))
-
-(fun make_label (lbl) (
-    (return (make_node2 Label (box lbl) current_loc))
     ))
 
 (export fun get_arity () (
@@ -1250,13 +1258,13 @@
         )
     (var break_lbl (fresh_label asm))
     (var exit_lbl  (fresh_label asm))
-    (add_symbol mod BreakLabel (make_label break_lbl))
+    (= break_labels (cons (box break_lbl) break_labels))
     (compile_block asm mod expr)
     (put_goto asm exit_lbl)
     (set_label asm break_lbl)
     (put_push asm nil)
     (set_label asm exit_lbl)
-    (delete_symbol mod BreakLabel)
+    (= break_labels (cdr break_labels))
     ))
 
 (fun compile_seq (asm mod expr) (
@@ -1303,26 +1311,31 @@
         (if (== ifelse nil)
             (do
                 (compile asm mod cnd)
+                (put_drop asm)
                 (put_push asm nil)
             )
             (do
                 (var exit_lbl (fresh_label asm))
-                (put_push asm nil)
+                (var cont_lbl (fresh_label asm))
                 (compile asm mod cnd)
                 (put_if_true asm exit_lbl)
-                (put_drop asm mod)
                 (compile asm mod ifelse)
+                (put_goto asm cont_lbl)
                 (set_label asm exit_lbl)
+                (put_push asm nil)
+                (set_label asm cont_lbl)
             ))
         (if (== ifelse nil)
             (do
                 (var exit_lbl (fresh_label asm))
-                (put_push asm nil)
+                (var cont_lbl (fresh_label asm))
                 (compile asm mod cnd)
                 (put_if_false asm exit_lbl)
-                (put_drop asm mod)
                 (compile asm mod ifthen)
+                (put_goto asm cont_lbl)
                 (set_label asm exit_lbl)
+                (put_push asm nil)
+                (set_label asm cont_lbl)
             )
             (do
                 (var else_lbl (fresh_label asm))
@@ -1424,8 +1437,8 @@
     (var exit_lbl (fresh_label asm))
     (var head_lbl (fresh_label asm))
 
-    (add_symbol mod BreakLabel (make_label exit_lbl))
-    (add_symbol mod ContinueLabel (make_label head_lbl))
+    (= break_labels (cons (box exit_lbl) break_labels))
+    (= continue_labels (cons (box head_lbl) continue_labels))
 
     (compile asm mod cnd)
 
@@ -1439,8 +1452,8 @@
     (set_label asm exit_lbl)
     (put_push asm nil)
 
-    (delete_symbol mod ContinueLabel)
-    (delete_symbol mod BreakLabel)
+    (= break_labels (cdr break_labels))
+    (= continue_labels (cdr continue_labels))
     ))
 
 ; translate for i in ary body to
@@ -1555,25 +1568,17 @@
     ))
 
 (fun compile_break (asm mod expr) (
-    (var lbl (lookup_symbol mod BreakLabel))
-    (if (! lbl)
+    (if (! break_labels)
         (throw (exception current_loc (string "`break' statement outside loop")))
         )
-    (if (!= (node_head lbl) Label)
-        (not_reachable "compile_break")
-        )
-    (put_goto asm (node_arg_int lbl 0))
+    (put_goto asm (unbox (car break_labels)))
     ))
 
 (fun compile_continue (asm mod expr) (
-    (var lbl (lookup_symbol mod ContinueLabel))
-    (if (! lbl)
+    (if (! continue_labels)
         (throw (exception current_loc (string "`continue' statement outside loop")))
         )
-    (if (!= (node_head lbl) Label)
-        (not_reachable "compile_continue")
-        )
-    (put_goto asm (node_arg_int lbl 0))
+    (put_goto asm (unbox (car continue_labels)))
     ))
 
 (fun compile_assign (asm mod expr) (

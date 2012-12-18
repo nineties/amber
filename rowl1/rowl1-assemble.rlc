@@ -7,7 +7,7 @@
 
 ; -- Just in time assembler
 ; (byte code (cvector), labels (ivector), replaces (list of repl info),
-;  address of objects to be GCed (ivector), vector of the objects, counter of label index, stack-depth)
+;  address of objects to be GCed (ivector), vector of the objects)
 ; -- repl info
 ; (pointer to the next info, index of the labels, offset of operand)
 
@@ -54,7 +54,7 @@
 (import "rowl1-util")
 
 (export fun make_assembler () (
-    (return (variant @AssemblerE 6 (make_cvector 0) (make_ivector 0) 0 (make_ivector 0) (make_vector 0) 0 0))
+    (return (variant @AssemblerE 5 (make_cvector 0) (make_ivector 0) 0 (make_ivector 0) (make_vector 0)))
     ))
 
 (export fun get_code (c) (
@@ -254,9 +254,9 @@
     ))
 
 (export fun fresh_label (c) (
-    (var n (field_get c 6))
-    (field_set c 6 (+ n 1))
-    (ivector_pushback (field_get c 2) -1)
+    (var lbls (field_get c 2))
+    (var n (ivector_size lbls))
+    (ivector_pushback lbls -1)
     (return n)
     ))
 
