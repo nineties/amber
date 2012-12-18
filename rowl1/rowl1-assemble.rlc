@@ -7,7 +7,7 @@
 
 ; -- Just in time assembler
 ; (byte code (cvector), labels (ivector), replaces (list of repl info),
-;  address of objects to be GCed (ivector), vector of the objects, counter of label index)
+;  address of objects to be GCed (ivector), vector of the objects, counter of label index, stack-depth)
 ; -- repl info
 ; (pointer to the next info, index of the labels, offset of operand)
 
@@ -33,7 +33,7 @@
 (foreach i vm_instructions (do
     (var name (symbol2s (car i)))
     (push insn_name_values name)
-    (var operands (cadr i))
+    (var operands (cdadr i))
     (if operands
         (push tswitch_entries
             `(@code . (do (do . @(map (lambda (o) (assoc o print_func)) operands)) break)))
@@ -54,7 +54,7 @@
 (import "rowl1-util")
 
 (export fun make_assembler () (
-    (return (variant @AssemblerE 5 (make_cvector 0) (make_ivector 0) 0 (make_ivector 0) (make_vector 0) 0))
+    (return (variant @AssemblerE 6 (make_cvector 0) (make_ivector 0) 0 (make_ivector 0) (make_vector 0) 0 0))
     ))
 
 (export fun get_code (c) (
@@ -422,7 +422,7 @@
     (var args `(c))
     (var body `((emit_byte c @code)))
     (var name (symbol2s (car i)))
-    (var operands (cadr i))
+    (var operands (cdadr i))
     (var j 0)
     (foreach opd operands (do
         (var arg (s++ `arg j))

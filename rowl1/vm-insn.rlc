@@ -83,35 +83,35 @@
     ))
 
 (var vm_instructions `(
-    (nop   () @true ())
-    (drop  () @true ((asm "addl $4, %esi")))
-    (drop2 () @true ((asm "addl $8, %esi")))
-    (dup   () @true ((asm "movl (%esi), %eax") (vmpush %eax)))
-    (swap  () @true (
+    (nop   (0) @true ())
+    (drop  (-1) @true ((asm "addl $4, %esi")))
+    (drop2 (-2) @true ((asm "addl $8, %esi")))
+    (dup   (1) @true ((asm "movl (%esi), %eax") (vmpush %eax)))
+    (swap  (0) @true (
         (asm "movl (%esi), %eax")
         (asm "movl 4(%esi), %ecx")
         (asm "movl %eax, 4(%esi)")
         (asm "movl %ecx, (%esi)")
         ))
-    (imm_im1   () @true ((vmpush $-1)))
-    (imm_i0    () @true ((vmpush %edx))) ; also used for 'nil'
-    (imm_i1    () @true ((vmpush $1)))
-    (imm_i2    () @true ((vmpush $2)))
-    (imm_i3    () @true ((vmpush $3)))
-    (imm_i4    () @true ((vmpush $4)))
-    (imm_i5    () @true ((vmpush $5)))
-    (imm_int16 (short) @true ((vmsshort 1 %eax) (vmpush %eax)))
-    (imm_int32 (int) @true ((vmint 1 %eax) (vmpush %eax)))
-    (iadd      () @true ((vmbin "addl")))
-    (isub      () @true ((vmbin "subl")))
-    (iadd1 () @true ((asm "addl $1, (%esi)")))
-    (isub1 () @true ((asm "subl $1, (%esi)")))
+    (imm_im1   (1) @true ((vmpush $-1)))
+    (imm_i0    (1) @true ((vmpush %edx))) ; also used for 'nil'
+    (imm_i1    (1) @true ((vmpush $1)))
+    (imm_i2    (1) @true ((vmpush $2)))
+    (imm_i3    (1) @true ((vmpush $3)))
+    (imm_i4    (1) @true ((vmpush $4)))
+    (imm_i5    (1) @true ((vmpush $5)))
+    (imm_int16 (1 short) @true ((vmsshort 1 %eax) (vmpush %eax)))
+    (imm_int32 (1 int) @true ((vmint 1 %eax) (vmpush %eax)))
+    (iadd      (-1) @true ((vmbin "addl")))
+    (isub      (-1) @true ((vmbin "subl")))
+    (iadd1 (0) @true ((asm "addl $1, (%esi)")))
+    (isub1 (0) @true ((asm "subl $1, (%esi)")))
 
-    (ineg       () @true ((asm "negl (%esi)")))
-    (imul      () @true ((vmpop %eax) (asm "imul (%esi), %eax") (asm "movl %eax, (%esi)")))
+    (ineg  (0) @true ((asm "negl (%esi)")))
+    (imul  (-1) @true ((vmpop %eax) (asm "imul (%esi), %eax") (asm "movl %eax, (%esi)")))
 
     ; signed
-    (idiv      () @true (
+    (idiv  (-1) @true (
         (asm "movl (%esi), %ecx")
         (asm "movl 4(%esi), %eax")
         (asm "cltd")
@@ -127,7 +127,7 @@
         (asm "movl %eax, (%esi)")
         (asm "xorl %edx, %edx") ; clear zero register
         ))
-    (imod       () @true (
+    (imod  (-1) @true (
         (asm "movl (%esi), %ecx")
         (asm "movl 4(%esi), %eax")
         (asm "cltd")
@@ -145,14 +145,14 @@
         ))
 
     ; unsigned
-    (udiv      () @true (
+    (udiv  (-1) @true (
         (vmpop %ecx)
         (asm "movl (%esi), %eax")
         (asm "divl %ecx")
         (asm "movl %eax, (%esi)")
         (asm "xorl %edx, %edx") ; clear zero register
         ))
-    (umod       () @true (
+    (umod  (-1) @true (
         (vmpop %ecx)
         (asm "movl (%esi), %eax")
         (asm "divl %ecx")
@@ -165,7 +165,7 @@
     ; 
     ; ludiv h l d = floor( (h*2^32 + l)/d )
     ; quotient must be less than 2^32
-    (ludiv      () @true (
+    (ludiv  (-2) @true (
         (vmpop %ecx)
         (vmpop %eax)
         (asm "movl (%esi), %edx")
@@ -174,45 +174,45 @@
         (asm "xorl %edx, %edx")
         ))
 
-    (shl   () @true (
+    (shl   (-1) @true (
         (vmpop %ecx)
         (vmpop %eax)
         (asm "shll %cl, %eax")
         (vmpush %eax)
         ))
-    (shr   () @true (
+    (shr   (-1) @true (
         (vmpop %ecx)
         (vmpop %eax)
         (asm "shrl %cl, %eax")
         (vmpush %eax)
         ))
-    (sal   () @true (
+    (sal   (-1) @true (
         (vmpop %ecx)
         (vmpop %eax)
         (asm "sall %cl, %eax")
         (vmpush %eax)
         ))
-    (sar   () @true (
+    (sar   (-1) @true (
         (vmpop %ecx)
         (vmpop %eax)
         (asm "sarl %cl, %eax")
         (vmpush %eax)
         ))
-    (bsr   () @true (
+    (bsr   (0) @true (
         (asm "movl (%esi), %eax")
         (asm "bsr %eax, %eax")
         (asm "cmovz %edx, %eax")
         (asm "movl %eax, (%esi)")
         ))
-    (and    () @true ((vmbin "andl")))
-    (or     () @true ((vmbin "orl")))
-    (xor    () @true ((vmbin "xorl")))
+    (and    (-1) @true ((vmbin "andl")))
+    (or     (-1) @true ((vmbin "orl")))
+    (xor    (-1) @true ((vmbin "xorl")))
 
-    (box       () @true (
+    (box    (0) @true (
         (asm "sall $1, (%esi)")
         (asm "addl $1, (%esi)")
         ))
-    (unbox     () @true (
+    (unbox  (0) @true (
         (asm "sarl $1, (%esi)")
         ))
 
@@ -220,7 +220,7 @@
     ; 1st argument must be big-integer
     ; 2nd argument must be big-integer or fixed-integer
     ; no run-time check is performed
-    (badd   () @true (
+    (badd   (-1) @true (
         (asm "pushl %ebx")
 
         (asm "movl (%esi), %eax") ; rhs
@@ -298,7 +298,7 @@
         (asm "addl $4, %esi")
         (asm "popl %ebx")
         ))
-    (bsub   () @true (
+    (bsub  (-1) @true (
         (asm "pushl %ebx")
 
         (asm "movl (%esi), %eax") ; rhs
@@ -445,7 +445,7 @@
         (asm "addl $4, %esi")
         (asm "popl %ebx")
         ))
-    (bmul   () @true (
+    (bmul  (-1) @true (
         (asm "pushl %ebx")
 
         (asm "movl (%esi), %eax") ; rhs
@@ -576,7 +576,7 @@
         (asm "popl %ebx")
         ))
 
-    (bcmp () @true (
+    (bcmp (-1) @true (
         (asm "pushl %ebx")
 
         (asm "movl (%esi), %eax")   ; rhs
@@ -629,7 +629,7 @@
         (asm "xorl %edx, %edx")
         (asm "popl %ebx")
         ))
-    (bshl () @true (
+    (bshl (-1) @true (
         (asm "pushl %ebx")
         (asm "movl (%esi), %ecx")  ; shift length
         (asm "shrl $5, %ecx")      ; ecx = ecx/32
@@ -744,7 +744,7 @@
         (asm "addl $4, %esi")
         (asm "popl %ebx")
         ))
-    (bshr () @true (
+    (bshr (-1) @true (
         (asm "pushl %ebx")
 
         ; shift (%esi) / 32
@@ -843,13 +843,13 @@
         (asm "popl %ebx")
         ))
 
-    (fneg () @true (
+    (fneg (0) @true (
         (asm "movl (%esi), %eax")
         (asm "fldl (%eax)")
         (asm "fchs")
         (asm "fstpl (%eax)")
         ))
-    (fadd () @true (
+    (fadd (-1) @true (
         (vmpop %ecx)
         (asm "movl (%esi), %eax")
         (asm "fldl (%ecx)")
@@ -857,7 +857,7 @@
         (asm "faddp %st, %st(1)")
         (asm "fstpl (%eax)")
         ))
-    (fsub () @true (
+    (fsub (-1) @true (
         (vmpop %ecx)
         (asm "movl (%esi), %eax")
         (asm "fldl (%ecx)")
@@ -865,7 +865,7 @@
         (asm "fsubp %st, %st(1)")
         (asm "fstpl (%eax)")
         ))
-    (fmul () @true (
+    (fmul (-1) @true (
         (vmpop %ecx)
         (asm "movl (%esi), %eax")
         (asm "fldl (%ecx)")
@@ -873,7 +873,7 @@
         (asm "fmulp %st, %st(1)")
         (asm "fstpl (%eax)")
         ))
-    (fdiv () @true (
+    (fdiv (-1) @true (
         (vmpop %ecx)
         (asm "movl (%esi), %eax")
         (asm "fldl (%ecx)")
@@ -882,7 +882,7 @@
         (asm "fstpl (%eax)")
         ))
     ; integer to float
-    (itof () @true (
+    (itof (0) @true (
         (vmsave)
         (call prim_allocate_float)
         (vmrestore)
@@ -894,7 +894,7 @@
     ; allocate cons object
     ; arg0 = cdr object
     ; arg1 = car object
-    (cons () @true (
+    (cons (-1) @true (
         (vmsave)
         (call allocate_cons)
         (vmrestore)
@@ -906,14 +906,14 @@
         ))
     ; decompose cons object
     ; arg0 = cons object
-    (decons () @true (
+    (decons (1) @true (
         (asm "movl (%esi), %eax")
         (asm "movl 4(%eax), %ecx")
         (asm "movl %ecx, (%esi)")
         (asm "movl (%eax), %eax")
         (vmpush %eax)
         ))
-    (list_at () @true (
+    (list_at (-1) @true (
         (vmpop %ecx)
         (asm "movl (%esi), %eax")
         (asm "0:")
@@ -926,7 +926,7 @@
         (asm "movl (%eax), %eax")
         (asm "movl %eax, (%esi)")
         ))
-    (list_from () @true (
+    (list_from (-1) @true (
         (vmpop %ecx)
         (asm "movl (%esi), %eax")
         (asm "0:")
@@ -938,7 +938,7 @@
         (asm "1:")
         (asm "movl %eax, (%esi)")
         ))
-    (list_len () @true (
+    (list_len (0) @true (
         (asm "movl (%esi), %eax")
         (asm "xorl %ecx, %ecx")
         (asm "0:")
@@ -953,7 +953,7 @@
     ; allocate plain object
     ; arg0 = size (in bytes)
     ; NB: allocated memory will not be zero-cleared
-    (plain (byte) @true (
+    (plain (1 byte) @true (
         (asm "movl (%esi), %eax")
         (vmsave)
         (asm "pushl %eax")
@@ -970,7 +970,7 @@
     ; NB:
     ;  - allocated memory will not be zero-cleared
     ;  - all boxed elements must be placed first
-    (struct (byte byte) @true (
+    (struct (1 byte byte) @true (
         (vmsave)
         (asm "pushl %esi")
         (vmubyte 2 %eax) ; # of boxed elements
@@ -993,7 +993,7 @@
     ;  - field0 is for the tag
     ;  - do not rewrite the tag
     ;  - all boxed elements must be placed first
-    (variant (short byte byte) @true (
+    (variant (1 short byte byte) @true (
         (vmsave)
         (asm "pushl %esi")
         (vmubyte 4 %eax) ; # of boxed elements
@@ -1009,13 +1009,13 @@
         (vmrestore)
         (vmpush %eax)
         ))
-    (field_get0 () @true @(gen_field_get 0)) ; also used for 'car'
-    (field_get1 () @true @(gen_field_get 1)) ; also used for 'cdr'
-    (field_get2 () @true @(gen_field_get 2))
-    (field_get3 () @true @(gen_field_get 3))
-    (field_get4 () @true @(gen_field_get 4))
-    (field_get5 () @true @(gen_field_get 5))
-    (field_get  (byte) @true (
+    (field_get0 (0) @true @(gen_field_get 0)) ; also used for 'car'
+    (field_get1 (0) @true @(gen_field_get 1)) ; also used for 'cdr'
+    (field_get2 (0) @true @(gen_field_get 2))
+    (field_get3 (0) @true @(gen_field_get 3))
+    (field_get4 (0) @true @(gen_field_get 4))
+    (field_get5 (0) @true @(gen_field_get 5))
+    (field_get  (0 byte) @true (
         (vmubyte 1 %eax)
         (asm "sall $2, %eax")
         (asm "movl (%esi), %ecx")
@@ -1024,13 +1024,13 @@
         (asm "movl %eax, (%esi)")
         ))
     ; field_set obj val
-    (field_set0 () @true @(gen_field_set 0)) ; also used for 'setcar'
-    (field_set1 () @true @(gen_field_set 1)) ; also used for 'setcdr'
-    (field_set2 () @true @(gen_field_set 2))
-    (field_set3 () @true @(gen_field_set 3))
-    (field_set4 () @true @(gen_field_set 4))
-    (field_set5 () @true @(gen_field_set 5))
-    (field_set  (byte) @true (
+    (field_set0 (-1) @true @(gen_field_set 0)) ; also used for 'setcar'
+    (field_set1 (-1) @true @(gen_field_set 1)) ; also used for 'setcdr'
+    (field_set2 (-1) @true @(gen_field_set 2))
+    (field_set3 (-1) @true @(gen_field_set 3))
+    (field_set4 (-1) @true @(gen_field_set 4))
+    (field_set5 (-1) @true @(gen_field_set 5))
+    (field_set  (-1 byte) @true (
         (vmubyte 1 %eax) ; index
         (asm "sall $2, %eax")
         (vmpop %ecx) ; obj
@@ -1039,7 +1039,7 @@
         (asm "movl %eax, (%ecx)")
         ))
     ; tuple nelem
-    (tuple () @true (
+    (tuple (0) @true (
         (asm "movl (%esi), %eax") ; # of elements
         (vmsave)
         (asm "pushl %eax")
@@ -1049,7 +1049,7 @@
         (asm "movl %eax, (%esi)")
         ))
     ; array nelem
-    (array () @true (
+    (array (0) @true (
         (asm "movl (%esi), %eax") ; # of elements
         (vmsave)
         (asm "pushl %eax")
@@ -1059,14 +1059,14 @@
         (asm "movl %eax, (%esi)")
         ))
     ; array_get ary idx
-    (array_get8 () @true (
+    (array_get8 (-1) @true (
         (vmpop %eax) ; index
         (asm "movl (%esi), %ecx") ; array
         (asm "addl %eax, %ecx")
         (asm "movsbl (%ecx), %eax")
         (asm "movl %eax, (%esi)")
         ))
-    (array_get16 () @true (
+    (array_get16 (-1) @true (
         (vmpop %eax) ; index
         (asm "sall $1, %eax")
         (asm "movl (%esi), %ecx") ; array
@@ -1074,7 +1074,7 @@
         (asm "movswl (%ecx), %eax")
         (asm "movl %eax, (%esi)")
         ))
-    (array_get32 () @true (
+    (array_get32 (-1) @true (
         (vmpop %eax) ; index
         (asm "sall $2, %eax")
         (asm "movl (%esi), %ecx") ; array
@@ -1083,14 +1083,14 @@
         (asm "movl %eax, (%esi)")
         ))
     ; array_get ary idx
-    (array_getu8 () @true (
+    (array_getu8 (-1) @true (
         (vmpop %eax) ; index
         (asm "movl (%esi), %ecx") ; array
         (asm "addl %eax, %ecx")
         (asm "movzbl (%ecx), %eax")
         (asm "movl %eax, (%esi)")
         ))
-    (array_getu16 () @true (
+    (array_getu16 (-1) @true (
         (vmpop %eax) ; index
         (asm "sall $1, %eax")
         (asm "movl (%esi), %ecx") ; array
@@ -1099,7 +1099,7 @@
         (asm "movl %eax, (%esi)")
         ))
     ; array_set ary idx val
-    (array_set8 () @true (
+    (array_set8 (-1) @true (
         (asm "movl 4(%esi), %eax") ; index
         (asm "movl 8(%esi), %ecx") ; array
         (asm "addl %eax, %ecx")
@@ -1107,7 +1107,7 @@
         (asm "movb %al, (%ecx)")
         (asm "addl $12, %esi")
         ))
-    (array_set16 () @true (
+    (array_set16 (-1) @true (
         (asm "movl 4(%esi), %eax") ; index
         (asm "sall $1, %eax")
         (asm "movl 8(%esi), %ecx") ; array
@@ -1116,7 +1116,7 @@
         (asm "movw %ax, (%ecx)")
         (asm "addl $12, %esi")
         ))
-    (array_set32 () @true (
+    (array_set32 (-1) @true (
         (asm "movl 4(%esi), %eax") ; index
         (asm "sall $2, %eax")
         (asm "movl 8(%esi), %ecx") ; array
@@ -1126,19 +1126,19 @@
         (asm "addl $12, %esi")
         ))
     ; allocate stack area for local variables
-    (allocate (byte) @true (
+    (allocate (arg0 byte) @true (
         (vmubyte 1 %eax)
         (asm "sall $2, %eax")
         (asm "subl %eax, %esi")
         ))
     ; number of arguments
-    (arity () @true (
+    (arity (1) @true (
         (asm "movl 8(%edi), %eax") ; %eax = 4 * arity
         (asm "shrl $2, %eax")
         (vmpush %eax)
         ))
     ; arguments
-    (args () @true (
+    (args (1) @true (
         (asm "subl $12, %esp")
         (asm "movl 8(%edi), %ecx") ; %ecx = 4 * arity
         (asm "leal 12(%edi,%ecx,1), %eax")
@@ -1168,100 +1168,100 @@
         (asm "xorl %edx, %edx")
         (vmpush %eax)
         ))
-    (arg0 () @true ((asm "movl 16(%edi), %eax") (vmpush %eax)))
-    (arg1 () @true ((asm "movl 20(%edi), %eax") (vmpush %eax)))
-    (arg2 () @true ((asm "movl 24(%edi), %eax") (vmpush %eax)))
-    (arg3 () @true ((asm "movl 28(%edi), %eax") (vmpush %eax)))
-    (arg4 () @true ((asm "movl 32(%edi), %eax") (vmpush %eax)))
+    (arg0 (1) @true ((asm "movl 16(%edi), %eax") (vmpush %eax)))
+    (arg1 (1) @true ((asm "movl 20(%edi), %eax") (vmpush %eax)))
+    (arg2 (1) @true ((asm "movl 24(%edi), %eax") (vmpush %eax)))
+    (arg3 (1) @true ((asm "movl 28(%edi), %eax") (vmpush %eax)))
+    (arg4 (1) @true ((asm "movl 32(%edi), %eax") (vmpush %eax)))
     ; load word from local
-    (loadl0 () @true ((asm "movl -4(%edi), %eax") (vmpush %eax)))
-    (loadl1 () @true ((asm "movl -8(%edi), %eax") (vmpush %eax)))
-    (loadl2 () @true ((asm "movl -12(%edi), %eax") (vmpush %eax)))
-    (loadl3 () @true ((asm "movl -16(%edi), %eax") (vmpush %eax)))
-    (loadl4 () @true ((asm "movl -20(%edi), %eax") (vmpush %eax)))
-    (loadl5 () @true ((asm "movl -24(%edi), %eax") (vmpush %eax)))
-    (loadl (byte) @true (
+    (loadl0 (1) @true ((asm "movl -4(%edi), %eax") (vmpush %eax)))
+    (loadl1 (1) @true ((asm "movl -8(%edi), %eax") (vmpush %eax)))
+    (loadl2 (1) @true ((asm "movl -12(%edi), %eax") (vmpush %eax)))
+    (loadl3 (1) @true ((asm "movl -16(%edi), %eax") (vmpush %eax)))
+    (loadl4 (1) @true ((asm "movl -20(%edi), %eax") (vmpush %eax)))
+    (loadl5 (1) @true ((asm "movl -24(%edi), %eax") (vmpush %eax)))
+    (loadl (1 byte) @true (
         (vmsbyte 1 %ecx) ; offset
         (asm "leal (%edi,%ecx,1), %eax")
         (asm "movl (%eax), %eax")
         (vmpush %eax)
         ))
     ; store word to local
-    (storel0 () @true ((asm "movl (%esi), %eax") (asm "movl %eax, -4(%edi)")))
-    (storel1 () @true ((asm "movl (%esi), %eax") (asm "movl %eax, -8(%edi)")))
-    (storel2 () @true ((asm "movl (%esi), %eax") (asm "movl %eax, -12(%edi)")))
-    (storel3 () @true ((asm "movl (%esi), %eax") (asm "movl %eax, -16(%edi)")))
-    (storel4 () @true ((asm "movl (%esi), %eax") (asm "movl %eax, -20(%edi)")))
-    (storel5 () @true ((asm "movl (%esi), %eax") (asm "movl %eax, -24(%edi)")))
-    (storel (byte) @true (
+    (storel0 (0) @true ((asm "movl (%esi), %eax") (asm "movl %eax, -4(%edi)")))
+    (storel1 (0) @true ((asm "movl (%esi), %eax") (asm "movl %eax, -8(%edi)")))
+    (storel2 (0) @true ((asm "movl (%esi), %eax") (asm "movl %eax, -12(%edi)")))
+    (storel3 (0) @true ((asm "movl (%esi), %eax") (asm "movl %eax, -16(%edi)")))
+    (storel4 (0) @true ((asm "movl (%esi), %eax") (asm "movl %eax, -20(%edi)")))
+    (storel5 (0) @true ((asm "movl (%esi), %eax") (asm "movl %eax, -24(%edi)")))
+    (storel (0 byte) @true (
         (vmsbyte 1 %ecx) ; index
         (asm "leal (%edi,%ecx,1), %eax")
         (asm "movl (%esi), %ecx")
         (asm "movl %ecx, (%eax)")
         ))
-    (incrl0 () @true ((asm "addl $1, -4(%edi)")))
-    (incrl1 () @true ((asm "addl $1, -8(%edi)")))
-    (incrl2 () @true ((asm "addl $1, -12(%edi)")))
-    (incrl3 () @true ((asm "addl $1, -16(%edi)")))
-    (incrl4 () @true ((asm "addl $1, -20(%edi)")))
-    (incrl5 () @true ((asm "addl $1, -24(%edi)")))
-    (incrl (byte) @true (
+    (incrl0 (0) @true ((asm "addl $1, -4(%edi)")))
+    (incrl1 (0) @true ((asm "addl $1, -8(%edi)")))
+    (incrl2 (0) @true ((asm "addl $1, -12(%edi)")))
+    (incrl3 (0) @true ((asm "addl $1, -16(%edi)")))
+    (incrl4 (0) @true ((asm "addl $1, -20(%edi)")))
+    (incrl5 (0) @true ((asm "addl $1, -24(%edi)")))
+    (incrl (0 byte) @true (
         (vmsbyte 1 %ecx) ; index
         (asm "leal (%edi,%ecx,1), %eax")
         (asm "addl $1, (%eax)")
         ))
-    (decrl0 () @true ((asm "subl $1, -4(%edi)")))
-    (decrl1 () @true ((asm "subl $1, -8(%edi)")))
-    (decrl2 () @true ((asm "subl $1, -12(%edi)")))
-    (decrl3 () @true ((asm "subl $1, -16(%edi)")))
-    (decrl4 () @true ((asm "subl $1, -20(%edi)")))
-    (decrl5 () @true ((asm "subl $1, -24(%edi)")))
-    (decrl (byte) @true (
+    (decrl0 (0) @true ((asm "subl $1, -4(%edi)")))
+    (decrl1 (0) @true ((asm "subl $1, -8(%edi)")))
+    (decrl2 (0) @true ((asm "subl $1, -12(%edi)")))
+    (decrl3 (0) @true ((asm "subl $1, -16(%edi)")))
+    (decrl4 (0) @true ((asm "subl $1, -20(%edi)")))
+    (decrl5 (0) @true ((asm "subl $1, -24(%edi)")))
+    (decrl (0 byte) @true (
         (vmsbyte 1 %ecx) ; index
         (asm "leal (%edi,%ecx,1), %eax")
         (asm "subl $1, (%eax)")
         ))
-    (addrl (byte) @true (
+    (addrl (1 byte) @true (
         (vmsbyte 1 %ecx) ; index
         (asm "leal (%edi,%ecx,1), %eax")
         (vmpush %eax)
         ))
     ; load byte from value area
-    (loadbv (ushort) @true (
+    (loadbv (1 ushort) @true (
         (vmushort 1 %eax)
         (asm "addl value_area_base, %eax")
         (asm "movsbl (%eax), %eax")
         (vmpush %eax)
         ))
     ; load word from value area
-    (loadv (ushort) @true (
+    (loadv (1 ushort) @true (
         (vmushort 1 %eax)
         (asm "addl value_area_base, %eax")
         (asm "movl (%eax), %eax")
         (vmpush %eax)
         ))
     ; load address of array from value area
-    (loadav (ushort) @true (
+    (loadav (1 ushort) @true (
         (vmushort 1 %eax)
         (asm "addl value_area_base, %eax")
         (vmpush %eax)
         ))
     ; store byte to value area
-    (storebv (ushort) @true (
+    (storebv (0 ushort) @true (
         (vmushort 1 %eax)
         (asm "addl value_area_base, %eax")
         (asm "movl (%esi), %ecx")
         (asm "movb %cl, (%eax)")
         ))
     ; store word to value area
-    (storewv (ushort) @true (
+    (storewv (0 ushort) @true (
         (vmushort 1 %eax)
         (asm "addl value_area_base, %eax")
         (asm "movl (%esi), %ecx")
         (asm "movl %ecx, (%eax)")
         ))
     ; load global heap object
-    (loado (ushort) @true (
+    (loado (0 ushort) @true (
         (vmushort 1 %eax)
         (asm "shll $2, %eax")
         (asm "addl gobject_area_base, %eax")
@@ -1269,7 +1269,7 @@
         (vmpush %eax)
         ))
     ; store global heap object
-    (storeo (ushort) @true (
+    (storeo (0 ushort) @true (
         (vmushort 1 %eax)
         (asm "shll $2, %eax")
         (asm "addl gobject_area_base, %eax")
@@ -1277,31 +1277,31 @@
         (asm "movl %ecx, (%eax)")
         ))
     ; 'fun:1' 'relative address of the function:2'
-    (fun (addr) @true (
+    (fun (1 addr) @true (
         (vmsshort 1 %eax) ; offset of address of the function
         (asm "addl %ebx, %eax") ; compute absloute address
         (asm "subl code_base, %eax")
         (vmpush %eax)
         ))
     ; 'lfun:1' 'relative address of the function:4'
-    (lfun (laddr) @true (
+    (lfun (1 laddr) @true (
         (vmint 1 %eax) ; offset of address of the function
         (asm "addl %ebx, %eax") ; compute absloute address
         (asm "subl code_base, %eax")
         (vmpush %eax)
         ))
     ; 'prim:1' 'index of the external function:2'
-    (prim (prim) @true (
+    (prim (1 prim) @true (
         (vmushort 1 %eax) ; index of the function
         (asm "orl  $0x80000000, %eax") ; set flag
         (vmpush %eax)
         ))
-    (push (object) @true (
+    (push (1 object) @true (
         (vmint 1 %eax)
         (vmpush %eax)
         ))
     ; 'call:1' 'relative address of the function:2' 'size of arguments:1'
-    (call (addr byte) @nil  (
+    (call ((- 1 (/ arg1 4)) addr byte) @nil  (
         (asm "subl $4, %esi")   ; for closure-frame
         (vmubyte 3 %eax)
         (vmpush %eax) ; store size of arguments
@@ -1315,7 +1315,7 @@
         (vmfetch)
         ))
     ; 'lcall:1' 'relative address of the function:4' 'size of arguments:1'
-    (lcall (laddr byte) @nil (
+    (lcall ((- 1 (/ arg1 4)) laddr byte) @nil (
         (asm "subl $4, %esi")   ; for closure-frame
         (vmubyte 5 %eax)
         (vmpush %eax) ; store size of arguments
@@ -1329,7 +1329,7 @@
         (vmfetch)
         ))
     ; 'pcall:1' 'index of the external function:2' 'size of arguments:1'
-    (pcall (prim byte) @true (
+    (pcall ((- 1 (/ arg1 4)) prim byte) @true (
         (vmsave)
         (vmushort 1 %eax)
         (vmubyte 3 %ecx)
@@ -1344,7 +1344,7 @@
         (vmpush %eax) ; push return value
         ))
     ; 'dcall:1' 'size of arguments:1'
-    (dcall (byte) @nil (
+    (dcall ((- 1 (/ arg0 4)) byte) @nil (
         (asm "movl (%esi), %eax")
         (if (< (register %eax) 0) ; check flag
             ( ; call primitive function
@@ -1377,7 +1377,7 @@
             ))
         ))
     ; 'jcall:1' 'size of arguments:1'
-    (jcall (byte) @nil (
+    (jcall ((- 1 (/ arg0 4)) byte) @nil (
         (asm "movl %ebx, %ecx")
         (asm "addl $2, %ecx")
         (vmubyte 1 %eax)
@@ -1390,12 +1390,12 @@
         (asm "movl %esi, %edi") ; set base pointer
         (vmfetch)
         ))
-    (jjump () @nil (
+    (jjump (-1) @nil (
         (vmpop %ebx)
         (asm "movl (%ebx), %ebx") ; pointer to the bytecode
         (vmfetch)
         ))
-    (return () @nil  (
+    (return (-1) @nil  (
         (asm "xorl %ecx, %ecx") ; return value
         (asm "movl %edi, %esi")
         (vmpop %edi) ; base pointer
@@ -1406,7 +1406,7 @@
         (vmpush %ecx) ; push return value
         (vmfetch)
         ))
-    (ireturn () @nil  (
+    (ireturn (-1) @nil  (
         (asm "movl (%esi), %ecx") ; return value
         (asm "movl %edi, %esi")
         (vmpop %edi) ; base pointer
@@ -1418,7 +1418,7 @@
         (vmfetch)
         ))
     ; switch (table search)
-    (tswitch (ushort) @nil (
+    (tswitch (-1 ushort) @nil (
         (vmpop %eax)
         (vmushort 1 %ecx) ; number of cases
         (asm "cmpl %eax, %ecx")
@@ -1433,7 +1433,7 @@
         (vmfetch)
         ))
     ; switch (linear search)
-    (lswitch (int) @nil (
+    (lswitch (-1 int) @nil (
         (vmpop %eax)
         (vmint 1 %ecx) ; maximum value of case values
         (asm "addl $5, %ebx")
@@ -1451,30 +1451,30 @@
         (asm "addl %eax, %ebx")
         (vmfetch)
         ))
-    (goto       (addr) @nil ((vmsshort 1 %eax) (asm "addl %eax, %ebx") (vmfetch)))
-    (if_zero    (addr) @nil @(gen_comparison1 "cmovz"))
-    (if_nonzero (addr) @nil @(gen_comparison1 "cmovnz"))
-    (if_eq      (addr) @nil @(gen_comparison2 "cmove"))
-    (if_ne      (addr) @nil @(gen_comparison2 "cmovne"))
-    (if_gt      (addr) @nil @(gen_comparison2 "cmovg"))
-    (if_ge      (addr) @nil @(gen_comparison2 "cmovge"))
-    (if_lt      (addr) @nil @(gen_comparison2 "cmovl"))
-    (if_le      (addr) @nil @(gen_comparison2 "cmovle"))
-    (if_ugt     (addr) @nil @(gen_comparison2 "cmova"))
-    (if_uge     (addr) @nil @(gen_comparison2 "cmovae"))
-    (if_ult     (addr) @nil @(gen_comparison2 "cmovb"))
-    (if_ule     (addr) @nil @(gen_comparison2 "cmovbe"))
+    (goto       (0 addr) @nil ((vmsshort 1 %eax) (asm "addl %eax, %ebx") (vmfetch)))
+    (if_zero    (-1 addr) @nil @(gen_comparison1 "cmovz"))
+    (if_nonzero (-1 addr) @nil @(gen_comparison1 "cmovnz"))
+    (if_eq      (-2 addr) @nil @(gen_comparison2 "cmove"))
+    (if_ne      (-2 addr) @nil @(gen_comparison2 "cmovne"))
+    (if_gt      (-2 addr) @nil @(gen_comparison2 "cmovg"))
+    (if_ge      (-2 addr) @nil @(gen_comparison2 "cmovge"))
+    (if_lt      (-2 addr) @nil @(gen_comparison2 "cmovl"))
+    (if_le      (-2 addr) @nil @(gen_comparison2 "cmovle"))
+    (if_ugt     (-2 addr) @nil @(gen_comparison2 "cmova"))
+    (if_uge     (-2 addr) @nil @(gen_comparison2 "cmovae"))
+    (if_ult     (-2 addr) @nil @(gen_comparison2 "cmovb"))
+    (if_ule     (-2 addr) @nil @(gen_comparison2 "cmovbe"))
 
-    (if_feq     (addr) @nil @(gen_comparison3 "je"))
-    (if_fne     (addr) @nil @(gen_comparison3 "jne"))
-    (if_fgt     (addr) @nil @(gen_comparison3 "ja"))
-    (if_fge     (addr) @nil @(gen_comparison3 "jae"))
-    (if_flt     (addr) @nil @(gen_comparison3 "jb"))
-    (if_fle     (addr) @nil @(gen_comparison3 "jbe"))
+    (if_feq     (-2 addr) @nil @(gen_comparison3 "je"))
+    (if_fne     (-2 addr) @nil @(gen_comparison3 "jne"))
+    (if_fgt     (-2 addr) @nil @(gen_comparison3 "ja"))
+    (if_fge     (-2 addr) @nil @(gen_comparison3 "jae"))
+    (if_flt     (-2 addr) @nil @(gen_comparison3 "jb"))
+    (if_fle     (-2 addr) @nil @(gen_comparison3 "jbe"))
 
     ; instructions for handling exceptions.
     ; push unwind stack
-    (unwind_push (addr) @true (
+    (unwind_push (0 addr) @true (
         (vmsshort 1 %eax)
         (asm "addl %ebx, %eax") ; address of handler
         (asm "pushl %eax")
@@ -1492,14 +1492,14 @@
         (asm "movl %eax, exstack")
         ))
     ; pop unwind stack
-    (unwind_pop () @true (
+    (unwind_pop (0) @true (
         (asm "addl $12, %esp")
         (asm "movl exstack, %eax")
         (asm "movl 4(%eax), %eax")
         (asm "movl %eax, exstack")
         ))
     ; throw given value
-    (throw () @nil (
+    (throw (0) @nil (
         (vmpop %ecx)    ; exception value
         (asm "movl exstack, %eax")
         (asm "movl (%eax), %esp")
@@ -1512,9 +1512,9 @@
         (vmfetch)
         ))
 
-    (exit () @nil ((vmpop %eax) (break)))
+    (exit (-1) @nil ((vmpop %eax) (break)))
 
-    (check_int  (addr) @nil (
+    (check_int  (-1 addr) @nil (
         (vmpop %eax)
         (vmsshort 1 %ecx)
         (asm "andl $1, %eax")
@@ -1523,8 +1523,8 @@
         (vmsucc %eax)
         (vmfetch)
         ))
-    (check_string (addr) @nil @(gen_check_pstruct PLAIN_STRING))
-    (check_list (addr int) @nil (
+    (check_string (-1 addr) @nil @(gen_check_pstruct PLAIN_STRING))
+    (check_list (-1 addr int) @nil (
         ; XXX: should not hardcode the layout of object header.
         (vmpop %eax)
         (vmint 3 %ecx)
@@ -1553,7 +1553,7 @@
         (vmsucc 7)
         (vmfetch)
         ))
-    (check_list2 (addr int) @nil (
+    (check_list2 (-2 addr int) @nil (
         ; XXX: should not hardcode the layout of object header.
         (vmpop %eax)
         (vmint 3 %ecx)
@@ -1592,7 +1592,7 @@
     (var entries ())
     (foreach i vm_instructions (do
         (var name (car i))
-        (var len  (insn_length (cadr i)))
+        (var len  (insn_length (cdadr i)))
         (push entries `(@name @code @len))
         (incr code)
         ))
