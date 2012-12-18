@@ -401,7 +401,7 @@
     ))
 
 ; boxed version
-(fun extract_string_ (p begin end) (
+(fun get_input_text (p begin end) (
     (return (extract_string p (unbox begin) (unbox end)))
     ))
 
@@ -1086,7 +1086,7 @@
     (return (to_sym (strcat "parse_" (strcat (symbol_name sym) "_"))))
     ))
 
-(var PVar (to_sym "%Parser")) ; internal use
+(var PVar (to_sym "parser")) ; internal use
 (fun make_nodevar (idx) (
     (return (to_sym (strcat "node" (itos idx))))
     ))
@@ -1752,14 +1752,9 @@
         (= elems (cdr elems))
         ))
 
-    (= body (cons (defvar (to_sym "GET_INPUT_TEXT")
-        (lambda 0
-            (apply (to_sym "%extract_string") (list3
-                PVar
-                bpos
-                (apply (to_sym "%get_pos") (list1 PVar))
-            ))))
-        body))
+    (= body (cons (defvar (to_sym "begin") bpos) body))
+    (= body (cons (defvar (to_sym "end")
+        (apply (to_sym "%get_pos") (list1 PVar))) body))
 
     (= body (cons (set_parsed act) body))
     (return (breakable (list_reverse body)))
@@ -1946,34 +1941,33 @@
     ))
 
 (export fun init_parser_funcs (mod) (
-    (add_function1 mod (to_sym "%get_column") (domainP Parser) get_column 0)
-    (add_function1 mod (to_sym "%set_newline") (domainP Parser) set_newline 0)
-    (add_function2 mod (to_sym "%set_indent") (domainP Parser) (domainP Int) set_indent 0)
-    (add_function1 mod (to_sym "%check_indent") (domainP Parser) check_indent 0)
-    (add_function2 mod (to_sym "%parsed") (domainP Parser) DontCare parsed 0)
-    (add_function2 mod (to_sym "%noparse") (domainP Parser) DontCare noparse 0)
-    (add_function1 mod (to_sym "%alloc_error_state") (domainP Parser) alloc_error_state 0)
-    (add_function2 mod (to_sym "%set_error_state") (domainP Parser) DontCare set_error_state 0)
+    (add_function1 mod (to_sym "%get_column") DontCare get_column 0)
+    (add_function1 mod (to_sym "%set_newline") DontCare set_newline 0)
+    (add_function2 mod (to_sym "%set_indent") DontCare DontCare set_indent 0)
+    (add_function1 mod (to_sym "%check_indent") DontCare check_indent 0)
+    (add_function2 mod (to_sym "%parsed") DontCare DontCare parsed 0)
+    (add_function2 mod (to_sym "%noparse") DontCare DontCare noparse 0)
+    (add_function1 mod (to_sym "%alloc_error_state") DontCare alloc_error_state 0)
+    (add_function2 mod (to_sym "%set_error_state") DontCare DontCare set_error_state 0)
     (add_function2 mod (to_sym "%join_error_state") DontCare DontCare join_error_state 0)
-    (add_function1 mod (to_sym "%copy_parser_state") (domainP Parser) copy_parser_state 0)
-    (add_function2 mod (to_sym "%set_parser_state") (domainP Parser) (domainP Parser) set_parser_state 0)
-    (add_function2 mod (to_sym "%set_parser_state_all") (domainP Parser) (domainP Parser) set_parser_state_all 0)
-    (add_function3 mod (to_sym "%call_parser") (domainP Parser) (domainP Symbol) (domainP Function) call_parser 0)
-
-    (add_function2 mod (to_sym "%negate") (domainP Parser) DontCare negate 0)
-    (add_function3 mod (to_sym "%oneof") (domainP Parser) stringT stringT oneof 0)
-    (add_function3 mod (to_sym "%noneof") (domainP Parser) stringT stringT noneof 0)
+    (add_function1 mod (to_sym "%copy_parser_state") DontCare copy_parser_state 0)
+    (add_function2 mod (to_sym "%set_parser_state") DontCare DontCare set_parser_state 0)
+    (add_function2 mod (to_sym "%set_parser_state_all") DontCare DontCare set_parser_state_all 0)
+    (add_function3 mod (to_sym "%call_parser") DontCare DontCare DontCare call_parser 0)
+    (add_function2 mod (to_sym "%negate") DontCare DontCare negate 0)
+    (add_function3 mod (to_sym "%oneof") DontCare DontCare DontCare oneof 0)
+    (add_function3 mod (to_sym "%noneof") DontCare DontCare DontCare noneof 0)
     (add_function1 mod (to_sym "%apply_located") DontCare apply_located 0)
     (add_function1 mod (to_sym "%open_scope") DontCare open_scope 0)
     (add_function1 mod (to_sym "%close_scope") DontCare close_scope 0)
-    (add_function1 mod (to_sym "%get_pos") (domainP Parser) get_pos 0)
-    (add_function3 mod (to_sym "%extract_string")
-        (domainP Parser) (domainP Int) (domainP Int) extract_string_ 0)
+    (add_function1 mod (to_sym "%get_pos") DontCare get_pos 0)
 
     ; Use internal version of list operations considering redefinition of them.
-    (add_function2 mod (to_sym "%cons") DontCare listT __cons 0)
-    (add_function1 mod (to_sym "%reverse") listT __reverse 0)
-    (add_function1 mod (to_sym "%length") listT __length 0)
+    (add_function2 mod (to_sym "%cons") DontCare DontCare __cons 0)
+    (add_function1 mod (to_sym "%reverse") DontCare __reverse 0)
+    (add_function1 mod (to_sym "%length") DontCare __length 0)
+
+    (add_function3 mod (to_sym "input_text") (domainP Parser) intT intT get_input_text 0)
 
     (add_parser mod (to_sym "parse_spaces") parse_spaces)
     (add_parser mod (to_sym "parse_blanks") parse_blanks)
