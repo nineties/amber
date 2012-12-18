@@ -1234,16 +1234,29 @@
         ))
     ))
 
-(fun compile_block_top  (asm mod expr) (
-    (compile_function asm 0 mod 0 expr noguard nil)
-    ))
-
 (fun compile_block (asm mod expr) (
-    (if (in_top_scope mod) (return (compile_block_top asm mod expr)))
+    (if (in_top_scope mod)
+        (return (compile_function asm 0 mod 0 expr noguard nil))
+        )
     (var exprs (node_arg expr 0))
     (push_varscope mod)
     (compile_block_body asm mod exprs)
     (pop_varscope mod)
+    ))
+
+(fun compile_breakable (asm mod expr) (
+    (if (in_top_scope mod)
+        (return (compile_function asm 0 mod 0 expr noguard nil))
+        )
+    (var break_lbl (fresh_label asm))
+    (var exit_lbl  (fresh_label asm))
+    (add_symbol mod BreakLabel (make_label break_lbl))
+    (compile_block asm mod expr)
+    (put_goto asm exit_lbl)
+    (set_label asm break_lbl)
+    (put_push asm nil)
+    (set_label asm exit_lbl)
+    (delete_symbol mod BreakLabel)
     ))
 
 (fun compile_seq (asm mod expr) (
@@ -1549,7 +1562,6 @@
     (if (!= (node_head lbl) Label)
         (not_reachable "compile_break")
         )
-    (put_push asm nil)
     (put_goto asm (node_arg_int lbl 0))
     ))
 
@@ -1561,7 +1573,6 @@
     (if (!= (node_head lbl) Label)
         (not_reachable "compile_continue")
         )
-    (put_push asm nil)
     (put_goto asm (node_arg_int lbl 0))
     ))
 
@@ -1956,6 +1967,7 @@
     (add_compiler mod (make_node1 Seq listT) compile_seq)
     (add_compiler mod (make_node2 Scoped (domainP Module) DontCare)
         compile_scoped)
+    (add_compiler mod (make_node1 Breakable listT) compile_breakable)
 
     (add_compiler mod (mkif DontCare DontCare) compile_if)
 	(add_compiler mod (ifelse DontCare DontCare DontCare) compile_ifelse)
