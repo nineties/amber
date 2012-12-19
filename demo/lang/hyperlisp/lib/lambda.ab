@@ -22,6 +22,9 @@ module HyperLisp {
           | "." hl_expr
             { `Whole{!$1} }
 
+    # Rename variables to avoid name conflict.
+    rename(sym): ("hyperlisp_" + sym).to_sym
+
     # Create sexp which represents the position of metaliteral X
     point: (X, X)      -> one
          | (Y@Meta, X) -> zero
@@ -119,6 +122,8 @@ module HyperLisp {
         a: compile_(car(cdr(p)), car(cdr(x)), f)
         `puts(!a)
     }
+    compile_apply(p, x, f) where car(x) == \exit: 
+        exit(0)
     compile_apply(p, x, f) where car(x) == one:
         compile_(car(cdr(p)), car(cdr(x)), f)
     compile_apply(p, x, f) where car(x) == zero: `\!zero
@@ -150,8 +155,8 @@ module HyperLisp {
     compile_(p, x, \false): compile_eval(p, x)
     compile_obj
         : (p, x) where atom(p) -> compile_arg(car(p), \x)
-        | (p, x@Meta)   -> x[0]
-        | (p, x@Symbol) -> x
+        | (p, x@Meta)   -> rename(x[0])
+        | (p, x@Symbol) -> rename(x)
         | (p, x) where x == zero -> `\!zero
         | (p, x@Cons) -> {
             a: compile_obj(car(p), car(x))
@@ -219,7 +224,7 @@ module HyperLisp {
         sym: car(cdr(x))
         lam: car(cdr(cdr(x)))
         fun: compile_lambda_jit(lam)
-        amber::define_global_variable(sym, fun)
+        amber::define_global_variable(rename(sym), fun)
         sym
     }
     eval_(x) where car(x) == \Meta{Delta}: eval_define(x)
