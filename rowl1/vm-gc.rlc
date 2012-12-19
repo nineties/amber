@@ -132,8 +132,8 @@
 (define OBJECT_PLAIN_TAG (addr) (BOXED_FIELD_SIZE addr))
 (define SEQUENCE_TAG (addr) (BOXED_FIELD_SIZE addr))
 
-(define WEAKREF_IS_DEAD (addr) (BOXED_FIELD_SIZE addr))
-(define SET_WEAKREF_DEAD (addr) `([]= @addr 0 (| ([] @addr 0) @(<< 1 4))))
+(define WEAKREF_FLAG (addr) (BOXED_FIELD_SIZE addr))
+(define SET_WEAKREF_FLAG (addr) `([]= @addr 0 (| ([] @addr 0) @(<< 1 4))))
 
 (define HEADER (tag nboxed objsz) `(| (<< @objsz 11) (| (<< @nboxed 4) @tag)))
 (define SET_HEADER (addr tag nboxed objsz) `([]= @addr 0 @(HEADER tag nboxed objsz)))
@@ -379,6 +379,15 @@
         (return)
         ))
     (if (== tag @TAG_WEAKREF) (
+        (int flag @(WEAKREF_FLAG head))
+        (int mask (>> flag 1))
+        (int n (- @(OBJECT_WORDS head) 1))
+        (while (> n 0) (
+            (if (& mask 1) ((move_object obj)))
+            (+= obj @WORD_SIZE)
+            (>>= mask 1)
+            (-= n 1)
+            ))
         (return)
         ))
     (if (== tag @TAG_EXPR) (
@@ -393,25 +402,48 @@
     (error "move_fields: not reachable")
     ))
 
-(fun update_weakref (p) (
-    (void* obj ([] p 0))
+(fun move_weakref_ent (objp) (
+    (void* obj ([] objp 0))
+    ; nil object
     (if (! obj) ((return @FALSE)))
     (if (! @(IS_POINTER_TO_HEAP obj)) ((return @FALSE)))
     (if (& obj 1) ((return @FALSE))) ; boxed integer
+    ; this object is already in next generation
     (if (== @(pdescr->generation (ADDR2PDESCR obj)) next_gen)
         ((return @FALSE)))
-
     (-= obj @WORD_SIZE)
-
+    ; this object is already copyed
     (if @(OBJECT_COPYED obj) (
-        ([]= p 0 @(FORWARD_ADDR obj))
+        ([]= objp 0 @(FORWARD_ADDR obj))
         (return @FALSE)
         ))
-    ; this object is dead.
-    ([]= p 0 0)
-    (-= p 4)
-    @(SET_WEAKREF_DEAD p)
+    ; this object is dead
     (return @TRUE)
+    ))
+
+(fun update_weakref (obj) (
+    (void* head (- obj @WORD_SIZE))
+    (int mask (>> @(WEAKREF_FLAG head) 1))
+    (int n (- @(OBJECT_WORDS head) 1))
+    (int m n)
+    (int dead 0)
+    (while (> n 0) (
+        (if (& mask 1) (
+            (if (move_weakref_ent obj) (
+                (= dead 1)
+                (break)
+                ))
+            ))
+        (+= obj @WORD_SIZE)
+        (>>= mask 1)
+        (-= n 1)
+        ))
+
+    (if dead (
+        (memset (+ head @WORD_SIZE) 0 (* m @WORD_SIZE))
+        (return @TRUE)
+        ))
+    (return @FALSE)
     ))
 
 (fun update_weakref_list () (
@@ -647,11 +679,13 @@
     ))
 
 (export prim_allocate_weakref)
-(fun prim_allocate_weakref (obj) (
-    (void* ptr (allocate_object 3))
-    @(SET_HEADER ptr TAG_WEAKREF 0 3)
+(fun prim_allocate_weakref (mask size) (
+    (if (> size 6) ((return 0)))
+    (+= size 1)
+    (void* ptr (allocate_object size))
+    @(SET_HEADER ptr TAG_WEAKREF (& (<< mask 1) 0x7f) size)
     (+= ptr @WORD_SIZE)
-    ([]= ptr 0 obj)
+    (memset ptr 0 (* @WORD_SIZE (- size 1)))
 
     (void* cons (allocate_cons))
     ([]= cons 0 ptr)
@@ -664,7 +698,10 @@
 (export prim_weakref_alive)
 (fun prim_weakref_alive (ref) (
     (-= ref 4)
-    (return (- 1 @(WEAKREF_IS_DEAD ref)))
+    (if (& @(WEAKREF_FLAG ref) 1)
+        (return @FALSE)
+        (return @TRUE)
+        )
     ))
 
 ; array of integers
