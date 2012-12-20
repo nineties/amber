@@ -383,7 +383,7 @@
     ))
 
 (define emit_comparison ((op lhs rhs)) (do
-    (var insn (assoc op `((== . "sete") (!= . "setne") (< . "setl") (> . "setg") (<= . "setle") (>= . "setge"))))
+    (var insn (assoc op `((== . "sete") (!= . "setne") (< . "setl") (> . "setg") (<= . "setle") (>= . "setge") (u< . "setb") (u> . "seta") (u<= . "setbe") (u>= . "setae"))))
     (emit_expr lhs)
     (emit_expr rhs)
     (popl `%eax)
@@ -506,7 +506,7 @@
     (if ret (emit_return `(return) nil nil))
     ))
 
-(define comparison? (op) (member? op `(== != < > <= >=)))
+(define comparison? (op) (member? op `(== != < > <= >= u< u> u<= u>=)))
 
 (define emit_if ((_ expr ifthen . ifelse) dst ret) (do
     (set ifelse (if ifelse (car ifelse) nil))
@@ -559,7 +559,7 @@
         ))
 
 (define emit_cond_if (expr ifthen ifelse dst ret) (do
-    (var insn (assoc (car expr) `((== . "jne") (!= . "je") (< . "jge") (> . "jle") (<= . "jg") (>= . "jl"))))
+    (var insn (assoc (car expr) `((== . "jne") (!= . "je") (< . "jge") (> . "jle") (<= . "jg") (>= . "jl") (u< . "jae") (u> . "jbe") (u<= . "ja") (u>= . "jb"))))
     (var ifend-lbl (mklabel `end))
     (var ifelse-lbl (if ifelse (mklabel `ifelse) nil))
     (emit_expr (cadr expr) `%eax nil)  ; lhs
@@ -668,6 +668,10 @@
     (>       . @emit_comparison)
     (<=      . @emit_comparison)
     (>=      . @emit_comparison)
+    (u<      . @emit_comparison)
+    (u>      . @emit_comparison)
+    (u<=     . @emit_comparison)
+    (u>=     . @emit_comparison)
     (=       . @emit_asgn)
     (+=      . @emit_opasgn)
     (-=      . @emit_opasgn)

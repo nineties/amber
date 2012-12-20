@@ -16,18 +16,14 @@
 (extern object current_loc)
 
 ; symbol table (symbols are globally unique)
-(var symbol_table (make_idtable))
+(var symbol_table (init_symbol_table (make_idtable)))
 (var symbol_index_gen 0)
 (var builtin_symbol_index_gen -1)
 
 ; builtin expression headers and types
 (export var DontCare    (to_sym "_"))
 
-(export var true        (to_sym "true"))
-(export var false       (to_sym "false"))
-(export var nil         (to_sym "nil"))
-(export var undefined   (to_sym "undefined"))
-
+(export var Bool        (to_builtin_sym "Bool"))
 (export var Symbol      (to_builtin_sym "Symbol"))
 (export var Int         (to_builtin_sym "Int"))
 (export var BigInt      (to_builtin_sym "BigInt"))
@@ -143,6 +139,14 @@
 (extern fun out_of_range)
 (extern fun type_error)
 
+(fun init_symbol_table (tbl) (
+    (idtable_add tbl (strdup "nil") @C_NIL)
+    (idtable_add tbl (strdup "true") @C_TRUE)
+    (idtable_add tbl (strdup "false") @C_FALSE)
+    (idtable_add tbl (strdup "undefined") @C_UNDEF)
+    (return tbl)
+    ))
+
 (export fun to_builtin_sym (name) (
     (var sym (idtable_find symbol_table name))
     (if sym (return sym))
@@ -197,20 +201,19 @@
     ))
 
 (export fun symbol_name (sym) (
+    (if (is_special sym) (do
+        (if (== sym @C_NIL) (return (string "nil")))
+        (if (== sym @C_TRUE) (return (string "true")))
+        (if (== sym @C_FALSE) (return (string "false")))
+        (return (string "undefined"))
+        ))
     (return (field_get sym @SymbolName))
-    ))
-
-(export fun is_special_symbol (sym) (
-    (return (|| (== sym true)
-            (|| (== sym false)
-            (|| (== sym nil)
-            (|| (== sym DontCare)
-                (== sym undefined))))))
     ))
 
 (export fun node_type (obj) (
     (if (! obj) (return @ListE))
     (if (& obj 1) (return @IntE))
+    (if (is_special obj) (return @SymbolE))
     (var tag (get_tag obj))
     (if (== tag @TAG_PSTRUCT) (return (+ (get_pstruct_tag obj) @PLAIN_TYPE_OFFSET)))
     (if (== tag @TAG_VARIANT) (return (field_get obj 0)))
@@ -372,7 +375,7 @@
 (export fun node_arg (expr idx) (
     (if (is_atom expr)
         (throw (invalid_argument current_loc
-        (string "Can't access fields of builtin object") expr)))
+        (string "Can't access fields of atoms") expr)))
     (if (is_list expr)  (return (list_at_check expr idx)))
     (if (is_tuple expr) (return (tuple_at expr idx)))
     (if (is_array expr) (return (array_at expr idx)))
@@ -382,11 +385,15 @@
     (return (array_get object expr (+ idx 1)))
     ))
 
+(export fun check_type (arg type) (
+    (if (!= (node_type arg) type)
+        (throw (type_error current_loc (type_string type arg) arg))
+        )
+    ))
+
 (fun node_arg_check (expr type idx) (
     (var arg (node_arg expr idx))
-    (if (!= (node_type arg) type)
-        (throw (type_error current_loc (type_string type) arg))
-        )
+    (check_type arg type)
     (return arg)
     ))
 
@@ -563,6 +570,12 @@
     ))
 
 (export fun output_symbol (ochan sym) (
+    (if (is_special sym) (do
+        (if (== sym @C_NIL) (return (output_string ochan "nil")))
+        (if (== sym @C_TRUE) (return (output_string ochan "true")))
+        (if (== sym @C_FALSE) (return (output_string ochan "false")))
+        (return (output_string ochan "undefined"))
+        ))
     (output_string ochan (field_get sym @SymbolName))
     ))
 
@@ -590,7 +603,7 @@
     (output_string ochan "th")
     ))
 
-(fun type_string (type) (
+(fun type_string (type node) (
     (tswitch type (
         (@SymbolE           . (return (string "Symbol")))
         (@ExprE             . (return (string "composite expression")))

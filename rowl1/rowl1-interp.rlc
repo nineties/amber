@@ -26,14 +26,14 @@
 (export var current_mod null)
 (export fun set_loc (loc) (
     (= current_loc loc)
-    (add_module_variable amber_mod (to_sym "LOCATION") true loc)
+    (add_module_variable amber_mod (to_sym "LOCATION") @C_TRUE loc)
     ))
 
 (var module_stack null)
 
 (export fun set_current_module (mod) (
     (= current_mod mod)
-    (add_module_variable amber_mod (to_sym "MODULE") true mod)
+    (add_module_variable amber_mod (to_sym "MODULE") @C_TRUE mod)
     ))
 
 (export fun eval_shell () (
@@ -114,7 +114,7 @@
         (interpret p)
         )
 
-    (eval_exit nil)
+    (eval_exit @C_NIL)
 
     (return 0)
     ))
@@ -219,8 +219,8 @@
 (extern fun ary_push)
 (fun interpret_shell (p) (
     (var outputs (ary_new))
-    (add_module_variable amber_mod (to_sym "shell_outputs") true outputs)
-    (ary_push outputs undefined)
+    (add_module_variable amber_mod (to_sym "shell_outputs") @C_TRUE outputs)
+    (ary_push outputs @C_UNDEF)
     (while 1 (do
         (try 
             (while 1 (do
@@ -308,26 +308,26 @@
         (eval (car stmts))
         (= stmts (cdr stmts))
         ))
-    (return nil)
+    (return @C_NIL)
     ))
 
 (fun eval_replace_syntax (expr) (
     (var lhs (node_arg_symbol expr 0))
     (var rhs (node_arg_symbol expr 1))
     (eval (compile_replace_syntax lhs rhs))
-    (return nil)
+    (return @C_NIL)
     ))
 
 (fun eval_reserve_symbol (expr) (
     (for i 0 (node_size expr)
         (add_reserve_symbol (node_arg expr i))
         )
-    (return nil)
+    (return @C_NIL)
     ))
 
 (fun eval_seq (expr) (
     (var stmts (node_arg expr 0))
-    (var v nil)
+    (var v @C_NIL)
     (while stmts (do
         (= v (eval (car stmts)))
         (= stmts (cdr stmts))
@@ -357,7 +357,7 @@
 
 (export fun at_exit (fun) (
     (= atexit_list (cons fun atexit_list))
-    (return nil)
+    (return @C_NIL)
     ))
 
 (var import_dirs null)
@@ -403,7 +403,7 @@
         (var fullpath (build_path (car dir) path ""))
         (if (file_exists fullpath) (do
             (if (is_already_imported fullpath)
-                (return nil)
+                (return @C_NIL)
                 )
             (add_importd_file fullpath)
 
@@ -427,7 +427,7 @@
             (close_in ichan)
 
             (set_loc no_loc)
-            (return nil)
+            (return @C_NIL)
             ))
         (= dir (cdr dir))
         ))
@@ -446,7 +446,7 @@
 
 (fun eval_open (expr) (
     (open_module current_loc current_mod (node_arg expr 0))
-    (return nil)
+    (return @C_NIL)
     ))
 
 (fun eval_import (expr) (
@@ -462,12 +462,12 @@
         (= path (strcat path ".ab"))
         ))
     (import_file path)
-    (return nil)
+    (return @C_NIL)
     ))
 
 (fun setup_argv (argc argv) (
     (var ARGV (ary_new))
-    (add_module_variable amber_mod (to_sym "ARGV") true ARGV)
+    (add_module_variable amber_mod (to_sym "ARGV") @C_TRUE ARGV)
     (if (== argc 0) return)
     (for i 1 argc (do
         (ary_push ARGV (string (array_get string argv i)))
@@ -479,21 +479,21 @@
     ))
 
 (fun def_global_var (sym val) (
-    (add_module_variable current_mod sym false val)
+    (add_module_variable current_mod sym @C_FALSE val)
     (return val)
     ))
 
 (fun setup_globals (mod) (
     (var symT (domainP Symbol))
     
-    (add_module_variable mod (to_sym "amber") false mod)
-    (add_module_variable mod (to_sym "LOCATION") false current_loc)
-    (add_module_variable mod (to_sym "MODULE") false current_mod)
-    (add_module_variable mod (to_sym "PROMPT") false (string "amber"))
+    (add_module_variable mod (to_sym "amber") @C_FALSE mod)
+    (add_module_variable mod (to_sym "LOCATION") @C_FALSE current_loc)
+    (add_module_variable mod (to_sym "MODULE") @C_FALSE current_mod)
+    (add_module_variable mod (to_sym "PROMPT") @C_FALSE (string "amber"))
 
     (if (in_shell_mode)
-        (add_module_variable mod (to_sym "shell_mode") true true)
-        (add_module_variable mod (to_sym "shell_mode") true false)
+        (add_module_variable mod (to_sym "shell_mode") @C_TRUE @C_TRUE)
+        (add_module_variable mod (to_sym "shell_mode") @C_TRUE @C_FALSE)
         )
     
     (add_function1 mod Rewrite DontCare default_rewrite 0)

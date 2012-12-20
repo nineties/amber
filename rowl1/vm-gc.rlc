@@ -103,6 +103,8 @@
 (define BIDX2BLOCK  (idx)   `(<< @idx @BLOCK_SHIFT))
 (define IS_POINTER_TO_HEAP  (addr)  `(!= @(blockmap->first (BLOCK2BIDX addr)) 0))
 
+(define IS_CONSTANT (addr) `(|| (& @addr 1) (u<= @addr 8)))
+
 (define BDESCR2BLOCK (bdescr) `(<< (- @bdescr block_map) @(- BLOCK_SHIFT BDESCR_SHIFT)))
 
 (define blockmap[] (idx)    `(+ block_map (* @BDESCR_SIZE @idx)))
@@ -296,10 +298,9 @@
     (void* obj ([] objp 0))
 
     ; nil object
-    (if (! obj) ((return)))
+    (if @(IS_CONSTANT obj) ((return)))
 
     (if (! @(IS_POINTER_TO_HEAP obj)) ((return)))
-    (if (& obj 1) ((return))) ; boxed integer
 
     ; this object is already in next generation
     (if (== @(pdescr->generation (ADDR2PDESCR obj)) next_gen) ((return)))
@@ -405,9 +406,8 @@
 (fun move_weakref_ent (objp) (
     (void* obj ([] objp 0))
     ; nil object
-    (if (! obj) ((return @FALSE)))
+    (if @(IS_CONSTANT obj) ((return @FALSE)))
     (if (! @(IS_POINTER_TO_HEAP obj)) ((return @FALSE)))
-    (if (& obj 1) ((return @FALSE))) ; boxed integer
     ; this object is already in next generation
     (if (== @(pdescr->generation (ADDR2PDESCR obj)) next_gen)
         ((return @FALSE)))
@@ -683,7 +683,8 @@
     (if (> size 6) ((return 0)))
     (+= size 1)
     (void* ptr (allocate_object size))
-    @(SET_HEADER ptr TAG_WEAKREF (& (<< mask 1) 0x7f) size)
+    (int flag (& (<< mask 1) 0x7f))
+    @(SET_HEADER ptr TAG_WEAKREF flag size)
     (+= ptr @WORD_SIZE)
     (memset ptr 0 (* @WORD_SIZE (- size 1)))
 
@@ -868,6 +869,14 @@
     ([]= ptr 0 ([] f 0))
     ([]= ptr 1 ([] f 1))
     (return ptr)
+    ))
+
+(export prim_is_special)
+(fun prim_is_special (obj) (
+    (if (&& obj (&& (! (& obj 1)) (u<= obj @SPECIAL_MAX)))
+        ((return @TRUE))
+        ((return @FALSE))
+        )
     ))
 
 (export prim_get_tag)

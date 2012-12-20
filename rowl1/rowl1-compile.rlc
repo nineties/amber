@@ -42,22 +42,12 @@
     (compile_simple_call asm 2 trace_func)
     ))
 
-(fun is_identifier (expr) (
-    (if (is_symbol expr) (return @TRUE))
-    (var hd (node_head expr))
-    (if (&& (== hd Qualified) (== (node_size expr) 2)) (do
-        (if (! (is_symbol (node_arg expr 0))) (return @FALSE))
-        (return (is_identifier (node_arg expr 1)))
-        ))
-    (return @FALSE)
-    ))
-
 (fun defined_symbol (expr) (
     (var lhs (node_arg expr 0))
     (if (is_symbol lhs) (return lhs))
     (var hd (node_head lhs))
     (if (== hd Ref) (return (node_arg lhs 2)))
-    (return nil)
+    (return @C_NIL)
     ))
 
 (export fun callable (expr) (
@@ -68,6 +58,7 @@
     ))
 
 (fun iter_args (f node arg level) (
+    (if (is_special node) (return arg))
     (if (is_symbol node)
         (if (== level 0) (return (f node arg)) (return arg))
         )
@@ -114,11 +105,12 @@
 (fun fv_iter (mod expr level fv) (
     (if (is_symbol expr) (do
         (if (== level 0) (do
+            (if (is_special expr) (return fv))
+            (if (== expr DontCare) (return fv))
             (= fv (list_delete expr fv))
             (var info (lookup_symbol mod expr))
             ; module-variables and special symbols are not free.
             (if (== (node_head info) ModuleVariable) (return fv))
-            (if (is_special_symbol expr) (return fv))
             (return (cons expr fv))
             ))
         (return fv)
@@ -175,7 +167,8 @@
 
 (fun alpha_args_iter (tbl chk rep expr level) (
     (if (is_symbol expr) (do
-        (if (is_special_symbol expr) (return expr))
+        (if (== expr DontCare) (return expr))
+        (if (is_special expr) (return expr))
         (if (== level 0) (do
             (if (symtable_find tbl expr)
                 (do
@@ -229,7 +222,7 @@
     (lfor v (field_get rep 0) (do
         (var v1 (field_get v 0))
         (var v2 (field_get v 1))
-        (if (== guard nil)
+        (if (== guard @C_NIL)
             (= guard (make_node2 Equal v1 v2))
             (= guard (make_node2 SeqAnd guard (make_node2 Equal v1 v2)))
             )
@@ -250,8 +243,8 @@
         )
         (do
             (= args (alpha_args_iter tbl chk rep args 0))
-            (var guard (setup_guard rep nil))
-            (if (== guard nil)
+            (var guard (setup_guard rep @C_NIL))
+            (if (== guard @C_NIL)
                 (return args)
                 (return (make_node2 Where args guard))
                 )
@@ -260,7 +253,8 @@
 
 (fun alpha (tbl expr) (
     (if (is_symbol expr) (do
-        (if (is_special_symbol expr) (return expr))
+        (if (== expr DontCare) (return expr))
+        (if (is_special expr) (return expr))
         (var subst (symtable_find tbl expr))
         (if subst (return subst))
         (return expr)
@@ -401,11 +395,11 @@
         (while fv (do
             (var info (symtable_find tbl (car fv)))
             (if (== info maybe) (do
-                (symtable_replace tbl (car fv) true)
+                (symtable_replace tbl (car fv) @C_TRUE)
                 ))
             (= fv (cdr fv))
             ))
-        (return (make_node2 Closure nil expr))
+        (return (make_node2 Closure @C_NIL expr))
         ))
     ; Closure has no closure variables since it is already closed.
     (if (== hd Closure) (return expr))
@@ -452,6 +446,7 @@
     ))
 
 (fun subst_clsvars (tbl cls expr) (
+    (if (is_special expr) (return expr))
     (if (is_symbol expr) (do
         (var v (symtable_find tbl expr))
         (if (&& v (!= v maybe)) (return (clone v)))
@@ -493,7 +488,7 @@
         (return expr)
         ))
     (if (== hd Closure) (do
-        (if (== (node_arg expr 0) nil)
+        (if (== (node_arg expr 0) @C_NIL)
             (node_arg_set expr 0 cls)
             )
         (node_arg_set expr 1 (subst_clsvars tbl cls (node_arg expr 1)))
@@ -610,6 +605,14 @@
     (compile asm mod (node_arg expr 1))
     ))
 
+(fun compile_special (asm mod expr) (
+    (put_imm_int16 asm expr)
+    ))
+
+(fun compile_const_int (asm mod expr) (
+    (put_imm_int asm expr)
+    ))
+
 (fun compile_const (asm mod expr) (
     (put_push asm expr)
     ))
@@ -690,7 +693,7 @@
         (symtable_add tbl (car vars) maybe)
         (= vars (cdr vars))
         ))
-    (if (!= cls nil)
+    (if (!= cls @C_NIL)
         (symtable_add tbl cls maybe)
         )
     (= body (scan_clsvars mod body tbl))
@@ -705,7 +708,7 @@
         (var stmts 0)
         (= stmts (cons (defvar newcls
             (make_node1 AllocClsEnv (box clssize))) stmts))
-        (if (== cls nil)
+        (if (== cls @C_NIL)
             (= stmts (store_args tbl args stmts))
             (= stmts (store_args tbl (cons cls args) stmts))
             )
@@ -768,6 +771,7 @@
     ))
 
 (fun setup_arg (tbl obj arg level nc) (
+    (if (is_special arg) (return nc))
     (if (is_symbol arg) (do
         (if (== level 0) (do
             (if (|| (== (node_head obj) Argument) (== arg DontCare))
@@ -811,7 +815,7 @@
                         "\"...\" node must be placed last in the order of arguments")))
                     )
                 (var v (node_arg_symbol a 0))
-                (if (== v nil) (return nc))
+                (if (== v @C_NIL) (return nc))
                 (var t (unique_sym))
                 (= obj (make_list_from obj idx))
                 (symtable_add tbl t obj)
@@ -843,7 +847,7 @@
                     "\"...\" must be placed last in the order of arguments"
                 ))))
             (var v (node_arg_symbol a 0))
-            (if (== v nil) (return nc))
+            (if (== v @C_NIL) (return nc))
             (var t (unique_sym))
             (= obj (make_restof obj i))
             (symtable_add tbl t obj)
@@ -908,10 +912,10 @@
         )
     ))
 (fun compile_define_variable_ (asm mod expr) (
-    (var overwrite false)
+    (var overwrite @C_FALSE)
     (if (&& (== (node_size expr) 3)
             (== (node_arg expr 2) (to_sym "overwrite")))
-        (= overwrite true)
+        (= overwrite @C_TRUE)
         )
     (var lhs (node_arg expr 0))
     (var rhs (node_arg expr 1))
@@ -948,8 +952,8 @@
         (list_append vars (list1 t))) (list1 rhs)))
 
     (while vars (do
-        (var def nil)
-        (if (== overwrite true)
+        (var def @C_NIL)
+        (if (== overwrite @C_TRUE)
             (= def (make_node3 DefVariable (car vars) Decons (to_sym "overwrite")))
             (= def (make_node2 DefVariable (car vars) Decons))
             )
@@ -966,7 +970,7 @@
     ))
 
 (fun compile_define_variable_top (asm mod lhs rhs overwrite) (
-    (if (== overwrite false) (check_redefinition mod lhs))
+    (if (== overwrite @C_FALSE) (check_redefinition mod lhs))
     (compile asm mod rhs)
     (put_push asm overwrite)
     (put_push asm lhs)
@@ -977,7 +981,7 @@
 (fun compile_define_variable_local (asm mod lhs rhs overwrite) (
     (if (is_symbol lhs) (do
         (var idx 0)
-        (if (== overwrite true)
+        (if (== overwrite @C_TRUE)
             (do
                 (var info (lookup_symbol mod lhs))
                 (= idx (node_arg_int info 0))
@@ -995,7 +999,7 @@
     ))
 
 (fun compile_define_clsref (asm mod clsref rhs overwrite) (
-    (if (== overwrite false) (add_symbol mod (node_arg_symbol clsref 2) clsref))
+    (if (== overwrite @C_FALSE) (add_symbol mod (node_arg_symbol clsref 2) clsref))
     (compile asm mod (assign clsref rhs))
     ))
 
@@ -1003,7 +1007,7 @@
     (var info (lookup_symbol_local mod sym))
     (if (! info) return)
     (if (== (node_head info) ModuleVariable) (do
-        (if (|| (== (node_arg info 1) false) (== (node_arg info 2) true))
+        (if (|| (== (node_arg info 1) @C_FALSE) (== (node_arg info 2) @C_TRUE))
             return
             )
         ))
@@ -1232,7 +1236,7 @@
 
 (fun compile_block_body (asm mod exprs) (
     (if (! exprs) (do
-        (put_push asm nil)
+        (put_nil asm)
         return
         ))
     (while exprs (do
@@ -1244,7 +1248,7 @@
 
 (fun compile_block (asm mod expr) (
     (if (in_top_scope mod)
-        (return (compile_function asm 0 mod 0 expr noguard nil))
+        (return (compile_function asm 0 mod 0 expr noguard @C_NIL))
         )
     (var exprs (node_arg expr 0))
     (push_varscope mod)
@@ -1254,7 +1258,7 @@
 
 (fun compile_breakable (asm mod expr) (
     (if (in_top_scope mod)
-        (return (compile_function asm 0 mod 0 expr noguard nil))
+        (return (compile_function asm 0 mod 0 expr noguard @C_NIL))
         )
     (var break_lbl (fresh_label asm))
     (var exit_lbl  (fresh_label asm))
@@ -1262,7 +1266,7 @@
     (compile_block asm mod expr)
     (put_goto asm exit_lbl)
     (set_label asm break_lbl)
-    (put_push asm nil)
+    (put_nil asm)
     (set_label asm exit_lbl)
     (= break_labels (cdr break_labels))
     ))
@@ -1277,18 +1281,8 @@
     (compile asm scope (node_arg expr 1))
     ))
 
-(fun put_if_true (asm lbl) (
-    (put_push asm false)
-    (put_if_ne asm lbl)
-    ))
-
-(fun put_if_false (asm lbl) (
-    (put_push asm false)
-    (put_if_eq asm lbl)
-    ))
-
 (fun compile_if (asm mod expr) (
-    (compile_ifelse_main asm mod (node_arg expr 0) (node_arg expr 1) nil)
+    (compile_ifelse_main asm mod (node_arg expr 0) (node_arg expr 1) @C_NIL)
     ))
 
 (fun compile_ifelse (asm mod expr) (
@@ -1307,12 +1301,12 @@
     (if (&& (== cnd_hd SeqOr) (== size 2))
         (return (compile_ifelse_or asm mod cnd ifthen ifelse))
         )
-    (if (== ifthen nil)
-        (if (== ifelse nil)
+    (if (== ifthen @C_NIL)
+        (if (== ifelse @C_NIL)
             (do
                 (compile asm mod cnd)
                 (put_drop asm)
-                (put_push asm nil)
+                (put_nil asm)
             )
             (do
                 (var exit_lbl (fresh_label asm))
@@ -1322,10 +1316,10 @@
                 (compile asm mod ifelse)
                 (put_goto asm cont_lbl)
                 (set_label asm exit_lbl)
-                (put_push asm nil)
+                (put_nil asm)
                 (set_label asm cont_lbl)
             ))
-        (if (== ifelse nil)
+        (if (== ifelse @C_NIL)
             (do
                 (var exit_lbl (fresh_label asm))
                 (var cont_lbl (fresh_label asm))
@@ -1334,7 +1328,7 @@
                 (compile asm mod ifthen)
                 (put_goto asm cont_lbl)
                 (set_label asm exit_lbl)
-                (put_push asm nil)
+                (put_nil asm)
                 (set_label asm cont_lbl)
             )
             (do
@@ -1450,7 +1444,7 @@
     (compile asm mod cnd)
     (put_if_true asm head_lbl)
     (set_label asm exit_lbl)
-    (put_push asm nil)
+    (put_nil asm)
 
     (= break_labels (cdr break_labels))
     (= continue_labels (cdr continue_labels))
@@ -1477,7 +1471,7 @@
             (defvar iter (apply (to_sym "each") (list1 ary)))
             (defvar i (apply iter 0))
             (make_node2 While
-                (make_node1 Not (apply (to_sym "equal") (list2 i undefined)))
+                (make_node1 Not (apply (to_sym "equal") (list2 i @C_UNDEF)))
                 (seq (list2
                     body
                     (assign i (apply iter 0))
@@ -1495,7 +1489,7 @@
             (defvar iter (apply (to_sym "reverse_each") (list1 ary)))
             (defvar i (apply iter 0))
             (make_node2 While
-                (make_node1 Not (apply (to_sym "equal") (list2 i undefined)))
+                (make_node1 Not (apply (to_sym "equal") (list2 i @C_UNDEF)))
                 (seq (list2
                     body
                     (assign i (apply iter 0))
@@ -1680,15 +1674,15 @@
     (var else_lbl (fresh_label asm))
     (var exit_lbl (fresh_label asm))
     (put_if_false asm else_lbl)
-    (put_push asm false)
+    (put_false asm)
     (put_goto asm exit_lbl)
     (set_label asm else_lbl)
-    (put_push asm true)
+    (put_true asm)
     (set_label asm exit_lbl)
     ))
 
 (fun compile_logical (asm mod expr) (
-	(compile asm mod (ifelse expr true false))
+	(compile asm mod (ifelse expr @C_TRUE @C_FALSE))
 	))
 
 (fun compile_lambda_main (asm mod args body guard cls) (
@@ -1727,7 +1721,7 @@
     ))
 
 (fun compile_lambda (asm mod expr) (
-    (return (compile_lambda_ asm mod expr nil))
+    (return (compile_lambda_ asm mod expr @C_NIL))
     ))
 
 (fun compile_bind (asm mod expr) (
@@ -1843,7 +1837,7 @@
                 (= newfunc (make_bound newfunc func))
                 )
         ))
-    (add_module_variable mod sym false newfunc)
+    (add_module_variable mod sym @C_FALSE newfunc)
     ))
 
 ; DefineFunction{sym, fun} is equivalent to:
@@ -1852,7 +1846,7 @@
 ; sym: fun | sym (overwrite) (when `sym' is defined in local scope)
 (fun compile_define_function (asm mod expr) (
     (var lhs (node_arg expr 0))
-    (var sym nil)
+    (var sym @C_NIL)
     (if (== (node_head lhs) Ref)
         (= sym (node_arg_symbol lhs 2))
     (if (is_symbol lhs)
@@ -1948,11 +1942,11 @@
 
     (add_compiler mod (domainP Symbol) compile_var)
     (add_compiler mod (make_node1 Dynamic symT) compile_dynamic_var)
-    (add_compiler mod (quote true) compile_const)
-    (add_compiler mod (quote false) compile_const)
-    (add_compiler mod (quote nil) compile_const)
-    (add_compiler mod (quote undefined) compile_const)
-    (add_compiler mod (domainP Int) compile_const)
+    (add_compiler mod (quote @C_TRUE) compile_special)
+    (add_compiler mod (quote @C_FALSE) compile_special)
+    (add_compiler mod (quote @C_NIL) compile_special)
+    (add_compiler mod (quote @C_UNDEF) compile_special)
+    (add_compiler mod (domainP Int) compile_const_int)
     (add_compiler mod (domainP String) compile_const)
     (add_compiler mod (domainP BigInt) compile_const)
     (add_compiler mod (domainP Float) compile_const)

@@ -34,7 +34,7 @@
 (var EOF -2)
 
 (define CHGRP (c) `(array_get char chgroup @c))
-(define PARSED (p) `(== (field_get @p 1) true))
+(define PARSED (p) `(== (field_get @p 1) @C_TRUE))
 (define TOKEN (p) `(field_get @p 2))
 
 (define MEMOIZE (sym)
@@ -264,7 +264,7 @@
     ))
 
 (fun parsed (p val) (
-    (field_set p 1 true)
+    (field_set p 1 @C_TRUE)
     (field_set p 2 val)
     (if (> (field_get p 8) (field_get p 9)) (do
         (field_set p 6 @FALSE)
@@ -272,13 +272,13 @@
     ))
 
 (fun noparse (p msg) (
-    (field_set p 1 false)
+    (field_set p 1 @C_FALSE)
     (field_set p 2 (string msg))
     ))
 
 (fun mayparse (p msg) (
     (= may_parse @TRUE)
-    (field_set p 1 false)
+    (field_set p 1 @C_FALSE)
     (field_set p 2 (string msg))
     ))
 
@@ -300,7 +300,7 @@
     ))
     
 (fun set_error_state (p err) (
-    (field_set p 1 false)
+    (field_set p 1 @C_FALSE)
     (field_set p 2 (field_get err 0)) 
     (field_set p 4 (field_get err 1))
     (field_set p 5 (field_get err 3))
@@ -310,12 +310,12 @@
 (fun negate (p) (
     (if @(PARSED p)
         (do
-            (field_set p 1 false)
+            (field_set p 1 @C_FALSE)
             (field_set p 2 (string "unexpected token"))
         )
         (do
-            (field_set p 1 true)
-            (field_set p 2 nil)
+            (field_set p 1 @C_TRUE)
+            (field_set p 2 @C_NIL)
         ))
     ))
 
@@ -434,10 +434,10 @@
     ))
 
 (fun check_indent (p) (
-    (if (field_get p 6) (return true))
+    (if (field_get p 6) (return @C_TRUE))
     (if (<= (field_get p 8) (field_get p 9))
-        (return false)
-        (return true)
+        (return @C_FALSE)
+        (return @C_TRUE)
         )
     ))
 
@@ -751,7 +751,7 @@
         ))
     (if (== (get_pos p) pos)
         (return (noparse p "expect blank"))
-        (return (parsed p nil))
+        (return (parsed p @C_NIL))
         )
     ))
 @(MEMOIZE blanks)
@@ -776,7 +776,7 @@
         ))
     (if (== (get_pos p) pos)
         (return (noparse p "expect blank"))
-        (return (parsed p nil))
+        (return (parsed p @C_NIL))
         )
     ))
 @(MEMOIZE spaces)
@@ -789,7 +789,7 @@
         (if (|| (== c '\n') (< c 0)) break)
         (getc p)
         ))
-    (return (parsed p nil))
+    (return (parsed p @C_NIL))
     ))
 @(MEMOIZE shell_style_comment)
 
@@ -801,7 +801,7 @@
         (if (|| (== c '\n') (< c 0)) break)
         (getc p)
         ))
-    (return (parsed p nil))
+    (return (parsed p @C_NIL))
     ))
 @(MEMOIZE C_style_comment)
 
@@ -1417,7 +1417,7 @@
             ))
         (block (list4
             (assign elems (apply (to_sym "%cons") (list2 (get_token) elems)))
-            (make_node2 While true (block (list_reverse loop_body)))
+            (make_node2 While @C_TRUE (block (list_reverse loop_body)))
             (gen_set_parser_state_all PVar state)
             (set_parsed (apply (to_sym "%reverse") (list1 elems)))
             ))
@@ -1457,7 +1457,7 @@
     (= body (cons (mkif (test_parsed) (block (list5
         (assign elems (apply (to_sym "%cons") (list2 (get_token) elems)))
         (defvar state (gen_copy_parser_state PVar))
-        (make_node2 While true (block (list_reverse loop_body)))
+        (make_node2 While @C_TRUE (block (list_reverse loop_body)))
         (gen_set_parser_state_all PVar state)
         (set_parsed (apply (to_sym "%reverse") (list1 elems)))
         ))) body))
@@ -1532,7 +1532,7 @@
                 (make_node0 Break)
             )))
         body))
-    (= body (cons (make_node2 While true
+    (= body (cons (make_node2 While @C_TRUE
             (block (list_reverse loop_body))) body))
     (= body (cons (gen_set_parser_state_all PVar state) body))
     (= body (cons (apply (to_sym "%set_indent") (list2 PVar indent_save)) body))
@@ -1585,7 +1585,7 @@
             ))
         (block (list4
             (assign elems (apply (to_sym "%cons") (list2 (get_token) elems)))
-            (make_node2 While true (block (list_reverse loop_body)))
+            (make_node2 While @C_TRUE (block (list_reverse loop_body)))
             (gen_set_parser_state_all PVar state)
             (set_parsed (apply (to_sym "%reverse") (list1 elems)))
             ))) body))
@@ -1614,7 +1614,7 @@
         ))) body))
 
     (= body (cons (assign elems (apply (to_sym "%cons") (list2 (get_token) elems))) body))
-    (= body (cons (make_node2 While true
+    (= body (cons (make_node2 While @C_TRUE
         (block (list_reverse loop_body))) body))
     (= body (cons (gen_set_parser_state_all PVar state) body))
     (= body (cons (mkif
@@ -1659,9 +1659,9 @@
 
 ; enter anonymous scope
 (fun open_scope (extra) (
-    (var module (make_module nil current_mod))
+    (var module (make_module @C_NIL current_mod))
     (set_current_module module)
-    (if (!= extra nil)
+    (if (!= extra @C_NIL)
         (open_module current_loc module extra)
         )
     ))
@@ -1693,7 +1693,7 @@
             (test_noparse)
             (block (list2
                 (gen_set_parser_state_all PVar state)
-                (set_parsed nil)
+                (set_parsed @C_NIL)
                 ))
             (set_parsed (qquote (make_node1 Some (unquote (get_token)))))
             ))))
@@ -1888,7 +1888,7 @@
     (return (block (list5
         (defvar state (gen_copy_parser_state PVar))
         new_parser
-        (mkif (test_parsed) (mkreturn nil))
+        (mkif (test_parsed) (mkreturn @C_NIL))
         (gen_set_parser_state_all PVar state)
         (apply old_parser (list1 PVar))
         )))

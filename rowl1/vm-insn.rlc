@@ -55,12 +55,22 @@
     (vmfetch)
     ))
 
+(define gen_comparison4 (v) `(
+    (vmpop %eax)
+    (asm "cmpl $" @v ", %eax")
+    (asm "movl $3, %eax")
+    (vmsshort 1 %ecx)
+    (asm "cmove %ecx, %eax")
+    (vmsucc %eax)
+    (vmfetch)
+    ))
+
 (define gen_check_pstruct (type) `(
     (vmpop %eax)
+    (asm "cmpl $" @SPECIAL_MAX ", %eax")
+    (asm "jbe 1f")
     (asm "testl $1, %eax")
     (asm "jnz 1f")
-    (asm "testl %eax, %eax")
-    (asm "jz 1f")
     (asm "movl -4(%eax), %eax")
     ; XXX: should not hardcode the layout of object header.
     (asm "andl $" @(- (<< 1 11) 1) ", %eax")
@@ -1464,6 +1474,27 @@
     (if_flt     (-2 addr) @nil @(gen_comparison3 "jb"))
     (if_fle     (-2 addr) @nil @(gen_comparison3 "jbe"))
 
+    (if_nil    (-1 addr) @nil @(gen_comparison4 C_NIL))
+    (if_undef  (-1 addr) @nil @(gen_comparison4 C_UNDEF))
+    (if_true   (-1 addr) @nil (
+        (vmpop %eax)
+        (asm "cmpl $" @C_FALSE ", %eax")
+        (asm "movl $3, %eax")
+        (vmsshort 1 %ecx)
+        (asm "cmovne %ecx, %eax")
+        (vmsucc %eax)
+        (vmfetch)
+        ))
+    (if_false  (-1 addr) @nil (
+        (vmpop %eax)
+        (asm "cmpl $" @C_FALSE ", %eax")
+        (asm "movl $3, %eax")
+        (vmsshort 1 %ecx)
+        (asm "cmove %ecx, %eax")
+        (vmsucc %eax)
+        (vmfetch)
+        ))
+
     ; instructions for handling exceptions.
     ; push unwind stack
     (unwind_push (0 addr) @true (
@@ -1523,7 +1554,9 @@
         (asm "0:")
         (asm "testl %eax, %eax")
         (asm "jz 1f")
-        (asm "testl $1, %eax") ; if 1 & %eax != 0 then %eax is a boxed integer.
+        (asm "cmpl $" @SPECIAL_MAX ", %eax")
+        (asm "jbe 3f") ; if %eax <= SPECIAL_MAX then %eax is a unboxed data.
+        (asm "testl $1, %eax")
         (asm "jnz 3f")
         (asm "movl -4(%eax), %edx") ; %edx <- header of %eax
         (asm "andl $15, %edx")
@@ -1554,7 +1587,9 @@
         (asm "jz 1f")
         (asm "testl %ecx, %ecx")
         (asm "jz 2f")
-        (asm "testl $1, %eax") ; if 1 & %eax != 0 then %eax is a boxed integer.
+        (asm "cmpl $" @SPECIAL_MAX ", %eax")
+        (asm "jbe 3f") ; if %eax <= SPECIAL_MAX then %eax is a unboxed data.
+        (asm "testl $1, %eax")
         (asm "jnz 3f")
         (asm "movl -4(%eax), %edx") ; %edx <- header of %eax
         (asm "andl $15, %edx")
