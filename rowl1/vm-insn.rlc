@@ -883,11 +883,54 @@
         (asm "fdivp %st, %st(1)")
         (asm "fstpl (%eax)")
         ))
+    (fabs (0) @true (
+        (asm "movl (%esi), %eax")
+        (asm "fldl (%eax)")
+        (asm "fabs")
+        (asm "fstpl (%eax)")
+        ))
     (fsqrt (0) @true (
         (asm "movl (%esi), %eax")
         (asm "fldl (%eax)")
         (asm "fsqrt")
         (asm "fstpl (%eax)")
+        ))
+    (fcos (0) @true (
+        (asm "movl (%esi), %eax")
+        (asm "fldl (%eax)")
+        (asm "fcos")
+        (asm "fstpl (%eax)")
+        ))
+    (fsin (0) @true (
+        (asm "movl (%esi), %eax")
+        (asm "fldl (%eax)")
+        (asm "fsin")
+        (asm "fstpl (%eax)")
+        ))
+    (ftan (0) @true (
+        (asm "movl (%esi), %ecx")
+        (asm "fldl (%ecx)")
+        (asm "fxam")
+        (asm "fstsw %ax")
+        (asm "sahf")
+        (asm "jc 2f")
+
+        (asm "1:")
+        (asm "fptan")
+        (asm "fstp %st(0)")
+        (asm "fstsw %ax")
+        (asm "sahf")
+        (asm "jnp 3f")
+        (asm "fldpi")
+        (asm "fxch")
+        (asm "fprem1")
+        (asm "jmp 1b")
+
+        (asm "2:")
+        (asm "fldl NaN")
+
+        (asm "3:")
+        (asm "fstpl (%ecx)")
         ))
     ; integer to float
     (itof (0) @true (
