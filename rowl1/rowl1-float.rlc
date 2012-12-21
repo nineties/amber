@@ -194,7 +194,16 @@
     (if (&& (== f0 0) (|| (== f1 0) (== f1 0x80000000))) (return (string "0.0")))
 
     (if (< f1 0) (= sign 1))
-    (var exp (- (- (& (>> f1 20) 0x7ff) 1023) 52))
+    (var exp (- (& (>> f1 20) 0x7ff) 1023))
+    (if (== exp 1024) (do
+        (if (&& (== (& f1 0xfffff) 0) (== f0 0)) (do
+            (if sign
+                (return (string "-inf"))
+                (return (string "inf"))
+                )
+            ))
+        (return (string "NaN"))
+        ))
     (var man (allocate_bint 2))
     (field_set man 1 2)
     (bint_set_digit man 0 f0)
@@ -205,6 +214,7 @@
 (var ten^15 (mul (uint_to_bint 1000000000) (uint_to_bint 1000000)))
 (fun decode_float (sign man e) (
     (var p 0)
+    (-= e 52)
     (if (>= e -52)
         (= p (- (/ (+ (* 3 e) 6) 10)))
         (= p (- -5 (/ (+ (* 4 e) 4) 5)))
