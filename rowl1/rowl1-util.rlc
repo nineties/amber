@@ -152,15 +152,28 @@
     ))
 
 (export fun list_delete (val ls) (
-    (if (! ls) (return 0))
-    (if (== val (car ls)) (return (cdr ls)))
-    (return (cons (car ls) (list_delete val (cdr ls))))
+    (var p 0)
+    (var ret ls)
+    (while ls (do
+        (if (== (car ls) val) (do
+            (if (! p)
+                (= ret (cdr ls))
+                (setcdr p (cdr ls))
+                )
+            break
+            ))
+        (= p ls)
+        (= ls (cdr ls))
+        ))
+    (return ret)
     ))
 
 (export fun list_member (val ls) (
-    (if (! ls) (return 0))
-    (if (== val (car ls)) (return @TRUE))
-    (return (list_member val (cdr ls)))
+    (while ls (do
+        (if (== val (car ls)) (return @TRUE))
+        (= ls (cdr ls))
+        ))
+    (return @FALSE)
     ))
 
 (export fun list_drop (ls n) (

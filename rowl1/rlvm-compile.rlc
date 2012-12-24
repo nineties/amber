@@ -78,7 +78,7 @@
 
 (define gen_startup_func () (do
     (reset_insn_seq)
-    (compile_expr `(exit (main (cmd_argc) (cmd_argv))))
+    (compile_expr `(exit (main (cmd_argc) (cmd_argv))) true)
     (var call_main (get_insn_seq))
     `(function @nil __startup__ @(append startup_code call_main))
     ))
@@ -99,21 +99,22 @@
         (otherwise `(@loadl (byte @(arg_offs idx))))
         ))
 
-(define compile_var (sym) (do
-    (var loc (lookup_var sym))
-    (cond
-        ((== `arg (car loc)) (emit_insn (arg_insn (cadr loc))))
-        ((== `local (car loc)) (compile_local_var loc))
-        ((== `value (car loc)) (compile_value loc))
-        ((== `object (car loc)) (compile_object loc))
-        ((== `fun (car loc)) (compile_fun loc))
-        ((== `extfun (car loc)) (compile_extfun loc))
-        ((== `prim (car loc)) (compile_prim loc))
-        ((== `extvalue (car loc)) (compile_value loc))
-        ((== `extobject (car loc)) (compile_object loc))
-        (otherwise (error "compile_var: not implemented " loc))
-        )
-    true
+(define compile_var (sym drop) (do
+    (if (not drop) (do
+        (var loc (lookup_var sym))
+        (cond
+            ((== `arg (car loc)) (emit_insn (arg_insn (cadr loc))))
+            ((== `local (car loc)) (compile_local_var loc))
+            ((== `value (car loc)) (compile_value loc))
+            ((== `object (car loc)) (compile_object loc))
+            ((== `fun (car loc)) (compile_fun loc))
+            ((== `extfun (car loc)) (compile_extfun loc))
+            ((== `prim (car loc)) (compile_prim loc))
+            ((== `extvalue (car loc)) (compile_value loc))
+            ((== `extobject (car loc)) (compile_object loc))
+            (otherwise (error "compile_var: not implemented " loc))
+            )
+        ))
     ))
 
 (define compile_value ((opdtype type name)) (do
@@ -154,40 +155,41 @@
     (emit_insn `(prim (short @idx)))
     ))
 
-(define compile_int_lit (val) (do
-    (cond
-        ((== val 0)  (emit_insn `imm_i0))
-        ((== val 1)  (emit_insn `imm_i1))
-        ((== val 2)  (emit_insn `imm_i2))
-        ((== val 3)  (emit_insn `imm_i3))
-        ((== val 4)  (emit_insn `imm_i4))
-        ((== val 5)  (emit_insn `imm_i5))
-        ((== val -1) (emit_insn `imm_im1))
-        ((and (<= val 32768) (> val -32769)) (emit_insn `(imm_int16 (short @val))))
-        (otherwise (emit_insn `(imm_int32 (long @val))))
-        )
-    true
+(define compile_int_lit (val drop) (do
+    (if (not drop) 
+        (cond
+            ((== val 0)  (emit_insn `imm_i0))
+            ((== val 1)  (emit_insn `imm_i1))
+            ((== val 2)  (emit_insn `imm_i2))
+            ((== val 3)  (emit_insn `imm_i3))
+            ((== val 4)  (emit_insn `imm_i4))
+            ((== val 5)  (emit_insn `imm_i5))
+            ((== val -1) (emit_insn `imm_im1))
+            ((and (<= val 32768) (> val -32769)) (emit_insn `(imm_int16 (short @val))))
+            (otherwise (emit_insn `(imm_int32 (long @val))))
+            ))
     ))
 
 (var string_decls ())
-(define compile_string_lit (str) (do
-    (var strlbl (mklabel))
-    (add_var strlbl `(value string @strlbl))
-    (push string_decls `(string @nil @strlbl @str))
-    (emit_insn `(loadav (value @strlbl)))
-    true
+(define compile_string_lit (str drop) (do
+    (if (not drop) (do
+        (var strlbl (mklabel))
+        (add_var strlbl `(value string @strlbl))
+        (push string_decls `(string @nil @strlbl @str))
+        (emit_insn `(loadav (value @strlbl)))
+        ))
     ))
 
-(define compile_exit (expr) (do
-    (compile_expr (cadr expr))
+(define compile_exit (expr drop) (do
+    (assert "exit" drop)
+    (compile_expr (cadr expr) nil)
     (emit_insn `exit)
-    nil
     ))
 
-(define compile_return (expr) (do
-    (compile_expr (cadr expr))
+(define compile_return (expr drop) (do
+    (assert "return" drop)
+    (compile_expr (cadr expr) nil)
     (emit_insn `ireturn)
-    nil
     ))
 
 (define compile_local_incrdecr (op (_ idx)) (do
@@ -201,15 +203,15 @@
             (emit_insn `(@insn (byte @(local_offs idx))))
         )
         )
-    nil
     ))
 
-(define compile_incrdecr ((op v)) (do
+(define compile_incrdecr ((op v) drop) (do
+    (assert "incrdecr" drop)
     (var loc (lookup_var v))
     (cond
         ((== `local (car loc)) (compile_local_incrdecr op loc))
-        ((== `incr op) (compile_expr `(+= @v 1)))
-        ((== `decr op) (compile_expr `(-= @v 1)))
+        ((== `incr op) (compile_expr `(+= @v 1) true))
+        ((== `decr op) (compile_expr `(-= @v 1) true))
         )
     ))
 
@@ -230,30 +232,27 @@
 (define assignment_operator? (op) (assoc op assignment_operator))
 (define conditional_operator? (op) (member? op conditional_operator))
 
-(define compile_binexpr (expr) (do
+(define compile_binexpr (expr drop) (do
     (var insn (assoc (car expr) binary_operator))
     (var lhs (cadr expr))
     (var rhs (caddr expr))
-    (compile_expr lhs)
-    (compile_expr rhs)
-    (emit_insn insn)
-    true
+    (compile_expr lhs drop)
+    (compile_expr rhs drop)
+    (if (not drop) (emit_insn insn))
     ))
 
-(define compile_unexpr (expr) (do
+(define compile_unexpr (expr drop) (do
     (var insn (assoc (car expr) unary_operator))
     (var arg (cadr expr))
-    (compile_expr arg)
-    (emit_insn insn)
-    true
+    (compile_expr arg drop)
+    (if (not drop) (emit_insn insn))
     ))
 
-(define compile_ludiv (expr) (do
-    (compile_expr (cadr expr))
-    (compile_expr (caddr expr))
-    (compile_expr (cadddr expr))
-    (emit_insn `ludiv)
-    true
+(define compile_ludiv (expr drop) (do
+    (compile_expr (cadr expr) drop)
+    (compile_expr (caddr expr) drop)
+    (compile_expr (cadddr expr) drop)
+    (if (not drop) (emit_insn `ludiv))
     ))
 
 (define arg_offs (idx) (* 4 (+ 4 idx)))
@@ -271,137 +270,139 @@
         (otherwise (error "too many local variables"))
         )
     ))
-(define compile_local_assign (insn loc rhs) (do
+(define compile_local_assign (insn loc rhs drop) (do
     (if (!= `nop insn)
         (do
             (compile_local_var loc)
-            (compile_expr rhs)
+            (compile_expr rhs nil)
             (emit_insn insn)
         )
         (do
-            (compile_expr rhs)
+            (compile_expr rhs nil)
         )
         )
     (gen_storel (cadr loc))
+    (if drop (emit_insn `drop))
     ))
 
-(define compile_arg_assign (insn loc rhs) (do
+(define compile_arg_assign (insn loc rhs drop) (do
     (if (!= `nop insn)
         (do
             (emit_insn (arg_insn (cadr loc)))
-            (compile_expr rhs)
+            (compile_expr rhs nil)
             (emit_insn insn)
         )
         (do
-            (compile_expr rhs)
+            (compile_expr rhs nil)
         )
         )
     (var idx (cadr loc))
     (emit_insn `(storel (byte @(arg_offs idx))))
+    (if drop (emit_insn `drop))
     ))
 
-(define compile_value_assign (insn (_ type name) rhs) (do
+(define compile_value_assign (insn (_ type name) rhs drop) (do
     (var load_store_op (assoc type `((char . (loadbv storebv)) (int . (loadv storewv)))))
     (if (!= `nop insn)
         (do
             (emit_insn `(@(car load_store_op) (value @name)))
-            (compile_expr rhs)
+            (compile_expr rhs nil)
             (emit_insn insn)
             (emit_insn `(@(cadr load_store_op) (value @name)))
         )
         (do
-            (compile_expr rhs)
+            (compile_expr rhs nil)
             (emit_insn `(@(cadr load_store_op) (value @name)))
         )
         )
+    (if drop (emit_insn `drop))
     ))
 
-(define compile_object_assign (insn (_ name) rhs) (do
+(define compile_object_assign (insn (_ name) rhs drop) (do
     (if (!= `nop insn)
         (do
             (emit_insn `(loado (object @name)))
-            (compile_expr rhs)
+            (compile_expr rhs nil)
             (emit_insn insn)
             (emit_insn `(storeo (object @name)))
         )
         (do
-            (compile_expr rhs)
+            (compile_expr rhs nil)
             (emit_insn `(storeo (object @name)))
         ))
+    (if drop (emit_insn `drop))
     ))
 
-(define compile_assign (expr) (do
+(define compile_assign (expr drop) (do
     (var insn (assoc (car expr) assignment_operator))
     (var lhs (cadr expr))
     (var rhs (caddr expr))
     (var loc (lookup_var lhs))
     (cond
-        ((== `local (car loc)) (compile_local_assign insn loc rhs))
-        ((== `arg (car loc)) (compile_arg_assign insn loc rhs))
-        ((== `value (car loc)) (compile_value_assign insn loc rhs))
-        ((== `object (car loc)) (compile_object_assign insn loc rhs))
+        ((== `local (car loc)) (compile_local_assign insn loc rhs drop))
+        ((== `arg (car loc)) (compile_arg_assign insn loc rhs drop))
+        ((== `value (car loc)) (compile_value_assign insn loc rhs drop))
+        ((== `object (car loc)) (compile_object_assign insn loc rhs drop))
         (otherwise (error "compile_assign: not implemented"))
         )
-    true
     ))
 
 ; translate (cmp a b) to 
-(define compile_conditional (expr) (do
+(define compile_conditional (expr drop) (do
     (compile_block `(
         (var ret 0)
         (if @expr (incr ret))
         ret
-        ))
-    true
+        ) drop)
     ))
 
-(define compile_prim_call (idx args) (do
+(define compile_prim_call (idx args drop) (do
     (var narg (length args))
-    (foreach a (reverse args) (compile_expr a))
+    (foreach a (reverse args) (compile_expr a nil))
     (emit_insn `(pcall (short @idx) (byte @(* 4 narg))))
-    true
+    (if drop (emit_insn `drop))
     ))
 
-(define compile_localcall (fun args) (do
+(define compile_localcall (fun args drop) (do
     (var narg (length args))
-    (foreach a (reverse args) (compile_expr a))
+    (foreach a (reverse args) (compile_expr a nil))
     (emit_insn `(call (label @fun) (byte @(* 4 narg))))
-    true
+    (if drop (emit_insn `drop))
     ))
 
-(define compile_extcall (fun args) (do
+(define compile_extcall (fun args drop) (do
     (var narg (length args))
-    (foreach a (reverse args) (compile_expr a))
+    (foreach a (reverse args) (compile_expr a nil))
     (emit_insn `(lcall (extfun @fun) (byte @(* 4 narg))))
-    true
+    (if drop (emit_insn `drop))
     ))
 
-(define compile_dynamiccall (fun args) (do
+(define compile_dynamiccall (fun args drop) (do
     (var narg (length args))
-    (foreach a (reverse args) (compile_expr a))
-    (compile_expr fun)
+    (foreach a (reverse args) (compile_expr a nil))
+    (compile_expr fun nil)
     (emit_insn `(dcall (byte @(* 4 narg))))
-    true
+    (if drop (emit_insn `drop))
     ))
 
-(define compile_call (expr) (do
+(define compile_call (expr drop) (do
     (var fun (car expr))
     (var loc (try_lookup_var fun))
     (cond
-        ((nil? loc) (compile_localcall fun (cdr expr)))
-        ((== `prim (car loc)) (compile_prim_call (cadr loc) (cdr expr)))
-        ((== `extfun (car loc)) (compile_extcall fun (cdr expr)))
-        ((== `fun (car loc)) (compile_localcall fun (cdr expr)))
-        ((cons? loc) (compile_dynamiccall fun (cdr expr)))
+        ((nil? loc) (compile_localcall fun (cdr expr) drop))
+        ((== `prim (car loc)) (compile_prim_call (cadr loc) (cdr expr) drop))
+        ((== `extfun (car loc)) (compile_extcall fun (cdr expr) drop))
+        ((== `fun (car loc)) (compile_localcall fun (cdr expr) drop))
+        ((cons? loc) (compile_dynamiccall fun (cdr expr) drop))
         (otherwise (error "compile_call: not reachable here"))
         )))
 
-(define compile_byterun ((_ bytecode . args)) (do
+(define compile_byterun ((_ bytecode . args) drop) (do
     (var narg (length args))
-    (foreach a (reverse args) (compile_expr a))
-    (compile_expr bytecode)
+    (foreach a (reverse args) (compile_expr a nil))
+    (compile_expr bytecode nil)
     (emit_insn `(jcall (byte @(* 4 narg))))
-    true
+    (if drop (emit_insn `drop))
     ))
 
 (var comparison_operator
@@ -409,7 +410,8 @@
       (f< . if_fge) (f> . if_fle) (f<= . if_fgt) (f>= . if_flt) (f== . if_fne) (f!= . if_feq)))
 (define comparison_expr? (expr) (and (cons? expr) (assoc (car expr) comparison_operator)))
 
-(define compile_comp_if (expr) (do
+(define compile_comp_if (expr drop) (do
+    (assert "comp_if" drop)
     (var condexpr (cadr expr))
     (var insn (assoc (car condexpr) comparison_operator))
     (var lhs (cadr condexpr))
@@ -418,53 +420,51 @@
     (var ifelse (if (cdddr expr) (cadddr expr) `nop))
     (var ifelse_label (mklabel))
     (var end_label (mklabel))
-    (compile_expr lhs)
-    (compile_expr rhs)
+    (compile_expr lhs nil)
+    (compile_expr rhs nil)
     (emit_insn `(@insn @(label ifelse_label)))
-    (if (compile_expr ifthen) (emit_insn `drop))
+    (compile_expr ifthen true)
     (emit_insn `(goto @(label end_label)))
     (emit_insn (label ifelse_label))
-    (if (compile_expr ifelse) (emit_insn `drop))
+    (compile_expr ifelse true)
     (emit_insn (label end_label))
-    nil
     ))
 
-(define compile_unless (expr ifthen ifelse) (do
-    (compile_expr `(if @expr @ifelse @ifthen))
+(define compile_unless (expr ifthen ifelse drop) (do
+    (compile_expr `(if @expr @ifelse @ifthen) drop)
     ))
 
-(define compile_seqand_if (lhs rhs ifthen ifelse) (do
+(define compile_seqand_if (lhs rhs ifthen ifelse drop) (do
     (var ifend_label (mklabel))
-    (compile_expr `(if @lhs (if @rhs (do @ifthen (goto @ifend_label)))))
-    (compile_expr ifelse)
+    (compile_expr `(if @lhs (if @rhs (do @ifthen (goto @ifend_label)))) true)
+    (compile_expr ifelse true)
     (emit_insn (label ifend_label))
-    nil
     ))
 
-(define compile_seqor_if (lhs rhs ifthen ifelse) (do
-    (compile_expr `(if (&& (! @lhs) (! @rhs)) @ifelse @ifthen))
+(define compile_seqor_if (lhs rhs ifthen ifelse drop) (do
+    (compile_expr `(if (&& (! @lhs) (! @rhs)) @ifelse @ifthen) drop)
     ))
 
-(define compile_if (expr) (do
+(define compile_if (expr drop) (do
+    (assert "if" drop)
     (var e (cadr expr))
     (var ifthen (caddr expr))
     (var ifelse (if (cdddr expr) (cadddr expr) `nop))
     (cond
-        ((and (cons? e) (== `! (car e))) (compile_unless (cadr e) ifthen ifelse))
-        ((and (cons? e) (== `&& (car e))) (compile_seqand_if (cadr e) (caddr e) ifthen ifelse))
-        ((and (cons? e) (== `|| (car e))) (compile_seqor_if (cadr e) (caddr e) ifthen ifelse))
-        ((comparison_expr? e) (compile_comp_if expr))
+        ((and (cons? e) (== `! (car e))) (compile_unless (cadr e) ifthen ifelse drop))
+        ((and (cons? e) (== `&& (car e))) (compile_seqand_if (cadr e) (caddr e) ifthen ifelse drop))
+        ((and (cons? e) (== `|| (car e))) (compile_seqor_if (cadr e) (caddr e) ifthen ifelse drop))
+        ((comparison_expr? e) (compile_comp_if expr drop))
         (otherwise  (do
             (var ifelse_label (mklabel))
             (var end_label (mklabel))
-            (compile_expr e)
+            (compile_expr e nil)
             (emit_insn `(if_zero @(label ifelse_label)))
-            (if (compile_expr ifthen) (emit_insn `drop))
+            (compile_expr ifthen true)
             (emit_insn `(goto @(label end_label)))
             (emit_insn (label ifelse_label))
-            (if (compile_expr ifelse) (emit_insn `drop))
+            (compile_expr ifelse true)
             (emit_insn (label end_label))
-            nil
             ))
         )))
 
@@ -478,7 +478,7 @@
 ;     if (e1) goto loop;
 ; }
 
-(define compile_while ((_ expr body)) (do
+(define compile_while ((_ expr body) drop) (do
     (var loop_label (mklabel))
     (push_exit_label)
     (compile_if
@@ -487,9 +487,8 @@
             @body
             (label @(car continue_labels))
             (if @expr (goto @loop_label))
-            )))
+            )) drop)
     (pop_exit_label)
-    nil
     ))
 
 ; for v low high body
@@ -505,10 +504,10 @@
 ;     if (v < e) goto loop;
 ; }
 
-(define compile_for ((_ it low high body)) (do
+(define compile_for ((_ it low high body) drop) (do
     (var loop_label (mklabel))
     (push_exit_label)
-    (if (compile_block `(
+    (compile_block `(
         (var @it @low)
         (var end @high)
         (if (< @it end) (do
@@ -518,11 +517,8 @@
             (incr @it)
             (if (< @it end) (goto @loop_label))
             ))
-        ))
-        (emit_insn `drop)
-        )
+        ) drop)
     (pop_exit_label)
-    nil
     ))
 
 ; rfor v high low body
@@ -538,10 +534,10 @@
 ;     if (v >= e) goto loop;
 ; }
 
-(define compile_rfor ((_ it low high body)) (do
+(define compile_rfor ((_ it low high body) drop) (do
     (var loop_label (mklabel))
     (push_exit_label)
-    (if (compile_block `(
+    (compile_block `(
         (var @it (- @high 1))
         (var end @low)
         (if (>= @it end) (do
@@ -551,30 +547,25 @@
             (decr @it)
             (if (>= @it end) (goto @loop_label))
             ))
-        ))
-        (emit_insn `drop)
-        )
+        ) drop)
     (pop_exit_label)
-    nil
     ))
 
-(define compile_list_for ((_ it ls body)) (do
+(define compile_list_for ((_ it ls body) drop) (do
     (push_exit_label)
-    (if (compile_block `(
+    (compile_block `(
             (var tmp @ls)
             (while tmp (do
                 (var @it (car tmp))
                 @body
                 (= tmp (cdr tmp))
                 ))
-        ))
-        (emit_insn `drop)
-        )
+        ) drop)
     (pop_exit_label)
-    nil
     ))
 
-(define compile_tswitch ((_ e cases)) (do
+(define compile_tswitch ((_ e cases) drop) (do
+    (assert "tswitch" drop)
     (var ncase (length cases))
     (var idx 0)
     (var labels ())
@@ -586,7 +577,7 @@
         ))
     (set labels (reverse labels))
 
-    (compile_expr e)
+    (compile_expr e nil)
 
     (push_exit_label)
     (emit_insn `(tswitch (short @(- ncase 1))))
@@ -595,14 +586,14 @@
         ))
     (foreach c cases (do
         (emit_insn (label (car labels)))
-        (if (compile_expr (cdr c)) (emit_insn `drop))
+        (compile_expr (cdr c) true)
         (set labels (cdr labels))
         ))
     (pop_exit_label)
-    nil
     ))
 
-(define compile_lswitch ((_ e cases)) (do
+(define compile_lswitch ((_ e cases) drop) (do
+    (assert "lswitch" drop)
     (var ncase (length cases))
     (var val nil)
     (var labels ())
@@ -620,7 +611,7 @@
         ))
     (= labels (reverse labels))
 
-    (compile_expr e)
+    (compile_expr e nil)
 
     (push_exit_label)
     (emit_insn `(lswitch (long @val)))
@@ -629,164 +620,159 @@
         ))
     (foreach c cases (do
         (emit_insn (label (cdar labels)))
-        (if (compile_expr (cdr c)) (emit_insn `drop))
+        (compile_expr (cdr c) true)
         (= labels (cdr labels))
         ))
     (pop_exit_label)
-    nil
     ))
 
-(define compile_try ((_ body (_ v handler))) (do
+(define compile_try ((_ body (_ v handler)) drop) (do
+    (assert "try" drop)
     (var handler_lbl (mklabel))
     (var cont_lbl (mklabel))
 
     (emit_insn `(unwind_push @(label handler_lbl)))
-    (if (compile_expr body) (emit_insn `drop))
+    (compile_expr body true)
     (emit_insn `unwind_pop)
     (emit_insn `(goto @(label cont_lbl)))
     (emit_insn (label handler_lbl))
     
     (gen_storel (register_local_var v))
     (emit_insn `drop)
-    (if (compile_expr handler) (emit_insn `drop))
+    (compile_expr handler true)
 a   (emit_insn (label cont_lbl))
-    nil
     ))
 
-(define compile_throw ((_ e)) (do
-    (compile_expr e)
+(define compile_throw ((_ e) drop) (do
+    (assert "throw" drop)
+    (compile_expr e nil)
     (emit_insn `throw)
-    nil
     ))
 
-(define compile_label ((_ name)) (do
+(define compile_label ((_ name) drop) (do
+    (assert "label" drop)
     (emit_insn (label name))
-    nil
     ))
 
-(define compile_goto ((_ name)) (do
+(define compile_goto ((_ name) drop) (do
+    (assert "goto" drop)
     (emit_insn `(goto @(label name)))
-    nil
     ))
 
 (define compile_break (_) (do
     (var break_label (car break_labels))
     (emit_insn `(goto @(label break_label)))
-    nil
     ))
 
 (define compile_continue (_) (do
     (var continue_label (car continue_labels))
     (emit_insn `(goto @(label continue_label)))
-    nil
     ))
 
-(define compile_local_vardecl ((_ name . valopt)) (do
+(define compile_local_vardecl ((_ name . valopt) drop) (do
     (var idx (register_local_var name))
     (var val (if valopt (car valopt) 0))
-    (compile_expr val)
+    (compile_expr val nil)
     (gen_storel idx)
-    true
+    (if drop (emit_insn `drop))
     ))
 
 (define compile_arg_addressof   ((_ idx)) (emit_insn `(addrl (byte @(arg_offs idx)))))
 (define compile_local_addressof ((_ idx)) (emit_insn `(addrl (byte @(local_offs idx)))))
 
-(define compile_addressof ((_ sym)) (do
-    (var loc (lookup_var sym))
-    (cond
-        ((== `arg (car loc)) (compile_arg_addressof loc))
-        ((== `local (car loc)) (compile_local_addressof loc))
-        (otherwise (error "compile_var: not implemented" loc))
-        )
-    true
+(define compile_addressof ((_ sym) drop) (do
+    (if (not drop) (do
+        (var loc (lookup_var sym))
+        (cond
+            ((== `arg (car loc)) (compile_arg_addressof loc))
+            ((== `local (car loc)) (compile_local_addressof loc))
+            (otherwise (error "compile_var: not implemented" loc))
+            )
+        ))
     ))
 
 (define compile_unboxed_array (type len) (do
     (var elem_sz (unboxed_type_size type))
-    (compile_expr `(* @elem_sz @len))
+    (compile_expr `(* @elem_sz @len) nil)
     (emit_insn `(plain (byte @PLAIN_OTHER)))
-    true
     ))
 
 (define compile_boxed_array (_ len) (do
-    (compile_expr len)
+    (compile_expr len nil)
     (emit_insn `array)
-    true
     ))
 
-(define compile_array ((_ type len))
-    (if (unboxed_type? type)
-        (compile_unboxed_array type len)
-        (compile_boxed_array type len)
+(define compile_array ((_ type len) drop)
+    (if (not drop)
+        (if (unboxed_type? type)
+            (compile_unboxed_array type len)
+            (compile_boxed_array type len)
+            )
         )
     )
 
-(define compile_array_get ((_ type ary idx)) (do
+(define compile_array_get ((_ type ary idx) drop) (do
     (var insn (assoc type
         `((uchar . array_getu8) (char . array_get8) (short . array_get16) (int . array_get32) (string . array_get32)
           (object . array_get32)
         )))
     (if (not insn) ((error "ERROR: array_get: invalid type " type)))
-    (compile_expr ary)
-    (compile_expr idx)
-    (emit_insn insn)
-    true
+    (compile_expr ary drop)
+    (compile_expr idx drop)
+    (if (not drop) (emit_insn insn))
     ))
 
-(define compile_array_set ((_ type ary idx val)) (do
+(define compile_array_set ((_ type ary idx val) drop) (do
+    (assert "array_set" drop)
     (var insn (assoc type
         `((int . array_set32) (short . array_set16) (char . array_set8) (string . array_set32)
           (object . array_set32)
         )))
     (if (not insn) ((error "ERROR: array_set: invalid type " type)))
-    (compile_expr ary)
-    (compile_expr idx)
-    (compile_expr val)
+    (compile_expr ary nil)
+    (compile_expr idx nil)
+    (compile_expr val nil)
     (emit_insn insn)
-    nil
     ))
 
-(define compile_cons ((_ hd tl)) (do
-    (compile_expr tl)
-    (compile_expr hd)
-    (emit_insn `cons)
-    true
+(define compile_cons ((_ hd tl) drop) (do
+    (compile_expr tl drop)
+    (compile_expr hd drop)
+    (if (not drop) (emit_insn `cons))
     ))
 
-(define compile_struct ((_ nboxed . args)) (do
+(define compile_struct ((_ nboxed . args) drop) (do
     (var nelem (length args))
     (set args (reverse args))
-    (foreach a args (compile_expr a))
-    (emit_insn `(struct (byte @nelem) (byte @nboxed)))
-    true
+    (foreach a args (compile_expr a drop))
+    (if (not drop) (emit_insn `(struct (byte @nelem) (byte @nboxed))))
     ))
 
-(define compile_variant ((_ tag nboxed . args)) (do
+(define compile_variant ((_ tag nboxed . args) drop) (do
     (var nelem (length args))
     (set args (reverse args))
-    (foreach a args (compile_expr a))
-    (emit_insn `(variant (short @tag) (byte @nelem) (byte @nboxed)))
-    true
+    (foreach a args (compile_expr a drop))
+    (if (not drop) (emit_insn `(variant (short @tag) (byte @nelem) (byte @nboxed))))
     ))
 
-(define compile_field_get ((_ tup idx)) (do
-    (compile_expr tup)
-    (emit_insn (cond
-        ((== idx 0) `field_get0)
-        ((== idx 1) `field_get1)
-        ((== idx 2) `field_get2)
-        ((== idx 3) `field_get3)
-        ((== idx 4) `field_get4)
-        ((== idx 5) `field_get5)
-        (otherwise  `(field_get (byte @idx)))
+(define compile_field_get ((_ tup idx) drop) (do
+    (compile_expr tup drop)
+    (if (not drop) (do
+        (emit_insn (cond
+            ((== idx 0) `field_get0)
+            ((== idx 1) `field_get1)
+            ((== idx 2) `field_get2)
+            ((== idx 3) `field_get3)
+            ((== idx 4) `field_get4)
+            ((== idx 5) `field_get5)
+            (otherwise  `(field_get (byte @idx)))
+            ))
         ))
-    true
     ))
 
-(define compile_field_set ((_ tup idx val)) (do
-    (compile_expr val)
-    (compile_expr tup)
+(define compile_field_set ((_ tup idx val) drop) (do
+    (compile_expr val nil)
+    (compile_expr tup nil)
     (emit_insn (cond
         ((== idx 0) `field_set0)
         ((== idx 1) `field_set1)
@@ -796,105 +782,101 @@ a   (emit_insn (label cont_lbl))
         ((== idx 5) `field_set5)
         (otherwise  `(field_set (byte @idx)))
         ))
-    nil
+    (if drop (emit_insn `drop))
     ))
 
-(define compile_list_at ((_ ls idx)) (do
-    (compile_expr ls)
-    (compile_expr idx)
-    (emit_insn `list_at)
-    true
+(define compile_list_at ((_ ls idx) drop) (do
+    (compile_expr ls drop)
+    (compile_expr idx drop)
+    (if (not drop) (emit_insn `list_at))
     ))
 
-(define compile_list_len ((_ ls)) (do
-    (compile_expr ls)
-    (emit_insn `list_len)
-    true
+(define compile_list_len ((_ ls) drop) (do
+    (compile_expr ls drop)
+    (if (not drop) (emit_insn `list_len))
     ))
 
-(define compile_expr (expr) (do
+(define compile_expr (expr drop) (do
     (cond
-        ((== `nop expr) nil)
-        ((== `null expr)   (do (emit_insn `imm_i0) true))
-        ((== `return expr) (do (emit_insn `return) nil))
-        ((== `break expr) (compile_break expr))
-        ((== `continue expr) (compile_continue expr))
-        ((char? expr) (compile_int_lit (char2int expr)))
-        ((int? expr) (compile_int_lit expr))
-        ((string? expr) (compile_string_lit expr))
-        ((symbol? expr) (compile_var expr))
-        ((== `var (car expr)) (compile_local_vardecl expr))
-        ((== `address (car expr)) (compile_addressof expr))
-        ((== `if (car expr)) (compile_if expr))
-        ((== `while (car expr)) (compile_while expr))
-        ((== `for (car expr)) (compile_for expr))
-        ((== `rfor (car expr)) (compile_rfor expr))
-        ((== `lfor (car expr)) (compile_list_for expr))
-        ((== `tswitch (car expr)) (compile_tswitch expr))
-        ((== `lswitch (car expr)) (compile_lswitch expr))
-        ((and (== `try (car expr)) (== `catch (caaddr expr))) (compile_try expr))
-        ((== `throw (car expr)) (compile_throw expr))
-        ((== `label (car expr)) (compile_label expr))
-        ((== `goto (car expr)) (compile_goto expr))
-        ((== `do (car expr)) (compile_block (cdr expr)))
-        ((== `exit (car expr)) (compile_exit expr))
-        ((== `return (car expr)) (compile_return expr))
-        ((== `incr (car expr)) (compile_incrdecr expr))
-        ((== `decr (car expr)) (compile_incrdecr expr))
-        ((== `array (car expr)) (compile_array expr))
-        ((== `array_get (car expr)) (compile_array_get expr))
-        ((== `array_set (car expr)) (compile_array_set expr))
-        ((== `load (car expr)) (compile_array_get expr))
-        ((== `store (car expr)) (compile_array_set expr))
-        ((== `cons (car expr)) (compile_cons expr))
-        ((== `struct (car expr)) (compile_struct expr))
-        ((== `variant (car expr)) (compile_variant expr))
-        ((== `field_get (car expr)) (compile_field_get expr))
-        ((== `field_set (car expr)) (compile_field_set expr))
-        ((== `get (car expr)) (compile_field_get `(field_get @(cadr expr) 0)))
-        ((== `set (car expr)) (compile_field_set `(field_set @(cadr expr) 0 @(caddr expr))))
-        ((== `car (car expr)) (compile_field_get `(field_get @(cadr expr) 0)))
-        ((== `cdr (car expr)) (compile_field_get `(field_get @(cadr expr) 1)))
-        ((== `caar (car expr)) (compile_expr `(car (car @(cadr expr)))))
-        ((== `caadr (car expr)) (compile_expr `(car (car (cdr @(cadr expr))))))
-        ((== `cadar (car expr)) (compile_expr `(car (cdr (car @(cadr expr))))))
-        ((== `caaar (car expr)) (compile_expr `(car (car (car @(cadr expr))))))
-        ((== `caaadr (car expr)) (compile_expr `(car (car (car (cdr @(cadr expr)))))))
-        ((== `cdar (car expr)) (compile_expr `(cdr (car @(cadr expr)))))
-        ((== `cdaar (car expr)) (compile_expr `(cdr (car (car @(cadr expr))))))
-        ((== `cadr (car expr)) (compile_expr `(car (cdr @(cadr expr)))))
-        ((== `caddr (car expr)) (compile_expr `(car (cdr (cdr @(cadr expr))))))
-        ((== `cddr (car expr)) (compile_expr `(cdr (cdr @(cadr expr)))))
-        ((== `setcar (car expr)) (compile_field_set `(field_set @(cadr expr) 0 @(caddr expr))))
-        ((== `setcdr (car expr)) (compile_field_set `(field_set @(cadr expr) 1 @(caddr expr))))
-        ((== `list_at (car expr)) (compile_list_at expr))
-        ((== `list_len (car expr)) (compile_list_len expr))
-        ((== `box (car expr)) (compile_expr `(+ (<< @(cadr expr) 1) 1)))
-        ((== `unbox (car expr)) (compile_expr `(>> @(cadr expr) 1)))
-        ((== `byterun (car expr)) (compile_byterun expr))
-        ((== `ludiv (car expr)) (compile_ludiv expr))
+        ((== `nop expr)    (if (not drop) (emit_insn `imm_i0)))
+        ((== `null expr)   (if (not drop) (emit_insn `imm_i0)))
+        ((== `return expr) (do (assert "return" drop) (emit_insn `return)))
+        ((== `break expr) (do (assert "break" drop) (compile_break expr)))
+        ((== `continue expr) (do (assert "continue" drop) (compile_continue expr)))
+        ((char? expr) (compile_int_lit (char2int expr) drop))
+        ((int? expr) (compile_int_lit expr drop))
+        ((string? expr) (compile_string_lit expr drop))
+        ((symbol? expr) (compile_var expr drop))
+        ((== `var (car expr)) (compile_local_vardecl expr drop))
+        ((== `address (car expr)) (compile_addressof expr drop))
+        ((== `if (car expr)) (compile_if expr drop))
+        ((== `while (car expr)) (compile_while expr drop))
+        ((== `for (car expr)) (compile_for expr drop))
+        ((== `rfor (car expr)) (compile_rfor expr drop))
+        ((== `lfor (car expr)) (compile_list_for expr drop))
+        ((== `tswitch (car expr)) (compile_tswitch expr drop))
+        ((== `lswitch (car expr)) (compile_lswitch expr drop))
+        ((and (== `try (car expr)) (== `catch (caaddr expr))) (compile_try expr drop))
+        ((== `throw (car expr)) (compile_throw expr drop))
+        ((== `label (car expr)) (compile_label expr drop))
+        ((== `goto (car expr)) (compile_goto expr drop))
+        ((== `do (car expr)) (compile_block (cdr expr) drop))
+        ((== `exit (car expr)) (compile_exit expr drop))
+        ((== `return (car expr)) (compile_return expr drop))
+        ((== `incr (car expr)) (compile_incrdecr expr drop))
+        ((== `decr (car expr)) (compile_incrdecr expr drop))
+        ((== `array (car expr)) (compile_array expr drop))
+        ((== `array_get (car expr)) (compile_array_get expr drop))
+        ((== `array_set (car expr)) (compile_array_set expr drop))
+        ((== `load (car expr)) (compile_array_get expr drop))
+        ((== `store (car expr)) (compile_array_set expr drop))
+        ((== `cons (car expr)) (compile_cons expr drop))
+        ((== `struct (car expr)) (compile_struct expr drop))
+        ((== `variant (car expr)) (compile_variant expr drop))
+        ((== `field_get (car expr)) (compile_field_get expr drop))
+        ((== `field_set (car expr)) (compile_field_set expr drop))
+        ((== `get (car expr)) (compile_field_get `(field_get @(cadr expr) 0) drop))
+        ((== `set (car expr)) (compile_field_set `(field_set @(cadr expr) 0 @(caddr expr)) drop))
+        ((== `car (car expr)) (compile_field_get `(field_get @(cadr expr) 0) drop))
+        ((== `cdr (car expr)) (compile_field_get `(field_get @(cadr expr) 1) drop))
+        ((== `caar (car expr)) (compile_expr `(car (car @(cadr expr))) drop))
+        ((== `caadr (car expr)) (compile_expr `(car (car (cdr @(cadr expr)))) drop))
+        ((== `cadar (car expr)) (compile_expr `(car (cdr (car @(cadr expr)))) drop))
+        ((== `caaar (car expr)) (compile_expr `(car (car (car @(cadr expr)))) drop))
+        ((== `caaadr (car expr)) (compile_expr `(car (car (car (cdr @(cadr expr))))) drop))
+        ((== `cdar (car expr)) (compile_expr `(cdr (car @(cadr expr))) drop))
+        ((== `cdaar (car expr)) (compile_expr `(cdr (car (car @(cadr expr)))) drop))
+        ((== `cadr (car expr)) (compile_expr `(car (cdr @(cadr expr))) drop))
+        ((== `caddr (car expr)) (compile_expr `(car (cdr (cdr @(cadr expr)))) drop))
+        ((== `cddr (car expr)) (compile_expr `(cdr (cdr @(cadr expr))) drop))
+        ((== `setcar (car expr)) (compile_field_set `(field_set @(cadr expr) 0 @(caddr expr)) drop))
+        ((== `setcdr (car expr)) (compile_field_set `(field_set @(cadr expr) 1 @(caddr expr)) drop))
+        ((== `list_at (car expr)) (compile_list_at expr drop))
+        ((== `list_len (car expr)) (compile_list_len expr drop))
+        ((== `box (car expr)) (compile_expr `(+ (<< @(cadr expr) 1) 1) drop))
+        ((== `unbox (car expr)) (compile_expr `(>> @(cadr expr) 1) drop))
+        ((== `byterun (car expr)) (compile_byterun expr drop))
+        ((== `ludiv (car expr)) (compile_ludiv expr drop))
         ((and (== 3 (length expr)) (binary_operator? (car expr)))
-            (compile_binexpr expr))
+            (compile_binexpr expr drop))
         ((and (== 2 (length expr)) (unary_operator? (car expr)))
-            (compile_unexpr expr))
+            (compile_unexpr expr drop))
         ((and (== 3 (length expr)) (assignment_operator? (car expr)))
-            (compile_assign expr))
+            (compile_assign expr drop))
         ((and (cons? expr) (conditional_operator? (car expr)))
-            (compile_conditional expr))
-        (otherwise (compile_call expr))
+            (compile_conditional expr drop))
+        (otherwise (compile_call expr drop))
         )))
 
-(define compile_block (block) (do
+(define compile_block (block drop) (do
     (vtable_push)
-    (var ret nil)
     (foreach e block
         (if last?
-            (= ret (compile_expr e))
-            (if (compile_expr e) (emit_insn `drop))
+            (compile_expr e drop)
+            (compile_expr e true)
             )
         )
     (vtable_pop)
-    ret
     ))
 
 (define compile_fundecl ((_ name params body) export) (do
@@ -910,7 +892,7 @@ a   (emit_insn (label cont_lbl))
         (incr pidx)
         ))
 
-    (if (compile_block body) (emit_insn `drop))
+    (compile_block body true)
     (if (or (nil? insn_seq) (and (!= (last_insn) `return) (!= (last_insn) `ireturn))) (do
     (emit_insn `return)
         ))
@@ -940,10 +922,10 @@ a   (emit_insn (label cont_lbl))
             (add_var name `(object @name))
 
             (reset_insn_seq)
-            (compile_expr `(= @name (array string @arrlen)))
+            (compile_expr `(= @name (array string @arrlen)) true)
             (var i 0)
             (foreach s value_list (do
-                (compile_expr `(array_set string @name @i @s))
+                (compile_expr `(array_set string @name @i @s) true)
                 (+= i 1)
             ))
             (var insn_seq (get_insn_seq))
@@ -1009,7 +991,7 @@ a   (emit_insn (label cont_lbl))
 (define compile_object_decl (export name value) (do
     (add_var name `(object @name))
     (reset_insn_seq)
-    (compile_expr value)
+    (compile_expr value nil)
     (emit_insn `(storeo (object @name)))
     (emit_insn `drop)
     (var insn_seq (get_insn_seq))

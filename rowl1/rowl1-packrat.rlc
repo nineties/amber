@@ -1162,7 +1162,7 @@
         (return (compile_seq pat ws))
         )
     (if (== hd Choice)
-        (return (compile_choice (node_args pat) ws))
+        (return (compile_choice pat ws))
         )
     (var len (list_len (node_args pat)))
     (if (== hd Delimited) (do
@@ -1355,7 +1355,7 @@
     (if (< (list_len ps) 2)
         (throw (unexpected_error current_loc
             (string "require more than 1 arguments")
-            (make_node Choice ps)
+            ps
             )))
 
     (var body 0)
@@ -1365,12 +1365,11 @@
     (= body (cons (defvar error (apply (to_sym "%alloc_error_state") (list1 PVar))) body))
     (= body (cons (defvar state (gen_copy_parser_state PVar)) body))
 
-    (while ps (do
-        (= body (cons (compile_parser_element (car ps) ws) body))
+    (for i 0 (node_size ps) (do
+        (= body (cons (compile_parser_element (node_arg ps i) ws) body))
         (= body (cons (mkif (test_parsed) (make_node0 Break)) body))
         (= body (cons (apply (to_sym "%join_error_state") (list2 error PVar)) body))
         (= body (cons (gen_set_parser_state_all PVar state) body))
-        (= ps (cdr ps))
         ))
     (= body (cons (apply (to_sym "%set_error_state") (list2 PVar error)) body))
 
