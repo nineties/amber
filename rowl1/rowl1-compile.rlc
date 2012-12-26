@@ -1165,7 +1165,7 @@
         (return (put_push asm expr)))
     (if (== hd List) (do
         (if (! expr)
-            (put_push asm 0)
+            (put_zero asm)
             (do
                 (compile_qquote_main asm mod (cdr expr) level)
                 (compile_qquote_main asm mod (car expr) level)
@@ -1183,7 +1183,11 @@
         (+= level 1)
         ))
 
-    (compile_qquote_main asm mod (node_args expr) level)
+    (put_zero asm)
+    (rfor i 0 (node_size expr) (do
+        (compile_qquote_main asm mod (node_arg expr i) level)
+        (put_cons asm)
+        ))
     (put_push asm (node_head expr))
     (compile_simple_call asm 2 make_node)
     ))
@@ -1646,6 +1650,7 @@
 
     (put_unwind_push asm hdlr_lbl)
     (compile asm mod stmt)
+    (put_drop asm)
 
     (put_unwind_pop asm)
     (put_goto asm cont_lbl)
