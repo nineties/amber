@@ -72,6 +72,7 @@
 (define last_insn () (car insn_seq))
 
 (define emit_insn (insn) (push insn_seq insn))
+(define emit_nil () (emit_insn `(imm_int16 @C_NIL)))
 
 (var startup_code ())
 (define push_startup_code (code) (set startup_code (append startup_code code)))
@@ -315,7 +316,7 @@
             (emit_insn `(@(cadr load_store_op) (value @name)))
         )
         )
-    (if drop (emit_insn `drop))
+    (if (not drop) (emit_nil))
     ))
 
 (define compile_object_assign (insn (_ name) rhs drop) (do
@@ -330,7 +331,7 @@
             (compile_expr rhs nil)
             (emit_insn `(storeo (object @name)))
         ))
-    (if drop (emit_insn `drop))
+    (if (not drop) (emit_nil))
     ))
 
 (define compile_assign (expr drop) (do
@@ -993,7 +994,6 @@ a   (emit_insn (label cont_lbl))
     (reset_insn_seq)
     (compile_expr value nil)
     (emit_insn `(storeo (object @name)))
-    (emit_insn `drop)
     (var insn_seq (get_insn_seq))
     (push_startup_code insn_seq)
     `(object @export @name)
