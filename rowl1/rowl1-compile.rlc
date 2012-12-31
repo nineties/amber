@@ -954,8 +954,8 @@
                 (add_symbol mod lhs (make_lvar idx))
             ))
         (compile asm mod rhs)
+        (put_dup asm)
         (put_store_lvar asm idx)
-        (put_nil asm)
         return
         ))
     (throw (string "not implemented"))
@@ -1550,6 +1550,7 @@
         )
 
     (compile asm mod rhs)
+    (put_dup asm)
     (var v (lookup_symbol mod lhs))
     (if (! v)
         (throw (undefined_var current_loc lhs))
@@ -1559,17 +1560,14 @@
         (put_push asm v)
         (put_field_get1 asm)
         (put_field_set0 asm)
-        (put_nil asm)
         return
         )
     (if (== vty LocalVariable) (do
         (put_store_lvar asm (node_arg_int v 0))
-        (put_nil asm)
         return
         )
     (if (== vty Argument) (do
         (put_store_arg asm (node_arg_int v 0))
-        (put_nil asm)
         return
         ))))
     (throw (bug (string "compile_assign")))
@@ -1743,9 +1741,9 @@
     (var lhs (node_arg expr 0))
     (var rhs (node_arg expr 1))
     (compile asm mod rhs)
+    (put_dup asm)
     (compile asm mod (node_arg lhs 0))
     (put_fieldset asm (node_arg_int lhs 1))
-    (put_nil asm)
     ))
 
 (fun compile_fieldref (asm mod expr) (
@@ -1757,9 +1755,9 @@
     (var lhs (node_arg expr 0))
     (var rhs (node_arg expr 1))
     (compile asm mod rhs)
+    (put_dup asm)
     (compile asm mod (node_arg lhs 0))
     (put_fieldset asm (node_arg_int lhs 1))
-    (put_nil asm)
     ))
 
 (export fun compile_simple_function (asm arity func) (
