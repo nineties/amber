@@ -12,8 +12,9 @@
     ))
 
 (define gen_field_set (idx) `(
-    (vmpop %eax) ; ptr
-    (asm "movl (%esi), %ecx") ; value
+    (asm "movl (%esi), %eax")
+    (asm "movl 4(%esi), %ecx")
+    (asm "addl $8, %esi")
     (asm "movl %ecx, " @(* 4 idx) "(%eax)")
     ))
 
@@ -28,8 +29,9 @@
     ))
 
 (define gen_comparison2 (cmovname) `(
-    (vmpop %eax)
-    (vmpop %ecx)
+    (asm "movl (%esi), %eax")
+    (asm "movl 4(%esi), %ecx")
+    (asm "addl $8, %esi")
     (asm "cmpl %eax, %ecx")
     (asm "movl $3, %eax")
     (vmsshort 1 %ecx)
@@ -39,8 +41,9 @@
     ))
 
 (define gen_comparison3 (jmpname) `(
-    (vmpop %eax)
-    (vmpop %ecx)
+    (asm "movl (%esi), %eax")
+    (asm "movl 4(%esi), %ecx")
+    (asm "addl $8, %esi")
     (asm "fldl (%eax)")
     (asm "fldl (%ecx)")
     (asm "fcompp")
@@ -1075,19 +1078,20 @@
         (asm "movl %eax, (%esi)")
         ))
     ; field_set obj val
-    (field_set0 (-1) @true @(gen_field_set 0)) ; also used for 'setcar'
-    (field_set1 (-1) @true @(gen_field_set 1)) ; also used for 'setcdr'
-    (field_set2 (-1) @true @(gen_field_set 2))
-    (field_set3 (-1) @true @(gen_field_set 3))
-    (field_set4 (-1) @true @(gen_field_set 4))
-    (field_set5 (-1) @true @(gen_field_set 5))
-    (field_set  (-1 byte) @true (
+    (field_set0 (-2) @true @(gen_field_set 0)) ; also used for 'setcar'
+    (field_set1 (-2) @true @(gen_field_set 1)) ; also used for 'setcdr'
+    (field_set2 (-2) @true @(gen_field_set 2))
+    (field_set3 (-2) @true @(gen_field_set 3))
+    (field_set4 (-2) @true @(gen_field_set 4))
+    (field_set5 (-2) @true @(gen_field_set 5))
+    (field_set  (-2 byte) @true (
         (vmubyte 1 %eax) ; index
         (asm "sall $2, %eax")
-        (vmpop %ecx) ; obj
+        (asm "movl (%esi), %ecx")
         (asm "addl %eax, %ecx")
-        (asm "movl (%esi), %eax")
+        (asm "movl 4(%esi), %eax")
         (asm "movl %eax, (%ecx)")
+        (asm "addl $8, %esi")
         ))
     ; tuple nelem
     (tuple (0) @true (
@@ -1238,16 +1242,16 @@
         (vmpush %eax)
         ))
     ; store word to local
-    (storel0 (0) @true ((asm "movl (%esi), %eax") (asm "movl %eax, -4(%edi)")))
-    (storel1 (0) @true ((asm "movl (%esi), %eax") (asm "movl %eax, -8(%edi)")))
-    (storel2 (0) @true ((asm "movl (%esi), %eax") (asm "movl %eax, -12(%edi)")))
-    (storel3 (0) @true ((asm "movl (%esi), %eax") (asm "movl %eax, -16(%edi)")))
-    (storel4 (0) @true ((asm "movl (%esi), %eax") (asm "movl %eax, -20(%edi)")))
-    (storel5 (0) @true ((asm "movl (%esi), %eax") (asm "movl %eax, -24(%edi)")))
-    (storel (0 byte) @true (
+    (storel0 (-1) @true ((vmpop %eax) (asm "movl %eax, -4(%edi)")))
+    (storel1 (-1) @true ((vmpop %eax) (asm "movl %eax, -8(%edi)")))
+    (storel2 (-1) @true ((vmpop %eax) (asm "movl %eax, -12(%edi)")))
+    (storel3 (-1) @true ((vmpop %eax) (asm "movl %eax, -16(%edi)")))
+    (storel4 (-1) @true ((vmpop %eax) (asm "movl %eax, -20(%edi)")))
+    (storel5 (-1) @true ((vmpop %eax) (asm "movl %eax, -24(%edi)")))
+    (storel (-1 byte) @true (
         (vmsbyte 1 %ecx) ; index
         (asm "leal (%edi,%ecx,1), %eax")
-        (asm "movl (%esi), %ecx")
+        (vmpop %ecx)
         (asm "movl %ecx, (%eax)")
         ))
     (incrl0 (0) @true ((asm "addl $1, -4(%edi)")))

@@ -158,9 +158,9 @@
     (return (fv_iter mod expr 0 0))
     ))
 
-; alpha-conversion
+;== alpha-conversion ==
 
-; this routine also translates
+; This routine also translates
 ; f(... x ... x ...) : body
 ; to
 ; f(... x ... y ...) where x==y : body
@@ -336,14 +336,14 @@
     (return expr)
     ))
 
-(fun alloc_function (args code guard need_copy) (
-    (return (variant @FunctionE 5 0 args code guard need_copy))
+(fun alloc_function (args code guard) (
+    (return (variant @FunctionE 4 0 args code guard))
     ))
 
-(fun make_function (args code guard need_copy) (
+(fun make_function (args code guard) (
     (var arity (list_len args))
     (= args (cons (box arity) args))
-    (return (alloc_function args code guard need_copy))
+    (return (alloc_function args code guard))
     ))
 
 (fun make_bound (fun1 fun2) (
@@ -717,11 +717,6 @@
         ))
     (push_varscope mod)
 
-    ; interior parameters of Nodes like x of "f(\Foo{x}): ..."
-    ; needs to be copied to VM-stack so as it can be accessed same as
-    ; local variables or non-interior parameters.
-    (var need_copy (setup_args (get_vartable mod) args))
-
     (var cnt_addr (get_address asm_body))
     (put_allocate asm_body 0)
 
@@ -734,14 +729,7 @@
 
     (reset_variable_count mod)
 
-    (var tmp_need_copy need_copy)
-    (while tmp_need_copy (do
-        (var idx (get_lvar_idx mod))
-        (add_symbol mod (caar tmp_need_copy) (make_lvar idx))
-        (setcar tmp_need_copy (cadar tmp_need_copy))
-        (= tmp_need_copy (cdr tmp_need_copy))
-        ))
-
+    (setup_args (get_vartable mod) args)
 
     (if (!= guard noguard)
         (compile asm_guard mod guard)
@@ -755,54 +743,34 @@
     (= max_lvar_idx save_max_lvar_idx)
     (= break_labels save_break_labels)
     (= continue_labels save_continue_labels)
-
-    (return need_copy)
     ))
 
 (fun setup_args (tbl args) (
-    (var need_copy 0)
     (var idx 0)
     (while args (do
-        (= need_copy (setup_arg tbl (make_arg idx) (car args) 0 need_copy))
+        (setup_arg tbl (make_arg idx) (car args) 0)
         (= args (cdr args))
         (+= idx 1)
         ))
-    (return need_copy)
     ))
 
-(fun setup_arg (tbl obj arg level nc) (
-    (if (is_special arg) (return nc))
+(fun setup_arg (tbl obj arg level) (
+    (if (is_special arg) return)
     (if (is_symbol arg) (do
-        (if (== level 0) (do
-            (if (|| (== (node_head obj) Argument) (== arg DontCare))
-                ; need no copy
-                (symtable_add tbl arg obj)
-                (do
-                    (var t (unique_sym))
-                    (symtable_add tbl t obj)
-                    (= nc (cons (list2 arg obj) nc))
-                ))
-            ))
-        (return nc)
+        (if (== level 0) (symtable_add tbl arg obj))
+        return
         ))
-    (if (is_atom arg) (return nc))
+    (if (is_atom arg) return)
     (var argty (node_head arg))
     (if (== argty Domain) (do
         (if (== level 0) (do
             (var v (node_arg_symbol arg 0))
-            (if (|| (== (node_head obj) Argument) (== v DontCare))
-                ; need no copy
-                (symtable_add tbl v obj)
-                (do
-                    (var t (unique_sym))
-                    (symtable_add tbl t obj)
-                    (= nc (cons (list2 v obj) nc))
-                ))
+            (symtable_add tbl v obj)
             (var dom (node_arg arg 1))
             (if (! (is_symbol dom))
-                (= nc (setup_arg tbl obj dom 0 nc))
+                (setup_arg tbl obj dom 0)
                 )
-            (return nc)
+            return
             ))
         ))
     (if (== argty List) (do
@@ -815,26 +783,23 @@
                         "\"...\" node must be placed last in the order of arguments")))
                     )
                 (var v (node_arg_symbol a 0))
-                (if (== v @C_NIL) (return nc))
-                (var t (unique_sym))
+                (if (== v @C_NIL) return)
                 (= obj (make_list_from obj idx))
-                (symtable_add tbl t obj)
-                (return (cons (list2 v obj) nc))
+                (symtable_add tbl v obj)
+                return
                 ))
-            (= nc (setup_arg tbl (make_list_at obj idx) a level nc))
+            (setup_arg tbl (make_list_at obj idx) a level)
             (= arg (cdr arg))
             (incr idx)
             ))
-        (return nc)
+        return
         ))
-    (if (== argty Quote)
-        (return nc)
-        )
+    (if (== argty Quote) return)
     (if (== argty Unquote) 
-        (return (setup_arg tbl obj (node_arg arg 0) (- level 1) nc))
+        (return (setup_arg tbl obj (node_arg arg 0) (- level 1)))
         )
     (if (== argty QuasiQuote)
-        (return (setup_arg tbl obj (node_arg arg 0) (+ level 1) nc))
+        (return (setup_arg tbl obj (node_arg arg 0) (+ level 1)))
         )
     (if (== argty Ellipsis)
         (throw (exception current_loc (string "Variable-length arguments is not allowed")))
@@ -847,16 +812,13 @@
                     "\"...\" must be placed last in the order of arguments"
                 ))))
             (var v (node_arg_symbol a 0))
-            (if (== v @C_NIL) (return nc))
-            (var t (unique_sym))
+            (if (== v @C_NIL) return)
             (= obj (make_restof obj i))
-            (symtable_add tbl t obj)
-            (return (cons (list2 v obj) nc))
+            (symtable_add tbl v obj)
+            return
             ))
-        (= nc (setup_arg tbl (make_node_at arg obj i)
-                (node_arg arg i) level nc))
+        (setup_arg tbl (make_node_at arg obj i) (node_arg arg i) level)
         ))
-    (return nc)
     ))
 
 (fun var_loc (info) (
@@ -993,6 +955,7 @@
             ))
         (compile asm mod rhs)
         (put_store_lvar asm idx)
+        (put_nil asm)
         return
         ))
     (throw (string "not implemented"))
@@ -1596,14 +1559,17 @@
         (put_push asm v)
         (put_field_get1 asm)
         (put_field_set0 asm)
+        (put_nil asm)
         return
         )
     (if (== vty LocalVariable) (do
         (put_store_lvar asm (node_arg_int v 0))
+        (put_nil asm)
         return
         )
     (if (== vty Argument) (do
         (put_store_arg asm (node_arg_int v 0))
+        (put_nil asm)
         return
         ))))
     (throw (bug (string "compile_assign")))
@@ -1695,16 +1661,14 @@
     (if (!= guard noguard)
         (do
             (var asm_guard (make_assembler))
-            (var need_copy (compile_function
-                asm_body asm_guard mod args body guard cls))
+            (compile_function asm_body asm_guard mod args body guard cls)
             (put_ireturn asm_body)
-            (put_push asm (make_function args (get_code asm_body) (get_code asm_guard) need_copy))
+            (put_push asm (make_function args (get_code asm_body) (get_code asm_guard)))
         )
         (do
-            (var need_copy (compile_function
-                asm_body 0 mod args body noguard cls))
+            (compile_function asm_body 0 mod args body noguard cls)
             (put_ireturn asm_body)
-            (put_push asm (make_function args (get_code asm_body) 0 need_copy))
+            (put_push asm (make_function args (get_code asm_body) 0))
         ))
     ))
 
@@ -1781,6 +1745,7 @@
     (compile asm mod rhs)
     (compile asm mod (node_arg lhs 0))
     (put_fieldset asm (node_arg_int lhs 1))
+    (put_nil asm)
     ))
 
 (fun compile_fieldref (asm mod expr) (
@@ -1794,6 +1759,7 @@
     (compile asm mod rhs)
     (compile asm mod (node_arg lhs 0))
     (put_fieldset asm (node_arg_int lhs 1))
+    (put_nil asm)
     ))
 
 (export fun compile_simple_function (asm arity func) (

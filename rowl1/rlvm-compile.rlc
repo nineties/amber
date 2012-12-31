@@ -72,7 +72,7 @@
 (define last_insn () (car insn_seq))
 
 (define emit_insn (insn) (push insn_seq insn))
-(define emit_nil () (emit_insn `(imm_int16 @C_NIL)))
+(define emit_nil () (emit_insn `(imm_int16 (short @C_NIL))))
 
 (var startup_code ())
 (define push_startup_code (code) (set startup_code (append startup_code code)))
@@ -283,7 +283,7 @@
         )
         )
     (gen_storel (cadr loc))
-    (if drop (emit_insn `drop))
+    (if (not drop) (emit_nil))
     ))
 
 (define compile_arg_assign (insn loc rhs drop) (do
@@ -299,7 +299,7 @@
         )
     (var idx (cadr loc))
     (emit_insn `(storel (byte @(arg_offs idx))))
-    (if drop (emit_insn `drop))
+    (if (not drop) (emit_nil))
     ))
 
 (define compile_value_assign (insn (_ type name) rhs drop) (do
@@ -436,6 +436,7 @@
     ))
 
 (define compile_seqand_if (lhs rhs ifthen ifelse drop) (do
+    (assert "seqand_if" drop)
     (var ifend_label (mklabel))
     (compile_expr `(if @lhs (if @rhs (do @ifthen (goto @ifend_label)))) true)
     (compile_expr ifelse true)
@@ -639,7 +640,6 @@
     (emit_insn (label handler_lbl))
     
     (gen_storel (register_local_var v))
-    (emit_insn `drop)
     (compile_expr handler true)
 a   (emit_insn (label cont_lbl))
     ))
@@ -675,7 +675,7 @@ a   (emit_insn (label cont_lbl))
     (var val (if valopt (car valopt) 0))
     (compile_expr val nil)
     (gen_storel idx)
-    (if drop (emit_insn `drop))
+    (if (not drop) (emit_nil))
     ))
 
 (define compile_arg_addressof   ((_ idx)) (emit_insn `(addrl (byte @(arg_offs idx)))))
@@ -783,7 +783,7 @@ a   (emit_insn (label cont_lbl))
         ((== idx 5) `field_set5)
         (otherwise  `(field_set (byte @idx)))
         ))
-    (if drop (emit_insn `drop))
+    (if (not drop) (emit_nil))
     ))
 
 (define compile_list_at ((_ ls idx) drop) (do
@@ -894,9 +894,9 @@ a   (emit_insn (label cont_lbl))
         ))
 
     (compile_block body true)
-    (if (or (nil? insn_seq) (and (!= (last_insn) `return) (!= (last_insn) `ireturn))) (do
-    (emit_insn `return)
-        ))
+    (if (or (nil? insn_seq) (and (!= (last_insn) `return) (!= (last_insn) `ireturn)))
+        (emit_insn `return)
+        )
 
     (var insn_seq (get_insn_seq))
     (if (> num_local_var 0)
