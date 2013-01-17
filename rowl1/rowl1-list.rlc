@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2012-12-16 03:11:36 nineties $
+; $Id: rowl1-list.rlc 2013-01-17 16:24:10 nineties $
 ;
 
 (import "rlvm-compile")
@@ -155,6 +155,17 @@
     (return @C_FALSE)
     ))
 
+(fun ls_index (ls v) (
+    (var f (lookup_func current_mod (to_sym "equal")))
+    (var idx 0)
+    (while ls (do
+        (if (== (byterun f v (car ls)) @C_TRUE) (return (box idx)))
+        (= ls (cdr ls))
+        (+= idx 1)
+        ))
+    (return @C_UNDEF)
+    ))
+
 (fun ls_create (n f) (
     (var new_ls 0)
     (var code (get_bytecode f))
@@ -182,6 +193,7 @@
     (add_function2 std (to_sym "foldl1") listT funT ls_foldl1 0)
     (add_function2 std (to_sym "foldr1") listT funT ls_foldr1 0)
     (add_function2 std (to_sym "contain") listT DontCare ls_contain 0)
+    (add_function2 std (to_sym "index") listT DontCare ls_index 0)
     (add_function2 mod (to_sym "create") intT funT ls_create 0)
     ))
 
