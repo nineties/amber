@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-table.rlc 2012-12-15 10:53:37 nineties $
+; $Id: rowl1-table.rlc 2013-01-17 22:25:08 nineties $
 ;
 
 (import "rlvm-compile")
@@ -190,17 +190,18 @@
     ))
 
 (fun ht_store (tbl key val) (
+    (var bucket (field_get tbl 1))
     (var hash (field_get tbl 2))
     (var eql  (field_get tbl 3))
-    (var bucket (field_get tbl 1))
+    (var depth (field_get tbl 6))
     (var size (seq_size bucket))
 
     (var hash_value (unbox (byterun hash key)))
     (var h (% hash_value size))
     (var entry (array_get object bucket h))
     (while entry (do    
-        (var e_key (field_get entry 0))
-        (if (== (byterun eql e_key key) @C_TRUE) (do
+        (if (&& (== (byterun eql (field_get entry 0) key) @C_TRUE)
+                (== depth (field_get entry 4))) (do
             (field_set entry 1 val)
             (return val)
             ))
@@ -264,6 +265,12 @@
     (var entry (field_get tbl 5))
     (output_string ochan "Table{")
     (while entry (do
+        (var d (field_get entry 4))
+        (if (> d 1) (do
+            (output_char ochan '(')
+            (output_int  ochan d)
+            (output_string ochan ") ")
+            ))
         (pprint ochan (field_get entry 0))
         (output_string ochan " => ")
         (pprint ochan (field_get entry 1))
