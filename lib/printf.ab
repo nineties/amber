@@ -1,13 +1,13 @@
 # Copyright (C) 2010 nineties
 #
-# $Id: printf.ab 2012-12-13 22:15:02 nineties $
+# $Id: printf.ab 2013-01-19 13:10:27 nineties $
 
 module std {
     ### Format string
     # XXX: Not good implementation (should not define new syntax)
 
     format_string_element
-        ::= "%" [sSdXobp] { $input }
+        ::= "%" [sSdXobpf] { $input }
           | "%" .   { throw `SyntaxError{!LOCATION,
                         "Invalid format string", !($0 + $1)}
                     }
@@ -26,6 +26,8 @@ module std {
                     -> loop(fs, ss, std::cons(`print(!io, !s), ls))
                 | (["%d", fs...], [s, ss...], ls)
                     -> loop(fs, ss, std::cons(`print(!io, !s), ls))
+                | (["%f", fs...], [s, ss...], ls)
+                    -> loop(fs, ss, std::cons(`pprint(!io, !s), ls))
                 | (["%p", fs...], [s, ss...], ls)
                     -> loop(fs, ss, std::cons(`pprint(!io, !s), ls))
                 | ([f@String, fs...], args, ls)

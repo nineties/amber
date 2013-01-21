@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-string.rlc 2012-12-15 10:45:36 nineties $
+; $Id: rowl1-string.rlc 2013-01-21 15:35:08 nineties $
 ;
 
 (import "rlvm-compile")
@@ -57,6 +57,18 @@
     (= s (strdup s))
     (unescape_string_d s)
     (return s)
+    ))
+
+; returns true is s1 contains s2 as a sub-string.
+(fun s_contain (s1 s2) (
+    ; simple method
+    (var l1 (strlen s1))
+    (var l2 (strlen s2))
+    (if (< l1 l2) (return @C_FALSE))
+    (for i 0 (- l1 l2) (do
+        (if (strneq (+ s1 i) s2 l2) (return @C_TRUE))
+        ))
+    (return @C_FALSE)
     ))
 
 (fun s_code (s) (
@@ -153,8 +165,8 @@
     (add_function2 std (to_sym "at") stringT intT s_at 0)
     (add_function2 std (to_sym "at") stringT irangeT s_at_range 0)
     (add_function3 std (to_sym "store") stringT intT stringT s_store 0)
-
     (add_function1 std (to_sym "unescape") stringT s_unescape 0)
+    (add_function2 std (to_sym "contain") stringT stringT s_contain 0)
 
     ; StringIO module
     (var sioT (domainP StringIO))

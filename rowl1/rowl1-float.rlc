@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-float.rlc 2012-11-30 14:17:47 nineties $
+; $Id: rowl1-float.rlc 2013-01-19 13:55:51 nineties $
 ;
 
 (import "rlvm-compile")
@@ -130,67 +130,67 @@
 (var two^64 (bigshl (uint_to_bint 1) 64))
 
 (fun encode_float (sign f n e) (
-;    (if (bint_is_zero f) (do
-;        (var float (allocate_float))
-;        (field_set float 0 0)
-;        (field_set float 1 0)
-;        (return float)
-;        ))
-;
-;    (var shift 0)
-;    (if (>= (+ n e) 1)
-;        (= shift (- 56 (* 3 (+ n e))))
-;        (= shift (- 57 (* 4 (+ n e))))
-;        )
-;
-;    (= f (bint_shiftL f (box shift)))
-;
-;    ; here f has more than 53 bits (so, it is a bigint)
-;    (var rem 0)
-;    (if (> e 0) (do
-;        (var b (uint_to_bint 1))
-;        (while (> e 0) (do
-;            (= b (mul b (box 10)))
-;            (-= e 1)
-;            ))
-;        (= f (mul f b)) 
-;        )
-;    (if (< e 0) (do
-;        (var b (uint_to_bint 1))
-;        (while (< e 0) (do
-;            (= b (mul b (box 10)))
-;            (+= e 1)
-;            ))
-;        (var r (bigdiv f (to_bint b)))
-;        (if (! (bint_is_zero r)) (= rem 1))
-;        )))
-;
-;    (var nd (bint_ndigits2 f))
-;    (var exp (- (- nd 1) shift))
-;    (var offs (- nd 53))
-;
-;    (var w (bint_digit f 0))
-;    (var ulp (& (>> w offs) 1))
-;    (var G (& (>> w (- offs 1)) 1))
-;    (var R 0)
-;    (if (|| rem (& w (- (<< 1 offs) 1))) (= R 1))
-;    (= f (bint_shiftR f (box offs)))
-;    (if (&& G (|| ulp R))
-;        (= f (add f (box 1)))
-;        (if (== (bint_digit f 1) 0x00200000)
-;            (+= exp 1) ; carry
-;            )
-;        )
-;
-;    (= w (bint_digit f 1))
-;    (= w (| (& w 0xfffff) (<< (& (+ exp 1023) 0x7ff) 20)))
-;    (if sign (= w (| w 0x80000000)))
-;    (bint_set_digit f 1 w)
-;
-;    (var float (allocate_float))
-;    (field_set float 0 (bint_digit f 0))
-;    (field_set float 1 (bint_digit f 1))
-;    (return float)
+    (if (bint_is_zero f) (do
+        (var float (allocate_float))
+        (field_set float 0 0)
+        (field_set float 1 0)
+        (return float)
+        ))
+
+    (var shift 0)
+    (if (>= (+ n e) 1)
+        (= shift (- 56 (* 3 (+ n e))))
+        (= shift (- 57 (* 4 (+ n e))))
+        )
+
+    (= f (bint_shiftL f (box shift)))
+
+    ; here f has more than 53 bits (so, it is a bigint)
+    (var rem 0)
+    (if (> e 0) (do
+        (var b (uint_to_bint 1))
+        (while (> e 0) (do
+            (= b (mul b (box 10)))
+            (-= e 1)
+            ))
+        (= f (mul f b)) 
+        )
+    (if (< e 0) (do
+        (var b (uint_to_bint 1))
+        (while (< e 0) (do
+            (= b (mul b (box 10)))
+            (+= e 1)
+            ))
+        (var r (bigdiv f (to_bint b)))
+        (if (! (bint_is_zero r)) (= rem 1))
+        )))
+
+    (var nd (bint_ndigits2 f))
+    (var exp (- (- nd 1) shift))
+    (var offs (- nd 53))
+
+    (var w (bint_digit f 0))
+    (var ulp (& (>> w offs) 1))
+    (var G (& (>> w (- offs 1)) 1))
+    (var R 0)
+    (if (|| rem (& w (- (<< 1 offs) 1))) (= R 1))
+    (= f (bint_shiftR f (box offs)))
+    (if (&& G (|| ulp R))
+        (= f (add f (box 1)))
+        (if (== (bint_digit f 1) 0x00200000)
+            (+= exp 1) ; carry
+            )
+        )
+
+    (= w (bint_digit f 1))
+    (= w (| (& w 0xfffff) (<< (& (+ exp 1023) 0x7ff) 20)))
+    (if sign (= w (| w 0x80000000)))
+    (bint_set_digit f 1 w)
+
+    (var float (allocate_float))
+    (field_set float 0 (bint_digit f 0))
+    (field_set float 1 (bint_digit f 1))
+    (return float)
     ))
 
 ; ==== translate floating-point number to ascii-string ====
@@ -204,6 +204,9 @@
     (if (& f1 0x80000000) (do
         (= s 1)
         (= v (float_uminus v))
+        ))
+    (if (&& (! f0) (! f1)) (do
+        (return (string "0.0"))
         ))
     (var e (- (& (>> f1 20) 0x7ff) 1023))
     (var f (allocate_bint 2))
