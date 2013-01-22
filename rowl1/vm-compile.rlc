@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-compile.rlc 2012-12-11 23:01:19 nineties $
+; $Id: vm-compile.rlc 2013-01-23 01:48:30 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -131,6 +131,12 @@
         ((int? src)     (emit "movb" src (lookup_8breg dst)))
         ((char? src)    (emit "movb" src (lookup_8breg dst)))
         (otherwise      (emit "movsbl" src dst))
+        ))
+(define movzw (src dst)
+    (cond
+        ((int? src)     (emit "movzw" src (lookup_16breg dst)))
+        ((char? src)    (emit "movzw" src (lookup_16breg dst)))
+        (otherwise      (emit "movzwl" src dst))
         ))
 (define movw (src dst)
     (cond
@@ -291,6 +297,21 @@
         ))
     (if ret (emit_return `(return) nil nil))
     ))
+
+(define emit_subsu16 ((_ ptr idx) dst ret) (do
+    (if dst (do
+        (emit_expr ptr `%eax nil)
+        (if (!= idx 0) (do
+            (pushl `%eax)
+            (emit_expr idx `%ecx nil)
+            (popl `%eax)
+            (emit "addl" %ecx %eax)
+            ))
+        (movzw `(deref %eax 0) dst)
+        ))
+    (if ret (emit_return `(return) nil nil))
+    ))
+
 
 (define emit_deref8 ((_ ptr) dst ret) (do
     (if dst (do
@@ -647,6 +668,7 @@
     (get8    . @emit_subs8)
     (getu8   . @emit_subsu8)
     (get16   . @emit_subs16)
+    (getu16  . @emit_subsu16)
     ([]      . @emit_subs)
     ([]8     . @emit_subs8)
     ([]16    . @emit_subs16)

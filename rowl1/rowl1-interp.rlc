@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2012-12-16 02:07:47 nineties $
+; $Id: rowl1-interp.rlc 2013-01-23 00:58:38 nineties $
 ;
 
 (import "rlvm-compile")
@@ -111,9 +111,14 @@
 
     (if (in_shell_mode)
         (interpret_shell p)
-        (interpret p)
+        (do
+            (var fd (open "."))
+            (var dir (get_directory file))
+            (chdir dir)
+            (interpret p)
+            (fchdir fd)
         )
-
+        )
     (eval_exit @C_NIL)
 
     (return 0)
@@ -450,6 +455,8 @@
     ))
 
 (fun eval_import (expr) (
+    (debugs "eval_import:")
+    (debugpf expr)
     (var path (node_arg expr 0))
     (if (== (node_head path) List) (do
         (var syms path)
@@ -461,7 +468,10 @@
             ))
         (= path (strcat path ".ab"))
         ))
+    (debugs path)
+    (debugs "\n")
     (import_file path)
+    (debugs "done\n")
     (return @C_NIL)
     ))
 

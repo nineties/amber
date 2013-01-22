@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-io.rlc 2012-12-11 01:55:15 nineties $
+; $Id: rowl1-io.rlc 2013-01-23 01:53:03 nineties $
 ;
 
 (import "rlvm-compile")
@@ -10,10 +10,12 @@
 
 (compile `object `(
 
+(import "rowl1-util")
 (import "rowl1-node")
 (import "rowl1-module")
 (import "rowl1-compile")
 (import "rowl1-pprint")
+(import "rowl1-bigint")
 
 (export fun make_ifstream (path in) (
     (return (variant @InputFileStreamE 2 path in))
@@ -85,12 +87,58 @@
     (return s)
     ))
 
-(fun io_read_int (io) (
+(fun io_read_int8 (io) (
+    (var n)
+    (if (< (input_char (address n) (field_get io 2)) 0)
+        (return (to_sym "eof"))
+        )
+    (return (box n))
+    ))
+
+(fun io_read_uint8 (io) (
+    (var n)
+    (if (< (input_uchar (address n) (field_get io 2)) 0)
+        (return (to_sym "eof"))
+        )
+    (return (box n))
+    ))
+
+(fun io_read_int16 (io) (
+    (var n)
+    (if (< (input_short (address n) (field_get io 2)) 0)
+        (return (to_sym "eof"))
+        )
+    (return (box n))
+    ))
+
+(fun io_read_uint16 (io) (
+    (var n)
+    (if (< (input_ushort (address n) (field_get io 2)) 0)
+        (return (to_sym "eof"))
+        )
+    (return (box n))
+    ))
+
+(fun io_read_int32 (io) (
     (var n)
     (if (< (input_int (address n) (field_get io 2)) 0)
         (return (to_sym "eof"))
         )
-    (return (box n))
+    (if (&& (<= n @FIXNUM_MAX) (>= n @FIXNUM_MIN))
+        (return (box n))
+        (return (int_to_bint n))
+        )
+    ))
+
+(fun io_read_uint32 (io) (
+    (var n)
+    (if (< (input_int (address n) (field_get io 2)) 0)
+        (return (to_sym "eof"))
+        )
+    (if (&& (<= n @FIXNUM_MAX) (>= n 0))
+        (return (box n))
+        (return (uint_to_bint n))
+        )
     ))
 
 (export fun setup_io (std) (
@@ -112,7 +160,14 @@
     (add_function1 IO (to_sym "read_char") (domainP InputFileStream) io_read_char 0)
     (add_function1 IO (to_sym "read_string") (domainP InputFileStream) io_read_string 0)
     (add_function1 IO (to_sym "read_line") (domainP InputFileStream) io_read_line 0)
-    (add_function1 IO (to_sym "read_int") (domainP InputFileStream) io_read_int 0)
+    (add_function1 IO (to_sym "read_int") (domainP InputFileStream) io_read_int32 0)
+
+    (add_function1 IO (to_sym "read_int8") (domainP InputFileStream) io_read_int8 0)
+    (add_function1 IO (to_sym "read_uint8") (domainP InputFileStream) io_read_uint8 0)
+    (add_function1 IO (to_sym "read_int16") (domainP InputFileStream) io_read_int16 0)
+    (add_function1 IO (to_sym "read_uint16") (domainP InputFileStream) io_read_uint16 0)
+    (add_function1 IO (to_sym "read_int32") (domainP InputFileStream) io_read_int32 0)
+    (add_function1 IO (to_sym "read_uint32") (domainP InputFileStream) io_read_uint32 0)
     ))
 
     ))
