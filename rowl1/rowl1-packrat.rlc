@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2013-01-22 22:24:35 nineties $
+; $Id: rowl1-packrat.rlc 2013-01-23 15:05:14 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1185,6 +1185,10 @@
         (if (!= len 2) (goto compile_error))
         (return (compile_scoped (node_arg pat 0) (node_arg pat 1) ws))
         ))
+    (if (== hd ParseWith) (do
+        (if (!= len 1) (goto compile_error))
+        (return (compile_parse_with (node_arg pat 0) ws))
+        ))
     (if (!= len 1) (goto compile_error))
     (if (== hd OneOf)
         (return (compile_oneof (node_arg pat 0) ws))
@@ -1674,6 +1678,17 @@
         )
     ))
 
+; parsewith{ sym } is translated to
+(fun compile_parse_with (sym ws) (
+    (return (parse_with_check (apply
+        (apply (to_sym "%getparser") (list1 sym))
+        (list1 PVar)) ws))
+    ))
+
+(fun getparser (sym) (
+    (return (lookup_dynamic_var (to_parse sym)))
+    ))
+
 ; Option{ p } is translated to
 ;
 ; state = copy_parser_state(parser)
@@ -1963,6 +1978,7 @@
     (add_function1 mod (to_sym "%apply_located") DontCare apply_located 0)
     (add_function1 mod (to_sym "%open_scope") DontCare open_scope 0)
     (add_function1 mod (to_sym "%close_scope") DontCare close_scope 0)
+    (add_function1 mod (to_sym "%getparser") symT getparser 0)
     (add_function1 mod (to_sym "%get_pos") DontCare get_pos 0)
 
     ; Use internal version of list operations considering redefinition of them.

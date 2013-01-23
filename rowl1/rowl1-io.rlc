@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-io.rlc 2013-01-23 01:53:03 nineties $
+; $Id: rowl1-io.rlc 2013-01-23 02:11:37 nineties $
 ;
 
 (import "rlvm-compile")
@@ -141,6 +141,17 @@
         )
     ))
 
+(fun io_read_float (io) (
+    (var f (allocate_float))
+    (if (< (input_int f (field_get io 2)) 0)
+        (return (to_sym "eof"))
+        )
+    (if (< (input_int (+ f 4) (field_get io 2)) 0)
+        (return (to_sym "eof"))
+        )
+    (return f)
+    ))
+
 (export fun setup_io (std) (
     (var IO (find_module no_loc std (to_sym "IO") @TRUE))
     (add_module_variable IO (to_sym "stdin")  @C_FALSE (make_ifstream (string "stdin") stdin))
@@ -168,6 +179,7 @@
     (add_function1 IO (to_sym "read_uint16") (domainP InputFileStream) io_read_uint16 0)
     (add_function1 IO (to_sym "read_int32") (domainP InputFileStream) io_read_int32 0)
     (add_function1 IO (to_sym "read_uint32") (domainP InputFileStream) io_read_uint32 0)
+    (add_function1 IO (to_sym "read_float") (domainP InputFileStream) io_read_float 0)
     ))
 
     ))

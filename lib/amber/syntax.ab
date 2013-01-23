@@ -2,7 +2,7 @@ ReplaceSyntax{comment, shell_style_comment}
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2013-01-22 22:21:20 nineties $
+# $Id: syntax.ab 2013-01-23 16:19:05 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -31,6 +31,7 @@ ReplaceSyntax{comment, shell_style_comment}
 # delimited2(p, d) : sequence of p delimited by d (two or many)
 # located(p)       : parse p with location
 # scoped(m, p)     : parse p within module m
+# parsewith(p)     : do parse using p (p can refer previous tokens)
 # nospace(p)       : parse p without parsing spaces between tokens
 # withblank(p)     : parse p with more than one banks between tokens
 
@@ -83,6 +84,8 @@ DefineSyntax{
             QuasiQuote{Located{Unquote{node2}}}, multiline},
         Tuple{List{"scoped", "(", expr, ",", syntax_element, ")"},
             QuasiQuote{Scoped{Unquote{node2}, Unquote{node4}}}, multiline},
+        Tuple{List{"parsewith", "(", symbol, ")"},
+            QuasiQuote{ParseWith{Unquote{node2}}}, multiline},
         Tuple{List{"nospace", "(", syntax_element, ")"},
             QuasiQuote{NoSpace{Unquote{node2}}}, multiline},
         Tuple{List{"nospace", "(", Many1{syntax_element}, ")"},
@@ -165,6 +168,10 @@ block_body ::= aligned(located(statement))
 primaryblock
     ::= [multiline] "{" block_body "}" { node1 }
         # Block with module imports
+
+      | [multiline] "seq" "{" aligned(located(statement)) "}"
+        { MakeNode{Quote{Seq}, List{node2}} }
+
       | [multiline] "(" qualified_symbol ")" "{" scoped(node1, block_body) "}"
         { node4 }
 
@@ -173,6 +180,9 @@ block ::= primaryblock
 
 primary_expr
     ::= primaryblock
+
+      | [multiline] "<" qualified_symbol ">" "{" parsewith(node1) "}"
+        { node4 }
 
       | [multiline] "(" expr ")"                  { node1 } 
       | [multiline] "(" statement ")"             { node1 }
@@ -370,7 +380,7 @@ statement
 ## Reserved Keywords
 ReserveSymbol{not, and, or, where, open, import, if, else, case, of,
     while, for, reverse_for, in, continue, break, return,
-    throw, try, catch
+    throw, try, catch, seq
 }
 
 ## Syntax Sugars
