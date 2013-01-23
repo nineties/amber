@@ -1,6 +1,6 @@
 # Copyright (C) 2012 nineties
 #
-# $Id: binio.ab 2013-01-23 19:09:08 nineties $
+# $Id: binio.ab 2013-01-23 22:15:09 nineties $
 
 ### Definition ###
 #
@@ -47,6 +47,7 @@ module binio {
     string: \BinIOType{string}
 
     module impl {
+        # Reader
         read_funcs: Table {
             \int8   => read_int8,
             \uint8  => read_uint8,
@@ -64,6 +65,7 @@ module binio {
                 throw `UnknownBinaryFormat{!LOCATION, !t}
             f(io)
         }
+
         read(io, Array{t, n@Int}): {
             if (n <= 0)
                 throw `InvalidBinaryFormat{!LOCATION, Array{!t, !n}}
@@ -73,14 +75,46 @@ module binio {
             ary
         }
 
-        define(name, fields): {
+        #Writer
+        write_funcs: Table {
+            \int8   => write_int8,
+            \uint8  => write_uint8,
+            \int16  => write_int16,
+            \uint16 => write_uint16,
+            \int32  => write_int32,
+            \uint32 => write_uint32,
+            \float  => write_float,
+            \string => write_string
+        }
+
+        write(io, t, data): {
+            f: write_funcs[t]
+            if (f == undefined)
+                throw `UnknownBinaryFormat{!LOCATION, !t}
+            f(io, data)
+        }
+
+        write(io, Array{t, len}, data): {
+            for i in 0..len-1
+                write(io, t, data[i])
+        }
+
+        define_binio(name, fields): {
             read_funcs[name] = (io) -> {
                 MakeNode{name, fields.map(((_, t)) -> read(io, t))}
+            }
+            write_funcs[name] = (io, data) -> {
+                i: 0
+                for (_, t) in fields {
+                    write(io, t, data[i])
+                    i += 1
+                }
             }
         }
     }
 
     read(io, BinIOType{t}): impl::read(io, t)
+    write(io, data): impl::write(io, head(data), data) 
 }
 
 ### Syntax ###
@@ -104,9 +138,8 @@ binio_definition
 statement ::= binio_definition
 
 ### Semantics ###
-#DefineBinIO{name, fields} => binio::impl::define(name, fields)
 DefineBinIO{name, fields} => {
-        impl::define(name, fields)
+        impl::define_binio(name, fields)
         `seq {
             (!name): \BinIOType{!name}
             !std::impl::gen_struct_decl(name, fields.map(((x,_)) -> `Field{!x, undefined}))

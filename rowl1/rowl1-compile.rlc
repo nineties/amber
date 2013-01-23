@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2013-01-23 15:01:46 nineties $
+; $Id: rowl1-compile.rlc 2013-01-23 22:36:29 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1422,10 +1422,10 @@
 ;
 ; {
 ;     iter: ary.each
-;     i: iter()
-;     while (i != undefined) {
+;     v: nil
+;     while ((v = iter()) != undefined) {
+;         i = v
 ;         body
-;         i = iter()
 ;     }
 ; }
 
@@ -1434,15 +1434,18 @@
     (var ary (node_arg expr 1))
     (var body (node_arg expr 2))
     (var iter (unique_sym))
+    (var v (unique_sym))
     (compile asm mod
         (block (list3
             (defvar iter (apply (to_sym "each") (list1 ary)))
+            (defvar v @C_NIL)
             (defvar i (apply iter 0))
             (make_node2 While
-                (make_node1 Not (apply (to_sym "equal") (list2 i @C_UNDEF)))
+                (make_node1 Not (apply (to_sym "equal") (list2
+                (assign v (apply iter 0)) @C_UNDEF)))
                 (seq (list2
+                    (defvar i v)
                     body
-                    (assign i (apply iter 0))
                     )))
             )))
     ))
@@ -1452,15 +1455,18 @@
     (var ary (node_arg expr 1))
     (var body (node_arg expr 2))
     (var iter (unique_sym))
+    (var v (unique_sym))
     (compile asm mod
         (block (list3
             (defvar iter (apply (to_sym "reverse_each") (list1 ary)))
+            (defvar v @C_NIL)
             (defvar i (apply iter 0))
             (make_node2 While
-                (make_node1 Not (apply (to_sym "equal") (list2 i @C_UNDEF)))
+                (make_node1 Not (apply (to_sym "equal") (list2
+                (assign v (apply iter 0)) @C_UNDEF)))
                 (seq (list2
+                    (defvar i v)
                     body
-                    (assign i (apply iter 0))
                     )))
             )))
     ))

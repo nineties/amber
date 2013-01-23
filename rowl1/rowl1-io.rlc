@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-io.rlc 2013-01-23 02:11:37 nineties $
+; $Id: rowl1-io.rlc 2013-01-23 21:05:07 nineties $
 ;
 
 (import "rlvm-compile")
@@ -14,8 +14,11 @@
 (import "rowl1-node")
 (import "rowl1-module")
 (import "rowl1-compile")
+(import "rowl1-error")
 (import "rowl1-pprint")
 (import "rowl1-bigint")
+
+(extern object current_loc)
 
 (export fun make_ifstream (path in) (
     (return (variant @InputFileStreamE 2 path in))
@@ -152,6 +155,41 @@
     (return f)
     ))
 
+(fun io_write_byte8 (io n) (
+    (= n (unbox n))
+    (output_bytes (field_get io 2) (address n) 1)
+    (return @C_NIL)
+    ))
+
+(fun io_write_byte16 (io n) (
+    (= n (unbox n))
+    (output_bytes (field_get io 2) (address n) 2)
+    (return @C_NIL)
+    ))
+
+(fun io_write_byte32 (io n) (
+    (if (& n 1)
+        (do
+            (= n (unbox n))
+            (output_bytes (field_get io 2) (address n) 2)
+            (return @C_NIL)
+        ))
+    (if (!= (node_head n) BigInt)
+        (throw (invalid_argument current_loc
+            (string "32-bit integer is required")
+            n)))
+    (= n (bint_digit n 0))
+    (output_bytes (field_get io 2) (address n) 4)
+    (return @C_NIL)
+    ))
+
+(fun io_write_float (io f) (
+    (var ochan (field_get io 2))
+    (output_bytes ochan f 4)
+    (output_bytes ochan (+ f 4) 4)
+    (return @C_NIL)
+    ))
+
 (export fun setup_io (std) (
     (var IO (find_module no_loc std (to_sym "IO") @TRUE))
     (add_module_variable IO (to_sym "stdin")  @C_FALSE (make_ifstream (string "stdin") stdin))
@@ -171,8 +209,8 @@
     (add_function1 IO (to_sym "read_char") (domainP InputFileStream) io_read_char 0)
     (add_function1 IO (to_sym "read_string") (domainP InputFileStream) io_read_string 0)
     (add_function1 IO (to_sym "read_line") (domainP InputFileStream) io_read_line 0)
-    (add_function1 IO (to_sym "read_int") (domainP InputFileStream) io_read_int32 0)
 
+    ; Binary IO
     (add_function1 IO (to_sym "read_int8") (domainP InputFileStream) io_read_int8 0)
     (add_function1 IO (to_sym "read_uint8") (domainP InputFileStream) io_read_uint8 0)
     (add_function1 IO (to_sym "read_int16") (domainP InputFileStream) io_read_int16 0)
@@ -180,6 +218,15 @@
     (add_function1 IO (to_sym "read_int32") (domainP InputFileStream) io_read_int32 0)
     (add_function1 IO (to_sym "read_uint32") (domainP InputFileStream) io_read_uint32 0)
     (add_function1 IO (to_sym "read_float") (domainP InputFileStream) io_read_float 0)
+
+    (add_function2 IO (to_sym "write_int8") (domainP OutputFileStream) intT io_write_byte8 0)
+    (add_function2 IO (to_sym "write_uint8") (domainP OutputFileStream) intT io_write_byte8 0)
+    (add_function2 IO (to_sym "write_int16") (domainP OutputFileStream) intT io_write_byte16 0)
+    (add_function2 IO (to_sym "write_uint16") (domainP OutputFileStream) intT io_write_byte16 0)
+    (add_function2 IO (to_sym "write_int32") (domainP OutputFileStream) DontCare io_write_byte32 0)
+    (add_function2 IO (to_sym "write_uint32") (domainP OutputFileStream) DontCare io_write_byte32 0)
+    (add_function2 IO (to_sym "write_float") (domainP OutputFileStream) floatT io_write_float 0)
+    (add_function2 IO (to_sym "write_string") (domainP OutputFileStream) stringT io_print_str 0)
     ))
 
     ))
