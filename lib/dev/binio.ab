@@ -1,6 +1,6 @@
 # Copyright (C) 2012 nineties
 #
-# $Id: binio.ab 2013-01-24 00:28:38 nineties $
+# $Id: binio.ab 2013-01-24 12:01:09 nineties $
 
 ### Definition ###
 #
@@ -35,30 +35,43 @@ import data.struct
 
 module binio {
     # Types
-    char:   \BinIOType{int8}
-    int8:   \BinIOType{int8}
-    int16:  \BinIOType{int16}
-    int32:  \BinIOType{int32}
-    uchar:  \BinIOType{uint8}
-    uint8:  \BinIOType{uint8}
-    uint16: \BinIOType{uint16}
-    uint32: \BinIOType{uint32}
-    float:  \BinIOType{float}
-    string: \BinIOType{string}
+    char:    \BinIOType{int8}
+    int8:    \BinIOType{int8}
+    int16:   \BinIOType{int16}
+    int32:   \BinIOType{int32}
+    int64:   \BinIOType{int64}
+    uchar:   \BinIOType{uint8}
+    uint8:   \BinIOType{uint8}
+    uint16:  \BinIOType{uint16}
+    uint32:  \BinIOType{uint32}
+    uint64:  \BinIOType{uint64}
+    float:   \BinIOType{float}
+    string:  \BinIOType{string}
+    address: \BinIOType{address}
+    offset:  \BinIOType{offset}
 
     module impl {
+        read_address_error(_):
+            throw `Error{!LOCATION, "Address width is unspecified. Call binio::set_address_width(n)."}
+        write_address_error(_, _):
+            throw `Error{!LOCATION, "Address width is unspecified. Call binio::set_address_width(n)."}
+
         # Reader
         read_funcs: Table {
-            \char   => read_int8,
-            \uchar  => read_uint8,
-            \int8   => read_int8,
-            \uint8  => read_uint8,
-            \int16  => read_int16,
-            \uint16 => read_uint16,
-            \int32  => read_int32,
-            \uint32 => read_uint32,
-            \float  => read_float,
-            \string => read_string
+            \char    => read_int8,
+            \uchar   => read_uint8,
+            \int8    => read_int8,
+            \uint8   => read_uint8,
+            \int16   => read_int16,
+            \uint16  => read_uint16,
+            \int32   => read_int32,
+            \uint32  => read_uint32,
+            \int64   => read_int64,
+            \uint64  => read_uint64,
+            \float   => read_float,
+            \string  => read_string,
+            \address => read_address_error,
+            \offset  => read_address_error
         }
 
         read(io, t): {
@@ -79,16 +92,20 @@ module binio {
 
         #Writer
         write_funcs: Table {
-            \char   => write_int8,
-            \uchar  => write_uint8,
-            \int8   => write_int8,
-            \uint8  => write_uint8,
-            \int16  => write_int16,
-            \uint16 => write_uint16,
-            \int32  => write_int32,
-            \uint32 => write_uint32,
-            \float  => write_float,
-            \string => write_string
+            \char    => write_int8,
+            \uchar   => write_uint8,
+            \int8    => write_int8,
+            \uint8   => write_uint8,
+            \int16   => write_int16,
+            \uint16  => write_uint16,
+            \int32   => write_int32,
+            \uint32  => write_uint32,
+            \int64   => write_int64,
+            \uint64  => write_uint64,
+            \float   => write_float,
+            \string  => write_string,
+            \address => write_address_error,
+            \offset  => write_address_error
         }
 
         write(io, t, data): {
@@ -119,6 +136,22 @@ module binio {
 
     read(io, BinIOType{t}): impl::read(io, t)
     write(io, data): impl::write(io, head(data), data) 
+
+    set_address_width(n@Int): {
+        if (n == 32) {
+            impl::read_funcs[\address]  = read_uint32
+            impl::read_funcs[\offset]   = read_uint32
+            impl::write_funcs[\address] = write_uint32
+            impl::write_funcs[\offset]  = write_uint32
+        } else if (n == 64) {
+            impl::read_funcs[\address]  = read_uint64
+            impl::read_funcs[\offset]   = read_uint64
+            impl::write_funcs[\address] = write_uint64
+            impl::write_funcs[\offset]  = write_uint64
+        } else {
+            throw `Error{"Invalid address width", !n}
+        }
+    }
 }
 
 ### Syntax ###

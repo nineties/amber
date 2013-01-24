@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-io.rlc 2013-01-24 00:29:16 nineties $
+; $Id: rowl1-io.rlc 2013-01-24 11:54:27 nineties $
 ;
 
 (import "rlvm-compile")
@@ -144,6 +144,51 @@
         )
     ))
 
+(fun io_read_int64 (io) (
+    (var n1)
+    (var n2)
+    (if (< (input_int (address n1) (field_get io 2)) 0)
+        (return (to_sym "eof"))
+        )
+    (if (< (input_int (address n2) (field_get io 2)) 0)
+        (return (to_sym "eof"))
+        )
+
+    (var b (allocate_bint 2))
+    (if (< n2 0)
+        (do
+            (= n1 (~ n1))
+            (= n2 (~ n2))
+            (+= n2 1)
+            (if (== n2 0) (+= n1 1))
+        ))
+    (bint_set_digit b 0 n1)
+    (bint_set_digit b 1 n2)
+    (bint_set_ndigit b 2)
+    (return (norm b))
+    ))
+
+(fun io_read_uint64 (io) (
+    (var n1)
+    (var n2)
+    (if (< (input_int (address n1) (field_get io 2)) 0)
+        (return (to_sym "eof"))
+        )
+    (if (< (input_int (address n2) (field_get io 2)) 0)
+        (return (to_sym "eof"))
+        )
+    (debugs "64bit\n")
+    (debugx n1)
+    (debugs "\n")
+    (debugx n2)
+    (debugs "\n")
+    (var b (allocate_bint 2))
+    (bint_set_digit b 0 n1)
+    (bint_set_digit b 1 n2)
+    (bint_set_ndigit b 2)
+    (return (norm b))
+    ))
+
 (fun io_read_float (io) (
     (var f (allocate_float))
     (if (< (input_int f (field_get io 2)) 0)
@@ -183,6 +228,24 @@
     (return @C_NIL)
     ))
 
+(fun io_write_byte64 (io n) (
+    (if (& n 1)
+        (do
+            (= n (unbox n))
+            (output_bytes (field_get io 2) (address n) 4)
+            (= n 0)
+            (output_bytes (field_get io 2) (address n) 4)
+            (return @C_NIL)
+        ))
+    (if (!= (node_head n) BigInt)
+        (throw (invalid_argument current_loc
+            (string "32-bit integer is required")
+            n)))
+    (= n (bint_digit n 0))
+    (output_bytes (field_get io 2) (address n) 8)
+    (return @C_NIL)
+    ))
+
 (fun io_write_float (io f) (
     (var ochan (field_get io 2))
     (output_bytes ochan f 4)
@@ -217,6 +280,8 @@
     (add_function1 IO (to_sym "read_uint16") (domainP InputFileStream) io_read_uint16 0)
     (add_function1 IO (to_sym "read_int32") (domainP InputFileStream) io_read_int32 0)
     (add_function1 IO (to_sym "read_uint32") (domainP InputFileStream) io_read_uint32 0)
+    (add_function1 IO (to_sym "read_int64") (domainP InputFileStream) io_read_int64 0)
+    (add_function1 IO (to_sym "read_uint64") (domainP InputFileStream) io_read_uint64 0)
     (add_function1 IO (to_sym "read_float") (domainP InputFileStream) io_read_float 0)
 
     (add_function2 IO (to_sym "write_int8") (domainP OutputFileStream) intT io_write_byte8 0)
@@ -225,6 +290,8 @@
     (add_function2 IO (to_sym "write_uint16") (domainP OutputFileStream) intT io_write_byte16 0)
     (add_function2 IO (to_sym "write_int32") (domainP OutputFileStream) DontCare io_write_byte32 0)
     (add_function2 IO (to_sym "write_uint32") (domainP OutputFileStream) DontCare io_write_byte32 0)
+    (add_function2 IO (to_sym "write_int64") (domainP OutputFileStream) DontCare io_write_byte64 0)
+    (add_function2 IO (to_sym "write_uint64") (domainP OutputFileStream) DontCare io_write_byte64 0)
     (add_function2 IO (to_sym "write_float") (domainP OutputFileStream) floatT io_write_float 0)
     (add_function2 IO (to_sym "write_string") (domainP OutputFileStream) stringT io_print_str 0)
     ))
