@@ -1,6 +1,6 @@
 # Copyright (C) 2012 nineties
 #
-# $Id: binio.ab 2013-01-24 19:40:47 nineties $
+# $Id: binio.ab 2013-01-24 22:44:44 nineties $
 
 ### Definition ###
 #
@@ -32,6 +32,7 @@
 #
 
 import data.struct
+open bigint
 
 module binio {
     module impl {
@@ -74,9 +75,15 @@ module binio {
             ary
         }
 
-        read(io, Map{t, list}): {
+        read(io, Map{t, list@List}): {
             i: read(io, t)
-            (list[i] == undefined) ? i : list[i]
+            (i >= list.size) ? i : list[i]
+        }
+
+        read(io, Map{t, map@BiTable}): {
+            i: read(io, t)
+            v: map.right[i]
+            (v == undefined) ? i : v
         }
 
         #Writer
@@ -109,8 +116,16 @@ module binio {
                 write(io, t, data[i])
         }
 
-        write(io, Map{t, list}, data): {
+        write(io, Map{t, list@List}, data): {
             i: index(list, data)
+            if (i == undefined)
+                write(io, t, data)
+            else
+                write(io, t, i)
+        }
+
+        write(io, Map{t, map@BiTable}, data): {
+            i: map.left[data]
             if (i == undefined)
                 write(io, t, data)
             else
@@ -148,16 +163,20 @@ module binio {
         } else {
             throw `Error{"Invalid address width", !n}
         }
+        nil
     }
 }
 
 ### Syntax ###
-binio_type
-    ::= binio_type "[" expr "]"
+binio_simple_type
+    ::= binio_simple_type "[" expr "]"
         { `Array{!$0, !eval($2)} }
-      | binio_type "=>" "{" delimited1(expr, ",") "}"
-        { `Map{!$0, !eval($3)} }
       | symbol
+
+binio_type
+    ::= binio_simple_type "=>" expr
+        { `Map{!$0, !eval($2)} }
+      | binio_simple_type
 
 binio_field
     ::= symbol ":" binio_type           { ($0, $2) }

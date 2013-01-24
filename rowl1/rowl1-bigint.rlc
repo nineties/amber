@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-bigint.rlc 2013-01-24 11:50:45 nineties $
+; $Id: rowl1-bigint.rlc 2013-01-25 00:31:51 nineties $
 ;
 
 (import "rlvm-compile")
@@ -358,6 +358,100 @@
         (= r 9)
         ))
     (field_set u 3 sign)
+    (return u)
+    ))
+
+(export fun parse_bint_binary (str) (
+    (var slen (strlen str))
+    (var p 0)
+
+    ; skip "0b"
+    (+= str 2)
+    (-= slen 2)
+
+    (var ulen (/ (+ slen 31) 32))
+    (var u (allocate_bint ulen))
+
+    (var j 0)
+    (var c 0)
+    (var w 0)
+    (rfor i 0 slen (do
+        (if (== (array_get char str i) '1') (|= w (<< 1 c)))
+        (+= c 1)
+        (if (== c 32) (do
+            (bint_set_digit u j w)
+            (= c 0)
+            (= w 0)
+            (+= j 1)
+            ))
+        ))
+    (bint_set_digit u j w)
+    (bint_set_ndigit u ulen)
+    (return u)
+    ))
+
+(export fun parse_bint_octal (str) (
+    (var slen (strlen str))
+    (var p 0)
+
+    ; skip "0o"
+    (+= str 2)
+    (-= slen 2)
+
+    (var ulen (/ (+ (* 3 slen) 31) 32))
+    (var u (allocate_bint ulen))
+
+    (var c 0)
+    (var w 0)
+    (for i 0 slen (do
+        (<<= w 3)
+        (|= w (- (array_get char str i) '0'))
+        (+= c 3)
+        (if (== c 30) (do
+            (bigshl u 30)
+            (bint_set_digit u 0 (| (bint_digit u 0) w))
+            (= c 0)
+            (= w 0)
+            ))
+        ))
+    (if (> c 0) (do
+        (bigshl u c)
+        (bint_set_digit u 0 (| (bint_digit u 0) w))
+        ))
+    (return u)
+    ))
+
+(export fun parse_bint_hex (str) (
+    (var slen (strlen str))
+    (var p 0)
+
+    ; skip "0x"
+    (+= str 2)
+    (-= slen 2)
+
+    (var ulen (/ (+ (* 4 slen) 31) 32))
+    (var u (allocate_bint ulen))
+
+    (var j 0)
+    (var c 0)
+    (var w 0)
+    (rfor i 0 slen (do
+        (var d (array_get char str i))
+        (if (>= d 'a') (= d (+ (- d 'a') 10))
+        (if (>= d 'A') (= d (+ (- d 'A') 10))
+            (-= d '0')
+            ))
+        (|= w (<< d c))
+        (+= c 4)
+        (if (== c 32) (do
+            (bint_set_digit u j w)
+            (= c 0)
+            (= w 0)
+            (+= j 1)
+            ))
+        ))
+    (bint_set_digit u j w)
+    (bint_set_ndigit u ulen)
     (return u)
     ))
 
