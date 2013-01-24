@@ -1,6 +1,6 @@
 # Copyright (C) 2012 nineties
 #
-# $Id: binio.ab 2013-01-24 16:35:11 nineties $
+# $Id: binio.ab 2013-01-24 19:40:47 nineties $
 
 ### Definition ###
 #
@@ -34,22 +34,6 @@
 import data.struct
 
 module binio {
-    # Types
-    char:    \BinIOType{int8}
-    int8:    \BinIOType{int8}
-    int16:   \BinIOType{int16}
-    int32:   \BinIOType{int32}
-    int64:   \BinIOType{int64}
-    uchar:   \BinIOType{uint8}
-    uint8:   \BinIOType{uint8}
-    uint16:  \BinIOType{uint16}
-    uint32:  \BinIOType{uint32}
-    uint64:  \BinIOType{uint64}
-    float:   \BinIOType{float}
-    string:  \BinIOType{string}
-    address: \BinIOType{address}
-    offset:  \BinIOType{offset}
-
     module impl {
         read_address_error(_):
             throw `Error{!LOCATION, "Address width is unspecified. Call binio::set_address_width(n)."}
@@ -90,6 +74,11 @@ module binio {
             ary
         }
 
+        read(io, Map{t, list}): {
+            i: read(io, t)
+            (list[i] == undefined) ? i : list[i]
+        }
+
         #Writer
         write_funcs: Table {
             \char    => write_int8,
@@ -120,6 +109,14 @@ module binio {
                 write(io, t, data[i])
         }
 
+        write(io, Map{t, list}, data): {
+            i: index(list, data)
+            if (i == undefined)
+                write(io, t, data)
+            else
+                write(io, t, i)
+        }
+
         define_binio(name, fields): {
             read_funcs[name] = (io) -> {
                 MakeNode{name, fields.map(((_, t)) -> read(io, t))}
@@ -134,7 +131,7 @@ module binio {
         }
     }
 
-    read(io, BinIOType{t}): impl::read(io, t)
+    read(io, t): impl::read(io, t)
     write(io, data): impl::write(io, head(data), data) 
 
     set_address_width(n@Int): {
@@ -156,7 +153,10 @@ module binio {
 
 ### Syntax ###
 binio_type
-    ::= binio_type "[" expr "]"         { `Array{!$0, !eval($2)} }
+    ::= binio_type "[" expr "]"
+        { `Array{!$0, !eval($2)} }
+      | binio_type "=>" "{" delimited1(expr, ",") "}"
+        { `Map{!$0, !eval($3)} }
       | symbol
 
 binio_field
@@ -176,9 +176,8 @@ statement ::= binio_definition
 
 ### Semantics ###
 DefineBinIO{name, fields} => {
-        impl::define_binio(name, fields)
+        binio::impl::define_binio(name, fields)
         `seq {
-            (!name): \BinIOType{!name}
             !std::impl::gen_struct_decl(name, fields.map(((x,_)) -> `Field{!x, undefined}))
         }
     }
