@@ -1,6 +1,6 @@
 # Copyright (C) 2012 nineties
 #
-# $Id: binio.ab 2013-01-24 22:44:44 nineties $
+# $Id: binio.ab 2013-01-25 02:21:29 nineties $
 
 ### Definition ###
 #
@@ -61,7 +61,7 @@ module binio {
 
         read(io, t): {
             f: read_funcs[t]
-            if (f == undefined)
+            if (f == undef)
                 throw `UnknownBinaryFormat{!LOCATION, !t}
             f(io)
         }
@@ -83,7 +83,7 @@ module binio {
         read(io, Map{t, map@BiTable}): {
             i: read(io, t)
             v: map.right[i]
-            (v == undefined) ? i : v
+            (v == undef) ? i : v
         }
 
         #Writer
@@ -106,28 +106,28 @@ module binio {
 
         write(io, t, data): {
             f: write_funcs[t]
-            if (f == undefined)
+            if (f == undef)
                 throw `UnknownBinaryFormat{!LOCATION, !t}
-            f(io, data)
+            f(io, (data != undef) ? data : 0)
         }
 
         write(io, Array{t, n@Int}, data): {
             for i in 0..n-1
-                write(io, t, data[i])
+                write(io, t, (data != undef) ? data[i] : 0)
         }
 
         write(io, Map{t, list@List}, data): {
             i: index(list, data)
-            if (i == undefined)
-                write(io, t, data)
+            if (i == undef)
+                write(io, t, (data != undef) ? data : 0)
             else
                 write(io, t, i)
         }
 
         write(io, Map{t, map@BiTable}, data): {
             i: map.left[data]
-            if (i == undefined)
-                write(io, t, data)
+            if (i == undef)
+                write(io, t, (data != undef) ? data : 0)
             else
                 write(io, t, i)
         }
@@ -197,6 +197,6 @@ statement ::= binio_definition
 DefineBinIO{name, fields} => {
         binio::impl::define_binio(name, fields)
         `seq {
-            !std::impl::gen_struct_decl(name, fields.map(((x,_)) -> `Field{!x, undefined}))
+            !std::impl::gen_struct_decl(name, fields.map(((x,_)) -> `Field{!x, undef}))
         }
     }
