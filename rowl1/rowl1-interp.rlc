@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2013-01-24 17:29:18 nineties $
+; $Id: rowl1-interp.rlc 2013-01-25 04:43:25 nineties $
 ;
 
 (import "rlvm-compile")
@@ -32,6 +32,9 @@
 (var module_stack null)
 
 (export fun set_current_module (mod) (
+    (if (!= (node_head mod) Module)
+        (throw (type_error current_loc (string "module") mod))
+        )
     (= current_mod mod)
     (add_module_variable amber_mod (to_sym "MODULE") @C_TRUE mod)
     ))
@@ -163,6 +166,14 @@
             (node_arg_set lhs 1 (rewrite (node_arg lhs 1)))
             )
         (node_arg_set expr 1 (rewrite (node_arg expr 1)))
+        (return expr)
+        ))
+
+    (if (== hd Scoped) (do
+        (var save_mod current_mod)
+        (set_current_module (node_arg expr 0))
+        (node_arg_set expr 1 (rewrite (node_arg expr 1)))
+        (set_current_module save_mod)
         (return expr)
         ))
 
