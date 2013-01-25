@@ -1,6 +1,6 @@
 # Copyright (C) 2012 nineties
 #
-# $Id: binio.ab 2013-01-25 02:21:29 nineties $
+# $Id: binio.ab 2013-01-25 12:05:29 nineties $
 
 ### Definition ###
 #
@@ -54,7 +54,7 @@ module binio {
             \int64   => read_int64,
             \uint64  => read_uint64,
             \float   => read_float,
-            \string  => read_string,
+            \asciiz  => read_string,
             \address => read_address_error,
             \offset  => read_address_error
         }
@@ -99,7 +99,9 @@ module binio {
             \int64   => write_int64,
             \uint64  => write_uint64,
             \float   => write_float,
-            \string  => write_string,
+            \asciiz  => (io, str) -> {
+                write_string(io, str); write_uint8(io, 0)
+            },
             \address => write_address_error,
             \offset  => write_address_error
         }
@@ -148,6 +150,14 @@ module binio {
 
     read(io, t): impl::read(io, t)
     write(io, data): impl::write(io, head(data), data) 
+    write(io, t, data): impl::write(io, t, data) 
+
+    align(io, w): {
+        if (w == 0) return
+        for i in 1 .. (io.position % w) {
+            impl::write(io, \uint8, 0)
+        }
+    }
 
     set_address_width(n@Int): {
         if (n == 32) {

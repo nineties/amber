@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-table.rlc 2013-01-24 20:59:24 nineties $
+; $Id: rowl1-table.rlc 2013-01-25 05:15:00 nineties $
 ;
 
 (import "rlvm-compile")
@@ -235,7 +235,7 @@
         (= keys (cons (field_get entries 0) keys))
         (= entries (field_get entries 3))
         ))
-    (return (list_reverse keys))
+    (return keys)
     ))
 
 (fun ht_values (tbl) (
@@ -245,7 +245,7 @@
         (= values (cons (field_get entries 1) values))
         (= entries (field_get entries 3))
         ))
-    (return (list_reverse values))
+    (return values)
     ))
 
 (extern fun tuple2)
@@ -257,24 +257,19 @@
             (field_get entry 1)) es))
         (= entry (field_get entry 3))
         ))
-    (return (list_reverse es))
+    (return es)
     ))
 
 (export fun pp_table (ochan tbl) (
-    (var entry (field_get tbl 5))
+    (var entries (ht_entries tbl))
     (output_string ochan "Table{")
-    (while entry (do
-        (var d (field_get entry 4))
-        (if (> d 1) (do
-            (output_char ochan '(')
-            (output_int  ochan d)
-            (output_string ochan ") ")
-            ))
-        (pprint ochan (field_get entry 0))
+    (while entries (do
+        (var pair (car entries))
+        (pprint ochan (array_get object pair 0))
         (output_string ochan " => ")
-        (pprint ochan (field_get entry 1))
-        (= entry (field_get entry 3))
-        (if entry (output_string ochan ", "))
+        (pprint ochan (array_get object pair 1))
+        (= entries (cdr entries))
+        (if entries (output_string ochan ", "))
         ))
     (output_string ochan "}")
     ))

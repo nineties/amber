@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-io.rlc 2013-01-23 01:46:03 nineties $
+; $Id: vm-prim-io.rlc 2013-01-25 12:26:31 nineties $
 ;
 
 (import "stdlib")
@@ -88,9 +88,9 @@
     (return chan)
     ))
 
-; ochan = (buf, fd, pos)
+; ochan = (buf, fd, pos in buf, pos)
 (fun make_ochan (fd) (
-    (void* chan (prim_make_struct3 1 (make_carray @WRBUFSZ) fd 0))
+    (void* chan (prim_make_struct4 1 (make_carray @WRBUFSZ) fd 0 0))
     (= ochan_list (make_cons chan ochan_list))
     (return chan)
     ))
@@ -332,6 +332,14 @@
     (return 0)
     ))
 
+(export prim_position)
+(fun prim_position (ochan) (
+    (if (> (get ochan 1) 0)
+        ((return (get ochan 3)))
+        ((return (get ochan 2)))
+        )
+    ))
+
 (export prim_output_bytes)
 (fun prim_output_bytes (ochan ptr size) (
     (if (== (get ochan 1) @STDERR_FD) (
@@ -356,6 +364,7 @@
     (set8 (get ochan 0) (get ochan 2) c)
     (int new_size (+ (get ochan 2) 1))
     (set ochan 2 new_size)
+    (if (> (get ochan 1) 0) ((set ochan 3 (+ (get ochan 3) 1))))
     (if (&& (< (get ochan 1) 0) (== new_size (- (get ochan 3) 1))) (
         (reserve_sio ochan)
         (return)
