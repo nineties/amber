@@ -2,7 +2,7 @@ ReplaceSyntax{comment, shell_style_comment}
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2013-01-25 13:35:53 nineties $
+# $Id: syntax.ab 2013-01-28 00:25:11 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -213,13 +213,10 @@ postfix_expr
       | primary_expr "@" postfix_expr
         { MakeNode{Quote{Domain}, List{node0, node2}} }
 
-        # Message Passing Style
-        # e.s and e.s(a,b,c) are just syntax-sugars of s(e) and s(e,a,b,c)
       | postfix_expr "." symbol "(" delimited(expr, ",") ")"
-        { MakeNode{Quote{Apply}, List{node2,
-            Apply{Qualified{std, cons}, List{node0, node4}}}} }
+        { MakeNode{Quote{FieldGet}, List{node0, node2, node4}} }
       | postfix_expr "." symbol
-        { MakeNode{Quote{Apply}, List{node2, List{node0}}} }
+        { MakeNode{Quote{FieldGet}, List{node0, node2}} }
 
       | primary_expr "^" postfix_expr
         { MakeNode{Quote{Power}, List{node0, node2}} }
@@ -410,7 +407,6 @@ x == y  => `equal(!x, !y)
 x != y  => `(not equal(!x, !y))
 x[args...]     => `Apply{at, !std::cons(x, args)}
 x[args...] = e => `Apply{store, !std::cons(x, std::append(args, [e]))}
-x.s = e => `Apply{!("set_" + s).to_sym, ![x, e]}
 
 module parser {
     primary_expr ::= "$" decimal { ("node" + node1).to_sym }

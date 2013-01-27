@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2013-01-28 00:03:01 nineties $
+; $Id: rowl1-compile.rlc 2013-01-28 00:32:02 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1195,9 +1195,12 @@
 
 ; obj.f = v
 (fun compile_fieldset (asm mod expr) (
-    (var obj (node_arg expr 0))
-    (var sym (node_arg expr 1))
-    (var val (node_arg expr 2))
+    (debugs "compile_fieldset:")
+    (debugpf expr)
+    (var lhs (node_arg expr 0))
+    (var obj (node_arg lhs 0))
+    (var sym (node_arg lhs 1))
+    (var val (node_arg expr 1))
     (compile asm mod val)
     (compile asm mod obj)
     (put_push asm sym)
@@ -2025,9 +2028,6 @@
     (add_compiler mod (domainP Float) compile_const)
 
     (add_compiler mod (make_node2 Apply DontCare listT) compile_apply)
-    (add_compiler mod (make_node2 FieldGet DontCare symT) compile_fieldget)
-    (add_compiler mod (make_node3 FieldGet DontCare symT listT) compile_fieldget2)
-    (add_compiler mod (make_node3 FieldSet DontCare symT DontCare) compile_fieldset)
 
     (add_compiler mod (qquote (unquote (unquote DontCare))) compile_unquote)
     (add_compiler mod (qquote (quote (unquote DontCare))) compile_quote)
@@ -2076,6 +2076,11 @@
     (add_compiler mod (make_node2 Assign DontCare DontCare) compile_assign)
     (add_compiler mod (make_node2 Lambda DontCare DontCare) compile_lambda)
     (add_compiler mod (make_node2 Bind DontCare DontCare) compile_bind)
+
+    (add_compiler mod (make_node2 FieldGet DontCare symT) compile_fieldget)
+    (add_compiler mod (make_node3 FieldGet DontCare symT listT) compile_fieldget2)
+    (add_compiler mod (assign (make_node2 FieldGet DontCare symT) DontCare)
+        compile_fieldset)
 
     ; internal expressions
     (add_compiler mod (make_node2 FieldRef DontCare intT) compile_fieldref)
