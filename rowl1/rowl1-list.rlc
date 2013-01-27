@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2013-01-17 16:24:10 nineties $
+; $Id: rowl1-list.rlc 2013-01-28 01:33:22 nineties $
 ;
 
 (import "rlvm-compile")
@@ -166,13 +166,33 @@
     (return @C_UNDEF)
     ))
 
-(fun ls_create (n f) (
+(extern fun tuple2)
+(extern fun tuple_at)
+(fun ls_zip (a b) (
     (var new_ls 0)
-    (var code (get_bytecode f))
-    (for i 0 (unbox n) (do
-        (= new_ls (cons (byterun code (box i)) new_ls))
+    (while (&& a b) (do
+        (= new_ls (cons (tuple2 (car a) (car b)) new_ls))
+        (= a (cdr a))
+        (= b (cdr b))
         ))
     (return (list_reverse new_ls))
+    ))
+
+(fun ls_unzip (ls) (
+    (var left 0)
+    (var right 0)
+    (var orig ls)
+    (while ls (do
+        (var t (car ls))
+        (if (!= (node_type t) @TupleE)
+            (throw (invalid_argument current_loc
+                (string "List of tuples is required")
+                orig)))
+        (= left (cons (tuple_at t 0) left))
+        (= right (cons (tuple_at t 1) right))
+        (= ls (cdr ls))
+        ))
+    (return (tuple2 (list_reverse left) (list_reverse right)))
     ))
 
 (export fun setup_list (std) (
@@ -194,7 +214,8 @@
     (add_function2 std (to_sym "foldr1") listT funT ls_foldr1 0)
     (add_function2 std (to_sym "contain") listT DontCare ls_contain 0)
     (add_function2 std (to_sym "index") listT DontCare ls_index 0)
-    (add_function2 mod (to_sym "create") intT funT ls_create 0)
+    (add_function2 std (to_sym "zip") listT listT ls_zip 0)
+    (add_function1 std (to_sym "unzip") listT ls_unzip 0)
     ))
 
     ))

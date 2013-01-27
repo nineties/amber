@@ -1,20 +1,7 @@
 # Copyright (C) 2012 nineties
 #
-# $Id: struct.ab 2013-01-25 14:43:49 nineties $
+# $Id: struct.ab 2013-01-28 03:06:06 nineties $
 
-### Simple struct declaration
-# 
-# Declaration:
-#
-#   struct Foo
-#   struct Foo, Bar, ..
-#
-# Usage:
-#
-#   Foo{arg0, arg1, ...}
-#
-### Declaration with fields
-#
 # Declaration:
 #
 # struct Foo {
@@ -23,67 +10,53 @@
 #     ...
 # }
 #
+# or
+#
+#   Foo{ name1: default_value1, name2: default_value2, ... }
+#
 # Usage:
 #
-#   Foo{ name: value, name: value, ... }    # arbitrary order
+#   Foo{ name1: value1, name2: value2, ... }  # arbitrary order
 #
 
 module std {
     module impl {
-        simple_decl_single(sym):
-            `(!MakeNode{sym, [\(args...)]} => `MakeNode{\!!sym, !!\!args})
-        gen_simple_decls(syms): `Seq{!map(syms, simple_decl_single)}
-
-
-        gen_create_struct(head, names, values):
-            `(!MakeNode{head, [\(args...)]} => `{
-                obj: MakeNode{\!!head, !!values}
-                !!\Seq{!map(args, (Field{x,v} -> `Apply{!("set_" + x).to_sym, [obj, !v]}))}
-                obj
-            })
-
-        gen_getters(_, head, []): []
-        gen_getters(i, head, [x,xs...]): {
-            getter: `DefineFunction{!x, Lambda{Domain{obj, !head}, _at(obj, !i)}}
-            cons(getter, gen_getters(i+1, head, xs))
-        }
-
-        gen_setters(_, head, []): []
-        gen_setters(i, head, [x,xs...]): {
-            setter: `DefineFunction{!("set_" + x).to_sym, Lambda{[Domain{obj, !head}, val], _store(obj, !i, val)}}
-            cons(setter, gen_setters(i+1, head, xs))
-        }
-
-        gen_struct_decl(head, fields): {
-            names:  map(fields, f -> f[0])
-            values: map(fields, f -> f[1])
-
-            code1: gen_getters(0, head, names)
-            code2: gen_setters(0, head, names)
-            code3: gen_create_struct(head, names, values)
-            `Seq{[Seq{!code1}, Seq{!code2}, !code3]}
-        }
     }
 
-field_declaration
-    ::= symbol ":" expr
-        { `Field{!$0, !$2} }
+    struct_field ::= symbol ":" expr   { ($0, $2) }
+    struct_fields ::= [multiline] "{" delimited(struct_field, ",") "}"
+                      { $1 }
+                    | [multiline] "{" aligned(struct_field) "}"
+                      { $1 }
 
-field_declarations
-    ::= [multiline] "{" aligned(field_declaration) "}"
-        { $1 }
+    struct_declaration
+        ::= "struct" symbol struct_fields
+            { `DefineVariable{!$1, NewStruct{!$1, !$2}} }
+          | "struct" qualified_symbol struct_fields
+            { `DefineVariable{!$1, NewStruct{!$1[1], !$2}} }
 
-struct_declaration
-    ::= "struct" symbol field_declarations
-        { impl::gen_struct_decl($1, $2) }
-      | "struct" delimited1(symbol, ",")
-        { impl::gen_simple_decls($1) }
+    struct_creation
+        ::= [multiline] qualified_symbol struct_fields
+            { `CreateStruct{!$0, !$1} }
 
-struct_creation
-    ::= [multiline] symbol "{" delimited(field_declaration, ",") "}"
-        { MakeNode{$0, $2} }
+    statement ::= struct_declaration
+    postfix_expr ::= struct_creation
 
-statement ::= struct_declaration
-postfix_expr ::= struct_creation
+    NewStruct{name, fields} => {
+        (names, values): unzip(fields)
+        names  = Array::from_list(cons(\struct, names))
+        values = Array::from_list(cons(nil, values))
 
+        `MakeNode{\Struct, [\!name, \!names, !values]}
+    }
+
+    CreateStruct{struct, fields} => {
+        obj:  gensym()
+        assign: map(fields, ((x, v)) -> `Assign{FieldGet{!obj, !x}, !v})
+        `Block{[
+            DefineVariable{!obj, init_struct(!struct)},
+            Seq{!assign},
+            !obj
+            ]}
+    }
 }

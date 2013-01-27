@@ -1,0 +1,45 @@
+;
+; rowl - 1st generation
+; Copyright (C) 2012 nineties
+;
+; $Id: rowl1-array.rlc 2013-01-28 03:08:14 nineties $
+;
+
+(import "rlvm-compile")
+(import "rowl1-types")
+
+(compile `object `(
+
+(import "rowl1-util")
+(import "rowl1-node")
+(import "rowl1-module")
+(import "rowl1-compile")
+(import "rowl1-error")
+
+(extern object current_loc)
+(extern object current_mod)
+(extern fun array_at)
+
+(extern fun array_size)
+(fun init_struct (struct) (
+    (var head   (node_arg_symbol struct 0))
+    (var values (node_arg struct 2))
+    (if (!= (node_type values) @ArrayE) (do
+        (throw (invalid_argument current_loc
+            (string "Invalid structure-object") struct))
+        ))
+    (var n (array_size values))
+    (var obj (allocate_expr n))
+    (field_set obj 0 head)
+    (field_set obj 1 struct)
+    (for i 1 n (do
+        (array_set object obj (+ i 1) (array_at values i))
+        ))
+    (return obj)
+    ))
+
+(export fun setup_struct (std) (
+    (add_function1 std (to_sym "init_struct") (domainP Struct) init_struct 0)
+    ))
+
+    ))
