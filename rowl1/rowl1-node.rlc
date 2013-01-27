@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2013-01-25 02:21:41 nineties $
+; $Id: rowl1-node.rlc 2013-01-27 03:59:06 nineties $
 ;
 
 (import "rlvm-compile")
@@ -35,6 +35,11 @@
 (export var Table       (to_sym "Table"))
 (export var Tuple       (to_sym "Tuple"))
 (export var Range       (to_sym "Range"))
+
+(export var Struct      (to_sym "Struct"))
+(export var FieldGet    (to_sym "FieldGet"))
+(export var FieldSet    (to_sym "FieldSet"))
+
 (export var Block       (to_sym "Block"))
 (export var Breakable   (to_sym "BreakableBlock"))
 (export var Apply       (to_sym "Apply"))
@@ -132,7 +137,6 @@
 (export var ListFrom       (to_sym "%ListFrom"))
 (export var TupleAt        (to_sym "%TupleAt"))
 (export var ArrayAt        (to_sym "%ArrayAt"))
-(export var ExprAt         (to_sym "%ExprAt"))
 (export var RestOf         (to_sym "%RestOf"))
 
 (extern fun exception)
@@ -222,8 +226,10 @@
     (if (== tag @TAG_BYTECODE) (return @BytecodeE))
     (if (== tag @TAG_BIGINT) (return @BigIntE))
     (if (== tag @TAG_WEAKREF) (return @WeakRefE))
-    (if (&& (== tag @TAG_SEQUENCE) (== (get_sequence_tag obj) @SEQ_TUPLE))
-        (return @TupleE))
+    (if (== tag @TAG_SEQUENCE) (do
+        (if (== (get_sequence_tag obj) @SEQ_TUPLE) (return @TupleE))
+        (if (== (get_sequence_tag obj) @SEQ_ARRAY) (return @ArrayE))
+        ))
     (return @BuiltinE)
     ))
 

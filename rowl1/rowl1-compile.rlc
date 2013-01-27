@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2013-01-25 14:24:29 nineties $
+; $Id: rowl1-compile.rlc 2013-01-28 00:03:01 nineties $
 ;
 
 (import "rlvm-compile")
@@ -639,14 +639,6 @@
     (compile_simple_call asm 1 node_args)
     ))
 
-(fun compile_exprat (asm mod expr) (
-    (compile asm mod (node_arg expr 0))
-    (compile asm mod (node_arg expr 1))
-    (put_unbox asm)
-    (put_iadd1 asm)
-    (put_array_get32 asm)
-    ))
-
 (fun store_args (tbl args stmts) (
     (var vars (collect_args args))
     (while vars (do
@@ -823,7 +815,7 @@
 
 (fun var_loc (info) (
     (var hd (node_head info))
-    (if (|| (== hd ListAt) (|| (== hd ListFrom) (|| (== hd ExprAt) (== hd RestOf))))
+    (if (|| (== hd ListAt) (|| (== hd ListFrom) (|| (== hd FieldRef) (== hd RestOf))))
         (return (var_loc (node_arg info 0)))
         )
     (if (== hd ModuleVariable) (do
@@ -859,7 +851,7 @@
 (export fun make_node_at (arg obj idx) (
     (if (is_tuple arg) (return (make_node2 TupleAt obj (box idx))))
     (if (is_array arg) (return (make_node2 ArrayAt obj (box idx))))
-    (return (make_node2 ExprAt obj (box idx)))
+    (return (make_node2 FieldRef obj (box idx)))
     ))
 
 (export fun make_restof (obj idx) (
@@ -1042,7 +1034,7 @@
         (put_array_get32 asm)
         return
         ))
-    (if (== ty ExprAt) (do
+    (if (== ty FieldRef) (do
         (compile_operand asm (node_arg opd 0) sym)
         (put_imm_int asm (+ (node_arg_int opd 1) 1))
         (put_array_get32 asm)
@@ -1102,6 +1094,114 @@
     (put_push asm current_loc)
     (compile_simple_call asm 3 compile_matching)
     (put_jcall asm (* 4 arity))
+    ))
+
+(extern fun array_size)
+(extern fun array_at)
+(fun lookup_field (sym obj) (
+    (if (! (node_size obj)) (return @C_UNDEF))
+    (var struct (node_arg obj 0))
+    (if (!= (node_head struct) Struct) (return @C_UNDEF))
+    (var tbl (node_arg struct 1))
+    (if (!= (node_type tbl) @ArrayE) (return @C_UNDEF))
+
+    ; Do sequential searching since usually tbl is small enough.
+    (for i 0 (array_size tbl) (do
+        (if (== sym (array_at tbl i))
+            (return (node_arg obj i))
+            )
+        ))
+    (return @C_UNDEF)
+    ))
+
+(fun update_field (sym obj val) (
+    (if (! (node_size obj)) (goto update_error))
+    (var struct (node_arg obj 0))
+    (if (!= (node_head struct) Struct) (goto update_error))
+    (var tbl (node_arg struct 1))
+    (if (!= (node_type tbl) @ArrayE) (goto update_error))
+
+    ; Do sequential searching since usually tbl is small enough.
+    (for i 0 (array_size tbl) (do
+        (if (== sym (array_at tbl i)) (do
+            (node_arg_set obj i val)
+            (return @C_NIL)
+            ))
+        ))
+    (label update_error)
+    (throw (field_not_found current_loc obj sym))
+    ))
+
+; obj.f
+(fun compile_fieldget (asm mod expr) (
+    (var obj (node_arg expr 0))
+    (var sym (node_arg expr 1))
+    (var not_found (fresh_label asm))
+    (var exit (fresh_label asm))
+
+    (compile asm mod obj)
+    (put_dup asm)
+    (put_push asm sym)
+    (compile_simple_call asm 2 lookup_field)
+    (put_dup asm)
+    (put_undef asm)
+    (put_if_eq asm not_found)
+    (put_slide asm 1)
+    (put_goto asm exit)
+    (set_label asm not_found)
+    (put_drop asm)
+    (compile_var asm mod sym)
+    (put_push asm sym)
+    (put_push asm current_loc)
+    (compile_simple_call asm 3 compile_matching)
+    (put_jcall asm 4)
+    (set_label asm exit)
+    ))
+
+; obj.f(a, b, c)
+(fun compile_fieldget2 (asm mod expr) (
+    (var obj (node_arg expr 0))
+    (var sym (node_arg expr 1))
+    (var args (node_arg expr 2))
+    (var not_found (fresh_label asm))
+    (var exit (fresh_label asm))
+
+    (= args (list_reverse args))
+    (var arity 1)
+    (while args (do
+        (compile asm mod (car args))
+        (= args (cdr args))
+        (incr arity)
+        ))
+
+    (compile asm mod obj)
+    (put_dup asm)
+    (put_push asm sym)
+    (compile_simple_call asm 2 lookup_field)
+    (put_dup asm)
+    (put_undef asm)
+    (put_if_eq asm not_found)
+    (put_jcall asm (* 4 arity))
+    (put_goto asm exit)
+    (set_label asm not_found)
+    (put_drop asm)
+    (compile_var asm mod sym)
+    (put_push asm sym)
+    (put_push asm current_loc)
+    (compile_simple_call asm 3 compile_matching)
+    (put_jcall asm (* 4 arity))
+    (set_label asm exit)
+    ))
+
+; obj.f = v
+(fun compile_fieldset (asm mod expr) (
+    (var obj (node_arg expr 0))
+    (var sym (node_arg expr 1))
+    (var val (node_arg expr 2))
+    (compile asm mod val)
+    (compile asm mod obj)
+    (put_push asm sym)
+    (compile_simple_call asm 3 update_field)
     ))
 
 (fun compile_unquote (asm mod expr) (
@@ -1925,6 +2025,9 @@
     (add_compiler mod (domainP Float) compile_const)
 
     (add_compiler mod (make_node2 Apply DontCare listT) compile_apply)
+    (add_compiler mod (make_node2 FieldGet DontCare symT) compile_fieldget)
+    (add_compiler mod (make_node3 FieldGet DontCare symT listT) compile_fieldget2)
+    (add_compiler mod (make_node3 FieldSet DontCare symT DontCare) compile_fieldset)
 
     (add_compiler mod (qquote (unquote (unquote DontCare))) compile_unquote)
     (add_compiler mod (qquote (quote (unquote DontCare))) compile_quote)
@@ -1974,7 +2077,6 @@
     (add_compiler mod (make_node2 Lambda DontCare DontCare) compile_lambda)
     (add_compiler mod (make_node2 Bind DontCare DontCare) compile_bind)
 
-
     ; internal expressions
     (add_compiler mod (make_node2 FieldRef DontCare intT) compile_fieldref)
     (add_compiler mod (make_node2 Assign (make_node2 FieldRef DontCare intT) DontCare) compile_fieldref_assign)
@@ -1984,7 +2086,6 @@
     (add_compiler mod (make_node3 Ref DontCare intT symT) compile_clsref)
     (add_compiler mod (make_node2 Assign
         (make_node3 Ref DontCare intT symT) DontCare) compile_clsref_assign)
-    (add_compiler mod (make_node2 ExprAt DontCare intT) compile_exprat)
     (add_compiler mod (quote Decons) compile_decons)
     ))
 
