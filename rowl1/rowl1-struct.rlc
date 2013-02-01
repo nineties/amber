@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-array.rlc 2013-02-02 01:30:45 nineties $
+; $Id: rowl1-array.rlc 2013-02-02 02:02:47 nineties $
 ;
 
 (import "rlvm-compile")
@@ -41,8 +41,29 @@
     (return obj)
     ))
 
+(fun add_field (st name val) (
+    (var names (node_arg_list st 2))
+    (var values (node_arg_list st 3))
+    (node_arg_set st 2 (list_append names (list1 name)))
+    (node_arg_set st 3 (list_append values (list1 val)))
+    (return st)
+    ))
+
+(fun pprint_struct (io st) (
+    (var ochan (field_get io 2))
+    (output_string ochan "<#Struct (")
+    (output_symbol ochan (node_arg_symbol st 1))
+    (output_string ochan "):0x")
+    (output_hex ochan st 8)
+    (output_char ochan '>')
+    (return @C_NIL)
+    ))
+
 (export fun setup_struct (std) (
     (add_function1 std (to_sym "init_struct") (domainP Struct) init_struct 0)
+    (add_function3 std (to_sym "add_field") (domainP Struct) symT DontCare add_field 0)
+
+    (add_function2 std (to_sym "pprint") (domainP OutputFileStream) (domainP Struct) pprint_struct 0)
     ))
 
     ))
