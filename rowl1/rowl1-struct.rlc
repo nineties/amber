@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-array.rlc 2013-01-28 03:08:14 nineties $
+; $Id: rowl1-array.rlc 2013-02-02 01:30:45 nineties $
 ;
 
 (import "rlvm-compile")
@@ -22,18 +22,21 @@
 
 (extern fun array_size)
 (fun init_struct (struct) (
-    (var head   (node_arg_symbol struct 0))
-    (var values (node_arg struct 2))
-    (if (!= (node_type values) @ArrayE) (do
+    (var head   (node_arg_symbol struct 1))
+    (var values (node_arg struct 3))
+    (if (!= (node_type values) @ListE) (do
         (throw (invalid_argument current_loc
             (string "Invalid structure-object") struct))
         ))
-    (var n (array_size values))
-    (var obj (allocate_expr n))
+
+    (var obj (allocate_expr (+ (list_len values) 1)))
     (field_set obj 0 head)
     (field_set obj 1 struct)
-    (for i 1 n (do
-        (array_set object obj (+ i 1) (array_at values i))
+    (var i 2)
+    (while values (do
+        (array_set object obj i (car values))
+        (= values (cdr values))
+        (+= i 1)
         ))
     (return obj)
     ))

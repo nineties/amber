@@ -1,6 +1,6 @@
 # Copyright (C) 2012 nineties
 #
-# $Id: struct.ab 2013-01-28 03:06:06 nineties $
+# $Id: struct.ab 2013-02-02 01:20:04 nineties $
 
 # Declaration:
 #
@@ -42,12 +42,18 @@ module std {
     statement ::= struct_declaration
     postfix_expr ::= struct_creation
 
+
+    mother_structure: \Struct{
+        nil,
+        structure,
+        [name, fields, initial_values],
+        [nil, nil, nil]
+    }
+    #mother_structure[0] = mother_structure
+
     NewStruct{name, fields} => {
         (names, values): unzip(fields)
-        names  = Array::from_list(cons(\struct, names))
-        values = Array::from_list(cons(nil, values))
-
-        `MakeNode{\Struct, [\!name, \!names, !values]}
+        `MakeNode{\Struct, [\!mother_structure, \!name, \!names, !values]}
     }
 
     CreateStruct{struct, fields} => {

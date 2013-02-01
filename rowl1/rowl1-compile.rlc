@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2013-01-28 03:06:53 nineties $
+; $Id: rowl1-compile.rlc 2013-02-02 01:21:34 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1102,14 +1102,14 @@
     (if (! (node_size obj)) (return @C_UNDEF))
     (var struct (node_arg obj 0))
     (if (!= (node_head struct) Struct) (return @C_UNDEF))
-    (var tbl (node_arg struct 1))
-    (if (!= (node_type tbl) @ArrayE) (return @C_UNDEF))
+    (var tbl (node_arg struct 2))
+    (if (!= (node_type tbl) @ListE) (return @C_UNDEF))
 
-    ; Do sequential searching since usually tbl is small enough.
-    (for i 0 (array_size tbl) (do
-        (if (== sym (array_at tbl i))
-            (return (node_arg obj i))
-            )
+    (var i 1)
+    (while tbl (do
+        (if (== sym (car tbl)) (return (node_arg obj i)))
+        (+= i 1)
+        (= tbl (cdr tbl))
         ))
     (return @C_UNDEF)
     ))
@@ -1118,15 +1118,18 @@
     (if (! (node_size obj)) (goto update_error))
     (var struct (node_arg obj 0))
     (if (!= (node_head struct) Struct) (goto update_error))
-    (var tbl (node_arg struct 1))
-    (if (!= (node_type tbl) @ArrayE) (goto update_error))
+    (var tbl (node_arg struct 2))
+    (if (!= (node_type tbl) @ListE) (goto update_error))
 
     ; Do sequential searching since usually tbl is small enough.
-    (for i 0 (array_size tbl) (do
-        (if (== sym (array_at tbl i)) (do
+    (var i 1)
+    (while tbl (do
+        (if (== sym (car tbl)) (do
             (node_arg_set obj i val)
             (return val)
             ))
+        (+= i 1)
+        (= tbl (cdr tbl))
         ))
     (label update_error)
     (throw (field_not_found current_loc obj sym))
