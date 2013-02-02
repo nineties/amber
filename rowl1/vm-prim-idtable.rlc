@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-idtable.rlc 2012-07-26 04:33:34 nineties $
+; $Id: vm-prim-idtable.rlc 2013-02-02 22:49:22 nineties $
 ;
 
 (import "stdlib")
@@ -12,16 +12,12 @@
 
 ; structure of objects
 ;
-; idtable
-;     0 : list of local tables
-;     1 : # of identifiers
-;
-; local table
+; table
 ;     0 : bucket
 ;     1 : pointer to the next table
 ;     2 : vector of entries
 ;     3 : size of the bucket
-;     4 : # of local identifiers
+;     4 : # of identifiers
 ;
 ; table entry
 ;     0 : key
@@ -34,37 +30,14 @@
     0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
     ))
 
-(fun make_table () (
+(export prim_make_idtable)
+(fun prim_make_idtable () (
     (int size (get prime_numbers 0))
     (if (! size) (
         (error "too many local identifiers")
         ))
     (void* bucket (prim_allocate_array size))
     (return (prim_make_struct5 3 bucket 0 (prim_make_vector 0) size 0))
-    ))
-
-(export prim_make_idtable)
-(fun prim_make_idtable () (
-    (void* idtable (prim_make_struct2 1 0 0))
-    (prim_idtable_push idtable)
-    (return idtable)
-    ))
-
-(export prim_idtable_push)
-(fun prim_idtable_push (idtable) (
-    (void* table (make_table))
-    (set table 1 (get idtable 0))
-    (set idtable 0 table)
-    ))
-
-(export prim_idtable_pop)
-(fun prim_idtable_pop (idtable) (
-    (void* table (get idtable 0))
-    (if (! table) (
-        (bug "idtable_push/pop mismatch")
-        ))
-    (set idtable 0 (get table 1))
-    (set idtable 1 (- (get idtable 1) (get table 4)))
     ))
 
 (fun hash (name) (
@@ -98,17 +71,8 @@
         ))
     ))
 
-(fun get_top_table (idtable) (
-    (void* table (get idtable 0))
-    (if (! table) (
-        (error "no local tables")
-        ))
-    (return table)
-    ))
-
 (export prim_idtable_add)
-(fun prim_idtable_add (idtable name val) (
-    (void* table (get_top_table idtable))
+(fun prim_idtable_add (table name val) (
     (rehash table)
     (int size (get table 3))
     (void* bucket (get table 0))
@@ -125,10 +89,11 @@
 
     ; increment counters
     (set table 4 (+ (get table 4) 1))
-    (set idtable 1 (+ (get idtable 1) 1))
     ))
 
-(fun lookup_local_table (table name h) (
+(export prim_idtable_find)
+(fun prim_idtable_find (table name) (
+    (int h (hash name))
     (int size (get table 3))
     (void* bucket (get table 0))
     (%= h size)
@@ -137,18 +102,6 @@
         (void* key (get entry 0))
         (if (streq key name) ((return (get entry 1))))
         (= entry (get entry 2))
-        ))
-    (return 0)
-    ))
-
-(export prim_idtable_find)
-(fun prim_idtable_find (idtable name) (
-    (void* table (get_top_table idtable))
-    (int h (hash name))
-    (while table (
-        (void* val (lookup_local_table table name h))
-        (if val ((return val)))
-        (= table (get table 1))
         ))
     (return 0)
     ))
