@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2012-12-16 01:48:58 nineties $
+; $Id: vm-gc.rlc 2013-02-04 22:00:02 nineties $
 ;
 
 (import "stdlib")
@@ -123,8 +123,7 @@
 ; variant  : |  --  |  size | #box | 0b0101 |
 ; bytecode : |  --  |     5 |    0 | 0b0110 |
 ; bigint   : |  --  |     5 |    0 | 0b0111 |
-; weakref  : |  --  |     2 | flag | 0b1000 |
-; expr     : |  --  |  size |    0 | 0b1001
+; expr     : |  --  |  size |    0 | 0b1000 |
 
 (define OBJECT_WORDS (addr)  `(& (>> ([] @addr 0) 11) @(- (<< 1 20) 1)))
 (define OBJECT_TAG (addr)    `(& ([] @addr 0) @(- (<< 1 4) 1)))
@@ -133,9 +132,6 @@
 (define BOXED_FIELD_SIZE (addr) `(& (>> ([] @addr 0) 4) @(- (<< 1 7) 1)))
 (define OBJECT_PLAIN_TAG (addr) (BOXED_FIELD_SIZE addr))
 (define SEQUENCE_TAG (addr) (BOXED_FIELD_SIZE addr))
-
-(define WEAKREF_FLAG (addr) (BOXED_FIELD_SIZE addr))
-(define SET_WEAKREF_FLAG (addr) `([]= @addr 0 (| ([] @addr 0) @(<< 1 4))))
 
 (define HEADER (tag nboxed objsz) `(| (<< @objsz 11) (| (<< @nboxed 4) @tag)))
 (define SET_HEADER (addr tag nboxed objsz) `([]= @addr 0 @(HEADER tag nboxed objsz)))
@@ -169,8 +165,6 @@
 
 (void*[] @MAX_STATICS statics)
 (int num_static)
-
-(void* weakref_list 0)
 
 (export register_static)
 (fun register_static (addr) (
@@ -294,6 +288,7 @@
         ))
     ))
 
+(export move_object)
 (fun move_object (objp) (
     (void* obj ([] objp 0))
 
@@ -379,18 +374,6 @@
         (move_object obj) ; array
         (return)
         ))
-    (if (== tag @TAG_WEAKREF) (
-        (int flag @(WEAKREF_FLAG head))
-        (int mask (>> flag 1))
-        (int n (- @(OBJECT_WORDS head) 1))
-        (while (> n 0) (
-            (if (& mask 1) ((move_object obj)))
-            (+= obj @WORD_SIZE)
-            (>>= mask 1)
-            (-= n 1)
-            ))
-        (return)
-        ))
     (if (== tag @TAG_EXPR) (
         (int len (- @(OBJECT_WORDS head) 1)) ; -1 for the header
         (while (> len 0) (
@@ -403,65 +386,6 @@
     (error "move_fields: not reachable")
     ))
 
-(fun move_weakref_ent (objp) (
-    (void* obj ([] objp 0))
-    ; nil object
-    (if @(IS_CONSTANT obj) ((return @FALSE)))
-    (if (! @(IS_POINTER_TO_HEAP obj)) ((return @FALSE)))
-    ; this object is already in next generation
-    (if (== @(pdescr->generation (ADDR2PDESCR obj)) next_gen)
-        ((return @FALSE)))
-    (-= obj @WORD_SIZE)
-    ; this object is already copyed
-    (if @(OBJECT_COPYED obj) (
-        ([]= objp 0 @(FORWARD_ADDR obj))
-        (return @FALSE)
-        ))
-    ; this object is dead
-    (return @TRUE)
-    ))
-
-(fun update_weakref (obj) (
-    (void* head (- obj @WORD_SIZE))
-    (int mask (>> @(WEAKREF_FLAG head) 1))
-    (int n (- @(OBJECT_WORDS head) 1))
-    (int m n)
-    (int dead 0)
-    (while (> n 0) (
-        (if (& mask 1) (
-            (if (move_weakref_ent obj) (
-                (= dead 1)
-                (break)
-                ))
-            ))
-        (+= obj @WORD_SIZE)
-        (>>= mask 1)
-        (-= n 1)
-        ))
-
-    (if dead (
-        (memset (+ head @WORD_SIZE) 0 (* m @WORD_SIZE))
-        (return @TRUE)
-        ))
-    (return @FALSE)
-    ))
-
-(fun update_weakref_list () (
-    (void* ls weakref_list)
-    (= weakref_list 0)
-    (void* p 0)
-    (void* next 0)
-    (while ls (
-        (= p ([] ls 0))
-        (= next ([] ls 1))
-        (if (! (update_weakref p)) (
-            ; This weakref is alive.
-            ([]= ls 1 weakref_list)
-            (= weakref_list ls)
-            ))
-        (= ls next)
-        ))
-    ))
 
 (export prim_garbage_collect)
 (fun prim_garbage_collect () (
@@ -500,8 +424,6 @@
         (decr n)
         ))
 
-    (move_object (address weakref_list)) 
-
     ; sweep across promoted pages with breadth-first traversing and copy their consistents.
     (while page_queue_head (
         (void* p page_queue_head)
@@ -515,9 +437,24 @@
         (= page_queue_head @(pdescr->next page_queue_head))
         ))
 
-    (insert_padding)
+    (while 1 (
+        (if (! (update_wrtable_list)) ((break)))
+        (while page_queue_head (
+            (void* p page_queue_head)
+            (= p @(PDESCR2PAGE p))
+            (move_fields p)
+            (+= p (* @WORD_SIZE @(OBJECT_WORDS p)))
+            (while (&& (& p @PAGE_MASK) (!= p freep)) (
+                (move_fields p)
+                (+= p (* @WORD_SIZE @(OBJECT_WORDS p)))
+                ))
+            (= page_queue_head @(pdescr->next page_queue_head))
+            ))
+        ))
 
-    (update_weakref_list)
+    (replace_wrtable_list)
+
+    (insert_padding)
 
     (= current_gen next_gen) ; switch to next generation
     ))
@@ -686,31 +623,18 @@
     (return ptr)
     ))
 
-(export prim_allocate_weakref)
-(fun prim_allocate_weakref (mask size) (
-    (if (> size 6) ((return 0)))
-    (+= size 1)
-    (void* ptr (allocate_object size))
-    (int flag (& (<< mask 1) 0x7f))
-    @(SET_HEADER ptr TAG_WEAKREF flag size)
-    (+= ptr @WORD_SIZE)
-    (memset ptr 0 (* @WORD_SIZE (- size 1)))
 
-    (void* cons (allocate_cons))
-    ([]= cons 0 ptr)
-    ([]= cons 1 weakref_list)
-    (= weakref_list cons)
-
-    (return ptr)
-    ))
-
-(export prim_weakref_alive)
-(fun prim_weakref_alive (ref) (
-    (-= ref 4)
-    (if (& @(WEAKREF_FLAG ref) 1)
-        (return @FALSE)
+(export is_alive)
+(fun is_alive (obj) (
+    (if @(IS_CONSTANT obj) ((return @TRUE)))
+    (if (! @(IS_POINTER_TO_HEAP obj)) ((return @TRUE)))
+    (if (== @(pdescr->generation (ADDR2PDESCR obj)) next_gen)
+        ((return @TRUE)))
+    (-= obj @WORD_SIZE)
+    (if @(OBJECT_COPYED obj) (
         (return @TRUE)
-        )
+        ))
+    (return @FALSE)
     ))
 
 ; array of integers

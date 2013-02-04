@@ -1,0 +1,160 @@
+;
+; rowl - 1st generation
+; Copyright (C) 2010 nineties
+;
+; $Id: vm-prim-wrtable.rlc 2013-02-04 22:00:32 nineties $
+;
+
+; Weak reference table from object to object
+; No scoping capability is supported.
+
+(import "stdlib")
+(import "vm-compile")
+
+(var vm-prim-code `(
+
+; structure of objects
+;
+; table
+;     0 : bucket
+;     1 : list of entries
+;     2 : pointer to the next table in wrtable_list
+;     3 : new table for GC
+;     4 : size of the bucket
+;     5 : # of entries
+;
+; table entry
+;     0 : the key
+;     1 : the value
+;     2 : pointer to the next entry in bucket
+;     3 : pointer to the next entry in list of entries
+
+(int[] 32 prime_numbers (
+    5 11 17 37 67 131 257 521 1031 2053 4099 8209 16411 32771 65537 131101
+    0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+    ))
+
+(void* wrtable_list 0)
+
+(export prim_make_wrtable)
+(fun prim_make_wrtable () (
+    (int size (get prime_numbers 1))
+    (void* bucket (prim_allocate_array size))
+    (void* tbl (prim_make_struct6 0 bucket 0 wrtable_list 0 size 0))
+    (= wrtable_list tbl)
+    (return tbl)
+    ))
+
+(fun make_wrtable_GC () (
+    (int size (get prime_numbers 1))
+    (void* bucket (prim_allocate_array size))
+    (void* tbl (prim_make_struct6 4 bucket 0 0 0 size 0))
+    (return tbl)
+    ))
+
+(export update_wrtable_list)
+(fun update_wrtable_list () (
+    (void* tbl wrtable_list)
+    (int changed 0)
+    (while tbl (
+        (void* entry (get tbl 1))
+        (void* remain 0)
+        (void* new_tbl (get tbl 3))
+        
+        (while entry (
+            (void* key (get entry 0))
+            (void* next (get entry 3))
+            (if (is_alive key)
+                (
+                    (= changed 1)
+                    (move_object entry)
+                    (move_object (+ entry 4))
+                    (if (! new_tbl) (
+                        (= new_tbl (make_wrtable_GC))
+                        (set tbl 3 new_tbl)
+                        ))
+                    (prim_wrtable_add new_tbl (get entry 0) (get entry 1))
+                )
+                (
+                    (set entry 3 remain)
+                    (= remain entry)
+                ))
+            (= entry next)
+            ))
+        (set tbl 1 remain)
+        (= tbl (get tbl 2))
+        ))
+    (return changed)
+    ))
+
+(export replace_wrtable_list)
+(fun replace_wrtable_list () (
+    (void* new_list 0)
+    (while wrtable_list (
+        (void* new_tbl (get wrtable_list 3))
+        (if new_tbl (
+            (set new_tbl 2 new_list)
+            (= new_list new_tbl)
+            ))
+        (= wrtable_list (get wrtable_list 2))
+        ))
+    (= wrtable_list new_list)
+    ))
+
+(fun rehash (table) (
+    (int old_size (get table 4))
+    (int n_entry (get table 5))
+    (if (> n_entry old_size) (
+        (int size (get prime_numbers (bsr n_entry)))
+        (if (! size) (
+            (error "too many objects")
+            ))
+        (void* bucket (prim_allocate_array size))
+        (void* entry (get table 1))
+        (while entry (
+            (int h (% (get entry 0) size))
+            (set entry 2 (get bucket h))
+            (set bucket h entry)
+            (= entry (get entry 3))
+            ))
+        (set table 0 bucket)
+        (set table 4 size)
+        ))
+    ))
+
+(export prim_wrtable_add)
+(fun prim_wrtable_add (table key val) (
+    (rehash table)
+    (int size (get table 4))
+    (void* bucket (get table 0))
+    (void* ent (prim_make_struct4 0 key val 0 0))
+    (%= key size)
+
+    ; add the entry to the bucket
+    (set ent 2 (get bucket key))
+    (set bucket key ent)
+
+    (set ent 3 (get table 1))
+    (set table 1 ent)
+    (set table 5 (+ (get table 5) 1))
+    ))
+
+(export prim_wrtable_find)
+(fun prim_wrtable_find (table key) (
+    (int size (get table 4))
+    (void* bucket (get table 0))
+    (int h (% key size))
+    (void* entry (get bucket h))
+    (while entry (
+        (void* e_key (get entry 0))
+        (if (== key e_key) ((return (get entry 1))))
+        (= entry (get entry 2))
+        ))
+    (return 0)
+    ))
+
+    ))
+
+(vtable_push)
+(compile vm-prim-code)
+(vtable_pop)

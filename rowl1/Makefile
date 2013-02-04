@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2013-01-28 02:11:09 nineties $
+# $Id: Makefile 2013-02-04 22:00:38 nineties $
 
 TOPDIR = ..
 ROWL0DIR = $(TOPDIR)/rowl0
@@ -63,7 +63,8 @@ VMOBJECTS = vm-main.o\
 		vm-prim-string.o\
 		vm-prim-vector.o\
 		vm-prim-tuple.o\
-		vm-prim-idtable.o
+		vm-prim-idtable.o\
+		vm-prim-wrtable.o
 
 vm-compile.o      : rlci stdlib.rlc config.rlc
 vm-main.o         : rlci stdlib.rlc vm-compile.rlc
@@ -76,6 +77,7 @@ vm-prim-io.o      : rlci stdlib.rlc vm-compile.rlc
 vm-prim-string.o  : rlci stdlib.rlc vm-compile.rlc
 vm-prim-vector.o  : rlci stdlib.rlc vm-compile.rlc
 vm-prim-tuple.o   : rlci stdlib.rlc vm-compile.rlc
+vm-prim-idtable.o : rlci stdlib.rlc vm-compile.rlc
 vm-prim-idtable.o : rlci stdlib.rlc vm-compile.rlc
 
 RLC1OBJECTS = rowl1-main.rlo\
