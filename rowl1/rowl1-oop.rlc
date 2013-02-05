@@ -1,0 +1,77 @@
+;
+; rowl - 1st generation
+; Copyright (C) 2010 nineties
+;
+; $Id: rowl1-list.rlc 2013-02-05 13:55:24 nineties $
+;
+
+(import "rlvm-compile")
+(import "rowl1-types")
+
+(compile `object `(
+
+(import "rowl1-util")
+(import "rowl1-node")
+(import "rowl1-module")
+(import "rowl1-compile")
+(import "rowl1-assemble")
+(import "rowl1-error")
+
+(extern object current_loc)
+(extern object current_mod)
+
+(var slots (make_wrtable))
+(var prototype (to_sym "prototype"))
+(var prototype_tbl (make_wrtable))
+
+(extern fun tuple_at)
+(fun make_object (head slots) (
+    (var obj (make_node0 head))
+    (while slots (do
+        (var t (car slots))
+        (if (!= (node_type t) @TupleE) (do
+            (throw (invalid_argument current_loc
+                (string "2nd argument of make_object must be list of (symbol, value)") t))
+            ))
+        (set_slot obj (tuple_at t 0) (tuple_at t 1))
+        (= slots (cdr slots))
+        ))
+    (return obj)
+    ))
+
+(export fun set_slot (obj sym val) (
+    (if (!= (node_type sym) @SymbolE)
+        (throw (invalid_argument current_loc
+            (string "invalid slot name") sym))
+        )
+    (var tbl (wrtable_find slots sym))
+    (if (== tbl @C_UNDEF) (do
+        (= tbl (make_wrtable))
+        (wrtable_add slots sym tbl)
+        ))
+    (wrtable_add tbl obj val)
+    (return val)
+    ))
+
+(export fun get_slot (obj sym) (
+    (var tbl (wrtable_find slots sym))
+    (if (== tbl @C_UNDEF) (return @C_UNDEF))
+    (label retry)
+    (var v (wrtable_find tbl obj))
+    (if (== v @C_UNDEF) (do
+        (= obj (wrtable_find prototype_tbl obj))
+        (if (== obj @C_UNDEF) (return v))
+        (goto retry)
+        ))
+    (return v)
+    ))
+
+(export fun setup_oop (std) (
+    (wrtable_add slots prototype prototype_tbl)
+
+    (add_function2 std (to_sym "make_object") symT listT make_object 0)
+    (add_function3 std (to_sym "set_slot") DontCare symT DontCare set_slot 0)
+    (add_function2 std (to_sym "get_slot") DontCare symT get_slot 0)
+    ))
+
+    ))

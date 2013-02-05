@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2013-02-05 11:39:50 nineties $
+; $Id: rowl1-compile.rlc 2013-02-05 13:54:07 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1096,32 +1096,14 @@
     (put_jcall asm (* 4 arity))
     ))
 
-; slots
-(var slots (make_wrtable))
-(var prototype (to_sym "prototype"))
-(var prototype_tbl (make_wrtable))
-
+(extern fun set_slot)
+(extern fun get_slot)
 (fun lookup_slot (sym obj) (
-    (var tbl (wrtable_find slots sym))
-    (if (== tbl @C_UNDEF) (return @C_UNDEF))
-    (label retry)
-    (var v (wrtable_find tbl obj))
-    (if (== v @C_UNDEF) (do
-        (= obj (wrtable_find prototype_tbl obj))
-        (if (== obj @C_UNDEF) (return v))
-        (goto retry)
-        ))
-    (return v)
+    (return (get_slot obj sym))
     ))
 
 (fun update_slot (sym obj val) (
-    (var tbl (wrtable_find slots sym))
-    (if (== tbl @C_UNDEF) (do
-        (= tbl (make_wrtable))
-        (wrtable_add slots sym tbl)
-        ))
-    (wrtable_add tbl obj val)
-    (return val)
+    (return (set_slot obj sym val))
     ))
 
 ; obj.f
@@ -1984,7 +1966,6 @@
 (export fun setup_builtin_compilers (mod) (
     (var locT (domainP Loc))
 
-    (wrtable_add slots prototype prototype_tbl)
 
     (add_function1 mod Compile DontCare compile_ 0)
 
