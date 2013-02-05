@@ -3,7 +3,7 @@
 # Copyright (C) 2009 nineties
 #
 
-# $Id: Makefile 2012-11-27 17:46:29 nineties $
+# $Id: Makefile 2013-02-05 14:03:42 nineties $
 
 LIBDIR = /usr/lib
 
@@ -12,6 +12,7 @@ all:
 	cd rowl1; $(MAKE)
 
 install:
+	rm -rf /usr/lib/amber
 	cd rowl1; $(MAKE) install_binaries install_libraries
 	mkdir -p /usr/lib/amber
 	cp -r lib/* /usr/lib/amber/

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2013-01-27 02:56:24 nineties $
+; $Id: rowl1-packrat.rlc 2013-02-05 14:43:27 nineties $
 ;
 
 (import "rlvm-compile")
@@ -207,6 +207,8 @@
 (var withblank_p @FALSE)
 (var shell_mode_p @FALSE)
 (var may_parse @FALSE)
+(var may_parse_pos 0)
+(var no_parse_pos 0)
 (var left_rec (string "Left Recursion Detected"))
 
 (extern object current_mod)
@@ -272,12 +274,19 @@
     ))
 
 (fun noparse (p msg) (
+    (var pos (field_get p 5))
+    (if (> pos no_parse_pos) (= no_parse_pos pos))
+    (if (> pos may_parse_pos) (= may_parse @FALSE))
     (field_set p 1 @C_FALSE)
     (field_set p 2 (string msg))
     ))
 
 (fun mayparse (p msg) (
-    (= may_parse @TRUE)
+    (var pos (field_get p 5))
+    (if (>= pos no_parse_pos) (do
+        (= may_parse @TRUE)
+        (= may_parse_pos pos)
+        ))
     (field_set p 1 @C_FALSE)
     (field_set p 2 (string msg))
     ))
@@ -1043,6 +1052,8 @@
     (var state (copy_parser_state p))
     (while @TRUE (do
         (= may_parse @FALSE)
+        (= may_parse_pos 0)
+        (= no_parse_pos 0)
         (set_indent p (box 0))
         (parse_spaces p)
 
