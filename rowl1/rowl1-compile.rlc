@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2013-02-02 01:21:34 nineties $
+; $Id: rowl1-compile.rlc 2013-02-05 11:39:50 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1096,47 +1096,36 @@
     (put_jcall asm (* 4 arity))
     ))
 
-(extern fun array_size)
-(extern fun array_at)
-(fun lookup_field (sym obj) (
-    (if (! (node_size obj)) (return @C_UNDEF))
-    (var struct (node_arg obj 0))
-    (if (!= (node_head struct) Struct) (return @C_UNDEF))
-    (var tbl (node_arg struct 2))
-    (if (!= (node_type tbl) @ListE) (return @C_UNDEF))
+; slots
+(var slots (make_wrtable))
+(var prototype (to_sym "prototype"))
+(var prototype_tbl (make_wrtable))
 
-    (var i 1)
-    (while tbl (do
-        (if (== sym (car tbl)) (return (node_arg obj i)))
-        (+= i 1)
-        (= tbl (cdr tbl))
+(fun lookup_slot (sym obj) (
+    (var tbl (wrtable_find slots sym))
+    (if (== tbl @C_UNDEF) (return @C_UNDEF))
+    (label retry)
+    (var v (wrtable_find tbl obj))
+    (if (== v @C_UNDEF) (do
+        (= obj (wrtable_find prototype_tbl obj))
+        (if (== obj @C_UNDEF) (return v))
+        (goto retry)
         ))
-    (return @C_UNDEF)
+    (return v)
     ))
 
-(fun update_field (sym obj val) (
-    (if (! (node_size obj)) (goto update_error))
-    (var struct (node_arg obj 0))
-    (if (!= (node_head struct) Struct) (goto update_error))
-    (var tbl (node_arg struct 2))
-    (if (!= (node_type tbl) @ListE) (goto update_error))
-
-    ; Do sequential searching since usually tbl is small enough.
-    (var i 1)
-    (while tbl (do
-        (if (== sym (car tbl)) (do
-            (node_arg_set obj i val)
-            (return val)
-            ))
-        (+= i 1)
-        (= tbl (cdr tbl))
+(fun update_slot (sym obj val) (
+    (var tbl (wrtable_find slots sym))
+    (if (== tbl @C_UNDEF) (do
+        (= tbl (make_wrtable))
+        (wrtable_add slots sym tbl)
         ))
-    (label update_error)
-    (throw (field_not_found current_loc obj sym))
+    (wrtable_add tbl obj val)
+    (return val)
     ))
 
 ; obj.f
-(fun compile_fieldget (asm mod expr) (
+(fun compile_slot (asm mod expr) (
     (var obj (node_arg expr 0))
     (var sym (node_arg expr 1))
     (var not_found (fresh_label asm))
@@ -1145,7 +1134,7 @@
     (compile asm mod obj)
     (put_dup asm)
     (put_push asm sym)
-    (compile_simple_call asm 2 lookup_field)
+    (compile_simple_call asm 2 lookup_slot)
     (put_dup asm)
     (put_undef asm)
     (put_if_eq asm not_found)
@@ -1162,12 +1151,12 @@
     ))
 
 ; obj.f(a, b, c)
-(fun compile_fieldget2 (asm mod expr) (
+(fun compile_slot2 (asm mod expr) (
     (var obj (node_arg expr 0))
     (var sym (node_arg expr 1))
     (var args (node_arg expr 2))
     (var not_found (fresh_label asm))
-    (var exit (fresh_label asm))
+    (var call (fresh_label asm))
 
     (= args (list_reverse args))
     (var arity 1)
@@ -1180,24 +1169,23 @@
     (compile asm mod obj)
     (put_dup asm)
     (put_push asm sym)
-    (compile_simple_call asm 2 lookup_field)
+    (compile_simple_call asm 2 lookup_slot)
     (put_dup asm)
     (put_undef asm)
     (put_if_eq asm not_found)
-    (put_jcall asm (* 4 arity))
-    (put_goto asm exit)
+    (put_goto asm call)
     (set_label asm not_found)
     (put_drop asm)
     (compile_var asm mod sym)
+    (set_label asm call)
     (put_push asm sym)
     (put_push asm current_loc)
     (compile_simple_call asm 3 compile_matching)
     (put_jcall asm (* 4 arity))
-    (set_label asm exit)
     ))
 
 ; obj.f = v
-(fun compile_fieldset (asm mod expr) (
+(fun compile_slotset (asm mod expr) (
     (var lhs (node_arg expr 0))
     (var obj (node_arg lhs 0))
     (var sym (node_arg lhs 1))
@@ -1205,7 +1193,7 @@
     (compile asm mod val)
     (compile asm mod obj)
     (put_push asm sym)
-    (compile_simple_call asm 3 update_field)
+    (compile_simple_call asm 3 update_slot)
     ))
 
 (fun compile_unquote (asm mod expr) (
@@ -1996,6 +1984,8 @@
 (export fun setup_builtin_compilers (mod) (
     (var locT (domainP Loc))
 
+    (wrtable_add slots prototype prototype_tbl)
+
     (add_function1 mod Compile DontCare compile_ 0)
 
     (add_compiler mod DontCare compile_error)
@@ -2078,10 +2068,10 @@
     (add_compiler mod (make_node2 Lambda DontCare DontCare) compile_lambda)
     (add_compiler mod (make_node2 Bind DontCare DontCare) compile_bind)
 
-    (add_compiler mod (make_node2 FieldGet DontCare symT) compile_fieldget)
-    (add_compiler mod (make_node3 FieldGet DontCare symT listT) compile_fieldget2)
-    (add_compiler mod (assign (make_node2 FieldGet DontCare symT) DontCare)
-        compile_fieldset)
+    (add_compiler mod (make_node2 Slot DontCare symT) compile_slot)
+    (add_compiler mod (make_node3 Slot DontCare symT listT) compile_slot2)
+    (add_compiler mod (assign (make_node2 Slot DontCare symT) DontCare)
+        compile_slotset)
 
     ; internal expressions
     (add_compiler mod (make_node2 FieldRef DontCare intT) compile_fieldref)
