@@ -1,0 +1,364 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Why I am developing Amber - Amber</title>
+  <meta name="author" content="Koichi Nakamura">
+
+  
+  <meta name="description" content="Why I Am Developing Amber Jun 16th, 2012 programmer> I've finished writing the program. programmer> Compile it to C code and evaluate performance. &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://nineties.github.com/amber/blog/motivation.html">
+  <link href="/amber/favicon.png" rel="icon">
+  <link href="/amber/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <script src="/amber/javascripts/modernizr-2.0.js"></script>
+  <script src="/amber/javascripts/ender.js"></script>
+  <script src="/amber/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/amber/atom.xml" rel="alternate" title="Amber" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+
+  
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  
+      <h1><a href="/amber/">Amber</a></h1>
+  
+  
+    <h2>A Language for High-Level Programming with Self-Extension</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/amber/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:nineties.github.com/amber" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  
+    <li><a href="/amber/blog">Blog</a></li>
+    <li><a href="/amber/feature.html">Feature</a></li>
+    <li><a href="/amber/tutorial">Tutorial</a></li>
+    <li><a href="/amber/reference">Reference</a></li>
+    <li><a href="/amber/implementation">Implementation</a></li>
+    <li><a href="/amber/ja//blog/motivation.html">日本語</a></li>
+  
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article role="article">
+  
+  <header>
+    <h1 class="entry-title">Why I Am Developing Amber</h1>
+    <p class="meta">
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-06-16T22:00:00+09:00" pubdate data-updated="true">Jun 16<span>th</span>, 2012</time></p>
+  </header>
+  
+  <blockquote><p>programmer> I've finished writing the program. <br/>
+programmer> Compile it to C code and evaluate performance.<br/>
+compiler> Compiling with default plan ................ done.<br/>
+compiler> Running the program ................ done.<br/>
+compiler> This is the performance reports:</p>
+
+<pre><code>file    function    frequency   exectime(total) exectime(average)   ratio
+....
+....    foo()       XXX times   YY.YYY sec      0.ZZZ sec           83%
+....
+</code></pre>
+
+<p>programmer> Hmm... foo() seems too slow. Let's tune it. Some advices?<br/>
+compiler> Matrix multiplication in line 110, file XXX, is considered hotspot.</p>
+
+<pre><code>109     ...
+110     A = B*A + C
+111     ...
+</code></pre>
+
+<p>compiler> Following parallelization options might be available.</p>
+
+<ol>
+<li>OpenMP (...)</li>
+<li>SIMD extension (...)</li>
+</ol>
+
+
+<p>compiler> But, I couldn't complete alias analysis between A,B and C. <br/>
+programmer> It's no problem. Try parallelize the program opportunistically.<br/>
+compiler> Ok. Parallelizing ................ done.<br/>
+compiler> This is the generated code.</p>
+
+<pre><code>110     #pragma omp parallel for
+111     for (... ) {     
+112         ...
+...
+</code></pre>
+
+<p>programmer> Well, compile it and evaluate again.<br/>
+compiler> Compiling with the new plan ................ done.<br/>
+compiler> Running the program ................ done.<br/>
+compiler> This is the performance reports:</p>
+
+<pre><code>file    function    frequency   exectime(total) exectime(average)   ratio
+....
+....    foo()       XXX times   YY.YYY sec      0.ZZZ sec           32%
+....
+</code></pre>
+
+<p>programmer> Very nice, save this compilation plan and finish.</p></blockquote>
+
+<p>I want to realize this kind of <strong>Interactive Compilation System</strong> and I'm developing Amber for it.</p>
+
+<p>I have a strong interest in High-Performance Computation (HPC) using super computers.
+Of course, Amber is a general purpose language but my motivation has been significantly impacted by issues in HPC field.
+My challenge is to establish a methodology to use millions of cores effectively.
+To achieve high performance with such a huge number of cores, integration of human and computer intelligence is necessary.
+I explain my idea's point by point in the following sections.</p>
+
+<h2>Separation of programs and compilation plans</h2>
+
+<p>There is one-to-many correspondence between a program and computers because we usually want to use one program for several machines for many years.
+However, the optimal ways to speed up prgrams differ from one architecture to another especially for parallel architectures.
+The result is badly-swollen programs which contain a large number of <code>#if</code>, <code>#pragma</code> and almost same but slightly different functions.</p>
+
+<p><img src="../images/compilation-current.png" width="500" title="&#34;Current structure of compilation&#34;" alt="&#34;Current structure of compilation&#34;"></p>
+
+<p>Separation of programs and compilation plans is a natural solution for this situation.
+Keep the original program clean and write a machine-dependent compilation plan as other files.
+This file may includes usual compiler options but also <strong>program translations</strong> (e.g., unroll this loop X times, inline this procedure call, modify data layout of this object, ...).</p>
+
+<p><img src="../images/compilation-with-plans.png" width="500" title="&#34;Separation of programs and compilation plans&#34;" alt="&#34;Separation of programs and compilation plans&#34;"></p>
+
+<h2>Ask the compiler where and how to tune</h2>
+
+<p>Ok, let's write a compilation plan for architecture <em>A</em>. Then you may be stumped about where and how to optimize the program.
+You have to learn performance profiler to know program's hotspot.
+You also investigate optimal way for speedup. And to do that, you have to learn characteristics of architecture <em>A</em> deeply (e.g., network structure, memory hierarchy, cache memories, instruction sets). You may require a lot of trial and error.</p>
+
+<p>Many of these tasks are the specialities of compilers. Why don't we ask them about tuning?</p>
+
+<h2>Only programmers know correctness of programs</h2>
+
+<p>As you know, compilers always have to do correct program translation. Here is two big problems.</p>
+
+<p>First, analysis of correctness is difficult or impossible for compilers in many cases.
+For automatic parallelization, precise alias analysis and dependency analysis are necessary but these are NP-hard in general.
+It is often impossible when you use third party libraries and its source code is unavailable.
+However, you must know whether your algorithm is essentially parallel or not.</p>
+
+<p>Second, compilers' criteria of correctness are too strict. For example, is translation from <code>((x + y) + z) + w</code> to <code>(x + y) + (z + w)</code> correct?
+When variables are finite floating point numbers, the results are different in general.
+Such translation is not a problem for humans in many cases, however compilers never know its correctness.
+This is just a trivial example, and similar situation occurs very often.</p>
+
+<p>Compiler options, pragmas and attributes (e.g., <code>restrict</code> attribute in C) are solutions of current compilers. The problem of this solution is learning cost as described in previous section.
+Our place to go to is the <strong>Human-computer interaction system</strong>.</p>
+
+<h2>Write programs in high-level abstraction</h2>
+
+<p>(... writing ...)</p>
+
+  
+    <footer>
+      <p class="meta">
+        
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-06-16T22:00:00+09:00" pubdate data-updated="true">Jun 16<span>th</span>, 2012</time>
+        
+      </p>
+      
+        <div class="sharing">
+  
+  <a href="http://twitter.com/share" class="twitter-share-button" data-url="http://nineties.github.com/amber/blog/motivation.html" data-via="9_ties" data-counturl="http://nineties.github.com/amber/blog/motivation.html" >Tweet</a>
+  
+  
+  
+</div>
+
+      
+    </footer>
+  
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>About Me</h1>
+  <ul>
+    <li>  中村晃一 (Koichi Nakamura) </li>
+    <li> Ph.D. student in Gratuate School of Information Science and Technology at The University of Tokyo </li>
+    <li> koichi.nakamur a.t. gmail.com </li>
+    <li> <a href="http://twitter.com/9_ties">@9_ties</a></li>
+  </ul>
+</section>
+<section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/amber/blog/2012/06/14/updated-features/">Updated features</a>
+      </li>
+    
+      <li class="post">
+        <a href="/amber/blog/2012/06/12/created-ambers-project-page/">Created Amber's Project Page</a>
+      </li>
+    
+  </ul>
+</section>
+
+<section>
+  <h1>GitHub Repos</h1>
+  <ul id="gh_repos">
+    <li class="loading">Status updating...</li>
+  </ul>
+  
+  <a href="https://github.com/nineties">@nineties</a> on GitHub
+  
+  <script type="text/javascript">
+    $.domReady(function(){
+        if (!window.jXHR){
+            var jxhr = document.createElement('script');
+            jxhr.type = 'text/javascript';
+            jxhr.src = '/javascripts/libs/jXHR.js';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(jxhr, s);
+        }
+
+        github.showRepos({
+            user: 'nineties',
+            count: 1,
+            skip_forks: true,
+            target: '#gh_repos'
+        });
+    });
+  </script>
+  <script src="/amber/javascripts/github.js" type="text/javascript"> </script>
+</section>
+
+
+<section>
+  <h1>Latest Tweets</h1>
+  <ul id="tweets">
+    <li class="loading">Status updating...</li>
+  </ul>
+  <script type="text/javascript">
+    $.domReady(function(){
+      getTwitterFeed("9_ties", 4, false);
+    });
+  </script>
+  <script src="/amber/javascripts/twitter.js" type="text/javascript"> </script>
+  
+    <a href="http://twitter.com/9_ties" class="twitter-follow-button" data-show-count="false">Follow @9_ties</a>
+  
+</section>
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2013 - Koichi Nakamura -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'nineties';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://nineties.github.com/amber/blog/motivation.html';
+        var disqus_url = 'http://nineties.github.com/amber/blog/motivation.html';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+
+
+
+
+  <script type="text/javascript">
+    (function(){
+      var twitterWidgets = document.createElement('script');
+      twitterWidgets.type = 'text/javascript';
+      twitterWidgets.async = true;
+      twitterWidgets.src = 'http://platform.twitter.com/widgets.js';
+      document.getElementsByTagName('head')[0].appendChild(twitterWidgets);
+    })();
+  </script>
+
+
+
+
+
+</body>
+</html>

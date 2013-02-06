@@ -1,0 +1,738 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Amber Application Example: N-Body Simulation - Amber</title>
+  <meta name="author" content="Koichi Nakamura">
+
+  
+  <meta name="description" content="Amber Application Example: N-Body Simulation Aug 28th, 2012 Koichi: Hi Douglas and Piet, I'm glad you're interested in my new computer
+language, &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://nineties.github.com/amber/nbody/">
+  <link href="/amber/favicon.png" rel="icon">
+  <link href="/amber/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <script src="/amber/javascripts/modernizr-2.0.js"></script>
+  <script src="/amber/javascripts/ender.js"></script>
+  <script src="/amber/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/amber/atom.xml" rel="alternate" title="Amber" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+
+  
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  
+      <h1><a href="/amber/">Amber</a></h1>
+  
+  
+    <h2>A Language for High-Level Programming with Self-Extension</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/amber/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:nineties.github.com/amber" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  
+    <li><a href="/amber/blog">Blog</a></li>
+    <li><a href="/amber/feature.html">Feature</a></li>
+    <li><a href="/amber/tutorial">Tutorial</a></li>
+    <li><a href="/amber/reference">Reference</a></li>
+    <li><a href="/amber/implementation">Implementation</a></li>
+    <li><a href="/amber/ja//nbody/index.html">日本語</a></li>
+  
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article role="article">
+  
+  <header>
+    <h1 class="entry-title">Amber Application Example: N-Body Simulation</h1>
+    <p class="meta">
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-08-28T13:00:00+09:00" pubdate data-updated="true">Aug 28<span>th</span>, 2012</time></p>
+  </header>
+  
+  <p>Koichi:</p>
+
+<blockquote><p>Hi Douglas and Piet, I'm glad you're interested in my new computer
+language, Amber.</p></blockquote>
+
+<p>Piet:</p>
+
+<blockquote><p>Yes, I've heard you talking about it, and I very much like its power
+and flexibility.  However, I am not sure whether such a very general
+language can be used in an efficient way for practical problems.  So
+I brought my colleague Douglas, who is interested in writing codes for
+N-body simulations.</p></blockquote>
+
+<p>Douglas:</p>
+
+<blockquote><p>It would be great to see some concrete scientific results, to see
+how the advantages of Amber pay off in practice.</p></blockquote>
+
+<p>Koichi:</p>
+
+<blockquote><p>Great!  I am in fact eager to explore some specific applications in
+Amber early on, while I am developing the language.  This will help me
+to see how the flexibility of Amber can best be presented to users
+interested in developing applications.
+To start with, what is an "N-body simulation"?</p></blockquote>
+
+<p>Douglas:</p>
+
+<blockquote><p>The solar system is a good illustration.  Think about modelling the
+motion of the eight planets and the sun.  Represent each object by a
+point mass, write down the equations of motion (using Newton's Law for
+the gravitational attraction, and Newton's Law of motion), and then
+integrate the equations with some numerical algorithm.</p></blockquote>
+
+<p>Koichi:</p>
+
+<blockquote><p>I'm not sure exactly what that means, but let's get started, and I
+will ask questions as we get along.</p></blockquote>
+
+<p>Piet:</p>
+
+<blockquote><p>And meanwhile we will ask questions about Amber.</p></blockquote>
+
+<p>Douglas:</p>
+
+<blockquote><p>In physics, an equation of motion is a recipe for how a physical
+body moves through space, in time.  The mathematical form is a
+differential equation.  In order to solve a differential equation, you
+need an initial condition, to get started, and also a kind of final
+condition, to know when to stop.</p></blockquote>
+
+<p>Koichi:</p>
+
+<blockquote><p>I like to program in a top-down way.  That means that we write down
+what we would like the computer to understand, before actually telling
+the computer what to do.</p></blockquote>
+
+<p>Douglas:</p>
+
+<blockquote><p>Can you show me what you would write down in this case.</p></blockquote>
+
+<p>Koichi:</p>
+
+<blockquote><p>From what you have just told me, here is how I would write it in
+Amber:</p></blockquote>
+
+<pre><code>Nbody_simulation {
+    initial:  ...
+    final:    ...
+    equation: d y / d x = ....
+}
+</code></pre>
+
+<p>Douglas:</p>
+
+<blockquote><p>What does that mean?</p></blockquote>
+
+<p>Koichi:</p>
+
+<blockquote><p>This is my way of specifying that an N-body simulation is basically
+the solution of a differential equation, given initial and final
+conditions.</p></blockquote>
+
+<p>Douglas:</p>
+
+<blockquote><p>What you wrote above, is that a form of pseudocode, or can Amber
+directly understand that text, after you add values for the <code>...</code>?</p></blockquote>
+
+<p>Koichi:</p>
+
+<blockquote><p>It is just a pseudocode and Amber can not understand that text.
+However, we can extend Amber's capability so as to understand our new
+language.  Amber supports you to use the most suitable language for
+writing problems of your domain.</p></blockquote>
+
+<p>Piet:</p>
+
+<blockquote><p>Ah, that is very nice.  Normally when we try to write a new piece
+of code, we may first scribble a piece of pseudocode on a blackboard.
+After that, we translate that into actual lines of code of the
+computer language we use.  Are you now suggesting to do the exact
+opposite?  Not changing the pseudocode into code, but extending the
+language in such a way that it can actually run the pseudocode?</p></blockquote>
+
+<p>Koichi:</p>
+
+<blockquote><p>Yes, that's the main idea.  The key here is the development of a
+Domain Specific Language, or DSL for short.</p></blockquote>
+
+<p>Douglas:</p>
+
+<blockquote><p>I sort of get it.  Do you have any other examples of DSLs?</p></blockquote>
+
+<p>Koichi:</p>
+
+<blockquote><p>There are two categories of DSLs.  Originally, a DSL was typically
+written from scratch, just like any other computer language, but
+intended for a more limited range of applications, which allows the
+introduction of specific operations for specialized purposes.
+Examples would be <a href="http://en.wikipedia.org/wiki/SQL">SQL</a> for
+operating relational-database systems and
+<a href="http://en.wikipedia.org/wiki/Yacc">Yacc</a> for writing parsers.
+However, more recently we have begun to use higher level languages
+to write DSLs directly in terms of those languages themselves.  An
+example is <a href="http://www.ruby-lang.org/en/">Ruby</a>, that is used to write
+the killer application <a href="http://rubyonrails.org/">Ruby on Rails</a>, which
+integrates several DSLs for writing web-application systems easily.</p></blockquote>
+
+<p>Douglas:</p>
+
+<blockquote><p>I've heard of SQL and Yacc, but I've never used them.  Do you know
+of any DSLs that are scientific applications?  Perhaps Maple would be
+an example, as well as Mathematica?</p></blockquote>
+
+<p>Koichi:</p>
+
+<blockquote><p>Yes. There are many kind of DSLs in scientific applications: Formula
+manipulation languages (e.g., Maple, Mathematica, Maxima), Numerical
+computation languages (e.g., MATLAB, Scilab, Octable), Statistical
+computing language (e.g., R) and Data viaualization languages (e.g.,
+gnuplot, graphviz).</p></blockquote>
+
+<p>Piet:</p>
+
+<blockquote><p>I understand that most DSLs are written from scratch, based on a
+simpler language such as C for example.  Do I understand that Ruby
+is high-level enough, or `meta' enough, to allow a DSL to be written
+directly in Ruby, while retaining the Ruby syntax?</p></blockquote>
+
+<p>Koichi:</p>
+
+<blockquote><p>Yes.  Examples are Rakefile and Ruby on Rails.  However, at present,
+other modern popular languages don't have enough capabilities to
+implement internal DSLs.  This is the state of things.</p></blockquote>
+
+<p>Piet:</p>
+
+<blockquote><p>Really?  How about Python?  In may ways Python resembles Ruby, at
+least for the average user.</p></blockquote>
+
+<p>Koichi:</p>
+
+<blockquote><p>in fact, there are no famous "internal" DSLs written in Python,
+because Python's syntax is rather poor in comparison to Ruby.
+Actually, Ruby and LISP are the only ones which support writing
+internal DSLs in powerfully ways -- and now amber is the new one.</p></blockquote>
+
+<p>Piet:</p>
+
+<blockquote><p>That is very interesting.  I had not realized that.  And I'm excited
+about seeing in practice how you will use a meta-level language like
+Amber to write a DSL for us in Amber!
+What is the next step?  Will we
+stop now what we are doing, as a top-down way of thinking?  And will
+we now write our new DSL, bottom-up?</p></blockquote>
+
+<p>Koichi:</p>
+
+<blockquote><p>No, the nice thing of writing a DSL in Amber is that we can continue
+all the way in a top-down fashion.  The next step will be to give
+Amber a framework in which it can understand the pseudocode.</p></blockquote>
+
+<p>Piet:</p>
+
+<blockquote><p>Very nice!  Let's do it.</p></blockquote>
+
+<p>Koichi:</p>
+
+<blockquote><p>Well, in order for Amber to understand the pseudocode, we first have
+to define a syntax, in which the pseudocode lines will be valid
+statements. It can be written like:</p></blockquote>
+
+<pre><code>statement ::= [multiline]
+    "Nbody_simulation" "{"
+        aligned(nbody_simulation_component)
+    "}"
+
+nbody_simulation_component
+    ::= "initial" ":" aligned(statement)
+      | "final" ":" expr
+      | "equation" ":" aligned(differential_equation)
+
+differential_equation  ::= "d" symbol "/" "d" symbol "=" expr
+</code></pre>
+
+<p>Piet:</p>
+
+<blockquote><p>In what context do these lines appear?  Will this be part of Amber?
+Or is it part of a new library?  It looks quite different from the
+first piece of code that you wrote, which was much simpler.</p></blockquote>
+
+<p>Koichi:</p>
+
+<blockquote><p>It will be part of our new library for N-body simulation.
+The notation I use is based on
+<a href="http://en.wikipedia.org/wiki/Backus-Naur_Form">Backus-Naur Form (BNF)</a>
+with several extensions, which is commonly-used notation for defining
+syntaxes of languages.</p></blockquote>
+
+<p>Douglas:</p>
+
+<blockquote><p>What is the status of the word <code>statement</code> here?</p></blockquote>
+
+<p>Koichi:</p>
+
+<blockquote><p>The symbols at the left-hand side of the operator <code>::=</code> are new
+expressions that we can write to extend Amber.  By doing so, we
+extend the Amber syntax.  And by providing new expressions at the
+right-hand side of this operator, we define the meaning of the new
+expressions at the left-hand side.  Since Amber parses programs as
+lines of statements, we have to begin with defining our new
+statement.</p></blockquote>
+
+<p>Douglas:</p>
+
+<blockquote><p>Please explain this particular statement definition.</p></blockquote>
+
+<p>Koichi:</p>
+
+<blockquote><p>Our new statement begins with a string "Nbody_simulation", followed
+by a number of elements (<code>nbody_simulation_component</code>) enclosed within
+bracesk, which constitute the simulation.</p>
+
+<p>Amber's parser distinguish syntax elements based on "indentation-level"
+and <code>aligned</code> and <code>[multiline]</code> are Amber's extension for defining
+syntaxes related indentation. <code>aligned(...)</code> parses elements which
+have same indentation-level and <code>[multiline]</code> tells the parser that
+some elements of the syntax could be placed in same level. In this
+case, the string "Nbody_simulation" and the closing brace "}" will
+be.</p>
+
+<p>The definition of <code>nbody_simulation_component</code> consists of "initial
+condition", "final condition" and "equation".  The initial condition
+consists of a header string "initial", a delimiter ":" and several
+statements, initialization of variables.  Definitions of final
+condition and equation are similar.</p></blockquote>
+
+<p>Piet:</p>
+
+<blockquote><p>It does not seem to be so difficult. So, can Amber understand our
+pseudocode now?</p></blockquote>
+
+<p>Koichi:</p>
+
+<blockquote><p>Only syntaxes. Because we haven't tell Amber the meaning of our program.
+Well, before going next step, let's see how Amber understand our
+pseudocode with the current definitions using Amber's interactive
+shell. Save the definitions above to a file named "nbody-lib.ab" and
+launch Amber-shell from command-line:</p></blockquote>
+
+<pre><code>$ amber
+amber:1&gt;
+</code></pre>
+
+<blockquote><p>Then, load the "nbody-lib.ab" like this:</p></blockquote>
+
+<pre><code>amber:1&gt; include "nbody-lib.ab";
+=&gt; nil
+amber:2&gt;
+</code></pre>
+
+<blockquote><p>Now, Amber has the capability of understanding our pseudocode. Input
+a program like this:</p></blockquote>
+
+<pre><code>amber:2&gt; Nbody_simulation {
+amber:2~     initial:
+amber:2~         x: Vector[0.0, 1.0, 0.0]
+amber:2~         v: Vector[1.0, 0.0, 0.0]
+amber:2~         t: 0.0
+amber:2~         dt: 0.01
+amber:2~     final:
+amber:2~         t &gt;= 10.0
+amber:2~     equation:
+amber:2~         d x / d t = v
+amber:2~         d v / d t = -x/|x|^3
+amber:2~ };
+=&gt; ["Nbody_simulation", "{", [["initial", ":", [DefineVariable{x, Vector{0.0, 1.0, 0.0}},
+DefineVariable{v, Vector{1.0, 0.0, 0.0}}, DefineVariable{t, 0.0}, DefineVariable{dt, 0.01}]],
+["final", ":", t &gt;= 1.0.], ["equation", ":", [["d", x, "/", "d", t, "=", v], ["d", v, "/",
+"d", t, "=", -x/|x|^3]]]], "}"]
+</code></pre>
+
+<p>Koichi:</p>
+
+<blockquote><p>You can see that Amber understands our language just as a sequence
+of tokens.  Tokens like "{" or "d" are not necessary for Amber. So it is
+better to re-form tokens.  Re-formation of tokens can be written like:</p></blockquote>
+
+<hr />
+
+<p>(Following parts are under edit.)</p>
+
+<p>statement ::= [multiline]</p>
+
+<pre><code>"Nbody_simulation" "{"
+    initial_condition
+    final_condition
+    equation
+"}"
+{ `Nbody_simulation{!$2,!$3, !$4} }
+</code></pre>
+
+<p>initial_condition ::= "initial" ":" aligned(statement) { $2 }
+final_condition   ::= "final" ":" expr { $2 }
+equation ::= "equation" ":" aligned(differential_equation) { $2 }</p>
+
+<p>differential_equation</p>
+
+<pre><code>::= "d" symbol "/" "d" symbol "=" expr
+    { `DiffEqn{!$1, !$4, !$6} }
+</code></pre>
+
+<p>(Qs and As)</p>
+
+<p> The initial and final conditions consist of a corresponding header string (e.g., "initial" ":") and an expression. The symbol `Nbody_simulation' is just a unique name of the statement so that Amber can understand the statement. Next, We have to define the internal representation of the new syntaxes.</p>
+
+<pre><code>statement ::= "Nbody_simulation" "{"
+    initial_condition
+    final_condition
+    equation
+    "}"
+    { `Nbody_simulation{!$2, !$3, !$4} }
+
+initial_condition ::= "initial" ":" expr    { $2 }
+final_condition   ::= "final" ":" expr      { $2 }
+equation ::= "equation" ":" differential_equation   { $2 }
+
+differential_equation ::= "d" symbol "/" "d" symbol "=" expr
+    { `DiffEqn{!$1, !$4, !$6} }
+</code></pre>
+
+<p>Douglas:</p>
+
+<blockquote><p>I notice you've added an extra expression (in braces) to each piece of syntax. I'll ask you about that in a minute, but what is the analogous concept for the syntax <code>1 + 2</code> which you mentioned previously?</p></blockquote>
+
+<p>Koichi:</p>
+
+<blockquote><p>For example <code>1 + 2</code> and <code>add(1, 2)</code> have different syntaxes but their internal representation can be same, like <code>Add{1, 2}</code>.</p></blockquote>
+
+<p>Douglas:</p>
+
+<blockquote><p>So, is <code>Nbody_simulation{...}</code> the internal representation of my problem?.</p></blockquote>
+
+<p>Koichi:</p>
+
+<blockquote><p>Correct.</p></blockquote>
+
+<p>Douglas:</p>
+
+<blockquote><p>OK. Now can you please explain what <code>`</code> <code>!</code> and <code>$</code> mean?</p></blockquote>
+
+<p>Koichi:</p>
+
+<blockquote><p><code>$n</code> represents "nth-element of the syntax". For example, when amber parses <code>d y / d x = ...</code> using the syntax definition,</p></blockquote>
+
+<pre><code>differential_equation ::= "d" symbol "/" "d" symbol "=" expr
+</code></pre>
+
+<blockquote><p><code>$0</code> will be a string <code>"d"</code>, <code>$1</code> will be a symbol <code>y</code>, <code>$2</code> will be a string <code>"/"</code> and so on.</p>
+
+<p><code>`</code> and <code>!</code> represent operations called quasi-quotation and unquotation. <code>`( some expression )</code> means "do not evaluate this expression" and <code>!( some expression )</code> means "evaluate only this expression". For example, when you write <code>`(1 + !(2 + 3))</code> amber evaluates it to <code>Add{1, 5}</code></p></blockquote>
+
+<p>Koichi:</p>
+
+<blockquote><p>Finally, we have to define the meanings attached to these internal representations, like this:</p></blockquote>
+
+<pre><code>NbodySim{ini, fin, eqation} =&gt; `compile("C") {
+    !ini
+    while (not !fin) {
+        !eqation
+    }
+}
+
+DiffEqn{y, x, fun} =&gt; `{
+    !y += !fun * !("d" + x)
+}
+</code></pre>
+
+<p>Koichi:</p>
+
+<blockquote><p>These definitions mean that the patterns on the left hand side of <code>=&gt;</code>, like <code>NbodySim{init, fin, equation}</code>, will be translated into the corresponding programs on the right. <code>compile("C") { ... }</code>, from standard library of Amber, translates the program into a C-program.</p></blockquote>
+
+<p>Douglas:</p>
+
+<blockquote><p>How does Amber execute <code>ini</code>?</p></blockquote>
+
+<p>Koichi:</p>
+
+<blockquote><p>It doesn't: Amber does not execute the actual simulation.  It just generates the code for the simulation.</p></blockquote>
+
+<p>Douglas:</p>
+
+<blockquote><p>So, what form does <code>ini</code> take?</p></blockquote>
+
+<p>Koichi:</p>
+
+<blockquote><p>It would be easier to explain with a specific N-body problem.  Can you suggest one?</p></blockquote>
+
+<hr />
+
+<p>Douglas:</p>
+
+<blockquote><p>How about the Kepler problem.  This is the motion of a test particle under an inverse square attractive force.  In the x,y plane (z = 0) you could, for example, start with initial position (1,0,0), initial velocity (0,1,0), and then the body will move in a circle about the origin (if G times the mass of the central body is 1)
+So what does this Kepler problem look like if we implement it in amber?</p></blockquote>
+
+<p>Koichi:</p>
+
+<blockquote><p>Simple:</p></blockquote>
+
+<pre><code>include "nbody-lib.ab"
+Nbody_simulation {
+    initial: v: Vector[0.0, 1.0, 0.0], x: Vector[1.0, 0.0, 0.0]
+    final:   t &gt;= 1.0
+    equation:
+        d x / d t = v
+        d v / d t = - x/|x|^3
+}
+</code></pre>
+
+<p>Douglas:</p>
+
+<blockquote><p>I assume that amber has <code>Vector</code> as a built-in type, or in some standard mathematical library?</p></blockquote>
+
+<p>Koichi:</p>
+
+<blockquote><p>It's in a library</p></blockquote>
+
+<p>Douglas:</p>
+
+<blockquote><p>How about <code>|x|</code> and <code>|x|^3</code>?</p></blockquote>
+
+<p>Koichi:</p>
+
+<blockquote><p>It's also in a library. <code>|x|</code> is the absolute value of the <code>x</code>, that is the euclidean norm of the vector <code>x</code> in this case. And <code>|x|^3</code> is the cube of <code>|x|</code>.</p></blockquote>
+
+<hr />
+
+<p>Douglas:</p>
+
+<blockquote><p>That didn't seem too hard.  But remember I am really interested in the general gravitational N-body problem</p></blockquote>
+
+<p>Koichi:</p>
+
+<blockquote><p>Shall we implement it now?</p></blockquote>
+
+<pre><code>include "nbody-lib.ab"
+Nbody_simulation {
+    initial:  v: Vector(....) * N : Vector(...) * N
+    final:    t &gt;= 1.0
+    equation: {
+        d x[i] / d t = v[i] (forall i in 0 .. N-1)
+        d v[i] / d t = ...  (forall i in 0 .. N-1)
+    }
+}
+</code></pre>
+
+  
+    <footer>
+      <p class="meta">
+        
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-08-28T13:00:00+09:00" pubdate data-updated="true">Aug 28<span>th</span>, 2012</time>
+        
+      </p>
+      
+        <div class="sharing">
+  
+  <a href="http://twitter.com/share" class="twitter-share-button" data-url="http://nineties.github.com/amber/nbody/index.html" data-via="9_ties" data-counturl="http://nineties.github.com/amber/nbody/index.html" >Tweet</a>
+  
+  
+  
+</div>
+
+      
+    </footer>
+  
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>About Me</h1>
+  <ul>
+    <li>  中村晃一 (Koichi Nakamura) </li>
+    <li> Ph.D. student in Gratuate School of Information Science and Technology at The University of Tokyo </li>
+    <li> koichi.nakamur a.t. gmail.com </li>
+    <li> <a href="http://twitter.com/9_ties">@9_ties</a></li>
+  </ul>
+</section>
+<section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/amber/blog/2012/06/14/updated-features/">Updated features</a>
+      </li>
+    
+      <li class="post">
+        <a href="/amber/blog/2012/06/12/created-ambers-project-page/">Created Amber's Project Page</a>
+      </li>
+    
+  </ul>
+</section>
+
+<section>
+  <h1>GitHub Repos</h1>
+  <ul id="gh_repos">
+    <li class="loading">Status updating...</li>
+  </ul>
+  
+  <a href="https://github.com/nineties">@nineties</a> on GitHub
+  
+  <script type="text/javascript">
+    $.domReady(function(){
+        if (!window.jXHR){
+            var jxhr = document.createElement('script');
+            jxhr.type = 'text/javascript';
+            jxhr.src = '/javascripts/libs/jXHR.js';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(jxhr, s);
+        }
+
+        github.showRepos({
+            user: 'nineties',
+            count: 1,
+            skip_forks: true,
+            target: '#gh_repos'
+        });
+    });
+  </script>
+  <script src="/amber/javascripts/github.js" type="text/javascript"> </script>
+</section>
+
+
+<section>
+  <h1>Latest Tweets</h1>
+  <ul id="tweets">
+    <li class="loading">Status updating...</li>
+  </ul>
+  <script type="text/javascript">
+    $.domReady(function(){
+      getTwitterFeed("9_ties", 4, false);
+    });
+  </script>
+  <script src="/amber/javascripts/twitter.js" type="text/javascript"> </script>
+  
+    <a href="http://twitter.com/9_ties" class="twitter-follow-button" data-show-count="false">Follow @9_ties</a>
+  
+</section>
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2013 - Koichi Nakamura -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'nineties';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://nineties.github.com/amber/nbody/index.html';
+        var disqus_url = 'http://nineties.github.com/amber/nbody/index.html';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+
+
+
+
+  <script type="text/javascript">
+    (function(){
+      var twitterWidgets = document.createElement('script');
+      twitterWidgets.type = 'text/javascript';
+      twitterWidgets.async = true;
+      twitterWidgets.src = 'http://platform.twitter.com/widgets.js';
+      document.getElementsByTagName('head')[0].appendChild(twitterWidgets);
+    })();
+  </script>
+
+
+
+
+
+</body>
+</html>
