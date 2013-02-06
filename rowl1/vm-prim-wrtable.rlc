@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-wrtable.rlc 2013-02-05 11:08:50 nineties $
+; $Id: vm-prim-wrtable.rlc 2013-02-06 11:35:02 nineties $
 ;
 
 ; Weak reference table from object to object
@@ -22,10 +22,11 @@
 ;     3 : # of entries
 ;
 ; table entry
-;     0 : the key
-;     1 : the value
-;     2 : pointer to the next entry in bucket
-;     3 : pointer to the next entry in list of entries
+;     0 : pointer to the next entry in bucket
+;     1 : pointer to the next entry in list of entries
+;     2 : the key
+;     3 : the value
+;     4 : true is this entry is alive
 
 (int[] 32 prime_numbers (
     5 11 17 37 67 131 257 521 1031 2053 4099 8209 16411 32771 65537 131101
@@ -33,12 +34,14 @@
     ))
 
 (void* wrtable_list 0)
+(export wrtable_GC_ran)
+(int wrtable_GC_ran @FALSE)
 
 (export prim_make_wrtable)
 (fun prim_make_wrtable () (
     (int size (get prime_numbers 1))
     (void* bucket (prim_allocate_array size))
-    (void* tbl (prim_make_struct4 0 bucket 0 size 0))
+    (void* tbl (prim_make_struct4 2 bucket 0 size 0))
     (= wrtable_list (cons tbl wrtable_list))
     (return tbl)
     ))
@@ -51,104 +54,110 @@
         (void* tbl (get list 0))
         (void* entry (get tbl 1))
         (while entry (
-            (void* key (get entry 0))
-            (void* value (get entry 1))
-            (if (&& (is_alive key) (! (is_alive value)))
+            (void* key (get entry 2))
+            (void* value (get entry 3))
+            (int alive (is_alive key))
+            (if (&& alive (|| (require_move key) (require_move value)))
                 (
-                    (= changed 1)
-                    (move_object entry)
-                    (move_object (+ entry 4))
+                    (move_object (+ entry (* 2 @WORD_SIZE)))
+                    (move_object (+ entry (* 3 @WORD_SIZE)))
+                    (set entry 4 @TRUE)
                     (= changed 1)
                 ))
-            (= entry (get entry 3))
+            (if (! alive) (
+                (set entry 4 @FALSE)
+                ))
+            (= entry (get entry 1))
             ))
         (= list (get list 1))
         ))
     (return changed)
     ))
 
-(export replace_wrtable_entries)
-(fun replace_wrtable_entries () (
-    (void* list wrtable_list)
-    (while list (
-        (void* tbl (get list 0))
-        (int size (get tbl 2))
-        (void* bucket (prim_allocate_array size))
-        (void* entry (get tbl 1))
-
-        (set tbl 0 bucket)
-        (set tbl 1 0)
-        (set tbl 3 0)
-
-        (while entry (
-            (void* key (get entry 0))
-            (if (is_alive key) (
-                (prim_wrtable_add tbl key (get entry 1))
-                ))
-            (= entry (get entry 3))
-            ))
-        (= list (get list 1))
-        ))
-    ))
-
 (fun rehash (table) (
     (int old_size (get table 2))
     (int n_entry (get table 3))
-    (if (> n_entry old_size) (
+    (if (|| (> n_entry old_size) wrtable_GC_ran) (
         (int size (get prime_numbers (bsr n_entry)))
         (if (! size) (
-            (error "too many objects")
+            (if (! wrtable_GC_ran) ((return)))
+            (= size old_size)
             ))
         (void* bucket (prim_allocate_array size))
         (void* entry (get table 1))
+        (= n_entry 0)
         (while entry (
-            (int h (% (get entry 0) size))
-            (set entry 2 (get bucket h))
-            (set bucket h entry)
-            (= entry (get entry 3))
+            (if (get entry 4) (
+                (int h (% (get entry 2) size))
+                (set entry 0 (get bucket h))
+                (set bucket h entry)
+                (incr n_entry)
+                ))
+            (= entry (get entry 1))
             ))
         (set table 0 bucket)
         (set table 2 size)
+        (set table 3 n_entry)
         ))
+    ))
+
+(fun check_GC () (
+    (if (! wrtable_GC_ran) ((return)))
+    (void* list wrtable_list)
+    (while list (
+        (rehash (get list 0))
+        (= list (get list 1))
+        ))
+    (= wrtable_GC_ran @FALSE)
     ))
 
 (export prim_wrtable_add)
 (fun prim_wrtable_add (table key val) (
+    (check_GC)
+
     (int size (get table 2))
     (void* bucket (get table 0))
     (int h (% key size))
     (void* entry (get bucket h))
     (while entry (
-        (void* e_key (get entry 0))
+        (void* e_key (get entry 2))
         (if (== key e_key) (
-            (set entry 1 val)
+            (set entry 3 val)
             (return)
             ))
-        (= entry (get entry 2))
+        (= entry (get entry 0))
         ))
 
     (rehash table)
-    (void* ent (prim_make_struct4 0 key val 0 0))
+    (= bucket (get table 0))
+    (= size (get table 2))
+    (= h (% key size))
+
+    (= entry (prim_make_struct5 2 0 0 key val @TRUE))
 
     ; add the entry to the bucket
-    (set ent 2 (get bucket h))
-    (set bucket h ent)
+    (set entry 0 (get bucket h))
+    (set bucket h entry)
 
-    (set ent 3 (get table 1))
-    (set table 1 ent)
+    (set entry 1 (get table 1))
+    (set table 1 entry)
     (set table 3 (+ (get table 3) 1))
     ))
 
 (export prim_wrtable_find)
 (fun prim_wrtable_find (table key) (
+    (check_GC)
+
     (int size (get table 2))
     (void* bucket (get table 0))
     (int h (% key size))
     (void* entry (get bucket h))
     (while entry (
-        (void* e_key (get entry 0))
-        (if (== key e_key) ((return (get entry 1))))
-        (= entry (get entry 2))
+        (void* e_key (get entry 2))
+        (if (== key e_key) (
+            (return (get entry 3))
+            ))
+        (= entry (get entry 0))
         ))
     (return @C_UNDEF)
     ))

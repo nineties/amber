@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2013-02-05 13:55:24 nineties $
+; $Id: rowl1-list.rlc 2013-02-05 23:48:24 nineties $
 ;
 
 (import "rlvm-compile")
@@ -25,20 +25,6 @@
 (var prototype_tbl (make_wrtable))
 
 (extern fun tuple_at)
-(fun make_object (head slots) (
-    (var obj (make_node0 head))
-    (while slots (do
-        (var t (car slots))
-        (if (!= (node_type t) @TupleE) (do
-            (throw (invalid_argument current_loc
-                (string "2nd argument of make_object must be list of (symbol, value)") t))
-            ))
-        (set_slot obj (tuple_at t 0) (tuple_at t 1))
-        (= slots (cdr slots))
-        ))
-    (return obj)
-    ))
-
 (export fun set_slot (obj sym val) (
     (if (!= (node_type sym) @SymbolE)
         (throw (invalid_argument current_loc
@@ -69,7 +55,6 @@
 (export fun setup_oop (std) (
     (wrtable_add slots prototype prototype_tbl)
 
-    (add_function2 std (to_sym "make_object") symT listT make_object 0)
     (add_function3 std (to_sym "set_slot") DontCare symT DontCare set_slot 0)
     (add_function2 std (to_sym "get_slot") DontCare symT get_slot 0)
     ))

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2013-02-05 10:39:44 nineties $
+; $Id: vm-gc.rlc 2013-02-06 11:36:44 nineties $
 ;
 
 (import "stdlib")
@@ -147,6 +147,7 @@
 (extern int stack_size)
 (extern void* gobject_area_base)
 (extern int num_gobject)
+(extern int wrtable_GC_ran)
 
 (byte[] @(* BDESCR_SIZE MAX_BLOCKS) block_map)
 (int stack_base)    ; address of stack bottom
@@ -425,8 +426,9 @@
         ))
 
     ; sweep across promoted pages with breadth-first traversing and copy their consistents.
+    (void* p 0)
     (while page_queue_head (
-        (void* p page_queue_head)
+        (= p page_queue_head)
         (= p @(PDESCR2PAGE p))
         (move_fields p)
         (+= p (* @WORD_SIZE @(OBJECT_WORDS p)))
@@ -440,7 +442,7 @@
     (while 1 (
         (if (! (update_wrtable_list)) ((break)))
         (while page_queue_head (
-            (void* p page_queue_head)
+            (= p page_queue_head)
             (= p @(PDESCR2PAGE p))
             (move_fields p)
             (+= p (* @WORD_SIZE @(OBJECT_WORDS p)))
@@ -452,9 +454,9 @@
             ))
         ))
 
-    (replace_wrtable_entries)
-
     (insert_padding)
+
+    (= wrtable_GC_ran @TRUE)
 
     (= current_gen next_gen) ; switch to next generation
     ))
@@ -630,6 +632,19 @@
     (if (! @(IS_POINTER_TO_HEAP obj)) ((return @TRUE)))
     (if (== @(pdescr->generation (ADDR2PDESCR obj)) next_gen)
         ((return @TRUE)))
+    (-= obj @WORD_SIZE)
+    (if @(OBJECT_COPYED obj) (
+        (return @TRUE)
+        ))
+    (return @FALSE)
+    ))
+
+(export require_move)
+(fun require_move (obj) (
+    (if @(IS_CONSTANT obj) ((return @FALSE)))
+    (if (! @(IS_POINTER_TO_HEAP obj)) ((return @FALSE)))
+    (if (== @(pdescr->generation (ADDR2PDESCR obj)) next_gen)
+        ((return @FALSE)))
     (-= obj @WORD_SIZE)
     (if @(OBJECT_COPYED obj) (
         (return @TRUE)
