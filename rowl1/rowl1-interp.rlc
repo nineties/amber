@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2013-02-05 14:49:31 nineties $
+; $Id: rowl1-interp.rlc 2013-02-06 22:24:45 nineties $
 ;
 
 (import "rlvm-compile")
@@ -413,12 +413,13 @@
     ))
 
 (fun import_file (path) (
+    (= path (add_extension ".ab" path))
     (var dir import_dirs)
     (while dir (do
         (var fullpath (build_path (car dir) path ""))
         (if (file_exists fullpath) (do
             (if (is_already_imported fullpath)
-                (return @C_NIL)
+                (return @C_FALSE)
                 )
             (add_importd_file fullpath)
 
@@ -442,7 +443,7 @@
             (close_in ichan)
 
             (set_loc no_loc)
-            (return @C_NIL)
+            (return @C_TRUE)
             ))
         (= dir (cdr dir))
         ))
@@ -474,10 +475,9 @@
             (= syms (cdr syms))
             (if syms (= path (strcat path "/")))
             ))
-        (= path (strcat path ".ab"))
+        (= path (add_extension ".ab" path))
         ))
-    (import_file path)
-    (return @C_NIL)
+    (return (import_file path))
     ))
 
 (fun setup_argv (argc argv) (
@@ -496,6 +496,38 @@
 (fun def_global_var (sym val) (
     (add_module_variable current_mod sym @C_FALSE val)
     (return val)
+    ))
+
+(fun load_ (path) (
+    (var dir import_dirs)
+    (while dir (do
+        (var fullpath (build_path (car dir) path ""))
+        (if (file_exists fullpath) (do
+            (var ichan (open_in fullpath))
+            (var fd (open "."))
+            (var dir (get_directory fullpath))
+            (chdir dir)
+            (push_import_dir dir)
+
+            (var p (init_parser fullpath ichan))
+            (set_loc (get_loc p))
+
+            (var shell_mode_p (in_shell_mode))
+            (unset_shell_mode)
+            (interpret p)
+            (if shell_mode_p (set_shell_mode))
+
+            (pop_import_dir)
+
+            (fchdir fd)
+            (close_in ichan)
+
+            (set_loc no_loc)
+            (return @C_NIL)
+            ))
+        (= dir (cdr dir))
+        ))
+    (throw (not_found current_loc (string path)))
     ))
 
 (fun setup_globals (mod) (
@@ -528,6 +560,9 @@
     (add_function1 mod Eval (domainP ReserveSymbol) eval_reserve_symbol 0)
 
     (add_function1 mod Eval (quote (to_sym "exit")) eval_exit 0)
+
+    (add_function1 mod (to_sym "load") stringT load_ 0)
+    (add_function1 mod (to_sym "import") stringT import_file 0)
     (add_function1 mod (to_sym "exit") intT exit_ 0)
     (add_function1 mod (to_sym "atexit") funT at_exit 0)
 
