@@ -1,6 +1,6 @@
 # Copyright (C) 2012 nineties
 #
-# $Id: binio.ab 2013-02-02 01:34:25 nineties $
+# $Id: binio.ab 2013-02-06 13:46:39 nineties $
 
 ### Definition ###
 #
@@ -31,7 +31,6 @@
 # foo.write(io, data)
 #
 
-import data.struct
 open bigint
 
 module binio {
@@ -70,7 +69,7 @@ module binio {
             if (n <= 0)
                 throw `InvalidBinaryFormat{!LOCATION, Array{!t, !n}}
             ary: Array::new(n)
-            for i in 0..n-1
+            for (i in 0..n-1)
                 ary[i] = read(io, t)
             ary
         }
@@ -84,16 +83,6 @@ module binio {
             i: read(io, t)
             v: map.right[i]
             (v == undef) ? i : v
-        }
-
-        read(io, BinaryData{_, struct, fields}): {
-            obj: init_struct(struct)
-            i: 1
-            for (_, t) in fields {
-                obj[i] = read(io, t)
-                i += 1
-            }
-            obj
         }
 
         #Writer
@@ -124,7 +113,7 @@ module binio {
         }
 
         write(io, Array{t, n@Int}, data): {
-            for i in 0..n-1
+            for (i in 0..n-1)
                 write(io, t, (data != undef) ? data[i] : 0)
         }
 
@@ -144,23 +133,14 @@ module binio {
                 write(io, t, i)
         }
 
-        write(io, BinaryData{_, fields}, obj): {
-            i:1
-            for (_, t) in fields {
-                write(io, t, obj[i])
-                i += 1
-            }
-            nil
-        }
     }
 
     read(io, t): impl::read(io, t)
-    write(io, data): impl::write(io, data.binary_format, data) 
     write(io, t, data): impl::write(io, t, data) 
 
     align(io, w): {
         if (w == 0) return
-        for i in 1 .. (io.position % w) {
+        for (i in 1 .. (io.position % w)) {
             impl::write(io, \uint8, 0)
         }
     }
@@ -180,6 +160,24 @@ module binio {
             throw `Error{"Invalid address width", !n}
         }
         nil
+    }
+
+    make_binio(name, fields): {
+        obj: make BinIO{name}
+        obj.read = (_, io) -> {
+            obj: MakeNode{name, []}
+            for ((x, t) in fields) {
+                set_slot(obj, x, read(io, t))
+            }
+            obj
+        }
+        obj.write = (_, io, data) -> {
+            for ((x, t) in fields) {
+                write(io, t, get_slot(data, x))
+            }
+            nil
+        }
+        obj
     }
 }
 
@@ -203,35 +201,8 @@ binio_fields
 
 binio_definition
     ::= [multiline] "binio" symbol binio_fields
-        { `DefineVariable{!$1, NewBinaryData{!$1, !$2}} }
+        { `DefineVariable{!$1, binio::make_binio(\!$1, \!$2)} }
       | [multiline] "binio" qualified_symbol binio_fields
-        { `DefineVariable{!$1, NewBinaryData{!$1[1], !$2}} }
+        { `DefineVariable{!$1, binio::make_binio(\!$1[1], \!$2)} }
 
 statement ::= binio_definition
-
-### Semantics ###
-
-NewBinaryData{name, fields} => {
-    struct_fields: map(fields, ((x, _)) -> (x, nil))
-    struct: eval( `NewStruct{!name, !struct_fields} )
-    reader: (_, io) -> {
-        obj: init_struct(struct)
-        i: 1
-        for (_, t) in fields {
-            obj[i] = read(io, t)
-            i += 1
-        }
-        obj
-    }
-    writer: (_, io, data) -> {
-        i: 1
-        for (_, t) in fields {
-            write(io, obj[i])
-            i += 1
-        }
-        nil
-    }
-
-    binio_fields: [(\read, `\!reader), (\write, `\!writer)]
-    `NewStruct{!name, !binio_fields}
-}
