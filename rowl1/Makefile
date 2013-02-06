@@ -175,10 +175,10 @@ clean:
 install:
 	cd $(TOPDIR); $(MAKE) install
 
-install_binaries: rlvm amber
+install_binaries: amber
 	mkdir -p $(BINDIR)
 	cp $^ $(BINDIR)
 
-install_libraries: rowl1
+install_libraries: rowl1 rlvm
 	mkdir -p $(LIBDIR)/amber/bin
 	cp $^ $(LIBDIR)/amber/bin
