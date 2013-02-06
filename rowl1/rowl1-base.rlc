@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-base.rlc 2013-02-06 12:02:23 nineties $
+; $Id: rowl1-base.rlc 2013-02-06 23:09:26 nineties $
 ;
 
 (import "rlvm-compile")
@@ -108,17 +108,17 @@
     (return (_subst_loop obj code))
     ))
 
-(extern fun array_clone)
-(extern fun tuple_clone)
-(export fun _clone (obj) (
+(extern fun array_copy)
+(extern fun tuple_copy)
+(export fun _copy (obj) (
     (if (is_atom obj) (return obj))
-    (if (is_list obj) (return (list_clone obj)))
-    (if (is_tuple obj) (return (tuple_clone obj)))
-    (if (is_array obj) (return (array_clone obj)))
+    (if (is_list obj) (return (list_copy obj)))
+    (if (is_tuple obj) (return (tuple_copy obj)))
+    (if (is_array obj) (return (array_copy obj)))
     (var n (expr_size obj))
-    (var clone (allocate_expr n))
-    (memcpy clone obj (* 4 (+ n 1)))
-    (return clone)
+    (var copy (allocate_expr n))
+    (memcpy copy obj (* 4 (+ n 1)))
+    (return copy)
     ))
 
 (export fun setup_base (mod) (
@@ -138,7 +138,7 @@
 
     (add_function1 mod (to_sym "id") DontCare _id 0)
     (add_function2 mod (to_sym "subst") DontCare funT _subst 0)
-    (add_function1 mod (to_sym "clone") DontCare _clone 0)
+    (add_function1 mod (to_sym "copy") DontCare _copy 0)
 
     ))
 
