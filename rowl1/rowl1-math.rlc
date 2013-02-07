@@ -1,0 +1,80 @@
+;
+; rowl - 1st generation
+; Copyright (C) 2012 nineties
+;
+; $Id: rowl1-math.rlc 2013-02-08 00:26:40 nineties $
+;
+
+(import "rlvm-compile")
+(import "rowl1-types")
+
+(compile `object `(
+
+(import "rowl1-util")
+(import "rowl1-node")
+(import "rowl1-module")
+(import "rowl1-compile")
+(import "rowl1-assemble")
+(import "rowl1-error")
+
+(extern object current_loc)
+(extern object current_mod)
+
+(fun float_sqrt (f) (
+    (= f (copy_float f))
+    (return (fsqrt f))
+    ))
+
+(fun float_sin (f) (
+    (= f (copy_float f))
+    (return (fsin f))
+    ))
+
+(fun float_cos (f) (
+    (= f (copy_float f))
+    (return (fcos f))
+    ))
+
+(fun float_tan (f) (
+    (= f (copy_float f))
+    (return (ftan f))
+    ))
+
+(var to_f (to_sym "to_f"))
+(fun do_to_f (v) (
+    (= v (byterun (lookup_func current_mod to_f) v))
+    (if (!= (node_type v) @FloatE)
+        (throw (exception current_loc (string "to_f must returns floating-point value")))
+        )
+    (return v)
+    ))
+
+(fun sqrt (v) (
+    (return (float_sqrt (do_to_f v)))
+    ))
+
+(fun sin (v) (
+    (return (float_sin (do_to_f v)))
+    ))
+
+(fun cos (v) (
+    (return (float_cos (do_to_f v)))
+    ))
+
+(fun tan (v) (
+    (return (float_tan (do_to_f v)))
+    ))
+
+(export fun setup_math (std) (
+    (add_function1 std (to_sym "sqrt") DontCare sqrt 0)
+    (add_function1 std (to_sym "sin") DontCare sin 0)
+    (add_function1 std (to_sym "cos") DontCare cos 0)
+    (add_function1 std (to_sym "tan") DontCare tan 0)
+
+    (add_function1 std (to_sym "sqrt") floatT float_sqrt 0)
+    (add_function1 std (to_sym "sin") floatT float_sin 0)
+    (add_function1 std (to_sym "cos") floatT float_cos 0)
+    (add_function1 std (to_sym "tan") floatT float_tan 0)
+    ))
+
+   ))
