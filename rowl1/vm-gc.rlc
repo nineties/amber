@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2013-02-06 11:36:44 nineties $
+; $Id: vm-gc.rlc 2013-02-07 10:14:18 nineties $
 ;
 
 (import "stdlib")
@@ -166,6 +166,9 @@
 
 (void*[] @MAX_STATICS statics)
 (int num_static)
+
+(export stop_GC)
+(int stop_GC @FALSE)
 
 (export register_static)
 (fun register_static (addr) (
@@ -394,7 +397,7 @@
     ))
 
 (fun garbage_collect () (
-    (if @IN_GC (
+    (if (|| @IN_GC stop_GC) (
         (alloc_new_block)
         (return)
         ))
@@ -439,8 +442,10 @@
         (= page_queue_head @(pdescr->next page_queue_head))
         ))
 
+    (insert_padding)
+
     (while 1 (
-        (if (! (update_wrtable_list)) ((break)))
+        (if (! (move_wrtable_entries)) ((break)))
         (while page_queue_head (
             (= p page_queue_head)
             (= p @(PDESCR2PAGE p))
@@ -455,10 +460,9 @@
         ))
 
     (insert_padding)
-
-    (= wrtable_GC_ran @TRUE)
-
     (= current_gen next_gen) ; switch to next generation
+
+    (update_wrtable_list)
     ))
 
 (fun insert_padding () (
@@ -649,7 +653,7 @@
     (if @(OBJECT_COPYED obj) (
         (return @TRUE)
         ))
-    (return @FALSE)
+    (return @TRUE)
     ))
 
 ; array of integers
