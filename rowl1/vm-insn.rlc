@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2013-02-07 23:02:01 nineties $
+; $Id: vm-insn.rlc 2013-02-08 10:07:26 nineties $
 ;
 
 (define gen_field_get (idx) `(
@@ -943,6 +943,39 @@
         (asm "3:")
         (asm "fstpl (%ecx)")
         ))
+
+    ; compute x^y
+    (fpow (-1) @true (
+        (vmpop %ecx)                ; y
+        (asm "movl (%esi), %eax")   ; x
+        (asm "fldl (%ecx)")         ; y
+        (asm "fldl (%eax)")         ; x | y
+        (asm "fyl2x")               ; y*log2(x)
+        (asm "fst %st(1)")          ; y*log2(x) | y*log2(x) 
+        (asm "frndint")             ; [y*log2(x)] | y*log2(x)
+        (asm "fxch")                ; y*log2(x) | [y*log2(x)]
+        (asm "fsub %st(1), %st")    ; y*log2(x)-[y*log2(x)] | [y*log2(x)]
+        (asm "f2xm1")               ; 2^(y*log2(x)-[y*log2(x)])-1 | [y*log2(x)]
+        (asm "fld1")
+        (asm "faddp %st, %st(1)")   ; 2^(y*log2(x)-[y*log2(x)]) | [y*log2(x)]
+        (asm "fscale")              ; 2^(y*log2(x)) = x^y
+        (asm "fstpl (%eax)")
+        ))
+
+    ; compute log x (y)
+    (flog (-1) @true (
+        (vmpop %ecx)                ; y
+        (asm "movl (%esi), %eax")   ; x
+        (asm "fld1")                ; 1.0
+        (asm "fldl (%ecx)")         ; y | 1.0
+        (asm "fyl2x")               ; log2(y)
+        (asm "fld1")                ; 1.0 | log2(y)
+        (asm "fldl (%eax)")         ; x | 1.0 | log2(y)
+        (asm "fyl2x")               ; log2(x) | log2(y)
+        (asm "fdivp %st, %st(1)")   ; log2(y)/log2(x)
+        (asm "fstpl (%eax)")
+        ))
+
     ; integer to float
     (itof (0) @true (
         (vmsave)

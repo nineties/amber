@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-numeric.rlc 2013-02-07 23:11:42 nineties $
+; $Id: rowl1-numeric.rlc 2013-02-08 10:18:16 nineties $
 ;
 
 (import "rlvm-compile")
@@ -20,7 +20,7 @@
 (extern object current_mod)
 
 (var coerce (to_sym "coerce"))
-(fun do_coerce (a b) (
+(export fun do_coerce (a b) (
     (var r (byterun (lookup_func current_mod coerce) a b))
     (if (|| (!= (node_type r) @ListE) (!= (list_len r) 2)) (do
         (throw (exception current_loc (string "coerce must returns [a, b]")))
@@ -28,48 +28,20 @@
     (return r)
     ))
 
-(fun num_add (a b) (
+(export fun binary_coerce (sym a b) (
     (var r (do_coerce a b))
-    (return (byterun (lookup_func current_mod (to_sym "add")) (car r) (cadr r)))
-    ))
-(fun num_sub (a b) (
-    (var r (do_coerce a b))
-    (return (byterun (lookup_func current_mod (to_sym "sub")) (car r) (cadr r)))
-    ))
-(fun num_mul (a b) (
-    (var r (do_coerce a b))
-    (return (byterun (lookup_func current_mod (to_sym "mul")) (car r) (cadr r)))
-    ))
-(fun num_div (a b) (
-    (var r (do_coerce a b))
-    (return (byterun (lookup_func current_mod (to_sym "div")) (car r) (cadr r)))
-    ))
-(fun num_mod (a b) (
-    (var r (do_coerce a b))
-    (return (byterun (lookup_func current_mod (to_sym "mod")) (car r) (cadr r)))
-    ))
-(fun num_pow (a b) (
-    (var r (do_coerce a b))
-    (return (byterun (lookup_func current_mod (to_sym "pow")) (car r) (cadr r)))
-    ))
-(fun num_lt (a b) (
-    (var r (do_coerce a b))
-    (return (byterun (lookup_func current_mod (to_sym "lt")) (car r) (cadr r)))
-    ))
-(fun num_gt (a b) (
-    (var r (do_coerce a b))
-    (return (byterun (lookup_func current_mod (to_sym "gt")) (car r) (cadr r)))
-    ))
-(fun num_le (a b) (
-    (var r (do_coerce a b))
-    (return (byterun (lookup_func current_mod (to_sym "le")) (car r) (cadr r)))
-    ))
-(fun num_ge (a b) (
-    (var r (do_coerce a b))
-    (return (byterun (lookup_func current_mod (to_sym "ge")) (car r) (cadr r)))
+    (return (byterun (lookup_func current_mod sym) (car r) (cadr r)))
     ))
 
-
+(fun num_add (a b) ((return (binary_coerce (to_sym "add") a b))))
+(fun num_sub (a b) ((return (binary_coerce (to_sym "sub") a b))))
+(fun num_mul (a b) ((return (binary_coerce (to_sym "mul") a b))))
+(fun num_div (a b) ((return (binary_coerce (to_sym "div") a b))))
+(fun num_mod (a b) ((return (binary_coerce (to_sym "mod") a b))))
+(fun num_lt (a b) ((return (binary_coerce (to_sym "lt") a b))))
+(fun num_gt (a b) ((return (binary_coerce (to_sym "gt") a b))))
+(fun num_le (a b) ((return (binary_coerce (to_sym "le") a b))))
+(fun num_ge (a b) ((return (binary_coerce (to_sym "ge") a b))))
 
 (fun int_uplus (x) (
     (return x)
@@ -180,7 +152,6 @@
     (add_function2 std (to_sym "mul") DontCare DontCare num_mul 0)
     (add_function2 std (to_sym "div") DontCare DontCare num_div 0)
     (add_function2 std (to_sym "mod") DontCare DontCare num_mod 0)
-    (add_function2 std (to_sym "pow") DontCare DontCare num_pow 0)
     (add_function2 std (to_sym "lt") DontCare DontCare num_lt 0)
     (add_function2 std (to_sym "gt") DontCare DontCare num_gt 0)
     (add_function2 std (to_sym "le") DontCare DontCare num_le 0)

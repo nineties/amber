@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-math.rlc 2013-02-08 01:19:18 nineties $
+; $Id: rowl1-math.rlc 2013-02-08 10:20:14 nineties $
 ;
 
 (import "rlvm-compile")
@@ -13,6 +13,7 @@
 (import "rowl1-util")
 (import "rowl1-node")
 (import "rowl1-float")
+(import "rowl1-numeric")
 (import "rowl1-module")
 (import "rowl1-compile")
 (import "rowl1-assemble")
@@ -43,6 +44,21 @@
     (return (ftan f))
     ))
 
+(fun float_pow (x y) (
+    (if (! (float_positive x))
+        (throw (out_of_domain current_loc (to_sym "pow") x)))
+    (= x (copy_float x))
+    (return (fpow x y))
+    ))
+
+(fun float_log (x y) (
+    (if (! (float_positive x))
+        (throw (out_of_domain current_loc (to_sym "log") x)))
+    (if (! (float_positive y))
+        (throw (out_of_domain current_loc (to_sym "log") y)))
+    (return (flog x y))
+    ))
+
 (var to_f (to_sym "to_f"))
 (fun do_to_f (v) (
     (= v (byterun (lookup_func current_mod to_f) v))
@@ -68,16 +84,32 @@
     (return (float_tan (do_to_f v)))
     ))
 
+(fun tan (v) (
+    (return (float_tan (do_to_f v)))
+    ))
+
+(fun pow (x y) (
+    (return (binary_coerce (to_sym "pow") x y))
+    ))
+
+(fun log (x y) (
+    (return (binary_coerce (to_sym "log") x y))
+    ))
+
 (export fun setup_math (std) (
     (add_function1 std (to_sym "sqrt") DontCare sqrt 0)
     (add_function1 std (to_sym "sin") DontCare sin 0)
     (add_function1 std (to_sym "cos") DontCare cos 0)
     (add_function1 std (to_sym "tan") DontCare tan 0)
+    (add_function2 std (to_sym "pow") DontCare DontCare pow 0)
+    (add_function2 std (to_sym "log") DontCare DontCare log 0)
 
     (add_function1 std (to_sym "sqrt") floatT float_sqrt 0)
     (add_function1 std (to_sym "sin") floatT float_sin 0)
     (add_function1 std (to_sym "cos") floatT float_cos 0)
     (add_function1 std (to_sym "tan") floatT float_tan 0)
+    (add_function2 std (to_sym "pow") floatT floatT float_pow 0)
+    (add_function2 std (to_sym "log") floatT floatT float_log 0)
     ))
 
    ))
