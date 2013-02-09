@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-float.rlc 2013-02-08 10:11:22 nineties $
+; $Id: rowl1-float.rlc 2013-02-08 11:47:55 nineties $
 ;
 
 (import "rlvm-compile")
@@ -57,7 +57,7 @@
     ))
 
 (export fun float_positive (f) (
-    (if (&& (! (float_sign f)) (&& (float_is_zero f)))
+    (if (&& (! (float_sign f)) (! (float_is_zero f)))
         (return @TRUE)
         (return @FALSE)
         )
@@ -231,10 +231,26 @@
         (return (string "0.0"))
         ))
     (var e (- (& (>> f1 20) 0x7ff) 1023))
+    (= f1 (& f1 0xfffff))
+    
+    (if (== e 1024)
+        (if (&& (== f1 0) (== f0 0))
+            (if s
+                (return (string "-Infinity"))
+                (return (string "Infinity"))
+                )
+            (return (string "NaN"))
+            )
+        )
+
     (var f (allocate_bint 2))
     (field_set f 1 2)
     (bint_set_digit f 0 f0)
-    (bint_set_digit f 1 (| (& f1 0xfffff) (<< 1 20)))
+
+    (if (== e -1023)
+        (bint_set_digit f 1 f1)
+        (bint_set_digit f 1 (| f1 (<< 1 20)))
+        )
     (return (decode_float s f e))
     ))
 
