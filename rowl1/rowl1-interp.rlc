@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2013-02-08 00:12:28 nineties $
+; $Id: rowl1-interp.rlc 2013-02-13 03:28:22 nineties $
 ;
 
 (import "rlvm-compile")
@@ -131,6 +131,7 @@
     (return (call1 Eval expr))
     ))
 
+(extern fun list_to_table)
 (fun rewrite (expr) (
     (var new_expr (call1 Rewrite expr))
     (if (!= new_expr expr) (return (rewrite new_expr)))
@@ -177,6 +178,16 @@
         (return expr)
         ))
 
+    (if (is_table expr) (do
+        (var args (node_args expr))
+        (var new_args 0)
+        (while args (do
+            (= new_args (cons (rewrite (car args)) new_args))
+            (= args (cdr args))
+            ))
+        (return (list_to_table new_args))
+        ))
+
     (for i 0 (node_size expr) (do
         (node_arg_set expr i (rewrite (node_arg expr i)))
         ))
@@ -204,6 +215,16 @@
         )
     (if (== hd QuasiQuote)
         (+= level 1)
+        ))
+
+    (if (is_table expr) (do
+        (var args (node_args expr))
+        (var new_args 0)
+        (while args (do
+            (= new_args (cons (rewrite_qquote (car args) level) new_args))
+            (= args (cdr args))
+            ))
+        (return (list_to_table new_args))
         ))
 
     (for i 0 (node_size expr)

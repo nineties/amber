@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2013-02-13 00:23:03 nineties $
+; $Id: rowl1-compile.rlc 2013-02-13 03:27:55 nineties $
 ;
 
 (import "rlvm-compile")
@@ -164,7 +164,7 @@
 ; f(... x ... x ...) : body
 ; to
 ; f(... x ... y ...) where x==y : body
-
+(extern fun list_to_table)
 (fun alpha_args_iter (tbl chk rep expr level) (
     (if (is_symbol expr) (do
         (if (== expr DontCare) (return expr))
@@ -211,6 +211,17 @@
             ))
     (if (== hd QuasiQuote) (+= level 1)
     (if (== hd Unquote) (-= level 1))))
+
+    (if (is_table expr) (do
+        (var args (node_args expr))
+        (var new_args 0)
+        (while args (do
+            (= new_args (cons (alpha_args_iter tbl chk rep (car args) level) new_args))
+            (= args (cdr args))
+            ))
+        (return (list_to_table new_args))
+        ))
+
     (for i 0 (node_size expr)
         (node_arg_set expr i
             (alpha_args_iter tbl chk rep (node_arg expr i) level))
@@ -303,6 +314,15 @@
     (if (== hd Dynamic)
         (return expr)
         )
+    (if (is_table expr) (do
+        (var args (node_args expr))
+        (var new_args 0)
+        (while args (do
+            (= new_args (cons (alpha tbl (car args)) new_args))
+            (= args (cdr args))
+            ))
+        (return (list_to_table new_args))
+        ))
     (for i 0 (node_size expr)
         (node_arg_set expr i (alpha tbl (node_arg expr i)))
         )
@@ -1259,6 +1279,19 @@
     (compile_simple_call asm 2 make_node)
     ))
 
+(fun compile_table (asm mod expr) (
+    (var args (node_args expr))
+    (put_zero asm)
+    (while args (do
+        (compile asm mod (car args))
+        (put_cons asm)
+
+        (= args (cdr args))
+        ))
+    (put_push asm Table)
+    (compile_simple_call asm 2 make_node)
+    ))
+
 (fun compile_range (asm mod expr) (
     (compile asm mod (node_arg expr 1))
     (compile asm mod (node_arg expr 0))
@@ -1995,6 +2028,7 @@
     (add_compiler mod (domainP List)  compile_list)
     (add_compiler mod (domainP Tuple) compile_tuple)
     (add_compiler mod (domainP Array) compile_array)
+    (add_compiler mod (domainP Table) compile_table)
     (add_compiler mod (domainP Range) compile_range)
 
     (add_compiler mod (make_node1 Block listT) compile_block)

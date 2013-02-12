@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-table.rlc 2013-02-13 00:33:17 nineties $
+; $Id: rowl1-table.rlc 2013-02-13 03:25:05 nineties $
 ;
 
 (import "rlvm-compile")
@@ -29,7 +29,7 @@
 ; 0: TableE
 ; 1: bucket
 ; 2: hash-function
-; 3: equal-function to compare key
+; 3: equal-function to compare keys
 ; 4: list of entries
 ; 5: # of entries
 
@@ -40,22 +40,26 @@
 ; 3: pointer to the next entry in list of entries
 ; 4: the hash value
 
-(fun ht_new_with_hint (hint hash equal) (
+(fun table_new_with_hint (hint hash equal) (
     (var size (array_get int prime_numbers (bsr hint)))
     (return (variant @TableE 4 (allocate_array size) hash equal 0 0))
     ))
 
-(export fun ht_new () (
-    (return (ht_new_with_hint 10
+(export fun table_new () (
+    (return (table_new_with_hint 10
         (lookup_func current_mod (to_sym "hash"))
         (lookup_func current_mod (to_sym "equal"))
         ))
     ))
 
-(export fun ht_new2 (hash equal) (
+(export fun table_new2 (hash equal) (
     (= hash  (get_bytecode hash))
     (= equal (get_bytecode equal))
-    (return (ht_new_with_hint 10 hash equal))
+    (return (table_new_with_hint 10 hash equal))
+    ))
+
+(export fun table_size (tbl) (
+    (return (box (field_get tbl 5)))
     ))
 
 ; resize bucket
@@ -75,7 +79,7 @@
     (field_set tbl 1 bucket)
     ))
 
-(fun ht_add (tbl h key val hash) (
+(fun table_add (tbl h key val hash) (
     (var buf_size (seq_size (field_get tbl 1)))
     (var num_ent  (field_get tbl 5))
     (if (>= num_ent buf_size) (rehash tbl))
@@ -97,7 +101,7 @@
     (field_set tbl 5 (+ (field_get tbl 5) 1))
     ))
 
-(fun ht_store (tbl key val) (
+(fun table_store (tbl key val) (
     (var bucket (field_get tbl 1))
     (var hash (field_get tbl 2))
     (var eql  (field_get tbl 3))
@@ -113,11 +117,11 @@
             ))
         (= entry (field_get entry 2))
         ))
-    (ht_add tbl hash_value key val hash)
+    (table_add tbl hash_value key val hash)
     (return val)
     ))
 
-(fun ht_at (tbl key) (
+(fun table_at (tbl key) (
     (var hash (field_get tbl 2))
     (var eql  (field_get tbl 3))
     (var bucket (field_get tbl 1))
@@ -135,7 +139,7 @@
     (return @C_UNDEF)
     ))
 
-(fun ht_keys (tbl) (
+(fun table_keys (tbl) (
     (var keys 0)
     (var entries (field_get tbl 4))
     (while entries (do
@@ -145,7 +149,7 @@
     (return keys)
     ))
 
-(fun ht_values (tbl) (
+(fun table_values (tbl) (
     (var values 0)
     (var entries (field_get tbl 4))
     (while entries (do
@@ -155,20 +159,8 @@
     (return values)
     ))
 
-(extern fun tuple2)
-(fun ht_entries (tbl) (
-    (var es 0)
-    (var entry (field_get tbl 4))
-    (while entry (do
-        (= es (cons (tuple2 (field_get entry 0)
-            (field_get entry 1)) es))
-        (= entry (field_get entry 3))
-        ))
-    (return es)
-    ))
-
 (export fun pp_table (ochan tbl) (
-    (var entries (ht_entries tbl))
+    (var entries (table_to_list tbl))
     (output_string ochan "Table{")
     (while entries (do
         (var pair (car entries))
@@ -181,31 +173,64 @@
     (output_string ochan "}")
     ))
 
-(fun ht_from_list (list) (
+(export fun list_to_table (list) (
     (var orig list)
-    (var tbl (ht_new))
+    (var tbl (table_new))
     (while list (do
         (var ent (car list))
         (if (|| (!= (node_head ent) Tuple) (!= (node_size ent) 2))
-            (throw (invalid_argument current_loc (string "Table::create requires list of pairs") orig))
+            (throw (invalid_argument current_loc (string "Arguments of Table must be list of pairs") orig))
             )
-        (ht_store tbl (node_arg ent 0) (node_arg ent 1))
+        (table_store tbl (node_arg ent 0) (node_arg ent 1))
         (= list (cdr list))
         ))
     (return tbl)
     ))
 
-(export fun setup_table (std) (
-    (var mod (find_module no_loc std (to_sym "Table") @TRUE))
-    (add_function0 mod (to_sym "new") ht_new 0)
-    (add_function2 mod (to_sym "new") funT funT ht_new2 0)
-    (add_function1 mod (to_sym "from_list") listT ht_from_list 0)
-    (add_function2 std (to_sym "at") tableT DontCare ht_at 0)
-    (add_function3 std (to_sym "store") tableT DontCare DontCare ht_store 0)
+(extern fun tuple2)
+(export fun table_to_list (tbl) (
+    (var list 0)
+    (var entry (field_get tbl 4))
+    (while entry (do
+        (= list (cons (tuple2 (field_get entry 0)
+            (field_get entry 1)) list))
+        (= entry (field_get entry 3))
+        ))
+    (return list)
+    ))
 
-    (add_function1 std (to_sym "keys") tableT ht_keys 0) 
-    (add_function1 std (to_sym "values") tableT ht_values 0)
-    (add_function1 std (to_sym "entries") tableT ht_entries 0)
+
+(export fun table_restof (tbl i) (
+    (var num (field_get tbl 5))
+    (-= num i)
+    (var entry (field_get tbl 4))
+    (while (&& entry (> num 0)) (do
+        (= entry (field_get entry 3))
+        ))
+    (var list 0)
+    (while entry (do
+        (= list (cons (tuple2 (field_get entry 0)
+            (field_get entry 1)) list))
+        (= entry (field_get entry 3))
+        ))
+    (return list)
+    ))
+
+(export fun setup_table (std) (
+    (var ModTbl (find_module no_loc std (to_sym "Table") @TRUE))
+    (var ModList  (find_module no_loc std (to_sym "List") @TRUE))
+    (add_function0 ModTbl (to_sym "new") table_new 0)
+    (add_function2 ModTbl (to_sym "new") funT funT table_new2 0)
+    (add_function1 ModTbl (to_sym "from_list") listT list_to_table 0)
+    (add_function2 std (to_sym "at") tableT DontCare table_at 0)
+    (add_function3 std (to_sym "store") tableT DontCare DontCare table_store 0)
+    (add_function1 std (to_sym "size") tableT table_size 0)
+
+    (add_function1 ModList (to_sym "from_table") tableT table_to_list 0)
+
+    (add_function1 std (to_sym "keys") tableT table_keys 0) 
+    (add_function1 std (to_sym "values") tableT table_values 0)
+    (add_function1 std (to_sym "pairs") tableT table_to_list 0)
     ))
 
     ))

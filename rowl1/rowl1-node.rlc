@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2013-02-13 00:22:50 nineties $
+; $Id: rowl1-node.rlc 2013-02-13 03:27:25 nineties $
 ;
 
 (import "rlvm-compile")
@@ -246,12 +246,15 @@
 (export fun is_array (obj) (
     (if (== (node_type obj) @ArrayE) (return @TRUE) (return @FALSE))
     ))
+(export fun is_table (obj) (
+    (if (== (node_type obj) @TableE) (return @TRUE) (return @FALSE))
+    ))
 (export fun is_expr (obj) (
     (if (== (node_type obj) @ExprE) (return @TRUE) (return @FALSE))
     ))
 
 (fun is_atom_type (ty) (
-    (if (|| (== ty @ExprE) (|| (== ty @ListE) (|| (== ty @TupleE) (== ty @ArrayE))))
+    (if (|| (== ty @ExprE) (|| (== ty @ListE) (|| (== ty @TupleE) (|| (== ty @ArrayE) (== ty @TableE)))))
         (return @FALSE)
         (return @TRUE)
         )
@@ -326,21 +329,25 @@
 
 ; number of arguments
 (extern fun array_size)
+(extern fun table_size)
 (export fun node_size (expr) (
     (if (is_atom expr) (return 0))
     (if (is_list expr) (return (list_len expr)))
     (if (is_tuple expr) (return (seq_size expr)))
     (if (is_array expr) (return (array_size expr)))
+    (if (is_table expr) (return (table_size expr)))
     (return (expr_size expr))
     ))
 
 (extern fun tuple_to_list)
 (extern fun ary_to_list)
+(extern fun table_to_list)
 (export fun node_args (expr) (
     (if (is_atom expr) (return (list1 expr)))
     (if (is_list expr) (return expr))
     (if (is_tuple expr) (return (tuple_to_list expr)))
     (if (is_array expr) (return (ary_to_list expr)))
+    (if (is_table expr) (return (table_to_list expr)))
     (var args 0)
     (rfor i 0 (node_size expr)
         (= args (cons (node_arg expr i) args))
@@ -350,6 +357,7 @@
 
 (extern fun tuple_restof)
 (extern fun array_restof)
+(extern fun table_restof)
 (export fun node_restof (expr i) (
     (if (is_atom expr)
         (if (== i 0)
@@ -362,6 +370,7 @@
         ))
     (if (is_tuple expr) (return (tuple_restof expr i)))
     (if (is_array expr) (return (array_restof expr i)))
+    (if (is_table expr) (return (table_restof expr i)))
     (var args 0)
     (rfor j i (node_size expr)
         (= args (cons (node_arg expr j) args))
@@ -379,6 +388,7 @@
     (if (is_list expr)  (return (list_at_check expr idx)))
     (if (is_tuple expr) (return (tuple_at expr idx)))
     (if (is_array expr) (return (array_at expr idx)))
+    (if (is_table expr) (return (list_at_check (table_to_list expr) idx)))
 
     (if (>= idx (expr_size expr))
         (throw (out_of_range current_loc expr (box idx))))
@@ -424,6 +434,10 @@
     (if (is_list expr)  (return (list_store_check expr idx val)))
     (if (is_tuple expr) (return (tuple_store expr idx val)))
     (if (is_array expr) (return (array_store expr idx val)))
+    (if (is_table expr) (do
+        (throw (invalid_argument current_loc
+        (string "Can't access entries of table directly") expr))
+        ))
     (var n (expr_size expr))
     (if (>= idx n) (throw (out_of_range current_loc expr (box idx))))
     (array_set object expr (+ idx 1) val)
@@ -471,6 +485,7 @@
 
 (extern fun list_to_tuple)
 (extern fun list_to_ary)
+(extern fun list_to_table)
 (export fun make_node (head args) (
     (if (!= (node_type head) @SymbolE)
         (throw (exception current_loc (string "the 1st argument of MakeNode must be a Symbol")))
@@ -489,6 +504,7 @@
     (if (== head List)  (return args))
     (if (== head Tuple) (return (list_to_tuple args)))
     (if (== head Array) (return (list_to_ary args)))
+    (if (== head Table) (return (list_to_table args)))
 
     (var size (list_len args))
     (var expr (allocate_expr size))
