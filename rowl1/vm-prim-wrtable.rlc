@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-wrtable.rlc 2013-02-07 10:25:30 nineties $
+; $Id: vm-prim-wrtable.rlc 2013-02-12 17:14:16 nineties $
 ;
 
 ; Weak reference table from object to object
@@ -38,10 +38,12 @@
 
 (export prim_make_wrtable)
 (fun prim_make_wrtable () (
+    (= stop_GC @TRUE)
     (int size (get prime_numbers 1))
     (void* bucket (prim_allocate_array size))
     (void* tbl (prim_make_struct4 2 bucket 0 size 0))
     (= wrtable_list (cons tbl wrtable_list))
+    (= stop_GC @FALSE)
     (return tbl)
     ))
 
@@ -99,11 +101,13 @@
 
 (export update_wrtable_list)
 (fun update_wrtable_list () (
+    (= stop_GC @TRUE)
     (void* list wrtable_list)
     (while list (
         (rehash (get list 0) @TRUE)
         (= list (get list 1))
         ))
+    (= stop_GC @FALSE)
     ))
 
 (export prim_wrtable_add)

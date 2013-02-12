@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2013-02-07 10:14:18 nineties $
+; $Id: vm-gc.rlc 2013-02-12 17:29:30 nineties $
 ;
 
 (import "stdlib")
@@ -444,19 +444,20 @@
 
     (insert_padding)
 
-    (while 1 (
-        (if (! (move_wrtable_entries)) ((break)))
-        (while page_queue_head (
-            (= p page_queue_head)
-            (= p @(PDESCR2PAGE p))
+    (move_wrtable_entries)
+    (while page_queue_head (
+        (= p page_queue_head)
+        (= p @(PDESCR2PAGE p))
+        (move_fields p)
+        (+= p (* @WORD_SIZE @(OBJECT_WORDS p)))
+        (while (&& (& p @PAGE_MASK) (!= p freep)) (
             (move_fields p)
             (+= p (* @WORD_SIZE @(OBJECT_WORDS p)))
-            (while (&& (& p @PAGE_MASK) (!= p freep)) (
-                (move_fields p)
-                (+= p (* @WORD_SIZE @(OBJECT_WORDS p)))
-                ))
-            (= page_queue_head @(pdescr->next page_queue_head))
             ))
+        (if (== p freep) (
+            (move_wrtable_entries)
+            ))
+        (= page_queue_head @(pdescr->next page_queue_head))
         ))
 
     (insert_padding)
@@ -547,7 +548,7 @@
 
 (export prim_copy)
 (fun prim_copy (obj) (
-    (-= obj 4)
+    (-= obj @WORD_SIZE)
     (int words @(OBJECT_WORDS obj))
     (void* new_obj (allocate_object words))
     (copy_object new_obj obj words)
@@ -677,7 +678,7 @@
 (fun allocate_sequence (type nelem) (
     (int size (+ nelem 1))
     (void* ptr (allocate_object size))
-    (memset ptr 0 (* 4 size))
+    (memset ptr 0 (* @WORD_SIZE size))
     @(SET_HEADER ptr TAG_SEQUENCE type size)
     (+= ptr @WORD_SIZE)
     (return ptr)

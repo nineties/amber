@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: disasm.rlc 2012-09-15 09:22:27 nineties $
+; $Id: disasm.rlc 2013-02-10 02:32:52 nineties $
 ;
 
 (import "config")
@@ -152,6 +152,13 @@
     (newline oc)
     ))
 
+(fun output_printable (oc c) (
+    (if (&& (<= 0x20 c) (<= c 0x7e))
+        (output_char oc c)
+        (output_char oc '.')
+        )
+    ))
+
 (fun output_values (oc ic) (
     (var vsize (read_int_check ic))
     (output_string oc "- static values = ")
@@ -169,6 +176,12 @@
         (while (< j (+ i 16)) (do
             (output_char oc ' ')
             (output_hex oc (array_get char v j) 2)
+            (+= j 1)
+            ))
+        (output_string oc " : ")
+        (= j i)
+        (while (< j (+ i 16)) (do
+            (output_printable oc (array_get char v j))
             (+= j 1)
             ))
         (newline oc)
