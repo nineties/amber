@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-table.rlc 2013-02-12 17:28:00 nineties $
+; $Id: rowl1-table.rlc 2013-02-13 00:33:17 nineties $
 ;
 
 (import "rlvm-compile")
@@ -31,22 +31,18 @@
 ; 2: hash-function
 ; 3: equal-function to compare key
 ; 4: list of entries
-; 5: depth of stacking
-; 6: # of entries
+; 5: # of entries
 
 ; Fields of hash entries
 ; 0: the key
 ; 1: the value
 ; 2: pointer to the next entry in bucket
 ; 3: pointer to the next entry in list of entries
-; 4: the depth
-; 5: the hash value
+; 4: the hash value
 
 (fun ht_new_with_hint (hint hash equal) (
     (var size (array_get int prime_numbers (bsr hint)))
-    (var tbl (variant @TableE 4 (allocate_array size) hash equal 0 0 0))
-    (ht_enter tbl)
-    (return tbl)
+    (return (variant @TableE 4 (allocate_array size) hash equal 0 0))
     ))
 
 (export fun ht_new () (
@@ -62,44 +58,16 @@
     (return (ht_new_with_hint 10 hash equal))
     ))
 
-(fun ht_enter (tbl) (
-    (field_set tbl 5 (+ (field_get tbl 5) 1))
-    (return @C_NIL)
-    ))
-
-(fun ht_exit (tbl) (
-    (var bucket (field_get tbl 1))
-    (var bucket_size (seq_size bucket))
-    (var entry (field_get tbl 4))
-    (var depth (field_get tbl 5))
-    (if (== depth 0) (throw
-        (exception current_loc (string "Depth of table is zero"))
-        ))
-    (var count 0)
-    (while entry (do
-        (if (!= (field_get entry 4) depth) break)
-        ; remove the ehtry
-        (var h (% (field_get entry 5) bucket_size))
-        (array_set object bucket h (field_get entry 2))
-        (+= count 1)
-        (= entry (field_get entry 3))
-        ))
-    (field_set tbl 4 entry)
-    (field_set tbl 5 (- (field_get tbl 5) 1))
-    (field_set tbl 6 (- (field_get tbl 6) count))
-    (return @C_NIL)
-    ))
-
 ; resize bucket
 (fun rehash (tbl) (
-    (var num_ent (field_get tbl 6))
+    (var num_ent (field_get tbl 5))
     (var new_size (array_get int prime_numbers (bsr num_ent)))
     (if (! new_size)(throw
         (exception current_loc (string "rehash: too many entries"))))
     (var bucket (allocate_array new_size))
     (var entry (field_get tbl 4))
     (while entry (do
-        (var h (% (field_get entry 5) new_size))
+        (var h (% (field_get entry 4) new_size))
         (field_set entry 2 (array_get object bucket h))
         (array_set object bucket h entry)
         (= entry (field_get entry 3))
@@ -109,13 +77,12 @@
 
 (fun ht_add (tbl h key val hash) (
     (var buf_size (seq_size (field_get tbl 1)))
-    (var num_ent  (field_get tbl 6))
+    (var num_ent  (field_get tbl 5))
     (if (>= num_ent buf_size) (rehash tbl))
     
     (var bucket (field_get tbl 1))
     (var size   (seq_size bucket))
-    (var depth  (field_get tbl 5))
-    (var entry (struct 4 key val 0 0 depth h))
+    (var entry (struct 4 key val 0 0 h))
     (%= h size)
 
     ; add new entry to the list
@@ -127,22 +94,20 @@
     (array_set object bucket h entry)
 
     ; increment the counter
-    (field_set tbl 6 (+ (field_get tbl 6) 1))
+    (field_set tbl 5 (+ (field_get tbl 5) 1))
     ))
 
 (fun ht_store (tbl key val) (
     (var bucket (field_get tbl 1))
     (var hash (field_get tbl 2))
     (var eql  (field_get tbl 3))
-    (var depth (field_get tbl 5))
     (var size (seq_size bucket))
 
     (var hash_value (unbox (byterun hash key)))
     (var h (% hash_value size))
     (var entry (array_get object bucket h))
     (while entry (do    
-        (if (&& (== (byterun eql (field_get entry 0) key) @C_TRUE)
-                (== depth (field_get entry 4))) (do
+        (if (== (byterun eql (field_get entry 0) key) @C_TRUE) (do
             (field_set entry 1 val)
             (return val)
             ))
@@ -241,9 +206,6 @@
     (add_function1 std (to_sym "keys") tableT ht_keys 0) 
     (add_function1 std (to_sym "values") tableT ht_values 0)
     (add_function1 std (to_sym "entries") tableT ht_entries 0)
-
-    (add_function1 std (to_sym "enter") tableT ht_enter 0)
-    (add_function1 std (to_sym "exit") tableT ht_exit 0)
     ))
 
     ))
