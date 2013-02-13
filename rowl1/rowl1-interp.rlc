@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2013-02-13 22:03:53 nineties $
+; $Id: rowl1-interp.rlc 2013-02-14 03:06:54 nineties $
 ;
 
 (import "rlvm-compile")
@@ -32,7 +32,7 @@
 (var module_stack null)
 
 (export fun set_current_module (mod) (
-    (if (!= (node_head mod) Module)
+    (if (!= (node_bhead mod) Module)
         (throw (type_error current_loc (string "module") mod))
         )
     (= current_mod mod)
@@ -145,7 +145,7 @@
             ))
         (return expr)
         ))
-    (var hd (node_head expr))
+    (var hd (node_bhead expr))
     (if (== hd Quote) (return expr))
     (if (== hd QuasiQuote) (do
         (node_arg_set expr 0 (rewrite_qquote (node_arg expr 0) 0))
@@ -163,7 +163,7 @@
         ))
     (if (== hd Lambda) (do
         (var lhs (node_arg expr 0))
-        (if (== (node_head lhs) Where)
+        (if (== (node_bhead lhs) Where)
             (node_arg_set lhs 1 (rewrite (node_arg lhs 1)))
             )
         (node_arg_set expr 1 (rewrite (node_arg expr 1)))
@@ -204,7 +204,7 @@
             ))
         (return expr)
         ))
-    (var hd (node_head expr))
+    (var hd (node_bhead expr))
     (if (== hd Unquote) (do
         (if (== level 0)
             (node_arg_set expr 0 (rewrite (node_arg expr 0)))
@@ -488,7 +488,7 @@
 
 (fun eval_import (expr) (
     (var path (node_arg expr 0))
-    (if (== (node_head path) List) (do
+    (if (== (node_bhead path) List) (do
         (var syms path)
         (= path (string ""))
         (while syms (do

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-module.rlc 2013-02-08 00:25:52 nineties $
+; $Id: rowl1-module.rlc 2013-02-14 03:04:27 nineties $
 ;
 
 ; Module can be considered as a re-entrant scope.
@@ -58,7 +58,7 @@
 
 (export fun is_defined_locally (v) (
     (if (! v) (return @FALSE))
-    (if (&& (== (node_head v) ModuleVariable)
+    (if (&& (== (node_bhead v) ModuleVariable)
         (|| (== (node_arg v 1) @C_FALSE)
             (== (node_arg v 2) @C_TRUE)
         ))
@@ -69,7 +69,7 @@
 
 (fun is_effective_variable (v) (
     (if (! v) (return @FALSE))
-    (if (&& (== (node_head v) ModuleVariable) (== (node_arg v 1) @C_FALSE))
+    (if (&& (== (node_bhead v) ModuleVariable) (== (node_arg v 1) @C_FALSE))
         (return @FALSE)
         )
     (return @TRUE)
@@ -100,7 +100,7 @@
         (var ent (vector_at entries i))
         (if (! ent) continue)
         (var info (field_get ent 1))
-        (if (!= (node_head info) ModuleVariable) continue)
+        (if (!= (node_bhead info) ModuleVariable) continue)
         (var mark (fresh_mark))
         (update_module_variable mark curmod (field_get ent 0) (node_arg info 0))
         ))
@@ -115,8 +115,8 @@
     ))
 
 (export fun lookup_symbol (mod sig) (
-    (var hd (node_head sig))
-    (if (== hd Symbol)
+    (var hd (node_bhead sig))
+    (if (== hd BSymbol)
         (return (lookup_symbol_iter (fresh_mark) mod sig @FALSE))
     (if (== hd Qualified)
         (return (lookup_symbol
@@ -128,8 +128,8 @@
     ))
 
 (export fun lookup_effective_symbol (mod sig) (
-    (var hd (node_head sig))
-    (if (== hd Symbol)
+    (var hd (node_bhead sig))
+    (if (== hd BSymbol)
         (return (lookup_symbol_iter (fresh_mark) mod sig @TRUE))
     (if (== hd Qualified)
         (return (lookup_symbol
@@ -287,7 +287,7 @@
     ))
 
 (export fun must_be_module_variable (sym val) (
-    (if (!= (node_head val) ModuleVariable) (do
+    (if (!= (node_bhead val) ModuleVariable) (do
         (throw (unexpected_error current_loc
             (string "module variable is required")
             sym))
@@ -295,8 +295,8 @@
     ))
 
 (export fun find_module (loc curmod sig createp) (
-    (var hd (node_head sig))
-    (if (== hd Symbol) (do
+    (var hd (node_bhead sig))
+    (if (== hd BSymbol) (do
         (var mod 0)
         (if createp
             (= mod (lookup_symbol_current_module curmod sig))
@@ -305,7 +305,7 @@
         (if mod (do
             (must_be_module_variable sig mod)
             (= mod (car (node_arg mod 0)))
-            (if (!= (node_head mod) Module)
+            (if (!= (node_bhead mod) Module)
                 (throw (type_error loc (string "module") mod))
                 )
             (return mod)

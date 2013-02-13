@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2013-02-11 17:18:19 nineties $
+; $Id: rowl1-packrat.rlc 2013-02-14 02:59:28 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1012,7 +1012,7 @@
         (parse_char p '\n')
         @(CHECK p)
 
-        (if (!= (node_head stmt) Located) (throw
+        (if (!= (node_bhead stmt) Located) (throw
             (unexpected_error (get_loc p)
                 (string "parse_statement must returns Locate{...}")
                 stmt))
@@ -1058,7 +1058,7 @@
         (parse_char p '\n')
         (if (! @(PARSED p)) (if may_parse (goto retry) return))
 
-        (if (!= (node_head e) Located) (throw
+        (if (!= (node_bhead e) Located) (throw
             (unexpected_error (get_loc p)
                 (string "parse_statement must returns Locate{...}")
                 e))
@@ -1142,12 +1142,12 @@
     ))
 
 (fun compile_parser_element (pat ws) (
-    (var hd (node_head pat))
-    (if (== hd Symbol)
+    (var hd (node_bhead pat))
+    (if (== hd BSymbol)
         (return (parse_with_check
             (apply (dynamic (to_parse pat)) (list1 PVar)) ws))
         )
-    (if (== hd String)
+    (if (== hd BString)
         (return (parse_with_check
             (apply (dynamic (to_sym "parse_text")) (list2 PVar pat)) ws)))
     (if (== hd List)
@@ -1738,7 +1738,7 @@
 
 (fun compile_parser_action (elems act) (
     (var prog elems)
-    (if (!= (node_head elems) List)
+    (if (!= (node_bhead elems) List)
         (= elems (list1 elems))
         )
 
@@ -1788,7 +1788,7 @@
 
 (var multiline (to_sym "multiline"))
 (fun setup_options (opts) (
-    (if (!= (node_head opts) List)
+    (if (!= (node_bhead opts) List)
         (= opts (list1 opts))
         )
     (while opts (do
@@ -1808,7 +1808,7 @@
     ))
 
 (fun compile_parser (sym elems) (
-    (if (!= (node_head elems) List)
+    (if (!= (node_bhead elems) List)
         (= elems (list1 elems))
         )
 
@@ -1821,7 +1821,7 @@
     (while elems (do
         (var t (car elems))
         (var size (node_size t))
-        (if (|| (!= (node_head t) Tuple) (|| (< size 2) (> size 3))) (do
+        (if (|| (!= (node_bhead t) Tuple) (|| (< size 2) (> size 3))) (do
             (throw (unexpected_error current_loc
                 (string "Entries of syntax definition must be form of (parser, action, [options])")
                 t))
