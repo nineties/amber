@@ -108,7 +108,7 @@ module HIL {
     copyprop(sbst, |x|)   : copyprop_unary(sbst, x, \Absolute)
     copyprop(sbst, not x) : copyprop_unary(sbst, x, \Not)
     copyprop_unary(sbst, x, op):
-        MakeNode{op, [copyprop(sbst, x)]}
+        MakeObject{op, [copyprop(sbst, x)]}
     copyprop(sbst, x + y):  copyprop_binary(sbst, x, y, \Add)
     copyprop(sbst, x - y):  copyprop_binary(sbst, x, y, \Sub)
     copyprop(sbst, x * y):  copyprop_binary(sbst, x, y, \Mul)
@@ -122,7 +122,7 @@ module HIL {
     copyprop(sbst, x <= y): copyprop_binary(sbst, x, y, \LessEqual)
     copyprop(sbst, x >= y): copyprop_binary(sbst, x, y, \GreaterEqual)
     copyprop_binary(sbst, x, y, op):
-        MakeNode{op, [copyprop(sbst, x), copyprop(sbst, y)]}
+        MakeObject{op, [copyprop(sbst, x), copyprop(sbst, y)]}
     copyprop(sbst, x =  e): copyprop_assign(sbst, x, e, \Assign)
     copyprop(sbst, x += e): copyprop_assign(sbst, x, e, \AddAssign)
     copyprop(sbst, x -= e): copyprop_assign(sbst, x, e, \SubAssign)
@@ -130,7 +130,7 @@ module HIL {
     copyprop(sbst, x /= e): copyprop_assign(sbst, x, e, \DivAssign)
     copyprop(sbst, x %= e): copyprop_assign(sbst, x, e, \ModAssign)
     copyprop_assign(sbst, x, e, op):
-        MakeNode{op, [copyprop(sbst, x), copyprop(sbst, e)]}
+        MakeObject{op, [copyprop(sbst, x), copyprop(sbst, e)]}
 
     #=== linearization ===
     # linearize nested expressions.
@@ -176,7 +176,7 @@ module HIL {
     linearize_unary(e, op): {
         (stmt, t): linearize(e)
         v: newSymbol()
-        (`(!stmt; !v : !MakeNode{op, [t]}), v)
+        (`(!stmt; !v : !MakeObject{op, [t]}), v)
     }
 
     linearize(x + y):  linearize_binary(x, y, \Add)
@@ -195,7 +195,7 @@ module HIL {
         (stmt1, v1): linearize(e1)
         (stmt2, v2): linearize(e2)
         t: newSymbol()
-        (`(!stmt1; !stmt2; !t : !MakeNode{op, [v1, v2]}), t)
+        (`(!stmt1; !stmt2; !t : !MakeObject{op, [v1, v2]}), t)
     } 
 
     linearize(x  = e): linearize_assign(x, e, \Assign)
@@ -206,7 +206,7 @@ module HIL {
     linearize(x %= e): linearize_assign(x, e, \ModAssign)
     linearize_assign(x, e, op): {
         (stmt, t): linearize(e)
-        (`(!stmt; !MakeNode{op, [x, t]}), x)
+        (`(!stmt; !MakeObject{op, [x, t]}), x)
     }
 
     # linearization of conditional expressions
@@ -230,7 +230,7 @@ module HIL {
     linearize_cond_binary(e1, e2, op): {
         (stmt1, t1): linearize(e1)
         (stmt2, t2): linearize(e2)
-        (`(!stmt1; !stmt2), MakeNode{op, [t1, t2]})
+        (`(!stmt1; !stmt2), MakeObject{op, [t1, t2]})
     }
 
     #=== typing ===
@@ -325,7 +325,7 @@ module HIL {
     typing_assign(x, xty, e, ety, op): {
         insn: instruction_table[(op, xty, ety)]
         if (insn == undef) throw `UnknownAssignExpr{!op, !xty, !ety}
-        MakeNode{insn, [x, e]}
+        MakeObject{insn, [x, e]}
     }
 
     typing_expr(tmap, x @ Int):     (\Int, x)
@@ -344,7 +344,7 @@ module HIL {
     typing_unary(e, ty, op): {
         info: instruction_table[(op, ty)]
         if (info == undef) throw `UnknownUnaryExpr{!op, !ty}
-        (info[1], MakeNode{info[0], [e]})
+        (info[1], MakeObject{info[0], [e]})
     }
 
     typing_expr(tmap, x + y):  typing_binary_helper(tmap, x, y, \Add)
@@ -367,6 +367,6 @@ module HIL {
     typing_binary(e1, xty, e2, yty, op): {
         info: instruction_table[(op, xty, yty)]
         if (info == undef) throw `UnknownBinaryExpr{!op, !xty, !yty}
-        (info[1], MakeNode{info[0], [e1, e2]})
+        (info[1], MakeObject{info[0], [e1, e2]})
     }
 }

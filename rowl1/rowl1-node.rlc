@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2013-02-13 03:27:25 nineties $
+; $Id: rowl1-node.rlc 2013-02-13 11:58:33 nineties $
 ;
 
 (import "rlvm-compile")
@@ -23,12 +23,12 @@
 ; builtin expression headers and types
 (export var DontCare    (to_sym "_"))
 
-(export var Symbol      (to_builtin_sym "Symbol"))
-(export var Int         (to_builtin_sym "Int"))
-(export var BigInt      (to_builtin_sym "BigInt"))
-(export var Float       (to_builtin_sym "Float"))
-(export var String      (to_builtin_sym "String"))
-(export var Loc         (to_builtin_sym "Loc"))
+(export var Symbol      (to_sym "Symbol"))
+(export var Int         (to_sym "Int"))
+(export var BigInt      (to_sym "BigInt"))
+(export var Float       (to_sym "Float"))
+(export var String      (to_sym "String"))
+(export var Loc         (to_sym "Loc"))
 (export var Float       (to_sym "Float"))
 (export var List        (to_sym "List"))
 (export var Array       (to_sym "Array"))
@@ -63,7 +63,7 @@
 (export var Equal       (to_sym "Equal"))
 (export var NotEqual    (to_sym "NotEqual"))
 
-(export var MakeNode  (to_sym "MakeNode"))
+(export var MakeObject  (to_sym "MakeObject"))
 
 (export var FieldRef  (to_sym "%FieldRef")) ; only for internal use
 
@@ -443,20 +443,20 @@
     (array_set object expr (+ idx 1) val)
     ))
 
-(export fun make_node0 (head) (
+(export fun make_object0 (head) (
     (var e (allocate_expr 0))
     (field_set e 0 head)
     (return e)
     ))
 
-(export fun make_node1 (head a) (
+(export fun make_object1 (head a) (
     (var e (allocate_expr 1))
     (field_set e 0 head)
     (field_set e 1 a)
     (return e)
     ))
 
-(export fun make_node2 (head a b) (
+(export fun make_object2 (head a b) (
     (var e (allocate_expr 2))
     (field_set e 0 head)
     (field_set e 1 a)
@@ -464,7 +464,7 @@
     (return e)
     ))
 
-(export fun make_node3 (head a b c) (
+(export fun make_object3 (head a b c) (
     (var e (allocate_expr 3))
     (field_set e 0 head)
     (field_set e 1 a)
@@ -473,7 +473,7 @@
     (return e)
     ))
 
-(export fun make_node4 (head a b c d) (
+(export fun make_object4 (head a b c d) (
     (var e (allocate_expr 4))
     (field_set e 0 head)
     (field_set e 1 a)
@@ -486,16 +486,16 @@
 (extern fun list_to_tuple)
 (extern fun list_to_ary)
 (extern fun list_to_table)
-(export fun make_node (head args) (
+(export fun make_object (head args) (
     (if (!= (node_type head) @SymbolE)
-        (throw (exception current_loc (string "the 1st argument of MakeNode must be a Symbol")))
+        (throw (exception current_loc (string "the 1st argument of MakeObject must be a Symbol")))
         )
     (if (!= (node_type args) @ListE)
-        (throw (exception current_loc (string "the 2nd argument of MakeNode must be a List")))
+        (throw (exception current_loc (string "the 2nd argument of MakeObject must be a List")))
         )
 
     (if (is_builtin_sym head)
-        (throw (make_node Exception (list2
+        (throw (make_object Exception (list2
             (string "Can not create builtin object")
             head)))
         )
@@ -517,72 +517,72 @@
     ))
 
 (export fun qualified (outer inner) (
-    (return (make_node2 Qualified (to_sym outer) inner))
+    (return (make_object2 Qualified (to_sym outer) inner))
     ))
 
 (export fun located (loc expr) (
-    (return (make_node2 Located loc expr))
+    (return (make_object2 Located loc expr))
     ))
 
 (export fun quote (expr) (
-    (return (make_node1 Quote expr))
+    (return (make_object1 Quote expr))
     ))
 
 (export fun qquote (expr) (
-    (return (make_node1 QuasiQuote expr))
+    (return (make_object1 QuasiQuote expr))
     ))
 
 (export fun unquote (expr) (
-    (return (make_node1 Unquote expr))
+    (return (make_object1 Unquote expr))
     ))
 
 (export fun dynamic (sym) (
-    (return (make_node1 Dynamic sym))
+    (return (make_object1 Dynamic sym))
     ))
 
 (export fun ifelse (cnd then else) (
-    (return (make_node3 IfElse cnd then else))
+    (return (make_object3 IfElse cnd then else))
 	))
 
 (export fun mkif (cnd then) (
-    (return (make_node2 If cnd then))
+    (return (make_object2 If cnd then))
 	))
 
 (export fun apply (fun args) (
-    (return (make_node2 Apply fun args))
+    (return (make_object2 Apply fun args))
     ))
 
 (export fun block (stmts) (
-    (return (make_node1 Block stmts))
+    (return (make_object1 Block stmts))
     ))
 
 (export fun seq (stmts) (
-    (return (make_node1 Seq stmts))
+    (return (make_object1 Seq stmts))
     ))
 
 (export fun breakable (stmts) (
-    (return (make_node1 Breakable stmts))
+    (return (make_object1 Breakable stmts))
     ))
 
 (export fun lambda (args body) (
-    (return (make_node2 Lambda args body))
+    (return (make_object2 Lambda args body))
     ))
 
 (export fun assign (v arg) (
-    (return (make_node2 Assign v arg))
+    (return (make_object2 Assign v arg))
     ))
 
 (export fun mkreturn (v) (
-    (return (make_node1 Return v))
+    (return (make_object1 Return v))
     ))
 
 (export fun defvar (v arg) (
-    (return (make_node2 DefVariable v arg))
+    (return (make_object2 DefVariable v arg))
     ))
 
 ; patterns
 (export fun domainP (sym) (
-    (return (make_node2 Domain DontCare sym))
+    (return (make_object2 Domain DontCare sym))
     ))
 
 (export fun output_symbol (ochan sym) (
@@ -606,7 +606,7 @@
 (export var tableT     (domainP Table))
 (export var tupleT     (domainP Tuple))
 (export var funT       (domainP Function))
-(export var irangeT    (make_node2 Range intT intT))
+(export var irangeT    (make_object2 Range intT intT))
 
 ; printing functions
 (fun output_ordinal (ochan idx) (

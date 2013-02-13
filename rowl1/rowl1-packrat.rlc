@@ -913,7 +913,7 @@
     (parse_char p '}')
     @(CHECK p)
 
-    (parsed p (make_node hd (list_reverse args)))
+    (parsed p (make_object hd (list_reverse args)))
     ))
 @(MEMOIZE node)
 
@@ -967,7 +967,7 @@
     (parse_spaces p)
     (parse_char p '{')
     @(CHECK p)
-    (return (parsed p (make_node1 BeginModule mod)))
+    (return (parsed p (make_object1 BeginModule mod)))
     ))
 
 (fun parse_toplevel_statement (p) (
@@ -983,7 +983,7 @@
     (set_parser_state_all p state)
     (parse_char p '}')
     @(CHECK p)
-    (parsed p (make_node0 EndModule))
+    (parsed p (make_object0 EndModule))
     ))
 
 (export fun parse_statements (p) (
@@ -1086,7 +1086,7 @@
     ))
 
 (var PVar (to_sym "parser")) ; internal use
-(fun make_nodevar (idx) (
+(fun make_objectvar (idx) (
     (return (to_sym (strcat "node" (itos idx))))
     ))
 
@@ -1109,15 +1109,15 @@
     ))
 
 (fun get_token () (
-    (return (make_node2 FieldRef PVar (box 2)))
+    (return (make_object2 FieldRef PVar (box 2)))
     ))
 
 (fun test_parsed () (
-    (return (make_node2 FieldRef PVar (box 1)))
+    (return (make_object2 FieldRef PVar (box 1)))
     ))
 
 (fun test_noparse () (
-    (return (make_node1 Not (test_parsed)))
+    (return (make_object1 Not (test_parsed)))
     ))
 
 (fun parse_with_check (p ws) (
@@ -1326,7 +1326,7 @@
     (while elems (do
         (= body (cons (compile_parser_element (car elems) ws) body))
         (= ws @TRUE)
-        (= body (cons (mkif (test_noparse) (make_node0 Break)) body))
+        (= body (cons (mkif (test_noparse) (make_object0 Break)) body))
         (= body (cons (assign ret (apply (to_sym "%cons") (list2 (get_token) ret))) body))
         (= elems (cdr elems))
         ))
@@ -1363,7 +1363,7 @@
 
     (for i 0 (node_size ps) (do
         (= body (cons (compile_parser_element (node_arg ps i) ws) body))
-        (= body (cons (mkif (test_parsed) (make_node0 Break)) body))
+        (= body (cons (mkif (test_parsed) (make_object0 Break)) body))
         (= body (cons (apply (to_sym "%join_error_state") (list2 error PVar)) body))
         (= body (cons (gen_set_parser_state_all PVar state) body))
         ))
@@ -1398,7 +1398,7 @@
     (var loop_body 0)
     (= loop_body (cons (gen_set_parser_state_all state PVar) loop_body))
     (= loop_body (cons (compile_parser_element elem @TRUE) loop_body))
-    (= loop_body (cons (mkif (test_noparse) (make_node0 Break)) loop_body))
+    (= loop_body (cons (mkif (test_noparse) (make_object0 Break)) loop_body))
     (= loop_body (cons (assign elems (apply (to_sym "%cons") (list2 (get_token) elems))) loop_body))
 
     (var body 0)
@@ -1412,7 +1412,7 @@
             ))
         (block (list4
             (assign elems (apply (to_sym "%cons") (list2 (get_token) elems)))
-            (make_node2 While @C_TRUE (block (list_reverse loop_body)))
+            (make_object2 While @C_TRUE (block (list_reverse loop_body)))
             (gen_set_parser_state_all PVar state)
             (set_parsed (apply (to_sym "%reverse") (list1 elems)))
             ))
@@ -1442,7 +1442,7 @@
 
     (var loop_body 0)
     (= loop_body (cons (compile_parser_element elem @TRUE) loop_body))
-    (= loop_body (cons (mkif (test_noparse) (make_node0 Break)) loop_body))
+    (= loop_body (cons (mkif (test_noparse) (make_object0 Break)) loop_body))
     (= loop_body (cons (assign elems (apply (to_sym "%cons") (list2 (get_token) elems))) loop_body))
     (= loop_body (cons (gen_set_parser_state_all state PVar) loop_body))
 
@@ -1452,7 +1452,7 @@
     (= body (cons (mkif (test_parsed) (block (list5
         (assign elems (apply (to_sym "%cons") (list2 (get_token) elems)))
         (defvar state (gen_copy_parser_state PVar))
-        (make_node2 While @C_TRUE (block (list_reverse loop_body)))
+        (make_object2 While @C_TRUE (block (list_reverse loop_body)))
         (gen_set_parser_state_all PVar state)
         (set_parsed (apply (to_sym "%reverse") (list1 elems)))
         ))) body))
@@ -1498,14 +1498,14 @@
         (= loop_body (cons (gen_parse_spaces) loop_body))
         )
     (= loop_body (cons (mkif 
-            (make_node2 NotEqual
+            (make_object2 NotEqual
                 (apply (to_sym "%get_column") (list1 PVar))
                 clmn
                 )
-            (make_node0 Break)) loop_body))
+            (make_object0 Break)) loop_body))
     (= loop_body (cons (apply (to_sym "%set_newline") (list1 PVar)) loop_body))
     (= loop_body (cons (compile_parser_element elem @FALSE) loop_body))
-    (= loop_body (cons (mkif (test_noparse) (make_node0 Break)) loop_body))
+    (= loop_body (cons (mkif (test_noparse) (make_object0 Break)) loop_body))
 
     (var body 0)
     (= body (cons (defvar state (gen_copy_parser_state PVar)) body))
@@ -1524,10 +1524,10 @@
                 (gen_set_parser_state_all PVar state)
                 (apply (to_sym "%set_indent") (list2 PVar indent_save))
                 (set_parsed 0)
-                (make_node0 Break)
+                (make_object0 Break)
             )))
         body))
-    (= body (cons (make_node2 While @C_TRUE
+    (= body (cons (make_object2 While @C_TRUE
             (block (list_reverse loop_body))) body))
     (= body (cons (gen_set_parser_state_all PVar state) body))
     (= body (cons (apply (to_sym "%set_indent") (list2 PVar indent_save)) body))
@@ -1564,9 +1564,9 @@
     (var loop_body 0)
     (= loop_body (cons (gen_set_parser_state_all state PVar) loop_body))
     (= loop_body (cons (compile_parser_element delim @TRUE) loop_body))
-    (= loop_body (cons (mkif (test_noparse) (make_node0 Break)) loop_body))
+    (= loop_body (cons (mkif (test_noparse) (make_object0 Break)) loop_body))
     (= loop_body (cons (compile_parser_element p @TRUE) loop_body))
-    (= loop_body (cons (mkif (test_noparse) (make_node0 Break)) loop_body))
+    (= loop_body (cons (mkif (test_noparse) (make_object0 Break)) loop_body))
     (= loop_body (cons (assign elems (apply (to_sym "%cons") (list2 (get_token) elems))) loop_body))
 
     (var body 0)
@@ -1580,7 +1580,7 @@
             ))
         (block (list4
             (assign elems (apply (to_sym "%cons") (list2 (get_token) elems)))
-            (make_node2 While @C_TRUE (block (list_reverse loop_body)))
+            (make_object2 While @C_TRUE (block (list_reverse loop_body)))
             (gen_set_parser_state_all PVar state)
             (set_parsed (apply (to_sym "%reverse") (list1 elems)))
             ))) body))
@@ -1594,9 +1594,9 @@
     (var loop_body 0)
     (= loop_body (cons (gen_set_parser_state_all state PVar) loop_body))
     (= loop_body (cons (compile_parser_element delim @TRUE) loop_body))
-    (= loop_body (cons (mkif (test_noparse) (make_node0 Break)) loop_body))
+    (= loop_body (cons (mkif (test_noparse) (make_object0 Break)) loop_body))
     (= loop_body (cons (compile_parser_element p @TRUE) loop_body))
-    (= loop_body (cons (mkif (test_noparse) (make_node0 Break)) loop_body))
+    (= loop_body (cons (mkif (test_noparse) (make_object0 Break)) loop_body))
     (= loop_body (cons (assign elems (apply (to_sym "%cons") (list2 (get_token) elems))) loop_body))
 
     (var body 0)
@@ -1605,11 +1605,11 @@
     (= body (cons (compile_parser_element p ws) body))
     (= body (cons (mkif (test_noparse) (block (list2
         (set_noparse (string "The number of elements is insufficient"))
-        (make_node0 Break)
+        (make_object0 Break)
         ))) body))
 
     (= body (cons (assign elems (apply (to_sym "%cons") (list2 (get_token) elems))) body))
-    (= body (cons (make_node2 While @C_TRUE
+    (= body (cons (make_object2 While @C_TRUE
         (block (list_reverse loop_body))) body))
     (= body (cons (gen_set_parser_state_all PVar state) body))
     (= body (cons (mkif
@@ -1617,7 +1617,7 @@
             (list2 (apply (to_sym "%length") (list1 elems))
                 (box minlen))) (block (list2
         (set_noparse (string "The number of elements is insufficient"))
-        (make_node0 Break)
+        (make_object0 Break)
         ))) body))
 
     (= body (cons (set_parsed (apply (to_sym "%reverse") (list1 elems))) body))
@@ -1666,7 +1666,7 @@
     (var mod current_mod)
     (set_current_module (super_module current_mod))
     (if @(PARSED p)
-        (parsed p (make_node2 Scoped mod @(TOKEN p)))
+        (parsed p (make_object2 Scoped mod @(TOKEN p)))
         )
     ))
 
@@ -1701,7 +1701,7 @@
                 (gen_set_parser_state_all PVar state)
                 (set_parsed @C_NIL)
                 ))
-            (set_parsed (qquote (make_node1 Some (unquote (get_token)))))
+            (set_parsed (qquote (make_object1 Some (unquote (get_token)))))
             ))))
     ))
 
@@ -1750,13 +1750,13 @@
 
     (var with_spaces @FALSE)
     (while elems (do
-        (var ndvar (make_nodevar idx))
+        (var ndvar (make_objectvar idx))
         (= body (cons (compile_parser_element (car elems) with_spaces)
             body))
 
         (if (! nospace_p) (= with_spaces @TRUE))
 
-        (= body (cons (mkif (test_noparse) (make_node0 Break)) body))
+        (= body (cons (mkif (test_noparse) (make_object0 Break)) body))
         (= body (cons (defvar ndvar (get_token)) body))
         (incr idx)
         (= elems (cdr elems))
@@ -1832,7 +1832,7 @@
 
         (var act (compile_parser_action (node_arg t 0) (node_arg t 1)))
         (= body (cons act body))
-        (= body (cons (mkif (test_parsed) (make_node0 Break)) body))
+        (= body (cons (mkif (test_parsed) (make_object0 Break)) body))
         (= body (cons (apply (to_sym "%join_error_state") (list2 error PVar)) body))
         (= body (cons (gen_set_parser_state_all PVar state) body))
         (= elems (cdr elems))
@@ -1901,8 +1901,8 @@
     ))
 
 (fun compile_parser_driver (sym sym_) (
-    (return (make_node2 DefFunction sym
-        (lambda (make_node2 Domain PVar Parser)
+    (return (make_object2 DefFunction sym
+        (lambda (make_object2 Domain PVar Parser)
         (apply (to_sym "%call_parser") (list3 PVar (quote sym) sym_))
         )))
     ))
@@ -1916,10 +1916,10 @@
             (var new_parser (compile_parser parser_sym_ elems))
             (var stmts (list3
                 ; save existing parser
-                (make_node2 DefFunction copy_sym parser_sym_)
-                (make_node2 DefFunction parser_sym_
+                (make_object2 DefFunction copy_sym parser_sym_)
+                (make_object2 DefFunction parser_sym_
                     (lambda
-                        (make_node2 Domain PVar Parser)
+                        (make_object2 Domain PVar Parser)
                         (bind_parser copy_sym new_parser))
                     )
                 (compile_parser_driver parser_sym parser_sym_)
@@ -1929,9 +1929,9 @@
         (do
             (var new_parser (compile_parser parser_sym_ elems))
             (var stmts (list2
-                (make_node2 DefFunction parser_sym_
+                (make_object2 DefFunction parser_sym_
                     (lambda
-                        (make_node2 Domain PVar Parser)
+                        (make_object2 Domain PVar Parser)
                         new_parser)
                     )
                 (compile_parser_driver parser_sym parser_sym_)

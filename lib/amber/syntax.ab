@@ -67,7 +67,7 @@ DefineSyntax{
         Tuple{List{primary_syntax_element, "+"},
             QuasiQuote{Many1{Unquote{node0}}}},
         Tuple{List{Delimited2{primary_syntax_element, "/"}},
-            MakeNode{Quote{Choice}, node0}},
+            MakeObject{Quote{Choice}, node0}},
         Tuple{List{"&", primary_syntax_element},
             QuasiQuote{And{Unquote{node1}}}},
         Tuple{List{"!", primary_syntax_element},
@@ -160,7 +160,7 @@ DefineSyntax{
 ## Expressions
 qualified_symbol
     ::= qualified_symbol "::" symbol
-        { MakeNode{Quote{Qualified}, List{node0, node2}} }
+        { MakeObject{Quote{Qualified}, List{node0, node2}} }
       | symbol
 
 block_body ::= aligned(located(statement))
@@ -170,7 +170,7 @@ primary_block
         # Block with module imports
 
       | [multiline] "seq" "{" aligned(located(statement)) "}"
-        { MakeNode{Quote{Seq}, List{node2}} }
+        { MakeObject{Quote{Seq}, List{node2}} }
 
       | [multiline] "(" qualified_symbol ")" "{" scoped(node1, block_body) "}"
         { node4 }
@@ -190,7 +190,7 @@ primary_expr
 
       # Tuple literal
       | [multiline] "(" delimited2(expr, ",") ")"
-        { MakeNode{Quote{Tuple}, node1} }
+        { MakeObject{Quote{Tuple}, node1} }
 
       | qualified_symbol
       | atom
@@ -199,27 +199,27 @@ primary_expr
 postfix_expr
         # Function Application
     ::= postfix_expr "(" delimited(expr, ",") ")"
-        { MakeNode{Quote{Apply}, List{node0, node2}} }
+        { MakeObject{Quote{Apply}, List{node0, node2}} }
 
         # Subscription
       | postfix_expr "[" delimited(expr, ",") "]"
-        { MakeNode{Quote{Subscript}, List{node0, node2}} }
+        { MakeObject{Quote{Subscript}, List{node0, node2}} }
 
       | # Ellipsis Pattern
         postfix_expr "..."
-        { MakeNode{Quote{Ellipsis}, List{node0}} }
+        { MakeObject{Quote{Ellipsis}, List{node0}} }
 
         # Domain Pattern
       | primary_expr "@" postfix_expr
-        { MakeNode{Quote{Domain}, List{node0, node2}} }
+        { MakeObject{Quote{Domain}, List{node0, node2}} }
 
       | postfix_expr "." symbol "(" delimited(expr, ",") ")"
-        { MakeNode{Quote{Slot}, List{node0, node2, node4}} }
+        { MakeObject{Quote{Slot}, List{node0, node2, node4}} }
       | postfix_expr "." symbol
-        { MakeNode{Quote{Slot}, List{node0, node2}} }
+        { MakeObject{Quote{Slot}, List{node0, node2}} }
 
       | primary_expr "^" postfix_expr
-        { MakeNode{Quote{Power}, List{node0, node2}} }
+        { MakeObject{Quote{Power}, List{node0, node2}} }
 
       | node
 
@@ -227,11 +227,11 @@ postfix_expr
 
 quote_expr
     ::= "\\" quote_expr
-        { MakeNode{Quote{Quote}, List{node1}} }
+        { MakeObject{Quote{Quote}, List{node1}} }
       | "`"  quote_expr
-        { MakeNode{Quote{QuasiQuote}, List{node1}} }
+        { MakeObject{Quote{QuasiQuote}, List{node1}} }
       | "!"  quote_expr
-        { MakeNode{Quote{Unquote}, List{node1}} }
+        { MakeObject{Quote{Unquote}, List{node1}} }
       | postfix_expr
 
 pattern ::= quote_expr
@@ -246,7 +246,7 @@ prefix_expr
       | "not" quote_expr        { `Not{!node1} }
 
       | [multiline] "make" symbol "{" delimited(expr, ",") "}"
-        { `MakeNode{\!node1, !node3} }
+        { `MakeObject{\!node1, !node3} }
 
       | quote_expr
 

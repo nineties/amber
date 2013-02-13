@@ -1,6 +1,6 @@
 # Copyright (C) 2013 nineties
 #
-# $Id: oop.ab 2013-02-06 12:11:42 nineties $
+# $Id: oop.ab 2013-02-13 12:07:41 nineties $
 
 # Prototype-based Object-Oriented Programming
 
@@ -11,15 +11,15 @@ module std {
           | [multiline] "{" aligned(object_slot) "}"        { $1 }
 
     object_creation
-        ::= [multiline] "make" symbol object_slots { `MakeObject{!$1, !$2} }
+        ::= [multiline] "make" symbol object_slots { `MakeSlots{!$1, !$2} }
 
     prefix_expr ::= object_creation
 
-    MakeObject{head, fields} => {
+    MakeSlots{head, fields} => {
         obj: gensym()
         inits: map(fields, ((x,v)) -> `set_slot(!obj, \!x, !v))
         `{
-            DefineVariable{!obj, MakeNode{\!head, []}}
+            DefineVariable{!obj, MakeObject{\!head, []}}
             Seq{!inits}
             !obj
         }
