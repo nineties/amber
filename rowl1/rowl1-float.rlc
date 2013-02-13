@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-float.rlc 2013-02-08 11:47:55 nineties $
+; $Id: rowl1-float.rlc 2013-02-14 05:59:07 nineties $
 ;
 
 (import "rlvm-compile")
@@ -236,8 +236,8 @@
     (if (== e 1024)
         (if (&& (== f1 0) (== f0 0))
             (if s
-                (return (string "-Infinity"))
-                (return (string "Infinity"))
+                (return (string "-infinity"))
+                (return (string "infinity"))
                 )
             (return (string "NaN"))
             )
@@ -426,11 +426,15 @@
             ))
     ))
 
+(export fun float_infinity () (
+    (return (fdiv (itof 1) (itof 0)))
+    ))
+
 (fun float_uplus (f) (
     (return f)
     ))
 
-(fun float_uminus (f) (
+(export fun float_uminus (f) (
     (return (f- (copy_float f)))
     ))
 
@@ -504,6 +508,8 @@
 (fun fi_coerce (a b) ((return (list2 a (itof (unbox b))))))
 
 (export fun setup_float (std) (
+    (add_module_variable std (to_sym "infinity") @C_FALSE (float_infinity))
+
     (add_function1 std (to_sym "uplus") floatT float_uplus 0)
     (add_function1 std (to_sym "uminus") floatT float_uminus 0)
     (add_function1 std (to_sym "to_s") floatT float_to_s 0)

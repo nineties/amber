@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-bigint.rlc 2013-01-25 00:31:51 nineties $
+; $Id: rowl1-bigint.rlc 2013-02-14 05:58:23 nineties $
 ;
 
 (import "rlvm-compile")
@@ -650,8 +650,15 @@
 (fun fb_coerce (a b) ((return (list2 a (bint_to_f b)))))
 (fun bf_coerce (a b) ((return (list2 (bint_to_f a) b))))
 
+(extern fun float_infinity)
+(extern fun float_uminus)
+
 (export fun setup_bigint (std) (
     (var mod (find_module no_loc std (to_sym "bigint") @TRUE))
+
+    (add_module_variable mod (to_sym "INTEGER_MIN") @C_FALSE (float_uminus (float_infinity)))
+    (add_module_variable mod (to_sym "INTEGER_MAX") @C_FALSE (float_infinity))
+
     (add_function1 mod (to_sym "uplus") bintT bint_uplus 0)
     (add_function1 mod (to_sym "uminus") bintT bint_uminus 0)
     (add_function1 mod (to_sym "to_s") bintT bint_to_s 0)

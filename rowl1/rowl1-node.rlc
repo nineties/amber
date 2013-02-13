@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2013-02-14 02:32:12 nineties $
+; $Id: rowl1-node.rlc 2013-02-14 04:14:41 nineties $
 ;
 
 (import "rlvm-compile")
@@ -376,7 +376,7 @@
 (extern fun tuple_to_list)
 (extern fun ary_to_list)
 (export fun node_args (expr) (
-    (if (is_atom expr) (return (list1 expr)))
+    (if (is_atom expr) (return 0))
     (if (is_list expr) (return expr))
     (if (is_tuple expr) (return (tuple_to_list expr)))
     (if (is_array expr) (return (ary_to_list expr)))
@@ -391,10 +391,8 @@
 (extern fun array_restof)
 (export fun node_restof (expr i) (
     (if (is_atom expr)
-        (if (== i 0)
-            (return (list1 expr))
-            (throw (out_of_range current_loc expr (box i)))
-            )) 
+        (throw (out_of_range current_loc expr (box i)))
+        )
     (if (is_list expr) (do
         (for j 0 i (= expr (cdr expr)))
         (return expr)
@@ -412,11 +410,9 @@
 (extern fun tuple_at)
 (extern fun array_at)
 (export fun node_arg (expr idx) (
-    (if (is_atom expr) (do
-        (if (> idx 0)
-            (throw (out_of_range current_loc expr (box idx))))
-        (return expr)
-        ))
+    (if (is_atom expr) 
+        (throw (out_of_range current_loc expr (box idx)))
+        )
     (if (is_list expr)  (return (list_at_check expr idx)))
     (if (is_tuple expr) (return (tuple_at expr idx)))
     (if (is_array expr) (return (array_at expr idx)))
@@ -525,16 +521,6 @@
             (string "Can not create builtin object")
             head)))
         )
-
-    ; translate builtin objects
-    (if (&& args (! (cdr args))) (do
-        (if (== head Int) (do
-            (if (|| (is_int (car args)) (is_bigint (car args))) (return (car args)))
-            ))
-        (if (&& (== head String) (is_string (car args))) (return (car args)))
-        (if (&& (== head Symbol) (is_symbol (car args))) (return (car args)))
-        (if (&& (== head Float) (is_float (car args))) (return (car args)))
-        ))
 
     ; following three objects uses special data structure
     (if (== head List)  (return args))
