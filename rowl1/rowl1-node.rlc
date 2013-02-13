@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2013-02-13 11:58:33 nineties $
+; $Id: rowl1-node.rlc 2013-02-13 23:54:54 nineties $
 ;
 
 (import "rlvm-compile")
@@ -25,18 +25,15 @@
 
 (export var Symbol      (to_sym "Symbol"))
 (export var Int         (to_sym "Int"))
-(export var BigInt      (to_sym "BigInt"))
 (export var Float       (to_sym "Float"))
 (export var String      (to_sym "String"))
 (export var Loc         (to_sym "Loc"))
-(export var Float       (to_sym "Float"))
 (export var List        (to_sym "List"))
 (export var Array       (to_sym "Array"))
 (export var Table       (to_sym "Table"))
 (export var Tuple       (to_sym "Tuple"))
 (export var Range       (to_sym "Range"))
 
-(export var Struct      (to_sym "Struct"))
 (export var Slot        (to_sym "Slot"))
 
 (export var Block       (to_sym "Block"))
@@ -135,6 +132,14 @@
 (export var ArrayAt        (to_sym "%ArrayAt"))
 (export var RestOf         (to_sym "%RestOf"))
 
+; Builtin headers
+(export var BSymbol (to_builtin_sym "%Symbol"))
+(export var BInt    (to_builtin_sym "%Int"))
+(export var BString (to_builtin_sym "%String"))
+(export var BBigInt (to_builtin_sym "%BigInt"))
+(export var BFloat  (to_builtin_sym "%Float"))
+(export var BTable  (to_builtin_sym "%BTable"))
+
 (extern fun exception)
 (extern fun out_of_range)
 (extern fun type_error)
@@ -193,7 +198,7 @@
     (return (to_sym (strcat name (itos symbol_index_gen))))
     ))
 
-(fun is_builtin_sym (sym) (
+(export fun is_builtin_sym (sym) (
     (if (< (field_get sym 2) 0)
         (return @TRUE)
         (return @FALSE)
@@ -234,8 +239,14 @@
 (export fun is_int (obj) (
     (if (& obj 1) (return @TRUE) (return @FALSE))
     ))
+(export fun is_bigint (obj) (
+    (if (== (node_type obj) @BigIntE) (return @TRUE) (return @FALSE))
+    ))
 (export fun is_string (obj) (
     (if (== (node_type obj) @StringE) (return @TRUE) (return @FALSE))
+    ))
+(export fun is_float (obj) (
+    (if (== (node_type obj) @FloatE) (return @TRUE) (return @FALSE))
     ))
 (export fun is_list (obj) (
     (if (== (node_type obj) @ListE) (return @TRUE) (return @FALSE))
@@ -254,7 +265,7 @@
     ))
 
 (fun is_atom_type (ty) (
-    (if (|| (== ty @ExprE) (|| (== ty @ListE) (|| (== ty @TupleE) (|| (== ty @ArrayE) (== ty @TableE)))))
+    (if (|| (== ty @ExprE) (|| (== ty @ListE) (|| (== ty @TupleE) (== ty @ArrayE))))
         (return @FALSE)
         (return @TRUE)
         )
@@ -316,7 +327,7 @@
         (@ModuleE           . (return Module))
         (@ParserE           . (return Parser))
         (@StringIOE         . (return StringIO))
-        (@BigIntE           . (return BigInt))
+        (@BigIntE           . (return Int))
         (@LocE              . (return Loc))
         (@TupleE            . (return Tuple))
         (@IntE              . (return Int))
@@ -327,27 +338,51 @@
         ))
     ))
 
+(export fun node_bhead (node) (
+    (tswitch (node_type node) (
+        (@SymbolE           . (return BSymbol))
+        (@ExprE             . (return (field_get node 0)))
+        (@ListE             . (return List))
+        (@ArrayE            . (return Array))
+        (@TableE            . (return BTable))
+        (@AssemblerE        . (return Assembler))
+        (@BytecodeE         . (return Bytecode))
+        (@FunctionE         . (return Function))
+        (@BoundFunctionE    . (return Function))
+        (@InputFileStreamE  . (return InputFileStream))
+        (@OutputFileStreamE . (return OutputFileStream))
+        (@ModuleE           . (return Module))
+        (@ParserE           . (return Parser))
+        (@StringIOE         . (return StringIO))
+        (@BigIntE           . (return BBigInt))
+        (@LocE              . (return Loc))
+        (@TupleE            . (return Tuple))
+        (@IntE              . (return BInt))
+        (@StringE           . (return BString))
+        (@FloatE            . (return BFloat))
+        (@BuiltinE          . (return Builtin))
+        (default            . (not_reachable "node_head"))
+        ))
+    ))
+
 ; number of arguments
 (extern fun array_size)
 (extern fun table_size)
 (export fun node_size (expr) (
-    (if (is_atom expr) (return 0))
+    (if (is_atom expr) (return 1))
     (if (is_list expr) (return (list_len expr)))
     (if (is_tuple expr) (return (seq_size expr)))
     (if (is_array expr) (return (array_size expr)))
-    (if (is_table expr) (return (table_size expr)))
     (return (expr_size expr))
     ))
 
 (extern fun tuple_to_list)
 (extern fun ary_to_list)
-(extern fun table_to_list)
 (export fun node_args (expr) (
     (if (is_atom expr) (return (list1 expr)))
     (if (is_list expr) (return expr))
     (if (is_tuple expr) (return (tuple_to_list expr)))
     (if (is_array expr) (return (ary_to_list expr)))
-    (if (is_table expr) (return (table_to_list expr)))
     (var args 0)
     (rfor i 0 (node_size expr)
         (= args (cons (node_arg expr i) args))
@@ -357,11 +392,10 @@
 
 (extern fun tuple_restof)
 (extern fun array_restof)
-(extern fun table_restof)
 (export fun node_restof (expr i) (
     (if (is_atom expr)
         (if (== i 0)
-            (return 0)
+            (return (list1 expr))
             (throw (out_of_range current_loc expr (box i)))
             )) 
     (if (is_list expr) (do
@@ -370,7 +404,6 @@
         ))
     (if (is_tuple expr) (return (tuple_restof expr i)))
     (if (is_array expr) (return (array_restof expr i)))
-    (if (is_table expr) (return (table_restof expr i)))
     (var args 0)
     (rfor j i (node_size expr)
         (= args (cons (node_arg expr j) args))
@@ -382,13 +415,14 @@
 (extern fun tuple_at)
 (extern fun array_at)
 (export fun node_arg (expr idx) (
-    (if (is_atom expr)
-        (throw (invalid_argument current_loc
-        (string "Can't access fields of atoms") expr)))
+    (if (is_atom expr) (do
+        (if (> idx 0)
+            (throw (out_of_range current_loc expr (box idx))))
+        (return expr)
+        ))
     (if (is_list expr)  (return (list_at_check expr idx)))
     (if (is_tuple expr) (return (tuple_at expr idx)))
     (if (is_array expr) (return (array_at expr idx)))
-    (if (is_table expr) (return (list_at_check (table_to_list expr) idx)))
 
     (if (>= idx (expr_size expr))
         (throw (out_of_range current_loc expr (box idx))))
@@ -430,14 +464,10 @@
 (export fun node_arg_set (expr idx val) (
     (if (is_atom expr)
         (throw (invalid_argument current_loc
-        (string "Can't access fields of builtin object") expr)))
+        (string "Can't rewrite fields of builtin object") expr)))
     (if (is_list expr)  (return (list_store_check expr idx val)))
     (if (is_tuple expr) (return (tuple_store expr idx val)))
     (if (is_array expr) (return (array_store expr idx val)))
-    (if (is_table expr) (do
-        (throw (invalid_argument current_loc
-        (string "Can't access entries of table directly") expr))
-        ))
     (var n (expr_size expr))
     (if (>= idx n) (throw (out_of_range current_loc expr (box idx))))
     (array_set object expr (+ idx 1) val)
@@ -485,7 +515,6 @@
 
 (extern fun list_to_tuple)
 (extern fun list_to_ary)
-(extern fun list_to_table)
 (export fun make_object (head args) (
     (if (!= (node_type head) @SymbolE)
         (throw (exception current_loc (string "the 1st argument of MakeObject must be a Symbol")))
@@ -500,11 +529,20 @@
             head)))
         )
 
+    ; translate builtin objects
+    (if (&& args (! (cdr args))) (do
+        (if (== head Int) (do
+            (if (|| (is_int (car args)) (is_bigint (car args))) (return (car args)))
+            ))
+        (if (&& (== head String) (is_string (car args))) (return (car args)))
+        (if (&& (== head Symbol) (is_symbol (car args))) (return (car args)))
+        (if (&& (== head Float) (is_float (car args))) (return (car args)))
+        ))
+
     ; following three objects uses special data structure
     (if (== head List)  (return args))
     (if (== head Tuple) (return (list_to_tuple args)))
     (if (== head Array) (return (list_to_ary args)))
-    (if (== head Table) (return (list_to_table args)))
 
     (var size (list_len args))
     (var expr (allocate_expr size))
@@ -596,14 +634,14 @@
     ))
 
 ; types
-(export var symT       (domainP Symbol))
-(export var stringT    (domainP String))
-(export var intT       (domainP Int))
-(export var bintT      (domainP BigInt))
-(export var floatT     (domainP Float))
+(export var symT       (domainP BSymbol))
+(export var stringT    (domainP BString))
+(export var intT       (domainP BInt))
+(export var bintT      (domainP BBigInt))
+(export var floatT     (domainP BFloat))
 (export var listT      (domainP List))
 (export var arrayT     (domainP Array))
-(export var tableT     (domainP Table))
+(export var tableT     (domainP BTable))
 (export var tupleT     (domainP Tuple))
 (export var funT       (domainP Function))
 (export var irangeT    (make_object2 Range intT intT))

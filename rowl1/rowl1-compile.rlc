@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2013-02-13 03:27:55 nineties $
+; $Id: rowl1-compile.rlc 2013-02-13 23:55:14 nineties $
 ;
 
 (import "rlvm-compile")
@@ -45,7 +45,7 @@
 (fun defined_symbol (expr) (
     (var lhs (node_arg expr 0))
     (if (is_symbol lhs) (return lhs))
-    (var hd (node_head lhs))
+    (var hd (node_bhead lhs))
     (if (== hd Ref) (return (node_arg lhs 2)))
     (return @C_NIL)
     ))
@@ -67,7 +67,7 @@
         (lfor v node (= arg (iter_args f v arg level)))
         (return arg)
         ))
-    (var hd (node_head node))
+    (var hd (node_bhead node))
     (if (== hd Quote) (return arg))
     (if (== hd QuasiQuote) (+= level 1)
     (if (== hd Unquote)    (-= level 1)
@@ -79,7 +79,7 @@
     ))
 
 (fun delete_args (node fv) (
-    (if (== (node_head node) Where)
+    (if (== (node_bhead node) Where)
         (return (iter_args list_delete (node_arg node 0) fv 0))
         (return (iter_args list_delete node fv 0))
         )
@@ -90,7 +90,7 @@
     ))
 
 (fun collect_args (args) (
-    (if (== (node_head args) Where)
+    (if (== (node_bhead args) Where)
         (return (iter_args add_var (node_arg args 0) 0 0))
         (return (iter_args add_var args 0 0))
         )
@@ -110,7 +110,7 @@
             (= fv (list_delete expr fv))
             (var info (lookup_symbol mod expr))
             ; module-variables and special symbols are not free.
-            (if (== (node_head info) ModuleVariable) (return fv))
+            (if (== (node_bhead info) ModuleVariable) (return fv))
             (return (cons expr fv))
             ))
         (return fv)
@@ -120,7 +120,7 @@
         (lfor v expr (= fv (fv_iter mod v level fv)))
         (return fv)
         ))
-    (var hd (node_head expr))
+    (var hd (node_bhead expr))
     (if (== level 0) (do
         (if (|| (== hd DefVariable) (== hd DefFunction)) (do
             (= fv (fv_iter mod (node_arg expr 1) 0 fv))
@@ -129,7 +129,7 @@
         (if (== hd Lambda) (do
             (= fv (fv_iter mod (node_arg expr 1) 0 fv))
             (var arg (node_arg expr 0))
-            (if (== (node_head arg) Where)
+            (if (== (node_bhead arg) Where)
                 (= fv (fv_iter mod (node_arg arg 1) 0 fv))
                 )
             (return (delete_args (node_arg expr 0) fv))
@@ -197,7 +197,7 @@
             ))
         (return expr)
         ))
-    (var hd (node_head expr))
+    (var hd (node_bhead expr))
     (if (== hd Quote) (return expr))
     (if (== hd Domain)
         (if (== level 0) (do
@@ -211,16 +211,6 @@
             ))
     (if (== hd QuasiQuote) (+= level 1)
     (if (== hd Unquote) (-= level 1))))
-
-    (if (is_table expr) (do
-        (var args (node_args expr))
-        (var new_args 0)
-        (while args (do
-            (= new_args (cons (alpha_args_iter tbl chk rep (car args) level) new_args))
-            (= args (cdr args))
-            ))
-        (return (list_to_table new_args))
-        ))
 
     (for i 0 (node_size expr)
         (node_arg_set expr i
@@ -244,7 +234,7 @@
 (fun alpha_args (tbl args) (
     (var chk (struct 1 0))
     (var rep (struct 1 0))
-    (if (== (node_head args) Where)
+    (if (== (node_bhead args) Where)
         (do
             (node_arg_set args 0
                 (alpha_args_iter tbl chk rep (node_arg args 0) 0)) 
@@ -279,7 +269,7 @@
             ))
         (return expr)
         ))
-    (var hd (node_head expr))
+    (var hd (node_bhead expr))
     (if (== hd Located) (do
         (node_arg_set expr 1 (alpha tbl (node_arg expr 1)))
         (return expr)
@@ -314,15 +304,6 @@
     (if (== hd Dynamic)
         (return expr)
         )
-    (if (is_table expr) (do
-        (var args (node_args expr))
-        (var new_args 0)
-        (while args (do
-            (= new_args (cons (alpha tbl (car args)) new_args))
-            (= args (cdr args))
-            ))
-        (return (list_to_table new_args))
-        ))
     (for i 0 (node_size expr)
         (node_arg_set expr i (alpha tbl (node_arg expr i)))
         )
@@ -339,7 +320,7 @@
             ))
         (return expr)
         ))
-    (var hd (node_head expr))
+    (var hd (node_bhead expr))
     (if (== hd Unquote) (do
         (if (== level 0) (do
             (node_arg_set expr 0 (alpha tbl (node_arg expr 0)))
@@ -387,7 +368,7 @@
             ))
         (return expr)
         ))
-    (var hd (node_head expr))
+    (var hd (node_bhead expr))
     (if (== hd Located) (do
         (node_arg_set expr 1 (scan_clsvars mod (node_arg expr 1) tbl))
         (return expr)
@@ -447,7 +428,7 @@
             ))
         (return expr)
         ))
-    (var hd (node_head expr))
+    (var hd (node_bhead expr))
     (if (== hd Unquote) (do
         (if (== level 0) (do
             (node_arg_set expr 0 (scan_clsvars mod (node_arg expr 0) tbl))
@@ -481,7 +462,7 @@
             ))
         (return expr)
         ))
-    (var hd (node_head expr))
+    (var hd (node_bhead expr))
     (if (== hd Located) (do
         (node_arg_set expr 1 (subst_clsvars tbl cls (node_arg expr 1)))
         (return expr)
@@ -501,7 +482,7 @@
         ))
     (if (== hd Lambda) (do
         (var lhs (node_arg expr 0))
-        (if (== (node_head lhs) Where)
+        (if (== (node_bhead lhs) Where)
             (node_arg_set lhs 1 (subst_clsvars tbl cls (node_arg lhs 1)))
             )
         (node_arg_set expr 1 (subst_clsvars tbl cls (node_arg expr 1)))
@@ -536,7 +517,7 @@
 
 (fun subst_clsvars_qquote (tbl cls expr level) (
     (if (is_atom expr) (return expr))
-    (var hd (node_head expr))
+    (var hd (node_bhead expr))
     (if (== hd Unquote) (do
         (if (== level 0) (do
             (node_arg_set expr 0 (subst_clsvars tbl cls (node_arg expr 0)))
@@ -763,7 +744,7 @@
         return
         ))
     (if (is_atom arg) return)
-    (var argty (node_head arg))
+    (var argty (node_bhead arg))
     (if (== argty Domain) (do
         (if (== level 0) (do
             (var v (node_arg_symbol arg 0))
@@ -779,7 +760,7 @@
         (var idx 0)
         (while arg (do
             (var a (car arg))
-            (if (== (node_head a) Ellipsis) (do
+            (if (== (node_bhead a) Ellipsis) (do
                 (if (cdr arg)
                     (throw (exception current_loc (string
                         "\"...\" node must be placed last in the order of arguments")))
@@ -808,7 +789,7 @@
         )
     (for i 0 (node_size arg) (do
         (var a (node_arg arg i))
-        (if (== (node_head a) Ellipsis) (do
+        (if (== (node_bhead a) Ellipsis) (do
             (if (!= (+ i 1) (node_size arg))
                 (throw (exception current_loc (string
                     "\"...\" must be placed last in the order of arguments"
@@ -824,7 +805,7 @@
     ))
 
 (fun var_loc (info) (
-    (var hd (node_head info))
+    (var hd (node_bhead info))
     (if (|| (== hd ListAt) (|| (== hd ListFrom) (|| (== hd FieldRef) (== hd RestOf))))
         (return (var_loc (node_arg info 0)))
         )
@@ -869,7 +850,7 @@
     ))
 
 (fun compile_define_variable (asm mod expr) (
-    (var rhs_head (node_head (node_arg expr 1)))
+    (var rhs_head (node_bhead (node_arg expr 1)))
     (if (|| (== rhs_head Lambda) (== rhs_head Bind))
         (compile_define_function asm mod expr)
         (compile_define_variable_ asm mod expr)
@@ -884,7 +865,7 @@
     (var lhs (node_arg expr 0))
     (var rhs (node_arg expr 1))
 
-    (if (== (node_head lhs) Ref)
+    (if (== (node_bhead lhs) Ref)
         (return (compile_define_clsref asm mod lhs rhs overwrite))
         )
     (if (! (is_symbol lhs))
@@ -971,7 +952,7 @@
 (fun check_redefinition (mod sym) (
     (var info (lookup_symbol_local mod sym))
     (if (! info) return)
-    (if (== (node_head info) ModuleVariable) (do
+    (if (== (node_bhead info) ModuleVariable) (do
         (if (|| (== (node_arg info 1) @C_FALSE) (== (node_arg info 2) @C_TRUE))
             return
             )
@@ -999,7 +980,7 @@
         return
         ))
 
-    (var ty (node_head opd))
+    (var ty (node_bhead opd))
     (if (== ty ModuleVariable) (do
         (put_push asm opd)
         (put_push asm sym)
@@ -1064,7 +1045,7 @@
     (if (! v)
         ; `sym' is a module variable
         (= v (add_module_variable_display mod sym (struct 2 uninitialized no_loc)))
-    (if (== (node_head v) ModuleVariable) (do
+    (if (== (node_bhead v) ModuleVariable) (do
         (var u (lookup_symbol_current_module mod sym))
         (if (! u)
             (= v (add_module_variable_display mod sym (node_arg v 0)))
@@ -1202,12 +1183,12 @@
 (extern fun tuple5)
 
 (export fun compile_qquote_main (asm mod expr level) (
-    (var hd (node_head expr))
-    (if (== hd Symbol)
+    (var hd (node_bhead expr))
+    (if (== hd BSymbol)
         (return (put_push asm expr)))
-    (if (== hd Int)
+    (if (== hd BInt)
         (return (put_imm_int asm expr)))
-    (if (== hd String)
+    (if (== hd BString)
         (return (put_push asm expr)))
     (if (is_atom expr)
         (return (put_push asm expr)))
@@ -1236,7 +1217,7 @@
         (compile_qquote_main asm mod (node_arg expr i) level)
         (put_cons asm)
         ))
-    (put_push asm (node_head expr))
+    (put_push asm (node_bhead expr))
     (compile_simple_call asm 2 make_object)
     ))
 
@@ -1355,7 +1336,7 @@
     ))
 
 (fun compile_ifelse_main (asm mod cnd ifthen ifelse) (
-    (var cnd_hd (node_head cnd))
+    (var cnd_hd (node_bhead cnd))
     (var size (node_size cnd))
     (if (&& (== cnd_hd Not) (== size 1))
         (return (compile_ifelse_main asm mod (node_arg cnd 0) ifelse ifthen))
@@ -1435,7 +1416,7 @@
     ))
 
 (fun exit_if_true (asm mod expr exit) (
-    (var hd (node_head expr))
+    (var hd (node_bhead expr))
     (var size (node_size expr))
     (if (&& (== hd Not) (== size 1))
         (return (exit_if_false asm mod (node_arg expr 0) exit))
@@ -1457,7 +1438,7 @@
     ))
 
 (fun exit_if_false (asm mod expr exit) (
-    (var hd (node_head expr))
+    (var hd (node_bhead expr))
     (var size (node_size expr))
     (if (&& (== hd Not) (== size 1))
         (return (exit_if_true asm mod (node_arg expr 0) exit))
@@ -1647,7 +1628,7 @@
 (fun compile_assign (asm mod expr) (
     (var lhs (node_arg expr 0))
     (var rhs (node_arg expr 1))
-    (if (&& (! (is_symbol lhs)) (!= (node_head lhs) Qualified))
+    (if (&& (! (is_symbol lhs)) (!= (node_bhead lhs) Qualified))
         (return (compile_multi_assign asm mod lhs rhs))
         )
 
@@ -1657,7 +1638,7 @@
     (if (! v)
         (throw (undefined_var current_loc lhs))
         )
-    (var vty (node_head v))
+    (var vty (node_bhead v))
     (if (== vty ModuleVariable) (do
         (put_push asm v)
         (put_field_get1 asm)
@@ -1774,14 +1755,14 @@
 (fun compile_lambda_ (asm mod expr cls) (
     (var lhs (node_arg expr 0))
     (var body (node_arg expr 1))
-    (var hd (node_head lhs))
+    (var hd (node_bhead lhs))
     (if (== hd List)
         (compile_lambda_main asm mod lhs body noguard cls)
     (if (== hd Where)
         (do
             (var guard (node_arg lhs 1))
             (var args (node_arg lhs 0))
-            (= hd (node_head lhs))
+            (= hd (node_bhead lhs))
             (compile_lambda_main asm mod args body guard cls)
         )
         (compile_lambda_main asm mod (list1 lhs) body noguard cls)
@@ -1916,7 +1897,7 @@
 (fun compile_define_function (asm mod expr) (
     (var lhs (node_arg expr 0))
     (var sym @C_NIL)
-    (if (== (node_head lhs) Ref)
+    (if (== (node_bhead lhs) Ref)
         (= sym (node_arg_symbol lhs 2))
     (if (is_symbol lhs)
         (= sym lhs)
@@ -2008,15 +1989,15 @@
 
     (add_compiler mod (make_object2 DefFunction DontCare DontCare) compile_define_function)
 
-    (add_compiler mod (domainP Symbol) compile_var)
+    (add_compiler mod symT compile_var)
     (add_compiler mod (make_object1 Dynamic symT) compile_dynamic_var)
     (add_compiler mod (quote @C_TRUE) compile_special)
     (add_compiler mod (quote @C_FALSE) compile_special)
     (add_compiler mod (quote @C_NIL) compile_special)
     (add_compiler mod (quote @C_UNDEF) compile_special)
-    (add_compiler mod (domainP Int) compile_const_int)
-    (add_compiler mod (domainP String) compile_const)
-    (add_compiler mod (domainP BigInt) compile_const)
+    (add_compiler mod intT compile_const_int)
+    (add_compiler mod stringT compile_const)
+    (add_compiler mod bintT compile_const)
     (add_compiler mod (domainP Float) compile_const)
 
     (add_compiler mod (make_object2 Apply DontCare listT) compile_apply)

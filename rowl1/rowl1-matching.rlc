@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2012-12-17 10:21:12 nineties $
+; $Id: rowl1-matching.rlc 2013-02-13 23:01:33 nineties $
 ;
 
 (import "rlvm-compile")
@@ -109,8 +109,8 @@
     (if (is_symbol pat)
         (return varP)
         )
-    (var hd (node_head pat))
-    (if (|| (== hd Int) (== hd String))
+    (var hd (node_bhead pat))
+    (if (|| (== hd BInt) (== hd BString))
         (return pat)
         )
     (if (== hd Domain) (do
@@ -176,8 +176,8 @@
     ))
 
 (fun qquote_pat (pat level) (
-    (var hd (node_head pat))
-    (if (|| (== hd Symbol) (|| (== hd Int) (== hd String)))
+    (var hd (node_bhead pat))
+    (if (|| (== hd BSymbol) (|| (== hd BInt) (== hd BString)))
         (return pat)
         )
     (if (== hd List)
@@ -204,6 +204,7 @@
 
 (fun compile_matching_main (asm args pats) (
     (if (== (caar pats) 0) (do
+        (label compile_matching_main_loop)
         (var func (car pats))
         (var code (list_at func 1))
         (var guard (list_at func 2))
@@ -216,6 +217,10 @@
                 (put_push asm code)
                 (put_jjump asm)
                 (set_label asm guard_failed)
+                (if (cdr pats) (do
+                    (= pats (cdr pats))
+                    (goto compile_matching_main_loop)
+                    ))
             )
             (do
                 (put_push asm code)
@@ -257,8 +262,8 @@
         (set_label asm check_failed)
         return
         ))
-    (var hd (node_head p))
-    (if (== hd Symbol) (do
+    (var hd (node_bhead p))
+    (if (== hd BSymbol) (do
         (var check_failed (fresh_label asm))
         (compile_operand asm (car args) @C_NIL)
         (put_push asm p)
@@ -268,7 +273,7 @@
         (set_label asm check_failed)
         return
         ))
-    (if (== hd Int) (do
+    (if (== hd BInt) (do
         (var check_failed (fresh_label asm))
         (compile_operand asm (car args) @C_NIL)
         (put_check_int asm check_failed)
@@ -276,7 +281,7 @@
         (set_label asm check_failed)
         return
         ))
-    (if (== hd String) (do
+    (if (== hd BString) (do
         (var check_failed (fresh_label asm))
         (compile_operand asm (car args) @C_NIL)
         (put_check_string asm check_failed)
@@ -392,17 +397,25 @@
     ))
 
 (fun compile_head_check (asm ty exit_lbl) (
-    (if (== ty Int) (do
+    (if (== ty BInt) (do
         (put_check_int asm exit_lbl)
         return
         ))
-    (if (== ty String) (do
+    (if (== ty BString) (do
         (put_check_string asm exit_lbl)
         return
         ))
+    (if (is_builtin_sym ty)
+        (do
+            (put_imm_int32 asm node_bhead)
+            (put_dcall asm 4)
+        )
+        (do
+            (put_imm_int32 asm node_head)
+            (put_dcall asm 4)
+        ))
 
-    (put_imm_int32 asm node_head)
-    (put_dcall asm 4)
+
     (put_push asm ty)
     (put_if_ne asm exit_lbl)
     ))
@@ -506,7 +519,7 @@
     (if (! ls) (return (cons p 0)))
     (var a (caar p))
     (var b (caaar ls))
-    (if (<= a b)
+    (if (< a b)
         (return (cons p ls))
         (return (cons (car ls) (insert_int_pat p (cdr ls))))
         )
@@ -562,11 +575,11 @@
     (var p (caaar pats))
     (if (== p varP) (return (split_any pats)))
     (if (is_special p) (return (split_special p pats)))
-    (var hd (node_head p))
-    (if (== hd Int) (return (split_int_pat pats)))
-    (if (== hd String) (return (split_string_pat pats)))
+    (var hd (node_bhead p))
+    (if (== hd BInt) (return (split_int_pat pats)))
+    (if (== hd BString) (return (split_string_pat pats)))
     (if (== hd domP) (return (split_head_pat (node_arg_symbol p 1) pats)))
-    (if (== hd Symbol) (return (split_symbol_pat 0 pats)))
+    (if (== hd BSymbol) (return (split_symbol_pat 0 pats)))
     (if (== hd List) (return (split_list_pat pats)))
     (return (split_composite_pat pats))
     ))
@@ -597,7 +610,7 @@
     (var n 1)
     (var orig pats)
     (= pats (cdr pats))
-    (while (&& pats (== (node_type (caaar pats)) @Int)) (do
+    (while (&& pats (== (node_type (caaar pats)) @IntE)) (do
         (= pats (cdr pats))
         (incr n)
         ))
@@ -619,7 +632,7 @@
     ))
 
 (fun head_check (hd node) (
-    (if (&& (== (node_head node) domP) (== (node_arg_symbol node 1) hd))
+    (if (&& (== (node_bhead node) domP) (== (node_arg_symbol node 1) hd))
         (return @TRUE)
         (return @FALSE)
         )
@@ -637,8 +650,8 @@
     ))
 
 (fun same_symbol_pat (sym node) (
-    (var hd (node_head node))
-    (if (&& (== hd Symbol) (== node sym))
+    (var hd (node_bhead node))
+    (if (&& (== hd BSymbol) (== node sym))
         (return @TRUE)
         (return @FALSE)
         )
@@ -663,7 +676,7 @@
     (= pats (cdr pats))
     (while pats (do
         (var nd (caaar pats))
-        (if (|| (!= (node_head nd) List) (!= (list_len nd) len)) break)
+        (if (|| (!= (node_bhead nd) List) (!= (list_len nd) len)) break)
         (= pats (cdr pats))
         (incr n)
         ))
@@ -684,8 +697,8 @@
     (if (! pats) (return (cons p 0)))
     (var a (caar p))
     (var b (caaar pats))
-    (if (!= (node_head a) List) (return (cons (car pats) (insert_list_pat p (cdr pats)))))
-    (if (!= (node_head b) List) (return (cons p pats)))
+    (if (!= (node_bhead a) List) (return (cons (car pats) (insert_list_pat p (cdr pats)))))
+    (if (!= (node_bhead b) List) (return (cons p pats)))
     (var alen (list_len a))
     (var blen (list_len b))
     (if (<= alen blen)
@@ -698,12 +711,12 @@
     (var n 1)
     (var orig pats)
     (var p (caaar pats))
-    (var hd (node_head p))
+    (var hd (node_bhead p))
     (var size (node_size p))
     (= pats (cdr pats))
     (while pats (do
         (var nd (caaar pats))
-        (if (|| (!= (node_head nd) hd) (!= (node_size nd) size)) break)
+        (if (|| (!= (node_bhead nd) hd) (!= (node_size nd) size)) break)
         (= pats (cdr pats))
         (incr n)
         ))
@@ -711,8 +724,12 @@
     ))
 
 (fun shift_pat (pats) (
-    (if (== pats 0) (return 0))
-    (return (cons (cons (cdaar pats) (cdar pats)) (shift_pat (cdr pats))))
+    (var list pats)
+    (while list (do
+        (setcar list (cons (cdaar list) (cdar list)))
+        (= list (cdr list))
+        ))
+    (return pats)
     ))
 
 (fun expand_list_pat (pats) (
