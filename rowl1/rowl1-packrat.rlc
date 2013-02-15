@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2013-02-14 02:59:28 nineties $
+; $Id: rowl1-packrat.rlc 2013-02-16 03:52:12 nineties $
 ;
 
 (import "rlvm-compile")
@@ -259,10 +259,6 @@
     (return @(TOKEN p))
     ))
 
-(fun set_newline (p) (
-    (field_set p 6 @TRUE)
-    ))
-
 (fun parsed (p val) (
     (field_set p 1 @C_TRUE)
     (field_set p 2 val)
@@ -429,6 +425,7 @@
 ; set new indentation-level and return current indentation-level
 (fun set_indent (p c) (
     (var current_indent (field_get p 9))
+    (field_set p 6 @TRUE)
     (field_set p 9 (unbox c))
     (return (box current_indent))
     ))
@@ -957,7 +954,6 @@
 @(MEMOIZE statement)
 
 (fun parse_begin_module (p) (
-    (set_newline p)
     (parse_text p "module") 
     @(CHECK p)
     (parse_spaces p)
@@ -976,7 +972,6 @@
     (if @(PARSED p) return)
     (set_parser_state_all p state)
 
-    (set_newline p)
     (parse "parse_statement" p)
     (if @(PARSED p) return)
 
@@ -1002,7 +997,6 @@
         (if (== (lookahead p) @EOF) break)
 
         (set_indent p (get_column p))
-        (set_newline p)
         (parse_toplevel_statement p)
         @(CHECK p)
         (apply_located p)
@@ -1465,7 +1459,6 @@
 ; state = copy_parser_state(..)
 ; column = get_column(p)
 ; set_indent(p, column)
-; set_newline(p)
 ; v = p
 ; if (head(v) == NoParse) {
 ;     set_parser_state_all(state)
@@ -1477,7 +1470,7 @@
 ;     set_parser_state_all(state, p)
 ;     parse_spaces()
 ;     if (get_column(p) != column) break
-;     set_newline(p)
+;     set_indent(p, column)
 ;     v = p
 ;     if (head(v) == NoParse) break
 ; }
@@ -1503,7 +1496,7 @@
                 clmn
                 )
             (make_object0 Break)) loop_body))
-    (= loop_body (cons (apply (to_sym "%set_newline") (list1 PVar)) loop_body))
+    (= loop_body (cons (apply (to_sym "%set_indent") (list2 PVar clmn)) loop_body))
     (= loop_body (cons (compile_parser_element elem @FALSE) loop_body))
     (= loop_body (cons (mkif (test_noparse) (make_object0 Break)) loop_body))
 
@@ -1517,7 +1510,6 @@
     (= body (cons (defvar clmn (apply (to_sym "%get_column") (list1 PVar))) body))
     (= body (cons (defvar indent_save (apply (to_sym "%set_indent") (list2 PVar clmn))) body))
     (= body (cons (defvar elems 0) body))
-    (= body (cons (apply (to_sym "%set_newline") (list1 PVar)) body))
     (= body (cons (compile_parser_element elem @FALSE) body))
     (= body (cons (mkif (test_noparse)
             (block (list4
@@ -1952,7 +1944,6 @@
 
 (export fun init_parser_funcs (mod) (
     (add_function1 mod (to_sym "%get_column") DontCare get_column 0)
-    (add_function1 mod (to_sym "%set_newline") DontCare set_newline 0)
     (add_function2 mod (to_sym "%set_indent") DontCare DontCare set_indent 0)
     (add_function1 mod (to_sym "%check_indent") DontCare check_indent 0)
     (add_function2 mod (to_sym "%parsed") DontCare DontCare parsed 0)

@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2013-02-08 10:14:33 nineties $
+# $Id: Makefile 2013-02-14 17:53:11 nineties $
 
 TOPDIR = ..
 ROWL0DIR = $(TOPDIR)/rowl0
@@ -103,6 +103,7 @@ RLC1OBJECTS = rowl1-main.rlo\
 		  rowl1-array.rlo\
 		  rowl1-table.rlo\
 		  rowl1-oop.rlo\
+		  rowl1-function.rlo\
 		  rowl1-io.rlo\
 		  rowl1-pprint.rlo\
 		  rowl1-gc.rlo
@@ -138,6 +139,7 @@ rowl1-list.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo r
 rowl1-tuple.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-module.rlo rowl1-compile.rlo rowl1-assemble.rlo rowl1-error.rlo
 rowl1-array.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-module.rlo rowl1-compile.rlo rowl1-assemble.rlo rowl1-error.rlo
 rowl1-table.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-module.rlo rowl1-compile.rlo rowl1-error.rlo rowl1-pprint.rlo
+rowl1-function.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-module.rlo rowl1-compile.rlo rowl1-error.rlo
 rowl1-oop.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-module.rlo rowl1-compile.rlo rowl1-error.rlo
 rowl1-io.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-module.rlo rowl1-compile.rlo rowl1-error.rlo rowl1-pprint.rlo rowl1-bigint.rlo
 rowl1-pprint.rlo : $(RLVMCOMPILER) rowl1-types.rlo rowl1-util.rlo rowl1-node.rlo rowl1-compile.rlo

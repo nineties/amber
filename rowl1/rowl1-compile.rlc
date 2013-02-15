@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2013-02-14 03:43:12 nineties $
+; $Id: rowl1-compile.rlc 2013-02-14 18:28:39 nineties $
 ;
 
 (import "rlvm-compile")
@@ -346,7 +346,7 @@
     (return (alloc_function args code guard))
     ))
 
-(fun make_bound (fun1 fun2) (
+(export fun bind_function (fun1 fun2) (
     (if (! (callable fun1))
         (throw (type_error current_loc (string "function") fun1))
         )
@@ -1762,7 +1762,7 @@
 (fun compile_bind (asm mod expr) (
     (compile asm mod (node_arg expr 1))
     (compile asm mod (node_arg expr 0))
-    (compile_simple_call asm 2 make_bound)
+    (compile_simple_call asm 2 bind_function)
     ))
 
 (fun build_closure (lam clos) (
@@ -1857,7 +1857,7 @@
             (var box (node_arg info 0))
             (var func (field_get box 0))
             (if (callable func)
-                (= newfunc (make_bound newfunc func))
+                (= newfunc (bind_function newfunc func))
                 )
             (field_set box 0 newfunc)
             return
@@ -1870,7 +1870,7 @@
             (var box (node_arg info 0))
             (var func (field_get box 0))
             (if (callable func)
-                (= newfunc (make_bound newfunc func))
+                (= newfunc (bind_function newfunc func))
                 )
         ))
     (add_module_variable mod sym @C_FALSE newfunc)
@@ -1952,14 +1952,22 @@
     (return (byterun (compile_main current_mod expr)))
     ))
 
+(export fun compose_function (g f) (
+    (var asm (make_assembler))
+    (var args (list1 (to_sym "x")))
+    (compile_function asm 0 current_mod args
+        (apply (quote g) (list1 (apply (quote f) args)))
+        noguard @C_NIL)
+    (put_ireturn asm)
+    (return (make_function args (get_code asm) 0))
+    ))
+
 (export fun setup_builtin_compilers (mod) (
     (var locT (domainP Loc))
-
 
     (add_function1 mod Compile DontCare compile_ 0)
 
     (add_compiler mod DontCare compile_error)
-
     (add_compiler mod (make_object2 Located locT DontCare) compile_located)
 
     ; These commands have been evaluated in parsing phase.
