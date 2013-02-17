@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2013-02-14 18:28:39 nineties $
+; $Id: rowl1-compile.rlc 2013-02-18 08:08:14 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1954,12 +1954,20 @@
 
 (export fun compose_function (g f) (
     (var asm (make_assembler))
-    (var args (list1 (to_sym "x")))
-    (compile_function asm 0 current_mod args
-        (apply (quote g) (list1 (apply (quote f) args)))
-        noguard @C_NIL)
+
+    (put_push asm f)
+    (put_push asm f)
+    (put_push asm current_loc)
+    (compile_simple_call asm 3 compile_matching)
+    (put_jccall asm)
+    (put_push asm g)
+    (put_push asm g)
+    (put_push asm current_loc)
+    (compile_simple_call asm 3 compile_matching)
+    (put_jcall asm 4)
     (put_ireturn asm)
-    (return (make_function args (get_code asm) 0))
+
+    (return (alloc_function 0 (get_code asm) 0))
     ))
 
 (export fun setup_builtin_compilers (mod) (
