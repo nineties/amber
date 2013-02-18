@@ -9,7 +9,7 @@
   <meta name="author" content="Koichi Nakamura">
 
   
-  <meta name="description" content="前のページ 目次 次のページ チュートリアル3: 基本的なオブジェクトの種類 Feb 14th, 2013 今後、Amberが扱うデータをオブジェクトと呼ぶことにします。
+  <meta name="description" content="前のページ 目次 次のページ チュートリアル3: 基本的なオブジェクトの種類 Feb 18th, 2013 今後、Amberが扱うデータをオブジェクトと呼ぶことにします。
 オブジェクト指向で言う所のオブジェクトとは異なるので注意して下さい。
 「計算・処理の対象」くらいの意味です。 &hellip;">
   
@@ -101,7 +101,7 @@
   
 
 
-<time datetime="2013-02-14T20:09:15+09:00" pubdate data-updated="true">Feb 14<span>th</span>, 2013</time></p>
+<time datetime="2013-02-18T19:27:42+09:00" pubdate data-updated="true">Feb 18<span>th</span>, 2013</time></p>
   </header>
   
 
@@ -172,6 +172,43 @@ Error: UndefinedVariable{[amber:1], x}
 <p>バックスラッシュは<strong>クォーテーション</strong>を表しています。通常、Amberは<strong>入力されたオブジェクトをプログラムとして解釈</strong>しますが、クォーテーションが行われている場合には入力されたオブジェクトそのものとして解釈を行います。クォーテーションについては後の回にまた説明します。</p>
 
 <p>シンボルを処理する関数もいくつか用意されています。詳しくは<a href="/amber/ja/reference/std/symbol.html">標準ライブラリ:シンボル</a>を参照して下さい。</p>
+
+<h4>特殊シンボル</h4>
+
+<p>上で述べた様にAmberはシンボルを変数として解釈しますが<strong><code>true</code>, <code>false</code>, <code>nil</code>, <code>undef</code></strong>の４つのみはその<strong>シンボル自身</strong>として解釈します。</p>
+
+<pre><code>amber:1&gt; true
+=&gt; true
+amber:2&gt; false
+=&gt; false
+amber:3&gt; nil
+=&gt; nil
+amber:4&gt; undef
+=&gt; undef
+</code></pre>
+
+<p><code>true</code>と<code>false</code>は真偽値を表しています。例えば比較命令などがこれらを返します。</p>
+
+<pre><code>amber:1&gt; 1 &lt; 2
+=&gt; true
+amber:2&gt; 1 == 2
+=&gt; false
+</code></pre>
+
+<p><code>nil</code>は無という意味で、特に意味が無い値を表す為に用います。例えば関数<code>puts</code>の戻り値は<code>nil</code>です。</p>
+
+<pre><code>amber:1&gt; puts("Hello World!")
+Hello World!
+=&gt; nil
+</code></pre>
+
+<p><code>undef</code>は未定義という意味で、参照された要素が存在しない事を表す為に用います。例えば、この後説明する<strong>連想配列</strong>を存在しないキーで参照すると<code>undef</code>が返ります。</p>
+
+<pre><code>amber:1&gt; Table{"one" =&gt; 1, "two" =&gt; 2}
+=&gt; Table{"one" =&gt; 1, "two" =&gt; 2}
+amber:2&gt; %["three"]
+=&gt; undef
+</code></pre>
 
 <h3><a name="integer"> 整数 </a></h3>
 
@@ -272,17 +309,17 @@ amber:3&gt; [1, "foo", [1,2,3]]
 <p>3番目の例のように異なる種類のオブジェクトも格納する事が出来ます。
 演算子(<code>[]</code>)でi番目のオブジェクトの読み取り、演算子(<code>[]=</code>)で書き換えが出来ます。</p>
 
-<pre><code>amber:1&gt; list: [1, "foo", [1,2,3]]
+<pre><code>amber:1&gt; [1, "foo", [1,2,3]]
 =&gt; [1, "foo", [1, 2, 3]]
-amber:2&gt; list[0]
+amber:2&gt; %1[0]
 =&gt; 1
-amber:3&gt; list[1]
+amber:3&gt; %1[1]
 =&gt; "foo"
-amber:4&gt; list[2]
+amber:4&gt; %1[2]
 =&gt; [1, 2, 3]
-amber:5&gt; list[1] = "bar"
+amber:5&gt; %1[1] = "bar"
 =&gt; "bar"
-amber:6&gt; list
+amber:6&gt; %1
 =&gt; [1, "bar", [1, 2, 3]]
 </code></pre>
 
@@ -342,17 +379,17 @@ amber:3&gt; (1, "foo", [1,2,3])
 
 <p>連想配列では番号の代わりに記号<code>=&gt;</code>の左に書いた<strong>キー</strong>を用いて値を読み書きする事が出来ます。キーには任意のオブジェクトを利用する事が出来ます。読み書きは他のコンテナと同様に演算子<code>[]</code>と<code>[]=</code>を用います。</p>
 
-<pre><code>amber:1&gt; tbl: Table{"one" =&gt; 1, "two" =&gt; 2, "three" =&gt; 3}
+<pre><code>amber:1&gt; Table{"one" =&gt; 1, "two" =&gt; 2, "three" =&gt; 3}
 =&gt; Table{"one" =&gt; 1, "two" =&gt; 2, "three" =&gt; 3}
-amber:2&gt; tbl["one"]
+amber:2&gt; %1["one"]
 =&gt; 1
-amber:3&gt; tbl["two"]
+amber:3&gt; %1["two"]
 =&gt; 2
-amber:4&gt; tbl["three"]
+amber:4&gt; %1["three"]
 =&gt; 3
-amber:5&gt; tbl["four"] = 4
+amber:5&gt; %1["four"] = 4
 =&gt; 4
-amber:6&gt; tbl
+amber:6&gt; %1
 =&gt; Table{"one" =&gt; 1, "two" =&gt; 2, "three" =&gt; 3, "four" =&gt; 4}
 </code></pre>
 
@@ -386,7 +423,7 @@ amber:6&gt; tbl
   
 
 
-<time datetime="2013-02-14T20:09:15+09:00" pubdate data-updated="true">Feb 14<span>th</span>, 2013</time>
+<time datetime="2013-02-18T19:27:42+09:00" pubdate data-updated="true">Feb 18<span>th</span>, 2013</time>
         
       </p>
       

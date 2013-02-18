@@ -5,11 +5,12 @@
 <!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
 <head>
   <meta charset="utf-8">
-  <title>チュートリアル5: 制御構造 - Amber</title>
+  <title>チュートリアル5: 関数・クロージャ - Amber</title>
   <meta name="author" content="Koichi Nakamura">
 
   
-  <meta name="description" content=" チュートリアル5: 制御構造 Feb 13th, 2013 Feb 13th, 2013 Tweet ">
+  <meta name="description" content="前のページ 目次 チュートリアル5: 関数・クロージャ Feb 18th, 2013 関数 関数fを引数a,b,&#8230;に適用して呼び出すには f(a, b, ...) という構文を利用します。例えば以下のようになります。 amber:1&gt; head(1)
+=&gt; Int &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -77,10 +78,14 @@
   <header>
   <div class="pagination">
   
+  <a class="prev" href="4.html">前のページ</a>
+  
+  
+  <a class="index" href="index.html">目次</a>
   
   
   </div>
-    <h1 class="entry-title">チュートリアル5: 制御構造</h1>
+    <h1 class="entry-title">チュートリアル5: 関数・クロージャ</h1>
     <p class="meta">
 
 
@@ -93,15 +98,275 @@
   
 
 
-<time datetime="2013-02-13T23:32:54+09:00" pubdate data-updated="true">Feb 13<span>th</span>, 2013</time></p>
+<time datetime="2013-02-18T22:16:41+09:00" pubdate data-updated="true">Feb 18<span>th</span>, 2013</time></p>
   </header>
   
 
-  
+  <h2>関数</h2>
+
+<p>関数<code>f</code>を引数<code>a</code>,<code>b</code>,&#8230;に適用して呼び出すには</p>
+
+<pre><code>f(a, b, ...)
+</code></pre>
+
+<p>という構文を利用します。例えば以下のようになります。</p>
+
+<pre><code>amber:1&gt; head(1)
+=&gt; Int
+amber:2&gt; append([1,2], [3,4,5])
+=&gt; [1, 2, 3, 4, 5]
+amber:3&gt; sin(1.0)
+=&gt; 0.8414709848078965
+</code></pre>
+
+<p>また</p>
+
+<ul>
+<li><code>f(a)</code>の代わりに<code>a.f</code></li>
+<li><code>f(a,b,c)</code>の代わりに<code>a.f(b,c)</code></li>
+</ul>
+
+
+<p>という構文を利用する事も出来ます。</p>
+
+<pre><code>amber:1&gt; 1.head
+=&gt; Int
+amber:2&gt; [1,2].append([3,4,5])
+=&gt; [1, 2, 3, 4, 5]
+amber:3&gt; 1.0.sin
+=&gt; 0.8414709848078965
+</code></pre>
+
+<p>この<code>.</code>を用いた構文は関数適用の<strong>構文糖衣ではありません</strong>ので注意して下さい。関数適用も含んだより一般的な処理を表します。この事については後の回に説明します。</p>
+
+<h3>関数は第一級オブジェクト</h3>
+
+<p>Amberの関数は<strong>第一級オブジェクト</strong>なので、他のオブジェクトと同様に変数に代入したりコンテナに格納したり関数の引数として渡す事が出来ます。以下の様に関数オブジェクトのヘッドは<code>Function</code>で、そのアーギュメントを直に読み書きする事はできません。</p>
+
+<pre><code>amber:1&gt; head
+=&gt; &lt;#Function:0xf7610a04&gt;
+amber:2&gt; fullform(head)
+=&gt; "Function{...}"
+</code></pre>
+
+<p>関数を第一級オブジェクトとして扱う例として関数<code>map</code>を紹介します。これはリストの各要素に渡された関数を適用した結果のリストを返します。</p>
+
+<pre><code>amber:1&gt; map(head, [1, "foo", \foo, [1, 2, 3]])
+=&gt; [Int, String, Symbol, List]
+</code></pre>
+
+<h3>関数の合成</h3>
+
+<p>関数に対する演算で重要なものの一つは<strong>関数の合成</strong>です。関数<code>f</code>,<code>g</code>をこの順番に合成するには</p>
+
+<pre><code>g * f
+</code></pre>
+
+<p>と記述します。<code>g * f</code>は引数に<code>f</code>を適用した結果に<code>g</code>を適用するという関数となります。</p>
+
+<p>例えば以下の様にして<code>sin(cos(x))</code>を計算する関数を作成する事が出来ます。</p>
+
+<pre><code>amber:1&gt; sincos: sin*cos
+=&gt; &lt;#Function:0xf6483128&gt;
+amber:2&gt; sincos(1)
+=&gt; 0.5143952585235492
+</code></pre>
+
+<h3>無名関数</h3>
+
+<p>関数オブジェクトを生成する為には以下の構文を用います。</p>
+
+<pre><code>(引数1, 引数2, ...) -&gt; 式
+</code></pre>
+
+<p>例えば以下のように記述します。</p>
+
+<pre><code>amber:1&gt; (x) -&gt; x + 1
+=&gt; &lt;#Function:0xf64895e8&gt;
+amber:2&gt; %(3)
+=&gt; 4
+amber:3&gt; (x, y) -&gt; x + y
+=&gt; &lt;#Function:0xf64900d4&gt;
+amber:4&gt; %(2, 3)
+=&gt; 5
+</code></pre>
+
+<p>また、頻繁に利用する一変数関数の場合に限っては<code>(</code>と<code>)</code>を省略して</p>
+
+<pre><code>amber:1&gt; x -&gt; x + 1
+=&gt; &lt;#Function:0xf64881e8&gt;
+</code></pre>
+
+<p>と記述する事が可能です。</p>
+
+<h3>関数の定義</h3>
+
+<p>Amberにおける関数(<code>head</code>など)は通常の変数と同じ扱いです。(関数と変数の名前空間が同一です。)
+従って、変数に無名関数を束縛すれば関数<code>f(x)</code>の定義となります。</p>
+
+<pre><code>amber:1&gt; f: x -&gt; x^2
+=&gt; &lt;#Function:0xf64880a4&gt;
+amber:2&gt; f(3)
+=&gt; 9
+</code></pre>
+
+<p>また、関数定義専用の構文として記号<code>:</code>を用いた以下の構文もあります。変数を定義する際にも<code>:</code>を用いたのを思い出して下さい。
+今後は主にこの構文を用います。</p>
+
+<pre><code>amber:1&gt; f(x): x^2
+=&gt; &lt;#Function:0xf6484ca4&gt;
+amber:2&gt; f(3)
+=&gt; 9
+</code></pre>
+
+<p>定義する関数の中身が複数行に渡る場合には、以前説明した<strong>ブロック</strong>を用いる事が出来ます。
+ブロックの評価結果は最後の文の評価結果となります。例えば、以下の様に記述します。</p>
+
+<pre><code>amber:1&gt; f(x): {
+amber:1~        a: 1
+amber:1~        b: 2
+amber:1~        c: 3
+amber:1~        a*x^2 + b*x + c
+amber:1~ }
+=&gt; &lt;#Function:0xf640e168&gt;
+amber:2&gt; f(3)
+=&gt; 18
+</code></pre>
+
+<p>また、関数の中身は新たなスコープとなります。従って、今の例のように関数内部でのみ用いる変数(<strong>ローカル変数</strong>)を定義することができます。
+また、関数は変数と同じ名前空間に属しますので変数を定義出来る箇所ならばどこでも関数を定義する事が出来ます。
+例えば、以下のようにして関数内で関数を定義するといった事が可能です。</p>
+
+<pre><code>amber:1&gt; f(x): {
+amber:1~        g(x): x^2+x+1
+amber:1~        g(x) * g(x+1)
+amber:1~ }
+=&gt; &lt;#Function:0xf64dd424&gt;
+amber:2&gt; f(1)
+=&gt; 21
+</code></pre>
+
+<h3>return文</h3>
+
+<p>関数の途中で値を返却したい場合には<code>return</code>文を利用する事が出来ます。</p>
+
+<pre><code>amber:1&gt; f(x): {
+amber:1~        if (x &lt;= 0) return 0
+amber:1~        x-1
+amber:1~ }
+=&gt; &lt;#Function:0xf64d6dc4&gt;
+amber:2&gt; f(2)
+=&gt; 1
+amber:3&gt; f(-1)
+=&gt; 0
+</code></pre>
+
+<h2>クロージャ</h2>
+
+<p>Amberは<strong>レキシカルクロージャ</strong>を作成する機能を備えています。
+あるスコープで定義された関数がそのスコープの外に抜け出た場合にも、その関数はそれが定義されたスコープの変数を読み書き出来ます。この機能によって、例えば以下のような状態を持つ関数を実現する事が出来ます。</p>
+
+<pre><code>amber:1&gt; make_counter(): {
+amber:1~        n: 0
+amber:1~        return () -&gt; { n += 1 }
+amber:1~ }
+=&gt; &lt;#Function:0xf64c2b2c&gt;
+amber:2&gt; counter1: make_counter()
+=&gt; &lt;#Function:0xf64cd64c&gt;
+amber:3&gt; counter2: make_counter()
+=&gt; &lt;#Function:0xf64d7390&gt;
+amber:4&gt; counter1()
+=&gt; 1
+amber:5&gt; counter1()
+=&gt; 2
+amber:6&gt; counter2()
+=&gt; 1
+amber:7&gt; counter1()
+=&gt; 3
+amber:8&gt; counter2()
+=&gt; 2
+amber:9&gt; counter2()
+=&gt; 3
+amber:10&gt; counter1()
+=&gt; 4
+</code></pre>
+
+<p>クロージャ<code>counter1</code>と<code>counter2</code>はどちらも同じ<code>n</code>を読み書きしているにも関わらず、それぞれが独立して<code>n</code>の実体を持っている事に注意して下さい。
+このように関数のスコープは呼び出される度に新しく生成されます。</p>
+
+<p>もう少し複雑なクロージャの使い方として以下の例を見て下さい。</p>
+
+<pre><code>amber:1&gt; make_counter2(): {
+amber:1~        n: 0
+amber:1~        count_up: () -&gt; { n += 1 }
+amber:1~        count_down: () -&gt; { n -= 1 }
+amber:1~        return (count_up, count_down)
+amber:1~ }
+=&gt; &lt;#Function:0xf64589b8&gt;
+amber:2&gt; (up, down): make_counter2()
+=&gt; (&lt;#Function:0xf646b9d4&gt;, &lt;#Function:0xf646bb20&gt;)
+amber:3&gt; up()
+=&gt; 1
+amber:4&gt; up()
+=&gt; 2
+amber:5&gt; up()
+=&gt; 3
+amber:6&gt; down()
+=&gt; 2
+amber:7&gt; down()
+=&gt; 1
+amber:8&gt; up()
+=&gt; 2
+amber:9&gt; down()
+=&gt; 1
+</code></pre>
+
+<p>関数<code>make_counter2</code>は同一のスコープ内で2つのクロージャ<code>count_up</code>と<code>count_down</code>を作成しタプルにして返すものです。<code>amber:2&gt;</code>の行では、<code>make_counter2</code>の生成する2つのクロージャを<code>(up, down): ...</code>という構文で受け取っています(この構文については次回説明します)。その後の呼び出しをみれば判る様に、関数<code>up</code>と<code>down</code>は同一の環境を共有しています。また<code>up</code>と<code>down</code>を呼び出す以外の手段でこれらが参照する<code>n</code>を読み書きする事が出来ないことにも注意して下さい。</p>
+
+<p>以上の様にクロージャによって、カプセル化された固有の状態を持つオブジェクトを作成する事が出来ます。またクロージャは関数と全く同一のインターフェースを持つので関数に引数として渡したり、合成するなどといった事が同様に出来ます。これは非常に良い抽象化の手段となります。</p>
+
+<p>クロージャと関数の合成の例として<code>make_counter</code>とオブジェクトの文字列化を行う関数<code>to_s</code>を合成してみましょう。すると整数を文字列として順番に列挙するカウンターが出来上がります。</p>
+
+<pre><code>amber:1&gt; make_counter(): {
+amber:1~        n: 0
+amber:1~        return () -&gt; { n += 1 }
+amber:1~ }
+=&gt; &lt;#Function:0xf64c172c&gt;
+amber:2&gt; f: to_s * make_counter()
+=&gt; &lt;#Function:0xf64ce7cc&gt;
+amber:3&gt; f()
+=&gt; "1"
+amber:4&gt; f()
+=&gt; "2"
+amber:5&gt; f()
+=&gt; "3"
+amber:6&gt; f()
+=&gt; "4"
+</code></pre>
+
+<h3>returnのセマンティクスに関する注意</h3>
+
+<p>以下の例を見て下さい。文<code>return 0</code>が実行後の制御は<code>f</code>内に移っている事が判ります。つまりクロージャからの<code>return</code>はそのクロージャのみを抜けるという挙動をします。後の回に述べますが、<code>break</code>や<code>continue</code>等の文も同様にクロージャの中に閉じた振る舞いをします。</p>
+
+<pre><code>amber:1&gt; f(): {
+amber:1~        g(): { return 0 }
+amber:1~        g()
+amber:1~        return 1
+amber:1~ }
+=&gt; &lt;#Function:0xf64d0104&gt;
+amber:2&gt; f()
+=&gt; 1
+</code></pre>
+
+<p>しかし、関数をまたいだジャンプを行いたい場面も多いと思います。現状の実装では後に述べる<strong>例外機構</strong>のみがこれを可能としますが、より汎用的な<strong>継続</strong>による実装に置き換える事も検討しています。その場合は<code>return</code>などの文の扱いも変わってしまう可能性がありますので注意して下さい。</p>
 
 
   <div class="pagination">
   
+  <a class="prev" href="4.html">前のページ</a>
+  
+  
+  <a class="index" href="index.html">目次</a>
   
   
   </div>
@@ -121,7 +386,7 @@
   
 
 
-<time datetime="2013-02-13T23:32:54+09:00" pubdate data-updated="true">Feb 13<span>th</span>, 2013</time>
+<time datetime="2013-02-18T22:16:41+09:00" pubdate data-updated="true">Feb 18<span>th</span>, 2013</time>
         
       </p>
       
