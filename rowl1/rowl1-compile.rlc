@@ -346,7 +346,7 @@
     (return (alloc_function args code guard))
     ))
 
-(export fun bind_function (fun1 fun2) (
+(export fun fusion_function (fun1 fun2) (
     (if (! (callable fun1))
         (throw (type_error current_loc (string "function") fun1))
         )
@@ -850,7 +850,7 @@
 
 (fun compile_define_variable (asm mod expr) (
     (var rhs_head (node_bhead (node_arg expr 1)))
-    (if (|| (== rhs_head Lambda) (== rhs_head Bind))
+    (if (|| (== rhs_head Lambda) (== rhs_head Fusion))
         (compile_define_function asm mod expr)
         (compile_define_variable_ asm mod expr)
         )
@@ -1689,7 +1689,7 @@
     (set_label asm hdlr_lbl)
 
     ; here, the thrown exception is on the top of stack.
-    (compile asm mod (make_object2 Bind hdlr default_hdler))
+    (compile asm mod (make_object2 Fusion hdlr default_hdler))
     (put_push asm hdlr)
     (put_push asm current_loc)
     (compile_simple_call asm 3 compile_matching)
@@ -1759,10 +1759,10 @@
     (return (compile_lambda_ asm mod expr @C_NIL))
     ))
 
-(fun compile_bind (asm mod expr) (
+(fun compile_fusion (asm mod expr) (
     (compile asm mod (node_arg expr 1))
     (compile asm mod (node_arg expr 0))
-    (compile_simple_call asm 2 bind_function)
+    (compile_simple_call asm 2 fusion_function)
     ))
 
 (fun build_closure (lam clos) (
@@ -1857,7 +1857,7 @@
             (var box (node_arg info 0))
             (var func (field_get box 0))
             (if (callable func)
-                (= newfunc (bind_function newfunc func))
+                (= newfunc (fusion_function newfunc func))
                 )
             (field_set box 0 newfunc)
             return
@@ -1870,7 +1870,7 @@
             (var box (node_arg info 0))
             (var func (field_get box 0))
             (if (callable func)
-                (= newfunc (bind_function newfunc func))
+                (= newfunc (fusion_function newfunc func))
                 )
         ))
     (add_module_variable mod sym @C_FALSE newfunc)
@@ -1895,12 +1895,12 @@
     (if (is_defined_locally info)
         (return (compile_define_variable_ asm mod
             (make_object3 DefVariable lhs
-                (make_object2 Bind fun lhs) (to_sym "overwrite"))))
+                (make_object2 Fusion fun lhs) (to_sym "overwrite"))))
         )
     (= info (lookup_effective_symbol mod sym))
     (if info 
         (return (compile_define_variable_ asm mod
-            (make_object2 DefVariable lhs (make_object Bind (list2 fun lhs)))))
+            (make_object2 DefVariable lhs (make_object Fusion (list2 fun lhs)))))
         (return (compile_define_variable_ asm mod
             (make_object2 DefVariable lhs fun)))
         )
@@ -2050,7 +2050,7 @@
 
     (add_compiler mod (make_object2 Assign DontCare DontCare) compile_assign)
     (add_compiler mod (make_object2 Lambda DontCare DontCare) compile_lambda)
-    (add_compiler mod (make_object2 Bind DontCare DontCare) compile_bind)
+    (add_compiler mod (make_object2 Fusion DontCare DontCare) compile_fusion)
 
     (add_compiler mod (make_object2 Slot DontCare symT) compile_slot)
     (add_compiler mod (make_object3 Slot DontCare symT listT) compile_slot2)
