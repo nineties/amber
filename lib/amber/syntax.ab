@@ -2,7 +2,7 @@ ReplaceSyntax{comment, shell_style_comment}
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2013-02-19 10:15:10 nineties $
+# $Id: syntax.ab 2013-02-19 14:06:22 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -335,7 +335,13 @@ package ::= string
           | delimited1(symbol, ".")
 
 statement
-    ::= "open" qualified_symbol
+    ::= statement ";" statement
+        { `Seq{[!node0, !node2]} }
+
+      | statement ";"
+        { `Seq{[!node0, nil]} }
+
+      | "open" qualified_symbol
         { `Open{!node1} }
       | "import" package
         { `Import{!node1} }
@@ -376,9 +382,6 @@ statement
 
       | expr "=>" statement
         { `DefineFunction{rewrite, Lambda{!node0, !node2}} }
-
-      | statement ";" statement
-        { `Seq{[!node0, !node2]} }
 
 ## Reserved Keywords
 ReserveSymbol{not, and, or, where, open, if, else, case, of,
