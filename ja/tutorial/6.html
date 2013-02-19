@@ -5,13 +5,11 @@
 <!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
 <head>
   <meta charset="utf-8">
-  <title>チュートリアル5: 制御構造 - Amber</title>
+  <title>チュートリアル6: パターンマッチング・部分関数の融合 - Amber</title>
   <meta name="author" content="Koichi Nakamura">
 
   
-  <meta name="description" content=" 前のページ 目次 チュートリアル5: 制御構造 Feb 14th, 2013 本章ではif文やwhile文などの制御構造について説明します。 if文
-while文
-[ 前のページ 目次 Feb 14th, 2013 Tweet ">
+  <meta name="description" content="前のページ 目次 チュートリアル6: パターンマッチング・部分関数の融合 Feb 19th, 2013 パターンマッチング Amberでは関数の仮引数の代わりにパターンを記述する事により関数の定義域を限定する事が出来ます。つまり 関数名(パターン1, パターン2, ...): 関数本体 や ( &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -79,14 +77,14 @@ while文
   <header>
   <div class="pagination">
   
-  <a class="prev" href="4.html">前のページ</a>
+  <a class="prev" href="5.html">前のページ</a>
   
   
   <a class="index" href="index.html">目次</a>
   
   
   </div>
-    <h1 class="entry-title">チュートリアル5: 制御構造</h1>
+    <h1 class="entry-title">チュートリアル6: パターンマッチング・部分関数の融合</h1>
     <p class="meta">
 
 
@@ -99,25 +97,324 @@ while文
   
 
 
-<time datetime="2013-02-14T21:06:27+09:00" pubdate data-updated="true">Feb 14<span>th</span>, 2013</time></p>
+<time datetime="2013-02-19T21:14:49+09:00" pubdate data-updated="true">Feb 19<span>th</span>, 2013</time></p>
   </header>
   
 
-  <p>本章ではif文やwhile文などの制御構造について説明します。</p>
+  <h2>パターンマッチング</h2>
+
+<p>Amberでは関数の仮引数の代わりに<strong>パターン</strong>を記述する事により関数の定義域を限定する事が出来ます。つまり</p>
+
+<pre><code>関数名(パターン1, パターン2, ...): 関数本体
+</code></pre>
+
+<p>や</p>
+
+<pre><code>(パターン1, パターン2, ...) -&gt; 関数本体
+</code></pre>
+
+<p>という構文で記述します。</p>
+
+<p>例えばパターン<code>0</code>は整数<code>0</code>にのみマッチします。そこで以下のように整数<code>0</code>が渡された時のみ実行される関数を定義する事が出来ます。定義域外の引数が渡されると<code>undef</code>が返ります。</p>
+
+<pre><code>amber:1&gt; f(0): "zero"
+=&gt; &lt;#Function:0xf6480eb8&gt;
+amber:2&gt; f(0)
+=&gt; "zero"
+amber:3&gt; f(1)
+=&gt; undef
+</code></pre>
+
+<p>また、関数の引数の数も定義域の一種と見なされます。すなわち、以下の様に引数の数が異なる場合には<code>undef</code>が返ります。</p>
+
+<pre><code>amber:1&gt; f(x): 0
+=&gt; &lt;#Function:0xf6480b0c&gt;
+amber:2&gt; f(0, 1)
+=&gt; undef
+</code></pre>
+
+<h3>パターンの種類</h3>
+
+<h4>仮引数</h4>
+
+<p>これまで用いてきた仮引数(<code>x</code>等の通常のシンボル)は任意の値にマッチするパターンと見なす事が出来ます。</p>
+
+<pre><code>f(x, y): ...
+</code></pre>
+
+<h4>ドントケア</h4>
+
+<p>記号<code>_</code>は<strong>ドントケア</strong>というパターンを表します。仮引数と同様任意の値にマッチしますが、マッチした値は捨ててしまいます。</p>
+
+<pre><code>f(_): ...
+</code></pre>
+
+<h4>リテラルパターン</h4>
 
 <ul>
-<li><a href="#if">if文</a></li>
-<li><a href="#while">while文</a></li>
-<li>[</li>
+<li>整数定数</li>
+<li>文字列定数</li>
+<li>シンボル定数</li>
 </ul>
 
 
-<h2></h2>
+<p>は<strong>リテラルパターン</strong>となり、それ自身に一致する値のみを受け付けます。</p>
+
+<pre><code>f(0): ...
+f("foo"): ...
+f(\foo): ...
+</code></pre>
+
+<p>浮動小数点数によるリテラルパターンを記述する事はできません。浮動小数点数の値が一致するという事の考え方は場合によって異なるからです。浮動小数点数に対するマッチングは後述のガード節を用いて下さい。</p>
+
+<h4>ヘッドパターン</h4>
+
+<pre><code>シンボル(仮引数) @ シンボル(ヘッド)
+</code></pre>
+
+<p>という構文で<strong>ヘッドパターン</strong>を記述出来ます。これは引数のヘッドが一致する場合にのみマッチします。</p>
+
+<pre><code>amber:1&gt; f(x @ Int): "integer"
+=&gt; &lt;#Function:0xf6482334&gt;
+amber:2&gt; f(0)
+=&gt; "integer"
+amber:3&gt; f(1)
+=&gt; "integer"
+amber:4&gt; f(1.0)
+=&gt; undef
+</code></pre>
+
+<h4>複合パターン</h4>
+
+<p>引数部にオブジェクトをそのまま記述すると<strong>オブジェクトパターン</strong>となります。リテラルパターンもオブジェクトパターンの一種とみなす事が出来ます。ヘッドに対するマッチングが行われ、その後各アーギュメントについて再帰的にマッチングが行われます。</p>
+
+<p>以下の例の関数<code>f</code>の定義域は、ヘッドが<code>Foo</code>であり、アーギュメントが3つあり、1つめのアーギュメントが定数0であるオブジェクト1つということになります。</p>
+
+<pre><code>amber:1&gt; f(Foo{0, x, y}): [x, y]
+=&gt; &lt;#Function:0xf6492bc4&gt;
+amber:2&gt; f(\Foo{0, 1, 2})
+=&gt; [1, 2]
+amber:3&gt; f(\Hoge{0, 1, 2})
+=&gt; undef
+amber:4&gt; f(\Foo{1, 2, 3})
+=&gt; undef
+</code></pre>
+
+<p>また記号<code>...</code>を用いてアーギュメントの個数を指定しないパターンも記述出来ます。以下の例ではヘッドが<code>Foo</code>で、アーギュメントが2個以上の値にマッチします。</p>
+
+<pre><code>amber:1&gt; f(Foo{x, y, ...}): [x, y]
+=&gt; &lt;#Function:0xf6492bb4&gt;
+amber:2&gt; f(\Foo{0})
+=&gt; undef
+amber:3&gt; f(\Foo{0, 1})
+=&gt; [0, 1]
+amber:4&gt; f(\Foo{0, 1, 2})
+=&gt; [0, 1]
+</code></pre>
+
+<p>以下のように<code>変数...</code>という記述によって、<code>...</code>にマッチする部分をリストとして取り出すことが出来ます。</p>
+
+<pre><code>amber:1&gt; f(Foo{x, y, z...}): [x, y, z]
+=&gt; &lt;#Function:0xf64966cc&gt;
+amber:2&gt; f(\Foo{0, 1, 2, 3, 4, 5})
+=&gt; [0, 1, [2, 3, 4, 5]]
+</code></pre>
+
+<p>この記法を利用した例として、リストの先頭を取り出す<code>front</code>、先頭以外を取り出す<code>tail</code>は以下の様に定義する事ができます。</p>
+
+<pre><code>amber:1&gt; front([a, ...]): a
+=&gt; &lt;#Function:0xf6487d1c&gt;
+amber:2&gt; tail([_, as...]): as
+=&gt; &lt;#Function:0xf6496c40&gt;
+amber:3&gt; front([1,2,3,4,5])
+=&gt; 1
+amber:4&gt; tail([1,2,3,4,5])
+=&gt; [2, 3, 4, 5]
+</code></pre>
+
+<p>最後に</p>
+
+<pre><code>シンボル(仮引数) @ 複合パターン
+</code></pre>
+
+<p>と記述する事によって、パターンマッチを行うと同時にオブジェクト自身を仮引数に束縛させる事が出来ます。</p>
+
+<pre><code>amber:1&gt; f(obj @ Foo{x, y}): [obj, x, y]
+=&gt; &lt;#Function:0xf6493ea0&gt;
+amber:2&gt; f(\Foo{1, 2})
+=&gt; [Foo{1, 2}, 1, 2]
+</code></pre>
+
+<h4>ガード節</h4>
+
+<pre><code>f(引数1, 引数2, ...) where ガード節 : 関数本体
+</code></pre>
+
+<p>や</p>
+
+<pre><code>(引数1, 引数2, ...) where ガード節 -&gt; 関数本体
+</code></pre>
+
+<p>という構文によって<strong>ガード節</strong>を記述出来ます。ガード節とは何らかの述語であって、パターンマッチを全て通過した後関数本体を実行する前にそれが実行されます。ガード節の評価結果が<code>true</code>の時のみ関数本体が実行されます。</p>
+
+<p>例えば自然数のみを受け取る関数を以下の様に定義する事ができます。</p>
+
+<pre><code>amber:1&gt; f(x) where x &gt;= 0 : "natural number"
+=&gt; &lt;#Function:0xf6488edc&gt;
+amber:2&gt; f(0)
+=&gt; "natural number"
+amber:3&gt; f(1)
+=&gt; "natural number"
+amber:4&gt; f(2)
+=&gt; "natural number"
+amber:5&gt; f(-1)
+=&gt; undef
+</code></pre>
+
+<h2>部分関数の融合</h2>
+
+<p>Amberの全ての関数は全オブジェクトの一部だけを受け取る<strong>部分関数</strong>です。
+この部分関数を<strong>融合</strong>して一つの関数を作成する事が出来ます。
+そのためには演算子<code>|</code>を用いて</p>
+
+<pre><code>f | g
+</code></pre>
+
+<p>の様に記述します。この関数に引数を渡すと<code>f</code>,<code>g</code>の順番にパターンマッチを行い、
+最初にマッチした方が呼ばれます。</p>
+
+<p>簡単な例として数値の絶対値を求める関数は</p>
+
+<pre><code>x where x &gt;= 0 -&gt; x
+</code></pre>
+
+<p>と</p>
+
+<pre><code>x where x &lt; 0 -&gt; -x
+</code></pre>
+
+<p>を融合すれば良いですから</p>
+
+<pre><code>amber:1&gt; abs: (x where x &gt;= 0 -&gt; x) | (x where x &lt; 0 -&gt; -x)
+=&gt; &lt;#Function:0xf64a4818&gt;
+amber:2&gt; abs(1)
+=&gt; 1
+amber:3&gt; abs(-1)
+=&gt; 1
+</code></pre>
+
+<p>の様にして作ることが出来ます。一行で書く場合にはこのようになるのですが、
+複数行で記述すれば括弧を用いず以下のようにすっきりと書くことが出来ます。
+<sup><a href="#1">1</a></sup></p>
+
+<pre><code>abs: x where x &gt;= 0 -&gt; -x
+   | x where x &lt; 0  -&gt; x
+</code></pre>
+
+<p>また、以下のように関数定義の構文をそのまま用いて記述する事が出来ます。</p>
+
+<pre><code>abs(x) where x &lt; 0  : x
+abs(x) where x &gt;= 0 : -x
+</code></pre>
+
+<p>ただしこの場合は<strong>後に書いた定義の方が優先される</strong>ので注意して下さい。例えばフィボナッチ関数は演算子<code>|</code>を用いる場合には</p>
+
+<pre><code>fib: 0 -&gt; 0
+   | 1 -&gt; 1
+   | n -&gt; fib(n-1) + fib(n-2)
+</code></pre>
+
+<p>となりますが、関数定義を並べて書く場合には</p>
+
+<pre><code>fib(n): fib(n-1) + fib(n-2)
+fib(0): 0
+fib(1): 1
+</code></pre>
+
+<p>と書かなければなりません。このような仕様になっている理由は定義文は一つ一つ独立していて、実行される毎にfibの定義が拡張されていくのだと考えるからです。
+このようにAmberでは特に関数の融合を<strong>関数の拡張</strong>と呼ぶ事があります。</p>
+
+<h3>Amberでの考え方</h3>
+
+<p>Amberの部分関数は任意のタイミングで自由に融合させる事が出来ます。
+例えば、</p>
+
+<pre><code>f(0): 1
+</code></pre>
+
+<p>という関数を作ったとします。0以外の引数に関しては<code>undef</code>が返ります。
+これに標準ライブラリにある恒等関数<code>id</code>を融合させると、「0以外には何もしない」という関数が出来ます。
+「0以外はエラーにしたい」という場面もあるかもしれません。そのような時は例外を送出する関数と融合すれば良いです。</p>
+
+<pre><code>amber:1&gt; f(0): 1
+=&gt; &lt;#Function:0xf6480eb8&gt;
+amber:2&gt; map(f, [0,1,2,3,4])
+=&gt; [1, undef, undef, undef, undef]
+amber:3&gt; map(f | id, [0,1,2,3,4])
+=&gt; [1, 1, 2, 3, 4]
+amber:4&gt; map(f | (n -&gt; throw "invalid number: " + n), [0,1,2,3,4])
+Error: "invalid number: 1"
+</code></pre>
+
+<p>仕様の定まったアプリケーションを作成する場合にはこのような機能は不要ですが、
+ライブラリを作成する場合や、将来的な拡張性を考えた場合には部分関数は大変便利です。
+後に説明するAmberの自己拡張機能はこの部分関数の融合のメカニズムによって実現しています。</p>
+
+<p>私は、関数が定義域外の値をどう処理するかは本来その関数のあずかり知らぬ事だから未定義値を返すのが自然だと考えています。
+例外を送出する、エラー番号を返却する等の処理を行う場合には関数の間に共通する決まり事が必要になり、関数の部品としての独立性が低下するからです。
+定義域外の値については<code>undef</code>を返し、呼び出す側がそれを柔軟に処理できる仕組みを用意するというのがAmberでの考え方です。</p>
+
+<h3>部分関数とスコープ</h3>
+
+<p>あるスコープ内でスコープの外側にある関数を拡張しても外側の関数は影響を受けません。
+演算子<code>|</code>を用いれば一時的な拡張、スコープを用いればスコープ内でのみの拡張、一番外側で融合すれば恒久的な関数の機能拡張が行えるという事になります。</p>
+
+<pre><code>f(0): 1
+{
+    f(0): 2
+    puts(f(0))      # =&gt; 2
+}
+puts(f(0))          # =&gt; 1
+</code></pre>
+
+<h2>パターンマッチングを用いた変数定義</h2>
+
+<p>Amberではパターンマッチングを利用して変数定義・変数への代入を行う事が出来ます。
+関数定義で利用出来る任意のパターンを使う事が出来ます。</p>
+
+<pre><code>amber:1&gt; (1, (2, 3))
+=&gt; (1, (2, 3))
+amber:2&gt; (x, y): %
+=&gt; (1, (2, 3))
+amber:3&gt; x
+=&gt; 1
+amber:4&gt; y
+=&gt; (2, 3)
+amber:5&gt; (x, y) = (y, x)
+=&gt; ((2, 3), 1)
+amber:6&gt; x
+=&gt; (2, 3)
+amber:7&gt; y
+=&gt; 1
+</code></pre>
+
+<p>関数定義の場合との違いは、マッチングに失敗した場合にはエラーとなるという事です。</p>
+
+<pre><code>amber:1&gt; (x, y): (1, 2, 3)
+Error: MatchingFailed{[amber:1], pattern{(x, y)}, value{(1, 2, 3)}}
+</code></pre>
+
+<hr />
+
+<ul>
+<li><a name="1">[1]</a> 現状の実装ではシェルでこの入力はできません。ファイルに記述する場合限定です。シェルでの複数行文の入力については次回説明します。</li>
+</ul>
+
 
 
   <div class="pagination">
   
-  <a class="prev" href="4.html">前のページ</a>
+  <a class="prev" href="5.html">前のページ</a>
   
   
   <a class="index" href="index.html">目次</a>
@@ -140,7 +437,7 @@ while文
   
 
 
-<time datetime="2013-02-14T21:06:27+09:00" pubdate data-updated="true">Feb 14<span>th</span>, 2013</time>
+<time datetime="2013-02-19T21:14:49+09:00" pubdate data-updated="true">Feb 19<span>th</span>, 2013</time>
         
       </p>
       
