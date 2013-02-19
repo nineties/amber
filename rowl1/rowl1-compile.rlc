@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2013-02-19 21:45:23 nineties $
+; $Id: rowl1-compile.rlc 2013-02-19 22:53:25 nineties $
 ;
 
 (import "rlvm-compile")
@@ -900,9 +900,8 @@
     (put_dup asm)
     (put_undef asm)
     (put_if_ne asm lbl)
-    (put_push asm rhs)
     (put_push asm lhs)
-    (compile_simple_call asm 2 matching_failed)
+    (compile_simple_call asm 1 matching_failed)
     (put_throw asm)
 
     (set_label asm lbl)
@@ -1325,10 +1324,16 @@
     ))
 
 (fun compile_if (asm mod expr) (
+    (if (in_top_scope mod)
+        (return (compile_function asm 0 mod 0 expr noguard @C_NIL))
+        )
     (compile_ifelse_main asm mod (node_arg expr 0) (node_arg expr 1) @C_NIL)
     ))
 
 (fun compile_ifelse (asm mod expr) (
+    (if (in_top_scope mod)
+        (return (compile_function asm 0 mod 0 expr noguard @C_NIL))
+        )
     (compile_ifelse_main asm mod (node_arg expr 0) (node_arg expr 1) (node_arg expr 2))
     ))
 
@@ -1469,6 +1474,10 @@
 ; exit:
 ;
 (fun compile_while (asm mod expr) (
+    (if (in_top_scope mod)
+        (return (compile_function asm 0 mod 0 expr noguard @C_NIL))
+        )
+
     (var cnd (node_arg expr 0))
     (var body (node_arg expr 1))
     (var exit_lbl (fresh_label asm))
@@ -1505,6 +1514,10 @@
 ; }
 
 (fun compile_for (asm mod expr) (
+    (if (in_top_scope mod)
+        (return (compile_function asm 0 mod 0 expr noguard @C_NIL))
+        )
+
     (var i (node_arg expr 0))
     (var ary (node_arg expr 1))
     (var body (node_arg expr 2))
@@ -1525,6 +1538,10 @@
     ))
 
 (fun compile_revfor (asm mod expr) (
+    (if (in_top_scope mod)
+        (return (compile_function asm 0 mod 0 expr noguard @C_NIL))
+        )
+
     (var i (node_arg expr 0))
     (var ary (node_arg expr 1))
     (var body (node_arg expr 2))
@@ -1557,6 +1574,10 @@
 ; }
 
 (fun compile_range_for (asm mod expr) (
+    (if (in_top_scope mod)
+        (return (compile_function asm 0 mod 0 expr noguard @C_NIL))
+        )
+
     (var i (node_arg expr 0))
     (var rng (node_arg expr 1))
     (var a (node_arg rng 0))
@@ -1589,6 +1610,10 @@
 ; }
 
 (fun compile_range_revfor (asm mod expr) (
+    (if (in_top_scope mod)
+        (return (compile_function asm 0 mod 0 expr noguard @C_NIL))
+        )
+
     (var i (node_arg expr 0))
     (var rng (node_arg expr 1))
     (var a (node_arg rng 0))
@@ -1675,9 +1700,8 @@
     (put_dup asm)
     (put_undef asm)
     (put_if_ne asm lbl)
-    (put_push asm rhs)
     (put_push asm lhs)
-    (compile_simple_call asm 2 matching_failed)
+    (compile_simple_call asm 1 matching_failed)
     (put_throw asm)
     (set_label asm lbl)
 
