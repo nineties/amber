@@ -1,0 +1,486 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>チュートリアル6: 制御構造 - Amber</title>
+  <meta name="author" content="Koichi Nakamura">
+
+  
+  <meta name="description" content="前のページ 目次 チュートリアル6: 制御構造 Feb 20th, 2013 Amberの基本的な制御構造には以下の物があります。 ブロック
+シーケンス
+if文
+while文
+for文
+例外機構 ブロック 複数の文を記号{と}で囲むとブロックとなります。ブロック内部の文は順番に実行され、 &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://nineties.github.com/amber/ja/tutorial/7.html">
+  <link href="/amber/favicon.png" rel="icon">
+  <link href="/amber/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <script src="/amber/javascripts/modernizr-2.0.js"></script>
+  <script src="/amber/javascripts/ender.js"></script>
+  <script src="/amber/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/amber/atom.xml" rel="alternate" title="Amber" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+
+  
+
+</head>
+
+<body    class="collapse-sidebar sidebar-footer" >
+  <header role="banner"><hgroup>
+  
+      <h1><a href="/amber/ja/">Amber</a></h1>
+  
+  
+    <h2>A Language for High-Level Programming with Self-Extension</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/amber/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:nineties.github.com/amber" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  
+    
+    <li><a href="/amber/blog">Blog</a></li>
+    <li><a href="/amber/ja/feature.html">特徴</a></li>
+    <li><a href="/amber/ja/tutorial">チュートリアル</a></li>
+    <li><a href="/amber/ja/reference">リファレンス</a></li>
+    <li><a href="/amber/ja/implementation">実装</a></li>
+    <li><a href="/amber//tutorial/7.html">English</a></li>
+  
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article role="article">
+  
+  <header>
+  <div class="pagination">
+  
+  <a class="prev" href="6.html">前のページ</a>
+  
+  
+  <a class="index" href="index.html">目次</a>
+  
+  
+  </div>
+    <h1 class="entry-title">チュートリアル6: 制御構造</h1>
+    <p class="meta">
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2013-02-20T08:06:45+09:00" pubdate data-updated="true">Feb 20<span>th</span>, 2013</time></p>
+  </header>
+  
+
+  <p>Amberの基本的な制御構造には以下の物があります。</p>
+
+<ul>
+<li><a href="#block">ブロック</a></li>
+<li><a href="#sequence">シーケンス</a></li>
+<li><a href="#if">if文</a></li>
+<li><a href="#while">while文</a></li>
+<li><a href="#for">for文</a></li>
+<li><a href="#exception">例外機構</a></li>
+</ul>
+
+
+<h2><a name="block">ブロック</a></h2>
+
+<p>複数の文を記号<code>{</code>と<code>}</code>で囲むと<strong>ブロック</strong>となります。ブロック内部の文は順番に実行され、最後の文の評価値がブロックの評価値となります。文が一つも無いブロック(空ブロック)の評価値は<code>nil</code>です。
+ブロックの内部は新しいスコープとなります。</p>
+
+<pre><code>{
+    文1
+    文2
+    ...
+}
+</code></pre>
+
+<p>ブロック内の各文はインデントが揃っていなければなりません。以下の様にインデントがずれていると文法エラーとなります。インデント幅は任意です。</p>
+
+<pre><code>{
+    puts("Hello")
+  puts("World")
+}
+</code></pre>
+
+<p>記号<code>{</code>、<code>}</code>を用いない形式のブロックもありますがこれは後ほど紹介します。</p>
+
+<h2><a name="sequence">シーケンス</a></h2>
+
+<pre><code>seq {
+    文1
+    文2
+    ...
+}
+</code></pre>
+
+<p>と記述すると<strong>シーケンス</strong>となります。ブロックと同様に文を順番に実行しますがスコープを作りません。例えば以下のようにシーケンスの外から内部の定義を参照する事が出来ます。</p>
+
+<pre><code>seq {
+    x: 0
+}
+puts(x)         # =&gt; 0
+</code></pre>
+
+<p>シーケンスは主に<strong>マクロ</strong>の実装などに利用します。普段のプログラミングで使用する場面は少ないでしょう。</p>
+
+<p>また、演算子<code>;</code>を利用して</p>
+
+<pre><code>文1; 文2; 文3; ...
+</code></pre>
+
+<p>と記述してもシーケンスとなります。</p>
+
+<pre><code>文;
+</code></pre>
+
+<p>は</p>
+
+<pre><code>文; nil
+</code></pre>
+
+<p>の略となります。これはAmberのシェルを使う場合にいちいち評価値が表示されるのが煩わしい場合に利用出来る記法です。以下の様になります。</p>
+
+<pre><code>amber:1&gt; x: [1,2,3,4,5]
+=&gt; [1, 2, 3, 4, 5]
+amber:2&gt; y: [1,2,3,4,5];
+=&gt; nil
+</code></pre>
+
+<h2><a name="if">if文</a></h2>
+
+<pre><code>if (条件文) ブロック
+</code></pre>
+
+<p>と記述すると<strong>if文</strong>となります。これは条件分岐を表して「条件文」が<strong>trueを返す時</strong>には「ブロック」が実行されそれ以外では<code>nil</code>となります。
+Amberでは真を表すのはシンボル<code>true</code>のみです。その他の条件文を実行してその他のオブジェクトが返った場合には全て偽として扱われます。<sup><a href="#1">1</a></sup></p>
+
+<pre><code>if (条件文) ブロック1 else ブロック2
+</code></pre>
+
+<p>と記述すると<strong>if-else文</strong>となります。「条件文」が<code>true</code>を返した場合には「ブロック1」がそれ以外は「ブロック2」が実行されます。以前書いたフィボナッチ関数の例を条件分岐により定義してみると</p>
+
+<pre><code>fib(n): {
+    if (n &lt; 2) {
+        n
+    } else {
+        fib(n-1) + fib(n-2)
+    }
+}
+</code></pre>
+
+<p>となります。</p>
+
+<h3><code>{</code>と<code>}</code>の省略</h3>
+
+<p>ブロックを表す<code>{</code>と<code>}</code>は省略する事が出来ます。先ほどの<code>fib</code>の例は以下のようにも書けます。</p>
+
+<pre><code>fib(n):
+    if (n &lt; 2)
+        n
+    else
+        fib(n-1) + fib(n-2)
+</code></pre>
+
+<p>ブロックの区切りはインデントで識別されるので文が2つ以上の場合には各文のインデントを揃えて下さい。</p>
+
+<pre><code>hello():
+    print("Hello")
+    print(" ")
+    print("World")
+    print("\n")
+
+hello()     # =&gt; Hello World
+</code></pre>
+
+<p><code>{</code>と<code>}</code>が無くてもスコープは作られますので注意して下さい。</p>
+
+<h3>シェルでの複数行の文の入力</h3>
+
+<p>シェルでは<strong>まだ入力途中だと判断出来る場合</strong>にのみ次の行に継続します。例えば以下の例を見て下さい。</p>
+
+<pre><code>amber:1&gt; if true
+amber:1~        puts("Hello")
+Hello
+=&gt; nil
+</code></pre>
+
+<p><code>if true</code>の時点ではif文の途中だと判断されるので次の行に継続してプロンプトが<code>~</code>に変わっています。しかし<code>puts("Hello")</code>の時点でif文の入力が終わったと判断されます。従ってシェルで複数行のブロックを入力する場合には<strong><code>{</code>と<code>}</code>が必須</strong>です。</p>
+
+<p>if-else文を書く場合には以下のように書きます。</p>
+
+<pre><code>amber:1&gt; if true {
+amber:1~        puts("true")
+amber:1~ } else {
+amber:1~        puts("false")
+amber:1~ }
+true
+=&gt; nil
+</code></pre>
+
+<p>以後のステートメントについても同様です。</p>
+
+<h2><a name="while">while文</a></h2>
+
+<pre><code>while (条件式) ブロック
+</code></pre>
+
+<p>と記述すると<strong>while文</strong>となります。「条件式」が<code>true</code>である間繰り返して「ブロック」が実行されます。while文の評価値は常に<code>nil</code>となります。</p>
+
+<h2><a name="for">for文</a></h2>
+
+<pre><code>for (パターン in 式) ブロック
+</code></pre>
+
+<p>と記述すると<strong>for文</strong>となります。この文は「式」の評価値の各要素を順番に「パターン」に代入しながら「ブロック」を実行します。</p>
+
+<p>例えば、リストの要素を順番にイテレートするならば以下のようになります。</p>
+
+<pre><code>amber:1&gt; for (v in [1,2,3,4,5]) {
+amber:1~        puts(v)
+amber:1~ }
+1
+2
+3
+4
+5
+=&gt; nil
+</code></pre>
+
+<p>また、ペアのリストを順番にイテレートするならばパターンを用いて以下のように記述します。</p>
+
+<pre><code>amber:1&gt; for ((x, y) in [(1, 2), (3, 4), (5, 6)]) {
+amber:1~        puts(x + y)
+amber:1~ }
+3
+7
+11
+=&gt; nil
+</code></pre>
+
+<p>同様に配列やテーブルのイテレーションも出来ます。ユーザが定義したオブジェクトでも<code>each</code>という関数を備えていればfor文を利用する事が出来ます。詳しくは<a href="/amber/ja/reference/std/for-statement.html">標準ライブラリ:for文</a>を参照して下さい。</p>
+
+<h3>Rangeオブジェクト</h3>
+
+<pre><code>整数1..整数2
+</code></pre>
+
+<p>と記述すると「整数1」以上、「整数2」以下を表す<strong>Range</strong>オブジェクトとなります。これを用いると整数を順番にイテレートするfor文を記述出来ます。</p>
+
+<pre><code>amber:1&gt; for (i in 1..5) {
+amber:1~        puts(i)
+amber:1~ }
+1
+2
+3
+4
+5
+=&gt; nil
+</code></pre>
+
+<h3>break文とcontinue文</h3>
+
+<p>while文、for文のいずれにおいても<strong>break文</strong>によってループを中断する事が出来ます。</p>
+
+<pre><code>amber:1&gt; for (v in [1,2,3,4,5]) {
+amber:1~        if (v == 3) break
+amber:1~        puts(v)
+amber:1~ }
+1
+2
+=&gt; nil
+</code></pre>
+
+<p>また<strong>continue文</strong>を用いるとイテレーションを中断し、次のイテレーションにスキップする事が出来ます。</p>
+
+<pre><code>amber:1&gt; for (v in [1,2,3,4,5]) {
+amber:1~        if (v == 3) continue
+amber:1~        puts(v)
+amber:1~ }
+1
+2
+4
+5
+=&gt; nil
+</code></pre>
+
+<h2><a name="exception">例外機構</a></h2>
+
+<h3>throw文</h3>
+
+<pre><code>throw 式
+</code></pre>
+
+<p>と記述すると<strong>throw文</strong>となります。任意の値を投げる事が出来、
+後述する<strong>try-catch文</strong>によってその値を受け取る事が出来ます。</p>
+
+<h3>try-catch文</h3>
+
+<pre><code>try
+    文
+catch
+    式
+</code></pre>
+
+<p>と記述すると「文」の実行中に投げられた値は「式」(ハンドラ)によってキャッチされます。
+ハンドラの部分には任意の関数を記述する事が出来ます。</p>
+
+<pre><code>amber:1&gt; try
+amber:1~        throw "ERROR"
+amber:1~ catch e -&gt; {
+amber:1~        puts(e)
+amber:1~ }
+ERROR
+=&gt; nil
+</code></pre>
+
+<p>投げられた値がハンドラの定義域外であった場合にはキャッチされず、更に外側のtry-catch文に向かって送出されます。</p>
+
+<pre><code>amber:1&gt; try
+amber:1~        try
+amber:1~                throw 0
+amber:1~        catch 1 -&gt; {
+amber:1~                puts("caught 1")
+amber:1~        }
+amber:1~ catch 0 -&gt; {
+amber:1~        puts("caught 0")
+amber:1~ }
+caught 0
+=&gt; nil
+</code></pre>
+
+<hr />
+
+<ul>
+<li><a name="1">[1]</a> ここの仕様がどうあるべきかについてはまだ悩んでいます。今後変更になる可能性があります。</li>
+</ul>
+
+
+
+  <div class="pagination">
+  
+  <a class="prev" href="6.html">前のページ</a>
+  
+  
+  <a class="index" href="index.html">目次</a>
+  
+  
+  </div>
+  
+    <footer>
+      <p class="meta">
+        
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2013-02-20T08:06:45+09:00" pubdate data-updated="true">Feb 20<span>th</span>, 2013</time>
+        
+      </p>
+      
+        <div class="sharing">
+  
+  <a href="http://twitter.com/share" class="twitter-share-button" data-url="http://nineties.github.com/amber/ja/tutorial/7.html" data-via="9_ties" data-counturl="http://nineties.github.com/amber/ja/tutorial/7.html" >Tweet</a>
+  
+  
+  
+</div>
+
+      
+    </footer>
+  
+
+</article>
+</div>
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2013 - Koichi Nakamura -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'nineties';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://nineties.github.com/amber/ja/tutorial/7.html';
+        var disqus_url = 'http://nineties.github.com/amber/ja/tutorial/7.html';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+
+
+
+
+  <script type="text/javascript">
+    (function(){
+      var twitterWidgets = document.createElement('script');
+      twitterWidgets.type = 'text/javascript';
+      twitterWidgets.async = true;
+      twitterWidgets.src = 'http://platform.twitter.com/widgets.js';
+      document.getElementsByTagName('head')[0].appendChild(twitterWidgets);
+    })();
+  </script>
+
+
+
+
+
+</body>
+</html>
