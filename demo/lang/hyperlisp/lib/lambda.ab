@@ -28,7 +28,7 @@ module HyperLisp {
     # Create sexp which represents the position of metaliteral X
     point: (X, X)      -> one
          | (Y@Meta, X) -> zero
-         | (z, X) where z == zero -> zero
+         | (z, X) when z == zero -> zero
          | (Eq{x, y}, X) -> {
                px: point(x, X)
                py: point(y, X)
@@ -36,7 +36,7 @@ module HyperLisp {
                if (py == zero) return px
                throw `DuplicatedParameter{!X}
            }
-         | (x, X) where head(x.car) == \Whole -> { # [.x] or (.x)
+         | (x, X) when head(x.car) == \Whole -> { # [.x] or (.x)
                point(x.car[0], X)
            }
          | (x, X) -> { # [x,y,z] or (x,y,z)
@@ -48,13 +48,13 @@ module HyperLisp {
            }
 
     compile_as_sexp
-        : (p, z) where z == zero -> (zero, zero)
+        : (p, z) when z == zero -> (zero, zero)
         | (p, X@Meta) -> {
               pos: point(p, X)
               if (pos == zero) return (zero, X)
               (snoc(pos, zero), zero)
           }
-        | (p, x) where atom(x) -> {
+        | (p, x) when atom(x) -> {
               (p1, b1): compile_as_sexp(p, x.car)
               (p2, b2): compile_as_sexp(p, x.cdr)
               (cons(p1, p2), snoc(b1, b2))
@@ -65,8 +65,8 @@ module HyperLisp {
               (cons(p1, p2), cons(b1, b2))
           }
 
-    compile_arg: (p, x) where p == zero -> zero
-               | (p, x) where p == one  -> x
+    compile_arg: (p, x) when p == zero -> zero
+               | (p, x) when p == one  -> x
                | (p, x) -> {
                      p1: compile_arg(p.car, `(!x).car)
                      if (p1 != zero) return p1
@@ -74,16 +74,16 @@ module HyperLisp {
                  }
 
     compile_eval
-        : (p, x) where atom(p) -> compile_arg(p.car, \x)
+        : (p, x) when atom(p) -> compile_arg(p.car, \x)
         | (p, x@Meta)   -> `\!x[0]
         | (p, x@Symbol) -> `\!x
-        | (p, x) where x.car == \cond
+        | (p, x) when x.car == \cond
             -> compile_cond(p.cdr, x.cdr)
         | (p, x) -> compile_apply(p, x, atom(x))
 
     compile_evlis
-        : (p, x) where atom(p) -> compile_arg(p.car, \x)
-        | (p, x) where x == zero -> `\!zero
+        : (p, x) when atom(p) -> compile_arg(p.car, \x)
+        | (p, x) when x == zero -> `\!zero
         | (p, x) -> `cons(!compile_eval(p.car, x.car),
                           !compile_evlis(p.cdr, x.cdr))
 
@@ -91,46 +91,46 @@ module HyperLisp {
         `(!compile_obj(p.car, x.car))(!compile_obj(p.cdr, x.cdr))
     compile_apply(p, x, \false):
         `(!compile_obj(p.car, x.car))(!compile_evlis(p.cdr, x.cdr))
-    compile_apply(p, x, f) where x.car == \cons: {
+    compile_apply(p, x, f) when x.car == \cons: {
         a: compile_(p.cdr.car, x.cdr.car, f)
         b: compile_(p.cdr.cdr.car, x.cdr.cdr.car, f)
         `cons(!a,!b)
     }
-    compile_apply(p, x, f) where x.car == \snoc: {
+    compile_apply(p, x, f) when x.car == \snoc: {
         a: compile_(p.cdr.car, x.cdr.car, f)
         b: compile_(p.cdr.cdr.car, x.cdr.cdr.car, f)
         `snoc(!a, !b)
     }
-    compile_apply(p, x, f) where x.car == \car: {
+    compile_apply(p, x, f) when x.car == \car: {
         a: compile_(p.cdr.car, x.cdr.car, f)
         `at(!a, 0)
     }
-    compile_apply(p, x, f) where x.car == \cdr: {
+    compile_apply(p, x, f) when x.car == \cdr: {
         a: compile_(p.cdr.car, x.cdr.car, f)
         `at(!a, 1)
     }
-    compile_apply(p, x, f) where x.car == \eq: {
+    compile_apply(p, x, f) when x.car == \eq: {
         a: compile_(p.cdr.car, x.cdr.car, f)
         b: compile_(p.cdr.cdr.car, x.cdr.cdr.car, f)
         `((!a == !b) ? \!one : \!zero)
     }
-    compile_apply(p, x, f) where x.car == \null: {
+    compile_apply(p, x, f) when x.car == \null: {
         a: compile_(p.cdr.car, x.cdr.car, f)
         `((!a == !zero) ? \!one : \!zero)
     }
-    compile_apply(p, x, f) where x.car == \atom: {
+    compile_apply(p, x, f) when x.car == \atom: {
         a: compile_(p.cdr.car, x.cdr.car, f)
         `(atom(!a) ? \!one : \!zero)
         }
-    compile_apply(p, x, f) where x.car == \puts: {
+    compile_apply(p, x, f) when x.car == \puts: {
         a: compile_(p.cdr.car, x.cdr.car, f)
         `puts(!a)
     }
-    compile_apply(p, x, f) where x.car == \exit: 
+    compile_apply(p, x, f) when x.car == \exit: 
         exit(0)
-    compile_apply(p, x, f) where x.car == one:
+    compile_apply(p, x, f) when x.car == one:
         compile_(p.cdr.car, x.cdr.car, f)
-    compile_apply(p, x, f) where x.car == zero: `\!zero
+    compile_apply(p, x, f) when x.car == zero: `\!zero
 
     compile_cond(p, x): {
         condition: compile_condition(p.car.car, x.car.car)
@@ -141,31 +141,31 @@ module HyperLisp {
         else
             `IfElse{!condition, !body1, !body2}
     }
-    compile_cond(p, x) where x == zero: `\!zero
+    compile_cond(p, x) when x == zero: `\!zero
 
     compile_condition(p, x): `atom(!compile_eval(p, x))
-    compile_condition(p, x) where x.car == \eq: {
+    compile_condition(p, x) when x.car == \eq: {
         a: compile_(p.cdr.car, x.cdr.car, atom(x))
         b: compile_(p.cdr.cdr.car, x.cdr.cdr.car, atom(x))
         `(!a == !b)
     }
-    compile_condition(p, x) where x.car == \null: {
+    compile_condition(p, x) when x.car == \null: {
         a: compile_(p.cdr.car, x.cdr.car, atom(x))
         `(!a == \!zero)
     }
-    compile_condition(p, x) where x.car == \atom: {
+    compile_condition(p, x) when x.car == \atom: {
         a: compile_(p.cdr.car, x.cdr.car, atom(x))
         `atom(!a)
     }
-    compile_condition(p, x) where x == snoc(one, snoc(one, zero)): \true
+    compile_condition(p, x) when x == snoc(one, snoc(one, zero)): \true
 
     compile_(p, x, \true): compile_obj(p, x)
     compile_(p, x, \false): compile_eval(p, x)
     compile_obj
-        : (p, x) where atom(p) -> compile_arg(p.car, \x)
+        : (p, x) when atom(p) -> compile_arg(p.car, \x)
         | (p, x@Meta)   -> rename(x[0])
         | (p, x@Symbol) -> rename(x)
-        | (p, x) where x == zero -> `\!zero
+        | (p, x) when x == zero -> `\!zero
         | (p, x@Cons) -> {
             a: compile_obj(p.car, x.car)
             b: compile_obj(p.cdr, x.cdr)
@@ -199,8 +199,8 @@ module HyperLisp {
         cons_list([\label, p, b])
 
     # compile label-expression as a native function of Amber.
-    replace_label: (n, p, b) where p == zero -> b
-                 | (n, p, b) where atom(p)   -> n
+    replace_label: (n, p, b) when p == zero -> b
+                 | (n, p, b) when atom(p)   -> n
                  | (n, p, b@Cons)
                    -> cons(replace_label(n, p.car, b.car),
                            replace_label(n, p.cdr, b.cdr))
@@ -235,7 +235,7 @@ module HyperLisp {
         amber::define_global_variable(rename(sym), fun)
         sym
     }
-    eval_(x) where x.car == \Meta{Delta}: eval_define(x)
+    eval_(x) when x.car == \Meta{Delta}: eval_define(x)
     eval_(x@Meta): throw `UndefinedMetaLiteral{!x}
 
     # lambda-abstraction and label-expression is just a syntax sugar.
@@ -244,9 +244,9 @@ module HyperLisp {
     hl_expr_macro ::= old_hl_expr { macro($0) }
     ReplaceSyntax{hl_expr, hl_expr_macro}
 
-    macro: x@Cons where x.car == \Meta{Lambda} -> compile_lambda(x)
-         | x@Cons where x.car == \Meta{Label}  -> compile_label(x)
-         | x where x == zero -> zero
+    macro: x@Cons when x.car == \Meta{Lambda} -> compile_lambda(x)
+         | x@Cons when x.car == \Meta{Label}  -> compile_label(x)
+         | x when x == zero -> zero
          | x@Cons -> cons(macro(x.car), macro(x.cdr))
          | x@Snoc -> snoc(macro(x.car), macro(x.cdr))
          | x -> x

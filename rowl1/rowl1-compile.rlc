@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2013-02-19 22:53:25 nineties $
+; $Id: rowl1-compile.rlc 2013-02-20 16:57:12 nineties $
 ;
 
 (import "rlvm-compile")
@@ -78,7 +78,7 @@
     ))
 
 (fun delete_args (node fv) (
-    (if (== (node_bhead node) Where)
+    (if (== (node_bhead node) When)
         (return (iter_args list_delete (node_arg node 0) fv 0))
         (return (iter_args list_delete node fv 0))
         )
@@ -89,7 +89,7 @@
     ))
 
 (fun collect_args (args) (
-    (if (== (node_bhead args) Where)
+    (if (== (node_bhead args) When)
         (return (iter_args add_var (node_arg args 0) 0 0))
         (return (iter_args add_var args 0 0))
         )
@@ -128,7 +128,7 @@
         (if (== hd Lambda) (do
             (= fv (fv_iter mod (node_arg expr 1) 0 fv))
             (var arg (node_arg expr 0))
-            (if (== (node_bhead arg) Where)
+            (if (== (node_bhead arg) When)
                 (= fv (fv_iter mod (node_arg arg 1) 0 fv))
                 )
             (return (delete_args (node_arg expr 0) fv))
@@ -162,7 +162,7 @@
 ; This routine also translates
 ; f(... x ... x ...) : body
 ; to
-; f(... x ... y ...) where x==y : body
+; f(... x ... y ...) when x==y : body
 (extern fun list_to_table)
 (fun alpha_args_iter (tbl chk rep expr level) (
     (if (is_symbol expr) (do
@@ -233,7 +233,7 @@
 (fun alpha_args (tbl args) (
     (var chk (struct 1 0))
     (var rep (struct 1 0))
-    (if (== (node_bhead args) Where)
+    (if (== (node_bhead args) When)
         (do
             (node_arg_set args 0
                 (alpha_args_iter tbl chk rep (node_arg args 0) 0)) 
@@ -246,7 +246,7 @@
             (var guard (setup_guard rep @C_NIL))
             (if (== guard @C_NIL)
                 (return args)
-                (return (make_object2 Where args guard))
+                (return (make_object2 When args guard))
                 )
         ))
     ))
@@ -481,7 +481,7 @@
         ))
     (if (== hd Lambda) (do
         (var lhs (node_arg expr 0))
-        (if (== (node_bhead lhs) Where)
+        (if (== (node_bhead lhs) When)
             (node_arg_set lhs 1 (subst_clsvars tbl cls (node_arg lhs 1)))
             )
         (node_arg_set expr 1 (subst_clsvars tbl cls (node_arg expr 1)))
@@ -1789,7 +1789,7 @@
     (var hd (node_bhead lhs))
     (if (== hd List)
         (compile_lambda_main asm mod lhs body noguard cls)
-    (if (== hd Where)
+    (if (== hd When)
         (do
             (var guard (node_arg lhs 1))
             (var args (node_arg lhs 0))
