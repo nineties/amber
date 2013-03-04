@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2013-02-19 01:21:14 nineties $
+; $Id: rowl1-node.rlc 2013-03-02 11:49:44 nineties $
 ;
 
 (import "rlvm-compile")
@@ -42,7 +42,7 @@
 (export var Subscript   (to_sym "Subscript"))
 (export var Located     (to_sym "Located"))
 (export var Domain      (to_sym "Domain"))
-(export var When       (to_sym "When"))
+(export var When        (to_sym "When"))
 (export var Ellipsis    (to_sym "Ellipsis"))
 (export var Quote       (to_sym "Quote"))
 (export var QuasiQuote  (to_sym "QuasiQuote"))
@@ -74,11 +74,11 @@
 (export var BeginModule   (to_sym "BeginModule"))
 (export var EndModule     (to_sym "EndModule"))
 
-(export var Dynamic     (to_sym "Dynamic"))
 (export var Qualified   (to_sym "Qualified"))
 (export var Assign      (to_sym "Assign"))
 (export var Lambda      (to_sym "Lambda"))
 (export var Fusion      (to_sym "Fusion"))
+(export var Delegate    (to_sym "Delegate"))
 (export var Return      (to_sym "Return"))
 (export var Try         (to_sym "Try"))
 (export var Throw       (to_sym "Throw"))
@@ -91,7 +91,7 @@
 (export var Rewrite     (to_sym "rewrite"))
 
 ; for parser
-(export var Parser (to_builtin_sym "%Parser"))
+(export var Parser (to_builtin_sym "Parser"))
 
 (export var OneOf      (to_sym "OneOf"))
 (export var NoneOf     (to_sym "NoneOf"))
@@ -101,14 +101,12 @@
 (export var Many1      (to_sym "Many1"))
 (export var And        (to_sym "And"))
 ; Amber's original syntax elements
-(export var Scoped     (to_sym "Scoped"))
 (export var ParseWith  (to_sym "ParseWith"))
 (export var Aligned    (to_sym "Aligned"))
 (export var Delimited  (to_sym "Delimited"))
 (export var Delimited1 (to_sym "Delimited1"))
 (export var Delimited2 (to_sym "Delimited2"))
 (export var NoSpace    (to_sym "NoSpace"))
-(export var WithBlank  (to_sym "WithBlank"))
 
 (export var Some   (to_sym "Some"))
 
@@ -262,6 +260,15 @@
 (export fun is_expr (obj) (
     (if (== (node_type obj) @ExprE) (return @TRUE) (return @FALSE))
     ))
+(export fun is_function (obj) (
+    (var ty (node_type obj))
+    (if (|| (== ty @FunctionE)
+        (|| (== ty @BoundFunctionE)
+            (== ty @DelegateFunctionE)))
+        (return @TRUE)
+        (return @FALSE)
+        )
+    ))
 
 (fun is_atom_type (ty) (
     (if (|| (== ty @ExprE) (|| (== ty @ListE) (|| (== ty @TupleE) (== ty @ArrayE))))
@@ -321,6 +328,7 @@
         (@BytecodeE         . (return (to_sym "Bytecode")))
         (@FunctionE         . (return (to_sym "Function")))
         (@BoundFunctionE    . (return (to_sym "Function")))
+        (@DelegateFunctionE . (return (to_sym "Function")))
         (@InputFileStreamE  . (return (to_sym "InputFileStream")))
         (@OutputFileStreamE . (return (to_sym "OutputFileStream")))
         (@ModuleE           . (return (to_sym "Module")))
@@ -348,6 +356,7 @@
         (@BytecodeE         . (return Bytecode))
         (@FunctionE         . (return Function))
         (@BoundFunctionE    . (return Function))
+        (@DelegateFunctionE . (return Function))
         (@InputFileStreamE  . (return InputFileStream))
         (@OutputFileStreamE . (return OutputFileStream))
         (@ModuleE           . (return Module))
@@ -458,7 +467,7 @@
 (export fun node_arg_set (expr idx val) (
     (if (is_atom expr)
         (throw (invalid_argument current_loc
-        (string "Can't rewrite fields of builtin object") expr)))
+        (string "Can't modify fields of builtin object") expr)))
     (if (is_list expr)  (return (list_store_check expr idx val)))
     (if (is_tuple expr) (return (tuple_store expr idx val)))
     (if (is_array expr) (return (array_store expr idx val)))
@@ -558,8 +567,8 @@
     (return (make_object1 Unquote expr))
     ))
 
-(export fun dynamic (sym) (
-    (return (make_object1 Dynamic sym))
+(export fun mknot (e) (
+    (return (make_object1 Not e))
     ))
 
 (export fun ifelse (cnd then else) (
@@ -653,6 +662,7 @@
         (@BytecodeE         . (return (string "Bytecode")))
         (@FunctionE         . (return (string "Function")))
         (@BoundFunctionE    . (return (string "Function")))
+        (@DelegateFunctionE . (return (string "Function")))
         (@InputFileStreamE  . (return (string "InputFileStream")))
         (@OutputFileStreamE . (return (string "OutputFileStream")))
         (@ModuleE           . (return (string "Module")))

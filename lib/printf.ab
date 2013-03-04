@@ -1,37 +1,24 @@
 # Copyright (C) 2010 nineties
 #
-# $Id: printf.ab 2013-02-15 16:56:46 nineties $
+# $Id: printf.ab 2013-03-05 01:05:50 nineties $
 
-module std {
-    ### Format string
-    # XXX: Not good implementation (should not define new syntax)
-
-    format_string_element
-        ::= "%" [sSdXobpf] { $input }
-          | "%" .   { throw `SyntaxError{!LOCATION,
-                        "Invalid format string", !($0 + $1)}
-                    }
-          | nospace( [^%\""]+ ) { $input.unescape }
-    
-    format_string
-        ::= nospace( ('"' format_string_element* '"') ) { $0[1] }
-    
-    module printf {
+module Std {
+    module Printf {
         compile_printf(io, fmt, args):
             loop: ([], [], ls)
-                    -> `Block{!std::reverse(ls)}
+                    -> `Block{!Std::reverse(ls)}
                 | (["%s", fs...], [s, ss...], ls)
-                    -> loop(fs, ss, std::cons(`print(!io, !s), ls))
+                    -> loop(fs, ss, Std::cons(`print(!io, !s), ls))
                 | (["%S", fs...], [s, ss...], ls)
-                    -> loop(fs, ss, std::cons(`print(!io, !s), ls))
+                    -> loop(fs, ss, Std::cons(`print(!io, !s), ls))
                 | (["%d", fs...], [s, ss...], ls)
-                    -> loop(fs, ss, std::cons(`print(!io, !s), ls))
+                    -> loop(fs, ss, Std::cons(`print(!io, !s), ls))
                 | (["%f", fs...], [s, ss...], ls)
-                    -> loop(fs, ss, std::cons(`pprint(!io, !s), ls))
+                    -> loop(fs, ss, Std::cons(`pprint(!io, !s), ls))
                 | (["%p", fs...], [s, ss...], ls)
-                    -> loop(fs, ss, std::cons(`pprint(!io, !s), ls))
+                    -> loop(fs, ss, Std::cons(`pprint(!io, !s), ls))
                 | ([f@String, fs...], args, ls)
-                    -> loop(fs, args, std::cons(`print(!io, !f), ls))
+                    -> loop(fs, args, Std::cons(`print(!io, !f), ls))
                 | ([f, ...], _, _)
                     -> throw `Error{!LOCATION, !("argument for " + f.to_s + " is not found")} 
             loop(fmt, args, [])
@@ -43,12 +30,28 @@ module std {
                 io.to_s
              }
     }
+
+    module Parser {
+        ### Format string
+        # XXX: Not good implementation (should not define new syntax)
+
+        format_string_element
+            ::= "%" [sSdXobpf] { $input }
+              | "%" .   { throw `SyntaxError{!LOCATION,
+                            "Invalid format string", !($0 + $1)}
+                        }
+              | nospace( [^%\""]+ ) { $input.unescape }
+        
+        format_string
+            ::= nospace( ('"' format_string_element* '"') ) { $0[1] }
+
+        postfix_expr
+            ::= "printf" "(" format_string ("," expr)* ")" 
+                { Printf::compile_printf(\stdout, $2, map(x->x[1], $3)) }
+              | "printf" "(" expr "," format_string ("," expr)* ")"
+                { Printf::compile_printf($2, $4, map(x->x[1], $5)) }
+              | "format" "(" format_string ("," expr)* ")"
+                { Printf::compile_format($2, map(x->x[1], $3))}
+    }
     
-    postfix_expr
-        ::= "printf" "(" format_string ("," expr)* ")" 
-            { printf::compile_printf(\stdout, $2, map(x->x[1], $3)) }
-          | "printf" "(" expr "," format_string ("," expr)* ")"
-            { printf::compile_printf($2, $4, map(x->x[1], $5)) }
-          | "format" "(" format_string ("," expr)* ")"
-            { printf::compile_format($2, map(x->x[1], $3))}
 }

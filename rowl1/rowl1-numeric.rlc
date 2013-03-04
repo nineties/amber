@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-numeric.rlc 2013-02-08 10:18:16 nineties $
+; $Id: rowl1-numeric.rlc 2013-03-05 01:34:37 nineties $
 ;
 
 (import "rlvm-compile")
@@ -22,6 +22,9 @@
 (var coerce (to_sym "coerce"))
 (export fun do_coerce (a b) (
     (var r (byterun (lookup_func current_mod coerce) a b))
+    (if (== r @C_UNDEF) (do
+        (throw (make_object4 Exception current_loc (string "Type coerce-rule is not found") a b))
+        ))
     (if (|| (!= (node_type r) @ListE) (!= (list_len r) 2)) (do
         (throw (exception current_loc (string "coerce must returns [a, b]")))
         ))

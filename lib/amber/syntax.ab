@@ -1,8 +1,10 @@
-ReplaceSyntax{comment, shell_style_comment}
+BeginModule{Parser}
+
+Assign{comment, shell_style_comment}
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2013-02-19 21:33:42 nineties $
+# $Id: syntax.ab 2013-03-05 05:40:41 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -30,10 +32,8 @@ ReplaceSyntax{comment, shell_style_comment}
 # delimited1(p, d) : sequence of p delimited by d (one or many)
 # delimited2(p, d) : sequence of p delimited by d (two or many)
 # located(p)       : parse p with location
-# scoped(m, p)     : parse p within module m
 # parsewith(p)     : do parse using p (p can refer previous tokens)
 # nospace(p)       : parse p without parsing spaces between tokens
-# withblank(p)     : parse p with more than one banks between tokens
 
 DefineSyntax{
     character_set,
@@ -82,18 +82,12 @@ DefineSyntax{
             QuasiQuote{Delimited2{Unquote{node2}, Unquote{node4}}}, multiline},
         Tuple{List{"located", "(", syntax_element, ")"},
             QuasiQuote{Located{Unquote{node2}}}, multiline},
-        Tuple{List{"scoped", "(", expr, ",", syntax_element, ")"},
-            QuasiQuote{Scoped{Unquote{node2}, Unquote{node4}}}, multiline},
         Tuple{List{"parsewith", "(", symbol, ")"},
             QuasiQuote{ParseWith{Unquote{node2}}}, multiline},
         Tuple{List{"nospace", "(", syntax_element, ")"},
             QuasiQuote{NoSpace{Unquote{node2}}}, multiline},
         Tuple{List{"nospace", "(", Many1{syntax_element}, ")"},
             QuasiQuote{NoSpace{Unquote{node2}}}, multiline},
-        Tuple{List{"withblank", "(", syntax_element, ")"},
-            QuasiQuote{WithBlank{Unquote{node2}}}, multiline},
-        Tuple{List{"withblank", "(", Many1{syntax_element}, ")"},
-            QuasiQuote{WithBlank{Unquote{node2}}}, multiline},
         Tuple{List{primary_syntax_element}, node0}
     }
 }
@@ -101,29 +95,20 @@ DefineSyntax{
 DefineSyntax{
     parser_option,
     List{
-        Tuple{List{"[", Many1{symbol}, "]"},
+        Tuple{List{"<<", Many1{Choice{object,symbol}}, ">>"},
             node1, multiline}
-    }
-}
-
-BeginModule{parser}
-EndModule{}
-
-DefineSyntax{
-    parser_action_body,
-    List{
-        Tuple{List{"{", Aligned{statement}, "}"},
-            QuasiQuote{Block{Unquote{node1}}}, multiline}
     }
 }
 
 DefineSyntax{
     parser_action,
-    List{Tuple{List{Scoped{Quote{parser}, parser_action_body}}, node0}}
+    List{Tuple{List{"{", Aligned{statement}, "}"},
+        QuasiQuote{Block{Unquote{node1}}}, multiline}
+        }
 }
 
 DefineSyntax{
-    syntax,
+    parser_entry,
     List{
         Tuple{List{parser_option, Many1{syntax_element}, parser_action},
             QuasiQuote{Tuple{Unquote{node1}, Unquote{node2}, Unquote{node0}}}
@@ -132,7 +117,7 @@ DefineSyntax{
             QuasiQuote{Tuple{Unquote{node0}, Unquote{node1}}}
         },
         Tuple{List{parser_option, syntax_element},
-            QuasiQuote{Tuple{Unquote{List{node1}}, node0, Unquote{node0}}}
+            QuasiQuote{Tuple{Unquote{List{node1}}, node1, Unquote{node0}}}
         },
         Tuple{List{syntax_element},
             QuasiQuote{Tuple{Unquote{List{node0}}, node0}}
@@ -143,7 +128,7 @@ DefineSyntax{
 DefineSyntax{
     syntax_declaration,
     List{
-        Tuple{List{symbol, "::=", Delimited1{syntax, "|"}},
+        Tuple{List{symbol, "::=", Delimited1{parser_entry, "|"}},
             QuasiQuote{DefineSyntax{
                 Unquote{node0},
                 Unquote{node2}
@@ -157,7 +142,7 @@ DefineSyntax{
     List{Tuple{List{syntax_declaration}, node0}}
 }
 
-## Expressions
+### Expressions
 qualified_symbol
     ::= qualified_symbol "::" symbol
         { MakeObject{Quote{Qualified}, List{node0, node2}} }
@@ -166,10 +151,10 @@ qualified_symbol
 block_body ::= aligned(located(statement))
                 { QuasiQuote{Block{Unquote{node0}}} }
 primary_block
-    ::= [multiline] "{" block_body "}" { node1 }
+    ::= <<multiline>> "{" block_body "}" { node1 }
         # Block with module imports
 
-      | [multiline] "seq" "{" aligned(located(statement)) "}"
+      | <<multiline>> "seq" "{" aligned(located(statement)) "}"
         { MakeObject{Quote{Seq}, List{node2}} }
 
 block ::= primary_block
@@ -178,15 +163,15 @@ block ::= primary_block
 primary_expr
     ::= primary_block
 
-      | [multiline] "<" qualified_symbol ">" "{" parsewith(node1) "}"
+      | <<multiline>> "<" qualified_symbol ">" "{" parsewith(node1) "}"
         { node4 }
 
-      | [multiline] "(" expr ")"                  { node1 } 
-      | [multiline] "(" statement ")"             { node1 }
-      | [multiline] "[" delimited(expr, ",") "]"  { node1 } # List literal
+      | <<multiline>> "(" expr ")"                  { node1 } 
+      | <<multiline>> "(" statement ")"             { node1 }
+      | <<multiline>> "[" delimited(expr, ",") "]"  { node1 } # List literal
 
       # Tuple literal
-      | [multiline] "(" delimited2(expr, ",") ")"
+      | <<multiline>> "(" delimited2(expr, ",") ")"
         { MakeObject{Quote{Tuple}, node1} }
 
       | qualified_symbol
@@ -218,7 +203,7 @@ postfix_expr
       | primary_expr "^" postfix_expr
         { MakeObject{Quote{Power}, List{node0, node2}} }
 
-      | node
+      | object
 
       | primary_expr
 
@@ -234,15 +219,15 @@ quote_expr
 pattern ::= quote_expr
 term    ::= primary_expr
 
-# enable use of quotation expressions for following definitions.
-ReplaceSyntax{expr, quote_expr}
+## enable use of quotation expressions for following definitions.
+Assign{expr, quote_expr}
 
 prefix_expr
     ::= "+"          quote_expr { `UnaryPlus{!node1} }
       | "-" !decimal quote_expr { `UnaryMinus{!node2} }
       | "not" quote_expr        { `Not{!node1} }
 
-      | [multiline] "make" symbol "{" delimited(expr, ",") "}"
+      | <<multiline>> "make" symbol "{" delimited(expr, ",") "}"
         { `MakeObject{\!node1, !node3} }
 
       | quote_expr
@@ -293,7 +278,7 @@ ternary_expr
 
 guard_expr ::= ternary_expr
 
-arguments
+argument_list
     ::= "(" delimited(pattern, ",") ")" "when" guard_expr
         { `When{!node1, !node4} }
       | "(" delimited(pattern, ",") ")"
@@ -304,7 +289,7 @@ arguments
         { List{node1} }
 
 lambda_expr
-    ::= arguments "->" block
+    ::= argument_list "->" block
         { `Lambda{!node0, !node2} }
       | ternary_expr
 
@@ -325,7 +310,7 @@ assign_expr
       | pattern ">>=" assign_expr { `ShiftRAssign{!node0, !node2} }
       | multi_lambda_expr
 
-ReplaceSyntax{expr, assign_expr}
+Assign{expr, assign_expr}
 
 ### Statements
 package ::= string
@@ -343,19 +328,19 @@ statement
       | "import" package
         { `Import{!node1} }
 
-      | [multiline] "if" term statement "else" statement
+      | <<multiline>> "if" term statement "else" statement
         { `IfElse{!node1, !node2, !node4} }
-      | [multiline] "if" term statement
+      | <<multiline>> "if" term statement
         { `If{!node1, !node2} }
 
-      | [multiline] "case" term "of" multi_lambda_expr
+      | <<multiline>> "case" term "of" multi_lambda_expr
         { `Apply{!node3, [!node1]} }
 
-      | [multiline] "while" term block
+      | <<multiline>> "while" term block
         { `While{!node1, !node2} }
-      | [multiline] "for" "(" pattern "in" expr ")" block
+      | <<multiline>> "for" "(" pattern "in" expr ")" block
         { `For{!node2, !node4, !node6} }
-      | [multiline] "reverse_for" "(" pattern "in" expr ")" block
+      | <<multiline>> "reverse_for" "(" pattern "in" expr ")" block
         { `RevFor{!node2, !node4, !node6} }
       | "continue"
         { `Continue{} }
@@ -369,10 +354,10 @@ statement
 
       | "throw" expr
         { `Throw{!node1} }
-      | [multiline] "try" block "catch" multi_lambda_expr
+      | <<multiline>> "try" block "catch" multi_lambda_expr
         { `Try{!node1, !node3} }
 
-      | symbol arguments ":" block
+      | symbol argument_list ":" block
         { `DefineFunction{!node0, Lambda{!node1, !node3}} }
       | pattern ":" expr
         { `DefineVariable{!node0, !node2} }
@@ -380,11 +365,13 @@ statement
       | expr "=>" statement
         { `DefineFunction{rewrite, Lambda{!node0, !node2}} }
 
-## Reserved Keywords
+### Reserved Keywords
 ReserveSymbol{not, and, or, when, open, if, else, case, of,
     while, for, reverse_for, in, continue, break, return,
     throw, try, catch, seq, scope
 }
+
+EndModule{} # Parser
 
 ## Syntax Sugars
 +x      => `uplus(!x)
@@ -413,15 +400,31 @@ x == y  => `equal(!x, !y)
 x != y  => `(not equal(!x, !y))
 x is y  => `identical(!x, !y)
 x is not y => `(not identical(!x, !y))
-x[args...]     => `Apply{at, !std::cons(x, args)}
-x[args...] = e => `Apply{store, !std::cons(x, std::append(args, [e]))}
+x[args...]     => `Apply{at, !Std::cons(x, args)}
+x[args...] = e => `Apply{store, !Std::cons(x, Std::append(args, [e]))}
 
-module parser {
+module Parser {
+    ### Extend primary_expr so as to enable use $... to refer nodes
+    # of syntax-tree only in parser_action.
+    module Action {
     primary_expr ::= "$" decimal { ("node" + node1).to_sym }
                    | "$input"    { \input_text(parser,begin,end) }
-}
+    }
 
-module shell_syntax {
+    # FIXME: This is temporary dirty hack.
+    primary_expr_act : primary_expr | Action::primary_expr
+    parser_action_old: parser_action
+    parser_action = parser -> {
+        save_primary_expr: primary_expr
+        primary_expr = primary_expr_act
+        r: parser_action_old(parser)
+        primary_expr = save_primary_expr
+        r
+    }
+
+    ### Syntax definitions which are effective only in shell-mode.
+    module Shell {
     primary_expr ::= "%" nospace(decimal) { `shell_outputs[!$1] }
                    | "%"                  { `shell_outputs[0] }
+    }
 }

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2013-02-18 13:24:05 nineties $
+; $Id: rowl1-interp.rlc 2013-03-05 05:41:36 nineties $
 ;
 
 (import "rlvm-compile")
@@ -20,7 +20,6 @@
 (import "rowl1-error")
 (import "rowl1-pprint")
 
-(export var amber_mod null)
 (export var amber_mod null)
 (export var current_loc null)
 (export var current_mod null)
@@ -69,7 +68,9 @@
 (export fun eval_main (file ichan argc argv) (
     ;(var start (gettimeofday))
 
-    (= amber_mod (make_module (to_sym "amber") 0))
+    (= amber_mod (make_module 0 (to_sym "amber")))
+    (add_module_variable amber_mod (to_sym "Amber") @C_TRUE amber_mod)
+
     (= module_stack (cons amber_mod 0))
 
     (= current_loc no_loc)
@@ -78,8 +79,8 @@
     (setup_globals amber_mod)
     (setup_builtin_compilers amber_mod)
     (init_stdlib amber_mod)
-    (open_module current_loc amber_mod (to_sym "std"))
-    (open_module current_loc amber_mod (qualified "std" (to_sym "IO")))
+    (open_module amber_mod (to_sym "Std"))
+    (open_module amber_mod (qualified "Std" (to_sym "IO")))
 
     (init_parser_funcs amber_mod)
 
@@ -88,9 +89,6 @@
 
     (push_import_dir "/usr/lib/amber/")
     (import_file "amber/syntax.ab")
-    (if (in_shell_mode)
-        (open_module current_loc amber_mod (to_sym "shell_syntax"))
-        )
     (import_file "data/string.ab")
     (import_file "io.ab")
     (import_file "printf.ab")
@@ -134,6 +132,7 @@
 (extern fun list_to_table)
 (fun rewrite (expr) (
     (var new_expr (call1 Rewrite expr))
+    (if (== new_expr @C_UNDEF) (= new_expr expr))
     (if (!= new_expr expr) (return (rewrite new_expr)))
     (= expr new_expr)
     (if (is_atom expr) (return expr))
@@ -167,14 +166,6 @@
             (node_arg_set lhs 1 (rewrite (node_arg lhs 1)))
             )
         (node_arg_set expr 1 (rewrite (node_arg expr 1)))
-        (return expr)
-        ))
-
-    (if (== hd Scoped) (do
-        (var save_mod current_mod)
-        (set_current_module (node_arg expr 0))
-        (node_arg_set expr 1 (rewrite (node_arg expr 1)))
-        (set_current_module save_mod)
         (return expr)
         ))
 
@@ -236,17 +227,13 @@
 
 (fun interpret (p) (
     (while 1 (do
-        (parse_statements p)
+        (var eof (parse_statements p))
         (if (! (parse_success p)) (do
             (output_syntax_error (get_loc p) (parser_error p))
             (exit 1)
             ))
-        (var es (parsed_token p))
-        (if (! es) break)
-        (while es (do
-            (eval (car es))
-            (= es (cdr es))
-            ))
+        (if eof break)
+        (eval (parsed_token p))
         ))
     (= current_loc no_loc)
     ))
@@ -256,6 +243,7 @@
 (extern fun ary_push)
 (fun interpret_shell (p) (
     (var outputs (ary_new))
+    (enable_shell_syntax)
     (add_module_variable amber_mod (to_sym "shell_outputs") @C_TRUE outputs)
     (ary_push outputs @C_UNDEF)
     (while 1 (do
@@ -279,7 +267,6 @@
             (pprint stderr e)
             (output_string stderr "\n")
             (flush_parser p @TRUE)
-            (ary_push outputs e)
         )))))
     ))
 
@@ -298,18 +285,18 @@
     (return (eval (node_arg expr 1)))
     ))
 
-(fun eval_begin_module (expr) (
+(export fun eval_begin_module (expr) (
     (if (! (in_top_scope current_mod))
         (throw (exception current_mod (string "module definition in sub-scope is not allowed\n")))
         )
     (var modsig (node_arg expr 0))
-    (var module (find_module current_loc current_mod modsig @TRUE))
+    (var module (create_module current_mod modsig))
     (= module_stack (cons module module_stack))
     (set_current_module module)
     (return module)
     ))
 
-(fun eval_end_module (expr) (
+(export fun eval_end_module (expr) (
     (if (== current_mod amber_mod)
         (throw (exception current_mod (string "there is no module to close")))
         )
@@ -326,10 +313,6 @@
     (return r)
     ))
 
-(fun default_rewrite (expr) (
-    (return expr)
-    ))
-
 
 (fun rewrite_located (expr) (
     (node_arg_set expr 1 (rewrite (node_arg expr 1)))
@@ -339,18 +322,8 @@
 (fun eval_define_syntax (expr) (
     (var sym (node_arg expr 0))
     (var elm (node_arg expr 1))
-    (var stmts (compile_define_syntax sym elm))
-    (while stmts (do
-        (eval (car stmts))
-        (= stmts (cdr stmts))
-        ))
-    (return @C_NIL)
-    ))
-
-(fun eval_replace_syntax (expr) (
-    (var lhs (node_arg_symbol expr 0))
-    (var rhs (node_arg_symbol expr 1))
-    (eval (compile_replace_syntax lhs rhs))
+    (var stmt (compile_define_syntax sym elm))
+    (eval stmt)
     (return @C_NIL)
     ))
 
@@ -482,7 +455,7 @@
     ))
 
 (fun eval_open (expr) (
-    (open_module current_loc current_mod (node_arg expr 0))
+    (open_module current_mod (node_arg expr 0))
     (return @C_NIL)
     ))
 
@@ -503,7 +476,7 @@
 
 (fun setup_argv (argc argv) (
     (var ARGV (ary_new))
-    (add_module_variable amber_mod (to_sym "ARGV") @C_TRUE ARGV)
+    (add_module_variable amber_mod (to_sym "ARGV") @C_FALSE ARGV)
     (if (== argc 0) return)
     (for i 1 argc (do
         (ary_push ARGV (string (array_get string argv i)))
@@ -511,7 +484,10 @@
     ))
 
 (export fun prompt_string () (
-    (return (get_module_variable current_mod (to_sym "PROMPT")))
+    (var v (get_module_variable_value (to_sym "PROMPT")
+        (lookup_symbol current_mod (to_sym "PROMPT") @FALSE)
+        ))
+    (return v)
     ))
 
 (fun def_global_var (sym val) (
@@ -552,17 +528,15 @@
     ))
 
 (fun setup_globals (mod) (
-    (add_module_variable mod (to_sym "amber") @C_FALSE mod)
     (add_module_variable mod (to_sym "LOCATION") @C_FALSE current_loc)
     (add_module_variable mod (to_sym "MODULE") @C_FALSE current_mod)
     (add_module_variable mod (to_sym "PROMPT") @C_FALSE (string "amber"))
 
     (if (in_shell_mode)
-        (add_module_variable mod (to_sym "shell_mode") @C_TRUE @C_TRUE)
-        (add_module_variable mod (to_sym "shell_mode") @C_TRUE @C_FALSE)
+        (add_module_variable mod (to_sym "shell_mode") @C_FALSE @C_TRUE)
+        (add_module_variable mod (to_sym "shell_mode") @C_FALSE @C_FALSE)
         )
     
-    (add_function1 mod Rewrite DontCare default_rewrite 0)
     (add_function1 mod Rewrite (domainP Located) rewrite_located 0)
     (add_function1 mod Eval DontCare default_eval 0)
     (add_function1 mod Eval (domainP Located) eval_located 0)
@@ -575,7 +549,6 @@
     (add_function1 mod Eval (make_object1 Seq listT) eval_seq 0)
 
     (add_function1 mod Eval (make_object2 DefSyntax symT DontCare) eval_define_syntax 0)
-    (add_function1 mod Eval (make_object2 RepSyntax symT symT) eval_replace_syntax 0)
     (add_function1 mod Eval (domainP ReserveSymbol) eval_reserve_symbol 0)
 
     (add_function1 mod Eval (quote (to_sym "exit")) eval_exit 0)
@@ -607,16 +580,14 @@
 (extern fun setup_gc)
 
 (fun init_stdlib (mod) (
-    (var std (find_module no_loc mod (to_sym "std") @TRUE))
+    (var std (create_module mod (to_sym "Std")))
     (setup_pprint std)
     (setup_base std)
     (setup_symbol std)
 
     (setup_math std)
     (setup_numeric std)
-
     (setup_string std)
-
     (setup_bigint std)
     (setup_float std)
 

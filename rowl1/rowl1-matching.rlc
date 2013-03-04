@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2013-02-18 12:26:37 nineties $
+; $Id: rowl1-matching.rlc 2013-03-05 06:57:44 nineties $
 ;
 
 (import "rlvm-compile")
@@ -24,16 +24,76 @@
 (var domP      (to_sym "%Domain"))
 
 (extern object current_loc)
+
+(fun trace_func (msg val) (
+    (debugs msg)
+    (debugpf val)
+    (return val)
+    ))
+
+(fun trace (asm msg) (
+    (put_push asm (string msg))
+    (compile_simple_call asm 2 trace_func)
+    ))
+
+(fun compile_matching_unwrap (loc obj def) (
+    (if (== (node_type def) @DelegateFunctionE)
+        (= def (field_get def 2))
+        )
+    (return (compile_matching loc obj def))
+    ))
+
 (export fun compile_matching (loc obj def) (
-    (var ty (node_type def))
-    (if (&& (!= ty @BoundFunctionE) (!= ty @FunctionE)) (do
+    (if (! (is_function def))
         (throw (type_error loc (string "function") obj))
-        ))
+        )
 
     (var cache (field_get def 1))
     (if cache (return cache))
 
-    ; here, `def' has form of Function{ ... }
+    (var asm (make_assembler))
+
+    (if (!= (node_type def) @DelegateFunctionE)
+        (compile_matching_single_function asm loc obj def)
+        (do
+            (var fun (field_get def 2))
+            (var delegatee (field_get def 3))
+            (compile_matching_single_function asm loc obj fun)
+            (while delegatee (do
+                (var disp (car delegatee))
+                (var failed (fresh_label asm))
+
+                (put_push asm disp)
+                (put_car asm)
+                (put_push asm obj)
+                (put_push asm current_loc)
+                (compile_simple_call asm 3 compile_matching_unwrap)
+                (put_jccall asm)
+                (put_dup asm)
+                (put_undef asm)
+                (put_if_eq asm failed)
+                (put_ireturn asm)
+                (set_label asm failed)
+                (put_drop asm)
+    
+                (= delegatee (cdr delegatee))
+                ))
+        ))
+
+    (put_undef asm)
+    (put_ireturn asm)
+
+    (var code (get_code asm))
+    (field_set def 1 code) ; caching
+    (return code)
+    ))
+
+(fun compile_matching_single_function (asm loc obj def) (
+    (if (! (is_function def))
+        (throw (type_error loc (string "function") obj))
+        )
+
+    ; here, `def' has form of Function{ ... } of BoundFunction{ ... }
 
     ; construct pattern matrix 
     (var mat (construct_pattern_matrix def))
@@ -46,15 +106,7 @@
         ))
     (= args (cons (get_arity) args))
 
-    (var asm (make_assembler))
     (compile_matching_main asm args mat)
-
-    (put_undef asm)
-    (put_ireturn asm)
-
-    (var code (get_code asm))
-    (field_set def 1 code) ; caching
-    (return code)
     ))
 
 (fun construct_pattern_matrix (def) (
@@ -67,24 +119,28 @@
     (if (== (node_type def) @FunctionE)
         (return (cons (construct_row len def) tl))
         )
-    ; here `def' is a BoundFunction
-    (var fun1 (field_get def 2))
-    (var fun2 (field_get def 3))
-    (= tl (construct_pattern_matrix_sub len fun2 tl))
-    (return (construct_pattern_matrix_sub len fun1 tl))
+    (if (== (node_type def) @BoundFunctionE) (do
+        (var fun1 (field_get def 2))
+        (var fun2 (field_get def 3))
+        (= tl (construct_pattern_matrix_sub len fun2 tl))
+        (return (construct_pattern_matrix_sub len fun1 tl))
+        ))
+    (throw (string "BUG: construct_pattern_matrix_sub"))
     ))
 
 (fun max_arity (def) (
     (if (== (node_type def) @FunctionE)
         (return (list_len (field_get def 2)))
         )
-    ; here `def' is a BoundFunction 
-    (var len1 (max_arity (field_get def 2)))
-    (var len2 (max_arity (field_get def 3)))
-    (if (< len1 len2)
-        (return len2)
-        (return len1)
-        )
+    (if (== (node_type def) @BoundFunctionE) (do
+        (var len1 (max_arity (field_get def 2)))
+        (var len2 (max_arity (field_get def 3)))
+        (if (< len1 len2)
+            (return len2)
+            (return len1)
+            )
+        ))
+    (throw (string "BUG: max_arity"))
     ))
 
 (fun construct_row (len def) (
@@ -392,6 +448,7 @@
     ))
 
 (fun is_ellipsis_node (expr size) (
+    (if (== size 0) (return @FALSE))
     (if (== (node_arg expr (- size 1)) ellipsisP)
         (return @TRUE)
         (return @FALSE)
@@ -674,15 +731,34 @@
     (= pats (sort_list_pat pats))
     (var n 1)
     (var orig pats)
+    (var p (caaar pats))
     (var len (list_len (caaar pats)))
     (= pats (cdr pats))
-    (while pats (do
-        (var nd (caaar pats))
-        (if (|| (!= (node_bhead nd) List) (!= (list_len nd) len)) break)
-        (= pats (cdr pats))
-        (incr n)
+    (if (is_ellipsis_list p)
+        (do
+            (while pats (do
+                (var nd (caaar pats))
+                (if (|| (!= (node_bhead nd) List)
+                    (|| (!= (list_len nd) len)
+                        (! (is_ellipsis_list nd))))
+                    break)
+                (= pats (cdr pats))
+                (incr n)
+                ))
+            (return (list_split orig n))
+        )
+        (do
+            (while pats (do
+                (var nd (caaar pats))
+                (if (|| (!= (node_bhead nd) List)
+                    (|| (!= (list_len nd) len)
+                        (is_ellipsis_list nd)))
+                    break)
+                (= pats (cdr pats))
+                (incr n)
+                ))
+            (return (list_split orig n))
         ))
-    (return (list_split orig n))
     ))
 
 (fun sort_list_pat (pats) (
@@ -716,11 +792,30 @@
     (var hd (node_bhead p))
     (var size (node_size p))
     (= pats (cdr pats))
-    (while pats (do
-        (var nd (caaar pats))
-        (if (|| (!= (node_bhead nd) hd) (!= (node_size nd) size)) break)
-        (= pats (cdr pats))
-        (incr n)
+    (if (is_ellipsis_node p size)
+        (do
+            (while pats (do
+                (var nd (caaar pats))
+                (if (|| (!= (node_bhead nd) hd)
+                    (|| (!= (node_size nd) size)
+                        (! (is_ellipsis_node nd size))))
+                    break)
+                (= pats (cdr pats))
+                (incr n)
+                ))
+            (return (list_split orig n))
+        )
+        (do
+            (while pats (do
+                (var nd (caaar pats))
+                (if (|| (!= (node_bhead nd) hd)
+                    (|| (!= (node_size nd) size)
+                        (is_ellipsis_node nd size)))
+                    break)
+                (= pats (cdr pats))
+                (incr n)
+                ))
+            (return (list_split orig n))
         ))
     (return (list_split orig n))
     ))

@@ -2,21 +2,19 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-module.rlc 2013-02-20 21:29:15 nineties $
+; $Id: rowl1-module.rlc 2013-03-05 04:30:09 nineties $
 ;
 
-; Module can be considered as a re-entrant scope.
-; rowl (Amber) has a two kinds of modules; named module and anonymous module.
-; 
+; Module
 ; Fields:
-; - 1:sym       : name of the module (nil for anonymous module)
-; - 2:super     : a link to module where this module is defined.
-; - 3:imports   : list of imported modules.
-; - 4:users     : list of modules which import this module
-; - 5:children  : sub-modules in module hierarchy.
-; - 6:vtbl      : variable table
-; - 7:count     : local variable index counter
-; - 8:mark      : visited mark
+; - 1:vtbl       : variable table
+; - 2:delegatees : list of modules
+; - 3:delegators : list of modules
+; - 4:count      : local variable index counter
+; - 5:mark       : visited mark
+
+; ModuleVariable{disp, ture iff this is not a display}
+; disp = (value, location of definition)
 
 (import "rlvm-compile")
 (import "rowl1-types")
@@ -30,49 +28,31 @@
 
 (extern object current_loc)
 
-(export fun make_module (sym super) (
-    (var mod (variant @ModuleE 7
-        sym
-        super
-        0                   ; list of imported modules
-        0                   ; list of modules which import this module
-        0                   ; children
+(export fun make_module (outer sym) (
+    (var mod (variant @ModuleE 4
         (make_symtable 10)  ; variable table
+        0   ; delegatees
+        0   ; delegators
         (list1 (box 0))     ; local variable index counter
-        0                   ; visited-mark
+        0   ; visited-mark
         ))
-    (if super (do
-        (if (!= sym @C_NIL) (add_module_variable super sym @C_FALSE mod))
-        (add_child super mod)
+    (if outer (do
+        (add_delegator mod outer)
+        (add_module_variable outer sym @C_FALSE mod)
         ))
     (return mod)
     ))
 
-(export fun is_anonymous_module (mod) (
-    (return (== (field_get mod 1) @C_NIL))
+(export fun get_vartable (mod) (
+    (return (field_get mod 1))
     ))
 
-(fun add_child (super sub) (
-    (field_set super 5 (cons sub (list_delete sub (field_get super 5))))
+(export fun delegatees (mod) (
+    (return (field_get mod 2))
     ))
 
-(export fun is_defined_locally (v) (
-    (if (! v) (return @FALSE))
-    (if (&& (== (node_bhead v) ModuleVariable)
-        (|| (== (node_arg v 1) @C_FALSE)
-            (== (node_arg v 2) @C_TRUE)
-        ))
-        (return @FALSE)
-        )
-    (return @TRUE)
-    ))
-
-(fun is_effective_variable (v) (
-    (if (! v) (return @FALSE))
-    (if (&& (== (node_bhead v) ModuleVariable) (== (node_arg v 1) @C_FALSE))
-        (return @FALSE)
-        )
-    (return @TRUE)
+(fun delegators (mod) (
+    (return (field_get mod 3))
     ))
 
 (var visited_mark 0)
@@ -81,272 +61,353 @@
     (return visited_mark)
     ))
 
-(export fun super_module (mod) (
-    (return (field_get mod 2))
+(fun get_mark (mod) (
+    (return (field_get mod 5))
     ))
 
-(export fun opened_modules (mod) (
-    (return (field_get mod 3))
+(fun set_mark (mod mark) (
+    (field_set mod 5 mark)
     ))
 
-(export fun open_module (loc curmod sig) (
-    (var mod (find_module loc curmod sig @FALSE))
-    (field_set curmod 3 (cons mod (list_delete mod (field_get curmod 3))))
-    (field_set mod 4 (cons curmod (list_delete curmod (field_get mod 4))))
+(fun add_delegator (from to) (
+    (field_set from 2 (cons to (list_delete to (field_get from 2))))
+    (field_set to 3 (cons from (list_delete from (field_get to 3))))
+    (update_module_variables from)
+    ))
 
-    ; add all definitions in `mod' to `curmod'
-    (var entries (symtable_entries (field_get mod 6)))
-    (for i 0 (vector_size entries) (do
-        (var ent (vector_at entries i))
-        (if (! ent) continue)
-        (var info (field_get ent 1))
-        (if (!= (node_bhead info) ModuleVariable) continue)
-        (var mark (fresh_mark))
-        (update_module_variable mark curmod (field_get ent 0) (node_arg info 0))
+(fun del_delegator (from to) (
+    (field_set from 2 (list_delete to (field_get from 2)))
+    (field_set to 3 (list_delete from (field_get to 3)))
+    (update_module_variables from)
+    ))
+
+;;; ModuleVariable
+(fun is_display (v) (
+    (if (&& (== (node_bhead v) ModuleVariable)
+            (== (node_arg v 1) @C_FALSE))
+        (return @TRUE) ; display
+        )
+    (return @FALSE)
+    ))
+
+(export fun get_module_variable_disp (sym info) (
+    (if (!= (node_bhead info) ModuleVariable) (do
+        (throw (unexpected_error current_loc
+            (string "module variable is required2")
+            info))
+        ))
+    (return (node_arg info 0))
+    ))
+
+(export fun get_module_variable_value (sym info) (
+    (return (car (get_module_variable_disp sym info)))
+    ))
+
+(export fun open_module (outer sig) (
+    (var inner (find_module outer sig))
+    (add_delegator outer inner)
+    ))
+
+(export fun close_module (outer sig) (
+    (var inner (find_module outer sig))
+    (del_delegator outer inner)
+    ))
+
+(fun collect_all_delegators (mark mod list) (
+    (if (== (get_mark mod) mark) (return list))
+    (set_mark mod mark)
+
+    (= list (cons mod list))
+    (var mods (delegators mod))
+    (while mods (do
+        (= list (collect_all_delegators mark (car mods) list))
+        (= mods (cdr mods))
+        ))
+    (return list)
+    ))
+
+(fun update_module_variables (mod) (
+    (var mods (collect_all_delegators (fresh_mark) mod 0))
+    (while mods (do
+        (var delegator (car mods))
+        (var entries (symtable_entries (get_vartable delegator)))
+        (for i 0 (vector_size entries) (do
+            (var entry (vector_at entries i))
+            (var sym (field_get entry 0))
+            (var ent (field_get entry 1))
+            (var v (get_module_variable_value sym ent))
+            (if (&& (is_function v) (! (is_display ent)))
+                (update_function_entry delegator sym)
+                (update_variable_entry delegator sym ent)
+                )
+            ))
+        (= mods (cdr mods))
         ))
     ))
 
-(export fun add_symbol (mod sym v) (
-    (symtable_add (field_get mod 6) sym v)
-    ))
-
-(export fun delete_symbol (mod sym) (
-    (symtable_delete (field_get mod 6) sym)
-    ))
-
-(export fun lookup_symbol (mod sig) (
-    (var hd (node_bhead sig))
-    (if (== hd BSymbol)
-        (return (lookup_symbol_iter (fresh_mark) mod sig @FALSE))
-    (if (== hd Qualified)
-        (return (lookup_symbol
-            (find_module current_loc mod (node_arg sig 0) @FALSE) (node_arg sig 1)))
+(fun update_module_variables_single (mod sym) (
+    (var mods (collect_all_delegators (fresh_mark) mod 0))
+    (while mods (do
+        (var delegator (car mods))
+        (var ent (symtable_find (get_vartable delegator) sym))
+        (if ent (do
+            (var v (get_module_variable_value sym ent))
+            (if (&& (is_function v) (! (is_display ent)))
+                (update_function_entry delegator sym)
+                (update_variable_entry delegator sym ent)
+                )
+            ))
+        (= mods (cdr mods))
         ))
-    (throw (invalid_argument current_loc
-        (string "invalid identifier")
-        sig))
     ))
 
-(export fun lookup_effective_symbol (mod sig) (
-    (var hd (node_bhead sig))
-    (if (== hd BSymbol)
-        (return (lookup_symbol_iter (fresh_mark) mod sig @TRUE))
-    (if (== hd Qualified)
-        (return (lookup_symbol
-            (find_module current_loc mod (node_arg sig 0) @FALSE) (node_arg sig 1)))
-        ))
-    (throw (invalid_argument current_loc
-        (string "invalid identifier")
-        sig))
+(fun lookup_all_funcs (mod sym) (
+    (return (list_reverse (lookup_all_funcs_sub (fresh_mark) mod sym 0)))
     ))
 
-(fun lookup_symbol_iter (mark mod sym find_effective) (
-    (while mod (do
-        ; check visited-mark
-        (if (== (field_get mod 8) mark) break)
-        (field_set mod 8 mark)
+(fun lookup_all_funcs_sub (mark mod sym list) (
+    (if (== (get_mark mod) mark) (return list))
+    (set_mark mod mark)
 
-        (var tbl (field_get mod 6))
-        (var v (symtable_find tbl sym))
-        (if find_effective
-            (if (is_effective_variable v) (return v))
-            (if v (return v))
+    (var vtbl (get_vartable mod))
+    (var v (symtable_find vtbl sym))
+    (if (&& v (! (is_display v))) (do
+        (var disp (get_module_variable_disp sym v))
+        (if (! (list_member disp list))
+            (= list (cons disp list))
             )
+        ))
 
-        (= mod (super_module mod))
+    (var mods (delegatees mod))
+    (while mods (do
+        (= list (lookup_all_funcs_sub mark (car mods) sym list))
+        (= mods (cdr mods))
+        ))
+    (return list)
+    ))
+
+(fun update_function_entry (mod sym) (
+    (var disps (lookup_all_funcs mod sym))
+    (var disp  (car disps)) ; current module
+    (var other (cdr disps)) ; delegatees
+    (var fun (car disp))
+    (if (== (node_type fun) @DelegateFunctionE) (do
+        (field_set fun 1 0) ; clear cache
+        (field_set fun 3 other)
+        )
+    (if other
+        (setcar disp (variant @DelegateFunctionE 3 0 fun other))
+        ))
+    ))
+
+(fun update_variable_entry (mod sym info) (
+    (var mvar (lookup_symbol mod sym @TRUE))
+    ; If non-display variable found, update the module variable entry.
+    (if mvar
+        (node_arg_set info 0 (get_module_variable_disp sym mvar))
+        )
+    ))
+
+(export fun lookup_symbol (mod sig nodisp) (
+    (var hd (node_bhead sig))
+    (if (== hd Qualified)
+        (return (lookup_symbol
+            (find_module mod (node_arg_symbol sig 0))
+            (node_arg sig 1)
+            nodisp
+            )))
+    (if (== hd BSymbol) (do
+        (var v (lookup_symbol_iter (fresh_mark) mod sig nodisp))
+        (return v)
+        ))
+    (throw (invalid_argument current_loc
+        (string "invalid identifier")
+        sig))
+    ))
+
+(fun lookup_symbol_iter (mark mod sym nodisp) (
+    ; check visited-mark
+    (if (== (get_mark mod) mark) (return 0))
+    (set_mark mod mark)
+
+    (var vtbl (get_vartable mod))
+    (var v (symtable_find vtbl sym))
+    (if (&& v (! (&& nodisp (is_display v)))) (return v))
+
+    (var mods (delegatees mod))
+    (while mods (do
+        (= v (lookup_symbol_iter mark (car mods) sym nodisp))
+        (if (&& v (! (&& nodisp (is_display v)))) (return v))
+        (= mods (cdr mods))
         ))
     (return 0)
     ))
 
-(export fun lookup_symbol_local (mod sym) (
-    (var tbl (field_get mod 6))
-    (return (symtable_find_local tbl sym))
-    ))
-
-(export fun lookup_symbol_current_module (mod sym) (
-    (var tbl (field_get mod 6))
-    (return (symtable_find tbl sym))
-    ))
-
-(export fun get_variable_count (mod) (
-    (return (unbox (car (field_get mod 7))))
-    ))
-
-(export fun set_variable_count (mod cnt) (
-    (setcar (field_get mod 7) (box cnt))
-    ))
-
-(export fun reset_variable_count (mod) (
-    (setcar (field_get mod 7) (box 0))
-    ))
-
-(export fun incr_variable_count (mod) (
-    (var counters (field_get mod 7))
-    (setcar counters (+ (car counters) 2)) ; counters are boxed
-    ))
-
-(export fun push_varscope (mod) (
-    (symtable_push (field_get mod 6))
-    (var counters (field_get mod 7))
-    (field_set mod 7 (cons (car counters) counters))
-    ))
-
-(export fun pop_varscope (mod) (
-    (symtable_pop (field_get mod 6))
-    (field_set mod 7 (cdr (field_get mod 7)))
-    ))
-
-; add definition of module variable `sym' to `mod'.
-; `val' is a initial value.
-(export fun add_module_variable (mod sym overwrite val) (
-    (var box @C_NIL)
-    (var ent (lookup_symbol_local mod sym))
-    (if (! ent) (do
-        (= box (struct 2 val current_loc))
-        (= ent (make_object3 ModuleVariable box @C_TRUE @C_FALSE))
-        (symtable_add_to_global (field_get mod 6) sym ent)
-        (goto update_displays)
-        ))
-    (if (&& (== overwrite @C_FALSE)
-        (&& (== (node_arg ent 1) @C_TRUE)
-            (== (node_arg ent 2) @C_FALSE))) (do
-        (var prev_loc (field_get (node_arg ent 0) 1))
-        (throw (redefined_var current_loc prev_loc sym))
-        ))
-    (= box (struct 2 val current_loc))
-    (node_arg_set ent 0 box)
-    (node_arg_set ent 1 @C_TRUE)
-    (node_arg_set ent 2 @C_FALSE)
-    ; update variable-displays
-    (label update_displays)
-    (var mark (fresh_mark))
-    (var children (field_get mod 5))
-    (while children (do
-        (update_display_iter mark (car children) sym box)
-        (= children (cdr children))
-        ))
-
-    (var users (field_get mod 4))
-    (while users (do
-        (update_module_variable mark (car users) sym box)
-        (= users (cdr users))
-        ))
-    (return val)
-    ))
-
-(export fun add_module_variable_display (mod sym box) (
-    (var ent (lookup_symbol_local mod sym))
-    (if (! ent) (do
-        (= ent (make_object3 ModuleVariable box @C_FALSE @C_FALSE))
-        (symtable_add_to_global (field_get mod 6) sym ent)
-        ))
-    (return ent)
-    ))
-
-(fun update_module_variable (mark mod sym box) (
-    (if (== (field_get mod 8) mark) return)
-    (field_set mod 8 mark)
-    (var vtbl (field_get mod 6))
-    (var ent (symtable_find_global vtbl sym))
-    (if ent
-        (do
-            (node_arg_set ent 0 box)
-            (node_arg_set ent 1 @C_TRUE)
-            (node_arg_set ent 2 @C_TRUE)
-        )
-        (do
-            (= ent (make_object3 ModuleVariable box @C_TRUE @C_TRUE))
-            (symtable_add_to_global (field_get mod 6) sym ent)
-        ))
-    (var children (field_get mod 5))
-    (while children (do
-        (update_display_iter mark (car children) sym box)
-        (= children (cdr children))
-        ))
-    ))
-    
-(fun update_display_iter (mark mod sym box) (
-    (if (== (field_get mod 8) mark) return)
-    (field_set mod 8 mark)
-    (var vtbl (field_get mod 6))
-    (var display (symtable_find_global vtbl sym))
-    (if (&& display (== (node_arg display 1) @C_FALSE)) (do
-        (node_arg_set display 0 box)
-        ))
-    (var children (field_get mod 5))
-    (while children (do
-        (update_display_iter mark (car children) sym box)
-        (= children (cdr children))
-        ))
-    ))
-
-(export fun get_module_variable (mod sig) (
-    (var info (lookup_effective_symbol mod sig))
-    (must_be_module_variable sig info)
-    (return (car (node_arg info 0)))
-    ))
-
-(export fun must_be_module_variable (sym val) (
-    (if (!= (node_bhead val) ModuleVariable) (do
-        (throw (unexpected_error current_loc
-            (string "module variable is required")
-            sym))
-        ))
-    ))
-
-(export fun find_module (loc curmod sig createp) (
-    (var hd (node_bhead sig))
-    (if (== hd BSymbol) (do
-        (var mod 0)
-        (if createp
-            (= mod (lookup_symbol_current_module curmod sig))
-            (= mod (lookup_effective_symbol curmod sig))
-            )
-        (if mod (do
-            (must_be_module_variable sig mod)
-            (= mod (car (node_arg mod 0)))
-            (if (!= (node_bhead mod) Module)
-                (throw (type_error loc (string "module") mod))
-                )
-            (return mod)
+(export fun lookup_symbol_current_module (mod sym nodisp) (
+    (if (== (node_bhead sym) Qualified)
+        (return (lookup_symbol_current_module
+            (find_module mod (node_arg_symbol sym 0))
+            (node_arg sym 1)
+            nodisp
             ))
-        (if createp
-            (return (make_module sig curmod))
-            (throw (not_found loc sig))
-            )
-        ))
-    (if (== hd Qualified)
-        (return (find_module loc
-             (find_module loc curmod (node_arg sig 0) createp)
-                 (node_arg sig 1) createp))
         )
+    (var v (symtable_find (get_vartable mod) sym))
+    (if (&& v (! (&& nodisp (is_display v)))) (return v))
+    (return 0)
+    ))
+
+(export fun lookup_symbol_current_scope (mod sym nodisp) (
+    (if (== (node_bhead sym) Qualified)
+        (return (lookup_symbol_current_scope
+            (find_module mod (node_arg_symbol sym 0))
+            (node_arg sym 1)
+            nodisp
+            ))
+        )
+    (var v (symtable_find_local (get_vartable mod) sym))
+    (if (&& v (! (&& nodisp (is_display v)))) (return v))
+    (return 0)
+    ))
+
+(export fun find_module (curmod sig) (
+    (var mod (lookup_symbol curmod sig @FALSE))
+    (if (! mod) (throw (not_found current_loc sig)))
+    (= mod (get_module_variable_value sig mod))
+    (if (!= (node_type mod) @ModuleE)
+        (throw (type_error current_loc (string "module") mod))
+        )
+    (return mod)
+    ))
+
+(export fun create_module (curmod sig) (
+    (var mod (lookup_symbol curmod sig @FALSE))
+    (if mod (do
+        (= mod (get_module_variable_value sig mod))
+        (if (!= (node_type mod) @ModuleE)
+            (throw (type_error current_loc (string "module") mod))
+            )
+        (return mod)
+        ))
+
+    (var hd (node_bhead sig))
+    (if (== hd Qualified)
+        (return (create_module
+            (find_module curmod (node_arg sig 0))
+            (node_arg sig 1)))
+        )
+    (if (== hd BSymbol) (do 
+        (return (make_module curmod sig))
+        ))
     (throw (invalid_argument current_loc
         (string "invalid identifier")
         sig))
     ))
 
+(export fun add_module_variable (mod sym overwrite val) (
+    (if (== (node_bhead sym) Qualified)
+        (return (add_module_variable
+            (find_module mod (node_arg_symbol sym 0))
+            (node_arg sym 1)
+            overwrite
+            val
+        )))
+    (var disp 0)
+    (var ent (lookup_symbol_current_module mod sym @FALSE))
+    (if (! ent) (do
+        (= disp (struct 2 val current_loc))
+        (= ent (make_object2 ModuleVariable disp @C_TRUE))
+        (symtable_add_to_global (get_vartable mod) sym ent)
+        (goto finish)
+        ))
+    (if (&& (== overwrite @C_FALSE) (== (node_arg ent 1) @C_TRUE)) (do
+        (var prev_loc (field_get (node_arg ent 0) 1))
+        (throw (redefined_var current_loc prev_loc sym))
+        ))
+    (= disp (struct 2 val current_loc))
+    (node_arg_set ent 0 disp)
+    (node_arg_set ent 1 @C_TRUE)
+
+    (label finish)
+
+    (update_module_variables_single mod sym)
+
+    (if (is_function val) (do
+        (= ent (lookup_symbol mod sym @FALSE))
+        (if ent (update_function_entry mod sym))
+        ))
+    (return val)
+    ))
+
+(export fun add_module_function (mod sym overwrite val) (
+    (add_module_variable mod sym overwrite val)
+    (var ent (lookup_symbol mod sym @FALSE))
+    (if ent (update_function_entry mod sym))
+    ))
+
+(export fun is_local_var (v) (
+    (if (== (node_bhead v) ModuleVariable)
+        (return @TRUE) ; display
+        )
+    (return @FALSE)
+    ))
+
+(export fun get_variable_count (mod) (
+    (return (unbox (car (field_get mod 4))))
+    ))
+
+(export fun set_variable_count (mod cnt) (
+    (setcar (field_get mod 4) (box cnt))
+    ))
+
+(export fun reset_variable_count (mod) (
+    (setcar (field_get mod 4) (box 0))
+    ))
+
+(export fun incr_variable_count (mod) (
+    (var counters (field_get mod 4))
+    (setcar counters (+ (car counters) 2)) ; counters are boxed
+    ))
+
+(export fun push_varscope (mod) (
+    (symtable_push (get_vartable mod))
+    (var counters (field_get mod 4))
+    (field_set mod 4 (cons (car counters) counters))
+    ))
+
+(export fun pop_varscope (mod) (
+    (symtable_pop (get_vartable mod))
+    (field_set mod 4 (cdr (field_get mod 4)))
+    ))
+
 (export fun in_top_scope (mod) (
-    (var sym (field_get mod 1))
-    (if (&& (== (symtable_depth (field_get mod 6)) 1) (!= sym @C_NIL))
+    (if (== (symtable_depth (get_vartable mod)) 1)
         (return @TRUE)
         (return @FALSE)
         )
     ))
 
-(export fun get_vartable (mod) (
-    (return (field_get mod 6))
+(export fun add_symbol (mod sym v) (
+    (symtable_add (get_vartable mod) sym v)
     ))
 
-(export fun pp_module (ochan obj) (
-    (var sym (field_get obj 1))
-    (output_string ochan "<#Module:")
-    (if (!= sym @C_NIL)
-        (output_symbol ochan sym)
-        (output_string ochan "(anonym)")
+(export var uninitialized (to_sym "%uninitialized"))
+(var uninitialized_disp (struct 2 uninitialized no_loc))
+(export fun add_module_variable_display (mod sym) (
+    (if (! (is_symbol sym))
+        (throw (type_error current_loc (string "a symbol") sym))
         )
-    (output_string ochan ":")
-    (output_hex ochan obj 8)
-    (output_char ochan '>')
+    (var ent (lookup_symbol_current_module mod sym @FALSE))
+    (if (! ent) (do
+        (var mvar (lookup_symbol mod sym @TRUE))
+        (var disp 0)
+        (if mvar
+            (= disp (get_module_variable_disp sym mvar))
+            (= disp uninitialized_disp)
+            )
+        (= ent (make_object2 ModuleVariable disp @C_FALSE))
+        (symtable_add_to_global (get_vartable mod) sym ent)
+        ))
+    (return ent)
     ))
 
     ))

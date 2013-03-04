@@ -1,19 +1,21 @@
 # Copyright (C) 2013 nineties
 #
-# $Id: oop.ab 2013-02-15 16:57:38 nineties $
+# $Id: oop.ab 2013-03-05 05:41:52 nineties $
 
 # Prototype-based Object-Oriented Programming
 
-module std {
-    object_slot  ::= symbol ":" expr { ($0, $2) }
-    object_slots
-        ::= [multiline] "{" delimited(object_slot, ",") "}" { $1 }
-          | [multiline] "{" aligned(object_slot) "}"        { $1 }
+module Std {
+    module Parser {
+        object_slot  ::= symbol ":" expr { ($0, $2) }
+        object_slots
+            ::= <<multiline>> "{" delimited(object_slot, ",") "}" { $1 }
+              | <<multiline>> "{" aligned(object_slot) "}"        { $1 }
 
-    object_creation
-        ::= [multiline] "make" symbol object_slots { `MakeSlots{!$1, !$2} }
+        object_creation
+            ::= <<multiline>> "make" symbol object_slots { `MakeSlots{!$1, !$2} }
 
-    prefix_expr ::= object_creation
+        prefix_expr ::= object_creation
+    }
 
     MakeSlots{head, fields} => {
         obj: gensym()

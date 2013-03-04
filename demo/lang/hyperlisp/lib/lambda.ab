@@ -1,6 +1,6 @@
 # Copyright (C) 2012 nineties
 #
-# $Id: hyperlisp/symbol.ab 2013-02-13 00:25:18 nineties $
+# $Id: hyperlisp/symbol.ab 2013-03-05 04:50:21 nineties $
 
 # Reference
 #   Masahiko Sato and Masami Hagiya: HyperLisp, Algorithmic Languages
@@ -191,7 +191,7 @@ module HyperLisp {
 
     # compile lambda-abstraction as a native function of Amber.
     compile_lambda_jit(x):
-        amber::compile(`Lambda{x, !compile_eval(params(x), body(x))})
+        Amber::compile(`Lambda{x, !compile_eval(params(x), body(x))})
 
     # compile label-expression as a sexp.
     compile_label(x):
@@ -214,7 +214,7 @@ module HyperLisp {
         lam:  replace_label(name, params(x), body(x))
         fun : compile_eval(params(lam), body(lam))
         # register compiled function to the function table.
-        function[name] = amber::compile(`Lambda{x, !fun})
+        function[name] = Amber::compile(`Lambda{x, !fun})
 
     ## Function definition
 
@@ -222,7 +222,7 @@ module HyperLisp {
     # Amber's default syntax. 
     hl_comment ::= C_style_comment
 
-    hl_expr ::= [multiline]
+    hl_expr ::= <<multiline>>
                 "#" hl_literal hl_simple_expr "=" hl_expr ";"
                 { cons_list([\Meta{Delta}, $1,
                       cons_list([\Meta{Lambda}, $2, $4])]) }
@@ -232,7 +232,7 @@ module HyperLisp {
         sym: x.cdr.car
         lam: x.cdr.cdr.car
         fun: compile_lambda_jit(lam)
-        amber::define_global_variable(rename(sym), fun)
+        Amber::define_global_variable(rename(sym), fun)
         sym
     }
     eval_(x) when x.car == \Meta{Delta}: eval_define(x)

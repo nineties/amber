@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2013-02-20 16:57:12 nineties $
+; $Id: rowl1-compile.rlc 2013-03-05 06:09:14 nineties $
 ;
 
 (import "rlvm-compile")
@@ -20,7 +20,6 @@
 (var AllocClsEnv   (to_sym "%AllocClosureEnv"))
 (var Ref           (to_sym "%Ref"))
 (var Decons        (to_sym "%Decons"))
-(var uninitialized (to_sym "%uninitialized"))
 (var noguard       (to_sym "%noguard"))
 (var closed        (to_sym "%closed"))
 
@@ -47,13 +46,6 @@
     (var hd (node_bhead lhs))
     (if (== hd Ref) (return (node_arg lhs 2)))
     (return @C_NIL)
-    ))
-
-(export fun callable (expr) (
-    (var ty (node_type expr))
-    (if (== ty @FunctionE) (return @TRUE)
-    (if (== ty @BoundFunctionE) (return @TRUE)
-        (return @FALSE)))
     ))
 
 (fun iter_args (f node arg level) (
@@ -107,7 +99,7 @@
             (if (is_special expr) (return fv))
             (if (== expr DontCare) (return fv))
             (= fv (list_delete expr fv))
-            (var info (lookup_symbol mod expr))
+            (var info (lookup_symbol mod expr @FALSE))
             ; module-variables and special symbols are not free.
             (if (== (node_bhead info) ModuleVariable) (return fv))
             (return (cons expr fv))
@@ -138,9 +130,6 @@
             )
         (if (|| (== hd Block) (== hd Breakable))
             (return (fv_iter_block mod (node_arg_list expr 0) fv))
-            )
-        (if (== hd Dynamic)
-            (return fv)
             )
         ))
     (if (== hd Quote) (return fv))
@@ -300,9 +289,6 @@
         (node_arg_set expr 0 (alpha_qquote tbl (node_arg expr 0) 0))
         (return expr)
         ))
-    (if (== hd Dynamic)
-        (return expr)
-        )
     (for i 0 (node_size expr)
         (node_arg_set expr i (alpha tbl (node_arg expr i)))
         )
@@ -346,14 +332,25 @@
     (return (alloc_function args code guard))
     ))
 
-(export fun fusion_function (fun1 fun2) (
-    (if (! (callable fun1))
+(export fun bind_function (fun1 fun2) (
+    (if (! (is_function fun1))
         (throw (type_error current_loc (string "function") fun1))
         )
-    (if (! (callable fun2))
+    (if (! (is_function fun2))
         (throw (type_error current_loc (string "function") fun2))
         )
-    (return (variant @BoundFunctionE 3 0 fun1 fun2))
+
+    (if (== (node_type fun1) @DelegateFunctionE)
+        (throw (string "BUG (bind_function): Invalid argument type"))
+        )
+    (if (== (node_type fun2) @DelegateFunctionE)
+        (do
+            (field_set fun2 1 0) ; clear cache
+            (field_set fun2 2 (bind_function fun1 (field_get fun2 2)))
+            (return fun2)
+        )
+        (return (variant @BoundFunctionE 3 0 fun1 fun2))
+        )
     ))
 
 (var maybe (to_sym "maybe"))
@@ -405,7 +402,6 @@
     (if (== hd Closure) (return expr))
     (if (== hd Ref) (return expr))
     (if (== hd Quote) (return expr))
-    (if (== hd Dynamic) (return expr))
     (if (== hd QuasiQuote) (do
         (node_arg_set expr 0
             (scan_clsvars_qquote mod (node_arg expr 0) tbl 0))
@@ -506,8 +502,6 @@
         (node_arg_set expr 0 (subst_clsvars_qquote tbl cls (node_arg expr 0) 0))
         (return expr)
         ))
-    ; The binding of a dynamic variable is resolved at run-time.
-    (if (== hd Dynamic) (return expr))
     (for i 0 (node_size expr)
         (node_arg_set expr i (subst_clsvars tbl cls (node_arg expr i)))
         )
@@ -536,15 +530,14 @@
 
 (extern fun compile_matching)
 (export fun lookup_func (mod sym) (
-    (var def (lookup_symbol mod sym))
-    (if (! def) 
+    (var def (lookup_symbol mod sym @FALSE))
+    (if (! def) (do
         (throw (undefined_fun current_loc sym))
-        )
-    (must_be_module_variable sym def)
+        ))
     (check_init sym def)
     (var box (node_arg def 0))
     (var func (field_get box 0))
-    (if (! (callable func))
+    (if (! (is_function func))
         (throw (type_error current_loc (string "function") func))
         )
     (var loc (field_get box 1))
@@ -619,7 +612,7 @@
 
 (fun compile_qualified (asm mod expr) (
     (var modsig (node_arg expr 0))
-    (var module (find_module current_loc mod modsig @FALSE))
+    (var module (find_module mod modsig))
     (compile asm module (node_arg expr 1))
     ))
 
@@ -728,6 +721,9 @@
     ))
 
 (fun setup_args (tbl args) (
+    (if (!= (node_bhead args) @List) (throw
+        (type_error current_loc (string "a list") args)
+        ))
     (var idx 0)
     (while args (do
         (setup_arg tbl (make_arg idx) (car args) 0)
@@ -849,13 +845,6 @@
     ))
 
 (fun compile_define_variable (asm mod expr) (
-    (var rhs_head (node_bhead (node_arg expr 1)))
-    (if (|| (== rhs_head Lambda) (== rhs_head Fusion))
-        (compile_define_function asm mod expr)
-        (compile_define_variable_ asm mod expr)
-        )
-    ))
-(fun compile_define_variable_ (asm mod expr) (
     (var overwrite @C_FALSE)
     (if (&& (== (node_size expr) 3)
             (== (node_arg expr 2) (to_sym "overwrite")))
@@ -863,10 +852,18 @@
         )
     (var lhs (node_arg expr 0))
     (var rhs (node_arg expr 1))
+    (var lty (node_bhead lhs))
 
-    (if (== (node_bhead lhs) Ref)
+    (if (== lty Ref)
         (return (compile_define_clsref asm mod lhs rhs overwrite))
         )
+    (if (== lty Qualified) (do
+        (node_arg_set expr 0 (node_arg lhs 1))
+        (return (compile_define_variable asm
+            (find_module mod (node_arg_symbol lhs 0))
+            expr
+            ))
+        ))
     (if (! (is_symbol lhs))
         (return (compile_define_multi_variable asm mod lhs rhs overwrite))
         )
@@ -937,7 +934,7 @@
         (var idx 0)
         (if (== overwrite @C_TRUE)
             (do
-                (var info (lookup_symbol mod lhs))
+                (var info (lookup_symbol mod lhs @FALSE))
                 (= idx (node_arg_int info 0))
             )
             (do
@@ -959,17 +956,17 @@
     ))
 
 (fun check_redefinition (mod sym) (
-    (var info (lookup_symbol_local mod sym))
+    (var info (lookup_symbol_current_scope mod sym @TRUE))
     (if (! info) return)
-    (if (== (node_bhead info) ModuleVariable) (do
-        (if (|| (== (node_arg info 1) @C_FALSE) (== (node_arg info 2) @C_TRUE))
-            return
-            )
-        ))
     (throw (redefined_var current_loc (var_loc info) sym))
     ))
 
 (fun check_init (sym info) (
+    (if (!= (node_bhead info) ModuleVariable) (do
+        (throw (unexpected_error current_loc
+            (string "module variable is required")
+            sym))
+        ))
     (var box (node_arg info 0))
     (if (! box) (do
         (var loc (node_arg info 1))
@@ -978,8 +975,10 @@
     ))
 
 (fun load_module_variable (sym node) (
-    (var v (field_get (field_get node 1) 0))
-    (if (== v uninitialized) (throw (undefined_var current_loc sym)))
+    (var v (car (field_get node 1)))
+    (if (== v uninitialized) (do
+        (throw (undefined_var current_loc sym))
+        ))
     (return v)
     ))
 
@@ -1050,30 +1049,20 @@
     ))
 
 (fun compile_var (asm mod sym) (
-    (var v (lookup_symbol mod sym))
+    (var v (lookup_symbol mod sym @FALSE))
     (if (! v)
         ; `sym' is a module variable
-        (= v (add_module_variable_display mod sym (struct 2 uninitialized no_loc)))
-    (if (== (node_bhead v) ModuleVariable) (do
-        (var u (lookup_symbol_current_module mod sym))
-        (if (! u)
-            (= v (add_module_variable_display mod sym (node_arg v 0)))
-            )
-        )))
+        (= v (add_module_variable_display mod sym))
+        (do
+            (if (== (node_bhead v) ModuleVariable) (do
+                (var u (lookup_symbol_current_module mod sym @TRUE))
+                (if (! u)
+                    (= v (add_module_variable_display mod sym))
+                    )
+                ))
+        )
+        )
     (compile_operand asm v sym)
-    ))
-
-(export fun lookup_dynamic_var (sym) (
-    (var info (lookup_effective_symbol current_mod sym))
-    (must_be_module_variable sym info)
-    (var box (node_arg info 0))
-    (return (field_get box 0))
-    ))
-
-(fun compile_dynamic_var (asm mod expr) (
-    (var sym (node_arg_symbol expr 0))
-    (put_push asm sym)
-    (compile_simple_call asm 1 lookup_dynamic_var)
     ))
 
 (fun compile_apply (asm mod expr) (
@@ -1315,12 +1304,6 @@
 
 (fun compile_seq (asm mod expr) (
     (compile_block_body asm mod (node_arg expr 0))
-    ))
-
-(fun compile_scoped (asm mod expr) (
-    (var scope (node_arg expr 0))
-    (set_variable_count scope (get_variable_count mod))
-    (compile asm scope (node_arg expr 1))
     ))
 
 (fun compile_if (asm mod expr) (
@@ -1656,7 +1639,7 @@
 
     (compile asm mod rhs)
     (put_dup asm)
-    (var v (lookup_symbol mod lhs))
+    (var v (lookup_symbol mod lhs @FALSE))
     (if (! v)
         (throw (undefined_var current_loc lhs))
         )
@@ -1807,7 +1790,7 @@
 (fun compile_fusion (asm mod expr) (
     (compile asm mod (node_arg expr 1))
     (compile asm mod (node_arg expr 0))
-    (compile_simple_call asm 2 fusion_function)
+    (compile_simple_call asm 2 bind_function)
     ))
 
 (fun build_closure (lam clos) (
@@ -1893,67 +1876,55 @@
         ))
     ))
 
-(fun append_function (mod sym newfunc) (
-    (var info (lookup_symbol_local mod sym))
-    (if info
-        (do
-            (must_be_module_variable sym info)
-            (check_init sym info)
-            (var box (node_arg info 0))
-            (var func (field_get box 0))
-            (if (callable func)
-                (= newfunc (fusion_function newfunc func))
-                )
-            (field_set box 0 newfunc)
-            return
-        ))
-    (= info (lookup_symbol mod sym))
-    (if info
-        (do
-            (must_be_module_variable sym info)
-            (check_init sym info)
-            (var box (node_arg info 0))
-            (var func (field_get box 0))
-            (if (callable func)
-                (= newfunc (fusion_function newfunc func))
-                )
-        ))
-    (add_module_variable mod sym @C_FALSE newfunc)
+(fun variable_name (lhs) (
+    (if (== (node_bhead lhs) Ref)
+        (return (node_arg_symbol lhs 2))
+        )
+    (if (is_symbol lhs) (return lhs))
+    (if (== (node_bhead lhs) Qualified) (return lhs))
+    (throw (type_error current_loc (string "a symbol") lhs))
     ))
 
 ; DefineFunction{sym, fun} is equivalent to:
-; sym: fun                   (when `sym' is not defined)
-; sym: fun | sym             (when `sym' is defined in outer scope)
 ; sym: fun | sym (overwrite) (when `sym' is defined in local scope)
+; sym: fun   (other)
 (fun compile_define_function (asm mod expr) (
     (var lhs (node_arg expr 0))
-    (var sym @C_NIL)
-    (if (== (node_bhead lhs) Ref)
-        (= sym (node_arg_symbol lhs 2))
-    (if (is_symbol lhs)
-        (= sym lhs)
-        (throw (type_error current_loc (string "a symbol") lhs))
-        ))
-
+    (var sym (variable_name lhs))
+    (var info (lookup_symbol_current_scope mod sym @TRUE))
     (var fun (node_arg expr 1))
-    (var info (lookup_symbol_local mod sym))
-    (if (is_defined_locally info)
-        (return (compile_define_variable_ asm mod
-            (make_object3 DefVariable lhs
-                (make_object2 Fusion fun lhs) (to_sym "overwrite"))))
+
+    (if info
+        (return (compile_define_variable asm mod
+            (make_object3 DefVariable
+                lhs
+                (make_object2 Fusion fun lhs)
+                (to_sym "overwrite")
+            )))
         )
-    (= info (lookup_effective_symbol mod sym))
-    (if info 
-        (return (compile_define_variable_ asm mod
-            (make_object2 DefVariable lhs (make_object Fusion (list2 fun lhs)))))
-        (return (compile_define_variable_ asm mod
-            (make_object2 DefVariable lhs fun)))
-        )
+
+    (return (compile_define_variable asm mod
+        (make_object3 DefVariable
+            lhs fun (to_sym "overwrite")
+        )))
+    ))
+
+(fun append_function (mod sym newfunc) (
+    (var info (lookup_symbol_current_module mod sym @FALSE))
+    (if info
+        (do
+            (check_init sym info)
+            (var disp (get_module_variable_disp sym info))
+            (var func (car disp))
+            (setcar disp (bind_function newfunc func))
+            return
+        ))
+    (add_module_function mod sym @C_TRUE newfunc)
     ))
 
 (export fun add_function0 (mod sym func guard) (
     (var asm (make_assembler))
-    (compile_simple_function asm 1 func)
+    (compile_simple_function asm 0 func)
     (var code (get_code asm))
     (append_function mod sym (make_function 0 code guard))
     ))
@@ -2037,7 +2008,6 @@
     (add_compiler mod (make_object2 DefFunction DontCare DontCare) compile_define_function)
 
     (add_compiler mod symT compile_var)
-    (add_compiler mod (make_object1 Dynamic symT) compile_dynamic_var)
     (add_compiler mod (quote @C_TRUE) compile_special)
     (add_compiler mod (quote @C_FALSE) compile_special)
     (add_compiler mod (quote @C_NIL) compile_special)
@@ -2060,8 +2030,6 @@
 
     (add_compiler mod (make_object1 Block listT) compile_block)
     (add_compiler mod (make_object1 Seq listT) compile_seq)
-    (add_compiler mod (make_object2 Scoped (domainP Module) DontCare)
-        compile_scoped)
     (add_compiler mod (make_object1 Breakable listT) compile_breakable)
 
     (add_compiler mod (mkif DontCare DontCare) compile_if)
