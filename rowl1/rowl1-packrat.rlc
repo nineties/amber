@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2013-03-05 04:59:57 nineties $
+; $Id: rowl1-packrat.rlc 2013-03-07 00:34:58 nineties $
 ;
 
 (import "rlvm-compile")
@@ -446,6 +446,10 @@
         (field_set p 6 0)
         ))
 
+    ; reset error info
+    (field_set p 3 0)
+    (field_set p 11 0)
+
     (memotable_clear (field_get buf 2))
     (if (&& shell_mode_p (! force)) (field_set p 8 (+ (field_get p 8) 1)))
     ))
@@ -863,7 +867,7 @@
         break
         ))
     (if (== (get_pos p) pos)
-        (return (noparse p (strcat "unexpected character: " (ctos (lookahead p)))))
+        (return (noparse_quite p))
         (return (parsed p @C_NIL))
         )
     ))
@@ -1139,8 +1143,8 @@
             stmt))
         )
 
-    (flush_parser p @FALSE)
     (parsed p stmt)
+    (flush_parser p @FALSE)
     (return @FALSE)
     ))
 
@@ -1542,7 +1546,6 @@
     (= body (cons (make_object2 While @C_TRUE
         (block (list_reverse loop_body))) body))
     (= body (cons (gen_parsed (apply (to_sym "%reverse") (list1 elems))) body))
-
     (return (breakable (list_reverse body)))
     ))
 
@@ -1850,10 +1853,12 @@
     (= multiline_p @FALSE)
     ))
 
+(var idx 0)
 (fun compile_parser (elems) (
     (if (!= (node_bhead elems) List)
         (= elems (list1 elems))
         )
+    (+= idx 1)
 
     (var body 0)
     (var state (unique_sym))
@@ -1950,11 +1955,7 @@
     ))
 
 (fun add_parser (mod sym func) (
-    (var asm (make_assembler))
-    (put_arg0 asm) ; the parser
-    (compile_simple_call asm 1 func)
-    (var guard (get_code asm))
-    (add_function1 mod sym (domainP Parser) return_true guard)
+    (add_function1 mod sym (domainP Parser) func 0)
     ))
 
 (export fun enable_shell_syntax () (

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2013-03-05 06:09:14 nineties $
+; $Id: rowl1-compile.rlc 2013-03-07 00:34:34 nineties $
 ;
 
 (import "rlvm-compile")
@@ -152,7 +152,7 @@
 ; f(... x ... x ...) : body
 ; to
 ; f(... x ... y ...) when x==y : body
-(extern fun list_to_table)
+(extern fun _copy)
 (fun alpha_args_iter (tbl chk rep expr level) (
     (if (is_symbol expr) (do
         (if (== expr DontCare) (return expr))
@@ -186,6 +186,7 @@
         (return expr)
         ))
     (var hd (node_bhead expr))
+    (if (== hd Qualified) (return expr))
     (if (== hd Quote) (return expr))
     (if (== hd Domain)
         (if (== level 0) (do
@@ -250,45 +251,51 @@
         ))
     (if (is_atom expr) (return expr))
     (if (is_list expr) (do
-        (var ls expr)
-        (while ls (do
-            (setcar ls (alpha tbl (car ls)))
-            (= ls (cdr ls))
+        (var new 0)
+        (while expr (do
+            (= new (cons (alpha tbl (car expr)) new))
+            (= expr (cdr expr))
             ))
-        (return expr)
+        (return (list_reverse new))
         ))
     (var hd (node_bhead expr))
-    (if (== hd Located) (do
-        (node_arg_set expr 1 (alpha tbl (node_arg expr 1)))
-        (return expr)
-        ))
+    (if (== hd Located)
+        (return (make_object2 Located
+            (node_arg expr 0)
+            (alpha tbl (node_arg expr 1))))
+        )
     (if (|| (== hd DefVariable) (== hd DefFunction)) (do
+        (= expr (_copy expr))
         (node_arg_set expr 0 (alpha_args tbl (node_arg expr 0)))
         (node_arg_set expr 1 (alpha tbl (node_arg expr 1)))
         (return expr)
         ))
     (if (|| (== hd Block) (== hd Breakable)) (do
-        (var exprs (node_arg_list expr 0))
         (symtable_push tbl)
+        (var exprs (node_arg_list expr 0))
+        (var new_exprs 0)
         (while exprs (do
-            (setcar exprs (alpha tbl (car exprs)))
+            (= new_exprs (cons (alpha tbl (car exprs)) new_exprs))
             (= exprs (cdr exprs))
             ))
         (symtable_pop tbl)
-        (return expr)
+        (return (make_object1 hd (list_reverse new_exprs)))
         ))
     (if (== hd Lambda) (do
         (symtable_push tbl)
+        (= expr (_copy expr))
         (node_arg_set expr 0 (alpha_args tbl (node_arg expr 0)))
         (node_arg_set expr 1 (alpha tbl (node_arg expr 1)))
         (symtable_pop tbl)
         (return expr)
         ))
     (if (== hd Quote) (return expr))
-    (if (== hd QuasiQuote) (do
-        (node_arg_set expr 0 (alpha_qquote tbl (node_arg expr 0) 0))
-        (return expr)
-        ))
+    (if (== hd QuasiQuote)
+        (return (make_object1 QuasiQuote
+            (alpha_qquote tbl (node_arg expr 0) 0)))
+        )
+
+    (= expr (_copy expr))
     (for i 0 (node_size expr)
         (node_arg_set expr i (alpha tbl (node_arg expr i)))
         )
@@ -298,28 +305,77 @@
 (fun alpha_qquote (tbl expr level) (
     (if (is_atom expr) (return expr))
     (if (is_list expr) (do
-        (var ls expr)
-        (while ls (do
-            (setcar ls (alpha_qquote tbl (car ls) level))
-            (= ls (cdr ls))
+        (var ret 0)
+        (while expr (do
+            (= ret (cons (alpha_qquote tbl (car expr) level) ret))
+            (= expr (cdr expr))
             ))
-        (return expr)
+        (return (list_reverse ret))
         ))
     (var hd (node_bhead expr))
     (if (== hd Unquote) (do
-        (if (== level 0) (do
-            (node_arg_set expr 0 (alpha tbl (node_arg expr 0)))
-            (return expr)
-            ))
+        (if (== level 0)
+            (return (make_object1 Unquote (alpha tbl (node_arg expr 0))))
+            )
         (-= level 1)
         )
     (if (== hd QuasiQuote)
         (+= level 1)
         ))
+    (= expr (_copy expr))
     (for i 0 (node_size expr)
         (node_arg_set expr i (alpha_qquote tbl (node_arg expr i) level))
         )
     (return expr)
+    ))
+
+(fun unqualified_args_iter (expr ret level) (
+    (if (is_symbol expr) (do
+        (field_set ret 1 (cons expr (field_get ret 1)))
+        (field_set ret 2 (cons expr (field_get ret 2)))
+        (return expr)
+        ))
+    (if (is_atom expr) (return expr))
+    (if (is_list expr) (do
+        (var ls expr)
+        (while ls (do
+            (setcar ls (unqualified_args_iter (car ls) ret level))
+            (= ls (cdr ls))
+            ))
+        (return expr)
+        ))
+    (var hd (node_bhead expr))
+    (if (== hd Quote) (return expr))
+    (if (== hd Qualified) (do
+        (var v (unique_sym))
+        (field_set ret 1 (cons v (field_get ret 1)))
+        (field_set ret 2 (cons expr (field_get ret 2)))
+        (return v)
+        ))
+    (if (== hd Domain)
+        (if (== level 0) (do
+            (node_arg_set expr 0
+                (unqualified_args_iter (node_arg expr 0) ret 0))
+            (var dom (node_arg expr 1))
+            (if (! (is_symbol dom))
+                (node_arg_set expr 1 (unqualified_args_iter dom ret 0))
+                )
+            (return expr)
+            ))
+    (if (== hd QuasiQuote) (+= level 1)
+    (if (== hd Unquote) (-= level 1))))
+
+    (for i 0 (node_size expr)
+        (node_arg_set expr i
+            (unqualified_args_iter (node_arg expr i) ret level))
+        )
+    (return expr)
+    ))
+
+(fun unqualified_args (args) (
+    (var ret (struct 3 0 0 0))
+    (field_set ret 0 (unqualified_args_iter args ret 0))
+    (return ret)
     ))
 
 (fun alloc_function (args code guard) (
@@ -888,11 +944,14 @@
 ; car(tmp)
 (fun compile_define_multi_variable (asm mod lhs rhs overwrite) (
     (var lbl (fresh_label asm))
-    (var vars (collect_args lhs))
+    (var tup (unqualified_args lhs))
+    (var pattern (field_get tup 0))
+    (var tvars   (field_get tup 1))
+    (var rvars   (field_get tup 2))
     (var t (unique_sym))
     (compile asm mod (apply (lambda
-        (list1 (make_object2 Domain t lhs))
-        (list_append vars (list1 t))) (list1 rhs)))
+        (list1 (make_object2 Domain t pattern))
+        (list_append tvars (list1 t))) (list1 rhs)))
 
     (put_dup asm)
     (put_undef asm)
@@ -902,16 +961,16 @@
     (put_throw asm)
 
     (set_label asm lbl)
-    (while vars (do
+    (while rvars (do
         (var def @C_NIL)
         (if (== overwrite @C_TRUE)
-            (= def (make_object3 DefVariable (car vars) Decons (to_sym "overwrite")))
-            (= def (make_object2 DefVariable (car vars) Decons))
+            (= def (make_object3 DefVariable (car rvars) Decons (to_sym "overwrite")))
+            (= def (make_object2 DefVariable (car rvars) Decons))
             )
         (compile_define_variable asm mod def)
         (put_drop asm)
 
-        (= vars (cdr vars))
+        (= rvars (cdr rvars))
         ))
     (put_car asm)
     ))
@@ -1674,11 +1733,16 @@
 ; car(tmp)
 (fun compile_multi_assign (asm mod lhs rhs) (
     (var lbl (fresh_label asm))
-    (var vars (collect_args lhs))
+
+    (var tup (unqualified_args lhs))
+    (var pattern (field_get tup 0))
+    (var tvars   (field_get tup 1))
+    (var rvars   (field_get tup 2))
+
     (var t (unique_sym))
     (compile asm mod (apply (lambda
-        (list1 (make_object2 Domain t lhs))
-        (list_append vars (list1 t))) (list1 rhs)))
+        (list1 (make_object2 Domain t pattern))
+        (list_append tvars (list1 t))) (list1 rhs)))
 
     (put_dup asm)
     (put_undef asm)
@@ -1688,10 +1752,10 @@
     (put_throw asm)
     (set_label asm lbl)
 
-    (while vars (do
-        (compile_assign asm mod (assign (car vars) Decons))
+    (while rvars (do
+        (compile_assign asm mod (assign (car rvars) Decons))
         (put_drop asm)
-        (= vars (cdr vars))
+        (= rvars (cdr rvars))
         ))
     (put_car asm)
     ))

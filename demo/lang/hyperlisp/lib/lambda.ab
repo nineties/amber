@@ -1,6 +1,6 @@
 # Copyright (C) 2012 nineties
 #
-# $Id: hyperlisp/symbol.ab 2013-03-05 04:50:21 nineties $
+# $Id: hyperlisp/symbol.ab 2013-03-07 00:42:59 nineties $
 
 # Reference
 #   Masahiko Sato and Masami Hagiya: HyperLisp, Algorithmic Languages
@@ -10,6 +10,7 @@
 import core
 
 module HyperLisp {
+    module Parser {
     # Metaliteral
     hl_metaliteral ::= nospace( ([A-Z][A-Za-z0-9]*) )
                        { `Meta{!$input.to_sym} }
@@ -21,6 +22,7 @@ module HyperLisp {
             { `Eq{!$0, !$2} }
           | "." hl_expr
             { `Whole{!$1} }
+    }
 
     # Rename variables to avoid name conflict.
     rename(sym): ("hyperlisp_" + sym).to_sym
@@ -218,14 +220,16 @@ module HyperLisp {
 
     ## Function definition
 
+    module Parser {
     # The symbol '#' is used for start symbol of comments in
     # Amber's default syntax. 
-    hl_comment ::= C_style_comment
+    hl_comment: C_style_comment
 
     hl_expr ::= <<multiline>>
                 "#" hl_literal hl_simple_expr "=" hl_expr ";"
                 { cons_list([\Meta{Delta}, $1,
                       cons_list([\Meta{Lambda}, $2, $4])]) }
+    }
 
     # Extend eval and apply
     eval_define(x): {
@@ -238,16 +242,19 @@ module HyperLisp {
     eval_(x) when x.car == \Meta{Delta}: eval_define(x)
     eval_(x@Meta): throw `UndefinedMetaLiteral{!x}
 
-    # lambda-abstraction and label-expression is just a syntax sugar.
-    # Therefore, they should be translated to sexp before evaluation.
-    parse_old_hl_expr: parse_hl_expr
-    hl_expr_macro ::= old_hl_expr { macro($0) }
-    ReplaceSyntax{hl_expr, hl_expr_macro}
-
     macro: x@Cons when x.car == \Meta{Lambda} -> compile_lambda(x)
          | x@Cons when x.car == \Meta{Label}  -> compile_label(x)
          | x when x == zero -> zero
          | x@Cons -> cons(macro(x.car), macro(x.cdr))
          | x@Snoc -> snoc(macro(x.car), macro(x.cdr))
          | x -> x
+
+    module Parser {
+    # lambda-abstraction and label-expression is just a syntax sugar.
+    # Therefore, they should be translated to sexp before evaluation.
+    hl_expr_old: hl_expr
+    hl_expr_macro ::= hl_expr_old { macro($0) }
+    hl_expr = hl_expr_macro
+    }
+
 }

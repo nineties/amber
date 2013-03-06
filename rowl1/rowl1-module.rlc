@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-module.rlc 2013-03-05 04:30:09 nineties $
+; $Id: rowl1-module.rlc 2013-03-06 19:18:46 nineties $
 ;
 
 ; Module
@@ -280,6 +280,18 @@
     ))
 
 (export fun create_module (curmod sig) (
+    (var hd (node_bhead sig))
+    (if (== hd Qualified)
+        (return (create_module
+            (find_module curmod (node_arg sig 0))
+            (node_arg sig 1)))
+        )
+    (if (!= hd BSymbol)
+        (throw (invalid_argument current_loc
+            (string "invalid identifier")
+            sig))
+        )
+
     (var mod (lookup_symbol curmod sig @FALSE))
     (if mod (do
         (= mod (get_module_variable_value sig mod))
@@ -288,19 +300,7 @@
             )
         (return mod)
         ))
-
-    (var hd (node_bhead sig))
-    (if (== hd Qualified)
-        (return (create_module
-            (find_module curmod (node_arg sig 0))
-            (node_arg sig 1)))
-        )
-    (if (== hd BSymbol) (do 
-        (return (make_module curmod sig))
-        ))
-    (throw (invalid_argument current_loc
-        (string "invalid identifier")
-        sig))
+    (return (make_module curmod sig))
     ))
 
 (export fun add_module_variable (mod sym overwrite val) (
