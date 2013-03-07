@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2013-03-07 00:34:34 nineties $
+; $Id: rowl1-compile.rlc 2013-03-08 06:36:10 nineties $
 ;
 
 (import "rlvm-compile")
@@ -990,14 +990,14 @@
 
 (fun compile_define_variable_local (asm mod lhs rhs overwrite) (
     (if (is_symbol lhs) (do
-        (var idx 0)
-        (if (== overwrite @C_TRUE)
-            (do
-                (var info (lookup_symbol mod lhs @FALSE))
-                (= idx (node_arg_int info 0))
+        (var info (lookup_symbol_current_scope mod lhs @TRUE))
+        (if (&& (== overwrite @C_FALSE) info)
+            (throw (redefined_var current_loc (var_loc info) lhs))
             )
+        (var idx 0)
+        (if info
+            (= idx (node_arg_int info 0))
             (do
-                (check_redefinition mod lhs)
                 (= idx (get_lvar_idx mod))
                 (add_symbol mod lhs (make_lvar idx))
             ))
