@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2013-03-07 00:34:58 nineties $
+; $Id: rowl1-packrat.rlc 2013-03-08 05:58:20 nineties $
 ;
 
 (import "rlvm-compile")
@@ -48,14 +48,14 @@
         (var s (to_sym @(tos sym)))
         (var tbl (field_get (field_get p 4) 2))
         (var pos (field_get p 6))
-        (var v (memotable_find tbl s pos))
+        (var v (memotable_find tbl s pos (field_get p 7)))
         (if v (do
             (set_parser_state p (field_get v 0))
             (return @(PARSED_FLAG p))
             ))
         (@(s++ `parse_ sym '_') p)
         (var state (copy_parser_state p))
-        (memotable_add tbl s pos (struct 1 state @FALSE @FALSE @FALSE))
+        (memotable_add tbl s pos (field_get p 7) (struct 1 state @FALSE @FALSE @FALSE))
         (return @(PARSED_FLAG p))
     )))
 
@@ -144,7 +144,7 @@
         (var bucket (allocate_array new_size))
         (var entry (field_get table 1))
         (while entry (do
-            (var h (umod (field_get entry 5) new_size))
+            (var h (umod (field_get entry 6) new_size))
             (field_set entry 2 (array_get object bucket h))
             (array_set object bucket h entry)
             (= entry (field_get entry 3))
@@ -153,7 +153,7 @@
         ))
     ))
 
-(fun memotable_add (table sym pos obj) (
+(fun memotable_add (table sym pos nl obj) (
     (rehash table)
 
     (var bucket (field_get table 0))
@@ -163,16 +163,16 @@
     (var h (umod h_orig size))
     (var entry (array_get object bucket h))
     (while entry (do
-        (var e_sym (field_get entry 0))
-        (var e_pos (field_get entry 4))
-        (if (&& (== e_sym sym) (== e_pos pos)) (do
+        (if (&& (== (field_get entry 0) sym)
+            (&& (== (field_get entry 4) pos)
+                (== (field_get entry 5) nl))) (do
             (field_set entry 1 obj)
             return
             ))
         (= entry (field_get entry 2))
         ))
 
-    (var ent (struct 4 sym obj 0 0 pos h_orig))
+    (var ent (struct 4 sym obj 0 0 pos nl h_orig))
     (field_set ent 2 (array_get object bucket h))
     (array_set object bucket h ent)
 
@@ -182,16 +182,16 @@
     (field_set table 2 (+ (field_get table 2) 1))
     ))
 
-(fun memotable_find (table sym pos) (
+(fun memotable_find (table sym pos nl) (
     (var bucket (field_get table 0))
     (var size (seq_size bucket))
     (var h (hash sym pos))
     (= h (umod h size))
     (var entry (array_get object bucket h))
     (while entry (do
-        (var e_sym (field_get entry 0))
-        (var e_pos (field_get entry 4))
-        (if (&& (== e_sym sym) (== e_pos pos))
+        (if (&& (== (field_get entry 0) sym)
+            (&& (== (field_get entry 4) pos)
+                (== (field_get entry 5) nl)))
             (return (field_get entry 1))
             )
         (= entry (field_get entry 2))
@@ -262,9 +262,9 @@
 
     ; if column > indentation, current position is not the
     ; beginning of new line.
-    (if (> (field_get p 9) (field_get p 10)) (do
+    (if (> (field_get p 9) (field_get p 10))
         (field_set p 7 @FALSE)
-        ))
+        )
 
     (return @C_TRUE)
     ))
@@ -362,7 +362,9 @@
     (var vec (field_get buf 0))
     (var pos (field_get p 6))
     (var n 100)
-    (output_string stderr "input:")
+    (output_string stderr "input[newline=")
+    (output_int stderr (field_get p 7))
+    (output_string stderr "]:")
     (while (&& (< pos (cvector_size vec)) (> n 0)) (do
         (output_char stderr (cvector_at vec pos))
         (+= pos 1)
@@ -800,8 +802,12 @@
 (fun parse_float_ (p) (
     (var begin (field_get p 6))
     (var state (copy_parser_state p))
-    (if (!= (parse_decimal p) @C_FALSE) (return @C_FALSE))
-    (if (!= (lookahead p) '.') (return (noparse p "expect '.'")))
+    (if (== (parse_decimal p) @C_FALSE) (return @C_FALSE))
+    (if (!= (lookahead p) '.') (do
+        (noparse p "expect '.'")
+        (reset_parser_position p state)
+        (return @C_FALSE)
+        ))
     (getc p)
     (if (! (is_0_9 (lookahead p))) (do
         (noparse p "expect digits after the decimal point")
@@ -875,7 +881,7 @@
 
 (fun parse_shell_style_comment_ (p) (
     (var v (lookahead p))
-    (if (!= v '#') (return (noparse p "expect '#'")))
+    (if (!= v '#') (return (noparse_quite p)))
     (while @TRUE (do
         (var c (lookahead p))
         (if (|| (== c '\n') (< c 0)) break)
@@ -886,8 +892,8 @@
 @(MEMOIZE shell_style_comment)
 
 (fun parse_C_style_comment_ (p) (
+    (if (! (lookahead_text p "//")) (return @C_FALSE))
     (var v (parse_text p "//"))
-    (if (== v @C_FALSE) (return @C_FALSE))
     (while @TRUE (do
         (var c (lookahead p))
         (if (|| (== c '\n') (< c 0)) break)
@@ -1813,8 +1819,7 @@
     (var with_spaces @FALSE)
     (while elems (do
         (var ndvar (make_nodevar idx))
-        (= body (cons (compile_parser_element (car elems) with_spaces)
-            body))
+        (= body (cons (compile_parser_element (car elems) with_spaces) body))
 
         (if (! nospace_p) (= with_spaces @TRUE))
 
@@ -1891,7 +1896,7 @@
 (fun call_parser (p sym key fun) (
     (var tbl (field_get (field_get p 4) 2))
     (var pos (field_get p 6))
-    (var v (memotable_find tbl key pos))
+    (var v (memotable_find tbl key pos (field_get p 7)))
     (if v (do
         (if (field_get v 1) (do
             ; detected left-recursion
@@ -1907,7 +1912,7 @@
 
     ; state,possibly left-recursive,left-rec detected,parsed
     (var ent (struct 1 state @TRUE @FALSE @FALSE))
-    (memotable_add tbl key pos ent)
+    (memotable_add tbl key pos (field_get p 7) ent)
     (label retry_lbl)
     (byterun (compile_matching loc sym fun) p)
 
