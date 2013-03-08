@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2013-03-08 06:36:10 nineties $
+; $Id: rowl1-compile.rlc 2013-03-08 21:14:04 nineties $
 ;
 
 (import "rlvm-compile")
@@ -40,14 +40,6 @@
     (compile_simple_call asm 2 trace_func)
     ))
 
-(fun defined_symbol (expr) (
-    (var lhs (node_arg expr 0))
-    (if (is_symbol lhs) (return lhs))
-    (var hd (node_bhead lhs))
-    (if (== hd Ref) (return (node_arg lhs 2)))
-    (return @C_NIL)
-    ))
-
 (fun iter_args (f node arg level) (
     (if (is_special node) (return arg))
     (if (is_symbol node)
@@ -59,6 +51,11 @@
         (return arg)
         ))
     (var hd (node_bhead node))
+    (if (== hd Ref)
+        (if (== level 0)
+            (return (f (node_arg_symbol node 2) arg))
+            (return arg)
+        ))
     (if (== hd Quote) (return arg))
     (if (== hd QuasiQuote) (+= level 1)
     (if (== hd Unquote)    (-= level 1)
@@ -426,9 +423,13 @@
         (return expr)
         ))
     (if (|| (== hd DefVariable) (== hd DefFunction)) (do
-        (var sym (defined_symbol expr))
-        (if (! (symtable_find tbl sym)) (do
-            (symtable_add tbl sym maybe)
+        (var syms (collect_args (node_arg expr 0)))
+        (while syms (do
+            (var sym (car syms))
+            (if (! (symtable_find tbl sym)) (do
+                (symtable_add tbl sym maybe)
+                ))
+            (= syms (cdr syms))
             ))
         (node_arg_set expr 1 (scan_clsvars mod (node_arg expr 1) tbl))
         (return expr)
@@ -1556,10 +1557,6 @@
 ; }
 
 (fun compile_for (asm mod expr) (
-    (if (in_top_scope mod)
-        (return (compile_function asm 0 mod 0 expr noguard @C_NIL))
-        )
-
     (var i (node_arg expr 0))
     (var ary (node_arg expr 1))
     (var body (node_arg expr 2))
@@ -1580,10 +1577,6 @@
     ))
 
 (fun compile_revfor (asm mod expr) (
-    (if (in_top_scope mod)
-        (return (compile_function asm 0 mod 0 expr noguard @C_NIL))
-        )
-
     (var i (node_arg expr 0))
     (var ary (node_arg expr 1))
     (var body (node_arg expr 2))
@@ -1605,73 +1598,65 @@
 
 ; translate for i in a..b body to
 ;
-; i: {
-;     i: a
-;     tmp: b
-;     while (i <= tmp) {
-;         body
-;         i += 1
-;     }
-;     i
+; j: a
+; n: b
+; while (j <= n) {
+;     i: j
+;     body
+;     j += 1
 ; }
 
 (fun compile_range_for (asm mod expr) (
-    (if (in_top_scope mod)
-        (return (compile_function asm 0 mod 0 expr noguard @C_NIL))
-        )
-
     (var i (node_arg expr 0))
     (var rng (node_arg expr 1))
     (var a (node_arg rng 0))
     (var b (node_arg rng 1))
     (var body (node_arg expr 2))
-    (var tmp (unique_sym))
+    (var j   (unique_sym))
+    (var n (unique_sym))
 
     (compile asm mod 
         (block (list3
-            (defvar i a)
-            (defvar tmp b)
+            (defvar j a)
+            (defvar n b)
             (make_object2 While
-                (apply (to_sym "le") (list2 i tmp))
-                (seq (list2
+                (apply (to_sym "le") (list2 j n))
+                (seq (list3
+                    (defvar i j)
                     body
-                    (assign i (apply (to_sym "add") (list2 i (box 1)))))))
+                    (assign j (apply (to_sym "add") (list2 j (box 1)))))))
             )))
     ))
 
 ; translate revfor i in a..b body to
 ;
-; i: {
-;     i: b
-;     tmp: a
-;     while (i >= tmp) {
-;         body
-;         i -= 1
-;     }
-;     i
+; j: b
+; n: a
+; while (j >= n) {
+;     i: j
+;     body
+;     j -= 1
 ; }
 
 (fun compile_range_revfor (asm mod expr) (
-    (if (in_top_scope mod)
-        (return (compile_function asm 0 mod 0 expr noguard @C_NIL))
-        )
-
     (var i (node_arg expr 0))
     (var rng (node_arg expr 1))
     (var a (node_arg rng 0))
     (var b (node_arg rng 1))
     (var body (node_arg expr 2))
-    (var tmp (unique_sym))
+    (var j (unique_sym))
+    (var n (unique_sym))
 
     (compile asm mod
         (block (list3
-            (defvar i b)
-            (defvar tmp a)
+            (defvar j b)
+            (defvar n a)
             (make_object2 While
-                (apply (to_sym "ge") (list2 i tmp))
-                (seq (list2
+                (apply (to_sym "ge") (list2 i n))
+                (seq (list3
+                    (defvar i j)
                     body
-                    (assign i (apply (to_sym "sub") (list2 i (box 1)))))))
+                    (assign j (apply (to_sym "sub") (list2 j (box 1)))))))
             )))
     ))
 
