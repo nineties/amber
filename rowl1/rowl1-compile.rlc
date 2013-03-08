@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2013-03-08 21:38:36 nineties $
+; $Id: rowl1-compile.rlc 2013-03-09 00:50:53 nineties $
 ;
 
 (import "rlvm-compile")
@@ -2046,101 +2046,102 @@
     (return (alloc_function 0 (get_code asm) 0))
     ))
 
-(export fun setup_builtin_compilers (mod) (
+(extern object global)
+(export fun setup_builtin_compilers () (
     (var locT (domainP Loc))
 
-    (add_function1 mod Compile DontCare compile_ 0)
+    (add_function1 global Compile DontCare compile_ 0)
 
-    (add_compiler mod DontCare compile_error)
-    (add_compiler mod (make_object2 Located locT DontCare) compile_located)
+    (add_compiler global DontCare compile_error)
+    (add_compiler global (make_object2 Located locT DontCare) compile_located)
 
     ; These commands have been evaluated in parsing phase.
-    (add_compiler mod (make_object1 Open DontCare) topscope_only)
-    (add_compiler mod (make_object1 Import DontCare) topscope_only)
+    (add_compiler global (make_object1 Open DontCare) topscope_only)
+    (add_compiler global (make_object1 Import DontCare) topscope_only)
 
-    (add_compiler mod (make_object2 Qualified DontCare symT) compile_qualified)
+    (add_compiler global (make_object2 Qualified DontCare symT) compile_qualified)
 
-    (add_compiler mod (make_object2 MakeObject DontCare DontCare) compile_make_object)
+    (add_compiler global (make_object2 MakeObject DontCare DontCare) compile_make_object)
 
-    (add_compiler mod (make_object2 DefVariable DontCare DontCare) compile_define_variable)
-    (add_compiler mod (make_object3 DefVariable DontCare DontCare (quote (to_sym "overwrite"))) compile_define_variable)
+    (add_compiler global (make_object2 DefVariable DontCare DontCare) compile_define_variable)
+    (add_compiler global (make_object3 DefVariable DontCare DontCare (quote (to_sym "overwrite"))) compile_define_variable)
 
-    (add_compiler mod (make_object2 DefFunction DontCare DontCare) compile_define_function)
+    (add_compiler global (make_object2 DefFunction DontCare DontCare) compile_define_function)
 
-    (add_compiler mod symT compile_var)
-    (add_compiler mod (quote @C_TRUE) compile_special)
-    (add_compiler mod (quote @C_FALSE) compile_special)
-    (add_compiler mod (quote @C_NIL) compile_special)
-    (add_compiler mod (quote @C_UNDEF) compile_special)
-    (add_compiler mod intT compile_const_int)
-    (add_compiler mod stringT compile_const)
-    (add_compiler mod bintT compile_const)
-    (add_compiler mod (domainP Float) compile_const)
+    (add_compiler global symT compile_var)
+    (add_compiler global (quote @C_TRUE) compile_special)
+    (add_compiler global (quote @C_FALSE) compile_special)
+    (add_compiler global (quote @C_NIL) compile_special)
+    (add_compiler global (quote @C_UNDEF) compile_special)
+    (add_compiler global intT compile_const_int)
+    (add_compiler global stringT compile_const)
+    (add_compiler global bintT compile_const)
+    (add_compiler global (domainP Float) compile_const)
 
-    (add_compiler mod (make_object2 Apply DontCare listT) compile_apply)
+    (add_compiler global (make_object2 Apply DontCare listT) compile_apply)
 
-    (add_compiler mod (qquote (unquote (unquote DontCare))) compile_unquote)
-    (add_compiler mod (qquote (quote (unquote DontCare))) compile_quote)
-    (add_compiler mod (qquote (qquote (unquote (unquote DontCare)))) compile_qquote)
+    (add_compiler global (qquote (unquote (unquote DontCare))) compile_unquote)
+    (add_compiler global (qquote (quote (unquote DontCare))) compile_quote)
+    (add_compiler global (qquote (qquote (unquote (unquote DontCare)))) compile_qquote)
 
-    (add_compiler mod (domainP List)  compile_list)
-    (add_compiler mod (domainP Tuple) compile_tuple)
-    (add_compiler mod (domainP Array) compile_array)
-    (add_compiler mod (domainP Range) compile_range)
+    (add_compiler global (domainP List)  compile_list)
+    (add_compiler global (domainP Tuple) compile_tuple)
+    (add_compiler global (domainP Array) compile_array)
+    (add_compiler global (domainP Range) compile_range)
 
-    (add_compiler mod (make_object1 Block listT) compile_block)
-    (add_compiler mod (make_object1 Seq listT) compile_seq)
-    (add_compiler mod (make_object1 Breakable listT) compile_breakable)
+    (add_compiler global (make_object1 Block listT) compile_block)
+    (add_compiler global (make_object1 Seq listT) compile_seq)
+    (add_compiler global (make_object1 Breakable listT) compile_breakable)
 
-    (add_compiler mod (mkif DontCare DontCare) compile_if)
-	(add_compiler mod (ifelse DontCare DontCare DontCare) compile_ifelse)
-    (add_compiler mod (make_object2 While DontCare DontCare) compile_while)
-    (add_compiler mod (make_object3 While DontCare DontCare DontCare) compile_while)
+    (add_compiler global (mkif DontCare DontCare) compile_if)
+	(add_compiler global (ifelse DontCare DontCare DontCare) compile_ifelse)
+    (add_compiler global (make_object2 While DontCare DontCare) compile_while)
+    (add_compiler global (make_object3 While DontCare DontCare DontCare) compile_while)
 
-    (add_compiler mod (make_object3 For DontCare DontCare DontCare)
+    (add_compiler global (make_object3 For DontCare DontCare DontCare)
         compile_for
         )
-    (add_compiler mod (make_object3 RevFor DontCare DontCare DontCare)
+    (add_compiler global (make_object3 RevFor DontCare DontCare DontCare)
         compile_revfor
         )
-    (add_compiler mod (make_object3 For DontCare
+    (add_compiler global (make_object3 For DontCare
         (make_object2 Range DontCare DontCare) DontCare)
         compile_range_for)
-    (add_compiler mod (make_object3 RevFor DontCare
+    (add_compiler global (make_object3 RevFor DontCare
         (make_object2 Range DontCare DontCare) DontCare)
         compile_range_revfor)
 
-    (add_compiler mod (make_object0 Break) compile_break) 
-    (add_compiler mod (make_object0 Continue) compile_continue)
-    (add_compiler mod (make_object1 Return DontCare) compile_return)
-    (add_compiler mod (make_object2 Try DontCare DontCare) compile_try)
-    (add_compiler mod (make_object1 Throw DontCare) compile_throw)
+    (add_compiler global (make_object0 Break) compile_break) 
+    (add_compiler global (make_object0 Continue) compile_continue)
+    (add_compiler global (make_object1 Return DontCare) compile_return)
+    (add_compiler global (make_object2 Try DontCare DontCare) compile_try)
+    (add_compiler global (make_object1 Throw DontCare) compile_throw)
 
-    (add_compiler mod (make_object2 Equal DontCare DontCare) compile_eq)
-    (add_compiler mod (make_object2 NotEqual DontCare DontCare) compile_ne)
-    (add_compiler mod (make_object1 Not DontCare) compile_logical)
-	(add_compiler mod (make_object2 SeqAnd DontCare DontCare) compile_logical)
-	(add_compiler mod (make_object2 SeqOr DontCare DontCare) compile_logical)
+    (add_compiler global (make_object2 Equal DontCare DontCare) compile_eq)
+    (add_compiler global (make_object2 NotEqual DontCare DontCare) compile_ne)
+    (add_compiler global (make_object1 Not DontCare) compile_logical)
+	(add_compiler global (make_object2 SeqAnd DontCare DontCare) compile_logical)
+	(add_compiler global (make_object2 SeqOr DontCare DontCare) compile_logical)
 
-    (add_compiler mod (make_object2 Assign DontCare DontCare) compile_assign)
-    (add_compiler mod (make_object2 Lambda DontCare DontCare) compile_lambda)
-    (add_compiler mod (make_object2 Fusion DontCare DontCare) compile_fusion)
+    (add_compiler global (make_object2 Assign DontCare DontCare) compile_assign)
+    (add_compiler global (make_object2 Lambda DontCare DontCare) compile_lambda)
+    (add_compiler global (make_object2 Fusion DontCare DontCare) compile_fusion)
 
-    (add_compiler mod (make_object2 Slot DontCare symT) compile_slot)
-    (add_compiler mod (make_object3 Slot DontCare symT listT) compile_slot2)
-    (add_compiler mod (assign (make_object2 Slot DontCare symT) DontCare)
+    (add_compiler global (make_object2 Slot DontCare symT) compile_slot)
+    (add_compiler global (make_object3 Slot DontCare symT listT) compile_slot2)
+    (add_compiler global (assign (make_object2 Slot DontCare symT) DontCare)
         compile_slotset)
 
     ; internal expressions
-    (add_compiler mod (make_object2 FieldRef DontCare intT) compile_fieldref)
-    (add_compiler mod (make_object2 Assign (make_object2 FieldRef DontCare intT) DontCare) compile_fieldref_assign)
+    (add_compiler global (make_object2 FieldRef DontCare intT) compile_fieldref)
+    (add_compiler global (make_object2 Assign (make_object2 FieldRef DontCare intT) DontCare) compile_fieldref_assign)
 
-    (add_compiler mod (make_object1 AllocClsEnv intT) compile_alloc_clsenv)
-    (add_compiler mod (make_object2 Closure DontCare DontCare) compile_closure)
-    (add_compiler mod (make_object3 Ref DontCare intT symT) compile_clsref)
-    (add_compiler mod (make_object2 Assign
+    (add_compiler global (make_object1 AllocClsEnv intT) compile_alloc_clsenv)
+    (add_compiler global (make_object2 Closure DontCare DontCare) compile_closure)
+    (add_compiler global (make_object3 Ref DontCare intT symT) compile_clsref)
+    (add_compiler global (make_object2 Assign
         (make_object3 Ref DontCare intT symT) DontCare) compile_clsref_assign)
-    (add_compiler mod (quote Decons) compile_decons)
+    (add_compiler global (quote Decons) compile_decons)
     ))
 
 (export fun add_compiler (mod pat func) (

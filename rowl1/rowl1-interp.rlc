@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2013-03-05 05:41:36 nineties $
+; $Id: rowl1-interp.rlc 2013-03-09 00:55:06 nineties $
 ;
 
 (import "rlvm-compile")
@@ -20,12 +20,12 @@
 (import "rowl1-error")
 (import "rowl1-pprint")
 
-(export var amber_mod null)
+(export var global null)
 (export var current_loc null)
 (export var current_mod null)
 (export fun set_loc (loc) (
     (= current_loc loc)
-    (add_module_variable amber_mod (to_sym "LOCATION") @C_TRUE loc)
+    (add_module_variable global (to_sym "LOCATION") @C_TRUE loc)
     ))
 
 (var module_stack null)
@@ -35,7 +35,7 @@
         (throw (type_error current_loc (string "module") mod))
         )
     (= current_mod mod)
-    (add_module_variable amber_mod (to_sym "MODULE") @C_TRUE mod)
+    (add_module_variable global (to_sym "MODULE") @C_TRUE mod)
     ))
 
 (export fun eval_shell () (
@@ -68,24 +68,24 @@
 (export fun eval_main (file ichan argc argv) (
     ;(var start (gettimeofday))
 
-    (= amber_mod (make_module 0 (to_sym "amber")))
-    (add_module_variable amber_mod (to_sym "Amber") @C_TRUE amber_mod)
+    (= global (make_module 0 (to_sym "Global")))
+    (add_module_variable global (to_sym "Global") @C_TRUE global)
 
-    (= module_stack (cons amber_mod 0))
+    (= module_stack (cons global 0))
 
     (= current_loc no_loc)
 
     (setup_argv argc argv)
-    (setup_globals amber_mod)
-    (setup_builtin_compilers amber_mod)
-    (init_stdlib amber_mod)
-    (open_module amber_mod (to_sym "Std"))
-    (open_module amber_mod (qualified "Std" (to_sym "IO")))
+    (setup_globals)
+    (setup_builtin_compilers)
+    (init_stdlib)
+    (open_module global (to_sym "Std"))
+    (open_module global (qualified "Std" (to_sym "IO")))
 
-    (init_parser_funcs amber_mod)
+    (init_parser_funcs)
 
-    (= current_mod amber_mod)
-    (= current_loc no_loc)
+    (set_current_module global)
+    (set_loc no_loc)
 
     (push_import_dir "/usr/lib/amber/")
     (import_file "amber/syntax.ab")
@@ -126,12 +126,12 @@
     ))
 
 (fun eval (expr) (
-    (return (call1 Eval expr))
+    (return (byterun (lookup_func global Eval) expr))
     ))
 
 (extern fun list_to_table)
 (fun rewrite (expr) (
-    (var new_expr (call1 Rewrite expr))
+    (var new_expr (byterun (lookup_func global Rewrite) expr))
     (if (== new_expr @C_UNDEF) (= new_expr expr))
     (if (!= new_expr expr) (return (rewrite new_expr)))
     (= expr new_expr)
@@ -244,7 +244,7 @@
 (fun interpret_shell (p) (
     (var outputs (ary_new))
     (enable_shell_syntax)
-    (add_module_variable amber_mod (to_sym "shell_outputs") @C_TRUE outputs)
+    (add_module_variable global (to_sym "shell_outputs") @C_TRUE outputs)
     (ary_push outputs @C_UNDEF)
     (while 1 (do
         (try 
@@ -297,7 +297,7 @@
     ))
 
 (export fun eval_end_module (expr) (
-    (if (== current_mod amber_mod)
+    (if (== current_mod global)
         (throw (exception current_mod (string "there is no module to close")))
         )
     (if (! (in_top_scope current_mod))
@@ -476,7 +476,7 @@
 
 (fun setup_argv (argc argv) (
     (var ARGV (ary_new))
-    (add_module_variable amber_mod (to_sym "ARGV") @C_FALSE ARGV)
+    (add_module_variable global (to_sym "ARGV") @C_FALSE ARGV)
     (if (== argc 0) return)
     (for i 1 argc (do
         (ary_push ARGV (string (array_get string argv i)))
@@ -527,39 +527,39 @@
     (throw (not_found current_loc (string path)))
     ))
 
-(fun setup_globals (mod) (
-    (add_module_variable mod (to_sym "LOCATION") @C_FALSE current_loc)
-    (add_module_variable mod (to_sym "MODULE") @C_FALSE current_mod)
-    (add_module_variable mod (to_sym "PROMPT") @C_FALSE (string "amber"))
+(fun setup_globals () (
+    (add_module_variable global (to_sym "LOCATION") @C_FALSE current_loc)
+    (add_module_variable global (to_sym "MODULE") @C_FALSE current_mod)
+    (add_module_variable global (to_sym "PROMPT") @C_FALSE (string "amber"))
 
     (if (in_shell_mode)
-        (add_module_variable mod (to_sym "shell_mode") @C_FALSE @C_TRUE)
-        (add_module_variable mod (to_sym "shell_mode") @C_FALSE @C_FALSE)
+        (add_module_variable global (to_sym "shell_mode") @C_FALSE @C_TRUE)
+        (add_module_variable global (to_sym "shell_mode") @C_FALSE @C_FALSE)
         )
     
-    (add_function1 mod Rewrite (domainP Located) rewrite_located 0)
-    (add_function1 mod Eval DontCare default_eval 0)
-    (add_function1 mod Eval (domainP Located) eval_located 0)
-    (add_function1 mod Eval (make_object1 Open DontCare) eval_open 0)
-    (add_function1 mod Eval (make_object1 Import listT) eval_import 0)
-    (add_function1 mod Eval (make_object1 Import stringT) eval_import 0)
-    (add_function1 mod Eval (make_object1 BeginModule symT) eval_begin_module 0)
-    (add_function1 mod Eval (make_object1 BeginModule (domainP Qualified)) eval_begin_module 0)
-    (add_function1 mod Eval (make_object0 EndModule) eval_end_module 0)
-    (add_function1 mod Eval (make_object1 Seq listT) eval_seq 0)
+    (add_function1 global Rewrite (domainP Located) rewrite_located 0)
+    (add_function1 global Eval DontCare default_eval 0)
+    (add_function1 global Eval (domainP Located) eval_located 0)
+    (add_function1 global Eval (make_object1 Open DontCare) eval_open 0)
+    (add_function1 global Eval (make_object1 Import listT) eval_import 0)
+    (add_function1 global Eval (make_object1 Import stringT) eval_import 0)
+    (add_function1 global Eval (make_object1 BeginModule symT) eval_begin_module 0)
+    (add_function1 global Eval (make_object1 BeginModule (domainP Qualified)) eval_begin_module 0)
+    (add_function1 global Eval (make_object0 EndModule) eval_end_module 0)
+    (add_function1 global Eval (make_object1 Seq listT) eval_seq 0)
 
-    (add_function1 mod Eval (make_object2 DefSyntax symT DontCare) eval_define_syntax 0)
-    (add_function1 mod Eval (domainP ReserveSymbol) eval_reserve_symbol 0)
+    (add_function1 global Eval (make_object2 DefSyntax symT DontCare) eval_define_syntax 0)
+    (add_function1 global Eval (domainP ReserveSymbol) eval_reserve_symbol 0)
 
-    (add_function1 mod Eval (quote (to_sym "exit")) eval_exit 0)
+    (add_function1 global Eval (quote (to_sym "exit")) eval_exit 0)
 
-    (add_function1 mod (to_sym "load") stringT load_ 0)
-    (add_function1 mod (to_sym "import") stringT import_file 0)
-    (add_function1 mod (to_sym "exit") intT exit_ 0)
-    (add_function1 mod (to_sym "atexit") funT at_exit 0)
-
-    (add_function2 mod (to_sym "define_global_variable")
+    (add_function2 global (to_sym "define_global_variable")
         symT DontCare def_global_var 0)
+
+    (add_function1 global (to_sym "load") stringT load_ 0)
+    (add_function1 global (to_sym "import") stringT import_file 0)
+    (add_function1 global (to_sym "exit") intT exit_ 0)
+    (add_function1 global (to_sym "atexit") funT at_exit 0)
     ))
 
 (extern fun setup_pprint)
@@ -579,8 +579,8 @@
 (extern fun setup_oop)
 (extern fun setup_gc)
 
-(fun init_stdlib (mod) (
-    (var std (create_module mod (to_sym "Std")))
+(fun init_stdlib () (
+    (var std (create_module global (to_sym "Std")))
     (setup_pprint std)
     (setup_base std)
     (setup_symbol std)
