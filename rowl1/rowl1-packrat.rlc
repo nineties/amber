@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2013-03-08 05:58:20 nineties $
+; $Id: rowl1-packrat.rlc 2013-03-08 17:07:53 nineties $
 ;
 
 (import "rlvm-compile")
@@ -292,12 +292,12 @@
     (return (noparse_sub p msg @FALSE @TRUE))
     ))
 
-(fun noparse_quite (p msg) (
-    (return (noparse_sub p msg @TRUE @FALSE))
+(fun noparse_quite (p) (
+    (return (noparse_sub p 0 @TRUE @FALSE))
     ))
 
-(fun mayparse_quiet (p msg) (
-    (return (noparse_sub p msg @TRUE @TRUE))
+(fun mayparse_quiet (p) (
+    (return (noparse_sub p 0 @TRUE @TRUE))
     ))
 
 (fun negate (p) (
@@ -463,8 +463,10 @@
     ))
 
 (fun set_parser_state (dst src) (
-    ; NB: indentation-level and error position must not be copied
+    ; NB: error message, indentation-level and error position must not be copied
+    (var msg @(ERROR dst))
     (memcpy dst src (* 10 @WORD_SIZE))
+    (field_set dst 3 msg)
     ))
 
 (fun clear_parser_state (p state) (
