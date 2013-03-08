@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2013-03-08 21:14:04 nineties $
+; $Id: rowl1-compile.rlc 2013-03-08 21:38:36 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1523,11 +1523,16 @@
 
     (var cnd (node_arg expr 0))
     (var body (node_arg expr 1))
+    (var next @C_NIL)
+    (if (== (node_size expr) 3)
+        (= next (node_arg expr 2))
+        )
     (var exit_lbl (fresh_label asm))
+    (var cont_lbl (fresh_label asm))
     (var head_lbl (fresh_label asm))
 
     (= break_labels (cons (box exit_lbl) break_labels))
-    (= continue_labels (cons (box head_lbl) continue_labels))
+    (= continue_labels (cons (box cont_lbl) continue_labels))
 
     (compile asm mod cnd)
 
@@ -1536,6 +1541,11 @@
     
     (compile asm mod body)
     (put_drop asm)
+    (set_label asm cont_lbl)
+    (if (!= next @C_NIL) (do
+        (compile asm mod next)
+        (put_drop asm)
+        ))
     (compile asm mod cnd)
     (put_if_true asm head_lbl)
     (set_label asm exit_lbl)
@@ -1619,12 +1629,13 @@
         (block (list3
             (defvar j a)
             (defvar n b)
-            (make_object2 While
+            (make_object3 While
                 (apply (to_sym "le") (list2 j n))
-                (seq (list3
+                (seq (list2
                     (defvar i j)
                     body
-                    (assign j (apply (to_sym "add") (list2 j (box 1)))))))
+                    ))
+                (assign j (apply (to_sym "add") (list2 j (box 1)))))
             )))
     ))
 
@@ -1653,10 +1664,10 @@
             (defvar n a)
             (make_object2 While
                 (apply (to_sym "ge") (list2 i n))
-                (seq (list3
+                (seq (list2
                     (defvar i j)
-                    body
-                    (assign j (apply (to_sym "sub") (list2 j (box 1)))))))
+                    body))
+                (assign j (apply (to_sym "sub") (list2 j (box 1)))))
             )))
     ))
 
@@ -2084,6 +2095,7 @@
     (add_compiler mod (mkif DontCare DontCare) compile_if)
 	(add_compiler mod (ifelse DontCare DontCare DontCare) compile_ifelse)
     (add_compiler mod (make_object2 While DontCare DontCare) compile_while)
+    (add_compiler mod (make_object3 While DontCare DontCare DontCare) compile_while)
 
     (add_compiler mod (make_object3 For DontCare DontCare DontCare)
         compile_for
