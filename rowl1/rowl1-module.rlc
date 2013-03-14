@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-module.rlc 2013-03-06 19:18:46 nineties $
+; $Id: rowl1-module.rlc 2013-03-14 20:33:36 nineties $
 ;
 
 ; Module
@@ -93,7 +93,7 @@
 (export fun get_module_variable_disp (sym info) (
     (if (!= (node_bhead info) ModuleVariable) (do
         (throw (unexpected_error current_loc
-            (string "module variable is required2")
+            (string "module variable is required")
             info))
         ))
     (return (node_arg info 0))
@@ -161,11 +161,11 @@
         ))
     ))
 
-(fun lookup_all_funcs (mod sym) (
-    (return (list_reverse (lookup_all_funcs_sub (fresh_mark) mod sym 0)))
+(fun lookup_all_symbols (mod sym) (
+    (return (list_reverse (lookup_all_symbols_sub (fresh_mark) mod sym 0)))
     ))
 
-(fun lookup_all_funcs_sub (mark mod sym list) (
+(fun lookup_all_symbols_sub (mark mod sym list) (
     (if (== (get_mark mod) mark) (return list))
     (set_mark mod mark)
 
@@ -180,14 +180,14 @@
 
     (var mods (delegatees mod))
     (while mods (do
-        (= list (lookup_all_funcs_sub mark (car mods) sym list))
+        (= list (lookup_all_symbols_sub mark (car mods) sym list))
         (= mods (cdr mods))
         ))
     (return list)
     ))
 
 (fun update_function_entry (mod sym) (
-    (var disps (lookup_all_funcs mod sym))
+    (var disps (lookup_all_symbols mod sym))
     (var disp  (car disps)) ; current module
     (var other (cdr disps)) ; delegatees
     (var fun (car disp))
@@ -292,13 +292,14 @@
             sig))
         )
 
-    (var mod (lookup_symbol curmod sig @FALSE))
-    (if mod (do
-        (= mod (get_module_variable_value sig mod))
-        (if (!= (node_type mod) @ModuleE)
-            (throw (type_error current_loc (string "module") mod))
-            )
-        (return mod)
+    (var mod (lookup_symbol_current_module curmod sig @TRUE))
+    (if mod
+        (do
+            (= mod (get_module_variable_value sig mod))
+            (if (!= (node_type mod) @ModuleE)
+                (throw (type_error current_loc (string "module") mod))
+                )
+            (return mod)
         ))
     (return (make_module curmod sig))
     ))

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2013-03-09 00:38:51 nineties $
+; $Id: rowl1-packrat.rlc 2013-03-14 02:01:23 nineties $
 ;
 
 (import "rlvm-compile")
@@ -77,6 +77,9 @@
 (import "rowl1-compile")
 (import "rowl1-module")
 (import "rowl1-error")
+
+(extern object global)
+(extern object syntax)
 
 (array char chgroup (
      0 16 16 16 16 16 16 16 16  1  1 16 16  1 16 16
@@ -1126,7 +1129,7 @@
 (extern fun eval_end_module)
 (export fun parse_statements (p) (
     (var save_current_mod current_mod)
-    (set_current_module (find_module current_mod (to_sym "Parser")))
+    (set_current_module (find_module current_mod Syntax))
     (var eof (parse_statements_sub p))
     (set_current_module save_current_mod)
     (return eof)
@@ -1168,7 +1171,8 @@
 
 (export fun parse_shell_statement (p) (
     (var save_current_mod current_mod)
-    (set_current_module (find_module current_mod (to_sym "Parser")))
+    (set_current_module syntax)
+    (set_current_module (find_module current_mod Syntax))
     (var v (parse_shell_statement_sub p))
     (set_current_module save_current_mod)
     (return v)
@@ -1966,61 +1970,60 @@
     (add_function1 mod sym (domainP Parser) func 0)
     ))
 
+(extern object global)
+(extern object syntax)
+
 (export fun enable_shell_syntax () (
-    (open_module
-        (find_module current_mod (to_sym "Parser"))
-        (to_sym "Shell"))
+    (open_module syntax (to_sym "Shell"))
     ))
 
-(extern object global)
 (export fun init_parser_funcs () (
-    (= parser_mod (make_module global (to_sym "Parser")))
-    (add_function1 parser_mod (to_sym "%get_column") DontCare get_column 0)
-    (add_function2 parser_mod (to_sym "%set_indent") DontCare DontCare set_indent 0)
-    (add_function1 parser_mod (to_sym "%check_indent") DontCare check_indent 0)
-    (add_function2 parser_mod (to_sym "%parsed") DontCare DontCare parsed 0)
-    (add_function2 parser_mod (to_sym "%noparse") DontCare DontCare noparse 0)
-    (add_function1 parser_mod (to_sym "%copy_parser_state") DontCare copy_parser_state 0)
-    (add_function2 parser_mod (to_sym "%reset_parser_position") DontCare DontCare reset_parser_position 0)
-    (add_function2 parser_mod (to_sym "%set_parser_state") DontCare DontCare set_parser_state 0)
-    (add_function1 parser_mod (to_sym "%print_parser_state") DontCare print_parser_state 0)
-    (add_function4 parser_mod (to_sym "%call_parser") DontCare DontCare DontCare DontCare call_parser 0)
-    (add_function1 parser_mod (to_sym "%negate") DontCare negate 0)
-    (add_function3 parser_mod (to_sym "%oneof") DontCare DontCare DontCare oneof 0)
-    (add_function3 parser_mod (to_sym "%noneof") DontCare DontCare DontCare noneof 0)
-    (add_function1 parser_mod (to_sym "%apply_located") DontCare apply_located 0)
-    (add_function1 parser_mod (to_sym "%get_pos") DontCare get_pos 0)
+    (add_function1 syntax (to_sym "%get_column") DontCare get_column 0)
+    (add_function2 syntax (to_sym "%set_indent") DontCare DontCare set_indent 0)
+    (add_function1 syntax (to_sym "%check_indent") DontCare check_indent 0)
+    (add_function2 syntax (to_sym "%parsed") DontCare DontCare parsed 0)
+    (add_function2 syntax (to_sym "%noparse") DontCare DontCare noparse 0)
+    (add_function1 syntax (to_sym "%copy_parser_state") DontCare copy_parser_state 0)
+    (add_function2 syntax (to_sym "%reset_parser_position") DontCare DontCare reset_parser_position 0)
+    (add_function2 syntax (to_sym "%set_parser_state") DontCare DontCare set_parser_state 0)
+    (add_function1 syntax (to_sym "%print_parser_state") DontCare print_parser_state 0)
+    (add_function4 syntax (to_sym "%call_parser") DontCare DontCare DontCare DontCare call_parser 0)
+    (add_function1 syntax (to_sym "%negate") DontCare negate 0)
+    (add_function3 syntax (to_sym "%oneof") DontCare DontCare DontCare oneof 0)
+    (add_function3 syntax (to_sym "%noneof") DontCare DontCare DontCare noneof 0)
+    (add_function1 syntax (to_sym "%apply_located") DontCare apply_located 0)
+    (add_function1 syntax (to_sym "%get_pos") DontCare get_pos 0)
 
     ; Use internal version of list operations considering redefinition of them.
-    (add_function2 parser_mod (to_sym "%cons") DontCare DontCare __cons 0)
-    (add_function1 parser_mod (to_sym "%reverse") DontCare __reverse 0)
-    (add_function1 parser_mod (to_sym "%length") DontCare __length 0)
+    (add_function2 syntax (to_sym "%cons") DontCare DontCare __cons 0)
+    (add_function1 syntax (to_sym "%reverse") DontCare __reverse 0)
+    (add_function1 syntax (to_sym "%length") DontCare __length 0)
 
-    (add_function3 parser_mod (to_sym "input_text") (domainP Parser) intT intT get_input_text 0)
+    (add_function3 syntax (to_sym "input_text") (domainP Parser) intT intT get_input_text 0)
 
-    (add_parser parser_mod (to_sym "spaces") parse_spaces)
-    (add_parser parser_mod (to_sym "blanks") parse_blanks)
+    (add_parser syntax (to_sym "spaces") parse_spaces)
+    (add_parser syntax (to_sym "blanks") parse_blanks)
 
-    (add_function2 parser_mod (to_sym "text") (domainP Parser) stringT parse_text 0)
-    (add_parser parser_mod (to_sym "any") parse_any_char)
-    (add_parser parser_mod (to_sym "blank") parse_blank)
-    (add_parser parser_mod (to_sym "comment") parse_fail)
-    (add_parser parser_mod (to_sym "shell_style_comment") parse_shell_style_comment)
-    (add_parser parser_mod (to_sym "C_style_comment") parse_C_style_comment)
-    (add_parser parser_mod (to_sym "decimal") parse_decimal)
-    (add_parser parser_mod (to_sym "binary") parse_binary)
-    (add_parser parser_mod (to_sym "octal") parse_octal)
-    (add_parser parser_mod (to_sym "hex") parse_hex)
-    (add_parser parser_mod (to_sym "integer") parse_integer)
-    (add_parser parser_mod (to_sym "float") parse_float)
-    (add_parser parser_mod (to_sym "string") parse_string)
-    (add_parser parser_mod (to_sym "string_d") parse_string_d)
-    (add_parser parser_mod (to_sym "string_s") parse_string_s)
-    (add_parser parser_mod (to_sym "symbol") parse_symbol)
-    (add_parser parser_mod (to_sym "atom") parse_atom)
-    (add_parser parser_mod (to_sym "object") parse_object)
-    (add_parser parser_mod (to_sym "expr") parse_expr)
-    (add_parser parser_mod (to_sym "statement") parse_statement)
+    (add_function2 syntax (to_sym "text") (domainP Parser) stringT parse_text 0)
+    (add_parser syntax (to_sym "any") parse_any_char)
+    (add_parser syntax (to_sym "blank") parse_blank)
+    (add_parser syntax (to_sym "comment") parse_fail)
+    (add_parser syntax (to_sym "shell_style_comment") parse_shell_style_comment)
+    (add_parser syntax (to_sym "C_style_comment") parse_C_style_comment)
+    (add_parser syntax (to_sym "decimal") parse_decimal)
+    (add_parser syntax (to_sym "binary") parse_binary)
+    (add_parser syntax (to_sym "octal") parse_octal)
+    (add_parser syntax (to_sym "hex") parse_hex)
+    (add_parser syntax (to_sym "integer") parse_integer)
+    (add_parser syntax (to_sym "float") parse_float)
+    (add_parser syntax (to_sym "string") parse_string)
+    (add_parser syntax (to_sym "string_d") parse_string_d)
+    (add_parser syntax (to_sym "string_s") parse_string_s)
+    (add_parser syntax (to_sym "symbol") parse_symbol)
+    (add_parser syntax (to_sym "atom") parse_atom)
+    (add_parser syntax (to_sym "object") parse_object)
+    (add_parser syntax (to_sym "expr") parse_expr)
+    (add_parser syntax (to_sym "statement") parse_statement)
     ))
 
 (export fun output_syntax_error (loc e) (

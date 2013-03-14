@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2013-03-09 02:03:33 nineties $
+; $Id: rowl1-interp.rlc 2013-03-14 20:33:34 nineties $
 ;
 
 (import "rlvm-compile")
@@ -21,6 +21,8 @@
 (import "rowl1-pprint")
 
 (export var global null)
+(export var syntax null)
+
 (export var current_loc null)
 (export var current_mod null)
 (export fun set_loc (loc) (
@@ -65,11 +67,12 @@
     (return r)
     ))
 
-(export fun eval_main (file ichan argc argv) (
+(fun eval_main (file ichan argc argv) (
     ;(var start (gettimeofday))
 
-    (= global (make_module 0 (to_sym "Global")))
+    (= global    (make_module 0 (to_sym "Global")))
     (add_module_variable global (to_sym "Global") @C_TRUE global)
+    (= syntax    (create_module global Syntax))
 
     (= module_stack (cons global 0))
 
@@ -79,7 +82,7 @@
     (setup_globals)
     (setup_builtin_compilers)
     (init_stdlib)
-    (open_module global (to_sym "Std"))
+    (open_module global Std)
     (open_module global (qualified "Std" (to_sym "IO")))
 
     (init_parser_funcs)
@@ -321,8 +324,15 @@
 (fun eval_define_syntax (expr) (
     (var sym (node_arg expr 0))
     (var elm (node_arg expr 1))
+
     (var stmt (compile_define_syntax sym elm))
+
+    (var syntax_mod (create_module current_mod Syntax))
+    (open_module syntax_mod (qualified "Global" Syntax))
+    (var save_current_mod current_mod)
+    (set_current_module syntax_mod)
     (eval stmt)
+    (set_current_module save_current_mod)
     (return @C_NIL)
     ))
 
@@ -579,7 +589,7 @@
 (extern fun setup_gc)
 
 (fun init_stdlib () (
-    (var std (create_module global (to_sym "Std")))
+    (var std (create_module global Std))
     (setup_pprint std)
     (setup_base std)
     (setup_symbol std)

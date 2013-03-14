@@ -1,10 +1,8 @@
-BeginModule{Qualified{Std, Parser}}
-
-Assign{comment, shell_style_comment}
+Assign{Qualified{Syntax,comment}, Qualified{Syntax,shell_style_comment}}
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2013-03-08 17:41:41 nineties $
+# $Id: syntax.ab 2013-03-14 20:36:48 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -220,7 +218,7 @@ pattern ::= quote_expr
 term    ::= primary_expr
 
 ## enable use of quotation expressions for following definitions.
-Assign{expr, quote_expr}
+Assign{Qualified{Syntax,expr}, Qualified{Syntax,quote_expr}}
 
 prefix_expr
     ::= "+"          quote_expr { `UnaryPlus{!node1} }
@@ -310,7 +308,7 @@ assign_expr
       | pattern ">>=" assign_expr { `ShiftRAssign{!node0, !node2} }
       | multi_lambda_expr
 
-Assign{expr, assign_expr}
+Assign{Syntax::expr, Syntax::assign_expr}
 
 ### Statements
 package ::= string
@@ -371,8 +369,6 @@ ReserveSymbol{not, and, or, when, open, if, else, case, of,
     throw, try, catch, seq, scope
 }
 
-EndModule{} # Std::Parser
-
 ## Syntax Sugars
 +x      => `uplus(!x)
 -x      => `uminus(!x)
@@ -403,16 +399,16 @@ x is not y => `(not identical(!x, !y))
 x[args...]     => `Apply{at, !Std::cons(x, args)}
 x[args...] = e => `Apply{store, !Std::cons(x, Std::append(args, [e]))}
 
-module Std::Parser {
+module Syntax {
     ### Extend primary_expr so as to enable use $... to refer nodes
     # of syntax-tree only in parser_action.
     module Action {
-    primary_expr ::= "$" decimal { ("node" + node1).to_sym }
-                   | "$input"    { \input_text(parser,begin,end) }
+        primary_expr ::= "$" decimal { ("node" + node1).to_sym }
+                       | "$input"    { \input_text(parser,begin,end) }
     }
 
     # FIXME: This is temporary dirty hack.
-    primary_expr_act : primary_expr | Action::primary_expr
+    primary_expr_act : primary_expr | Action::Syntax::primary_expr
     parser_action_old: parser_action
     parser_action = parser -> {
         save_primary_expr: primary_expr
@@ -424,7 +420,7 @@ module Std::Parser {
 
     ### Syntax definitions which are effective only in shell-mode.
     module Shell {
-    primary_expr ::= "%" nospace(decimal) { `shell_outputs[!$1] }
-                   | "%"                  { `shell_outputs[0] }
+        primary_expr ::= "%" nospace(decimal) { `shell_outputs[!$1] }
+                       | "%"                  { `shell_outputs[0] }
     }
 }
