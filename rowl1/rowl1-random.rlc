@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-random.rlc 2013-03-16 16:08:21 nineties $
+; $Id: rowl1-random.rlc 2013-03-16 23:09:10 nineties $
 ;
 
 (import "rlvm-compile")
@@ -15,6 +15,7 @@
 (import "rowl1-util")
 (import "rowl1-error")
 (import "rowl1-module")
+(import "rowl1-numeric")
 (import "rowl1-bigint")
 (import "rowl1-float")
 
@@ -43,9 +44,14 @@
         seed))
     ))
 
+(var inv4294967295
+    (float_from_s "2.32830643708079738e-10")) ; 1.0/4294967295.0
 (var inv4294967296
     (float_from_s "2.32830643653869629e-10")) ; 1.0/4294967296.0
+(var half (float_from_s "0.5"))
+(var one  (float_from_s "1.0"))
 
+; generate random number in [0,1)
 (fun randf () (
     (return (fmul (uitof (randui)) inv4294967296))
     ))
@@ -84,6 +90,73 @@
     (return x)
     ))
 
+(fun randr_int (lopen ropen min max) (do
+    (if lopen (= min (add min (box 1))))
+    (if ropen (= max (sub max (box 1))))
+    (var width (add (sub max min) (box 1)))
+    (var v (call1 (to_sym "rand") width))
+    (return (add v min))
+    ))
+
+(fun randr_float (lopen ropen min max) (do
+    (var v (uitof (randui)))
+    (fsub max min)
+    (fmul v max)
+    (if lopen
+        (do
+            (if ropen
+                (fadd v half)
+                (fadd v one)
+                )
+            (fmul v inv4294967296)
+            (fadd v min)
+        )
+        (do
+            (if ropen
+                (fmul v inv4294967296)
+                (fmul v inv4294967295)
+                )
+            (fadd v min)
+        ))
+    (return v)
+    ))
+
+(fun randr (rng) (
+    (var size (node_size rng))
+    (if (|| (<= size 1) (<= 4 size)) (goto range_error))
+    (var min (node_arg rng 0))
+    (var max (node_arg rng 1))
+    (var lopen 0)
+    (var ropen 0)
+    (if (== size 3) (do
+        (var option (node_arg rng 2))
+        (if (== option (to_sym "Open")) (do (= lopen 1) (= ropen 1))
+        (if (== option (to_sym "LeftOpen")) (= lopen 1)
+        (if (== option (to_sym "RightOpen")) (= ropen 1)
+            (goto range_error)
+            )))
+        ))
+
+    (if (!= (node_bhead min) (node_bhead max)) (do
+        (var r (do_coerce_internal min max))
+        (if (== r @C_UNDEF) (goto range_error))
+        (= min (car r))
+        (= max (cadr r))
+        ))
+
+    (var ty (node_type min))
+    (if (|| (== ty @IntE) (== ty @BigIntE))
+        (return (randr_int lopen ropen min max))
+    (if (== ty @FloatE)
+        (return (randr_float lopen ropen min max))
+        ))
+
+    (label range_error)
+    (throw (invalid_argument current_loc
+        (string "Invalid range")
+        rng))
+    ))
+
 (export fun setup_random (std) (
     (srand0)
     (add_function0 std (to_sym "srand") srand0 0)
@@ -91,6 +164,7 @@
     (add_function0 std (to_sym "rand") randf 0)
     (add_function1 std (to_sym "rand") intT randi 0)
     (add_function1 std (to_sym "rand") bintT randbi 0)
+    (add_function1 std (to_sym "rand") (domainP Range) randr 0)
     ))
 
     ))

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2013-03-13 23:08:17 nineties $
+; $Id: rowl1-compile.rlc 2013-03-16 17:36:32 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1319,10 +1319,24 @@
     ))
 
 (fun compile_range (asm mod expr) (
-    (compile asm mod (node_arg expr 1))
-    (compile asm mod (node_arg expr 0))
-    (put_push asm Range)
-    (compile_simple_call asm 3 make_object2)
+    (var size (node_size expr))
+    (if (== size 2)
+        (do
+            (compile asm mod (node_arg expr 1))
+            (compile asm mod (node_arg expr 0))
+            (put_push asm Range)
+            (compile_simple_call asm 3 make_object2)
+        )
+    (if (== size 3)
+        (do
+            (compile asm mod (node_arg expr 2))
+            (compile asm mod (node_arg expr 1))
+            (compile asm mod (node_arg expr 0))
+            (put_push asm Range)
+            (compile_simple_call asm 4 make_object3)
+        )
+        (throw (unknown_expression current_loc expr))
+        ))
     ))
 
 (fun compile_block_body (asm mod exprs) (

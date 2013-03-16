@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-numeric.rlc 2013-03-05 01:34:37 nineties $
+; $Id: rowl1-numeric.rlc 2013-03-16 17:27:50 nineties $
 ;
 
 (import "rlvm-compile")
@@ -15,6 +15,8 @@
 (import "rowl1-util")
 (import "rowl1-error")
 (import "rowl1-module")
+(import "rowl1-bigint")
+(import "rowl1-float")
 
 (extern object current_loc)
 (extern object current_mod)
@@ -22,18 +24,47 @@
 (var coerce (to_sym "coerce"))
 (export fun do_coerce (a b) (
     (var r (byterun (lookup_func current_mod coerce) a b))
-    (if (== r @C_UNDEF) (do
-        (throw (make_object4 Exception current_loc (string "Type coerce-rule is not found") a b))
-        ))
+    (if (== r @C_UNDEF) (return r))
     (if (|| (!= (node_type r) @ListE) (!= (list_len r) 2)) (do
         (throw (exception current_loc (string "coerce must returns [a, b]")))
         ))
     (return r)
     ))
 
+
 (export fun binary_coerce (sym a b) (
     (var r (do_coerce a b))
+    (if (== r @C_UNDEF)
+        (throw (make_object5 Exception current_loc
+            (string "Binary operation is not supported")
+            (make_object1 (to_sym "method") sym)
+            (make_object1 (to_sym "lhs") a)
+            (make_object1 (to_sym "rhs") b)
+            ))
+        )
     (return (byterun (lookup_func current_mod sym) (car r) (cadr r)))
+    ))
+
+(export fun do_coerce_internal (a b) (
+    (var lty (node_type a))
+    (var rty (node_type b))
+    (if (== lty rty) (return (list2 a b)))
+    (if (== lty @IntE) 
+        (if (== rty @BigIntE) (return (ib_coerce a b))
+        (if (== rty @FloatE)  (return (if_coerce a b))
+            (return @C_UNDEF)
+            ))
+    (if (== lty @BigIntE)
+        (if (== rty @IntE)   (return (bi_coerce a b))
+        (if (== rty @FloatE) (return (bf_coerce a b))
+            (return @C_UNDEF)
+            ))
+    (if (== lty @FloatE)
+        (if (== rty @IntE)    (return (fi_coerce a b))
+        (if (== rty @BigIntE) (return (fb_coerce a b))
+            (return @C_UNDEF)
+            )))))
+    (return @C_UNDEF)
     ))
 
 (fun num_add (a b) ((return (binary_coerce (to_sym "add") a b))))
