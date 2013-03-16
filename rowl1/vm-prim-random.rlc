@@ -1,0 +1,115 @@
+;
+; rowl - 1st generation
+; Copyright (C) 2010 nineties
+;
+; $Id: vm-prim-random.rlc 2013-03-16 13:33:56 nineties $
+;
+
+; Implementation of Mersenne Twister (MT19937).
+; This code is based on 
+; http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/MT2002/CODES/mt19937ar.c
+
+
+(import "stdlib")
+(import "vm-compile")
+
+; period parameters
+(var N 624)
+(var M 397)
+(var MATRIX_A 0x9908b0df)    ; constant vector ASK
+(var UPPER_MASK 0x80000000)  ; most significant w-r bits
+(var LOWER_MASK 0x7fffffff)  ; least significant r  bits
+
+(var vm-prim-code `(
+
+(int[] @N mt)       ; the array for the state vector
+(int mti 0)
+
+(export prim_srand)
+(fun prim_srand (seed) (
+    (set mt 0 seed)
+    (= mti 1)
+    (while (< mti @N) (
+        (set mt mti (+ mti (* 1812433253
+            (^ (get mt (- mti 1))
+               (>> (get mt (- mti 1)) 30)))))
+        (+= mti 1)
+        ))
+    ))
+
+(export prim_srand_array)
+(fun prim_srand_array (key len) (
+    (int i 1)
+    (int j 0)
+    (int k 0)
+    (if (> @N len)
+        ((= k @N))
+        ((= k len))
+        )
+    (prim_srand 19650218)
+    (while k (
+        (set mt i (+ (+ (^ (get mt i) (*
+            (^ (get mt (- i 1)) (>> (get mt (- i 1)) 30))
+            1664525))
+            (get key j)) j))
+        (+= i 1)
+        (+= j 1)
+        (if (>= i @N) (
+            (set mt 0 (get mt @(- N 1)))
+            (= i 1)
+            ))
+        (if (>= j len) ((= j 0)))
+        (-= k 1)
+        ))
+    (= k @(- N 1))
+    (while k (
+        (set mt i (- (^ (get mt i) (*
+            (^ (get mt (- i 1)) (>> (get mt (- i 1)) 30))
+            1566083941)) i))
+        (+= i 1)
+        (if (>= i @N) (
+            (set mt 0 (get mt @(- N 1)))
+            (= i 1)
+            ))
+        (-= k 1)
+        ))
+    (set mt 0 0x80000000)
+    ))
+
+(int[] 2 mag01 (0 @MATRIX_A))
+(export prim_randui)
+(fun prim_randui () (
+    (int y)
+    (if (>= mti @N) (
+        (int kk 0)
+        (while (< kk @(- N M)) (
+            (= y (| (& (get mt kk) @UPPER_MASK) (& (get mt (+ kk 1)) @LOWER_MASK)))
+            (set mt kk (^ (^ (get mt (+ kk @M)) (>> y 1)) (get mag01 (& y 1))))
+            (+= kk 1)
+            ))
+        (while (< kk @(- N 1)) (
+            (= y (| (& (get mt kk) @UPPER_MASK) (& (get mt (+ kk 1)) @LOWER_MASK)))
+            (set mt kk (^ (^ (get mt (+ kk @(- M N))) (>> y 1)) (get mag01 (& y 1))))
+            (+= kk 1)
+            ))
+        (= y (| (& (get mt @(- N 1)) @UPPER_MASK) (& (get mt 0) @LOWER_MASK)))
+        (set mt @(- N 1) (^ (^ (get mt @(- M 1)) (>> y 1)) (get mag01 (& y 1))))
+        (= mti 0)
+        ))
+    (= y (get mt mti))
+    (+= mti 1)
+
+    ; Tempering
+    (^= y (>> y 11))
+    (^= y (& (<< y 7) 0x9d2c5680))
+    (^= y (& (<< y 15) 0xefc60000))
+    (^= y (>> y 18))
+
+    (return y)
+    ))
+
+    ))
+
+(vtable_push)
+(compile vm-prim-code)
+(vtable_pop)

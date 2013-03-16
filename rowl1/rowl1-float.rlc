@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-float.rlc 2013-02-14 05:59:07 nineties $
+; $Id: rowl1-float.rlc 2013-03-16 15:29:13 nineties $
 ;
 
 (import "rlvm-compile")
@@ -362,7 +362,7 @@
                 (= k (- k))))
             (var d 1000)
             (while (== (/ k d) 0) (/= d 10))
-            (while (> k 0) (do
+            (while (> d 0) (do
                 (array_set char s i (+ (/ k d) '0'))
                 (%= k d)
                 (/= d 10)
@@ -459,6 +459,16 @@
     (field_set b 1 2)
     (if sign (bigneg b))
     (return (bint_shiftR b (box shift)))
+    ))
+
+(export fun uitof (n) (
+    (if (>= n 0) (return (itof n)))
+    (var f (allocate_float))
+    (&= n 0x7fffffff)
+    ; exp = 31 because n >= 2^31
+    (field_set f 1 (| @(<< (+ 31 1023) 20) (>> n 11)))
+    (field_set f 0 (<< n 21))
+    (return f)
     ))
 
 (fun int_to_f (n) (

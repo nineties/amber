@@ -1,0 +1,96 @@
+;
+; rowl - 1st generation
+; Copyright (C) 2010 nineties
+;
+; $Id: rowl1-random.rlc 2013-03-16 16:08:21 nineties $
+;
+
+(import "rlvm-compile")
+(import "rowl1-types")
+
+(compile `object `(
+
+(import "rowl1-node")
+(import "rowl1-compile")
+(import "rowl1-util")
+(import "rowl1-error")
+(import "rowl1-module")
+(import "rowl1-bigint")
+(import "rowl1-float")
+
+(extern object current_loc)
+
+(fun srand0 () (
+    (srand (field_get (gettimeofday) 0)) ; get second
+    (return @C_TRUE)
+    ))
+
+(fun srandi (seed) (
+    (if (& seed 1) (do
+        (if (< seed 0) (goto seed_error))
+        (srand (unbox seed))
+        (return @C_TRUE)
+        ))
+    (if (!= (node_type seed) @BigIntE) (goto seed_error))
+    (if (bint_is_negative seed) (goto seed_error))
+
+    (srand_array (bint_digits seed) (bint_ndigit seed))
+    (return @C_TRUE)
+
+    (label seed_error)
+    (throw (invalid_argument current_loc
+        (string "Seed must be a non-negative integer")
+        seed))
+    ))
+
+(var inv4294967296
+    (float_from_s "2.32830643653869629e-10")) ; 1.0/4294967296.0
+
+(fun randf () (
+    (return (fmul (uitof (randui)) inv4294967296))
+    ))
+
+(fun randi (n) (
+    (= n (unbox n))
+    (if (<= n 0) (throw (invalid_argument current_loc
+        (string "Upper limit must be positive")
+        n
+        )))
+    (var mask (- (<< 1 (+ (bsr n) 1)) 1))
+    (var x (& (randui) mask))
+    (while (>= x n) (= x (& (randui) mask)))
+    (return (box x))
+    ))
+
+(fun randbi (n) (
+    (if (bint_is_negative n) (throw (invalid_argument current_loc
+        (string "Upper limit must be positive")
+        n
+        )))
+    (var m (- (bint_ndigit n) 1))
+
+    (var x (allocate_bint (+ m 1)))
+    (bint_set_ndigit x (+ m 1))
+
+    (var mask (- (<< 1 (+ (bsr (bint_digit n m)) 1)) 1))
+
+    (for i 0 m (bint_set_digit x i (randui)))
+    (bint_set_digit x m (& (randui) mask))
+    (while (>= (bigcmp x n) 0) (bint_set_digit x m (& (randui) mask)))
+    ; compute the length
+    (while (&& (>= m 0) (== (bint_digit x m) 0)) (-= m 1))
+    (if (< m 0) (= m 0))
+    (bint_set_ndigit x (+ m 1))
+    (return x)
+    ))
+
+(export fun setup_random (std) (
+    (srand0)
+    (add_function0 std (to_sym "srand") srand0 0)
+    (add_function1 std (to_sym "srand") (domainP Int) srandi 0)
+    (add_function0 std (to_sym "rand") randf 0)
+    (add_function1 std (to_sym "rand") intT randi 0)
+    (add_function1 std (to_sym "rand") bintT randbi 0)
+    ))
+
+    ))
