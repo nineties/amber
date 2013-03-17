@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2013-03-17 16:53:16 nineties $
+; $Id: rowl1-list.rlc 2013-03-17 20:36:32 nineties $
 ;
 
 (import "rlvm-compile")
@@ -202,6 +202,24 @@
     (return (tuple2 (list_reverse left) (list_reverse right)))
     ))
 
+(fun ls_flatten (ls) (
+    (var original ls)
+    (var new_ls 0)
+    (while ls (do
+        (var t (car ls))
+        (if (!= (node_type t) @ListE)
+            (throw (invalid_argument current_loc
+                (string "`flatten' requires list of lists")
+                original)))
+        (while t (do
+            (= new_ls (cons (car t) new_ls))
+            (= t (cdr t))
+            ))
+        (= ls (cdr ls))
+        ))
+    (return (list_reverse new_ls))
+    ))
+
 (export fun setup_list (std) (
     (var mod (create_module std (to_sym "List")))
     (add_function2 mod (to_sym "new") intT funT ls_new 0)
@@ -224,6 +242,7 @@
     (add_function2 std (to_sym "index") listT DontCare ls_index 0)
     (add_function2 std (to_sym "zip") listT listT ls_zip 0)
     (add_function1 std (to_sym "unzip") listT ls_unzip 0)
+    (add_function1 std (to_sym "flatten") listT ls_flatten 0)
     ))
 
     ))
