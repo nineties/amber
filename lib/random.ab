@@ -1,0 +1,47 @@
+# Copyright (C) 2012 nineties
+#
+# $Id: random.ab 2013-03-17 16:51:44 nineties $
+
+module Std {
+    # Choose one element randomly
+    choose(seq): seq[rand(seq.size)]
+
+    # Choose `n' element from `seq' randomly
+    choose(seq, n@Int) when n >= 0: {
+        seq = to_array(seq)
+        result: []
+        len: seq.size
+        if (n > len)
+            throw `Error{!LOCATION, "The sequence doesn't have " + n + " elements", seq}
+        reverse_for(i in len-n..len-1) {
+            j: rand(i+1)
+            (seq[i], seq[j]) = (seq[j], seq[i]) 
+            result = cons(seq[i], result)
+        }
+        result
+    }
+
+    # Choose `n' element from `seq' randomly
+    choose(seq, n@Int, \repeat) when n >= 0:
+        List::new(n, _ -> choose(seq))
+
+    # Shuffle `seq' randomly by Fisher-Yates's algorithm.
+    shuffle(seq): {
+        seq = copy(seq)
+        reverse_for (i in 1..(seq.size-1)) {
+            j: rand(i+1)
+            (seq[i], seq[j]) = (seq[j], seq[i]) 
+        }
+        seq
+    }
+
+    # Shuffle `seq'.
+    shuffle(seq@List): {
+        seq = to_array(seq)
+        reverse_for (i in 1..(seq.size-1)) {
+            j: rand(i+1)
+            (seq[i], seq[j]) = (seq[j], seq[i]) 
+        }
+        to_list(seq)
+    }
+}

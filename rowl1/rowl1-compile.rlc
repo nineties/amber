@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2013-03-16 17:36:32 nineties $
+; $Id: rowl1-compile.rlc 2013-03-17 16:46:41 nineties $
 ;
 
 (import "rlvm-compile")
@@ -263,8 +263,8 @@
         )
     (if (|| (== hd DefVariable) (== hd DefFunction)) (do
         (= expr (_copy expr))
-        (node_arg_set expr 0 (alpha_args tbl (node_arg expr 0)))
         (node_arg_set expr 1 (alpha tbl (node_arg expr 1)))
+        (node_arg_set expr 0 (alpha_args tbl (node_arg expr 0)))
         (return expr)
         ))
     (if (|| (== hd Block) (== hd Breakable)) (do
@@ -343,7 +343,7 @@
         ))
     (var hd (node_bhead expr))
     (if (== hd Quote) (return expr))
-    (if (== hd Qualified) (do
+    (if (|| (== hd Qualified) (== hd Subscript)) (do
         (var v (unique_sym))
         (field_set ret 1 (cons v (field_get ret 1)))
         (field_set ret 2 (cons expr (field_get ret 2)))
@@ -964,9 +964,15 @@
     (set_label asm lbl)
     (while rvars (do
         (var def @C_NIL)
+        (var v (car rvars))
+        (if (== (node_head v) Array)
+            (throw (make_object3 Exception current_loc
+                (string "Invalid lhs-operand")
+                v))
+            )
         (if (== overwrite @C_TRUE)
-            (= def (make_object3 DefVariable (car rvars) Decons (to_sym "overwrite")))
-            (= def (make_object2 DefVariable (car rvars) Decons))
+            (= def (make_object3 DefVariable v Decons (to_sym "overwrite")))
+            (= def (make_object2 DefVariable v Decons))
             )
         (compile_define_variable asm mod def)
         (put_drop asm)
@@ -1593,7 +1599,7 @@
             (make_object2 While
                 (make_object1 Not (apply (to_sym "equal") (list2
                 (assign v (apply iter 0)) @C_UNDEF)))
-                (seq (list2
+                (block (list2
                     (defvar i v)
                     body
                     )))
@@ -1612,8 +1618,8 @@
             (defvar v @C_NIL)
             (make_object2 While
                 (make_object1 Not (apply (to_sym "equal") (list2
-                (assign v (apply iter 0)) @C_UNDEF)))
-                (seq (list2
+                    (assign v (apply iter 0)) @C_UNDEF)))
+                (block (list2
                     (defvar i v)
                     body
                     )))
@@ -1645,7 +1651,7 @@
             (defvar n b)
             (make_object3 While
                 (apply (to_sym "le") (list2 j n))
-                (seq (list2
+                (block (list2
                     (defvar i j)
                     body
                     ))
@@ -1676,9 +1682,9 @@
         (block (list3
             (defvar j b)
             (defvar n a)
-            (make_object2 While
-                (apply (to_sym "ge") (list2 i n))
-                (seq (list2
+            (make_object3 While
+                (apply (to_sym "ge") (list2 j n))
+                (block (list2
                     (defvar i j)
                     body))
                 (assign j (apply (to_sym "sub") (list2 j (box 1)))))
@@ -1730,6 +1736,52 @@
     (throw (bug (string "compile_assign")))
     ))
 
+(fun compile_subscript (asm mod expr) (
+    (var opd (node_arg expr 0))
+    (var args (node_arg_list expr 1))
+
+    (= args (list_reverse args))
+    (var arity 0)
+    (while args (do
+        (compile asm mod (car args))
+        (= args (cdr args))
+        (incr arity)
+        ))
+    (compile asm mod opd)
+    (incr arity)
+
+    (compile asm mod (to_sym "at"))
+    (put_push asm (to_sym "at"))
+    (put_push asm current_loc)
+    (compile_simple_call asm 3 compile_matching)
+    (put_jcall asm (* 4 arity))
+    ))
+
+(fun compile_subscript_assign (asm mod expr) (
+    (var lhs (node_arg expr 0))
+    (var rhs (node_arg expr 1))
+    (var opd (node_arg lhs 0))
+    (var args (node_arg_list lhs 1))
+
+    (compile asm mod rhs)
+
+    (= args (list_reverse args))
+    (var arity 1)
+    (while args (do
+        (compile asm mod (car args))
+        (= args (cdr args))
+        (incr arity)
+        ))
+    (compile asm mod opd)
+    (incr arity)
+
+    (compile asm mod (to_sym "store"))
+    (put_push asm (to_sym "store"))
+    (put_push asm current_loc)
+    (compile_simple_call asm 3 compile_matching)
+    (put_jcall asm (* 4 arity))
+    ))
+
 ; translate
 ;
 ; Foo{x, y, Bar{z}} = e
@@ -1763,7 +1815,7 @@
     (set_label asm lbl)
 
     (while rvars (do
-        (compile_assign asm mod (assign (car rvars) Decons))
+        (compile asm mod (assign (car rvars) Decons))
         (put_drop asm)
         (= rvars (cdr rvars))
         ))
@@ -2140,6 +2192,11 @@
     (add_compiler global (make_object2 Assign DontCare DontCare) compile_assign)
     (add_compiler global (make_object2 Lambda DontCare DontCare) compile_lambda)
     (add_compiler global (make_object2 Fusion DontCare DontCare) compile_fusion)
+
+    (add_compiler global (make_object2 Subscript DontCare DontCare) compile_subscript)
+    (add_compiler global (make_object2 Assign
+        (make_object2 Subscript DontCare DontCare) DontCare)
+        compile_subscript_assign)
 
     (add_compiler global (make_object2 Slot DontCare symT) compile_slot)
     (add_compiler global (make_object3 Slot DontCare symT listT) compile_slot2)

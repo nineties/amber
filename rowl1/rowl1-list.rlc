@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2013-02-23 14:39:04 nineties $
+; $Id: rowl1-list.rlc 2013-03-17 16:53:16 nineties $
 ;
 
 (import "rlvm-compile")
@@ -22,6 +22,13 @@
 
 (fun index_out_of_range (list idx) (
     (throw (out_of_range current_loc list (box idx)))
+    ))
+
+(fun ls_new (n f) (
+    (var new_ls 0)
+    (var code (get_bytecode f))
+    (for i 0 n (= new_ls (cons (byterun code (box i)) new_ls)))
+    (return (list_reverse new_ls))
     ))
 
 (export fun list_at_check (ls i) (
@@ -197,6 +204,7 @@
 
 (export fun setup_list (std) (
     (var mod (create_module std (to_sym "List")))
+    (add_function2 mod (to_sym "new") intT funT ls_new 0)
     (add_function1 std (to_sym "length") listT ls_length 0)
     (add_function1 std (to_sym "size") listT ls_length 0)
     (add_function2 std (to_sym "cons") DontCare listT ls_cons 0)
