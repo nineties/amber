@@ -1,6 +1,6 @@
 " Language:	Amber
 " Maintainer:	nineties <nineties48@gmail.com>
-" $Id: amber.vim 2013-02-06 12:18:32 nineties $
+" $Id: amber.vim 2013-03-18 23:59:01 nineties $
 
 if exists("b:current_syntax")
 "    finish
@@ -8,10 +8,10 @@ endif
 
 syn case match " case sensitive
 
-syn keyword amberConstant    true false
+syn keyword amberConstant    true false nil undef
 syn keyword amberStatement   module return import open
-syn keyword amberConditional if else where and or not
-syn keyword amberRepeat      while
+syn keyword amberConditional if else where and or not case of
+syn keyword amberRepeat      while for reverse_for
 
 syn match   amberStandardConstant    "stdin\|stdout\|stderr"
 
