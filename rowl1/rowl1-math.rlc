@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-math.rlc 2013-02-16 04:09:51 nineties $
+; $Id: rowl1-math.rlc 2013-03-18 21:40:26 nineties $
 ;
 
 (import "rlvm-compile")
@@ -51,6 +51,10 @@
     (return (fpow x y))
     ))
 
+(var napier (float_from_s "2.7182818284590452"))
+(var two    (itof 2))
+(var ten    (itof 10))
+
 (fun float_log (x y) (
     (if (! (float_positive x))
         (throw (out_of_domain current_loc (to_sym "log") x)))
@@ -59,43 +63,56 @@
     (return (flog x y))
     ))
 
+(fun float_logE (x) ((return (float_log x napier))))
+(fun float_log2 (x) ((return (float_log x two))))
+(fun float_log10 (x) ((return (float_log x ten))))
+
 (var to_f (to_sym "to_f"))
-(fun do_to_f (v) (
-    (= v (byterun (lookup_func current_mod to_f) v))
-    (if (!= (node_type v) @FloatE)
-        (throw (exception current_loc (string "to_f must returns floating-point value")))
+(fun to_float (v) (
+    (var r (byterun (lookup_func current_mod to_f) v))
+    (if (== r @C_UNDEF)
+        (throw (make_object3 Exception current_loc
+            (string "Can't convert to floating-point number")
+            v)))
+    (if (!= (node_type r) @FloatE)
+        (throw (exception current_loc (string "to_f must returns floating-point number")))
         )
-    (return v)
+    (return r)
     ))
 
 (fun sqrt (v) (
-    (return (float_sqrt (do_to_f v)))
+    (return (float_sqrt (to_float v)))
     ))
 
 (fun sin (v) (
-    (return (float_sin (do_to_f v)))
+    (return (float_sin (to_float v)))
     ))
 
 (fun cos (v) (
-    (return (float_cos (do_to_f v)))
+    (return (float_cos (to_float v)))
     ))
 
 (fun tan (v) (
-    (return (float_tan (do_to_f v)))
+    (return (float_tan (to_float v)))
     ))
 
 (fun tan (v) (
-    (return (float_tan (do_to_f v)))
+    (return (float_tan (to_float v)))
     ))
 
 (fun pow (x y) (
-    (return (binary_coerce (to_sym "pow") x y))
+    (return (call2 (to_sym "pow") (to_float x) (to_float y)))
     ))
 
 (fun log (x y) (
-    (return (binary_coerce (to_sym "log") x y))
+    (return (call2 (to_sym "log") (to_float x) (to_float y)))
     ))
 
+(fun log1 (x) (
+    (return (call1 (to_sym "log") (to_float x)))
+    ))
+
+(extern fun compile_matching)
 (export fun setup_math (std) (
     (add_function1 std (to_sym "sqrt") DontCare sqrt 0)
     (add_function1 std (to_sym "sin") DontCare sin 0)
@@ -103,6 +120,7 @@
     (add_function1 std (to_sym "tan") DontCare tan 0)
     (add_function2 std (to_sym "pow") DontCare DontCare pow 0)
     (add_function2 std (to_sym "log") DontCare DontCare log 0)
+    (add_function1 std (to_sym "log") DontCare log1 0)
 
     (add_function1 std (to_sym "sqrt") floatT float_sqrt 0)
     (add_function1 std (to_sym "sin") floatT float_sin 0)
@@ -110,6 +128,9 @@
     (add_function1 std (to_sym "tan") floatT float_tan 0)
     (add_function2 std (to_sym "pow") floatT floatT float_pow 0)
     (add_function2 std (to_sym "log") floatT floatT float_log 0)
+    (add_function1 std (to_sym "log") floatT float_logE 0)
+    (add_function1 std (to_sym "log2") floatT float_log2 0)
+    (add_function1 std (to_sym "log10") floatT float_log10 0)
     ))
 
    ))
