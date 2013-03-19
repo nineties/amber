@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-array.rlc 2013-03-05 07:02:27 nineties $
+; $Id: rowl1-array.rlc 2013-03-19 17:26:12 nineties $
 ;
 
 (import "rlvm-compile")
@@ -47,9 +47,10 @@
     ))
 
 (fun pprint_main (ochan obj) (
+    (= obj (unwrap_internal obj))
     (tswitch (node_type obj) (
         (@SymbolE           . (return (output_symbol ochan obj)))
-        (@ExprE             . (return (pp_expr ochan obj)))
+        (@ExprE             . (return (pp_node ochan obj)))
         (@ListE             . (return (pp_list ochan obj)))
         (@ArrayE            . (return (pp_array ochan obj)))
         (@TableE            . (return (pp_table ochan obj)))
@@ -130,7 +131,8 @@
     (return @C_NIL)
     ))
 
-(fun pp_expr (ochan node) (
+(extern fun unwrap_internal)
+(fun pp_node (ochan node) (
     (output_symbol ochan (node_head node))
     (output_char ochan '{')
     (var n (node_size node))

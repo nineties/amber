@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2013-02-06 23:09:39 nineties $
+; $Id: rowl1-list.rlc 2013-03-19 11:49:08 nineties $
 ;
 
 (import "rlvm-compile")
@@ -51,6 +51,15 @@
     (array_set object t 2 c)
     (array_set object t 3 d)
     (array_set object t 4 e)
+    (return t)
+    ))
+
+(fun tp_new (n) (
+    (= n (unbox n))
+    (var t (allocate_tuple n))
+    (for i 0 n (do
+        (array_set object t i @C_UNDEF)
+        ))
     (return t)
     ))
 
@@ -139,6 +148,8 @@
     ))
 
 (export fun setup_tuple (std) (
+    (var mod (create_module std (to_sym "Tuple")))
+    (add_function1 mod (to_sym "new") intT tp_new 0)
     (add_function1 std (to_sym "length") tupleT tp_length 0)
     (add_function1 std (to_sym "size") tupleT tp_length 0)
     (add_function1 std (to_sym "hash") tupleT tp_hash 0)
