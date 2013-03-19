@@ -2,15 +2,17 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-util.rlc 2013-03-10 23:03:20 nineties $
+; $Id: rowl1-util.rlc 2013-03-19 21:43:32 nineties $
 ;
 
 (import "rlvm-compile")
 (import "rowl1-types")
 
+(define PRINTABLE (c) `(&& (<= 0x20 @c) (<= @c 0x7e)))
 (compile `object `(
 
 (export fun output_char_escape (ochan t) (
+    (if @(PRINTABLE t) (return (output_char ochan t)))
     (if (== t '\\') (do (output_char ochan '\\') (output_char ochan '\\'))
     (if (== t '\a') (output_string ochan "\\a")
     (if (== t '\b') (output_string ochan "\\b")
@@ -21,7 +23,10 @@
     (if (== t '\v') (output_string ochan "\\v")
     (if (== t '\0') (output_string ochan "\\0")
     (if (== t '"')  (output_string ochan "\\\"")
-        (output_char ochan t)
+        (do
+            (output_string ochan "\\x")
+            (output_hex ochan t 2)
+        )
         ))))))))))
     ))
 
