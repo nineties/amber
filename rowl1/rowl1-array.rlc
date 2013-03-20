@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-array.rlc 2013-03-17 11:51:03 nineties $
+; $Id: rowl1-array.rlc 2013-03-20 12:16:48 nineties $
 ;
 
 (import "rlvm-compile")
@@ -144,6 +144,19 @@
     (return ls)
     ))
 
+(fun ary_to_list2 (ary i j) (
+    (= i (unbox i))
+    (= j (unbox j))
+    (var ls 0)
+    (var size (field_get ary 2))
+    (if (>= j size) (index_out_of_range ary j))
+    (var buf (field_get ary 1))
+    (rfor k i (+ j 1) (do
+        (= ls (cons (array_get object buf k) ls))
+        ))
+    (return ls)
+    ))
+
 (export fun list_to_ary (ls) (
     (var size (list_len ls))
     (var buf (allocate_array size))
@@ -162,6 +175,7 @@
     (add_function2 ModArray (to_sym "new") intT DontCare ary_new3 0)
     (add_function1 std (to_sym "to_array") listT list_to_ary 0)
     (add_function1 std  (to_sym "to_list") arrayT ary_to_list 0)
+    (add_function3 std  (to_sym "to_list") arrayT intT intT ary_to_list2 0)
 
     (add_function1 std (to_sym "length") arrayT ary_size 0)
     (add_function1 std (to_sym "size") arrayT ary_size 0)

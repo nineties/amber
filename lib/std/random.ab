@@ -1,48 +1,35 @@
 # Copyright (C) 2012 nineties
 #
-# $Id: random.ab 2013-03-19 03:32:39 nineties $
+# $Id: random.ab 2013-03-20 12:18:02 nineties $
 
 module Std {
+    module impl {
+        # Choose `n' elements from `seq' and move them to the beginning of `seq' by
+        # Fisher-Yate's algorithm.
+        fisher_yates(seq, n): {
+            len: seq.size
+            if (n > len)
+                throw make Error {LOCATION, "The sequence doesn't have " + n + " elements"}
+            for(i in 0..n-1) {
+                j: i + rand(len-i)
+                (seq[i], seq[j]) = (seq[j], seq[i])
+            }
+            seq
+        }
+
+    }
+
     # Choose one element randomly
     choose(seq): seq[rand(seq.size)]
 
     # Choose `n' element from `seq' randomly
-    choose(seq, n@Int) when n >= 0: {
-        seq = to_array(seq)
-        result: []
-        len: seq.size
-        if (n > len)
-            throw `Error{!LOCATION, "The sequence doesn't have " + n + " elements", seq}
-        reverse_for(i in len-n..len-1) {
-            j: rand(i+1)
-            (seq[i], seq[j]) = (seq[j], seq[i]) 
-            result = cons(seq[i], result)
-        }
-        result
-    }
+    choose(seq, n@Int) when n >= 0: to_list(impl::fisher_yates(to_array(seq), n), 0, n-1)
 
     # Choose `n' element from `seq' randomly allowing repeatedly chosen
     # elements.
-    choose(seq, n@Int, \repeat) when n >= 0:
-        List::new(n, _ -> choose(seq))
+    choose(seq, n@Int, \repeat) when n >= 0: List::new(n, _ -> choose(seq))
 
     # Shuffle `seq' randomly by Fisher-Yates's algorithm.
-    shuffle(seq): {
-        seq = copy(seq)
-        reverse_for (i in 1..(seq.size-1)) {
-            j: rand(i+1)
-            (seq[i], seq[j]) = (seq[j], seq[i]) 
-        }
-        seq
-    }
-
-    # Shuffle `seq'.
-    shuffle(seq@List): {
-        seq = to_array(seq)
-        reverse_for (i in 1..(seq.size-1)) {
-            j: rand(i+1)
-            (seq[i], seq[j]) = (seq[j], seq[i]) 
-        }
-        to_list(seq)
-    }
+    shuffle(seq):      impl::fisher_yates(copy(seq), seq.size)
+    shuffle(seq@List): to_list(impl::fisher_yates(to_array(seq), seq.size))
 }
