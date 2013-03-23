@@ -1,13 +1,19 @@
 # Copyright (C) 2012 nineties
 #
-# $Id: list.ab 2013-02-15 16:56:26 nineties $
+# $Id: list.ab 2013-03-21 22:05:09 nineties $
 
 module Std {
     add(ls1@List, ls2@List): append(ls1, ls2)
 
-    concat(ls@List): foldl(ls, [], append)
+    concat(ls@List): foldl(append, [], ls)
 
-    concatMap(ls@List, fun@Function): concat(map(fun, ls))
+    index(ls@List, v): {
+        loop: ([], _) -> undef
+            | ([x,...], i) when x == v -> i
+            | ([_,xs...], i) -> loop(xs, i+1)
+
+        loop(ls, 0)
+    }
 
     delete: ([], _) -> []
           | ([v, vs...], x)

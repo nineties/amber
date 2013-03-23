@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2013-03-17 20:36:32 nineties $
+; $Id: rowl1-list.rlc 2013-03-21 20:34:14 nineties $
 ;
 
 (import "rlvm-compile")
@@ -97,18 +97,7 @@
     (return (list_reverse new_ls))
     ))
 
-(fun ls_map2 (f ls1 ls2) (
-    (var new_ls 0)
-    (var code (get_bytecode f))
-    (while (&& ls1 ls2) (do
-        (= new_ls (cons (byterun code (car ls1) (car ls2)) new_ls))
-        (= ls1 (cdr ls1))
-        (= ls2 (cdr ls2))
-        ))
-    (return (list_reverse new_ls))
-    ))
-
-(fun ls_foldl (ls v f) (
+(fun ls_foldl (f v ls) (
     (if (! ls) (return v))
     (var code (get_bytecode f))
     (while ls (do
@@ -123,54 +112,9 @@
     (return (byterun code (car ls) (foldr (cdr ls) v code)))
     ))
 
-(fun ls_foldr (ls v f) (
+(fun ls_foldr (f ls v) (
     (var code (get_bytecode f))
     (return (foldr ls v code))
-    ))
-
-(fun ls_foldl1 (ls f) (
-    (if (! ls) (throw (invalid_argument current_loc
-        (string "foldl1 requires non-empty list") ls)))
-    (var code (get_bytecode f))
-    (var v (car ls))
-    (= ls (cdr ls))
-    (while ls (do
-        (= v (byterun code v (car ls)))
-        (= ls (cdr ls))
-        ))
-    (return v)
-    ))
-
-(fun foldr1 (ls code) (
-    (if (! (cdr ls)) (return (car ls)))
-    (return (byterun code (car ls) (foldr1 (cdr ls) code)))
-    ))
-
-(fun ls_foldr1 (ls f) (
-    (if (! ls) (throw (invalid_argument current_loc
-        (string "foldr1 requires non-empty list") ls)))
-    (var code (get_bytecode f))
-    (return (foldr1 ls code))
-    ))
-
-(fun ls_contain (ls v) (
-    (var f (lookup_func current_mod (to_sym "equal")))
-    (while ls (do
-        (if (== (byterun f v (car ls)) @C_TRUE) (return @C_TRUE))
-        (= ls (cdr ls))
-        ))
-    (return @C_FALSE)
-    ))
-
-(fun ls_index (ls v) (
-    (var f (lookup_func current_mod (to_sym "equal")))
-    (var idx 0)
-    (while ls (do
-        (if (== (byterun f v (car ls)) @C_TRUE) (return (box idx)))
-        (= ls (cdr ls))
-        (+= idx 1)
-        ))
-    (return @C_UNDEF)
     ))
 
 (extern fun tuple2)
@@ -233,16 +177,8 @@
     (add_function1 std (to_sym "reverse") listT ls_reverse 0)
     (add_function2 std (to_sym "append") listT listT ls_append 0)
     (add_function2 std (to_sym "map") funT listT ls_map 0)
-    (add_function3 std (to_sym "map2") funT listT listT ls_map2 0)
-    (add_function3 std (to_sym "foldl") listT DontCare funT ls_foldl 0)
-    (add_function3 std (to_sym "foldr") listT DontCare funT ls_foldr 0)
-    (add_function2 std (to_sym "foldl1") listT funT ls_foldl1 0)
-    (add_function2 std (to_sym "foldr1") listT funT ls_foldr1 0)
-    (add_function2 std (to_sym "contain") listT DontCare ls_contain 0)
-    (add_function2 std (to_sym "index") listT DontCare ls_index 0)
-    (add_function2 std (to_sym "zip") listT listT ls_zip 0)
-    (add_function1 std (to_sym "unzip") listT ls_unzip 0)
-    (add_function1 std (to_sym "flatten") listT ls_flatten 0)
+    (add_function3 std (to_sym "foldl") funT DontCare listT ls_foldl 0)
+    (add_function3 std (to_sym "foldr") funT listT DontCare ls_foldr 0)
     ))
 
     ))

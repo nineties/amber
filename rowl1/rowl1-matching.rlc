@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2013-03-18 21:21:05 nineties $
+; $Id: rowl1-matching.rlc 2013-03-23 22:38:07 nineties $
 ;
 
 (import "rlvm-compile")
@@ -148,11 +148,12 @@
     ))
 
 (fun construct_row (len def) (
-    (var args (field_get def 2))
-    (var code (field_get def 3))
+    (var args  (field_get def 2))
+    (var code  (field_get def 3))
     (var guard (field_get def 4))
+    (var clos  (field_get def 5))
     (= args (setup_args len args))
-    (return (list3 args code guard))
+    (return (list4 args code guard clos))
     ))
 
 (fun setup_args (len args) (
@@ -270,10 +271,15 @@
         (var func (car pats))
         (var code (list_at func 1))
         (var guard (list_at func 2))
+        (var clos  (list_at func 3))
 
         (if guard
             (do
                 (var guard_failed (fresh_label asm))
+                (if clos (do
+                    (put_push asm clos)
+                    (put_store_closure asm)
+                    ))
                 (put_code asm guard)
                 (put_if_false asm guard_failed)
                 (put_push asm code)
@@ -285,6 +291,10 @@
                     ))
             )
             (do
+                (if clos (do
+                    (put_push asm clos)
+                    (put_store_closure asm)
+                    ))
                 (put_push asm code)
                 (put_jjump asm)
                 return

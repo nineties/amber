@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-array.rlc 2013-03-21 19:57:33 nineties $
+; $Id: rowl1-array.rlc 2013-03-21 20:36:39 nineties $
 ;
 
 (import "rlvm-compile")
@@ -204,6 +204,43 @@
     (return (variant @ArrayE 1 new size size))
     ))
 
+(fun ary_map2 (f ary1 ary2) (
+    (var size1 (field_get ary1 2))
+    (var buf1  (field_get ary1 1))
+    (var size2 (field_get ary2 2))
+    (var buf2  (field_get ary2 1))
+    (var size size1)
+    (if (< size2 size) (= size size2))
+    (var code (get_bytecode f))
+    (var new (allocate_array size))
+    (for i 0 size (do
+        (array_set object new i (byterun code
+            (array_get object buf1 i)
+            (array_get object buf2 i)))
+        ))
+    (return (variant @ArrayE 1 new size size))
+    ))
+
+(fun ary_foldl (f v ary) (
+    (var buf (field_get ary 1))
+    (var size (field_get ary 2))
+    (var code (get_bytecode f))
+    (for i 0 size (do
+        (= v (byterun code v (array_get object buf i)))
+        ))
+    (return v)
+    ))
+
+(fun ary_foldr (f ary v) (
+    (var buf (field_get ary 1))
+    (var size (field_get ary 2))
+    (var code (get_bytecode f))
+    (rfor i 0 size (do
+        (= v (byterun code (array_get object buf i) v))
+        ))
+    (return v)
+    ))
+
 (export fun setup_array (std) (
     (var ModArray (create_module std (to_sym "Array")))
     (var ModList  (create_module std (to_sym "List")))
@@ -223,6 +260,9 @@
     (add_function1 std (to_sym "reverse") arrayT ary_reverse 0)
     (add_function2 std (to_sym "append") arrayT arrayT ary_append 0)
     (add_function2 std (to_sym "map") funT arrayT ary_map 0)
+    (add_function3 std (to_sym "map2") funT arrayT arrayT ary_map2 0)
+    (add_function3 std (to_sym "foldl") funT DontCare arrayT ary_foldl 0)
+    (add_function3 std (to_sym "foldr") funT arrayT DontCare ary_foldr 0)
 
     ))
 

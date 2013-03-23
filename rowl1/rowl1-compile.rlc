@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2013-03-19 17:22:33 nineties $
+; $Id: rowl1-compile.rlc 2013-03-23 22:42:24 nineties $
 ;
 
 (import "rlvm-compile")
@@ -381,14 +381,14 @@
     (return ret)
     ))
 
-(fun alloc_function (args code guard) (
-    (return (variant @FunctionE 4 0 args code guard))
+(fun alloc_function (args code guard clos) (
+    (return (variant @FunctionE 5 0 args code guard clos))
     ))
 
 (fun make_function (args code guard) (
     (var arity (list_len args))
     (= args (cons (box arity) args))
-    (return (alloc_function args code guard))
+    (return (alloc_function args code guard 0))
     ))
 
 (export fun bind_function (fun1 fun2) (
@@ -1929,12 +1929,7 @@
     (var args (field_get lam 2))
     (var body (field_get lam 3))
     (var guard (field_get lam 4))
-    (var asm (make_assembler))
-    (put_push asm clos)
-    (put_store_closure asm)
-    (put_push asm body)
-    (put_jjump asm)
-    (return (alloc_function args (get_code asm) guard))
+    (return (alloc_function args body guard clos))
     ))
 
 (fun compile_closure (asm mod expr) (
