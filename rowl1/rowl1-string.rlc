@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-string.rlc 2013-02-23 14:39:22 nineties $
+; $Id: rowl1-string.rlc 2013-03-25 22:30:35 nineties $
 ;
 
 (import "rlvm-compile")
@@ -51,6 +51,16 @@
     (= a (call1 to_s a))
     (= b (call1 to_s b))
     (return (strcat a b))
+    ))
+
+(fun s_mul (a n) (
+    (= n (unbox n))
+    (var m (strlen a))
+    (var s (allocate_string (* m n)))
+    (for i 0 n (do
+        (strcpy (+ s (* m i)) a)
+        ))
+    (return s)
     ))
 
 (fun s_unescape (s) (
@@ -162,6 +172,7 @@
     (add_function2 std (to_sym "add") stringT stringT s_add 0)
     (add_function2 std (to_sym "add") stringT DontCare s_add2 0)
     (add_function2 std (to_sym "add") DontCare stringT s_add2 0)
+    (add_function2 std (to_sym "mul") stringT intT s_mul 0)
 
     (add_function1 std (to_sym "char") intT s_char 0)
     (add_function1 std (to_sym "code") stringT s_code 0) 
