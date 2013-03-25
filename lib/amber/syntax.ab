@@ -2,7 +2,7 @@ Assign{Qualified{Syntax,comment}, Qualified{Syntax,shell_style_comment}}
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2013-03-19 03:11:17 nineties $
+# $Id: syntax.ab 2013-03-24 18:57:01 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -375,6 +375,40 @@ ReserveSymbol{not, and, or, when, open, if, else, case, of,
 }
 
 ## Syntax Sugars
+
+rewrite_operator_assign(lhs, rhs, op): {
+    split: (Subscript{lhs, args}) -> {
+                stmt: []
+                new_args: []
+                new_lhs: lhs
+
+                for (a in args) {
+                    if (head(a) != \Symbol) {
+                        t: genSym()
+                        stmt = cons(`DefineVariable{!t, !a}, stmt)
+                        new_args = cons(t, new_args)
+                    } else
+                        new_args = cons(a, new_args)
+                }
+                new_args = reverse(new_args)
+
+                if (head(lhs) != \Symbol) {
+                    t: genSym()
+                    stmt = cons(`DefineVariable{!t, !lhs}, stmt)
+                    new_lhs = t
+                }
+
+                (`Subscript{!new_lhs, !new_args}, `Seq{!stmt})
+            }
+        | x -> (x, nil)
+
+    (x, s): split(lhs)
+    `{
+        !s
+        !x = (!op)(!x, !rhs)
+    }
+}
+
 +x      => `uplus(!x)
 -x      => `uminus(!x)
 x + y   => `add(!x, !y)
@@ -385,14 +419,14 @@ x / y   => `div(!x, !y)
 x % y   => `mod(!x, !y)
 x << y  => `shiftL(!x, !y)
 x >> y  => `shiftR(!x, !y)
-x += y  => `(!x = add(!x, !y))
-x -= y  => `(!x = sub(!x, !y))
-x *= y  => `(!x = mul(!x, !y))
-x ^= y  => `(!x = pow(!x, !y))
-x /= y  => `(!x = div(!x, !y))
-x %= y  => `(!x = mod(!x, !y))
-x <<= y => `(!x = shiftL(!x, !y))
-x >>= y => `(!x = shiftR(!x, !y))
+x += y  => rewrite_operator_assign(x, y, \add)
+x -= y  => rewrite_operator_assign(x, y, \sub)
+x *= y  => rewrite_operator_assign(x, y, \mul)
+x ^= y  => rewrite_operator_assign(x, y, \pow)
+x /= y  => rewrite_operator_assign(x, y, \div)
+x %= y  => rewrite_operator_assign(x, y, \mod)
+x <<= y => rewrite_operator_assign(x, y, \shiftL)
+x >>= y => rewrite_operator_assign(x, y, \shiftR)
 x < y   => `lt(!x, !y)
 x > y   => `gt(!x, !y)
 x <= y  => `le(!x, !y)

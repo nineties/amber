@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2013-03-23 22:42:24 nineties $
+; $Id: rowl1-compile.rlc 2013-03-25 13:09:14 nineties $
 ;
 
 (import "rlvm-compile")
@@ -267,10 +267,15 @@
             (node_arg expr 0)
             (alpha tbl (node_arg expr 1))))
         )
-    (if (|| (== hd DefVariable) (== hd DefFunction)) (do
+    (if (== hd DefVariable) (do
         (= expr (_copy expr))
         (node_arg_set expr 1 (alpha tbl (node_arg expr 1)))
         (node_arg_set expr 0 (alpha_args tbl (node_arg expr 0)))
+        (return expr)
+        ))
+    (if (== hd DefFunction) (do
+        (= expr (_copy expr))
+        (node_arg_set expr 1 (alpha tbl (node_arg expr 1)))
         (return expr)
         ))
     (if (|| (== hd Block) (== hd Breakable)) (do
@@ -2031,9 +2036,9 @@
         )
 
     (return (compile_define_variable asm mod
-        (make_object3 DefVariable
-            lhs fun (to_sym "overwrite")
-        )))
+        (make_object2 DefVariable
+            lhs fun)
+        ))
     ))
 
 (fun append_function (mod sym newfunc) (
