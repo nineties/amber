@@ -9,7 +9,7 @@
   <meta name="author" content="Koichi Nakamura">
 
   
-  <meta name="description" content="前のページ 目次 次のページ チュートリアル6: パターンマッチング・部分関数の融合 Feb 21st, 2013 パターンマッチング Amberでは関数の仮引数の代わりにパターンを記述する事により関数の定義域を限定する事が出来ます。つまり 関数名(パターン1, パターン2, ...): &hellip;">
+  <meta name="description" content="前のページ 目次 次のページ チュートリアル6: パターンマッチング・部分関数の融合 Mar 9th, 2013 パターンマッチング Amberでは関数の仮引数の代わりにパターンを記述する事により関数の定義域を限定する事が出来ます。つまり 関数名(パターン1, パターン2, ...): 関数本体 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -99,7 +99,7 @@
   
 
 
-<time datetime="2013-02-21T01:59:14+09:00" pubdate data-updated="true">Feb 21<span>st</span>, 2013</time></p>
+<time datetime="2013-03-09T02:49:54+09:00" pubdate data-updated="true">Mar 9<span>th</span>, 2013</time></p>
   </header>
   
 
@@ -297,36 +297,35 @@ amber:5&gt; f(-1)
 
 <p>を融合すれば良いですから</p>
 
-<pre><code>amber:1&gt; abs: (x when x &gt;= 0 -&gt; x) | (x when x &lt; 0 -&gt; -x)
-=&gt; &lt;#Function:0xf64a4818&gt;
+<pre><code>amber:1&gt; abs: x when x &gt;= 0 -&gt; x | x when x &lt; 0 -&gt; -x
+=&gt; &lt;#Function:0xf6515590&gt;
 amber:2&gt; abs(1)
 =&gt; 1
-amber:3&gt; abs(-1)
-=&gt; 1
+amber:3&gt; abs(-1.0)
+=&gt; 1.0
 </code></pre>
 
-<p>の様にして作ることが出来ます。一行で書く場合にはこのようになるのですが、
-複数行で記述すれば括弧を用いず以下のようにすっきりと書くことが出来ます。
+<p>の様にして作ることが出来ます。複数行では以下のように可読性のよい書き方が出来ます。
 <sup><a href="#1">1</a></sup></p>
 
-<pre><code>abs: x when x &gt;= 0 -&gt; -x
-   | x when x &lt; 0  -&gt; x
+<pre><code>abs: x when x &gt;= 0 -&gt; x
+   | x when x &lt; 0  -&gt; -x
 </code></pre>
 
-<p>また、以下のように関数定義の構文をそのまま用いて記述する事が出来ます。</p>
+<p>また、以下のように複数の関数定義文により記述する事も出来ます。</p>
 
-<pre><code>abs(x) when x &lt; 0  : x
-abs(x) when x &gt;= 0 : -x
+<pre><code>abs(x) when x &lt; 0  : -x
+abs(x) when x &gt;= 0 : x
 </code></pre>
 
-<p>ただしこの場合は<strong>後に書いた定義の方が優先される</strong>ので注意して下さい。例えばフィボナッチ関数は演算子<code>|</code>を用いる場合には</p>
+<p>ただしこの場合は<strong>後に書いた定義の方が優先される</strong>ので注意して下さい。例えばフィボナッチ数列の一般項を求める関数は演算子<code>|</code>を用いる場合には</p>
 
 <pre><code>fib: 0 -&gt; 0
    | 1 -&gt; 1
    | n -&gt; fib(n-1) + fib(n-2)
 </code></pre>
 
-<p>となりますが、関数定義を並べて書く場合には</p>
+<p>と記述しますが、関数定義を並べて書く場合には</p>
 
 <pre><code>fib(n): fib(n-1) + fib(n-2)
 fib(0): 0
@@ -334,7 +333,7 @@ fib(1): 1
 </code></pre>
 
 <p>と書かなければなりません。このような仕様になっている理由は定義文は一つ一つ独立していて、実行される毎にfibの定義が拡張されていくのだと考えるからです。
-このようにAmberでは特に関数の融合を<strong>関数の拡張</strong>と呼ぶ事があります。</p>
+このようにAmberでは関数の融合を<strong>関数の拡張</strong>と呼ぶ事があります。</p>
 
 <h3>Amberでの考え方</h3>
 
@@ -354,7 +353,7 @@ amber:2&gt; map(f, [0,1,2,3,4])
 =&gt; [1, undef, undef, undef, undef]
 amber:3&gt; map(f | id, [0,1,2,3,4])
 =&gt; [1, 1, 2, 3, 4]
-amber:4&gt; map(f | (n -&gt; throw "invalid number: " + n), [0,1,2,3,4])
+amber:4&gt; map(f | n -&gt; {throw "invalid number: " + n}, [0,1,2,3,4])
 Error: "invalid number: 1"
 </code></pre>
 
@@ -379,7 +378,7 @@ Error: "invalid number: 1"
 puts(f(0))          # =&gt; 1
 </code></pre>
 
-<h2>パターンマッチングを用いた変数定義</h2>
+<h2>パターンマッチングを用いた変数定義・代入</h2>
 
 <p>Amberではパターンマッチングを利用して変数定義・変数への代入を行う事が出来ます。
 関数定義で利用出来る任意のパターンを使う事が出来ます。</p>
@@ -403,7 +402,7 @@ amber:7&gt; y
 <p>関数定義の場合との違いは、マッチングに失敗した場合にはエラーとなるという事です。</p>
 
 <pre><code>amber:1&gt; (x, y): (1, 2, 3)
-Error: MatchingFailed{[amber:1], pattern{(x, y)}, value{(1, 2, 3)}}
+Error: MatchingFailed{[amber:1], pattern{(x, y)}}
 </code></pre>
 
 <hr />
@@ -441,7 +440,7 @@ Error: MatchingFailed{[amber:1], pattern{(x, y)}, value{(1, 2, 3)}}
   
 
 
-<time datetime="2013-02-21T01:59:14+09:00" pubdate data-updated="true">Feb 21<span>st</span>, 2013</time>
+<time datetime="2013-03-09T02:49:54+09:00" pubdate data-updated="true">Mar 9<span>th</span>, 2013</time>
         
       </p>
       

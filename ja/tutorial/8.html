@@ -9,7 +9,7 @@
   <meta name="author" content="Koichi Nakamura">
 
   
-  <meta name="description" content=" 前のページ 目次 チュートリアル8: モジュール Feb 21st, 2013 前のページ 目次 Feb 21st, 2013 Tweet ">
+  <meta name="description" content="前のページ 目次 チュートリアル8: モジュール Mar 15th, 2013 モジュールとは Amberにおけるモジュールとは複数の変数定義をひとまとまりにして扱う為の機能です。 全ての変数定義は必ず何らかのモジュールに属します。 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -97,11 +97,110 @@
   
 
 
-<time datetime="2013-02-21T12:22:20+09:00" pubdate data-updated="true">Feb 21<span>st</span>, 2013</time></p>
+<time datetime="2013-03-15T08:50:19+09:00" pubdate data-updated="true">Mar 15<span>th</span>, 2013</time></p>
   </header>
   
 
-  
+  <h2>モジュールとは</h2>
+
+<p>Amberにおける<strong>モジュール</strong>とは複数の変数定義をひとまとまりにして扱う為の機能です。</p>
+
+<p>全ての変数定義は必ず何らかのモジュールに属します。</p>
+
+<p>Amberのプログラムは常に何らかのモジュールの内部で実行されます。このモジュールを<strong>カレントモジュール</strong>と呼びます。そして、変数定義・関数定義により定義された変数はその時点でのカレントモジュールに登録されます。起動時のカレントモジュールはGlobalという物になっています。</p>
+
+<p>新たなモジュールを作成し、そのモジュールに実行を移すには</p>
+
+<pre><code>module モジュール名 {
+    文1
+    文2
+    ...
+}
+</code></pre>
+
+<p>と記述します。文1,文2,&#8230;はそのモジュール内で実行されます。例えば</p>
+
+<pre><code>module A {
+    x: 0
+    f(): 1
+}
+</code></pre>
+
+<p>と記述すると<code>A</code>という名前のモジュールが生成され、変数<code>x</code>と<code>f</code>の定義はこのモジュールに登録されます。</p>
+
+<p>あるモジュールの内部の変数を参照する為には</p>
+
+<pre><code>モジュール名 :: 変数名
+</code></pre>
+
+<p>と記述します。例えば以下の例の様になります。</p>
+
+<pre><code>module A {
+    x: 0
+}
+
+puts(A::x)  # =&gt; 0
+A::x = 1
+puts(A::x)  # =&gt; 1
+</code></pre>
+
+<p>また一度モジュールから出た後も、再び同じモジュールに入る事が出来ます。</p>
+
+<pre><code>module A {
+    x: 0
+}
+
+module A {
+    x = 1
+}
+
+puts(A::x)  # =&gt; 1
+</code></pre>
+
+<h2>モジュールの階層</h2>
+
+<p>あるモジュールを定義すると、そのモジュールは定義時点でのカレントモジュールに登録されます。このことによって、モジュール間には親子関係が発生します。すなわち、モジュールは階層をなします。この階層の頂点にはGlobalというモジュールが位置する事になります。</p>
+
+<p>モジュールAの内部でモジュールBを定義した場合、AをBの<strong>スーパーモジュール</strong>、BをAの<strong>サブモジュール</strong>と呼びます。
+モジュールAの外からAのサブモジュールを参照する為には</p>
+
+<pre><code>A :: サブモジュール名
+</code></pre>
+
+<p>と記述します。例えば以下の例のようになります。</p>
+
+<pre><code>module A {
+    module B {
+        x: 0
+    }
+
+    puts(B::x)  # =&gt; 0
+}
+puts(A::B::x)   # =&gt; 0
+</code></pre>
+
+<h2>標準で用意されているモジュール</h2>
+
+<p>Amberはいくつかの標準的なモジュールを起動時に生成します。それらの階層は以下の様になっています。</p>
+
+<pre><code>Global -+- Syntax --+-- Action
+        |           |
+        |           +-- Shell
+        |
+        +- Semantics --+-- Interpreter
+        |              |
+        |              +-- Compiler
+        |
+        +-- Std --+-- Numeric --+-- Integer
+                                |
+                                +-- BigInt
+</code></pre>
+
+<p><code>Syntax</code>以下のモジュールにはAmberの文法に関する定義が含まれています。
+<code>Semantics</code>以下のモジュールにはAmberの評価器(インタプリタやコンパイラ)に関する定義が含まれています。
+<code>Syntax</code>と<code>Semantics</code>は言語の構文論と意味論の核を担っています。</p>
+
+<p><code>Std</code>(Standardの略)以下のモジュールは<strong>標準モジュール</strong></p>
 
 
   <div class="pagination">
@@ -129,7 +228,7 @@
   
 
 
-<time datetime="2013-02-21T12:22:20+09:00" pubdate data-updated="true">Feb 21<span>st</span>, 2013</time>
+<time datetime="2013-03-15T08:50:19+09:00" pubdate data-updated="true">Mar 15<span>th</span>, 2013</time>
         
       </p>
       
