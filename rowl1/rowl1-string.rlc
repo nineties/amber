@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-string.rlc 2013-05-18 22:21:31 nineties $
+; $Id: rowl1-string.rlc 2013-05-19 08:45:59 nineties $
 ;
 
 (import "rlvm-compile")
@@ -17,6 +17,8 @@
 (import "rowl1-error")
 
 (extern object current_loc)
+(extern fun ary_new)
+(extern fun ary_push)
 
 (fun s_size (s) (
     (return (box (strlen s)))
@@ -69,7 +71,7 @@
     (return s)
     ))
 
-; returns true is s1 contains s2 as a sub-string.
+; returns true if s1 contains s2 as a sub-string.
 (fun s_contain (s1 s2) (
     ; simple method
     (var l1 (strlen s1))
@@ -79,6 +81,39 @@
         (if (strneq (+ s1 i) s2 l2) (return @C_TRUE))
         ))
     (return @C_FALSE)
+    ))
+
+; Split `str` by delimiter string `d`
+; split d d = []
+; split (d ++ s) d = cons "" (split s d)
+; split (s1 ++ d ++ s2) d = cons s1 (split s2 d)
+(fun s_split_ (str d i slen dlen) (
+    (if (< slen dlen)
+        (return (list1 (strndup (+ str i) slen)))
+        )
+    (if (strneq (+ str i) d dlen)
+        (return (cons (string "") (s_split_ str d (+ i dlen) (- slen dlen) dlen)))
+        )
+    (for k i (+ (- (+ i slen) dlen) 1) (do
+        (if (strneq (+ str k) d dlen)
+            (return (cons (substr str i (- k 1))
+                (s_split_ str d (+ k dlen) (- slen (+ k dlen)) dlen)
+                )))
+        ))
+    (return (list1 (strndup (+ str i) slen)))
+    ))
+
+(fun s_split (str d) (
+    (var slen (strlen str))
+    (var dlen (strlen d))
+    (if (== dlen 0) (do
+        (var ls 0)
+        (rfor i 0 slen (do
+            (= ls (cons (ctos (array_get char str i)) ls))
+            ))
+        (return ls)
+        ))
+    (return (s_split_ str d 0 slen dlen))
     ))
 
 (fun s_code (s) (
@@ -119,6 +154,12 @@
     (return c)
     ))
 
+(fun substr (s i j) (
+    (var str (allocate_string (+ (- j i) 1)))
+    (memcpy str (+ s i) (+ (- j i) 1))
+    (return str)
+    ))
+
 (fun s_at_range (s r) (
     (var b (node_arg_int r 0))
     (var e (node_arg_int r 1))
@@ -131,9 +172,7 @@
     (if (|| (>= e len) (< b 0))
         (throw (out_of_range current_loc s r))
         )
-    (var str (allocate_string (+ (- e b) 1)))
-    (memcpy str (+ s b) (+ (- e b) 1))
-    (return str)
+    (return (substr s b e))
     ))
 
 ;; StringIO
@@ -183,6 +222,7 @@
     (add_function3 std (to_sym "store") stringT intT stringT s_store 0)
     (add_function1 std (to_sym "unescape") stringT s_unescape 0)
     (add_function2 std (to_sym "contain") stringT stringT s_contain 0)
+    (add_function2 std (to_sym "split") stringT stringT s_split 0)
 
     ; StringIO module
     (var sioT (domainP StringIO))
