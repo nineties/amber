@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2013-03-23 22:38:07 nineties $
+; $Id: rowl1-matching.rlc 2013-05-28 10:16:56 nineties $
 ;
 
 (import "rlvm-compile")
@@ -36,13 +36,6 @@
     (compile_simple_call asm 2 trace_func)
     ))
 
-(fun compile_matching_unwrap (loc obj def) (
-    (if (== (node_type def) @DelegateFunctionE)
-        (= def (field_get def 2))
-        )
-    (return (compile_matching loc obj def))
-    ))
-
 (export fun compile_matching (loc obj def) (
     (if (! (is_function def))
         (throw (type_error loc (string "function") obj))
@@ -54,34 +47,7 @@
     (var asm (make_assembler))
     (var exit_lbl (fresh_label asm))
 
-    (if (!= (node_type def) @DelegateFunctionE)
-        (compile_matching_single_function asm loc obj def exit_lbl)
-        (do
-            (var fun (field_get def 2))
-            (var delegatee (field_get def 3))
-            (var exit_lbl2 (fresh_label asm))
-            (compile_matching_single_function asm loc obj fun exit_lbl2)
-            (set_label asm exit_lbl2)
-            (while delegatee (do
-                (var disp (car delegatee))
-                (var failed (fresh_label asm))
-
-                (put_push asm disp)
-                (put_car asm)
-                (put_push asm obj)
-                (put_push asm current_loc)
-                (compile_simple_call asm 3 compile_matching_unwrap)
-                (put_jccall asm)
-                (put_dup asm)
-                (put_undef asm)
-                (put_if_eq asm failed)
-                (put_ireturn asm)
-                (set_label asm failed)
-                (put_drop asm)
-    
-                (= delegatee (cdr delegatee))
-                ))
-        ))
+    (compile_matching_function asm loc obj def exit_lbl)
 
     (set_label asm exit_lbl)
     (put_undef asm)
@@ -92,7 +58,7 @@
     (return code)
     ))
 
-(fun compile_matching_single_function (asm loc obj def exit) (
+(fun compile_matching_function (asm loc obj def exit) (
     (if (! (is_function def))
         (throw (type_error loc (string "function") obj))
         )

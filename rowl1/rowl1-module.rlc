@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-module.rlc 2013-03-14 20:33:36 nineties $
+; $Id: rowl1-module.rlc 2013-05-28 10:17:47 nineties $
 ;
 
 ; Module
@@ -135,11 +135,7 @@
             (var entry (vector_at entries i))
             (var sym (field_get entry 0))
             (var ent (field_get entry 1))
-            (var v (get_module_variable_value sym ent))
-            (if (&& (is_function v) (! (is_display ent)))
-                (update_function_entry delegator sym)
-                (update_variable_entry delegator sym ent)
-                )
+            (update_variable_entry delegator sym ent)
             ))
         (= mods (cdr mods))
         ))
@@ -150,13 +146,7 @@
     (while mods (do
         (var delegator (car mods))
         (var ent (symtable_find (get_vartable delegator) sym))
-        (if ent (do
-            (var v (get_module_variable_value sym ent))
-            (if (&& (is_function v) (! (is_display ent)))
-                (update_function_entry delegator sym)
-                (update_variable_entry delegator sym ent)
-                )
-            ))
+        (if ent (update_variable_entry delegator sym ent))
         (= mods (cdr mods))
         ))
     ))
@@ -184,20 +174,6 @@
         (= mods (cdr mods))
         ))
     (return list)
-    ))
-
-(fun update_function_entry (mod sym) (
-    (var disps (lookup_all_symbols mod sym))
-    (var disp  (car disps)) ; current module
-    (var other (cdr disps)) ; delegatees
-    (var fun (car disp))
-    (if (== (node_type fun) @DelegateFunctionE) (do
-        (field_set fun 1 0) ; clear cache
-        (field_set fun 3 other)
-        )
-    (if other
-        (setcar disp (variant @DelegateFunctionE 3 0 fun other))
-        ))
     ))
 
 (fun update_variable_entry (mod sym info) (
@@ -331,18 +307,7 @@
     (label finish)
 
     (update_module_variables_single mod sym)
-
-    (if (is_function val) (do
-        (= ent (lookup_symbol mod sym @FALSE))
-        (if ent (update_function_entry mod sym))
-        ))
     (return val)
-    ))
-
-(export fun add_module_function (mod sym overwrite val) (
-    (add_module_variable mod sym overwrite val)
-    (var ent (lookup_symbol mod sym @FALSE))
-    (if ent (update_function_entry mod sym))
     ))
 
 (export fun is_local_var (v) (

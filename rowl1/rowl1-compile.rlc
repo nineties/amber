@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2013-03-25 14:06:02 nineties $
+; $Id: rowl1-compile.rlc 2013-05-28 10:16:14 nineties $
 ;
 
 (import "rlvm-compile")
@@ -404,17 +404,7 @@
         (throw (type_error current_loc (string "function") fun2))
         )
 
-    (if (== (node_type fun1) @DelegateFunctionE)
-        (throw (string "BUG (bind_function): Invalid argument type"))
-        )
-    (if (== (node_type fun2) @DelegateFunctionE)
-        (do
-            (field_set fun2 1 0) ; clear cache
-            (field_set fun2 2 (bind_function fun1 (field_get fun2 2)))
-            (return fun2)
-        )
-        (return (variant @BoundFunctionE 3 0 fun1 fun2))
-        )
+    (return (variant @BoundFunctionE 3 0 fun1 fun2))
     ))
 
 (var maybe (to_sym "maybe"))
@@ -930,6 +920,7 @@
         (return (compile_define_clsref asm mod lhs rhs overwrite))
         )
     (if (== lty Qualified) (do
+        (= expr (_copy expr))
         (node_arg_set expr 0 (node_arg lhs 1))
         (return (compile_define_variable asm
             (find_module mod (node_arg_symbol lhs 0))
@@ -2026,6 +2017,13 @@
 ; sym: fun   (other)
 (fun compile_define_function (asm mod expr) (
     (var lhs (node_arg expr 0))
+    (if (== (node_head lhs) Qualified) (do
+        (= expr (_copy expr))
+        (node_arg_set expr 0 (node_arg lhs 1))
+        (compile_define_function asm
+            (find_module mod (node_arg_symbol lhs 0))
+            expr
+            )))
     (var sym (variable_name lhs))
     (var info (lookup_symbol_current_scope mod sym @TRUE))
     (var fun (node_arg expr 1))
@@ -2055,7 +2053,7 @@
             (setcar disp (bind_function newfunc func))
             return
         ))
-    (add_module_function mod sym @C_TRUE newfunc)
+    (add_module_variable mod sym @C_TRUE newfunc)
     ))
 
 (export fun add_function0 (mod sym func guard) (
