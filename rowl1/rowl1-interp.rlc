@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2013-03-23 22:57:06 nineties $
+; $Id: rowl1-interp.rlc 2013-05-29 09:53:01 nineties $
 ;
 
 (import "rlvm-compile")
@@ -290,34 +290,6 @@
     (return (eval (node_arg expr 1)))
     ))
 
-(export fun eval_begin_module (expr) (
-    (if (! (in_top_scope current_mod))
-        (throw (exception current_mod (string "module definition in sub-scope is not allowed\n")))
-        )
-    (var modsig (node_arg expr 0))
-    (var module (create_module current_mod modsig))
-    (= module_stack (cons module module_stack))
-    (set_current_module module)
-    (return @C_TRUE)
-    ))
-
-(export fun eval_end_module (expr) (
-    (if (== current_mod global)
-        (throw (exception current_mod (string "there is no module to close")))
-        )
-    (if (! (in_top_scope current_mod))
-        (throw (exception current_mod (string "module definition in sub-scope is not allowed")))
-        )
-    (= module_stack (cdr module_stack))
-    (var module (car module_stack))
-    (if (! module) 
-        (throw (exception current_mod (string "can not exit global-scope")))
-        )
-    (set_current_module module)
-    (return @C_TRUE)
-    ))
-
-
 (fun rewrite_located (expr) (
     (node_arg_set expr 1 (rewrite (node_arg expr 1)))
     (return expr)
@@ -554,9 +526,6 @@
     (add_function1 global Eval (make_object1 Open DontCare) eval_open 0)
     (add_function1 global Eval (make_object1 Import listT) eval_import 0)
     (add_function1 global Eval (make_object1 Import stringT) eval_import 0)
-    (add_function1 global Eval (make_object1 BeginModule symT) eval_begin_module 0)
-    (add_function1 global Eval (make_object1 BeginModule (domainP Qualified)) eval_begin_module 0)
-    (add_function1 global Eval (make_object0 EndModule) eval_end_module 0)
     (add_function1 global Eval (make_object1 Seq listT) eval_seq 0)
 
     (add_function1 global Eval (make_object2 DefSyntax symT DontCare) eval_define_syntax 0)

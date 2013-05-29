@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2013-03-25 14:05:45 nineties $
+; $Id: rowl1-packrat.rlc 2013-05-29 09:52:49 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1102,31 +1102,6 @@
     ))
 @(MEMOIZE statement)
 
-(fun parse_begin_module (p) (
-    (var state (copy_parser_state p))
-    (parse_text p "module") 
-    (parse_spaces p)
-    (parse "qualified_symbol" p)
-    @(CHECK p)
-    (var mod @(TOKEN p))
-    (parse_spaces p)
-    (parse_char p '{')
-    @(CHECK p)
-    (return (parsed p (make_object1 BeginModule mod)))
-    ))
-
-(fun parse_toplevel_statement (p) (
-    (if (lookahead_text p "module") (do
-        (if (== (parse_begin_module p) @C_TRUE) (return @C_TRUE))
-        ))
-    (parse "statement" p)
-    (if @(PARSED p) return)
-    (if (== (parse_char p '}') @C_FALSE) return)
-    (parsed p (make_object0 EndModule))
-    ))
-
-(extern fun eval_begin_module)
-(extern fun eval_end_module)
 (export fun parse_statements (p) (
     (var save_current_mod current_mod)
     (set_current_module (find_module current_mod Syntax))
@@ -1141,7 +1116,7 @@
     (if (== (lookahead p) @EOF) (return @TRUE))
 
     (set_indent p (get_column p))
-    (parse_toplevel_statement p)
+    (parse "statement" p)
     (if (! @(PARSED p)) (return @FALSE))
     (apply_located p)
     (var stmt @(TOKEN p))
@@ -1186,7 +1161,7 @@
         (= mayparse_p @FALSE)
         (parse_spaces p)
         (set_indent p (get_column p))
-        (parse_toplevel_statement p)
+        (parse "statement" p)
         (if (! @(PARSED p)) (if mayparse_p (goto retry) return))
         (apply_located p)
 
