@@ -2,14 +2,19 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-module.rlc 2013-05-28 10:17:47 nineties $
+; $Id: rowl1-module.rlc 2013-06-04 17:56:37 nineties $
 ;
+
+; Modules has partial ordering relationship (denoted by A -> B).
+; Modules X s.t. X -> A are called `upper modules` of A.
+; Modules X s.t. A -> X are called `lower modules` of A.
+; lookup(A, x) is redirected to lookup(B, x) when A -> B and lookup(A, x) is undefined
 
 ; Module
 ; Fields:
 ; - 1:vtbl       : variable table
-; - 2:delegatees : list of modules
-; - 3:delegators : list of modules
+; - 2:upper      : list of direct uppder modules
+; - 3:lower      : list of direct lower modules
 ; - 4:count      : local variable index counter
 ; - 5:mark       : visited mark
 
@@ -28,30 +33,26 @@
 
 (extern object current_loc)
 
-(export fun make_module (outer sym) (
-    (var mod (variant @ModuleE 4
+;; interfaces
+(export fun make_module () (
+    (return (variant @ModuleE 4
         (make_symtable 10)  ; variable table
-        0   ; delegatees
-        0   ; delegators
+        0   ; list of direct upper modules
+        0   ; list of direct lower modules
         (list1 (box 0))     ; local variable index counter
         0   ; visited-mark
         ))
-    (if outer (do
-        (add_delegator mod outer)
-        (add_module_variable outer sym @C_FALSE mod)
-        ))
-    (return mod)
     ))
 
 (export fun get_vartable (mod) (
     (return (field_get mod 1))
     ))
 
-(export fun delegatees (mod) (
+(fun upper (mod) (
     (return (field_get mod 2))
     ))
 
-(fun delegators (mod) (
+(fun lower (mod) (
     (return (field_get mod 3))
     ))
 
@@ -69,17 +70,16 @@
     (field_set mod 5 mark)
     ))
 
-(fun add_delegator (from to) (
+(export fun import_module (upper lower) (
+    ))
+
+(export fun import_module (from to) (
     (field_set from 2 (cons to (list_delete to (field_get from 2))))
     (field_set to 3 (cons from (list_delete from (field_get to 3))))
     (update_module_variables from)
+    (return @C_NIL)
     ))
 
-(fun del_delegator (from to) (
-    (field_set from 2 (list_delete to (field_get from 2)))
-    (field_set to 3 (list_delete from (field_get to 3)))
-    (update_module_variables from)
-    ))
 
 ;;; ModuleVariable
 (fun is_display (v) (
@@ -103,31 +103,31 @@
     (return (car (get_module_variable_disp sym info)))
     ))
 
-(export fun open_module (outer sig) (
-    (var inner (find_module outer sig))
-    (add_delegator outer inner)
+(fun update_module_variables_iter (mark mod) (
+    (if (== (get_mark mod) mark) (return))
+    (set_mark mod mark)
+    (var mods (lower mod))
     ))
 
-(export fun close_module (outer sig) (
-    (var inner (find_module outer sig))
-    (del_delegator outer inner)
+(fun update_module_variables (mod) (
+    (update_module_variables_iter (fresh_mark) mod)
     ))
 
-(fun collect_all_delegators (mark mod list) (
+(fun collect_all_lower (mark mod list) (
     (if (== (get_mark mod) mark) (return list))
     (set_mark mod mark)
 
     (= list (cons mod list))
-    (var mods (delegators mod))
+    (var mods (lower mod))
     (while mods (do
-        (= list (collect_all_delegators mark (car mods) list))
+        (= list (collect_all_lower mark (car mods) list))
         (= mods (cdr mods))
         ))
     (return list)
     ))
 
 (fun update_module_variables (mod) (
-    (var mods (collect_all_delegators (fresh_mark) mod 0))
+    (var mods (collect_all_lower (fresh_mark) mod 0))
     (while mods (do
         (var delegator (car mods))
         (var entries (symtable_entries (get_vartable delegator)))
@@ -142,7 +142,7 @@
     ))
 
 (fun update_module_variables_single (mod sym) (
-    (var mods (collect_all_delegators (fresh_mark) mod 0))
+    (var mods (collect_all_lower (fresh_mark) mod 0))
     (while mods (do
         (var delegator (car mods))
         (var ent (symtable_find (get_vartable delegator) sym))
@@ -168,7 +168,7 @@
             )
         ))
 
-    (var mods (delegatees mod))
+    (var mods (upper mod))
     (while mods (do
         (= list (lookup_all_symbols_sub mark (car mods) sym list))
         (= mods (cdr mods))
@@ -210,7 +210,7 @@
     (var v (symtable_find vtbl sym))
     (if (&& v (! (&& nodisp (is_display v)))) (return v))
 
-    (var mods (delegatees mod))
+    (var mods (upper mod))
     (while mods (do
         (= v (lookup_symbol_iter mark (car mods) sym nodisp))
         (if (&& v (! (&& nodisp (is_display v)))) (return v))
