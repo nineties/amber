@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2013-06-02 11:20:01 nineties $
+; $Id: rowl1-interp.rlc 2013-07-01 12:08:42 nineties $
 ;
 
 (import "rlvm-compile")
@@ -22,6 +22,7 @@
 
 (export var global null)
 (export var syntax null)
+(export var std null)
 
 (export var current_loc null)
 (export var current_mod null)
@@ -70,20 +71,20 @@
 (fun eval_main (file ichan argc argv) (
     ;(var start (gettimeofday))
 
+    (= current_loc no_loc)
     (= global    (make_module 0 (to_sym "Global")))
     (add_module_variable global (to_sym "Global") @C_TRUE global)
     (= syntax    (create_module global Syntax))
 
     (= module_stack (cons global 0))
 
-    (= current_loc no_loc)
-
     (setup_argv argc argv)
     (setup_globals)
     (setup_builtin_compilers)
-    (init_stdlib)
-    (open_module global Std)
-    (open_module global (qualified "Std" (to_sym "IO")))
+    (= std (init_stdlib))
+
+    (import_module global syntax)
+    (import_module global std)
 
     (init_parser_funcs)
 
@@ -91,21 +92,21 @@
     (set_loc no_loc)
 
     (push_import_dir "/usr/lib/amber/")
-    ;(import_file "amber/syntax.ab")
-    ;(import_file "std/string.ab")
-    ;(import_file "std/numeric.ab")
-    ;(import_file "std/format.ab")
-    ;(import_file "std/list.ab")
-    ;(import_file "std/sequence.ab")
-    ;(import_file "std/array.ab")
-    ;(import_file "std/table.ab")
-    ;(import_file "std/oop.ab")
-    ;(import_file "std/io/io.ab")
+    (import_file "amber/syntax.ab")
+    (import_file "std/string.ab")
+    (import_file "std/numeric.ab")
+    (import_file "std/format.ab")
+    (import_file "std/list.ab")
+    (import_file "std/sequence.ab")
+    (import_file "std/array.ab")
+    (import_file "std/table.ab")
+    (import_file "std/oop.ab")
+    (import_file "std/io/io.ab")
 
-    ;(push_import_dir (get_directory file))
-    ;(push_import_dir (get_env "PWD"))
+    (push_import_dir (get_directory file))
+    (push_import_dir (get_env "PWD"))
 
-    ;(pre_import_module)
+    (pre_import_module)
 
     ;(var end (gettimeofday))
     ;(var diff (timeval_sub end start))
@@ -302,11 +303,26 @@
     (var stmt (compile_define_syntax sym elm))
 
     (var syntax_mod (create_module current_mod Syntax))
-    (open_module syntax_mod (qualified "Global" Syntax))
     (var save_current_mod current_mod)
     (set_current_module syntax_mod)
     (eval stmt)
     (set_current_module save_current_mod)
+    (return @C_NIL)
+    ))
+
+(fun eval_begin_module (expr) (
+    (var mod (create_module current_mod (node_arg expr 0)))
+    (= module_stack (cons mod module_stack))
+    (= current_mod mod)
+    (return @C_NIL)
+    ))
+
+(fun eval_end_module (expr) (
+    (if (! (cdr module_stack))
+        (throw (exception current_loc (string "Exiting from global module")))
+        )
+    (= module_stack (cdr module_stack))
+    (= current_mod (car module_stack))
     (return @C_NIL)
     ))
 
@@ -437,11 +453,6 @@
     (import_file pre_imports)
     ))
 
-(fun eval_open (expr) (
-    (open_module current_mod (node_arg expr 0))
-    (return @C_NIL)
-    ))
-
 (fun eval_import (expr) (
     (var path (node_arg expr 0))
     (if (== (node_bhead path) List) (do
@@ -523,13 +534,14 @@
     (add_function1 global Rewrite (domainP Located) rewrite_located 0)
     (add_function1 global Eval DontCare default_eval 0)
     (add_function1 global Eval (domainP Located) eval_located 0)
-    (add_function1 global Eval (make_object1 Open DontCare) eval_open 0)
     (add_function1 global Eval (make_object1 Import listT) eval_import 0)
     (add_function1 global Eval (make_object1 Import stringT) eval_import 0)
     (add_function1 global Eval (make_object1 Seq listT) eval_seq 0)
 
     (add_function1 global Eval (make_object2 DefSyntax symT DontCare) eval_define_syntax 0)
     (add_function1 global Eval (domainP ReserveSymbol) eval_reserve_symbol 0)
+    (add_function1 global Eval (make_object1 BeginModule DontCare) eval_begin_module 0)
+    (add_function1 global Eval (make_object0 EndModule) eval_end_module 0)
 
     (add_function1 global Eval (quote (to_sym "exit")) eval_exit 0)
 
@@ -561,26 +573,27 @@
 (extern fun setup_gc)
 
 (fun init_stdlib () (
-    (var std (create_module global Std))
-    (setup_pprint std)
-    (setup_base std)
-    (setup_symbol std)
+    (var mod (create_module global Std))
+    (setup_pprint mod)
+    (setup_base mod)
+    (setup_symbol mod)
 
-    (setup_math std)
-    (setup_numeric std)
-    (setup_string std)
-    (setup_bigint std)
-    (setup_float std)
-    (setup_random std)
+    (setup_math mod)
+    (setup_numeric mod)
+    (setup_string mod)
+    (setup_bigint mod)
+    (setup_float mod)
+    (setup_random mod)
 
-    (setup_io std)
-    (setup_list std)
-    (setup_tuple std)
-    (setup_array std)
-    (setup_table std)
-    (setup_function std)
-    (setup_oop std)
-    (setup_gc std)
+    (setup_io mod)
+    (setup_list mod)
+    (setup_tuple mod)
+    (setup_array mod)
+    (setup_table mod)
+    (setup_function mod)
+    (setup_oop mod)
+    (setup_gc mod)
+    (return mod)
     ))
 
     ))

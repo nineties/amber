@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-array.rlc 2013-05-28 10:17:14 nineties $
+; $Id: rowl1-array.rlc 2013-07-01 12:09:48 nineties $
 ;
 
 (import "rlvm-compile")
@@ -23,7 +23,7 @@
 (extern fun make_ofstream)
 
 (extern fun pp_table)
-(extern fun pp_table)
+(extern fun pp_module)
 (extern fun pp_bint)
 (extern fun pp_float)
 (extern fun print_bytecode)
@@ -56,11 +56,11 @@
         (@TableE            . (return (pp_table ochan obj)))
         (@AssemblerE        . (return (pp_object ochan "Assembler" obj)))
         (@BytecodeE         . (return (pp_object ochan "Bytecode" obj)))
-        (@FunctionE         . (return (pp_object ochan "Function" obj)))
-        (@BoundFunctionE    . (return (pp_object ochan "Function" obj)))
+        (@FunctionE         . (return (pp_function ochan obj)))
+        (@BoundFunctionE    . (return (pp_function ochan obj)))
         (@InputFileStreamE  . (return (pp_object ochan "InputFileStream" obj)))
         (@OutputFileStreamE . (return (pp_object ochan "OutputFileStream" obj)))
-        (@ModuleE           . (return (pp_object ochan "Module" obj)))
+        (@ModuleE           . (return (pp_module ochan obj)))
         (@ParserE           . (return (pp_object ochan "Parser" obj)))
         (@StringIOE         . (return (pp_object ochan "StringIO" obj)))
         (@BigIntE           . (return (pp_bint ochan obj)))
@@ -108,6 +108,34 @@
     (return @C_NIL)
     ))
 
+(fun pp_function_body (ochan func) (
+    (if (== (node_type func) @FunctionE)
+        (do
+            (output_string ochan "{0x")
+            (output_hex ochan func 8)
+            (output_string ochan "}(")
+            (var args (field_get func 2))
+            (= args (cdr args)) ; skip arity
+            (while args (do
+                (pprint ochan (car args))
+                (= args (cdr args))
+                (if args (output_string ochan ", "))
+                ))
+            (output_char ochan ")")
+        )
+        (do
+            (pp_function_body ochan (field_get func 2))
+            (output_string ochan ", ")
+            (pp_function_body ochan (field_get func 3))
+        ))
+    ))
+
+(fun pp_function (ochan func) (
+    (output_string ochan "<#Function:")
+    (pp_function_body ochan func)
+    (output_char ochan '>')
+    (return @C_NIL)
+    ))
 
 (fun pp_object (ochan name obj) (
     (output_string ochan "<#")

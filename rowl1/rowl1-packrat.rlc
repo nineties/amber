@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2013-06-02 11:22:35 nineties $
+; $Id: rowl1-packrat.rlc 2013-06-30 21:50:03 nineties $
 ;
 
 (import "rlvm-compile")
@@ -582,7 +582,7 @@
 (fun parse_char (p c) (
     (var v (lookahead p))
     (if (< v 0) (do
-        (return (mayparse p (strcat "expect " (escape_char c))))
+        (return (mayparse p (strcat "expect token: " (escape_char c))))
         ))
     (if (== v c) (do
         (getc p)
@@ -625,7 +625,7 @@
             (return (parsed p (string str)))
             ))
         (if (!= d c)
-            (return (noparse p (strcat "expect : " str)))
+            (return (noparse p (strcat "expect token: '" (strcat str "'"))))
             )
         (+= clmn 1)
         (if (== c '\n') (do
@@ -635,7 +635,7 @@
         (+= idx 1)
         (+= i 1)
         ))
-    (return (mayparse p (strcat "expect : " str)))
+    (return (mayparse p (strcat "expect token: '" (strcat str "'"))))
     ))
 
 ; parse_integers
@@ -650,7 +650,7 @@
     (var begin (field_get p 6))
     (var v (lookahead p))
 
-    (if (< v 0) (return (mayparse p "expect a number")))
+    (if (< v 0) (return (mayparse p "expect token: a number")))
 
     (var state (copy_parser_state p))
 
@@ -937,8 +937,8 @@
 ;   Only escape sequence \' is interpreted.
 (fun parse_string_s_ (p) (
     (var v (lookahead p))
-    (if (< v 0) (return (mayparse p "expect '")))
-    (if (!= v ''') (return (noparse p "expect '")))
+    (if (< v 0) (return (mayparse p "expect token: ' (single quote)")))
+    (if (!= v ''') (return (noparse p "expect token: ' (single quote)")))
     (var state (copy_parser_state p))
     (getc p)
     (var begin (field_get p 6))
@@ -955,12 +955,12 @@
 
     (= v (getc p))
     (if (< v 0) (do
-        (mayparse p "expect '")
+        (mayparse p "expect token: ' (single quote)")
         (reset_parser_position p state)
         (return @C_FALSE)
         ))
     (if (!= v ''') (do
-        (noparse p "expect '")
+        (noparse p "expect token: ' (single quote)")
         (reset_parser_position p state)
         (return @C_FALSE)
         ))
@@ -974,8 +974,8 @@
 ; double-quoted string literal
 (fun parse_string_d_ (p) (
     (var v (lookahead p))
-    (if (< v 0) (return (mayparse p "expect \"")))
-    (if (!= v '"') (return (noparse p "expect \"")))
+    (if (< v 0) (return (mayparse p "expect token: \" (double quote)")))
+    (if (!= v '"') (return (noparse p "expect token: \" (double quote)")))
     (getc p)
     (var state (copy_parser_state p))
     (var begin (field_get p 6))
@@ -998,12 +998,12 @@
     (var end (field_get p 6))
     (= v (getc p))
     (if (< v 0) (do
-        (mayparse p "expect \"")
+        (mayparse p "expect token: \" (double quote)")
         (reset_parser_position p state)
         (return @C_FALSE)
         ))
     (if (!= v '"') (do
-        (noparse p "expect \"")
+        (noparse p "expect token: \" (double quote)")
         (reset_parser_position p state)
         (return @C_FALSE)
         ))
@@ -1024,8 +1024,8 @@
 
 (fun parse_object_ (p) (
     (var c (lookahead p))
-    (if (< c 0) (return (mayparse p "expect a symbol")))
-    (if (! (is_letter c)) (return (noparse p "expect a symbol")))
+    (if (< c 0) (return (mayparse p "expect token: a symbol")))
+    (if (! (is_letter c)) (return (noparse p "expect token: a symbol")))
 
     (var state (copy_parser_state p))
 
@@ -1325,7 +1325,7 @@
 (fun oneof (p tbl str) (
     (var c (lookahead p))
     (if (< c 0)
-        (return (mayparse p (strcat "expect one of " str)))
+        (return (mayparse p (strcat "expect token: one of " str)))
         )
     (if (array_get char tbl c) (do
         (getc p)
@@ -1340,14 +1340,14 @@
 (fun noneof (p tbl str) (
     (var c (lookahead p))
     (if (< c 0)
-        (return (mayparse p (strcat "expect none of " str)))
+        (return (mayparse p (strcat "expect token: none of " str)))
         )
     (if (! (array_get char tbl c)) (do
         (getc p)
         (return (parsed p (ctos c)))
         ))
     (return (noparse p
-        (strcat "expect none of " 
+        (strcat "expect token: none of " 
         (strcat str
         (strcat " but got " (escape_char c))))))
     ))

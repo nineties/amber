@@ -2,21 +2,27 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-module.rlc 2013-06-04 17:56:37 nineties $
+; $Id: rowl1-module.rlc 2013-07-01 12:02:37 nineties $
 ;
 
-; Modules has partial ordering relationship (denoted by A -> B).
-; Modules X s.t. X -> A are called `upper modules` of A.
-; Modules X s.t. A -> X are called `lower modules` of A.
-; lookup(A, x) is redirected to lookup(B, x) when A -> B and lookup(A, x) is undefined
+; Modules has pre-ordering relationship (denoted by A -> B).
+; Modules X s.t. X -> A are called `lower modules` of A.
+; Modules X s.t. A -> X are called `upper modules` of A.
+
+; Properties:
+; A -> A
+; A -> B, B -> C => A -> C
+
+;lookup(A, x) is redirected to lookup(B, x) when A -> B and lookup(A, x) is undefined.
 
 ; Module
 ; Fields:
-; - 1:vtbl       : variable table
-; - 2:upper      : list of direct uppder modules
-; - 3:lower      : list of direct lower modules
-; - 4:count      : local variable index counter
-; - 5:mark       : visited mark
+; - 1:name       : symbol
+; - 2:vtbl       : variable table
+; - 3:upper      : list of direct upper modules
+; - 4:lower      : list of direct lower modules
+; - 5:count      : local variable index counter
+; - 6:mark       : visited mark
 
 ; ModuleVariable{disp, ture iff this is not a display}
 ; disp = (value, location of definition)
@@ -34,26 +40,58 @@
 (extern object current_loc)
 
 ;; interfaces
-(export fun make_module () (
-    (return (variant @ModuleE 4
+
+(export fun make_module (upper name) (
+    (if (!= (node_type name) @SymbolE)
+        (throw (type_error current_loc
+            (string "symbol") name))
+        )
+    (var m (variant @ModuleE 5
+        name
         (make_symtable 10)  ; variable table
         0   ; list of direct upper modules
         0   ; list of direct lower modules
         (list1 (box 0))     ; local variable index counter
         0   ; visited-mark
         ))
+    (if upper (do
+        (import_module m upper)
+        (add_module_variable upper name @FALSE m)
+        ))
+    (return m)
     ))
 
-(export fun get_vartable (mod) (
+(export fun module_name (mod) (
     (return (field_get mod 1))
     ))
 
-(fun upper (mod) (
+(export fun pp_module (ochan mod) (
+    (output_string ochan "<#")
+    (output_symbol ochan (module_name mod))
+    (output_string ochan ":0x")
+    (output_hex ochan mod 8)
+    (output_char ochan '>')
+    (return @C_NIL)
+    ))
+
+(export fun variable_table (mod) (
     (return (field_get mod 2))
     ))
 
-(fun lower (mod) (
+(fun set_upper_modules (mod upper_list) (
+    (field_set mod 3 upper_list)
+    ))
+
+(fun upper_modules (mod) (
     (return (field_get mod 3))
+    ))
+
+(fun lower_modules (mod) (
+    (return (field_get mod 4))
+    ))
+
+(fun set_lower_modules (mod lower_list) (
+    (field_set mod 4 lower_list)
     ))
 
 (var visited_mark 0)
@@ -62,24 +100,46 @@
     (return visited_mark)
     ))
 
-(fun get_mark (mod) (
+(fun variable_counters (mod) (
     (return (field_get mod 5))
     ))
 
+(fun set_variable_counters (mod cnt) (
+    (field_set mod 5 cnt)
+    ))
+
+(fun get_mark (mod) (
+    (return (field_get mod 6))
+    ))
+
 (fun set_mark (mod mark) (
-    (field_set mod 5 mark)
+    (field_set mod 6 mark)
     ))
 
-(export fun import_module (upper lower) (
+; reachable(low, up) = true iff low -> up
+(fun reachable (low up) (
+    (return (reachable_iter low up (fresh_mark)))
     ))
 
-(export fun import_module (from to) (
-    (field_set from 2 (cons to (list_delete to (field_get from 2))))
-    (field_set to 3 (cons from (list_delete from (field_get to 3))))
-    (update_module_variables from)
+(fun reachable_iter (low up mark) (
+    (if (== low up) (return @TRUE))
+    (if (== (get_mark up) mark) (return @FALSE))
+    (set_mark up mark)
+
+    (var upper (upper_modules up))
+    (while upper (do
+        (if (reachable_iter (car upper) low mark) (return @TRUE))
+        (= upper (cdr upper))
+        ))
+    (return @FALSE)
+    ))
+
+(export fun import_module (lower upper) (
+    (set_lower_modules upper (cons lower (list_delete lower (upper_modules upper))))
+    (set_upper_modules lower (cons upper (list_delete upper (lower_modules lower))))
+    (update_module_variables upper)
     (return @C_NIL)
     ))
-
 
 ;;; ModuleVariable
 (fun is_display (v) (
@@ -103,34 +163,24 @@
     (return (car (get_module_variable_disp sym info)))
     ))
 
-(fun update_module_variables_iter (mark mod) (
-    (if (== (get_mark mod) mark) (return))
-    (set_mark mod mark)
-    (var mods (lower mod))
-    ))
-
-(fun update_module_variables (mod) (
-    (update_module_variables_iter (fresh_mark) mod)
-    ))
-
-(fun collect_all_lower (mark mod list) (
+(fun collect_reachable_modules (mark mod list) (
     (if (== (get_mark mod) mark) (return list))
     (set_mark mod mark)
 
     (= list (cons mod list))
-    (var mods (lower mod))
+    (var mods (lower_modules mod))
     (while mods (do
-        (= list (collect_all_lower mark (car mods) list))
+        (= list (collect_reachable_modules mark (car mods) list))
         (= mods (cdr mods))
         ))
     (return list)
     ))
 
 (fun update_module_variables (mod) (
-    (var mods (collect_all_lower (fresh_mark) mod 0))
+    (var mods (collect_reachable_modules (fresh_mark) mod 0))
     (while mods (do
         (var delegator (car mods))
-        (var entries (symtable_entries (get_vartable delegator)))
+        (var entries (symtable_entries (variable_table delegator)))
         (for i 0 (vector_size entries) (do
             (var entry (vector_at entries i))
             (var sym (field_get entry 0))
@@ -142,10 +192,10 @@
     ))
 
 (fun update_module_variables_single (mod sym) (
-    (var mods (collect_all_lower (fresh_mark) mod 0))
+    (var mods (collect_reachable_modules (fresh_mark) mod 0))
     (while mods (do
         (var delegator (car mods))
-        (var ent (symtable_find (get_vartable delegator) sym))
+        (var ent (symtable_find (variable_table delegator) sym))
         (if ent (update_variable_entry delegator sym ent))
         (= mods (cdr mods))
         ))
@@ -159,7 +209,7 @@
     (if (== (get_mark mod) mark) (return list))
     (set_mark mod mark)
 
-    (var vtbl (get_vartable mod))
+    (var vtbl (variable_table mod))
     (var v (symtable_find vtbl sym))
     (if (&& v (! (is_display v))) (do
         (var disp (get_module_variable_disp sym v))
@@ -168,7 +218,7 @@
             )
         ))
 
-    (var mods (upper mod))
+    (var mods (upper_modules mod))
     (while mods (do
         (= list (lookup_all_symbols_sub mark (car mods) sym list))
         (= mods (cdr mods))
@@ -206,11 +256,11 @@
     (if (== (get_mark mod) mark) (return 0))
     (set_mark mod mark)
 
-    (var vtbl (get_vartable mod))
+    (var vtbl (variable_table mod))
     (var v (symtable_find vtbl sym))
     (if (&& v (! (&& nodisp (is_display v)))) (return v))
 
-    (var mods (upper mod))
+    (var mods (upper_modules mod))
     (while mods (do
         (= v (lookup_symbol_iter mark (car mods) sym nodisp))
         (if (&& v (! (&& nodisp (is_display v)))) (return v))
@@ -227,7 +277,7 @@
             nodisp
             ))
         )
-    (var v (symtable_find (get_vartable mod) sym))
+    (var v (symtable_find (variable_table mod) sym))
     (if (&& v (! (&& nodisp (is_display v)))) (return v))
     (return 0)
     ))
@@ -240,7 +290,7 @@
             nodisp
             ))
         )
-    (var v (symtable_find_local (get_vartable mod) sym))
+    (var v (symtable_find_local (variable_table mod) sym))
     (if (&& v (! (&& nodisp (is_display v)))) (return v))
     (return 0)
     ))
@@ -293,7 +343,7 @@
     (if (! ent) (do
         (= disp (struct 2 val current_loc))
         (= ent (make_object2 ModuleVariable disp @C_TRUE))
-        (symtable_add_to_global (get_vartable mod) sym ent)
+        (symtable_add_to_global (variable_table mod) sym ent)
         (goto finish)
         ))
     (if (&& (== overwrite @C_FALSE) (== (node_arg ent 1) @C_TRUE)) (do
@@ -318,42 +368,42 @@
     ))
 
 (export fun get_variable_count (mod) (
-    (return (unbox (car (field_get mod 4))))
+    (return (unbox (car (variable_counters mod))))
     ))
 
 (export fun set_variable_count (mod cnt) (
-    (setcar (field_get mod 4) (box cnt))
+    (setcar (variable_counters mod) (box cnt))
     ))
 
 (export fun reset_variable_count (mod) (
-    (setcar (field_get mod 4) (box 0))
+    (setcar (variable_counters mod) (box 0))
     ))
 
 (export fun incr_variable_count (mod) (
-    (var counters (field_get mod 4))
-    (setcar counters (+ (car counters) 2)) ; counters are boxed
+    (var counters (variable_counters mod))
+    (setcar counters (+ (car counters) 2)) ; NB: counters are boxed
     ))
 
 (export fun push_varscope (mod) (
-    (symtable_push (get_vartable mod))
-    (var counters (field_get mod 4))
-    (field_set mod 4 (cons (car counters) counters))
+    (symtable_push (variable_table mod))
+    (var counters (variable_counters mod))
+    (set_variable_counters mod (cons (car counters) counters))
     ))
 
 (export fun pop_varscope (mod) (
-    (symtable_pop (get_vartable mod))
-    (field_set mod 4 (cdr (field_get mod 4)))
+    (symtable_pop (variable_table mod))
+    (set_variable_counters mod (cdr (variable_counters mod)))
     ))
 
 (export fun in_top_scope (mod) (
-    (if (== (symtable_depth (get_vartable mod)) 1)
+    (if (== (symtable_depth (variable_table mod)) 1)
         (return @TRUE)
         (return @FALSE)
         )
     ))
 
 (export fun add_symbol (mod sym v) (
-    (symtable_add (get_vartable mod) sym v)
+    (symtable_add (variable_table mod) sym v)
     ))
 
 (export var uninitialized (to_sym "%uninitialized"))
@@ -371,7 +421,7 @@
             (= disp uninitialized_disp)
             )
         (= ent (make_object2 ModuleVariable disp @C_FALSE))
-        (symtable_add_to_global (get_vartable mod) sym ent)
+        (symtable_add_to_global (variable_table mod) sym ent)
         ))
     (return ent)
     ))
