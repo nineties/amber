@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2013-07-01 11:56:57 nineties $
+; $Id: rowl1-compile.rlc 2013-07-06 19:06:06 nineties $
 ;
 
 (import "rlvm-compile")
@@ -396,7 +396,7 @@
     (return (alloc_function args code guard 0))
     ))
 
-(export fun bind_function (fun1 fun2) (
+(export fun fusion_function (fun1 fun2) (
     (if (! (is_function fun1))
         (throw (type_error current_loc (string "function") fun1))
         )
@@ -1922,7 +1922,7 @@
 (fun compile_fusion (asm mod expr) (
     (compile asm mod (node_arg expr 1))
     (compile asm mod (node_arg expr 0))
-    (compile_simple_call asm 2 bind_function)
+    (compile_simple_call asm 2 fusion_function)
     ))
 
 (fun build_closure (lam clos) (
@@ -2050,7 +2050,7 @@
             (check_init sym info)
             (var disp (get_module_variable_disp sym info))
             (var func (car disp))
-            (setcar disp (bind_function newfunc func))
+            (setcar disp (fusion_function newfunc func))
             return
         ))
     (add_module_variable mod sym @C_TRUE newfunc)

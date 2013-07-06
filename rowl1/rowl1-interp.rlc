@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2013-07-01 12:47:29 nineties $
+; $Id: rowl1-interp.rlc 2013-07-06 22:29:58 nineties $
 ;
 
 (import "rlvm-compile")
@@ -83,8 +83,8 @@
     (setup_builtin_compilers)
     (= std (init_stdlib))
 
-    (import_module global syntax)
-    (import_module global std)
+    (open_module global syntax)
+    (open_module global std)
 
     (init_parser_funcs)
 
@@ -92,23 +92,23 @@
     (set_loc no_loc)
 
     (push_import_dir "/usr/lib/amber/")
-    (import_file "amber/syntax.ab")
-    (import_file "std/string.ab")
-    (import_file "std/numeric.ab")
-    (import_file "std/format.ab")
-    (import_file "std/list.ab")
-    (import_file "std/sequence.ab")
-    (import_file "std/array.ab")
-    (import_file "std/table.ab")
-    (import_file "std/oop.ab")
-    (import_file "std/io/io.ab")
+    (import_lib "amber/syntax.ab")
+    (import_lib "std/string.ab")
+    (import_lib "std/numeric.ab")
+    (import_lib "std/format.ab")
+    (import_lib "std/list.ab")
+    (import_lib "std/sequence.ab")
+    (import_lib "std/array.ab")
+    (import_lib "std/table.ab")
+    (import_lib "std/oop.ab")
+    (import_lib "std/io/io.ab")
 
-    (import_module std (create_module std (to_sym "IO")))
+    (open_module std (find_module std (to_sym "IO")))
 
     (push_import_dir (get_directory file))
     (push_import_dir (get_env "PWD"))
 
-    (pre_import_module)
+    (pre_import_lib)
 
     ;(var end (gettimeofday))
     ;(var diff (timeval_sub end start))
@@ -371,7 +371,7 @@
     ))
 
 (var import_dirs null)
-(var importd_modules null)
+(var imported_files null)
 
 ; XXX: fix this
 (fun push_import_dir (path) (
@@ -391,13 +391,13 @@
     (= import_dirs (cdr import_dirs))
     ))
 
-(fun add_importd_file (path) (
+(fun add_imported_file (path) (
     ; XXX: fixme. canonicalize the `path'
-    (= importd_modules (cons (string path) importd_modules))
+    (= imported_files (cons (string path) imported_files))
     ))
 
 (fun is_already_imported (path) (
-    (var list importd_modules)
+    (var list imported_files)
     (while list (do
         (if (streq path (car list))
             (return @TRUE)
@@ -407,7 +407,7 @@
     (return @FALSE)
     ))
 
-(fun import_file (path) (
+(fun import_lib (path) (
     (= path (add_extension ".ab" path))
     (var dir import_dirs)
     (while dir (do
@@ -416,7 +416,7 @@
             (if (is_already_imported fullpath)
                 (return @C_FALSE)
                 )
-            (add_importd_file fullpath)
+            (add_imported_file fullpath)
 
             (var ichan (open_in fullpath))
             (var fd (open "."))
@@ -450,9 +450,9 @@
     (= pre_imports (string sym))
     ))
 
-(fun pre_import_module () (
+(fun pre_import_lib () (
     (if (! pre_imports) return)
-    (import_file pre_imports)
+    (import_lib pre_imports)
     ))
 
 (fun eval_import (expr) (
@@ -467,7 +467,26 @@
             ))
         (= path (add_extension ".ab" path))
         ))
-    (return (import_file path))
+    (return (import_lib path))
+    ))
+
+(fun eval_open (expr) (
+    (var sig (node_arg expr 0))
+    (open_module current_mod (find_module current_mod sig))
+    (return @C_NIL)
+    ))
+
+(fun eval_extend (expr) (
+    (var sig (node_arg expr 0))
+    (extend_module current_mod (find_module current_mod sig))
+    (return @C_NIL)
+    ))
+
+(fun eval_extend2 (expr) (
+    (var mod1 (find_module current_mod (node_arg expr 0)))
+    (var mod2 (find_module current_mod (node_arg expr 1)))
+    (extend_module mod1 mod2)
+    (return @C_NIL)
     ))
 
 (fun setup_argv (argc argv) (
@@ -538,6 +557,10 @@
     (add_function1 global Eval (domainP Located) eval_located 0)
     (add_function1 global Eval (make_object1 Import listT) eval_import 0)
     (add_function1 global Eval (make_object1 Import stringT) eval_import 0)
+    (add_function1 global Eval (make_object1 Open DontCare) eval_open 0)
+    (add_function1 global Eval (make_object1 Extend DontCare) eval_extend 0)
+    (add_function1 global Eval (make_object2 Extend DontCare DontCare) eval_extend2 0)
+
     (add_function1 global Eval (make_object1 Seq listT) eval_seq 0)
 
     (add_function1 global Eval (make_object2 DefSyntax symT DontCare) eval_define_syntax 0)
@@ -551,7 +574,7 @@
         symT DontCare def_global_var 0)
 
     (add_function1 global (to_sym "load") stringT load_ 0)
-    (add_function1 global (to_sym "import") stringT import_file 0)
+    (add_function1 global (to_sym "import") stringT import_lib 0)
     (add_function1 global (to_sym "exit") intT exit_ 0)
     (add_function1 global (to_sym "atexit") funT at_exit 0)
     ))

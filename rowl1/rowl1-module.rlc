@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-module.rlc 2013-07-01 12:02:37 nineties $
+; $Id: rowl1-module.rlc 2013-07-06 19:35:24 nineties $
 ;
 
 ; Modules has pre-ordering relationship (denoted by A -> B).
@@ -55,7 +55,7 @@
         0   ; visited-mark
         ))
     (if upper (do
-        (import_module m upper)
+        (open_module m upper)
         (add_module_variable upper name @FALSE m)
         ))
     (return m)
@@ -78,12 +78,12 @@
     (return (field_get mod 2))
     ))
 
-(fun set_upper_modules (mod upper_list) (
-    (field_set mod 3 upper_list)
-    ))
-
 (fun upper_modules (mod) (
     (return (field_get mod 3))
+    ))
+
+(fun set_upper_modules (mod upper_list) (
+    (field_set mod 3 upper_list)
     ))
 
 (fun lower_modules (mod) (
@@ -116,29 +116,73 @@
     (field_set mod 6 mark)
     ))
 
-; reachable(low, up) = true iff low -> up
-(fun reachable (low up) (
-    (return (reachable_iter low up (fresh_mark)))
-    ))
-
-(fun reachable_iter (low up mark) (
-    (if (== low up) (return @TRUE))
-    (if (== (get_mark up) mark) (return @FALSE))
-    (set_mark up mark)
-
-    (var upper (upper_modules up))
-    (while upper (do
-        (if (reachable_iter (car upper) low mark) (return @TRUE))
-        (= upper (cdr upper))
-        ))
-    (return @FALSE)
-    ))
-
-(export fun import_module (lower upper) (
-    (set_lower_modules upper (cons lower (list_delete lower (upper_modules upper))))
-    (set_upper_modules lower (cons upper (list_delete upper (lower_modules lower))))
-    (update_module_variables upper)
+(export fun open_module (lower upper) (
+    (set_lower_modules upper (cons lower (list_delete lower (lower_modules upper))))
+    (set_upper_modules lower (cons upper (list_delete upper (upper_modules lower))))
+    (update_module_variable_disps lower)
     (return @C_NIL)
+    ))
+
+(export fun extend_module (lower upper) (
+    (var entries (symtable_entries (variable_table lower)))
+    (for i 0 (vector_size entries) (do
+        (var entry (vector_at entries i))
+        (var sym (field_get entry 0))
+        (var ent (field_get entry 1))
+        (extend_module_variable_entry ent sym upper)
+        ))
+    (return @C_NIL)
+    ))
+
+(extern fun fusion_function)
+(fun extend_module_variable_entry (mvar1 sym mod) (
+    (if (is_display mvar1) return)
+    (var val1 (get_module_variable_value sym mvar1))
+    (if (! (is_function val1)) return)
+    (var mvar2 (lookup_symbol mod sym @TRUE))
+    (if (! mvar2) return)
+    (var val2 (get_module_variable_value sym mvar2))
+    (modify_module_variable mvar1 (fusion_function val2 val1))
+    ))
+
+(fun modify_module_variable (mvar val) (
+    (field_set (node_arg mvar 0) 0 val)
+    return
+    ))
+
+(fun update_module_variable_disps (mod) (
+    (var mods (collect_reachable_modules mod 0 (fresh_mark)))
+    (while mods (do
+        (= mod (car mods))
+        (var entries (symtable_entries (variable_table mod)))
+        (for i 0 (vector_size entries) (do
+            (var entry (vector_at entries i))
+            (var sym (field_get entry 0))
+            (var ent (field_get entry 1))
+            (update_module_variable_entry mod sym ent)
+            ))
+        (= mods (cdr mods))
+        ))
+    return
+    ))
+
+(fun update_module_variable_disp (mod sym) (
+    (var mods (collect_reachable_modules mod 0 (fresh_mark)))
+    (while mods (do
+        (= mod (car mods))
+        (var ent (symtable_find (variable_table mod) sym))
+        (if ent (update_module_variable_entry mod sym ent))
+        (= mods (cdr mods))
+        ))
+    return
+    ))
+
+(fun update_module_variable_entry (mod sym ent) (
+    (if (! (is_display ent)) return)
+    (var mvar (lookup_symbol mod sym @TRUE))
+    (if mvar
+        (node_arg_set ent 0 (get_module_variable_disp sym mvar))
+        )
     ))
 
 ;;; ModuleVariable
@@ -163,42 +207,17 @@
     (return (car (get_module_variable_disp sym info)))
     ))
 
-(fun collect_reachable_modules (mark mod list) (
+(fun collect_reachable_modules (mod list mark) (
     (if (== (get_mark mod) mark) (return list))
     (set_mark mod mark)
 
     (= list (cons mod list))
     (var mods (lower_modules mod))
     (while mods (do
-        (= list (collect_reachable_modules mark (car mods) list))
+        (= list (collect_reachable_modules (car mods) list mark))
         (= mods (cdr mods))
         ))
     (return list)
-    ))
-
-(fun update_module_variables (mod) (
-    (var mods (collect_reachable_modules (fresh_mark) mod 0))
-    (while mods (do
-        (var delegator (car mods))
-        (var entries (symtable_entries (variable_table delegator)))
-        (for i 0 (vector_size entries) (do
-            (var entry (vector_at entries i))
-            (var sym (field_get entry 0))
-            (var ent (field_get entry 1))
-            (update_variable_entry delegator sym ent)
-            ))
-        (= mods (cdr mods))
-        ))
-    ))
-
-(fun update_module_variables_single (mod sym) (
-    (var mods (collect_reachable_modules (fresh_mark) mod 0))
-    (while mods (do
-        (var delegator (car mods))
-        (var ent (symtable_find (variable_table delegator) sym))
-        (if ent (update_variable_entry delegator sym ent))
-        (= mods (cdr mods))
-        ))
     ))
 
 (fun lookup_all_symbols (mod sym) (
@@ -226,14 +245,6 @@
     (return list)
     ))
 
-(fun update_variable_entry (mod sym info) (
-    (var mvar (lookup_symbol mod sym @TRUE))
-    ; If non-display variable found, update the module variable entry.
-    (if mvar
-        (node_arg_set info 0 (get_module_variable_disp sym mvar))
-        )
-    ))
-
 (export fun lookup_symbol (mod sig nodisp) (
     (var hd (node_bhead sig))
     (if (== hd Qualified)
@@ -242,10 +253,9 @@
             (node_arg sig 1)
             nodisp
             )))
-    (if (== hd BSymbol) (do
-        (var v (lookup_symbol_iter (fresh_mark) mod sig nodisp))
-        (return v)
-        ))
+    (if (== hd BSymbol)
+        (return (lookup_symbol_iter (fresh_mark) mod sig nodisp))
+        )
     (throw (invalid_argument current_loc
         (string "invalid identifier")
         sig))
@@ -356,7 +366,7 @@
 
     (label finish)
 
-    (update_module_variables_single mod sym)
+    (update_module_variable_disp mod sym)
     (return val)
     ))
 
