@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-module.rlc 2013-07-06 19:35:24 nineties $
+; $Id: rowl1-module.rlc 2013-07-07 23:42:03 nineties $
 ;
 
 ; Modules has pre-ordering relationship (denoted by A -> B).
@@ -121,33 +121,6 @@
     (set_upper_modules lower (cons upper (list_delete upper (upper_modules lower))))
     (update_module_variable_disps lower)
     (return @C_NIL)
-    ))
-
-(export fun extend_module (lower upper) (
-    (var entries (symtable_entries (variable_table lower)))
-    (for i 0 (vector_size entries) (do
-        (var entry (vector_at entries i))
-        (var sym (field_get entry 0))
-        (var ent (field_get entry 1))
-        (extend_module_variable_entry ent sym upper)
-        ))
-    (return @C_NIL)
-    ))
-
-(extern fun fusion_function)
-(fun extend_module_variable_entry (mvar1 sym mod) (
-    (if (is_display mvar1) return)
-    (var val1 (get_module_variable_value sym mvar1))
-    (if (! (is_function val1)) return)
-    (var mvar2 (lookup_symbol mod sym @TRUE))
-    (if (! mvar2) return)
-    (var val2 (get_module_variable_value sym mvar2))
-    (modify_module_variable mvar1 (fusion_function val2 val1))
-    ))
-
-(fun modify_module_variable (mvar val) (
-    (field_set (node_arg mvar 0) 0 val)
-    return
     ))
 
 (fun update_module_variable_disps (mod) (

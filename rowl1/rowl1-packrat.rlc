@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2013-06-30 21:50:03 nineties $
+; $Id: rowl1-packrat.rlc 2013-07-07 23:53:02 nineties $
 ;
 
 (import "rlvm-compile")
@@ -79,7 +79,6 @@
 (import "rowl1-error")
 
 (extern object global)
-(extern object syntax)
 
 (array char chgroup (
      0 16 16 16 16 16 16 16 16  1  1 16 16  1 16 16
@@ -1104,7 +1103,7 @@
 
 (export fun parse_statements (p) (
     (var save_current_mod current_mod)
-    (set_current_module (find_module current_mod Syntax))
+    (set_current_module (find_module global Syntax))
     (var eof (parse_statements_sub p))
     (set_current_module save_current_mod)
     (return eof)
@@ -1146,7 +1145,6 @@
 
 (export fun parse_shell_statement (p) (
     (var save_current_mod current_mod)
-    (set_current_module syntax)
     (set_current_module (find_module current_mod Syntax))
     (var v (parse_shell_statement_sub p))
     (set_current_module save_current_mod)
@@ -1946,13 +1944,12 @@
     ))
 
 (extern object global)
-(extern object syntax)
 
 (export fun enable_shell_syntax () (
     ;(call0 (qualified "Syntax" (to_sym "enable_shell_syntax")))
     ))
 
-(export fun init_parser_funcs () (
+(export fun init_parser_funcs (syntax) (
     (add_function1 syntax (to_sym "%get_column") DontCare get_column 0)
     (add_function2 syntax (to_sym "%set_indent") DontCare DontCare set_indent 0)
     (add_function1 syntax (to_sym "%check_indent") DontCare check_indent 0)

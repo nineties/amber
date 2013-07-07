@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2013-07-06 22:29:58 nineties $
+; $Id: rowl1-interp.rlc 2013-07-07 23:47:56 nineties $
 ;
 
 (import "rlvm-compile")
@@ -86,7 +86,7 @@
     (open_module global syntax)
     (open_module global std)
 
-    (init_parser_funcs)
+    (init_parser_funcs syntax)
 
     (set_current_module global)
     (set_loc no_loc)
@@ -476,19 +476,6 @@
     (return @C_NIL)
     ))
 
-(fun eval_extend (expr) (
-    (var sig (node_arg expr 0))
-    (extend_module current_mod (find_module current_mod sig))
-    (return @C_NIL)
-    ))
-
-(fun eval_extend2 (expr) (
-    (var mod1 (find_module current_mod (node_arg expr 0)))
-    (var mod2 (find_module current_mod (node_arg expr 1)))
-    (extend_module mod1 mod2)
-    (return @C_NIL)
-    ))
-
 (fun setup_argv (argc argv) (
     (var ARGV (ary_new))
     (add_module_variable global (to_sym "ARGV") @C_FALSE ARGV)
@@ -558,8 +545,6 @@
     (add_function1 global Eval (make_object1 Import listT) eval_import 0)
     (add_function1 global Eval (make_object1 Import stringT) eval_import 0)
     (add_function1 global Eval (make_object1 Open DontCare) eval_open 0)
-    (add_function1 global Eval (make_object1 Extend DontCare) eval_extend 0)
-    (add_function1 global Eval (make_object2 Extend DontCare DontCare) eval_extend2 0)
 
     (add_function1 global Eval (make_object1 Seq listT) eval_seq 0)
 
