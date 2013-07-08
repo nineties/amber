@@ -1,4 +1,4 @@
-# $Id: matching.ab 2013-03-14 20:37:24 nineties $
+# $Id: matching.ab 2013-07-08 19:14:51 nineties $
 
 import unittest
 
@@ -6,7 +6,7 @@ test_code
     ::= pattern "matches" pattern
         { `((!$0 -> true)(!$2) == true) }
       | pattern "doesn't" "match" pattern 
-        { `((!$0 -> true)(!$3) == undef) }
+        { `(TryApply{!$0 -> true, [!$3]} == undef) }
 
 test "pattern-matching engine (positive check)"
     "dontcare pattern":         _                    matches 0
@@ -41,5 +41,5 @@ test "pattern-matching engine (negative check)"
 
 test "pattern-matching engine (guard clauses)" {
     "positive check": (x when x > 0 -> true)(1) == true
-    "negative check": (x when x > 0 -> false)(0) == undef
+    "negative check": TryApply{x when x > 0 -> false, [0]} == undef
 }

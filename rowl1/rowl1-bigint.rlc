@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-bigint.rlc 2013-03-16 22:29:35 nineties $
+; $Id: rowl1-bigint.rlc 2013-07-08 21:54:12 nineties $
 ;
 
 (import "rlvm-compile")
@@ -677,47 +677,50 @@
 
 (extern fun float_infinity)
 (extern fun float_uminus)
+(extern object std)
+
+(fun enable_bigint () (
+    (add_module_variable std (to_sym "INTEGER_MIN") @C_TRUE (float_uminus (float_infinity)))
+    (add_module_variable std (to_sym "INTEGER_MAX") @C_TRUE (float_infinity))
+
+    (add_function1 std (to_sym "uplus") bintT bint_uplus 0)
+    (add_function1 std (to_sym "uminus") bintT bint_uminus 0)
+    (add_function1 std (to_sym "to_s") bintT bint_to_s 0)
+    (add_function1 std (to_sym "hash") bintT bint_hash 0)
+    (add_function1 std (to_sym "to_i") stringT bint_to_i 0)
+    (add_function1 std (to_sym "to_f") bintT bint_to_f 0)
+
+    (add_function2 std (to_sym "add") bintT bintT bint_add 0)
+    (add_function2 std (to_sym "sub") bintT bintT bint_sub 0)
+    (add_function2 std (to_sym "mul") bintT bintT bint_mul 0)
+    (add_function2 std (to_sym "pow") bintT bintT bint_pow 0)
+    (add_function2 std (to_sym "div") bintT bintT bint_div 0)
+    (add_function2 std (to_sym "mod") bintT bintT bint_mod 0)
+    (add_function2 std (to_sym "lt") bintT bintT bint_lt 0)
+    (add_function2 std (to_sym "gt") bintT bintT bint_gt 0)
+    (add_function2 std (to_sym "le") bintT bintT bint_le 0)
+    (add_function2 std (to_sym "ge") bintT bintT bint_ge 0)
+    (add_function2 std (to_sym "equal") bintT bintT bint_eq 0)
+    (add_function2 std (to_sym "shiftL") bintT intT bint_shiftL 0)
+    (add_function2 std (to_sym "shiftR") bintT intT bint_shiftR 0)
+
+    ; overwrite operations between int and int
+    (add_function2 std (to_sym "add") intT intT int_add2 0)
+    (add_function2 std (to_sym "sub") intT intT int_sub2 0)
+    (add_function2 std (to_sym "mul") intT intT int_mul2 0)
+    (add_function2 std (to_sym "pow") intT intT bint_pow 0)
+    (add_function2 std (to_sym "shiftL") intT intT bint_shiftL 0)
+    (add_function2 std (to_sym "shiftR") intT intT bint_shiftR 0)
+
+    (add_function2 std (to_sym "coerce") intT bintT ib_coerce 0)
+    (add_function2 std (to_sym "coerce") bintT intT bi_coerce 0)
+    (add_function2 std (to_sym "coerce") floatT bintT fb_coerce 0)
+    (add_function2 std (to_sym "coerce") bintT floatT bf_coerce 0)
+    ))
 
 (export fun setup_bigint (std) (
     (var mod (create_module std (to_sym "BigInt")))
-
-    (add_module_variable mod (to_sym "INTEGER_MIN") @C_FALSE (float_uminus (float_infinity)))
-    (add_module_variable mod (to_sym "INTEGER_MAX") @C_FALSE (float_infinity))
-
-    (add_function1 mod (to_sym "uplus") bintT bint_uplus 0)
-    (add_function1 mod (to_sym "uminus") bintT bint_uminus 0)
-    (add_function1 mod (to_sym "to_s") bintT bint_to_s 0)
-    (add_function1 mod (to_sym "hash") bintT bint_hash 0)
-    (add_function1 mod (to_sym "to_i") stringT bint_to_i 0)
-    (add_function1 mod (to_sym "to_f") bintT bint_to_f 0)
-
-    (add_function2 mod (to_sym "add") bintT bintT bint_add 0)
-    (add_function2 mod (to_sym "sub") bintT bintT bint_sub 0)
-    (add_function2 mod (to_sym "mul") bintT bintT bint_mul 0)
-    (add_function2 mod (to_sym "pow") bintT bintT bint_pow 0)
-    (add_function2 mod (to_sym "div") bintT bintT bint_div 0)
-    (add_function2 mod (to_sym "mod") bintT bintT bint_mod 0)
-    (add_function2 mod (to_sym "lt") bintT bintT bint_lt 0)
-    (add_function2 mod (to_sym "gt") bintT bintT bint_gt 0)
-    (add_function2 mod (to_sym "le") bintT bintT bint_le 0)
-    (add_function2 mod (to_sym "ge") bintT bintT bint_ge 0)
-    (add_function2 mod (to_sym "equal") bintT bintT bint_eq 0)
-    (add_function2 mod (to_sym "shiftL") bintT intT bint_shiftL 0)
-    (add_function2 mod (to_sym "shiftR") bintT intT bint_shiftR 0)
-    
-
-    ; overwrite operations between int and int
-    (add_function2 mod (to_sym "add") intT intT int_add2 0)
-    (add_function2 mod (to_sym "sub") intT intT int_sub2 0)
-    (add_function2 mod (to_sym "mul") intT intT int_mul2 0)
-    (add_function2 mod (to_sym "pow") intT intT bint_pow 0)
-    (add_function2 mod (to_sym "shiftL") intT intT bint_shiftL 0)
-    (add_function2 mod (to_sym "shiftR") intT intT bint_shiftR 0)
-
-    (add_function2 mod (to_sym "coerce") intT bintT ib_coerce 0)
-    (add_function2 mod (to_sym "coerce") bintT intT bi_coerce 0)
-    (add_function2 mod (to_sym "coerce") floatT bintT fb_coerce 0)
-    (add_function2 mod (to_sym "coerce") bintT floatT bf_coerce 0)
+    (add_function0 mod (to_sym "enable") enable_bigint 0)
     ))
 
     ))
