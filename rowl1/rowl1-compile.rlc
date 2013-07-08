@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2013-07-06 19:06:06 nineties $
+; $Id: rowl1-compile.rlc 2013-07-08 19:02:38 nineties $
 ;
 
 (import "rlvm-compile")
@@ -963,7 +963,7 @@
     (put_dup asm)
     (put_undef asm)
     (put_if_ne asm lbl)
-    (put_push asm lhs)
+    (put_push asm (defvar lhs rhs))
     (compile_simple_call asm 1 matching_failed)
     (put_throw asm)
 
@@ -1137,7 +1137,7 @@
     (compile_operand asm v sym)
     ))
 
-(fun compile_apply (asm mod expr) (
+(fun compile_tryapply (asm mod expr) (
     (var func (node_arg expr 0))
     (var args (node_arg expr 1))
     
@@ -1155,6 +1155,19 @@
     (put_push asm current_loc)
     (compile_simple_call asm 3 compile_matching)
     (put_jcall asm (* 4 arity))
+    ))
+
+(fun compile_apply (asm mod expr) (
+    (var lbl (fresh_label asm))
+    (compile_tryapply asm mod expr)
+
+    (put_dup asm)
+    (put_undef asm)
+    (put_if_ne asm lbl)
+    (put_push asm expr)
+    (compile_simple_call asm 1 matching_failed)
+    (put_throw asm)
+    (set_label asm lbl)
     ))
 
 (extern fun set_slot)
@@ -1815,7 +1828,7 @@
     (put_dup asm)
     (put_undef asm)
     (put_if_ne asm lbl)
-    (put_push asm lhs)
+    (put_push asm (assign lhs rhs))
     (compile_simple_call asm 1 matching_failed)
     (put_throw asm)
     (set_label asm lbl)
@@ -2152,6 +2165,7 @@
     (add_compiler global (domainP Float) compile_const)
 
     (add_compiler global (make_object2 Apply DontCare listT) compile_apply)
+    (add_compiler global (make_object2 TryApply DontCare listT) compile_tryapply)
 
     (add_compiler global (qquote (unquote (unquote DontCare))) compile_unquote)
     (add_compiler global (qquote (quote (unquote DontCare))) compile_quote)
