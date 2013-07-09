@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2013-05-28 10:16:56 nineties $
+; $Id: rowl1-matching.rlc 2013-07-09 22:31:02 nineties $
 ;
 
 (import "rlvm-compile")
@@ -63,7 +63,7 @@
         (throw (type_error loc (string "function") obj))
         )
 
-    ; here, `def' has form of Function{ ... } of BoundFunction{ ... }
+    ; here, `def' has form of Function{ ... } or BoundFunction{ ... }
 
     ; construct pattern matrix 
     (var mat (construct_pattern_matrix def))
@@ -86,10 +86,11 @@
     ))
 
 (fun construct_pattern_matrix_sub (len def tl) (
-    (if (== (node_type def) @FunctionE)
+    (var ty (node_type def))
+    (if (== ty @FunctionE)
         (return (cons (construct_row len def) tl))
         )
-    (if (== (node_type def) @BoundFunctionE) (do
+    (if (== ty @BoundFunctionE) (do
         (var fun1 (field_get def 2))
         (var fun2 (field_get def 3))
         (= tl (construct_pattern_matrix_sub len fun2 tl))
