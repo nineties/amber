@@ -2,7 +2,7 @@ Assign{Qualified{Syntax,comment}, Qualified{Syntax,shell_style_comment}}
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2013-07-07 23:44:49 nineties $
+# $Id: syntax.ab 2013-07-09 10:59:58 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -382,6 +382,18 @@ ReserveSymbol{not, and, or, when, open, if, else, case, of,
 
 ## Syntax Sugars
 
++x      => `uplus(!x)
+-x      => `uminus(!x)
+x + y   => `add(!x, !y)
+x - y   => `sub(!x, !y)
+x * y   => `mul(!x, !y)
+x ^ y   => `pow(!x, !y)
+x / y   => `div(!x, !y)
+x % y   => `mod(!x, !y)
+x << y  => `shiftL(!x, !y)
+x >> y  => `shiftR(!x, !y)
+x | y   => `fusion(!x, !y)
+
 rewrite_operator_assign(lhs, rhs, op): {
     split: (Subscript{lhs, args}) -> {
                 stmt: []
@@ -415,16 +427,6 @@ rewrite_operator_assign(lhs, rhs, op): {
     }
 }
 
-+x      => `uplus(!x)
--x      => `uminus(!x)
-x + y   => `add(!x, !y)
-x - y   => `sub(!x, !y)
-x * y   => `mul(!x, !y)
-x ^ y   => `pow(!x, !y)
-x / y   => `div(!x, !y)
-x % y   => `mod(!x, !y)
-x << y  => `shiftL(!x, !y)
-x >> y  => `shiftR(!x, !y)
 x += y  => rewrite_operator_assign(x, y, \add)
 x -= y  => rewrite_operator_assign(x, y, \sub)
 x *= y  => rewrite_operator_assign(x, y, \mul)

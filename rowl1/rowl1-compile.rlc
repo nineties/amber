@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2013-07-08 19:02:38 nineties $
+; $Id: rowl1-compile.rlc 2013-07-09 11:25:18 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1862,7 +1862,7 @@
     (set_label asm hdlr_lbl)
 
     ; here, the thrown exception is on the top of stack.
-    (compile asm mod (make_object2 Fusion hdlr default_hdler))
+    (compile asm mod (apply (to_sym "fusion") (list2 hdlr default_hdler)))
     (put_push asm hdlr)
     (put_push asm current_loc)
     (compile_simple_call asm 3 compile_matching)
@@ -1930,12 +1930,6 @@
 
 (fun compile_lambda (asm mod expr) (
     (return (compile_lambda_ asm mod expr @C_NIL))
-    ))
-
-(fun compile_fusion (asm mod expr) (
-    (compile asm mod (node_arg expr 1))
-    (compile asm mod (node_arg expr 0))
-    (compile_simple_call asm 2 fusion_function)
     ))
 
 (fun build_closure (lam clos) (
@@ -2045,7 +2039,7 @@
         (return (compile_define_variable asm mod
             (make_object3 DefVariable
                 lhs
-                (make_object2 Fusion fun lhs)
+                (apply (to_sym "fusion") (list2 fun lhs))
                 (to_sym "overwrite")
             )))
         )
@@ -2212,7 +2206,6 @@
 
     (add_compiler global (make_object2 Assign DontCare DontCare) compile_assign)
     (add_compiler global (make_object2 Lambda DontCare DontCare) compile_lambda)
-    (add_compiler global (make_object2 Fusion DontCare DontCare) compile_fusion)
 
     (add_compiler global (make_object2 Subscript DontCare DontCare) compile_subscript)
     (add_compiler global (make_object2 Assign
