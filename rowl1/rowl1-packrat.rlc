@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2013-07-08 19:05:30 nineties $
+; $Id: rowl1-packrat.rlc 2013-07-16 12:59:28 nineties $
 ;
 
 (import "rlvm-compile")
@@ -400,6 +400,10 @@
         (return -1)
         )
     (return (cvector_at vec idx))
+    ))
+
+(export fun end_of_file (p) (
+    (return (== (lookahead p) @EOF))
     ))
 
 (fun lookahead_text (p str) (
@@ -1100,37 +1104,27 @@
     ))
 @(MEMOIZE statement)
 
-(export fun parse_statements (p) (
+(export fun parse_toplevel (p) (
     (var save_current_mod current_mod)
     (set_current_module (find_module global Syntax))
-    (var eof (parse_statements_sub p))
+    (parse "toplevel_statement" p)
     (set_current_module save_current_mod)
-    (return eof)
     ))
 
-(fun parse_statements_sub (p) (
-    (if (== (lookahead p) @EOF) (return @TRUE))
+(fun parse_toplevel_statement (p) (
     (parse_spaces p)
-    (if (== (lookahead p) @EOF) (return @TRUE))
-
     (set_indent p (get_column p))
     (parse "statement" p)
-    (if (! @(PARSED p)) (return @FALSE))
+    (if (! @(PARSED p)) (return @C_NIL))
     (apply_located p)
     (var stmt @(TOKEN p))
 
     (parse_blanks p)
-    (if (== (parse_char p '\n') @C_FALSE) (return @FALSE))
-
-    (if (!= (node_bhead stmt) Located) (throw
-        (unexpected_error (get_loc p)
-            (string "parse_statement must returns Locate{...}")
-            stmt))
-        )
+    (if (== (parse_char p '\n') @C_FALSE) (return @C_NIL))
 
     (parsed p stmt)
     (flush_parser p @FALSE)
-    (return @FALSE)
+    (return @C_NIL)
     ))
 
 (fun print_prompt (p sign) (
@@ -1145,39 +1139,20 @@
 (export fun parse_shell_statement (p) (
     (var save_current_mod current_mod)
     (set_current_module (find_module current_mod Syntax))
-    (var v (parse_shell_statement_sub p))
+    (parse "shell_statement" p)
     (set_current_module save_current_mod)
-    (return v)
+    return
     ))
 
-(fun parse_shell_statement_sub (p) (
+(fun parse_shell_statement (p) (
     (print_prompt p "> ")
     (reserve p)
     (var state (copy_parser_state p))
     (while @TRUE (do
         (= mayparse_p @FALSE)
-        (parse_spaces p)
-        (set_indent p (get_column p))
-        (parse "statement" p)
-        (if (! @(PARSED p)) (if mayparse_p (goto retry) return))
-        (apply_located p)
+        (parse "toplevel_statement" p)
+        (if (|| @(PARSED p) (! mayparse_p)) return)
 
-        (var e @(TOKEN p))
-        (var loc (get_loc p))
-
-        (parse_blanks p)
-        (parse_char p '\n')
-        (if (! @(PARSED p)) (if mayparse_p (goto retry) return))
-
-        (if (!= (node_bhead e) Located) (throw
-            (unexpected_error (get_loc p)
-                (string "parse_statement must returns Locate{...}")
-                e))
-            )
-        (parsed p e)
-        return
-
-        (label retry)
         (clear_parser_state p state)
         (print_prompt p "~ ")
         (reserve p)
@@ -1995,6 +1970,8 @@
     (add_parser syntax (to_sym "object") parse_object)
     (add_parser syntax (to_sym "expr") parse_expr)
     (add_parser syntax (to_sym "statement") parse_statement)
+    (add_parser syntax (to_sym "toplevel_statement") parse_toplevel_statement)
+    (add_parser syntax (to_sym "shell_statement") parse_toplevel_statement)
     ))
 
 (export fun output_syntax_error (loc e) (
