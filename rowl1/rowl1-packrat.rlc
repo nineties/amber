@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2013-07-16 12:59:28 nineties $
+; $Id: rowl1-packrat.rlc 2013-07-28 11:12:33 nineties $
 ;
 
 (import "rlvm-compile")
@@ -461,6 +461,22 @@
     (if (&& shell_mode_p (! force)) (field_set p 8 (+ (field_get p 8) 1)))
     ))
 
+(fun get_token (p) (
+    (return @(TOKEN p))
+    ))
+
+(fun get_position (p) (
+    (return (get_loc p))
+    ))
+
+(fun get_nextchar (p) (
+    (var c (lookahead p))
+    (if (< c 0)
+        (return (to_sym "eof"))
+        (return (ctos c))
+        )
+    ))
+
 (fun copy_parser_state (p) (
     (var copy (variant @ParserE 4 0 0 0 0 0 0 0 0 0 0 0))
     (memcpy copy p (* 12 @WORD_SIZE))
@@ -839,7 +855,7 @@
     ))
 @(MEMOIZE float)
 
-(fun parse_blank (p) (
+(fun parse_whitespace (p) (
     (var c (lookahead p))
     (if (< c 0) (return (mayparse_quiet p)))
     (if (&& (is_spaces c) (!= c '\n')) (do
@@ -849,12 +865,12 @@
     (return (noparse_quite p))
     ))
 
-(fun parse_blanks_ (p) (
+(fun parse_spaces_oneline_ (p) (
     (var pos (get_pos p))
-    (var blank   (lookup_func current_mod (to_sym "blank")))
+    (var whitespace   (lookup_func current_mod (to_sym "whitespace")))
     (var comment (lookup_func current_mod (to_sym "comment")))
     (while @TRUE (do
-        (byterun blank p)
+        (byterun whitespace p)
         (if @(PARSED p) continue)
         (byterun comment p)
         (if @(PARSED p) continue)
@@ -865,14 +881,14 @@
         (return (parsed p @C_NIL))
         )
     ))
-@(MEMOIZE blanks)
+@(MEMOIZE spaces_oneline)
 
 (fun parse_spaces_ (p) (
     (var pos (get_pos p))
-    (var blank   (lookup_func current_mod (to_sym "blank")))
+    (var whitespace   (lookup_func current_mod (to_sym "whitespace")))
     (var comment (lookup_func current_mod (to_sym "comment")))
     (while @TRUE (do
-        (byterun blank p)
+        (byterun whitespace p)
         (if @(PARSED p) continue)
         (parse_char p '\n')
         (if @(PARSED p) continue)
@@ -1034,7 +1050,7 @@
     (if (== (parse_symbol p) @C_FALSE) (return @C_FALSE))
 
     (var hd @(TOKEN p))
-    (parse_blanks p)
+    (parse_spaces_oneline p)
     (parse_char p '{')
     @(CHECK p)
     (parse_spaces p)
@@ -1119,7 +1135,7 @@
     (apply_located p)
     (var stmt @(TOKEN p))
 
-    (parse_blanks p)
+    (parse_spaces_oneline p)
     (if (== (parse_char p '\n') @C_FALSE) (return @C_NIL))
 
     (parsed p stmt)
@@ -1947,12 +1963,17 @@
 
     (add_function3 syntax (to_sym "input_text") (domainP Parser) intT intT get_input_text 0)
 
+    (add_function1 syntax (to_sym "lookahead") (domainP Parser) get_nextchar 0)
+    (add_function1 syntax (to_sym "get_position") (domainP Parser) get_position 0)
+    (add_function1 syntax (to_sym "get_token") (domainP Parser) get_token 0)
+
+    
     (add_parser syntax (to_sym "spaces") parse_spaces)
-    (add_parser syntax (to_sym "blanks") parse_blanks)
+    (add_parser syntax (to_sym "spaces_oneline") parse_spaces_oneline)
 
     (add_function2 syntax (to_sym "text") (domainP Parser) stringT parse_text 0)
     (add_parser syntax (to_sym "any") parse_any_char)
-    (add_parser syntax (to_sym "blank") parse_blank)
+    (add_parser syntax (to_sym "whitespace") parse_whitespace)
     (add_parser syntax (to_sym "comment") parse_fail)
     (add_parser syntax (to_sym "shell_style_comment") parse_shell_style_comment)
     (add_parser syntax (to_sym "C_style_comment") parse_C_style_comment)
