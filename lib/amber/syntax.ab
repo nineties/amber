@@ -3,7 +3,7 @@ Assign{Qualified{Syntax,comment}, Qualified{Syntax,shell_style_comment}}
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2013-07-31 19:54:30 nineties $
+# $Id: syntax.ab 2013-07-31 22:25:33 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -467,8 +467,14 @@ parser_action = parser -> {
 
 #### Syntax definitions which are effective only in shell-mode.
 module Shell {
-    primary_expr ::= "%" nospace(decimal) { `shell_outputs[!$1] }
-                   | "%"                  { `shell_outputs[0] }
+    primary_expr ::= "%" decimal
+                     {
+                        if ($1 == 0 or $1 > shell_outputs.size) {
+                            throw `Error{!LOCATION, "The argument of % must be a line number"}
+                        }
+                        `shell_outputs[!$1]
+                     }
+                   | "%"         { `shell_outputs[0] }
 }
 
 enable_shell_syntax(): {

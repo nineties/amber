@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2013-07-31 19:06:11 nineties $
+; $Id: rowl1-packrat.rlc 2013-07-31 22:36:11 nineties $
 ;
 
 (import "rlvm-compile")
@@ -440,7 +440,11 @@
     (return c)
     ))
 
-(export fun flush_parser (p force) (
+(export fun increment_line (p) (
+    (field_set p 8 (+ (field_get p 8) 1))
+    ))
+
+(export fun flush_parser (p at_error) (
     (var buf (field_get p 4))
     (var cbuf (field_get buf 0))
     (var bufsz (cvector_size cbuf))
@@ -448,7 +452,7 @@
 
     ; XXX: Not good implementation.
     ; Ring buffer is better.
-    (if (|| (>= pos bufsz) force) (do
+    (if (|| (>= pos bufsz) at_error) (do
         (cvector_resize cbuf 0)
         (field_set p 6 0)
         ))
@@ -458,7 +462,6 @@
     (field_set p 11 0)
 
     (memotable_clear (field_get buf 2))
-    (if (&& shell_mode_p (! force)) (field_set p 8 (+ (field_get p 8) 1)))
     ))
 
 (fun get_token (p) (
@@ -1152,9 +1155,9 @@
     (flush stdout)
     ))
 
-(export fun parse_shell_statement (p) (
+(export fun parse_shell (p) (
     (var save_current_mod current_mod)
-    (set_current_module (find_module current_mod Syntax))
+    (set_current_module (find_module global (qualified "Lang" Syntax)))
     (parse "shell_statement" p)
     (set_current_module save_current_mod)
     return
@@ -1992,7 +1995,7 @@
     (add_parser syntax (to_sym "expr") parse_expr)
     (add_parser syntax (to_sym "statement") parse_statement)
     (add_parser syntax (to_sym "toplevel_statement") parse_toplevel_statement)
-    (add_parser syntax (to_sym "shell_statement") parse_toplevel_statement)
+    (add_parser syntax (to_sym "shell_statement") parse_shell_statement)
     ))
 
 (export fun output_syntax_error (loc e) (
