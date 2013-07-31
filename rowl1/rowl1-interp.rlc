@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2013-07-16 17:21:46 nineties $
+; $Id: rowl1-interp.rlc 2013-07-31 18:59:49 nineties $
 ;
 
 (import "rlvm-compile")
@@ -21,8 +21,9 @@
 (import "rowl1-pprint")
 
 (export var global null)
+(export var amber  null)
 (export var syntax null)
-(export var std null)
+(export var std    null)
 
 (export var current_loc null)
 (export var current_mod null)
@@ -59,7 +60,7 @@
     (try
         (= r (eval_main path ichan argc argv))
         (catch e (do
-            (output_string stderr "Exception: ")
+            (output_string stderr "Unaught exception: ")
             (pprint stderr e)
             (output_string stderr "\n")
             (= r 1)
@@ -70,18 +71,22 @@
 
 (fun eval_main (file ichan argc argv) (
     (= current_loc no_loc)
-    (= global    (make_module 0 (to_sym "Global")))
-    (add_module_variable global (to_sym "Global") @C_TRUE global)
-    (= syntax    (create_module global Syntax))
+    (= global (make_module 0 Global))
+    (add_module_variable global Global @C_TRUE global)
+
+    (= amber (create_module global Amber))
+    (add_module_variable global Lang @C_TRUE amber)
+
+    (= std    (create_module global Std))
+    (= syntax (create_module amber Syntax))
 
     (= module_stack (cons global 0))
 
     (setup_argv argc argv)
     (setup_globals)
     (setup_builtin_compilers)
-    (= std (init_stdlib))
+    (= std (init_lib))
 
-    (open_module global syntax)
     (open_module global std)
 
     (init_parser_funcs syntax)
@@ -126,12 +131,12 @@
     ))
 
 (fun eval (expr) (
-    (return (byterun (lookup_func current_mod Eval) expr))
+    (return (byterun (lookup_func current_mod (qualified "Lang" Eval)) expr))
     ))
 
 (extern fun list_to_table)
 (fun rewrite (expr) (
-    (var new_expr (byterun (lookup_func current_mod Rewrite) expr))
+    (var new_expr (byterun (lookup_func current_mod (qualified "Lang" Rewrite)) expr))
     (if (== new_expr @C_UNDEF) (= new_expr expr))
     (if (!= new_expr expr) (return (rewrite new_expr)))
     (= expr new_expr)
@@ -293,14 +298,7 @@
 (fun eval_define_syntax (expr) (
     (var sym (node_arg expr 0))
     (var elm (node_arg expr 1))
-
-    (var stmt (compile_define_syntax sym elm))
-
-    (var syntax_mod (create_module current_mod Syntax))
-    (var save_current_mod current_mod)
-    (set_current_module syntax_mod)
-    (eval stmt)
-    (set_current_module save_current_mod)
+    (eval (compile_define_syntax sym elm))
     (return @C_NIL)
     ))
 
@@ -531,19 +529,19 @@
         (add_module_variable global (to_sym "shell_mode") @C_FALSE @C_FALSE)
         )
     
-    (add_function1 global Rewrite (domainP Located) rewrite_located 0)
-    (add_function1 global Eval DontCare default_eval 0)
-    (add_function1 global Eval (domainP Located) eval_located 0)
-    (add_function1 global Eval (make_object1 Import listT) eval_import 0)
-    (add_function1 global Eval (make_object1 Import stringT) eval_import 0)
-    (add_function1 global Eval (make_object1 Open DontCare) eval_open 0)
+    (add_function1 amber Rewrite (domainP Located) rewrite_located 0)
+    (add_function1 amber Eval DontCare default_eval 0)
+    (add_function1 amber Eval (domainP Located) eval_located 0)
+    (add_function1 amber Eval (make_object1 Import listT) eval_import 0)
+    (add_function1 amber Eval (make_object1 Import stringT) eval_import 0)
+    (add_function1 amber Eval (make_object1 Open DontCare) eval_open 0)
 
-    (add_function1 global Eval (make_object1 Seq listT) eval_seq 0)
+    (add_function1 amber Eval (make_object1 Seq listT) eval_seq 0)
 
-    (add_function1 global Eval (make_object2 DefSyntax symT DontCare) eval_define_syntax 0)
-    (add_function1 global Eval (domainP ReserveSymbol) eval_reserve_symbol 0)
-    (add_function1 global Eval (make_object1 BeginModule DontCare) eval_begin_module 0)
-    (add_function1 global Eval (make_object0 EndModule) eval_end_module 0)
+    (add_function1 amber Eval (make_object2 DefSyntax symT DontCare) eval_define_syntax 0)
+    (add_function1 amber Eval (domainP ReserveSymbol) eval_reserve_symbol 0)
+    (add_function1 amber Eval (make_object1 BeginModule DontCare) eval_begin_module 0)
+    (add_function1 amber Eval (make_object0 EndModule) eval_end_module 0)
 
     (add_function1 global Eval (quote (to_sym "exit")) eval_exit 0)
 
@@ -574,28 +572,28 @@
 (extern fun setup_oop)
 (extern fun setup_gc)
 
-(fun init_stdlib () (
-    (var mod (create_module global Std))
-    (setup_pprint mod)
-    (setup_base mod)
-    (setup_symbol mod)
+(fun init_lib () (
+    (setup_pprint amber)
+    (setup_base amber)
 
-    (setup_math mod)
-    (setup_numeric mod)
-    (setup_string mod)
-    (setup_bigint mod)
-    (setup_float mod)
-    (setup_random mod)
+    (setup_symbol std)
 
-    (setup_io mod)
-    (setup_list mod)
-    (setup_tuple mod)
-    (setup_array mod)
-    (setup_table mod)
-    (setup_function mod)
-    (setup_oop mod)
-    (setup_gc mod)
-    (return mod)
+    (setup_math std)
+    (setup_numeric std)
+    (setup_string std)
+    (setup_bigint std)
+    (setup_float std)
+    (setup_random std)
+
+    (setup_io std)
+    (setup_list std)
+    (setup_tuple std)
+    (setup_array std)
+    (setup_table std)
+    (setup_function std)
+    (setup_oop std)
+    (setup_gc std)
+    (return std)
     ))
 
     ))

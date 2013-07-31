@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2013-07-09 23:53:36 nineties $
+; $Id: rowl1-compile.rlc 2013-07-31 19:02:57 nineties $
 ;
 
 (import "rlvm-compile")
@@ -33,6 +33,8 @@
 
 (extern object current_loc)
 (extern object current_mod)
+(extern object amber)
+(extern object global)
 (extern fun set_loc)
 
 (fun trace_func (msg val) (
@@ -616,7 +618,7 @@
     ))
 
 (fun compile (asm mod expr) (
-    (byterun (lookup_func mod Compile) asm mod expr)
+    (byterun (lookup_func global (qualified "Lang" Compile)) asm mod expr)
     ))
 
 (export fun call0 (sym) (
@@ -1616,7 +1618,7 @@
             (defvar iter (apply (to_sym "each") (list1 ary)))
             (defvar v @C_NIL)
             (make_object2 While
-                (make_object1 Not (apply (to_sym "equal") (list2
+                (make_object1 Not (apply (qualified "Lang" (to_sym "equal")) (list2
                 (assign v (apply iter 0)) @C_UNDEF)))
                 (block (list2
                     (defvar i v)
@@ -1636,7 +1638,7 @@
             (defvar iter (apply (to_sym "reverse_each") (list1 ary)))
             (defvar v @C_NIL)
             (make_object2 While
-                (make_object1 Not (apply (to_sym "equal") (list2
+                (make_object1 Not (apply (qualified "Lang" (to_sym "equal")) (list2
                     (assign v (apply iter 0)) @C_UNDEF)))
                 (block (list2
                     (defvar i v)
@@ -1876,7 +1878,7 @@
     ))
 
 (fun compile_eq (asm mod expr) (
-    (compile asm mod (make_object2 Apply (to_sym "equal") (node_args expr)))
+    (compile asm mod (make_object2 Apply (qualified "Lang" (to_sym "equal")) (node_args expr)))
     ))
 
 (fun compile_ne (asm mod expr) (
@@ -2149,106 +2151,105 @@
     (return (make_function (list1 x) (get_code asm) 0))
     ))
 
-(extern object global)
 (export fun setup_builtin_compilers () (
     (var locT (domainP Loc))
 
-    (add_function1 global Compile DontCare compile_ 0)
+    (add_function1 amber Compile DontCare compile_ 0)
 
-    (add_compiler global DontCare compile_error)
-    (add_compiler global (make_object2 Located locT DontCare) compile_located)
+    (add_compiler amber DontCare compile_error)
+    (add_compiler amber (make_object2 Located locT DontCare) compile_located)
 
     ; These commands have been evaluated in parsing phase.
-    (add_compiler global (make_object1 Import DontCare) topscope_only)
+    (add_compiler amber (make_object1 Import DontCare) topscope_only)
 
-    (add_compiler global (make_object2 Qualified DontCare symT) compile_qualified)
+    (add_compiler amber (make_object2 Qualified DontCare symT) compile_qualified)
 
-    (add_compiler global (make_object2 MakeObject DontCare DontCare) compile_make_object)
+    (add_compiler amber (make_object2 MakeObject DontCare DontCare) compile_make_object)
 
-    (add_compiler global (make_object2 DefVariable DontCare DontCare) compile_define_variable)
-    (add_compiler global (make_object3 DefVariable DontCare DontCare (quote (to_sym "overwrite"))) compile_define_variable)
+    (add_compiler amber (make_object2 DefVariable DontCare DontCare) compile_define_variable)
+    (add_compiler amber (make_object3 DefVariable DontCare DontCare (quote (to_sym "overwrite"))) compile_define_variable)
 
-    (add_compiler global (make_object2 DefFunction DontCare DontCare) compile_define_function)
+    (add_compiler amber (make_object2 DefFunction DontCare DontCare) compile_define_function)
 
-    (add_compiler global symT compile_var)
-    (add_compiler global (quote @C_TRUE) compile_special)
-    (add_compiler global (quote @C_FALSE) compile_special)
-    (add_compiler global (quote @C_NIL) compile_special)
-    (add_compiler global (quote @C_UNDEF) compile_special)
-    (add_compiler global intT compile_const_int)
-    (add_compiler global stringT compile_const)
-    (add_compiler global bintT compile_const)
-    (add_compiler global (domainP Float) compile_const)
+    (add_compiler amber symT compile_var)
+    (add_compiler amber (quote @C_TRUE) compile_special)
+    (add_compiler amber (quote @C_FALSE) compile_special)
+    (add_compiler amber (quote @C_NIL) compile_special)
+    (add_compiler amber (quote @C_UNDEF) compile_special)
+    (add_compiler amber intT compile_const_int)
+    (add_compiler amber stringT compile_const)
+    (add_compiler amber bintT compile_const)
+    (add_compiler amber (domainP Float) compile_const)
 
-    (add_compiler global (make_object2 Apply DontCare listT) compile_apply)
-    (add_compiler global (make_object2 TryApply DontCare listT) compile_tryapply)
+    (add_compiler amber (make_object2 Apply DontCare listT) compile_apply)
+    (add_compiler amber (make_object2 TryApply DontCare listT) compile_tryapply)
 
-    (add_compiler global (qquote (unquote (unquote DontCare))) compile_unquote)
-    (add_compiler global (qquote (quote (unquote DontCare))) compile_quote)
-    (add_compiler global (qquote (qquote (unquote (unquote DontCare)))) compile_qquote)
+    (add_compiler amber (qquote (unquote (unquote DontCare))) compile_unquote)
+    (add_compiler amber (qquote (quote (unquote DontCare))) compile_quote)
+    (add_compiler amber (qquote (qquote (unquote (unquote DontCare)))) compile_qquote)
 
-    (add_compiler global (domainP List)  compile_list)
-    (add_compiler global (domainP Tuple) compile_tuple)
-    (add_compiler global (domainP Array) compile_array)
-    (add_compiler global (domainP Range) compile_range)
+    (add_compiler amber (domainP List)  compile_list)
+    (add_compiler amber (domainP Tuple) compile_tuple)
+    (add_compiler amber (domainP Array) compile_array)
+    (add_compiler amber (domainP Range) compile_range)
 
-    (add_compiler global (make_object1 Block listT) compile_block)
-    (add_compiler global (make_object1 Seq listT) compile_seq)
-    (add_compiler global (make_object1 Breakable listT) compile_breakable)
+    (add_compiler amber (make_object1 Block listT) compile_block)
+    (add_compiler amber (make_object1 Seq listT) compile_seq)
+    (add_compiler amber (make_object1 Breakable listT) compile_breakable)
 
-    (add_compiler global (mkif DontCare DontCare) compile_if)
-	(add_compiler global (ifelse DontCare DontCare DontCare) compile_ifelse)
-    (add_compiler global (make_object2 While DontCare DontCare) compile_while)
-    (add_compiler global (make_object3 While DontCare DontCare DontCare) compile_while)
+    (add_compiler amber (mkif DontCare DontCare) compile_if)
+	(add_compiler amber (ifelse DontCare DontCare DontCare) compile_ifelse)
+    (add_compiler amber (make_object2 While DontCare DontCare) compile_while)
+    (add_compiler amber (make_object3 While DontCare DontCare DontCare) compile_while)
 
-    (add_compiler global (make_object3 For DontCare DontCare DontCare)
+    (add_compiler amber (make_object3 For DontCare DontCare DontCare)
         compile_for
         )
-    (add_compiler global (make_object3 RevFor DontCare DontCare DontCare)
+    (add_compiler amber (make_object3 RevFor DontCare DontCare DontCare)
         compile_revfor
         )
-    (add_compiler global (make_object3 For DontCare
+    (add_compiler amber (make_object3 For DontCare
         (make_object2 Range DontCare DontCare) DontCare)
         compile_range_for)
-    (add_compiler global (make_object3 RevFor DontCare
+    (add_compiler amber (make_object3 RevFor DontCare
         (make_object2 Range DontCare DontCare) DontCare)
         compile_range_revfor)
 
-    (add_compiler global (make_object0 Break) compile_break) 
-    (add_compiler global (make_object0 Continue) compile_continue)
-    (add_compiler global (make_object1 Return DontCare) compile_return)
-    (add_compiler global (make_object2 Try DontCare DontCare) compile_try)
-    (add_compiler global (make_object1 Throw DontCare) compile_throw)
+    (add_compiler amber (make_object0 Break) compile_break) 
+    (add_compiler amber (make_object0 Continue) compile_continue)
+    (add_compiler amber (make_object1 Return DontCare) compile_return)
+    (add_compiler amber (make_object2 Try DontCare DontCare) compile_try)
+    (add_compiler amber (make_object1 Throw DontCare) compile_throw)
 
-    (add_compiler global (make_object2 Equal DontCare DontCare) compile_eq)
-    (add_compiler global (make_object2 NotEqual DontCare DontCare) compile_ne)
-    (add_compiler global (make_object1 Not DontCare) compile_logical)
-	(add_compiler global (make_object2 SeqAnd DontCare DontCare) compile_logical)
-	(add_compiler global (make_object2 SeqOr DontCare DontCare) compile_logical)
+    (add_compiler amber (make_object2 Equal DontCare DontCare) compile_eq)
+    (add_compiler amber (make_object2 NotEqual DontCare DontCare) compile_ne)
+    (add_compiler amber (make_object1 Not DontCare) compile_logical)
+	(add_compiler amber (make_object2 SeqAnd DontCare DontCare) compile_logical)
+	(add_compiler amber (make_object2 SeqOr DontCare DontCare) compile_logical)
 
-    (add_compiler global (make_object2 Assign DontCare DontCare) compile_assign)
-    (add_compiler global (make_object2 Lambda DontCare DontCare) compile_lambda)
+    (add_compiler amber (make_object2 Assign DontCare DontCare) compile_assign)
+    (add_compiler amber (make_object2 Lambda DontCare DontCare) compile_lambda)
 
-    (add_compiler global (make_object2 Subscript DontCare DontCare) compile_subscript)
-    (add_compiler global (make_object2 Assign
+    (add_compiler amber (make_object2 Subscript DontCare DontCare) compile_subscript)
+    (add_compiler amber (make_object2 Assign
         (make_object2 Subscript DontCare DontCare) DontCare)
         compile_subscript_assign)
 
-    (add_compiler global (make_object2 Slot DontCare symT) compile_slot)
-    (add_compiler global (make_object3 Slot DontCare symT listT) compile_slot2)
-    (add_compiler global (assign (make_object2 Slot DontCare symT) DontCare)
+    (add_compiler amber (make_object2 Slot DontCare symT) compile_slot)
+    (add_compiler amber (make_object3 Slot DontCare symT listT) compile_slot2)
+    (add_compiler amber (assign (make_object2 Slot DontCare symT) DontCare)
         compile_slotset)
 
     ; internal expressions
-    (add_compiler global (make_object2 FieldRef DontCare intT) compile_fieldref)
-    (add_compiler global (make_object2 Assign (make_object2 FieldRef DontCare intT) DontCare) compile_fieldref_assign)
+    (add_compiler amber (make_object2 FieldRef DontCare intT) compile_fieldref)
+    (add_compiler amber (make_object2 Assign (make_object2 FieldRef DontCare intT) DontCare) compile_fieldref_assign)
 
-    (add_compiler global (make_object1 AllocClsEnv intT) compile_alloc_clsenv)
-    (add_compiler global (make_object2 Closure DontCare DontCare) compile_closure)
-    (add_compiler global (make_object3 Ref DontCare intT symT) compile_clsref)
-    (add_compiler global (make_object2 Assign
+    (add_compiler amber (make_object1 AllocClsEnv intT) compile_alloc_clsenv)
+    (add_compiler amber (make_object2 Closure DontCare DontCare) compile_closure)
+    (add_compiler amber (make_object3 Ref DontCare intT symT) compile_clsref)
+    (add_compiler amber (make_object2 Assign
         (make_object3 Ref DontCare intT symT) DontCare) compile_clsref_assign)
-    (add_compiler global (quote Decons) compile_decons)
+    (add_compiler amber (quote Decons) compile_decons)
     ))
 
 (export fun add_compiler (mod pat func) (

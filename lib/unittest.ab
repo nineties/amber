@@ -1,6 +1,6 @@
 # Copyright (C) 2012 nineties
 #
-# $Id: unittest.ab 2013-03-17 18:18:06 nineties $
+# $Id: unittest.ab 2013-07-31 19:17:33 nineties $
 
 #USAGE :
 #
@@ -10,24 +10,30 @@
 #     }
 # }
 
-statement
-    ::= "test" string block  { `UnitTestTarget{!$1, !$2} }
-      | string ":" test_code { `UnitTestItem{!$0, !$2} }
-ReserveSymbol{test}
-test_code ::= expr
+module Amber::Syntax {
+    statement
+        ::= "test" string block  { `UnitTestTarget{!$1, !$2} }
+          | string ":" test_code { `UnitTestItem{!$0, !$2} }
 
-UnitTestTarget{target, tests} => `{
-    printf("=== tests of %s ===\n\n", !target)
-    success: 0
-    failed:  0
-    !tests
-    printf("\n[success %d, failed %d]\n", success, failed)
+    test_code ::= expr
+
+    ReserveSymbol{test}
 }
-UnitTestItem{description, code} => `{
-    v: !code
-    printf("    %s ... %s\n", !description, v == true ? "OK" : "failed")
-    if (v == true)
-        success += 1
-    else
-        failed += 1
+
+module Amber {
+    UnitTestTarget{target, tests} => `{
+        printf("=== tests of %s ===\n\n", !target)
+        success: 0
+        failed:  0
+        !tests
+        printf("\n[success %d, failed %d]\n", success, failed)
+    }
+    UnitTestItem{description, code} => `{
+        v: !code
+        printf("    %s ... %s\n", !description, v == true ? "OK" : "failed")
+        if (v == true)
+            success += 1
+        else
+            failed += 1
+    }
 }

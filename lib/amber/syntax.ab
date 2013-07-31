@@ -1,8 +1,10 @@
-Assign{Qualified{Syntax,comment}, Qualified{Syntax,shell_style_comment}}
+BeginModule{Amber}
+BeginModule{Syntax}
+Assign{comment, shell_style_comment}
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2013-07-23 22:09:27 nineties $
+# $Id: syntax.ab 2013-07-31 19:36:28 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -215,7 +217,7 @@ pattern ::= quote_expr
 term    ::= primary_expr
 
 ## enable use of quotation expressions for following definitions.
-Assign{Qualified{Syntax,expr}, Qualified{Syntax,quote_expr}}
+Assign{expr, quote_expr}
 
 prefix_expr
     ::= "+"          quote_expr { `UnaryPlus{!node1} }
@@ -313,7 +315,7 @@ assign_expr
       | pattern ">>=" assign_expr { `ShiftRAssign{!node0, !node2} }
       | multi_lambda_expr
 
-Assign{Syntax::expr, Syntax::assign_expr}
+Assign{expr, assign_expr}
 
 ### Statements
 package ::= string
@@ -380,6 +382,8 @@ ReserveSymbol{not, and, or, when, open, if, else, case, of,
     throw, try, catch, scope, module, import, open, extend
 }
 
+EndModule{} # Close module Syntax
+
 ## Syntax Sugars
 
 +x      => `uplus(!x)
@@ -439,37 +443,40 @@ x < y   => `lt(!x, !y)
 x > y   => `gt(!x, !y)
 x <= y  => `le(!x, !y)
 x >= y  => `ge(!x, !y)
-x == y  => `equal(!x, !y)
-x != y  => `(not equal(!x, !y))
-x is y  => `identical(!x, !y)
-x is not y => `(not identical(!x, !y))
+x == y  => `Amber::equal(!x, !y)
+x != y  => `(not Amber::equal(!x, !y))
+x is y  => `Amber::identical(!x, !y)
+x is not y => `(not Amber::identical(!x, !y))
 
-module Syntax {
-    ### Extend primary_expr so as to enable use $... to refer nodes
-    # of syntax-tree only in parser_action.
-    module Action {
-        primary_expr ::= "$" decimal { ("node" + node1).to_sym }
-                       | "$input"    { \input_text(parser,begin,end) }
-    }
+BeginModule{Syntax}
 
-    # FIXME: This is temporary dirty hack.
-    primary_expr_act : primary_expr | Action::Syntax::primary_expr
-    parser_action_old: parser_action
-    parser_action = parser -> {
-        save_primary_expr: primary_expr
-        primary_expr = primary_expr_act
-        r: parser_action_old(parser)
-        primary_expr = save_primary_expr
-        r
-    }
-
-    ### Syntax definitions which are effective only in shell-mode.
-    module Shell {
-        primary_expr ::= "%" nospace(decimal) { `shell_outputs[!$1] }
-                       | "%"                  { `shell_outputs[0] }
-    }
-
-    enable_shell_syntax(): {
-        primary_expr = primary_expr | Shell::Syntax::primary_expr
-    }
+### Extend primary_expr so as to enable use $... to refer nodes
+# of syntax-tree only in parser_action.
+module Action {
+    primary_expr ::= "$" decimal { ("node" + node1).to_sym }
+                   | "$input"    { \input_text(parser,begin,end) }
 }
+
+# FIXME: This is temporary dirty hack.
+primary_expr_act : primary_expr | Action::primary_expr
+parser_action_old: parser_action
+parser_action = parser -> {
+    save_primary_expr: primary_expr
+    primary_expr = primary_expr_act
+    r: TryApply{parser_action_old, [parser]}
+    primary_expr = save_primary_expr
+    r
+}
+
+#### Syntax definitions which are effective only in shell-mode.
+module Shell {
+    primary_expr ::= "%" nospace(decimal) { `shell_outputs[!$1] }
+                   | "%"                  { `shell_outputs[0] }
+}
+
+#enable_shell_syntax(): {
+#    primary_expr = primary_expr | Shell::Syntax::primary_expr
+#}
+
+EndModule{}
+EndModule{}

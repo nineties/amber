@@ -1,6 +1,6 @@
 # Copyright (C) 2010 nineties
 #
-# $Id: format.ab 2013-03-17 22:57:44 nineties $
+# $Id: format.ab 2013-07-31 19:05:01 nineties $
 
 module Std {
     module Format {
@@ -31,26 +31,27 @@ module Std {
                 io.to_s
              }
     }
-
 }
 
-### Format string
-# XXX: Not good implementation (should not define new syntax)
+module Amber::Syntax {
+    ### Format string
+    # XXX: Not good implementation (should not define new syntax)
 
-format_string_element
-    ::= "%" [sSdXobpf] { $input }
-      | "%" .   { throw `SyntaxError{!LOCATION,
-                    "Invalid format string", !($0 + $1)}
-                }
-      | nospace( [^%\""]+ ) { $input.unescape }
+    format_string_element
+        ::= "%" [sSdXobpf] { $input }
+          | "%" .   { throw `SyntaxError{!LOCATION,
+                        "Invalid format string", !($0 + $1)}
+                    }
+          | nospace( [^%\""]+ ) { $input.unescape }
 
-format_string
-    ::= nospace( ('"' format_string_element* '"') ) { $0[1] }
+    format_string
+        ::= nospace( ('"' format_string_element* '"') ) { $0[1] }
 
-postfix_expr
-    ::= "printf" "(" format_string ("," expr)* ")" 
-        { Std::Format::compile_printf(\stdout, $2, map(x->x[1], $3)) }
-      | "printf" "(" expr "," format_string ("," expr)* ")"
-        { Std::Format::compile_printf($2, $4, map(x->x[1], $5)) }
-      | "format" "(" format_string ("," expr)* ")"
-        { Std::Format::compile_format($2, map(x->x[1], $3))}
+    postfix_expr
+        ::= "printf" "(" format_string ("," expr)* ")" 
+            { Std::Format::compile_printf(\stdout, $2, map(x->x[1], $3)) }
+          | "printf" "(" expr "," format_string ("," expr)* ")"
+            { Std::Format::compile_printf($2, $4, map(x->x[1], $5)) }
+          | "format" "(" format_string ("," expr)* ")"
+            { Std::Format::compile_format($2, map(x->x[1], $3))}
+}

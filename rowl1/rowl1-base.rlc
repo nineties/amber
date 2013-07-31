@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-base.rlc 2013-03-18 22:10:24 nineties $
+; $Id: rowl1-base.rlc 2013-07-31 19:34:41 nineties $
 ;
 
 (import "rlvm-compile")
@@ -28,7 +28,7 @@
     ))
 
 (fun _equal (a b) (
-    (var eql (lookup_func current_mod (to_sym "equal")))
+    (var eql (lookup_func current_mod (qualified "Lang" (to_sym "equal"))))
     (return (_equal_sub a b eql))
     ))
 
@@ -58,7 +58,7 @@
 
 (fun _hash (obj) (
     (if (is_atom obj) (return (box (umod obj 65537))))
-    (var hash (lookup_func current_mod (to_sym "hash")))
+    (var hash (lookup_func current_mod (qualified "Lang" (to_sym "hash"))))
     (var val 0)
     (for i 0 (node_size obj)
         (+= val (* (unbox (byterun hash (node_arg obj i))) 13))
@@ -121,34 +121,6 @@
     (return copy)
     ))
 
-(extern fun new_sio)
-(extern fun sio_raw)
-(extern fun sio_to_s)
-(fun _fullform (obj) (
-    (var io (new_sio))
-    (var ochan (sio_raw io))
-
-    (var h (node_bhead obj))
-
-    (if (is_hidden_sym h) (do
-        (output_symbol ochan h)
-        (output_string ochan "{...}")
-        (return (sio_to_s io))
-        ))
-
-    (var args (node_args obj))
-    
-    (output_symbol ochan h)
-    (output_char ochan '{')
-    (while args (do
-        (call2 (to_sym "pprint") io (car args))
-        (= args (cdr args))
-        (if args (output_string ochan ", "))
-        ))
-    (output_char ochan '}')
-    (return (sio_to_s io))
-    ))
-
 (export fun setup_base (mod) (
     (add_function1 mod (to_sym "head") DontCare _head 0)
     (add_function1 mod (to_sym "arguments") DontCare _args 0)
@@ -167,9 +139,6 @@
     (add_function1 mod (to_sym "id") DontCare _id 0)
     (add_function2 mod (to_sym "subst") DontCare funT _subst 0)
     (add_function1 mod (to_sym "copy") DontCare _copy 0)
-
-    (add_function1 mod (to_sym "fullform") DontCare _fullform 0)
-
     ))
 
     ))
