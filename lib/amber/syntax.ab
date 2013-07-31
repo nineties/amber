@@ -1,10 +1,9 @@
 BeginModule{Amber}
-BeginModule{Syntax}
-Assign{comment, shell_style_comment}
+Assign{Qualified{Syntax,comment}, Qualified{Syntax,shell_style_comment}}
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2013-07-31 19:36:28 nineties $
+# $Id: syntax.ab 2013-07-31 19:54:30 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -217,7 +216,7 @@ pattern ::= quote_expr
 term    ::= primary_expr
 
 ## enable use of quotation expressions for following definitions.
-Assign{expr, quote_expr}
+Assign{Qualified{Syntax,expr}, Qualified{Syntax,quote_expr}}
 
 prefix_expr
     ::= "+"          quote_expr { `UnaryPlus{!node1} }
@@ -315,7 +314,7 @@ assign_expr
       | pattern ">>=" assign_expr { `ShiftRAssign{!node0, !node2} }
       | multi_lambda_expr
 
-Assign{expr, assign_expr}
+Assign{Syntax::expr, Syntax::assign_expr}
 
 ### Statements
 package ::= string
@@ -381,8 +380,6 @@ ReserveSymbol{not, and, or, when, open, if, else, case, of,
     while, for, reverse_for, in, continue, break, return,
     throw, try, catch, scope, module, import, open, extend
 }
-
-EndModule{} # Close module Syntax
 
 ## Syntax Sugars
 
@@ -458,7 +455,7 @@ module Action {
 }
 
 # FIXME: This is temporary dirty hack.
-primary_expr_act : primary_expr | Action::primary_expr
+primary_expr_act : primary_expr | Action::Syntax::primary_expr
 parser_action_old: parser_action
 parser_action = parser -> {
     save_primary_expr: primary_expr
@@ -474,9 +471,9 @@ module Shell {
                    | "%"                  { `shell_outputs[0] }
 }
 
-#enable_shell_syntax(): {
-#    primary_expr = primary_expr | Shell::Syntax::primary_expr
-#}
+enable_shell_syntax(): {
+    primary_expr = primary_expr | Shell::Syntax::primary_expr
+}
 
 EndModule{}
 EndModule{}

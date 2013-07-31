@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2013-07-31 18:59:49 nineties $
+; $Id: rowl1-interp.rlc 2013-07-31 19:57:45 nineties $
 ;
 
 (import "rlvm-compile")
@@ -298,7 +298,11 @@
 (fun eval_define_syntax (expr) (
     (var sym (node_arg expr 0))
     (var elm (node_arg expr 1))
+    (var save_current_mod current_mod)
+    (var syntax_mod (create_module current_mod Syntax))
+    (set_current_module syntax_mod)
     (eval (compile_define_syntax sym elm))
+    (set_current_module save_current_mod)
     (return @C_NIL)
     ))
 
@@ -573,11 +577,9 @@
 (extern fun setup_gc)
 
 (fun init_lib () (
-    (setup_pprint amber)
     (setup_base amber)
-
+    (setup_pprint std)
     (setup_symbol std)
-
     (setup_math std)
     (setup_numeric std)
     (setup_string std)
