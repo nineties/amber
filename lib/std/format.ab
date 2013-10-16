@@ -1,57 +1,55 @@
 # Copyright (C) 2010 nineties
 #
-# $Id: format.ab 2013-07-31 19:48:17 nineties $
+# $Id: format.ab 2013-10-13 23:40:41 nineties $
 
-module Std {
-    module Format {
-        compile_printf(io, fmt, args):
-            loop: ([], [], ls)
-                    -> `Block{!Std::reverse(ls)}
-                | (["%s", fs...], [s, ss...], ls)
-                    -> loop(fs, ss, Std::cons(`print(!io, !s), ls))
-                | (["%S", fs...], [s, ss...], ls)
-                    -> loop(fs, ss, Std::cons(`print(!io, !s), ls))
-                | (["%d", fs...], [s, ss...], ls)
-                    -> loop(fs, ss, Std::cons(`print(!io, !s), ls))
-                | (["%f", fs...], [s, ss...], ls)
-                    -> loop(fs, ss, Std::cons(`pprint(!io, !s), ls))
-                | (["%p", fs...], [s, ss...], ls)
-                    -> loop(fs, ss, Std::cons(`pprint(!io, !s), ls))
-                | ([f@String, fs...], args, ls)
-                    -> loop(fs, args, Std::cons(`print(!io, !f), ls))
-                | ([f, ...], _, _) -> { 
-                        throw `Error{!LOCATION, !("argument for " + f.to_s + " is not found")} 
-                    }
-            loop(fmt, args, [])
 
-        compile_format(fmt, args):
-            `{
-                io: StringIO::new()
-                !compile_printf(\io, fmt, args)
-                io.to_s
-             }
-    }
+Format: `Module{Format}
+Format.Syntax: `Module{Syntax}
+
+Format.compile_printf(io, fmt, args): {
+    loop: ([], [], ls)
+            -> `Block{!reverse(ls)}
+        | (["%s", fs...], [s, ss...], ls)
+            -> loop(fs, ss, cons(`print(!io, !s), ls))
+        | (["%S", fs...], [s, ss...], ls)
+            -> loop(fs, ss, cons(`print(!io, !s), ls))
+        | (["%d", fs...], [s, ss...], ls)
+            -> loop(fs, ss, cons(`print(!io, !s), ls))
+        | (["%f", fs...], [s, ss...], ls)
+            -> loop(fs, ss, cons(`pprint(!io, !s), ls))
+        | (["%p", fs...], [s, ss...], ls)
+            -> loop(fs, ss, cons(`pprint(!io, !s), ls))
+        | ([f@String, fs...], args, ls)
+            -> loop(fs, args, cons(`print(!io, !f), ls))
+        | ([f, ...], _, _) -> { 
+                throw `Error{!LOCATION, !("argument for " + f.to_s + " is not found")} 
+            }
+    loop(fmt, args, [])
 }
 
-module Amber {
-    ### Format string
-    # XXX: Not good implementation (should not define new syntax)
+Format.compile_format(fmt, args):
+    `{
+        io: StringIO.new()
+        !Format.compile_printf(\io, fmt, args)
+        io.to_s
+     }
 
-    format_string_element
-        ::= "%" [sSdXobpf] { $input }
-          | "%" .   { throw `SyntaxError{!LOCATION,
-                        "Invalid format string", !($0 + $1)}
-                    }
-          | nospace( [^%\""]+ ) { $input.unescape }
+### Format string
 
-    format_string
-        ::= nospace( ('"' format_string_element* '"') ) { $0[1] }
+Format.fmtstr_element
+    ::= "%" [sSdXobpf] { $input }
+      | "%" .   { throw `SyntaxError{!LOCATION,
+                    "Invalid format string", !($0 + $1)}
+                }
+      | nospace( [^%\""]+ ) { $input.unescape }
 
-    postfix_expr
-        ::= "printf" "(" format_string ("," expr)* ")" 
-            { Std::Format::compile_printf(\stdout, $2, map(x->x[1], $3)) }
-          | "printf" "(" expr "," format_string ("," expr)* ")"
-            { Std::Format::compile_printf($2, $4, map(x->x[1], $5)) }
-          | "format" "(" format_string ("," expr)* ")"
-            { Std::Format::compile_format($2, map(x->x[1], $3))}
-}
+Format.fmtstr
+    ::= nospace( ('"' Format.fmtstr_element* '"') ) { $0[1] }
+
+postfix_expr
+    ::= "printf" "(" Format.fmtstr ("," expr)* ")" 
+        { Format.compile_printf(\stdout, $2, map(x->x[1], $3)) }
+      | "printf" "(" expr "," Format.fmtstr ("," expr)* ")"
+        { Format.compile_printf($2, $4, map(x->x[1], $5)) }
+      | "format" "(" Format.fmtstr ("," expr)* ")"
+        { Format.compile_format($2, map(x->x[1], $3))}

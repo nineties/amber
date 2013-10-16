@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-array.rlc 2013-03-21 20:36:39 nineties $
+; $Id: rowl1-array.rlc 2013-08-18 20:43:44 nineties $
 ;
 
 (import "rlvm-compile")
@@ -12,13 +12,12 @@
 
 (import "rowl1-util")
 (import "rowl1-node")
-(import "rowl1-module")
+(import "rowl1-object")
 (import "rowl1-compile")
 (import "rowl1-assemble")
 (import "rowl1-error")
 
 (extern object current_loc)
-(extern object current_mod)
 
 (fun index_out_of_range (ary idx) (
     (throw (out_of_range current_loc ary (box idx)))
@@ -241,28 +240,27 @@
     (return v)
     ))
 
-(export fun setup_array (std) (
-    (var ModArray (create_module std (to_sym "Array")))
-    (var ModList  (create_module std (to_sym "List")))
-    (add_function0 ModArray (to_sym "new") ary_new 0)
-    (add_function1 ModArray (to_sym "new") intT ary_new2 0)
-    (add_function2 ModArray (to_sym "new") intT DontCare ary_new3 0)
-    (add_function1 std (to_sym "to_array") listT list_to_ary 0)
-    (add_function1 std  (to_sym "to_list") arrayT ary_to_list 0)
-    (add_function3 std  (to_sym "to_list") arrayT intT intT ary_to_list2 0)
+(export fun setup_array (global) (
+    (var arr (set_undef_slot global (to_sym "Array") (make_object1 Module (to_sym "Array"))))
+    (add_function0 arr (to_sym "new") ary_new 0)
+    (add_function1 arr (to_sym "new") intT ary_new2 0)
+    (add_function2 arr (to_sym "new") intT DontCare ary_new3 0)
+    (add_function1 global (to_sym "to_array") listT list_to_ary 0)
+    (add_function1 global  (to_sym "to_list") arrayT ary_to_list 0)
+    (add_function3 global  (to_sym "to_list") arrayT intT intT ary_to_list2 0)
 
-    (add_function1 std (to_sym "length") arrayT ary_size 0)
-    (add_function1 std (to_sym "size") arrayT ary_size 0)
-    (add_function2 std (to_sym "at") arrayT intT ary_at 0)
-    (add_function3 std (to_sym "store") arrayT intT DontCare ary_store 0)
-    (add_function2 std (to_sym "push") arrayT DontCare ary_push 0)
+    (add_function1 global (to_sym "length") arrayT ary_size 0)
+    (add_function1 global (to_sym "size") arrayT ary_size 0)
+    (add_function2 global (to_sym "at") arrayT intT ary_at 0)
+    (add_function3 global (to_sym "store") arrayT intT DontCare ary_store 0)
+    (add_function2 global (to_sym "push") arrayT DontCare ary_push 0)
 
-    (add_function1 std (to_sym "reverse") arrayT ary_reverse 0)
-    (add_function2 std (to_sym "append") arrayT arrayT ary_append 0)
-    (add_function2 std (to_sym "map") funT arrayT ary_map 0)
-    (add_function3 std (to_sym "map2") funT arrayT arrayT ary_map2 0)
-    (add_function3 std (to_sym "foldl") funT DontCare arrayT ary_foldl 0)
-    (add_function3 std (to_sym "foldr") funT arrayT DontCare ary_foldr 0)
+    (add_function1 global (to_sym "reverse") arrayT ary_reverse 0)
+    (add_function2 global (to_sym "append") arrayT arrayT ary_append 0)
+    (add_function2 global (to_sym "map") funT arrayT ary_map 0)
+    (add_function3 global (to_sym "map2") funT arrayT arrayT ary_map2 0)
+    (add_function3 global (to_sym "foldl") funT DontCare arrayT ary_foldl 0)
+    (add_function3 global (to_sym "foldr") funT arrayT DontCare ary_foldr 0)
 
     ))
 

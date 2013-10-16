@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2013-07-31 23:19:30 nineties $
+; $Id: rowl1-interp.rlc 2013-10-14 12:42:00 nineties $
 ;
 
 (import "rlvm-compile")
@@ -12,38 +12,27 @@
 
 (import "rowl1-util")
 (import "rowl1-node")
-(import "rowl1-packrat")
-(import "rowl1-symtable")
-(import "rowl1-assemble")
-(import "rowl1-compile")
-(import "rowl1-module")
 (import "rowl1-error")
+(import "rowl1-object")
+(import "rowl1-symtable")
+;(import "rowl1-assemble")
+(import "rowl1-compile")
+(import "rowl1-packrat")
 (import "rowl1-pprint")
 
 (export var global null)
-(export var amber  null)
-(export var syntax null)
-(export var std    null)
-
+(export var variables null)
 (export var current_loc null)
-(export var current_mod null)
+
 (export fun set_loc (loc) (
     (= current_loc loc)
-    (add_module_variable global (to_sym "LOCATION") @C_TRUE loc)
+    (set_slot global (to_sym "LOCATION") loc)
     ))
 
-(var module_stack null)
-
-(export fun set_current_module (mod) (
-    (if (!= (node_bhead mod) Module)
-        (throw (type_error current_loc (string "module") mod))
-        )
-    (= current_mod mod)
-    (add_module_variable global (to_sym "MODULE") @C_TRUE mod)
-    ))
+(export var shell_mode_p @FALSE)
 
 (export fun eval_shell () (
-    (set_shell_mode)
+    (= shell_mode_p @TRUE)
     (try
         (return (eval_main "amber" stdin 0 0))
         (catch e (do
@@ -71,27 +60,16 @@
 
 (fun eval_main (file ichan argc argv) (
     (= current_loc no_loc)
-    (= global (make_module 0 Global))
-    (add_module_variable global Global @C_TRUE global)
-
-    (= amber (create_module global Amber))
-    (add_module_variable global Lang @C_TRUE amber)
-
-    (= std    (create_module global Std))
-    (= syntax (create_module amber Syntax))
-
-    (= module_stack (cons global 0))
+    (= global (make_object1 Module Amber))
+    (= variables (make_symtable 10))
+    (set_slot global Amber global)
+    (set_slot global Syntax (make_object1 Module Syntax))
 
     (setup_argv argc argv)
     (setup_globals)
     (setup_builtin_compilers)
-    (= std (init_lib))
-
-    (open_module global std)
-
-    (init_parser_funcs syntax)
-
-    (set_current_module global)
+    (init_lib)
+    (init_parser_funcs (get_slot global Syntax))
     (set_loc no_loc)
 
     (push_import_dir "/usr/lib/amber/")
@@ -106,16 +84,14 @@
     (import_lib "std/oop.ab")
     (import_lib "std/io/io.ab")
 
-    (open_module std (find_module std (to_sym "IO")))
-
     (push_import_dir (get_directory file))
     (push_import_dir (get_env "PWD"))
 
     (pre_import_lib)
 
-    (var p (init_parser file ichan))
+    (var p (make_parser file ichan))
 
-    (if (in_shell_mode)
+    (if shell_mode_p
         (interpret_shell p)
         (do
             (var fd (open "."))
@@ -131,12 +107,15 @@
     ))
 
 (fun eval (expr) (
-    (return (byterun (lookup_func current_mod (qualified "Lang" Eval)) expr))
+    (debugs "eval:")
+    (debugpf expr)
+    (debugs "primary_expr:")
+    (debugpf (get_slot (get_slot global Syntax) (to_sym "primary_expr")))
+    (return (byterun (lookup_func global Eval) expr))
     ))
 
-(extern fun list_to_table)
 (fun rewrite (expr) (
-    (var new_expr (byterun (lookup_func current_mod (qualified "Lang" Rewrite)) expr))
+    (var new_expr (byterun (lookup_func global Rewrite) expr))
     (if (== new_expr @C_UNDEF) (= new_expr expr))
     (if (!= new_expr expr) (return (rewrite new_expr)))
     (= expr new_expr)
@@ -157,11 +136,7 @@
         ))
 
     ; Don't rewrite patterns
-    (if (== hd DefVariable) (do
-        (node_arg_set expr 1 (rewrite (node_arg expr 1)))
-        (return expr)
-        ))
-    (if (== hd DefFunction) (do
+    (if (== hd Define) (do
         (node_arg_set expr 1 (rewrite (node_arg expr 1)))
         (return expr)
         ))
@@ -172,16 +147,6 @@
             )
         (node_arg_set expr 1 (rewrite (node_arg expr 1)))
         (return expr)
-        ))
-
-    (if (is_table expr) (do
-        (var args (node_args expr))
-        (var new_args 0)
-        (while args (do
-            (= new_args (cons (rewrite (car args)) new_args))
-            (= args (cdr args))
-            ))
-        (return (list_to_table new_args))
         ))
 
     (for i 0 (node_size expr) (do
@@ -213,16 +178,6 @@
         (+= level 1)
         ))
 
-    (if (is_table expr) (do
-        (var args (node_args expr))
-        (var new_args 0)
-        (while args (do
-            (= new_args (cons (rewrite_qquote (car args) level) new_args))
-            (= args (cdr args))
-            ))
-        (return (list_to_table new_args))
-        ))
-
     (for i 0 (node_size expr)
         (node_arg_set expr i
             (rewrite_qquote (node_arg expr i) level))
@@ -249,30 +204,30 @@
 (fun interpret_shell (p) (
     (var outputs (ary_new))
     (enable_shell_syntax)
-    (add_module_variable global (to_sym "shell_outputs") @C_TRUE outputs)
-    (ary_push outputs @C_UNDEF)
-    (while 1 (do
-        (try 
-            (while 1 (do
-                (parse_shell p)
-                (if (! (parse_success p)) (do
-                    (output_syntax_error (get_loc p) (parser_error p))
-                    (flush_parser p @TRUE)
-                    continue
-                    ))
-                (parsed_token p)
-                (var ret (eval (parsed_token p)))
-                (print_result ret)
-                (ary_store outputs (box 0) ret)
-                (ary_push outputs ret)
-                (increment_line p)
-                ))
-        (catch e (do
-            (output_string stderr "Error: ")
-            (pprint stderr e)
-            (output_string stderr "\n")
-            (flush_parser p @TRUE)
-        )))))
+    ;(set_slot global (to_sym "shell_outputs") outputs)
+    ;(ary_push outputs @C_UNDEF)
+    ;(while 1 (do
+    ;    (try 
+    ;        (while 1 (do
+    ;            (parse_shell p)
+    ;            (if (! (parse_success p)) (do
+    ;                (output_syntax_error (get_loc p) (parser_error p))
+    ;                (flush_parser p @TRUE)
+    ;                continue
+    ;                ))
+    ;            (parsed_token p)
+    ;            (var ret (eval (parsed_token p)))
+    ;            (print_result ret)
+    ;            (ary_store outputs (box 0) ret)
+    ;            (ary_push outputs ret)
+    ;            (increment_line p)
+    ;            ))
+    ;    (catch e (do
+    ;        (output_string stderr "Error: ")
+    ;        (pprint stderr e)
+    ;        (output_string stderr "\n")
+    ;        (flush_parser p @TRUE)
+    ;    )))))
     ))
 
 (fun print_result (val) (
@@ -282,7 +237,7 @@
     ))
 
 (fun default_eval (expr) (
-    (return (byterun (compile_main current_mod (rewrite expr))))
+    (return (byterun (compile_main (rewrite expr))))
     ))
 
 (fun eval_located (expr) (
@@ -296,29 +251,9 @@
     ))
 
 (fun eval_define_syntax (expr) (
-    (var sym (node_arg expr 0))
+    (var lhs (node_arg expr 0))
     (var elm (node_arg expr 1))
-    (var save_current_mod current_mod)
-    (var syntax_mod (create_module current_mod Syntax))
-    (set_current_module syntax_mod)
-    (eval (compile_define_syntax sym elm))
-    (set_current_module save_current_mod)
-    (return @C_NIL)
-    ))
-
-(fun eval_begin_module (expr) (
-    (var mod (create_module current_mod (node_arg expr 0)))
-    (= module_stack (cons mod module_stack))
-    (= current_mod mod)
-    (return @C_NIL)
-    ))
-
-(fun eval_end_module (expr) (
-    (if (! (cdr module_stack))
-        (throw (exception current_loc (string "Exiting from global module")))
-        )
-    (= module_stack (cdr module_stack))
-    (= current_mod (car module_stack))
+    (eval (compile_define_syntax lhs elm))
     (return @C_NIL)
     ))
 
@@ -418,13 +353,13 @@
             (chdir dir)
             (push_import_dir dir)
 
-            (var p (init_parser fullpath ichan))
+            (var p (make_parser fullpath ichan))
             (set_loc (get_loc p))
 
-            (var shell_mode_p (in_shell_mode))
-            (unset_shell_mode)
+            (var save_shell_mode_p shell_mode_p)
+            (= shell_mode_p @FALSE)
             (interpret p)
-            (if shell_mode_p (set_shell_mode))
+            (= shell_mode_p save_shell_mode_p)
 
             (pop_import_dir)
 
@@ -464,15 +399,9 @@
     (return (import_lib path))
     ))
 
-(fun eval_open (expr) (
-    (var sig (node_arg expr 0))
-    (open_module current_mod (find_module current_mod sig))
-    (return @C_NIL)
-    ))
-
 (fun setup_argv (argc argv) (
     (var ARGV (ary_new))
-    (add_module_variable global (to_sym "ARGV") @C_FALSE ARGV)
+    (set_slot global (to_sym "ARGV") ARGV)
     (if (== argc 0) return)
     (for i 1 argc (do
         (ary_push ARGV (string (array_get string argv i)))
@@ -480,15 +409,11 @@
     ))
 
 (export fun prompt_string () (
-    (var v (get_module_variable_value (to_sym "PROMPT")
-        (lookup_symbol current_mod (to_sym "PROMPT") @FALSE)
-        ))
+    (var v (get_slot global (to_sym "PROMPT")))
+    (if (!= (node_type v) @StringE)
+        (return (string "<invalid prompt string>"))
+        )
     (return v)
-    ))
-
-(fun def_global_var (sym val) (
-    (add_module_variable current_mod sym @C_FALSE val)
-    (return val)
     ))
 
 (fun load_ (path) (
@@ -502,13 +427,13 @@
             (chdir dir)
             (push_import_dir dir)
 
-            (var p (init_parser fullpath ichan))
+            (var p (make_parser fullpath ichan))
             (set_loc (get_loc p))
 
-            (var shell_mode_p (in_shell_mode))
-            (unset_shell_mode)
+            (var save_shell_mode_p shell_mode_p)
+            (= shell_mode_p @FALSE)
             (interpret p)
-            (if shell_mode_p (set_shell_mode))
+            (= shell_mode_p save_shell_mode_p)
 
             (pop_import_dir)
 
@@ -524,33 +449,26 @@
     ))
 
 (fun setup_globals () (
-    (add_module_variable global (to_sym "LOCATION") @C_FALSE current_loc)
-    (add_module_variable global (to_sym "MODULE") @C_FALSE current_mod)
-    (add_module_variable global (to_sym "PROMPT") @C_FALSE (string "amber"))
+    (set_slot global (to_sym "LOCATION") current_loc)
+    (set_slot global (to_sym "PROMPT") (string "amber"))
 
-    (if (in_shell_mode)
-        (add_module_variable global (to_sym "shell_mode") @C_FALSE @C_TRUE)
-        (add_module_variable global (to_sym "shell_mode") @C_FALSE @C_FALSE)
+    (if shell_mode_p
+        (set_slot global (to_sym "shell_mode") @C_TRUE)
+        (set_slot global (to_sym "shell_mode") @C_FALSE)
         )
     
-    (add_function1 amber Rewrite (domainP Located) rewrite_located 0)
-    (add_function1 amber Eval DontCare default_eval 0)
-    (add_function1 amber Eval (domainP Located) eval_located 0)
-    (add_function1 amber Eval (make_object1 Import listT) eval_import 0)
-    (add_function1 amber Eval (make_object1 Import stringT) eval_import 0)
-    (add_function1 amber Eval (make_object1 Open DontCare) eval_open 0)
+    (add_function1 global Rewrite (domainP Located) rewrite_located 0)
+    (add_function1 global Eval DontCare default_eval 0)
+    (add_function1 global Eval (domainP Located) eval_located 0)
+    (add_function1 global Eval (make_object1 Import listT) eval_import 0)
+    (add_function1 global Eval (make_object1 Import stringT) eval_import 0)
 
-    (add_function1 amber Eval (make_object1 Seq listT) eval_seq 0)
+    (add_function1 global Eval (make_object1 Seq listT) eval_seq 0)
 
-    (add_function1 amber Eval (make_object2 DefSyntax symT DontCare) eval_define_syntax 0)
-    (add_function1 amber Eval (domainP ReserveSymbol) eval_reserve_symbol 0)
-    (add_function1 amber Eval (make_object1 BeginModule DontCare) eval_begin_module 0)
-    (add_function1 amber Eval (make_object0 EndModule) eval_end_module 0)
+    (add_function1 global Eval (make_object2 DefSyntax DontCare DontCare) eval_define_syntax 0)
+    (add_function1 global Eval (domainP ReserveSymbol) eval_reserve_symbol 0)
 
-    (add_function1 amber Eval (quote (to_sym "exit")) eval_exit 0)
-
-    (add_function2 global (to_sym "define_global_variable")
-        symT DontCare def_global_var 0)
+    (add_function1 global Eval (quote (to_sym "exit")) eval_exit 0)
 
     (add_function1 global (to_sym "load") stringT load_ 0)
     (add_function1 global (to_sym "import") stringT import_lib 0)
@@ -564,38 +482,35 @@
 (extern fun setup_numeric)
 (extern fun setup_bigint)
 (extern fun setup_float)
-(extern fun setup_random)
-(extern fun setup_math)
+;(extern fun setup_random)
+;(extern fun setup_math)
 (extern fun setup_string)
 (extern fun setup_io)
 (extern fun setup_list)
 (extern fun setup_tuple)
 (extern fun setup_array)
 (extern fun setup_table)
-(extern fun setup_function)
-(extern fun setup_oop)
-(extern fun setup_gc)
+;(extern fun setup_oop)
+;(extern fun setup_gc)
 
 (fun init_lib () (
-    (setup_base amber)
-    (setup_pprint std)
-    (setup_symbol std)
-    (setup_math std)
-    (setup_numeric std)
-    (setup_string std)
-    (setup_bigint std)
-    (setup_float std)
-    (setup_random std)
-
-    (setup_io std)
-    (setup_list std)
-    (setup_tuple std)
-    (setup_array std)
-    (setup_table std)
-    (setup_function std)
-    (setup_oop std)
-    (setup_gc std)
-    (return std)
+    (setup_base global)
+    (setup_pprint global)
+    (setup_symbol global)
+;    (setup_math)
+    (setup_numeric global)
+    (setup_string global)
+    (setup_bigint global)
+    (setup_float global)
+;    (setup_random)
+;
+    (setup_io global)
+    (setup_list global)
+    (setup_tuple global)
+    (setup_array global)
+    (setup_table global)
+;    (setup_oop)
+;    (setup_gc)
     ))
 
     ))

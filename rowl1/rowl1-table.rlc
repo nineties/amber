@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-table.rlc 2013-07-31 19:35:32 nineties $
+; $Id: rowl1-table.rlc 2013-08-18 21:43:53 nineties $
 ;
 
 (import "rlvm-compile")
@@ -12,12 +12,12 @@
 
 (import "rowl1-util")
 (import "rowl1-node")
-(import "rowl1-module")
+(import "rowl1-object")
 (import "rowl1-compile")
 (import "rowl1-error")
 (import "rowl1-pprint")
 
-(extern object current_mod)
+(extern object global)
 (extern object current_loc)
 
 (array int prime_numbers (
@@ -47,8 +47,8 @@
 
 (export fun table_new () (
     (return (table_new_with_hint 10
-        (lookup_func current_mod (to_sym "hash"))
-        (lookup_func current_mod (to_sym "equal"))
+        (lookup_func global (to_sym "hash"))
+        (lookup_func global (to_sym "equal"))
         ))
     ))
 
@@ -216,21 +216,21 @@
     (return list)
     ))
 
-(export fun setup_table (std) (
-    (var ModTbl (create_module std (to_sym "Table")))
-    (var ModList  (create_module std (to_sym "List")))
-    (add_function0 ModTbl (to_sym "new") table_new 0)
-    (add_function2 ModTbl (to_sym "new") funT funT table_new2 0)
-    (add_function1 std (to_sym "to_table") listT list_to_table 0)
-    (add_function2 std (to_sym "at") tableT DontCare table_at 0)
-    (add_function3 std (to_sym "store") tableT DontCare DontCare table_store 0)
-    (add_function1 std (to_sym "size") tableT table_size 0)
+(export fun setup_table (global) (
+    (var mod (set_undef_slot global (to_sym "Table")
+        (make_object1 Module (to_sym "Table"))))
+    (add_function0 mod (to_sym "new") table_new 0)
+    (add_function2 mod (to_sym "new") funT funT table_new2 0)
+    (add_function1 global (to_sym "to_table") listT list_to_table 0)
+    (add_function2 global (to_sym "at") tableT DontCare table_at 0)
+    (add_function3 global (to_sym "store") tableT DontCare DontCare table_store 0)
+    (add_function1 global (to_sym "size") tableT table_size 0)
 
-    (add_function1 std (to_sym "to_list") tableT table_to_list 0)
+    (add_function1 global (to_sym "to_list") tableT table_to_list 0)
 
-    (add_function1 std (to_sym "keys") tableT table_keys 0) 
-    (add_function1 std (to_sym "values") tableT table_values 0)
-    (add_function1 std (to_sym "pairs") tableT table_to_list 0)
+    (add_function1 global (to_sym "keys") tableT table_keys 0) 
+    (add_function1 global (to_sym "values") tableT table_values 0)
+    (add_function1 global (to_sym "pairs") tableT table_to_list 0)
     ))
 
     ))

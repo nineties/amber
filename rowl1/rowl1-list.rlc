@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2013-03-21 20:34:14 nineties $
+; $Id: rowl1-list.rlc 2013-08-18 18:10:37 nineties $
 ;
 
 (import "rlvm-compile")
@@ -12,13 +12,12 @@
 
 (import "rowl1-util")
 (import "rowl1-node")
-(import "rowl1-module")
+(import "rowl1-object")
 (import "rowl1-compile")
 (import "rowl1-assemble")
 (import "rowl1-error")
 
 (extern object current_loc)
-(extern object current_mod)
 
 (fun index_out_of_range (list idx) (
     (throw (out_of_range current_loc list (box idx)))
@@ -164,21 +163,21 @@
     (return (list_reverse new_ls))
     ))
 
-(export fun setup_list (std) (
-    (var mod (create_module std (to_sym "List")))
+(export fun setup_list (global) (
+    (var mod (set_undef_slot global (to_sym "List") (make_object1 Module (to_sym "List"))))
     (add_function2 mod (to_sym "new") intT funT ls_new 0)
-    (add_function1 std (to_sym "length") listT ls_length 0)
-    (add_function1 std (to_sym "size") listT ls_length 0)
-    (add_function2 std (to_sym "cons") DontCare listT ls_cons 0)
-    (add_function1 std (to_sym "car") listT ls_car 0)
-    (add_function1 std (to_sym "cdr") listT ls_cdr 0)
-    (add_function2 std (to_sym "at") listT intT ls_at 0)
-    (add_function3 std (to_sym "store") listT intT DontCare ls_store 0)
-    (add_function1 std (to_sym "reverse") listT ls_reverse 0)
-    (add_function2 std (to_sym "append") listT listT ls_append 0)
-    (add_function2 std (to_sym "map") funT listT ls_map 0)
-    (add_function3 std (to_sym "foldl") funT DontCare listT ls_foldl 0)
-    (add_function3 std (to_sym "foldr") funT listT DontCare ls_foldr 0)
+    (add_function1 global (to_sym "length") listT ls_length 0)
+    (add_function1 global (to_sym "size") listT ls_length 0)
+    (add_function2 global (to_sym "cons") DontCare listT ls_cons 0)
+    (add_function1 global (to_sym "car") listT ls_car 0)
+    (add_function1 global (to_sym "cdr") listT ls_cdr 0)
+    (add_function2 global (to_sym "at") listT intT ls_at 0)
+    (add_function3 global (to_sym "store") listT intT DontCare ls_store 0)
+    (add_function1 global (to_sym "reverse") listT ls_reverse 0)
+    (add_function2 global (to_sym "append") listT listT ls_append 0)
+    (add_function2 global (to_sym "map") funT listT ls_map 0)
+    (add_function3 global (to_sym "foldl") funT DontCare listT ls_foldl 0)
+    (add_function3 global (to_sym "foldr") funT listT DontCare ls_foldr 0)
     ))
 
     ))

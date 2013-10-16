@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-symtable.rlc 2012-11-25 22:36:25 nineties $
+; $Id: rowl1-symtable.rlc 2013-08-17 08:31:53 nineties $
 ;
 
 (import "rlvm-compile")
@@ -35,7 +35,6 @@
 (export fun make_symtable (hint) (
     (var size (array_get int prime_numbers (bsr hint)))
     (var table (struct 3 (make_vector size) (make_vector 0) (make_ivector 0)))
-    (symtable_push table)
     (return table)
     ))
 
@@ -302,20 +301,8 @@
     (return 0)
     ))
 
-(export fun symtable_count_local (table) (
-    (var display (field_get table 2))
-    (var entries (field_get table 1))
-    (var depth (ivector_size display))
-    (var n (ivector_at display (- depth 1)))
-    (var end (vector_size entries))
-    (var begin (- end n))
-    (var count 0)
-    (while (< begin end) (do
-        (var entry (vector_at entries begin))
-        (if entry (+= count 1))
-        (incr begin)
-        ))
-    (return count)
+(export fun symtable_count (table) (
+    (return (vector_size (field_get table 1)))
     ))
 
 (extern fun pprint)

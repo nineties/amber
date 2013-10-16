@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-string.rlc 2013-05-19 08:45:59 nineties $
+; $Id: rowl1-string.rlc 2013-08-18 18:51:38 nineties $
 ;
 
 (import "rlvm-compile")
@@ -12,7 +12,7 @@
 
 (import "rowl1-util")
 (import "rowl1-node")
-(import "rowl1-module")
+(import "rowl1-object")
 (import "rowl1-compile")
 (import "rowl1-error")
 
@@ -203,35 +203,37 @@
     (return @C_NIL)
     ))
 
-(export fun setup_string (std) (
-    (add_function1 std (to_sym "size") stringT s_size 0)
-    (add_function1 std (to_sym "length") stringT s_size 0)
-    (add_function2 std (to_sym "equal") stringT stringT s_equal 0)
-    (add_function1 std (to_sym "hash") stringT s_hash 0)
-    (add_function1 std (to_sym "to_s") stringT s_to_s 0)
-    (add_function2 std (to_sym "add") stringT stringT s_add 0)
-    (add_function2 std (to_sym "add") stringT DontCare s_add2 0)
-    (add_function2 std (to_sym "add") DontCare stringT s_add2 0)
-    (add_function2 std (to_sym "mul") stringT intT s_mul 0)
+(export fun setup_string (global) (
+    (add_function1 global (to_sym "size") stringT s_size 0)
+    (add_function1 global (to_sym "length") stringT s_size 0)
+    (add_function2 global (to_sym "equal") stringT stringT s_equal 0)
+    (add_function1 global (to_sym "hash") stringT s_hash 0)
+    (add_function1 global (to_sym "to_s") stringT s_to_s 0)
+    (add_function2 global (to_sym "add") stringT stringT s_add 0)
+    (add_function2 global (to_sym "add") stringT DontCare s_add2 0)
+    (add_function2 global (to_sym "add") DontCare stringT s_add2 0)
+    (add_function2 global (to_sym "mul") stringT intT s_mul 0)
 
-    (add_function1 std (to_sym "char") intT s_char 0)
-    (add_function1 std (to_sym "code") stringT s_code 0) 
+    (add_function1 global (to_sym "char") intT s_char 0)
+    (add_function1 global (to_sym "code") stringT s_code 0) 
 
-    (add_function2 std (to_sym "at") stringT intT s_at 0)
-    (add_function2 std (to_sym "at") stringT irangeT s_at_range 0)
-    (add_function3 std (to_sym "store") stringT intT stringT s_store 0)
-    (add_function1 std (to_sym "unescape") stringT s_unescape 0)
-    (add_function2 std (to_sym "contain") stringT stringT s_contain 0)
-    (add_function2 std (to_sym "split") stringT stringT s_split 0)
+    (add_function2 global (to_sym "at") stringT intT s_at 0)
+    (add_function2 global (to_sym "at") stringT irangeT s_at_range 0)
+    (add_function3 global (to_sym "store") stringT intT stringT s_store 0)
+    (add_function1 global (to_sym "unescape") stringT s_unescape 0)
+    (add_function2 global (to_sym "contain") stringT stringT s_contain 0)
+    (add_function2 global (to_sym "split") stringT stringT s_split 0)
 
     ; StringIO module
     (var sioT (domainP StringIO))
-    (var SIO (create_module std (to_sym "StringIO")))
+    (var SIO (set_undef_slot global (to_sym "StringIO")
+        (make_object1 Module (to_sym "StringIO"))))
 
     (add_function0 SIO (to_sym "new") new_sio 0)
-    (add_function1 std (to_sym "to_s") sioT sio_to_s 0)
+    (add_function1 global (to_sym "to_s") sioT sio_to_s 0)
 
-    (var IO (create_module std (to_sym "IO")))
+    (var IO (set_undef_slot global (to_sym "IO")
+        (make_object1 Module (to_sym IO))))
     (add_function2 IO (to_sym "print") sioT symT sio_print_symbol 0)
     (add_function2 IO (to_sym "print") sioT stringT sio_print_str 0)
     (add_function2 IO (to_sym "print") sioT intT sio_print_int 0)

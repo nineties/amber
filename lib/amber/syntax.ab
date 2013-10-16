@@ -1,9 +1,8 @@
-BeginModule{Amber}
-Assign{Qualified{Syntax,comment}, Qualified{Syntax,shell_style_comment}}
+Assign{Slot{Syntax,comment}, Slot{Syntax,shell_style_comment}}
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2013-07-31 22:25:33 nineties $
+# $Id: syntax.ab 2013-10-16 09:47:05 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -32,12 +31,20 @@ Assign{Qualified{Syntax,comment}, Qualified{Syntax,shell_style_comment}}
 # delimited2(p, d) : sequence of p delimited by d (two or many)
 # located(p)       : parse p with location
 # parsewith(p)     : do parse using p (p can refer previous tokens)
-# nospace(p)       : parse p without parsing spaces between tokens
 
 DefineSyntax{
     character_set,
     List{Tuple{List{Many1{Choice{List{'\\', any}, List{Not{"]"}, any}}}},
-        Apply{input_text, List{parser,begin,end}}}
+        Apply{Slot{Syntax,input_text}, List{parser,begin,end}}}
+    }
+}
+
+DefineSyntax{
+    qualified_symbol,
+    List{
+        Tuple{List{qualified_symbol, ".", symbol},
+            QuasiQuote{Slot{Unquote{node0}, Unquote{node2}}}},
+        Tuple{List{symbol}, node0}
     }
 }
 
@@ -46,7 +53,7 @@ DefineSyntax{
     List{
         Tuple{List{"."}, Quote{any}},
         Tuple{List{string}, node0},
-        Tuple{List{symbol}, node0},
+        Tuple{List{qualified_symbol}, node0},
         Tuple{List{"(", syntax_element, ")"}, node1},
         Tuple{List{"(", Many1{syntax_element}, ")"}, node1, multiline},
         Tuple{List{"[", "^", character_set, "]"},
@@ -83,10 +90,6 @@ DefineSyntax{
             QuasiQuote{Located{Unquote{node2}}}, multiline},
         Tuple{List{"parsewith", "(", symbol, ")"},
             QuasiQuote{ParseWith{Unquote{node2}}}, multiline},
-        Tuple{List{"nospace", "(", syntax_element, ")"},
-            QuasiQuote{NoSpace{Unquote{node2}}}, multiline},
-        Tuple{List{"nospace", "(", Many1{syntax_element}, ")"},
-            QuasiQuote{NoSpace{Unquote{node2}}}, multiline},
         Tuple{List{primary_syntax_element}, node0}
     }
 }
@@ -94,7 +97,7 @@ DefineSyntax{
 DefineSyntax{
     parser_option,
     List{
-        Tuple{List{"<<", Many1{Choice{object,symbol}}, ">>"},
+        Tuple{List{"<<", Delimited1{symbol, ","}, ">>"},
             node1, multiline}
     }
 }
@@ -127,7 +130,7 @@ DefineSyntax{
 DefineSyntax{
     syntax_declaration,
     List{
-        Tuple{List{symbol, "::=", Delimited1{parser_entry, "|"}},
+        Tuple{List{qualified_symbol, "::=", Delimited1{parser_entry, "|"}},
             QuasiQuote{DefineSyntax{
                 Unquote{node0},
                 Unquote{node2}
@@ -142,35 +145,25 @@ DefineSyntax{
 }
 
 ### Expressions
-qualified_symbol
-    ::= qualified_symbol "::" symbol
-        { MakeObject{Quote{Qualified}, List{node0, node2}} }
-      | symbol
-
 block_body ::= aligned(located(statement))
-                { QuasiQuote{Block{Unquote{node0}}} }
+    { QuasiQuote{Block{Unquote{node0}}} }
+
 primary_block
     ::= <<multiline>> "{" block_body "}" { node1 }
-        # Block with module imports
 
 block ::= primary_block
         | block_body
 
 primary_expr
     ::= primary_block
-
       | <<multiline>> "<" qualified_symbol ">" "{" parsewith(node1) "}"
         { node4 }
-
-      | <<multiline>> "(" expr ")"                  { node1 } 
       | <<multiline>> "(" statement ")"             { node1 }
-      | <<multiline>> "[" delimited(expr, ",") "]"  { node1 } # List literal
-
+      # List literal
+      | <<multiline>> "[" delimited(expr, ",") "]"  { node1 }
       # Tuple literal
       | <<multiline>> "(" delimited2(expr, ",") ")"
         { MakeObject{Quote{Tuple}, node1} }
-
-      | qualified_symbol
       | atom
       | "..."   { Quote{Ellipsis{nil}} }
 
@@ -178,29 +171,20 @@ postfix_expr
         # Function Application
     ::= postfix_expr "(" delimited(expr, ",") ")"
         { MakeObject{Quote{Apply}, List{node0, node2}} }
-
         # Subscription
       | postfix_expr "[" delimited(expr, ",") "]"
         { MakeObject{Quote{Subscript}, List{node0, node2}} }
-
       | # Ellipsis Pattern
         postfix_expr "..."
         { MakeObject{Quote{Ellipsis}, List{node0}} }
-
         # Domain Pattern
       | primary_expr "@" postfix_expr
         { MakeObject{Quote{Domain}, List{node0, node2}} }
-
-      | postfix_expr "." symbol "(" delimited(expr, ",") ")"
-        { MakeObject{Quote{Slot}, List{node0, node2, node4}} }
       | postfix_expr "." symbol
         { MakeObject{Quote{Slot}, List{node0, node2}} }
-
       | primary_expr "^" postfix_expr
         { MakeObject{Quote{Power}, List{node0, node2}} }
-
       | object
-
       | primary_expr
 
 quote_expr
@@ -216,16 +200,12 @@ pattern ::= quote_expr
 term    ::= primary_expr
 
 ## enable use of quotation expressions for following definitions.
-Assign{Qualified{Syntax,expr}, Qualified{Syntax,quote_expr}}
+Assign{Slot{Syntax,expr}, Slot{Syntax,quote_expr}}
 
 prefix_expr
     ::= "+"          quote_expr { `UnaryPlus{!node1} }
       | "-" !decimal quote_expr { `UnaryMinus{!node2} }
       | "not" quote_expr        { `Not{!node1} }
-
-      | <<multiline>> "make" symbol "{" delimited(expr, ",") "}"
-        { `MakeObject{\!node1, !node3} }
-
       | quote_expr
 
 multiplicative_expr
@@ -314,24 +294,15 @@ assign_expr
       | pattern ">>=" assign_expr { `ShiftRAssign{!node0, !node2} }
       | multi_lambda_expr
 
-Assign{Syntax::expr, Syntax::assign_expr}
+Assign{Syntax.expr, Syntax.assign_expr}
 
 ### Statements
-package ::= string
-          | delimited1(symbol, ".")
-
 statement
     ::= statement ";" statement
         { `Seq{[!node0, !node2]} }
 
       | statement ";"
         { `Seq{[!node0, nil]} }
-
-      | "open" qualified_symbol
-        { `Open{!node1} }
-
-      | "import" package
-        { `Import{!node1} }
 
       | <<multiline>> "if" term statement "else" statement
         { `IfElse{!node1, !node2, !node4} }
@@ -362,124 +333,115 @@ statement
       | <<multiline>> "try" block "catch" multi_lambda_expr
         { `Try{!node1, !node3} }
 
-      | qualified_symbol argument_list ":" block
-        { `DefineFunction{!node0, Lambda{!node1, !node3}} }
-      | pattern ":" expr
-        { `DefineVariable{!node0, !node2} }
-
-      | expr "=>" statement
-        { `DefineFunction{rewrite, Lambda{!node0, !node2}} }
-
-      | "module" qualified_symbol "{"
-        { `BeginModule{!node1} }
-      | "}"
-        { `EndModule{} }
+      | <<multiline>> pattern ":" statement
+        { `Define{!node0, !node2} }
 
 ### Reserved Keywords
 ReserveSymbol{not, and, or, when, open, if, else, case, of,
     while, for, reverse_for, in, continue, break, return,
-    throw, try, catch, scope, module, import, open, extend
+    throw, try, catch, scope, import, open, extend
 }
 
 ## Syntax Sugars
 
-+x      => `uplus(!x)
--x      => `uminus(!x)
-x + y   => `add(!x, !y)
-x - y   => `sub(!x, !y)
-x * y   => `mul(!x, !y)
-x ^ y   => `pow(!x, !y)
-x / y   => `div(!x, !y)
-x % y   => `mod(!x, !y)
-x << y  => `shiftL(!x, !y)
-x >> y  => `shiftR(!x, !y)
-x | y   => `fusion(!x, !y)
+rewrite(+x)     = `uplus(!x)
+rewrite(-x)     = `uminus(!x)
+rewrite(x + y)  = `add(!x, !y)
+rewrite(x - y)  = `sub(!x, !y)
+rewrite(x * y)  = `mul(!x, !y)
+rewrite(x ^ y)  = `pow(!x, !y)
+rewrite(x / y)  = `div(!x, !y)
+rewrite(x % y)  = `mod(!x, !y)
+rewrite(x << y) = `shiftL(!x, !y)
+rewrite(x >> y) = `shiftR(!x, !y)
+rewrite(x | y)  = `fusion(!x, !y)
 
-rewrite_operator_assign(lhs, rhs, op): {
-    split: (Subscript{lhs, args}) -> {
-                stmt: []
-                new_args: []
-                new_lhs: lhs
+{
+    rewrite_operator_assign(lhs, rhs, op): {
+        split: (Subscript{lhs, args}) -> {
+                    stmt: []
+                    new_args: []
+                    new_lhs: lhs
 
-                for (a in args) {
-                    if (head(a) != \Symbol) {
+                    for (a in args) {
+                        if (head(a) != \Symbol) {
+                            t: genSym()
+                            stmt = cons(`Define{!t, !a}, stmt)
+                            new_args = cons(t, new_args)
+                        } else
+                            new_args = cons(a, new_args)
+                    }
+                    new_args = reverse(new_args)
+
+                    if (head(lhs) != \Symbol) {
                         t: genSym()
-                        stmt = cons(`DefineVariable{!t, !a}, stmt)
-                        new_args = cons(t, new_args)
-                    } else
-                        new_args = cons(a, new_args)
+                        stmt = cons(`Define{!t, !lhs}, stmt)
+                        new_lhs = t
+                    }
+
+                    (`Subscript{!new_lhs, !new_args}, `Seq{!stmt})
                 }
-                new_args = reverse(new_args)
+            | x -> (x, nil)
 
-                if (head(lhs) != \Symbol) {
-                    t: genSym()
-                    stmt = cons(`DefineVariable{!t, !lhs}, stmt)
-                    new_lhs = t
-                }
-
-                (`Subscript{!new_lhs, !new_args}, `Seq{!stmt})
-            }
-        | x -> (x, nil)
-
-    (x, s): split(lhs)
-    `{
-        !s
-        !x = (!op)(!x, !rhs)
+        (x, s): split(lhs)
+        `{
+            !s
+            !x = (!op)(!x, !rhs)
+        }
     }
+
+    rewrite(x += y)     = rewrite_operator_assign(x, y, \add)
+    rewrite(x -= y)     = rewrite_operator_assign(x, y, \sub)
+    rewrite(x *= y)     = rewrite_operator_assign(x, y, \mul)
+    rewrite(x ^= y)     = rewrite_operator_assign(x, y, \pow)
+    rewrite(x /= y)     = rewrite_operator_assign(x, y, \div)
+    rewrite(x %= y)     = rewrite_operator_assign(x, y, \mod)
+    rewrite(x <<= y)    = rewrite_operator_assign(x, y, \shiftL)
+    rewrite(x >>= y)    = rewrite_operator_assign(x, y, \shiftR)
+    rewrite(x < y)      = `lt(!x, !y)
+    rewrite(x > y)      = `gt(!x, !y)
+    rewrite(x <= y)     = `le(!x, !y)
+    rewrite(x >= y)     = `ge(!x, !y)
+    rewrite(x == y)     = `equal(!x, !y)
+    rewrite(x != y)     = `(not equal(!x, !y))
+    rewrite(x is y)     = `identical(!x, !y)
+    rewrite(x is not y) = `(not identical(!x, !y))
 }
-
-x += y  => rewrite_operator_assign(x, y, \add)
-x -= y  => rewrite_operator_assign(x, y, \sub)
-x *= y  => rewrite_operator_assign(x, y, \mul)
-x ^= y  => rewrite_operator_assign(x, y, \pow)
-x /= y  => rewrite_operator_assign(x, y, \div)
-x %= y  => rewrite_operator_assign(x, y, \mod)
-x <<= y => rewrite_operator_assign(x, y, \shiftL)
-x >>= y => rewrite_operator_assign(x, y, \shiftR)
-x < y   => `lt(!x, !y)
-x > y   => `gt(!x, !y)
-x <= y  => `le(!x, !y)
-x >= y  => `ge(!x, !y)
-x == y  => `Amber::equal(!x, !y)
-x != y  => `(not Amber::equal(!x, !y))
-x is y  => `Amber::identical(!x, !y)
-x is not y => `(not Amber::identical(!x, !y))
-
-BeginModule{Syntax}
 
 ### Extend primary_expr so as to enable use $... to refer nodes
 # of syntax-tree only in parser_action.
-module Action {
-    primary_expr ::= "$" decimal { ("node" + node1).to_sym }
-                   | "$input"    { \input_text(parser,begin,end) }
-}
 
-# FIXME: This is temporary dirty hack.
-primary_expr_act : primary_expr | Action::Syntax::primary_expr
-parser_action_old: parser_action
-parser_action = parser -> {
-    save_primary_expr: primary_expr
-    primary_expr = primary_expr_act
-    r: TryApply{parser_action_old, [parser]}
-    primary_expr = save_primary_expr
+Action: `Module{ParserAction}
+Action.Syntax: `Module{Syntax}
+
+Action.primary_expr ::= "$" decimal { ("node" + node1).to_sym }
+                      | "$input"    { \Syntax.input_text(parser,begin,end) }
+##
+### FIXME: This is temporary dirty hack.
+Syntax.primary_expr_act: Syntax.primary_expr | Action.Syntax.primary_expr
+Syntax.parser_action_old: Syntax.parser_action
+Syntax.parser_action = parser -> {
+    save_primary_expr: Syntax.primary_expr
+    Syntax.primary_expr = Syntax.primary_expr_act
+    r: TryApply{Syntax.parser_action_old, [parser]}
+    Syntax.primary_expr = save_primary_expr
     r
 }
 
-#### Syntax definitions which are effective only in shell-mode.
-module Shell {
-    primary_expr ::= "%" decimal
-                     {
-                        if ($1 == 0 or $1 > shell_outputs.size) {
-                            throw `Error{!LOCATION, "The argument of % must be a line number"}
-                        }
-                        `shell_outputs[!$1]
-                     }
-                   | "%"         { `shell_outputs[0] }
-}
+
+### Syntax definitions which are effective only in shell-mode.
+Shell: `Module{Shell}
+Shell.Syntax: `Module{Syntax}
+
+Shell.primary_expr ::= "%" decimal
+                 {
+                    if ($1 == 0 or $1 > shell_outputs.size) {
+                        throw `Error{!LOCATION, "The argument of % must be a line number"}
+                    }
+                    `shell_outputs[!$1]
+                 }
+                     | "%"         { `shell_outputs[0] }
 
 enable_shell_syntax(): {
-    primary_expr = primary_expr | Shell::Syntax::primary_expr
+    Syntax.primary_expr = Syntax.primary_expr | Shell.Syntax.primary_expr
 }
-
-EndModule{}
-EndModule{}

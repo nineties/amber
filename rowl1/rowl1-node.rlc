@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2013-07-31 16:02:46 nineties $
+; $Id: rowl1-node.rlc 2013-10-13 22:24:40 nineties $
 ;
 
 (import "rlvm-compile")
@@ -11,7 +11,6 @@
 (compile `object `(
 
 (import "rowl1-util")
-(import "rowl1-symtable")
 
 (extern object current_loc)
 
@@ -63,19 +62,11 @@
 
 (export var MakeObject  (to_sym "MakeObject"))
 
-(export var FieldRef  (to_sym "%FieldRef")) ; only for internal use
-
 (export var Import        (to_sym "Import"))
-(export var Open          (to_sym "Open"))
+(export var Define        (to_sym "Define"))
 (export var DefSyntax     (to_sym "DefineSyntax"))
-(export var RepSyntax     (to_sym "ReplaceSyntax"))
 (export var ReserveSymbol (to_sym "ReserveSymbol"))
-(export var DefVariable   (to_sym "DefineVariable"))
-(export var DefFunction   (to_sym "DefineFunction"))
-(export var BeginModule   (to_sym "BeginModule"))
-(export var EndModule     (to_sym "EndModule"))
 
-(export var Qualified   (to_sym "Qualified"))
 (export var Assign      (to_sym "Assign"))
 (export var Lambda      (to_sym "Lambda"))
 (export var Return      (to_sym "Return"))
@@ -110,15 +101,16 @@
 (export var Some   (to_sym "Some"))
 
 ; internal nodes
-(export var ModuleVariable (to_sym "ModuleVariable"))
-(export var LocalVariable  (to_sym "LocalVariable"))
+(export var GlobalVariable (to_sym "GlobalVariable")) ; GlobalVariable{sym}
+(export var LocalVariable  (to_sym "LocalVariable")) ; LocalVariable{idx}
+(export var Argument       (to_sym "Argument")) ; Argument{idx}
+(export var ListAt         (to_sym "ListAt"))   ; ListAt{var, idx}
+(export var ListFrom       (to_sym "ListFrom")) ; ListFrom{var, idx}
+(export var TupleAt        (to_sym "TupleAt"))  ; TupleAt{var, idx}
+(export var ArrayAt        (to_sym "ArrayAt"))  ; ArrayAt{var, idx}
+(export var RestOf         (to_sym "RestOf"))   ; RestOf{var, idx}
+(export var FieldRef       (to_sym "FieldRef")) ; FieldRef{var, idx}
 (export var Arity          (to_sym "Arity"))
-(export var Argument       (to_sym "Argument"))
-(export var ListAt         (to_sym "ListAt"))
-(export var ListFrom       (to_sym "ListFrom"))
-(export var TupleAt        (to_sym "TupleAt"))
-(export var ArrayAt        (to_sym "ArrayAt"))
-(export var RestOf         (to_sym "RestOf"))
 
 (export var Assembler        (to_builtin_sym "Assembler"))
 (export var Builtin          (to_builtin_sym "Builtin"))
@@ -131,10 +123,8 @@
 (export var Module           (to_builtin_sym "Module"))
 
 (export var Global (to_sym "Global"))
-(export var Lang   (to_sym "Lang"))
 (export var Amber  (to_sym "Amber"))
 (export var Syntax (to_sym "Syntax"))
-(export var Std    (to_sym "Std"))
 
 ; Builtin headers
 (export var BSymbol (to_builtin_sym "Symbol"))
@@ -333,7 +323,6 @@
         (@BoundFunctionE    . (return (to_sym "Function")))
         (@InputFileStreamE  . (return (to_sym "InputFileStream")))
         (@OutputFileStreamE . (return (to_sym "OutputFileStream")))
-        (@ModuleE           . (return (to_sym "Module")))
         (@ParserE           . (return (to_sym "Parser")))
         (@StringIOE         . (return (to_sym "StringIO")))
         (@BigIntE           . (return Int))
@@ -360,7 +349,6 @@
         (@BoundFunctionE    . (return Function))
         (@InputFileStreamE  . (return InputFileStream))
         (@OutputFileStreamE . (return OutputFileStream))
-        (@ModuleE           . (return Module))
         (@ParserE           . (return Parser))
         (@StringIOE         . (return StringIO))
         (@BigIntE           . (return BBigInt))
@@ -370,7 +358,7 @@
         (@StringE           . (return BString))
         (@FloatE            . (return BFloat))
         (@BuiltinE          . (return Builtin))
-        (default            . (not_reachable "node_head"))
+        (default            . (not_reachable "node_bhead"))
         ))
     ))
 
@@ -559,12 +547,12 @@
     (return expr)
     ))
 
-(export fun qualified (outer inner) (
-    (return (make_object2 Qualified (to_sym outer) inner))
-    ))
-
 (export fun located (loc expr) (
     (return (make_object2 Located loc expr))
+    ))
+
+(export fun slot (lhs rhs) (
+    (return (make_object2 Slot lhs rhs))
     ))
 
 (export fun quote (expr) (
@@ -624,7 +612,7 @@
     ))
 
 (export fun defvar (v arg) (
-    (return (make_object2 DefVariable v arg))
+    (return (make_object2 Define v arg))
     ))
 
 ; patterns
@@ -680,7 +668,6 @@
         (@BoundFunctionE    . (return (string "Function")))
         (@InputFileStreamE  . (return (string "InputFileStream")))
         (@OutputFileStreamE . (return (string "OutputFileStream")))
-        (@ModuleE           . (return (string "Module")))
         (@ParserE           . (return (string "Parser")))
         (@StringIOE         . (return (string "StringIO")))
         (@BigIntE           . (return (string "BigInt")))

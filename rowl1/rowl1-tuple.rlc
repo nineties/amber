@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2013-03-19 11:49:08 nineties $
+; $Id: rowl1-list.rlc 2013-08-18 21:44:16 nineties $
 ;
 
 (import "rlvm-compile")
@@ -12,13 +12,13 @@
 
 (import "rowl1-util")
 (import "rowl1-node")
-(import "rowl1-module")
+(import "rowl1-object")
 (import "rowl1-compile")
 (import "rowl1-assemble")
 (import "rowl1-error")
 
+(extern object global)
 (extern object current_loc)
-(extern object current_mod)
 
 (export fun tuple2 (a b) (
     (var t (allocate_tuple 2))
@@ -68,7 +68,7 @@
     ))
 
 (fun tp_hash (t) (
-    (var f (lookup_func current_mod (to_sym "hash")))
+    (var f (lookup_func global (to_sym "hash")))
     (var n (seq_size t))
     (var h 0)
     (for i 0 n (do
@@ -80,7 +80,7 @@
 (fun tp_equal (t1 t2) (
     (var n (seq_size t1))
     (if (!= (seq_size t2) n) (return @C_FALSE))
-    (var f (lookup_func current_mod (to_sym "equal")))
+    (var f (lookup_func global (to_sym "equal")))
     (for i 0 n (do
         (if (== (byterun f
             (array_get object t1 i) (array_get object t2 i)) @C_FALSE)
@@ -147,15 +147,15 @@
     (return t)
     ))
 
-(export fun setup_tuple (std) (
-    (var mod (create_module std (to_sym "Tuple")))
+(export fun setup_tuple (global) (
+    (var mod (set_undef_slot global (to_sym "Tuple") (make_object1 Module (to_sym "Tuple"))))
     (add_function1 mod (to_sym "new") intT tp_new 0)
-    (add_function1 std (to_sym "length") tupleT tp_length 0)
-    (add_function1 std (to_sym "size") tupleT tp_length 0)
-    (add_function1 std (to_sym "hash") tupleT tp_hash 0)
-    (add_function2 std (to_sym "equal") tupleT tupleT tp_equal 0)
-    (add_function2 std (to_sym "at") tupleT intT tp_at 0)
-    (add_function3 std (to_sym "store") tupleT intT DontCare tp_store 0)
+    (add_function1 global (to_sym "length") tupleT tp_length 0)
+    (add_function1 global (to_sym "size") tupleT tp_length 0)
+    (add_function1 global (to_sym "hash") tupleT tp_hash 0)
+    (add_function2 global (to_sym "equal") tupleT tupleT tp_equal 0)
+    (add_function2 global (to_sym "at") tupleT intT tp_at 0)
+    (add_function3 global (to_sym "store") tupleT intT DontCare tp_store 0)
     ))
 
     ))

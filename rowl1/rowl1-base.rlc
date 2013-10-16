@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-base.rlc 2013-07-31 19:34:41 nineties $
+; $Id: rowl1-base.rlc 2013-08-18 21:42:57 nineties $
 ;
 
 (import "rlvm-compile")
@@ -12,12 +12,13 @@
 
 (import "rowl1-util")
 (import "rowl1-node")
+(import "rowl1-object")
 (import "rowl1-compile")
 (import "rowl1-assemble")
 (import "rowl1-error")
 
+(extern object global)
 (extern object current_loc)
-(extern object current_mod)
 
 (fun _head (o) (
     (return (node_head o))
@@ -28,7 +29,7 @@
     ))
 
 (fun _equal (a b) (
-    (var eql (lookup_func current_mod (qualified "Lang" (to_sym "equal"))))
+    (var eql (lookup_func global (to_sym "equal")))
     (return (_equal_sub a b eql))
     ))
 
@@ -58,7 +59,7 @@
 
 (fun _hash (obj) (
     (if (is_atom obj) (return (box (umod obj 65537))))
-    (var hash (lookup_func current_mod (qualified "Lang" (to_sym "hash"))))
+    (var hash (lookup_func global (to_sym "hash")))
     (var val 0)
     (for i 0 (node_size obj)
         (+= val (* (unbox (byterun hash (node_arg obj i))) 13))
