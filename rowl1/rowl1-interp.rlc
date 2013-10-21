@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2013-10-14 12:42:00 nineties $
+; $Id: rowl1-interp.rlc 2013-10-21 18:09:21 nineties $
 ;
 
 (import "rlvm-compile")
@@ -78,7 +78,6 @@
     (import_lib "std/numeric.ab")
     (import_lib "std/format.ab")
     (import_lib "std/list.ab")
-    (import_lib "std/sequence.ab")
     (import_lib "std/array.ab")
     (import_lib "std/table.ab")
     (import_lib "std/oop.ab")
@@ -107,10 +106,6 @@
     ))
 
 (fun eval (expr) (
-    (debugs "eval:")
-    (debugpf expr)
-    (debugs "primary_expr:")
-    (debugpf (get_slot (get_slot global Syntax) (to_sym "primary_expr")))
     (return (byterun (lookup_func global Eval) expr))
     ))
 
@@ -135,8 +130,15 @@
         (return expr)
         ))
 
-    ; Don't rewrite patterns
+    ; Don't rewrite patterns but rewrite guard expressions
     (if (== hd Define) (do
+        (var lhs (node_arg expr 0))
+        (if (== (node_head lhs) Apply) (do
+            (var guard (node_arg lhs 1))
+            (if (== (node_head guard) When)
+                (node_arg_set guard 1 (rewrite (node_arg guard 1)))
+                )
+            ))
         (node_arg_set expr 1 (rewrite (node_arg expr 1)))
         (return expr)
         ))

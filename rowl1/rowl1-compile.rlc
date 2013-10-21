@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2013-10-16 15:04:19 nineties $
+; $Id: rowl1-compile.rlc 2013-10-21 18:06:03 nineties $
 ;
 
 (import "rlvm-compile")
@@ -476,13 +476,16 @@
         ; free variables of lambdas will be closure variables.
         (var fv (free_variables expr))
         (if (! fv) (return expr))
+        (var mkcls @FALSE)
         (while fv (do
             (var info (symtable_find tbl (car fv)))
+            (if info (= mkcls @TRUE))
             (if (== info maybe) (do
                 (symtable_replace tbl (car fv) @C_TRUE)
                 ))
             (= fv (cdr fv))
             ))
+        (if (! mkcls) (return expr))
         (return (make_object2 Closure @C_NIL expr))
         ))
     ; Closure has no closure variables since it is already closed.
@@ -993,37 +996,41 @@
 ; f(x,y,z): e       (in global scope)
 (fun compile_define_global (asm expr) (
     (var lhs (node_arg expr 0))
+    (var rhs (node_arg expr 1))
     (var ty (node_bhead lhs))
-    (if (== ty BSymbol)
-        (return (compile_define_global_variable asm lhs (node_arg expr 1)))
-    (if (== ty Tuple)
-        (return (compile_define_multi_variable asm lhs (node_arg expr 1)))
+    (if (&& (== (node_size expr) 3) (== (node_arg expr 2) (to_sym "partial")))
+        (return (compile_define_global_function asm lhs rhs))
+        )
     (if (== ty Apply)
-        (return (compile_define_global_function asm
-            (node_arg lhs 0) (node_arg lhs 1) (node_arg expr 1)))
+        (throw (unknown_expression current_loc expr))
+    (if (== ty BSymbol)
+        (return (compile_define_global_variable asm lhs rhs))
+    (if (== ty Tuple)
+        (return (compile_define_multi_variable asm lhs rhs))
     (if (== ty Slot)
-        (return (compile_define_slot asm (node_arg expr 0) (node_arg expr 1)))
+        (return (compile_define_slot asm lhs rhs))
         ))))
     (throw (unknown_expression current_loc expr))
     ))
-
-
 
 ; v: e              (in local scope)
 ; (x,y,z): e        (in local scope)
 ; f(x,y,z): e       (in local scope)
 (fun compile_define_local (asm expr) (
     (var lhs (node_arg expr 0))
+    (var rhs (node_arg expr 1))
+    (if (&& (== (node_size expr) 3) (== (node_arg expr 2) (to_sym "partial")))
+        (return (compile_define_local_function asm lhs rhs))
+        )
     (var ty (node_bhead lhs))
-    (if (|| (== ty BSymbol) (== ty Ref))
-        (return (compile_define_local_variable asm lhs (node_arg expr 1)))
-    (if (== ty Tuple)
-        (return (compile_define_multi_variable asm lhs (node_arg expr 1)))
     (if (== ty Apply)
-        (return (compile_define_local_function asm
-            (node_arg lhs 0) (node_arg lhs 1) (node_arg expr 1)))
+        (return (unknown_expression current_loc expr))
+    (if (|| (== ty BSymbol) (== ty Ref))
+        (return (compile_define_local_variable asm lhs rhs))
+    (if (== ty Tuple)
+        (return (compile_define_multi_variable asm lhs rhs))
     (if (== ty Slot)
-        (return (compile_define_slot asm (node_arg expr 0) (node_arg expr 1)))
+        (return (compile_define_slot asm lhs rhs))
         ))))
     (throw (unknown_expression current_loc expr))
     ))
@@ -1074,22 +1081,19 @@
     (put_car asm)
     ))
 
-(fun compile_define_global_function (asm lhs args body) (
+(fun compile_define_global_function (asm lhs lam) (
     (var ty (node_bhead lhs))
     (if (== ty Slot) (do
         (var obj (node_arg lhs 0))
         (var sym (node_arg_symbol lhs 1))
-        (compile asm (lambda args body))
+        (compile asm lam)
         (put_push asm sym)
         (compile asm obj)
         (compile_simple_call asm 3 append_slot)
         return
         ))
 
-    (if (|| (!= ty BSymbol) (!= (node_bhead args) List))
-        (throw (unknown_expression current_loc (make_object2 Define (apply lhs args) body)))
-        )
-    (compile asm (lambda args body))
+    (compile asm lam)
     (put_push asm lhs)
     (put_push asm global)
     (compile_simple_call asm 3 append_function)
@@ -1116,40 +1120,27 @@
     (put_store_lvar asm idx)
     ))
 
-(fun compile_define_local_function (asm lhs args body) (
+(fun compile_define_local_function (asm lhs lam) (
     (var ty (node_bhead lhs))
     (if (== ty Slot) (do
         (var obj (node_arg lhs 0))
         (var sym (node_arg_symbol lhs 1))
-        (compile asm (lambda args body))
+        (compile asm lam)
         (put_push asm sym)
         (compile asm obj)
         (compile_simple_call asm 3 append_slot)
         return
         ))
 
-    (if (|| (!= ty BSymbol) (!= (node_bhead args) List))
-        (throw (unknown_expression current_loc (make_object2 Define (apply lhs args) body)))
+    (if (&& (!= ty BSymbol) (!= ty Ref))
+        (throw (unknown_expression current_loc (make_object2 Define lhs lam))) 
         )
-    (var info (symtable_find_local variables lhs))
-    (var idx 0)
-    (var lam (lambda args body))
-    (if info
-        (do
-            (= idx (node_arg_int info 0))
-            (put_load_lvar asm idx)
-            (compile asm lam)
-            (compile_simple_call asm 2 fusion_function)
-            (put_dup asm)
-            (put_store_lvar asm idx)
+
+    (if (symtable_find_local variables (variable_name lhs))
+        (return (compile_define_local_variable asm lhs
+            (apply (to_sym "fusion") (list2 lam lhs))))
+        (return (compile_define_local_variable asm lhs lam))
         )
-        (do
-            (= idx (get_lvar_idx))
-            (symtable_add variables lhs (make_lvar idx))
-            (compile asm lam)
-            (put_dup asm)
-            (put_store_lvar asm idx)
-        ))
     ))
 
 (fun compile_decons (asm expr) (
@@ -1770,15 +1761,26 @@
     (var lhs (node_arg expr 0))
     (var rhs (node_arg expr 1))
 
+    ; f(x) = e is equivarent to f = x -> e | f
+    (if (&& (== (node_size expr) 3) (== (node_arg expr 2) (to_sym "partial"))) (do
+        (return (compile asm (assign lhs (apply (to_sym "fusion") (list2 rhs lhs)))))
+        ))
+
     (var lty (node_bhead lhs))
     (if (== lty Apply)
-        (return (compile_function_assign asm lhs rhs))
+        (throw (unknown_expression current_loc expr))
         )
     (if (== lty Slot)
         (return (compile_assign_slot asm lhs rhs))
         )
     (if (== lty Subscript)
         (return (compile_subscript_assign asm lhs rhs))
+        )
+    (if (== lty FieldRef)
+        (return (compile_fieldref_assign asm lhs rhs))
+        )
+    (if (== lty Ref)
+        (return (compile_clsref_assign asm lhs rhs))
         )
 
     (if (! (is_symbol lhs))
@@ -1829,9 +1831,7 @@
     (put_jcall asm (* 4 arity))
     ))
 
-(fun compile_subscript_assign (asm expr) (
-    (var lhs (node_arg expr 0))
-    (var rhs (node_arg expr 1))
+(fun compile_subscript_assign (asm lhs rhs) (
     (var opd (node_arg lhs 0))
     (var args (node_arg_list lhs 1))
 
@@ -2018,9 +2018,7 @@
     (put_fieldget asm (node_arg_int expr 1))
     ))
 
-(fun compile_clsref_assign (asm expr) (
-    (var lhs (node_arg expr 0))
-    (var rhs (node_arg expr 1))
+(fun compile_clsref_assign (asm lhs rhs) (
     (compile asm rhs)
     (put_dup asm)
     (compile asm (node_arg lhs 0))
@@ -2032,9 +2030,7 @@
     (put_fieldget asm (node_arg_int expr 1))
     ))
 
-(fun compile_fieldref_assign (asm expr) (
-    (var lhs (node_arg expr 0))
-    (var rhs (node_arg expr 1))
+(fun compile_fieldref_assign (asm lhs rhs) (
     (compile asm rhs)
     (put_dup asm)
     (compile asm (node_arg lhs 0))
@@ -2175,7 +2171,6 @@
     (add_compiler global (make_object1 Import DontCare) topscope_only)
 
     (add_compiler global (make_object2 MakeObject DontCare DontCare) compile_make_object)
-    (add_compiler global (make_object2 Define DontCare DontCare) compile_define)
     (add_compiler global symT compile_var)
     (add_compiler global (quote @C_TRUE) compile_special)
     (add_compiler global (quote @C_FALSE) compile_special)
@@ -2235,19 +2230,17 @@
     (add_compiler global (make_object2 Lambda DontCare DontCare) compile_lambda)
 
     (add_compiler global (make_object2 Subscript DontCare DontCare) compile_subscript)
-    (add_compiler global (assign DontCare DontCare) compile_assign)
+
+    (add_compiler global (domainP Define) compile_define)
+    (add_compiler global (domainP Assign) compile_assign)
 
     (add_compiler global (make_object2 Slot DontCare symT) compile_slot)
 
     ; internal expressions
     (add_compiler global (make_object2 FieldRef DontCare intT) compile_fieldref)
-    (add_compiler global (make_object2 Assign (make_object2 FieldRef DontCare intT) DontCare) compile_fieldref_assign)
-
     (add_compiler global (make_object1 AllocClsEnv intT) compile_alloc_clsenv)
     (add_compiler global (make_object2 Closure DontCare DontCare) compile_closure)
     (add_compiler global (make_object3 Ref DontCare intT symT) compile_clsref)
-    (add_compiler global (make_object2 Assign
-        (make_object3 Ref DontCare intT symT) DontCare) compile_clsref_assign)
     (add_compiler global (quote Decons) compile_decons)
 
     ; vertical composition

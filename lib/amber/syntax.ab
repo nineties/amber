@@ -2,7 +2,7 @@ Assign{Slot{Syntax,comment}, Slot{Syntax,shell_style_comment}}
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2013-10-16 09:47:05 nineties $
+# $Id: syntax.ab 2013-10-21 17:58:47 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -344,17 +344,34 @@ ReserveSymbol{not, and, or, when, open, if, else, case, of,
 
 ## Syntax Sugars
 
-rewrite(+x)     = `uplus(!x)
-rewrite(-x)     = `uminus(!x)
-rewrite(x + y)  = `add(!x, !y)
-rewrite(x - y)  = `sub(!x, !y)
-rewrite(x * y)  = `mul(!x, !y)
-rewrite(x ^ y)  = `pow(!x, !y)
-rewrite(x / y)  = `div(!x, !y)
-rewrite(x % y)  = `mod(!x, !y)
-rewrite(x << y) = `shiftL(!x, !y)
-rewrite(x >> y) = `shiftR(!x, !y)
-rewrite(x | y)  = `fusion(!x, !y)
+rewrite = fusion(
+        Define{Apply{f, args}, e} -> `Define{!f, Lambda{!args, !e}, partial},
+        rewrite
+        )
+rewrite = fusion(
+        Assign{Apply{f, args}, e} -> `Assign{!f, Lambda{!args, !e}, partial},
+        rewrite
+        )
+
+rewrite(+x)         = `uplus(!x)
+rewrite(-x)         = `uminus(!x)
+rewrite(x + y)      = `add(!x, !y)
+rewrite(x - y)      = `sub(!x, !y)
+rewrite(x * y)      = `mul(!x, !y)
+rewrite(x ^ y)      = `pow(!x, !y)
+rewrite(x / y)      = `div(!x, !y)
+rewrite(x % y)      = `mod(!x, !y)
+rewrite(x << y)     = `shiftL(!x, !y)
+rewrite(x >> y)     = `shiftR(!x, !y)
+rewrite(x | y)      = `fusion(!x, !y)
+rewrite(x < y)      = `lt(!x, !y)
+rewrite(x > y)      = `gt(!x, !y)
+rewrite(x <= y)     = `le(!x, !y)
+rewrite(x >= y)     = `ge(!x, !y)
+rewrite(x == y)     = `equal(!x, !y)
+rewrite(x != y)     = `(not equal(!x, !y))
+rewrite(x is y)     = `identical(!x, !y)
+rewrite(x is not y) = `(not identical(!x, !y))
 
 {
     rewrite_operator_assign(lhs, rhs, op): {
@@ -398,14 +415,6 @@ rewrite(x | y)  = `fusion(!x, !y)
     rewrite(x %= y)     = rewrite_operator_assign(x, y, \mod)
     rewrite(x <<= y)    = rewrite_operator_assign(x, y, \shiftL)
     rewrite(x >>= y)    = rewrite_operator_assign(x, y, \shiftR)
-    rewrite(x < y)      = `lt(!x, !y)
-    rewrite(x > y)      = `gt(!x, !y)
-    rewrite(x <= y)     = `le(!x, !y)
-    rewrite(x >= y)     = `ge(!x, !y)
-    rewrite(x == y)     = `equal(!x, !y)
-    rewrite(x != y)     = `(not equal(!x, !y))
-    rewrite(x is y)     = `identical(!x, !y)
-    rewrite(x is not y) = `(not identical(!x, !y))
 }
 
 ### Extend primary_expr so as to enable use $... to refer nodes
