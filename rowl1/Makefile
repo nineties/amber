@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2013-08-20 00:46:24 nineties $
+# $Id: Makefile 2013-11-17 18:57:04 nineties $
 
 TOPDIR = ..
 ROWL0DIR = $(TOPDIR)/rowl0
@@ -98,6 +98,8 @@ RLC1OBJECTS = rowl1-main.rlo\
 			  rowl1-numeric.rlo\
 			  rowl1-bigint.rlo\
 			  rowl1-float.rlo\
+			  rowl1-math.rlo\
+			  rowl1-random.rlo\
 			  rowl1-string.rlo\
 			  rowl1-list.rlo\
 			  rowl1-tuple.rlo\
@@ -117,7 +119,7 @@ RLVMCOMPILER = rlci\
 startup.rlo		: $(RLVMCOMPILER)
 rowl1-main.rlo	 : $(RLVMCOMPILER) rowl1-types.rlc rowl1-interp.rlo
 rowl1-util.rlo	 : $(RLVMCOMPILER) rowl1-types.rlc
-rowl1-interp.rlo   : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-error.rlo rowl1-object.rlo rowl1-symtable.rlo rowl1-compile.rlo rowl1-packrat.rlo rowl1-pprint.rlo
+rowl1-interp.rlo   : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-error.rlo rowl1-object.rlo rowl1-symtable.rlo rowl1-compile.rlo rowl1-packrat.rlo rowl1-pprint.rlo rowl1-math.rlo
 rowl1-node.rlo	 : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo
 rowl1-error.rlo: $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo
 rowl1-object.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-compile.rlo rowl1-error.rlo
@@ -139,8 +141,8 @@ rowl1-table.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo 
 rowl1-io.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-object.rlo rowl1-compile.rlo rowl1-error.rlo rowl1-pprint.rlo rowl1-bigint.rlo
 rowl1-pprint.rlo : $(RLVMCOMPILER) rowl1-types.rlo rowl1-util.rlo rowl1-node.rlo rowl1-compile.rlo
 
-rowl1-random.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-compile.rlo rowl1-assemble.rlo rowl1-error.rlo rowl1-numeric.rlo rowl1-bigint.rlo rowl1-float.rlo
-rowl1-math.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-float.rlo rowl1-numeric.rlo rowl1-compile.rlo rowl1-assemble.rlo rowl1-error.rlo
+rowl1-random.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-object.rlo rowl1-compile.rlo rowl1-assemble.rlo rowl1-error.rlo rowl1-numeric.rlo rowl1-bigint.rlo rowl1-float.rlo
+rowl1-math.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-object.rlo rowl1-float.rlo rowl1-numeric.rlo rowl1-compile.rlo rowl1-assemble.rlo rowl1-error.rlo
 rowl1-pprint.rlo : $(RLVMCOMPILER) rowl1-types.rlo rowl1-util.rlo rowl1-node.rlo rowl1-compile.rlo
 rowl1-gc.rlo : $(RLVMCOMPILER) rowl1-types.rlo rowl1-util.rlo rowl1-node.rlo rowl1-compile.rlo rowl1-symbol.rlo
 

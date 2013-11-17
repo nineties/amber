@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-math.rlc 2013-03-18 21:40:26 nineties $
+; $Id: rowl1-math.rlc 2013-11-17 18:46:51 nineties $
 ;
 
 (import "rlvm-compile")
@@ -12,18 +12,18 @@
 
 (import "rowl1-util")
 (import "rowl1-node")
+(import "rowl1-object")
 (import "rowl1-float")
 (import "rowl1-numeric")
-(import "rowl1-module")
 (import "rowl1-compile")
 (import "rowl1-assemble")
 (import "rowl1-error")
 
+(extern object global)
 (extern object current_loc)
-(extern object current_mod)
 
 (fun float_sqrt (f) (
-    (if (float_sin f)
+    (if (float_sign f)
         (throw (out_of_domain current_loc (to_sym "sqrt") f)))
     (= f (copy_float f))
     (return (fsqrt f))
@@ -69,7 +69,7 @@
 
 (var to_f (to_sym "to_f"))
 (fun to_float (v) (
-    (var r (byterun (lookup_func current_mod to_f) v))
+    (var r (byterun (lookup_func global to_f) v))
     (if (== r @C_UNDEF)
         (throw (make_object3 Exception current_loc
             (string "Can't convert to floating-point number")
@@ -112,25 +112,25 @@
     (return (call1 (to_sym "log") (to_float x)))
     ))
 
-(extern fun compile_matching)
-(export fun setup_math (std) (
-    (add_function1 std (to_sym "sqrt") DontCare sqrt 0)
-    (add_function1 std (to_sym "sin") DontCare sin 0)
-    (add_function1 std (to_sym "cos") DontCare cos 0)
-    (add_function1 std (to_sym "tan") DontCare tan 0)
-    (add_function2 std (to_sym "pow") DontCare DontCare pow 0)
-    (add_function2 std (to_sym "log") DontCare DontCare log 0)
-    (add_function1 std (to_sym "log") DontCare log1 0)
+(export fun setup_math (global) (
+    (var math (set_undef_slot global (to_sym "Math") (make_object1 Module (to_sym "Math"))))
+    (add_function1 math (to_sym "sqrt") DontCare sqrt 0)
+    (add_function1 math (to_sym "sin") DontCare sin 0)
+    (add_function1 math (to_sym "cos") DontCare cos 0)
+    (add_function1 math (to_sym "tan") DontCare tan 0)
+    (add_function2 math (to_sym "pow") DontCare DontCare pow 0)
+    (add_function2 math (to_sym "log") DontCare DontCare log 0)
+    (add_function1 math (to_sym "log") DontCare log1 0)
 
-    (add_function1 std (to_sym "sqrt") floatT float_sqrt 0)
-    (add_function1 std (to_sym "sin") floatT float_sin 0)
-    (add_function1 std (to_sym "cos") floatT float_cos 0)
-    (add_function1 std (to_sym "tan") floatT float_tan 0)
-    (add_function2 std (to_sym "pow") floatT floatT float_pow 0)
-    (add_function2 std (to_sym "log") floatT floatT float_log 0)
-    (add_function1 std (to_sym "log") floatT float_logE 0)
-    (add_function1 std (to_sym "log2") floatT float_log2 0)
-    (add_function1 std (to_sym "log10") floatT float_log10 0)
+    (add_function1 math (to_sym "sqrt") floatT float_sqrt 0)
+    (add_function1 math (to_sym "sin") floatT float_sin 0)
+    (add_function1 math (to_sym "cos") floatT float_cos 0)
+    (add_function1 math (to_sym "tan") floatT float_tan 0)
+    (add_function2 math (to_sym "pow") floatT floatT float_pow 0)
+    (add_function2 math (to_sym "log") floatT floatT float_log 0)
+    (add_function1 math (to_sym "log") floatT float_logE 0)
+    (add_function1 math (to_sym "log2") floatT float_log2 0)
+    (add_function1 math (to_sym "log10") floatT float_log10 0)
     ))
 
    ))
