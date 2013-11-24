@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-float.rlc 2013-08-18 18:20:42 nineties $
+; $Id: rowl1-float.rlc 2013-11-24 13:45:41 nineties $
 ;
 
 (import "rlvm-compile")
@@ -137,6 +137,7 @@
 (var two^63 (bigshl (uint_to_bint 1) 63))
 (var two^64 (bigshl (uint_to_bint 1) 64))
 
+; This implementation is not efficient.
 (fun encode_float (sign f n e) (
     (if (bint_is_zero f) (do
         (var float (allocate_float))
@@ -145,60 +146,84 @@
         (return float)
         ))
 
-    (var shift 0)
-    (if (>= (+ n e) 1)
-        (= shift (- 56 (* 3 (+ n e))))
-        (= shift (- 57 (* 4 (+ n e))))
+    (= f (to_bint f))
+    (if (>= e 0)
+        (do
+            (while (>= e 9) (do
+                (= f (mul f ten^9))
+                (-= e 9)
+                ))
+            (while (> e 0) (do
+                (= f (mul f (box 10)))
+                (-= e 1)
+                ))
+            (= f (to_bint f))
+            (var nbits (bint_ndigits2 f))
+            (var exp (- nbits 1))
+            (if (> exp 1024) (return (float_infinity)))
+            (if (<= exp -1024) (return (float_uminus (float_infinity))))
+            (if (!= nbits 55) (do ; mantissa 53bit + Gbit + Rbit
+                (= f (to_bint (bint_shiftR f (box (- nbits 55)))))
+                ))
+            (var lo (bint_digit f 0))
+            (var ulp (& (>> lo 2) 1))
+            (var G (& (>> lo 1) 1))
+            (var R (& lo 1))
+            (if (&& G (|| ulp R))
+                (= f (to_bint (add f (box 0x4))))
+                )
+            (= nbits (bint_ndigits2 f))
+            (= f (to_bint (bint_shiftR f (box (- nbits 53)))))
+            (= lo (bint_digit f 0))
+            (var hi (bint_digit f 1))
+            (= hi (| (& hi 0xfffff) (<< (& (+ exp 1023) 0x7ff) 20)))
+            (if sign (= hi (| hi 0x80000000)))
+            (var float (allocate_float))
+            (field_set float 0 lo)
+            (field_set float 1 hi)
+            (return float)
         )
+        (do
+            (= e (- e))
+            (var n (bint_ndigits2 f))
+            (var p (+ (- 55 (- n 1)) (* e 4)))
+            (= f (to_bint (bint_shiftL f (box p))))
 
-    (= f (bint_shiftL f (box shift)))
-
-    ; here f has more than 53 bits (so, it is a bigint)
-    (var rem 0)
-    (if (> e 0) (do
-        (var b (uint_to_bint 1))
-        (while (> e 0) (do
-            (= b (mul b (box 10)))
-            (-= e 1)
-            ))
-        (= f (mul f b)) 
-        )
-    (if (< e 0) (do
-        (var b (uint_to_bint 1))
-        (while (< e 0) (do
-            (= b (mul b (box 10)))
-            (+= e 1)
-            ))
-        (var r (bigdiv f (to_bint b)))
-        (if (! (bint_is_zero r)) (= rem 1))
-        )))
-
-    (var nd (bint_ndigits2 f))
-    (var exp (- (- nd 1) shift))
-    (var offs (- nd 53))
-
-    (var w (bint_digit f 0))
-    (var ulp (& (>> w offs) 1))
-    (var G (& (>> w (- offs 1)) 1))
-    (var R 0)
-    (if (|| rem (& w (- (<< 1 offs) 1))) (= R 1))
-    (= f (bint_shiftR f (box offs)))
-    (if (&& G (|| ulp R))
-        (= f (add f (box 1)))
-        (if (== (bint_digit f 1) 0x00200000)
-            (+= exp 1) ; carry
-            )
-        )
-
-    (= w (bint_digit f 1))
-    (= w (| (& w 0xfffff) (<< (& (+ exp 1023) 0x7ff) 20)))
-    (if sign (= w (| w 0x80000000)))
-    (bint_set_digit f 1 w)
-
-    (var float (allocate_float))
-    (field_set float 0 (bint_digit f 0))
-    (field_set float 1 (bint_digit f 1))
-    (return float)
+            ; create 10^e
+            (var b (box 1))
+            (while (>= e 9) (do
+                (= b (mul b ten^9))
+                (-= e 9)
+                ))
+            (while (> e 0) (do
+                (= b (mul b (box 10)))
+                (-= e 1)
+                ))
+            (bigdiv f (to_bint b))
+            (var nbits (bint_ndigits2 f))
+            (if (!= nbits 55) (do  ; mantissa + Gbit + Rbit
+                (= f (to_bint (bint_shiftR f (box (- nbits 55)))))
+                (-= p (- nbits 55))
+                ))
+            (var lo (bint_digit f 0))
+            (var ulp (& (>> lo 2) 1))
+            (var G (& (>> lo 1) 1))
+            (var R (& lo 1))
+            (if (&& G (|| ulp R))
+                (= f (to_bint (add f (box 0x4))))
+                )
+            (= nbits (bint_ndigits2 f))
+            (= f (to_bint (bint_shiftR f (box (- nbits 53)))))
+            (var exp (- (- nbits  p) 1))
+            (= lo (bint_digit f 0))
+            (var hi (bint_digit f 1))
+            (= hi (| (& hi 0xfffff) (<< (& (+ exp 1023) 0x7ff) 20)))
+            (if sign (= hi (| hi 0x80000000)))
+            (var float (allocate_float))
+            (field_set float 0 lo)
+            (field_set float 1 hi)
+            (return float)
+        ))
     ))
 
 ; ==== translate floating-point number to ascii-string ====
@@ -283,7 +308,6 @@
     ; less than or equal 16 digits in base 10.
     (var digits (allocate_carray 16))
     (var n (generate digits 0 r s mp mm B low_ok high_ok))
-
     (return (format_float sign k digits n))
     ))
 
