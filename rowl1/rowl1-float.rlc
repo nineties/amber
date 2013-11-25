@@ -2,8 +2,11 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-float.rlc 2013-11-26 00:36:00 nineties $
+; $Id: rowl1-float.rlc 2013-11-26 03:28:50 nineties $
 ;
+
+; Since Amber has no 64-bit integer, this source code uses bignums instead.
+; It will be refined in newer version of Amber.
 
 (import "rlvm-compile")
 (import "rowl1-types")
@@ -257,19 +260,17 @@
     ))
 
 ; ==== translate floating-point number to ascii-string ====
-; This implementation is base on folloing paper.
-; Robert G. Burger: "Printing Floating-Point Numbers Quickly and Accurately"
 
 (fun float_to_s (v) (
     (var s 0)
     (var f0 (field_get v 0))
     (var f1 (field_get v 1))
+    (if (&& (! f0) (! f1)) (do
+        (return (string "0.0"))
+        ))
     (if (& f1 0x80000000) (do
         (= s 1)
         (= v (float_uminus v))
-        ))
-    (if (&& (! f0) (! f1)) (do
-        (return (string "0.0"))
         ))
     (var e (- (& (>> f1 20) 0x7ff) 1023))
     (= f1 (& f1 0xfffff))
@@ -298,49 +299,136 @@
 ; v: abs of input floating-point number.
 ; f: mantissa (bigint)
 ; e: exponent
+(var ten (int_to_bint 10))
 (fun decode_float (sign f e) (
     (-= e 52)
-    (var b (int_to_bint 1))
-    (var B (int_to_bint 10))
-    (var round_p (bint_even f))
+
+    ; find k s.t. 10^k <= f*2^e < 10^(k+1) by linear search.
+    ; It is not efficient.
+    (var f_save (copy_bint f))
+    (var k 0)
     (if (>= e 0)
-        (if (== (bint_eq f (bigshl (copy_bint b) 52)) @C_FALSE)
-            (do
-                (var be (bigshl (copy_bint b) e))
-                (var fbe2 (bigshl (bigmul f be) 1))
-                (return (scale sign fbe2 (int_to_bint 2) be be 0 B round_p round_p))
-            )
-            (do
-                (var be (bigshl (copy_bint b) e))
-                (var be1 (bigshl (copy_bint be) 1))
-                (var fbe12 (bigshl (bigmul f be1) 1))
-                (return (scale sign fbe12 (int_to_bint 4) be1 be 0 B round_p round_p))
-            ))
-        (if (|| (== e -1022) (== (bint_eq f (bigshl (copy_bint b) 52)) @C_FALSE))
-            (return (scale sign (bigshl f 1) (bigshl b (- 1 e)) (int_to_bint 1) (int_to_bint 1) 0 B round_p round_p))
-            (return (scale sign (bigshl f 2) (bigshl b (- 2 e)) (int_to_bint 2) (int_to_bint 1) 0 B round_p round_p))
-            ))
-    ))
-
-(fun scale (sign r s mp mm k B low_ok high_ok) (
-    (var rmp (bigadd (copy_bint r) mp))
-    (if (|| (&& high_ok (>= (bigcmp rmp s) 0))
-            (&& (! high_ok) (> (bigcmp rmp s) 0))) (do
-        (return (scale sign r (bigmul s B) mp mm (+ k 1) B low_ok high_ok)))
+        (do
+            (bigshl f e)
+            (var b (int_to_bint 1))
+            (while (>= (bigcmp f b) 0) (do
+                (bigmul b ten)
+                (+= k 1)
+                ))
+            (-= k 1)
         )
-    (bigmul rmp B)
-    (if (|| (&& high_ok (< (bigcmp rmp s) 0))
-            (&& (! high_ok) (<= (bigcmp rmp s) 0)))
-        (return (scale sign (bigmul r B) s (bigmul mp B) (bigmul mm B) (- k 1)
-                    B low_ok high_ok)))
+        (do
+            (var b (int_to_bint 1))
+            (bigshl b (- e))
+            (if (>= (bigcmp f b) 0)
+                (do
+                    (while (>= (bigcmp f b) 0) (do
+                        (bigmul b ten)
+                        (+= k 1)
+                        ))
+                    (-= k 1)
+                )
+                (do
+                    (while (< (bigcmp f b) 0) (do
+                        (bigmul f ten)
+                        (-= k 1)
+                        ))
+                ))
+        ))
+    (= f f_save)
 
-    ; the precision of IEEE 64-bit floating point number is
-    ; less than or equal 16 digits in base 10.
-    (var digits (allocate_carray 16))
-    (var n (generate digits 0 r s mp mm B low_ok high_ok))
-    (return (format_float sign k digits n))
+    ; find integer m (10^15 <= m < 10^16) s.t. by binary search
+    ; m * 10^(k-15) <= f*2^e < (m+1) * 10^(k-15)
+    (var left  (parse_bint "1000000000000000"))
+    (var right (parse_bint "10000000000000000"))
+    (var b (int_to_bint 1))
+    (var kk (- k 15))
+    (if (< kk 0) (= kk (- kk)))
+    (while (> kk 0) (do (bigmul b ten) (-= kk 1)))
+    (while (!= (bint_sub right left) (box 1)) (do
+        (var m (bint_shiftR (bint_add left right) (box 1)))
+        (var m2 (copy_bint m))
+        (var f2 (copy_bint f))
+        (if (>= e 0)
+            (bigshl f2 e)
+            (bigshl m2 (- e))
+            )
+        (if (>= k 15)
+            (bigmul m2 b)
+            (bigmul f2 b)
+            )
+        (if (<= (bigcmp m2 f2) 0)
+            (= left m)
+            (= right m)
+            )
+        ))
+
+    ; select left or right
+    (var r (bint_mod left (box 10)))
+    (var m left)
+    (if (== r (box 9)) (= m right))
+
+    (var digits (bint_to_s m))
+    (var exp (- k 15))
+    (rfor i 0 (strlen digits) (do
+        (if (== (array_get char digits i) '0')
+            (do
+                (array_set char digits i '\0')
+                (+= exp 1)
+            )
+            break
+            )
+        ))
+    (var n (strlen digits))
+    (return (format_float sign (+ exp n) digits n))
     ))
 
+; v: abs of input floating-point number.
+; f: mantissa (bigint)
+; e: exponent
+;(fun decode_float (sign f e) (
+;    (-= e 52)
+;    (var b (int_to_bint 1))
+;    (var B (int_to_bint 10))
+;    (var round_p (bint_even f))
+;    (if (>= e 0)
+;        (if (== (bint_eq f (bigshl (copy_bint b) 52)) @C_FALSE)
+;            (do
+;                (var be (bigshl (copy_bint b) e))
+;                (var fbe2 (bigshl (bigmul f be) 1))
+;                (return (scale sign fbe2 (int_to_bint 2) be be 0 B round_p round_p))
+;            )
+;            (do
+;                (var be (bigshl (copy_bint b) e))
+;                (var be1 (bigshl (copy_bint be) 1))
+;                (var fbe12 (bigshl (bigmul f be1) 1))
+;                (return (scale sign fbe12 (int_to_bint 4) be1 be 0 B round_p round_p))
+;            ))
+;        (if (|| (== e -1022) (== (bint_eq f (bigshl (copy_bint b) 52)) @C_FALSE))
+;            (return (scale sign (bigshl f 1) (bigshl b (- 1 e)) (int_to_bint 1) (int_to_bint 1) 0 B round_p round_p))
+;            (return (scale sign (bigshl f 2) (bigshl b (- 2 e)) (int_to_bint 2) (int_to_bint 1) 0 B round_p round_p))
+;            ))
+;    ))
+;
+;(fun scale (sign r s mp mm k B low_ok high_ok) (
+;    (var rmp (bigadd (copy_bint r) mp))
+;    (if (|| (&& high_ok (>= (bigcmp rmp s) 0))
+;            (&& (! high_ok) (> (bigcmp rmp s) 0))) (do
+;        (return (scale sign r (bigmul s B) mp mm (+ k 1) B low_ok high_ok)))
+;        )
+;    (bigmul rmp B)
+;    (if (|| (&& high_ok (< (bigcmp rmp s) 0))
+;            (&& (! high_ok) (<= (bigcmp rmp s) 0)))
+;        (return (scale sign (bigmul r B) s (bigmul mp B) (bigmul mm B) (- k 1)
+;                    B low_ok high_ok)))
+;
+;    ; the precision of IEEE 64-bit floating point number is
+;    ; less than or equal 16 digits in base 10.
+;    (var digits (allocate_carray 16))
+;    (var n (generate digits 0 r s mp mm B low_ok high_ok))
+;    (return (format_float sign k digits n))
+;    ))
+;
 ; Format  0.d1 d2 ... dn 10^k to
 ; d1 d2 ..... dn . 0           (when n = k)
 ; d1 d2 ... dk . d(k+1) ... dn (when k > 0 and n > k)
@@ -429,42 +517,42 @@
     (return s)
     ))
 
-(fun generate (ds i r s mp mm B low_ok high_ok) (
-    (var d (bigmul (copy_bint r) B))
-    (= r (bigdiv d s))
-    (= mp (bigmul mp B))
-    (= mm (bigmul mm B))
-    (var rmp (bigadd (copy_bint r) mp))
-    (var tc1 (|| (&& low_ok (<= (bigcmp r mm) 0))
-                 (&& (! low_ok) (< (bigcmp r mm) 0))))
-    (var tc2 (|| (&& high_ok (>= (bigcmp rmp s) 0))
-                 (&& (! high_ok) (> (bigcmp rmp s) 0))))
-    (if (! tc1)
-        (if (! tc2)
-            (do
-                (array_set char ds i (+ (bint_digit d 0) '0'))
-                (return (generate ds (+ i 1) r s mp mm B low_ok high_ok))
-            )
-            (do
-                (array_set char ds i (+ (bint_digit d 0) '1'))
-                (return (+ i 1))
-            ))
-        (if (! tc2)
-            (do
-                (array_set char ds i (+ (bint_digit d 0) '0'))
-                (return (+ i 1))
-            )
-            (if (< (bigcmp (bigshl r 1) s) 0)
-                (do
-                    (array_set char ds i (+ (bint_digit d 0) '0'))
-                    (return (+ i 1))
-                )
-                (do
-                    (array_set char ds i (+ (bint_digit d 0) '1'))
-                    (return (+ i 1))
-                ))
-            ))
-    ))
+;(fun generate (ds i r s mp mm B low_ok high_ok) (
+;    (var d (bigmul (copy_bint r) B))
+;    (= r (bigdiv d s))
+;    (= mp (bigmul mp B))
+;    (= mm (bigmul mm B))
+;    (var rmp (bigadd (copy_bint r) mp))
+;    (var tc1 (|| (&& low_ok (<= (bigcmp r mm) 0))
+;                 (&& (! low_ok) (< (bigcmp r mm) 0))))
+;    (var tc2 (|| (&& high_ok (>= (bigcmp rmp s) 0))
+;                 (&& (! high_ok) (> (bigcmp rmp s) 0))))
+;    (if (! tc1)
+;        (if (! tc2)
+;            (do
+;                (array_set char ds i (+ (bint_digit d 0) '0'))
+;                (return (generate ds (+ i 1) r s mp mm B low_ok high_ok))
+;            )
+;            (do
+;                (array_set char ds i (+ (bint_digit d 0) '1'))
+;                (return (+ i 1))
+;            ))
+;        (if (! tc2)
+;            (do
+;                (array_set char ds i (+ (bint_digit d 0) '0'))
+;                (return (+ i 1))
+;            )
+;            (if (< (bigcmp (bigshl r 1) s) 0)
+;                (do
+;                    (array_set char ds i (+ (bint_digit d 0) '0'))
+;                    (return (+ i 1))
+;                )
+;                (do
+;                    (array_set char ds i (+ (bint_digit d 0) '1'))
+;                    (return (+ i 1))
+;                ))
+;            ))
+;    ))
 
 (export fun float_infinity () (
     (return (fdiv (itof 1) (itof 0)))
