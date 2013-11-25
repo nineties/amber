@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-bigint.rlc 2013-11-25 10:03:49 nineties $
+; $Id: rowl1-bigint.rlc 2013-11-25 21:54:57 nineties $
 ;
 
 (import "rlvm-compile")
@@ -155,8 +155,6 @@
     (var rlen (+ vlen 1))
     (var p (+ (- ulen vlen) 1))
     (memcpy rdigit (+ udigit (* 4 p)) (* 4 (- vlen 1)))
-    ;(memcpy rdigit (+ udigit (* 4 p)) (* 4 vlen))
-    (array_set int rdigit vlen 0)
 
     (array_set int qdigit p (bigdiv_sub r v))
     (while (> p 0) (do
@@ -370,7 +368,7 @@
         (= r 9)
         ))
     (field_set u 3 sign)
-    (return u)
+    (return (remove_leading_zeros u))
     ))
 
 (export fun parse_bint_binary (str) (
@@ -399,7 +397,7 @@
         ))
     (bint_set_digit u j w)
     (bint_set_ndigit u ulen)
-    (return u)
+    (return (remove_leading_zeros u))
     ))
 
 (export fun parse_bint_octal (str) (
@@ -430,7 +428,7 @@
         (bigshl u c)
         (bint_set_digit u 0 (| (bint_digit u 0) w))
         ))
-    (return u)
+    (return (remove_leading_zeros u))
     ))
 
 (export fun parse_bint_hex (str) (
@@ -464,7 +462,7 @@
         ))
     (bint_set_digit u j w)
     (bint_set_ndigit u ulen)
-    (return u)
+    (return (remove_leading_zeros u))
     ))
 
 (fun bint_hash (n) (
@@ -497,6 +495,14 @@
         (| (<< (& (+ e 1023) 0x7ff) 20)
            (& (bint_digit b 1) 0xfffff))))
     (return f)
+    ))
+
+(fun remove_leading_zeros (b) (
+    (var i (- (field_get b 1) 1))
+    (var digits (field_get b 0))
+    (while (&& (> i 0) (== (array_get int digits i) 0)) (-= i 1))
+    (field_set b 1 (+ i 1))
+    (return b)
     ))
 
 (export fun norm (n) (
