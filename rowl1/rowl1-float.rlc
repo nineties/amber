@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-float.rlc 2013-11-26 03:37:53 nineties $
+; $Id: rowl1-float.rlc 2013-11-26 04:37:08 nineties $
 ;
 
 ; Since Amber has no 64-bit integer, this source code uses bignums instead.
@@ -142,12 +142,7 @@
 
 ; This implementation is not efficient.
 (fun encode_float (sign f n e) (
-    (if (bint_is_zero f) (do
-        (var float (allocate_float))
-        (field_set float 0 0)
-        (field_set float 1 0)
-        (return float)
-        ))
+    (if (bint_is_zero f) (return (float_zero)))
 
     (= f (to_bint f))
     (if (>= e 0)
@@ -247,6 +242,20 @@
                 (= f (to_bint (bint_shiftR f (box (- nbits 53)))))
                 )
             (var exp (- (- nbits  p) 1))
+            (if (< exp -1022) (do
+                ; denormal number
+                (if (<= exp -1075) (return (float_zero)))
+                (var w (- (+ exp 1022)))
+                (= Rbit 0)
+                (= Gbit 0)
+                (= ulp 0)
+                (if (& (- (<< 1 (- w 1)) 1) (bint_digit f 0)) (= Rbit 1))
+                (if (& (<< 1 (- w 1)) (bint_digit f 0)) (= Gbit 1))
+                (if (& (<< 1 w) (bint_digit f 0)) (= ulp 1))
+                (bigshr f w)
+                (if (&& Gbit (|| ulp Rbit)) (= f (to_bint (add f (box 1)))))
+                (= exp -1023)
+                ))
             (= lo (bint_digit f 0))
             (var hi (bint_digit f 1))
             (= hi (| (& hi 0xfffff) (<< (& (+ exp 1023) 0x7ff) 20)))
@@ -552,6 +561,13 @@
 ;                ))
 ;            ))
 ;    ))
+
+(export fun float_zero () (
+    (var float (allocate_float))
+    (field_set float 0 0)
+    (field_set float 1 0)
+    (return float)
+    ))
 
 (export fun float_infinity () (
     (return (fdiv (itof 1) (itof 0)))
