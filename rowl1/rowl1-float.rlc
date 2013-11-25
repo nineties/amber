@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-float.rlc 2013-11-24 13:45:41 nineties $
+; $Id: rowl1-float.rlc 2013-11-25 08:52:53 nineties $
 ;
 
 (import "rlvm-compile")
@@ -188,6 +188,7 @@
             (var n (bint_ndigits2 f))
             (var p (+ (- 55 (- n 1)) (* e 4)))
             (= f (to_bint (bint_shiftL f (box p))))
+            ;(debugpf f)
 
             ; create 10^e
             (var b (box 1))
@@ -199,7 +200,10 @@
                 (= b (mul b (box 10)))
                 (-= e 1)
                 ))
+            ;(debugs "division!\n")
+            ;(debugpf b)
             (bigdiv f (to_bint b))
+            ;(debugpf f)
             (var nbits (bint_ndigits2 f))
             (if (!= nbits 55) (do  ; mantissa + Gbit + Rbit
                 (= f (to_bint (bint_shiftR f (box (- nbits 55)))))
@@ -222,6 +226,9 @@
             (var float (allocate_float))
             (field_set float 0 lo)
             (field_set float 1 hi)
+            ;(debugpf f)
+            ;(debugi exp)
+            ;(debugs "\n")
             (return float)
         ))
     ))
@@ -552,6 +559,17 @@
 
     (add_function2 global (to_sym "coerce") intT floatT if_coerce 0)
     (add_function2 global (to_sym "coerce") floatT intT fi_coerce 0)
+
+    ; test of bigint
+    (debugs "test of division\n")
+    (var y (parse_bint "830767497365572420564879412675215360"))
+    (var x (parse_bint "10000000000000000"))
+    (bigdiv y x)
+    (debugpf y)
+    (= y (parse_bint "830767497365572420564879412675215360"))
+    (= x (parse_bint   "100000000000000000"))
+    (bigdiv y x)
+    (debugpf y)
     ))
 
    ))
