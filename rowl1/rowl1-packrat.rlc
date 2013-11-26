@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2013-10-20 18:52:05 nineties $
+; $Id: rowl1-packrat.rlc 2013-11-26 12:42:16 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1183,25 +1183,25 @@
     ))
 
 (fun gen_copy_parser_state () (
-    (return (tryapply (syntax_func "%copy_parser_state") (list1 PVar)))
+    (return (apply (syntax_func "%copy_parser_state") (list1 PVar)))
     ))
 (fun gen_reset_parser_position (dst src) (
-    (return (tryapply (syntax_func "%reset_parser_position") (list2 dst src)))
+    (return (apply (syntax_func "%reset_parser_position") (list2 dst src)))
     ))
 (fun gen_set_parser_state (dst src) (
-    (return (tryapply (syntax_func "%set_parser_state") (list2 dst src)))
+    (return (apply (syntax_func "%set_parser_state") (list2 dst src)))
     ))
 
 (fun gen_parsed (v) (
-    (return (tryapply (syntax_func "%parsed") (list2 PVar v)))
+    (return (apply (syntax_func "%parsed") (list2 PVar v)))
     ))
 
 (fun gen_noparse (v) (
-    (return (tryapply (syntax_func "%noparse") (list2 PVar v)))
+    (return (apply (syntax_func "%noparse") (list2 PVar v)))
     ))
 
 (fun gen_parse_spaces () (
-    (return (tryapply (syntax_func "spaces") (list1 PVar)))
+    (return (apply (syntax_func "spaces") (list1 PVar)))
     ))
 
 (fun gen_get_token () (
@@ -1225,7 +1225,7 @@
 ; If !multiline_p, indentation-level is checked.
 (fun parse_with_check (p ws) (
     (if (! multiline_p)
-        (= p (ifelse (tryapply (syntax_func "%check_indent") (list1 PVar))
+        (= p (ifelse (apply (syntax_func "%check_indent") (list1 PVar))
                 p
                 (gen_noparse (string "Invalid indentation"))))
         )
@@ -1248,17 +1248,17 @@
     (var hd (node_bhead pat))
     (if (== hd BSymbol)
         (return (parse_with_check
-            (tryapply (slot Syntax pat) (list1 PVar)) ws))
+            (apply (slot Syntax pat) (list1 PVar)) ws))
         )
     (if (== hd Slot) (do
         (var obj (node_arg pat 0))
         (var sym (node_arg pat 1))
         (return (parse_with_check
-            (tryapply (slot (slot obj Syntax) sym) (list1 PVar)) ws))
+            (apply (slot (slot obj Syntax) sym) (list1 PVar)) ws))
         ))
     (if (== hd BString)
         (return (parse_with_check
-            (tryapply (syntax_func "text") (list2 PVar pat)) ws)))
+            (apply (syntax_func "text") (list2 PVar pat)) ws)))
     (if (== hd List)
         (return (compile_seq pat ws))
         )
@@ -1396,13 +1396,13 @@
 (fun compile_oneof (str ws) (
     (var tbl (compile_character_set str))
     (return (parse_with_check
-        (tryapply (syntax_func "%oneof") (list3 PVar tbl str)) ws))
+        (apply (syntax_func "%oneof") (list3 PVar tbl str)) ws))
     ))
 
 (fun compile_noneof (str ws) (
     (var tbl (compile_character_set str))
     (return (parse_with_check
-        (tryapply (syntax_func "%noneof") (list3 PVar tbl str)) ws))
+        (apply (syntax_func "%noneof") (list3 PVar tbl str)) ws))
     ))
 
 ; List{ p1, p2, ...} is translated to
@@ -1430,10 +1430,10 @@
         (= body (cons (compile_parser_element (car elems) ws) body))
         (= body (cons (mkif (gen_test_noparse) (make_object0 Break)) body))
         (= ws @TRUE)
-        (= body (cons (assign ret (tryapply (syntax_func "%cons") (list2 (gen_get_token) ret))) body))
+        (= body (cons (assign ret (apply (syntax_func "%cons") (list2 (gen_get_token) ret))) body))
         (= elems (cdr elems))
         ))
-    (= body (cons (gen_parsed (tryapply (syntax_func "%reverse") (list1 ret))) body))
+    (= body (cons (gen_parsed (apply (syntax_func "%reverse") (list1 ret))) body))
     (return (breakable (list_reverse body)))
     ))
 
@@ -1483,19 +1483,19 @@
     (var loop_body 0)
     (= loop_body (cons (compile_parser_element elem @TRUE) loop_body))
     (= loop_body (cons (mkif (gen_test_noparse) (make_object0 Break)) loop_body))
-    (= loop_body (cons (assign elems (tryapply (syntax_func "%cons") (list2 (gen_get_token) elems))) loop_body))
+    (= loop_body (cons (assign elems (apply (syntax_func "%cons") (list2 (gen_get_token) elems))) loop_body))
 
     (var body 0)
     (= body (cons (compile_parser_element elem ws) body))
     (= body (cons (mkif (gen_test_noparse) (make_object0 Break)) body))
-    (= body (cons (assign elems (tryapply (syntax_func "%cons") (list2 (gen_get_token) elems))) body))
+    (= body (cons (assign elems (apply (syntax_func "%cons") (list2 (gen_get_token) elems))) body))
     (= body (cons (make_object2 While @C_TRUE
         (block (list_reverse loop_body))) body))
 
     (return (block (list3
         (defvar elems 0)
         (breakable (list_reverse body))
-        (gen_parsed (tryapply (syntax_func "%reverse") (list1 elems)))
+        (gen_parsed (apply (syntax_func "%reverse") (list1 elems)))
         )))
     ))
 
@@ -1520,16 +1520,16 @@
     (var loop_body 0)
     (= loop_body (cons (compile_parser_element elem @TRUE) loop_body))
     (= loop_body (cons (mkif (gen_test_noparse) (make_object0 Break)) loop_body))
-    (= loop_body (cons (assign elems (tryapply (syntax_func "%cons") (list2 (gen_get_token) elems))) loop_body))
+    (= loop_body (cons (assign elems (apply (syntax_func "%cons") (list2 (gen_get_token) elems))) loop_body))
 
     (var body 0)
     (= body (cons (defvar elems 0) body))
     (= body (cons (compile_parser_element elem ws) body))
     (= body (cons (mkif (gen_test_noparse) (make_object0 Break)) body))
-    (= body (cons (assign elems (tryapply (syntax_func "%cons") (list2 (gen_get_token) elems))) body))
+    (= body (cons (assign elems (apply (syntax_func "%cons") (list2 (gen_get_token) elems))) body))
     (= body (cons (make_object2 While @C_TRUE
         (block (list_reverse loop_body))) body))
-    (= body (cons (gen_parsed (tryapply (syntax_func "%reverse") (list1 elems))) body))
+    (= body (cons (gen_parsed (apply (syntax_func "%reverse") (list1 elems))) body))
     (return (breakable (list_reverse body)))
     ))
 
@@ -1571,16 +1571,16 @@
     (var indent_save (unique_sym))
 
     (var loop_body 0)
-    (= loop_body (cons (assign elems (tryapply (syntax_func "%cons") (list2 (gen_get_token) elems))) loop_body))
+    (= loop_body (cons (assign elems (apply (syntax_func "%cons") (list2 (gen_get_token) elems))) loop_body))
     (= loop_body (cons (gen_set_parser_state state PVar) loop_body))
     (= loop_body (cons (gen_parse_spaces) loop_body))
     (= loop_body (cons (mkif 
             (make_object2 NotEqual
-                (tryapply (syntax_func "%get_column") (list1 PVar))
+                (apply (syntax_func "%get_column") (list1 PVar))
                 clmn
                 )
             (make_object0 Break)) loop_body))
-    (= loop_body (cons (tryapply (syntax_func "%set_indent") (list2 PVar clmn)) loop_body))
+    (= loop_body (cons (apply (syntax_func "%set_indent") (list2 PVar clmn)) loop_body))
     (= loop_body (cons (compile_parser_element elem @FALSE) loop_body))
     (= loop_body (cons (mkif (gen_test_noparse) (make_object0 Break)) loop_body))
 
@@ -1592,8 +1592,8 @@
         (= body (cons (gen_parse_spaces) body))
         )
 
-    (= body (cons (defvar clmn (tryapply (syntax_func "%get_column") (list1 PVar))) body))
-    (= body (cons (defvar indent_save (tryapply (syntax_func "%set_indent") (list2 PVar clmn))) body))
+    (= body (cons (defvar clmn (apply (syntax_func "%get_column") (list1 PVar))) body))
+    (= body (cons (defvar indent_save (apply (syntax_func "%set_indent") (list2 PVar clmn))) body))
     (= body (cons (compile_parser_element elem @FALSE) body))
     (= body (cons (mkif (gen_test_noparse)
             (block (list3
@@ -1605,8 +1605,8 @@
     (= body (cons (make_object2 While @C_TRUE
             (block (list_reverse loop_body))) body))
     (= body (cons (gen_reset_parser_position PVar state) body))
-    (= body (cons (tryapply (syntax_func "%set_indent") (list2 PVar indent_save)) body))
-    (= body (cons (gen_parsed (tryapply (syntax_func "%reverse") (list1 elems))) body))
+    (= body (cons (apply (syntax_func "%set_indent") (list2 PVar indent_save)) body))
+    (= body (cons (gen_parsed (apply (syntax_func "%reverse") (list1 elems))) body))
     (return (breakable (list_reverse body)))
     ))
 
@@ -1644,7 +1644,7 @@
     (= loop_body (cons (mkif (gen_test_noparse) (make_object0 Break)) loop_body))
     (= loop_body (cons (compile_parser_element p @TRUE) loop_body))
     (= loop_body (cons (mkif (gen_test_noparse) (make_object0 Break)) loop_body))
-    (= loop_body (cons (assign elems (tryapply (syntax_func "%cons") (list2 (gen_get_token) elems))) loop_body))
+    (= loop_body (cons (assign elems (apply (syntax_func "%cons") (list2 (gen_get_token) elems))) loop_body))
 
     (var body 0)
     (= body (cons (defvar elems 0) body))
@@ -1657,12 +1657,12 @@
             (make_object0 Break)
             ))) body))
     (= body (cons
-        (assign elems (tryapply (syntax_func "%cons") (list2 (gen_get_token) elems))) body))
+        (assign elems (apply (syntax_func "%cons") (list2 (gen_get_token) elems))) body))
     (= body (cons
         (make_object2 While @C_TRUE (block (list_reverse loop_body)))
         body))
     (= body (cons (gen_reset_parser_position PVar state) body))
-    (= body (cons (gen_parsed (tryapply (syntax_func "%reverse") (list1 elems)))
+    (= body (cons (gen_parsed (apply (syntax_func "%reverse") (list1 elems)))
             body))
     (return (breakable (list_reverse body)))
     ))
@@ -1677,7 +1677,7 @@
     (= loop_body (cons (mkif (gen_test_noparse) (make_object0 Break)) loop_body))
     (= loop_body (cons (compile_parser_element p @TRUE) loop_body))
     (= loop_body (cons (mkif (gen_test_noparse) (make_object0 Break)) loop_body))
-    (= loop_body (cons (assign elems (tryapply (syntax_func "%cons") (list2 (gen_get_token) elems))) loop_body))
+    (= loop_body (cons (assign elems (apply (syntax_func "%cons") (list2 (gen_get_token) elems))) loop_body))
 
     (var body 0)
     (= body (cons (defvar elems 0) body))
@@ -1688,19 +1688,19 @@
         (make_object0 Break)
         ))) body))
     (= body (cons
-        (assign elems (tryapply (syntax_func "%cons") (list2 (gen_get_token) elems))) body))
+        (assign elems (apply (syntax_func "%cons") (list2 (gen_get_token) elems))) body))
     (= body (cons
         (make_object2 While @C_TRUE (block (list_reverse loop_body)))
         body))
     (= body (cons (gen_reset_parser_position PVar state) body))
     (= body (cons (mkif
-        (tryapply (to_sym "lt")
-            (list2 (tryapply (syntax_func "%length") (list1 elems))
+        (apply (to_sym "lt")
+            (list2 (apply (syntax_func "%length") (list1 elems))
                 (box minlen))) (block (list2
         (gen_noparse (string "The number of elements is insufficient"))
         (make_object0 Break)
         ))) body))
-    (= body (cons (gen_parsed (tryapply (syntax_func "%reverse") (list1 elems)))
+    (= body (cons (gen_parsed (apply (syntax_func "%reverse") (list1 elems)))
             body))
     (return (breakable (list_reverse body)))
     ))
@@ -1712,7 +1712,7 @@
 ; Parsed{loc, Located{loc, v}}
 (fun compile_located (p ws) (
     (= p (compile_parser_element p ws))
-    (return (block (list2 p (tryapply (syntax_func "%apply_located") (list1 PVar)))))
+    (return (block (list2 p (apply (syntax_func "%apply_located") (list1 PVar)))))
     ))
 
 ; parsewith{ sym } is translated to
@@ -1721,7 +1721,7 @@
         (= sym (slot (slot (node_arg sym 0) Syntax) (node_arg sym 1)))
         (= sym (slot Syntax sym))
         )
-    (return (parse_with_check (tryapply sym (list1 PVar)) ws))
+    (return (parse_with_check (apply sym (list1 PVar)) ws))
     ))
 
 ; Option{ p } is translated to
@@ -1775,7 +1775,7 @@
         (defvar state (gen_copy_parser_state))
         (compile_parser_element p ws)
         (gen_reset_parser_position PVar state)
-        (tryapply (syntax_func "%negate") (list1 PVar))
+        (apply (syntax_func "%negate") (list1 PVar))
         )))
     ))
 
@@ -1796,7 +1796,7 @@
     (var body 0)
     (var bpos (unique_sym))
 
-    (= body (cons (defvar bpos (tryapply (syntax_func "%get_pos") (list1 PVar))) body))
+    (= body (cons (defvar bpos (apply (syntax_func "%get_pos") (list1 PVar))) body))
 
     (var with_spaces @FALSE)
     (while elems (do
@@ -1813,7 +1813,7 @@
 
     (= body (cons (defvar (to_sym "begin") bpos) body))
     (= body (cons (defvar (to_sym "end")
-        (tryapply (syntax_func "%get_pos") (list1 PVar))) body))
+        (apply (syntax_func "%get_pos") (list1 PVar))) body))
 
     (= body (cons (gen_parsed act) body))
     (return (breakable (list_reverse body)))
@@ -1924,7 +1924,7 @@
 (export fun compile_define_syntax (lhs elems) (
     (var key (to_sym (strcat "%key" (itos key_idx))))
     (var parser_body (compile_parser elems))
-    (var parser (tryapply (syntax_func "%call_parser")
+    (var parser (apply (syntax_func "%call_parser")
             (list4 PVar (quote lhs) (quote key) parser_body)))
     (+= key_idx 1)
 

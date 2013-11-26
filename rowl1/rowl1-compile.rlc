@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2013-11-17 17:24:46 nineties $
+; $Id: rowl1-compile.rlc 2013-11-26 12:41:29 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1252,7 +1252,7 @@
     (compile_operand asm (lookup_symbol sym) sym)
     ))
 
-(fun compile_tryapply (asm expr) (
+(fun compile_apply (asm expr) (
     (var func (node_arg expr 0))
     (var args (node_arg expr 1))
     
@@ -1270,18 +1270,6 @@
     (put_push asm current_loc)
     (compile_simple_call asm 3 compile_matching)
     (put_jcall asm (* 4 arity))
-    ))
-
-(fun compile_apply (asm expr) (
-    ;(var lbl (fresh_label asm))
-    (compile_tryapply asm expr)
-    ;(put_dup asm)
-    ;(put_undef asm)
-    ;(put_if_ne asm lbl)
-    ;(put_push asm expr)
-    ;(compile_simple_call asm 1 matching_failed)
-    ;(put_throw asm)
-    ;(set_label asm lbl)
     ))
 
 (fun compile_unquote (asm expr) (
@@ -2181,7 +2169,6 @@
     (add_compiler global (domainP Float) compile_const)
 
     (add_compiler global (make_object2 Apply DontCare listT) compile_apply)
-    (add_compiler global (make_object2 TryApply DontCare listT) compile_tryapply)
 
     (add_compiler global (qquote (unquote (unquote DontCare))) compile_unquote)
     (add_compiler global (qquote (quote (unquote DontCare))) compile_quote)
