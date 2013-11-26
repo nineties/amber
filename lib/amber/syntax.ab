@@ -2,7 +2,7 @@ Assign{Slot{Syntax,comment}, Slot{Syntax,shell_style_comment}}
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2013-10-21 17:58:47 nineties $
+# $Id: syntax.ab 2013-11-26 09:30:40 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -423,10 +423,10 @@ rewrite(x is not y) = `(not identical(!x, !y))
 Action: `Module{ParserAction}
 Action.Syntax: `Module{Syntax}
 
-Action.primary_expr ::= "$" decimal { ("node" + node1).to_sym }
+Action.primary_expr ::= "$" decimal { to_sym("node" + node1) }
                       | "$input"    { \Syntax.input_text(parser,begin,end) }
-##
-### FIXME: This is temporary dirty hack.
+
+### FIXME: This is a temporary dirty hack.
 Syntax.primary_expr_act: Syntax.primary_expr | Action.Syntax.primary_expr
 Syntax.parser_action_old: Syntax.parser_action
 Syntax.parser_action = parser -> {
@@ -444,7 +444,7 @@ Shell.Syntax: `Module{Syntax}
 
 Shell.primary_expr ::= "%" decimal
                  {
-                    if ($1 == 0 or $1 > shell_outputs.size) {
+                    if ($1 == 0 or $1 > size(shell_outputs)) {
                         throw `Error{!LOCATION, "The argument of % must be a line number"}
                     }
                     `shell_outputs[!$1]
