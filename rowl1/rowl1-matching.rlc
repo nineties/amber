@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2014-01-17 22:19:46 nineties $
+; $Id: rowl1-matching.rlc 2014-01-17 23:30:52 nineties $
 ;
 
 (import "rlvm-compile")
@@ -234,9 +234,18 @@
     (if (== (caar pats) 0) (do
         (label compile_matching_main_loop)
         (var func (field_get (car pats) 1))
-        (var code (field_get func 3))
-        (var guard (field_get func 4))
-        (var clos  (field_get func 5))
+        (var ty (node_type func))
+        (var code 0)
+        (var guard 0)
+        (var clos 0)
+        (if (== ty @FunctionE)
+            (do
+                (= code (field_get func 3))
+                (= guard (field_get func 4))
+                (= clos (field_get func 5))
+            )
+            (= guard (field_get func 3))
+            )
 
         (if guard
             (do
@@ -247,8 +256,17 @@
                     ))
                 (put_code asm guard)
                 (put_if_false asm guard_failed)
-                (put_push asm code)
-                (put_jjump asm)
+
+                (if (== ty @FunctionE)
+                    (do
+                        (put_push asm code)
+                        (put_jjump asm)
+                    )
+                    (do
+                        (put_imm_int32 asm (field_get func 4))
+                        (put_aforward asm)
+                    ))
+
                 (set_label asm guard_failed)
                 (if (cdr pats) (do
                     (= pats (cdr pats))
@@ -260,8 +278,17 @@
                     (put_push asm clos)
                     (put_store_closure asm)
                     ))
-                (put_push asm code)
-                (put_jjump asm)
+
+                (if (== ty @FunctionE)
+                    (do
+                        (put_push asm code)
+                        (put_jjump asm)
+                    )
+                    (do
+                        (put_imm_int32 asm (field_get func 4))
+                        (put_aforward asm)
+                    ))
+
                 return
             ))
         (put_goto asm exit)
