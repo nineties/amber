@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2013-11-26 12:38:45 nineties $
+; $Id: vm-insn.rlc 2014-01-17 18:46:02 nineties $
 ;
 
 (define gen_field_get (idx) `(
@@ -1442,38 +1442,25 @@
         (asm "addl %ecx, %esi") ; remove arguments from stack
         (vmpush %eax) ; push return value
         ))
-    ; 'dcall:1' 'size of arguments:1'
-    (dcall ((- 1 (/ arg0 4)) byte) @nil (
-        (asm "movl (%esi), %eax")
-        (if (< (register %eax) 0) ; check flag
-            ( ; call primitive function
-                (vmpop %eax)
-                (asm "movzwl %ax, %eax") ; function index is 2byte value
-                (vmubyte 1 %ecx)
-                (vmsave)
-                (asm "pushl %esi") ; push argv
-                (asm "pushl %ecx") ; push argsize
-                (asm "pushl %eax") ; push index
-                (call vm_pcall)
-                (asm "addl $12, %esp")
-                (vmrestore)
-                (vmubyte 1 %ecx) ; total size of arguments
-                (asm "addl %ecx, %esi") ; remove arguments from stack
-                (vmpush %eax) ; push return value
-            )
-            ( ; absolute call
-                (asm "movl %ebx, %ecx")
-                (asm "addl $2, %ecx")
-                (vmubyte 1 %eax)
-                (vmpop %ebx)
-                (asm "subl $4, %esi")   ; for closure-frame
-                (vmpush %eax) ; store size of arguments
-                (vmpush %ecx) ; store return point
-                (vmpush %edi) ; store base pointer
-                (asm "movl %esi, %edi") ; set base pointer
-                (asm "addl code_base, %ebx")
-                (vmfetch)
-            ))
+    ; 'acall:1' 'size of arguments:1'
+    (acall ((- 1 (/ arg0 4)) byte) @nil (
+        (asm "movl %ebx, %ecx")
+        (asm "addl $2, %ecx")
+        (vmubyte 1 %eax)
+        (vmpop %ebx)
+        (asm "subl $4, %esi")   ; for closure-frame
+        (vmpush %eax) ; store size of arguments
+        (vmpush %ecx) ; store return point
+        (vmpush %edi) ; store base pointer
+        (asm "movl %esi, %edi") ; set base pointer
+        (asm "addl code_base, %ebx")
+        (vmfetch)
+        ))
+    ; 'aforward:1'
+    (aforward (-1) @nil (
+        (vmpop %ebx)
+        (asm "addl code_base, %ebx")
+        (vmfetch)
         ))
     ; 'jcall:1' 'size of arguments:1'
     (jcall ((- 1 (/ arg0 4)) byte) @nil (
