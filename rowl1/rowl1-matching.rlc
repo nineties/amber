@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2013-10-16 15:06:09 nineties $
+; $Id: rowl1-matching.rlc 2014-01-17 22:19:46 nineties $
 ;
 
 (import "rlvm-compile")
@@ -63,7 +63,7 @@
         (throw (type_error loc (string "function") def))
         )
 
-    ; here, `def' has form of Function{ ... } or BoundFunction{ ... }
+    ; here, `def' has form of Function{ ... }, BuiltinFunction{ ...} or BoundFunction{ ... }
 
     ; construct pattern matrix 
     (var mat (construct_pattern_matrix def))
@@ -87,7 +87,7 @@
 
 (fun construct_pattern_matrix_sub (len def tl) (
     (var ty (node_type def))
-    (if (== ty @FunctionE)
+    (if (|| (== ty @FunctionE) (== ty @BuiltinFunctionE))
         (return (cons (construct_row len def) tl))
         )
     (if (== ty @BoundFunctionE) (do
@@ -100,10 +100,11 @@
     ))
 
 (fun max_arity (def) (
-    (if (== (node_type def) @FunctionE)
+    (var ty (node_type def))
+    (if (|| (== ty @FunctionE) (== ty @BuiltinFunctionE))
         (return (list_len (field_get def 2)))
         )
-    (if (== (node_type def) @BoundFunctionE) (do
+    (if (== ty @BoundFunctionE) (do
         (var len1 (max_arity (field_get def 2)))
         (var len2 (max_arity (field_get def 3)))
         (if (< len1 len2)
@@ -116,11 +117,8 @@
 
 (fun construct_row (len def) (
     (var args  (field_get def 2))
-    (var code  (field_get def 3))
-    (var guard (field_get def 4))
-    (var clos  (field_get def 5))
     (= args (setup_args len args))
-    (return (list4 args code guard clos))
+    (return (struct 2 args def))
     ))
 
 (fun setup_args (len args) (
@@ -235,10 +233,10 @@
 (fun compile_matching_main (asm args pats exit) (
     (if (== (caar pats) 0) (do
         (label compile_matching_main_loop)
-        (var func (car pats))
-        (var code (list_at func 1))
-        (var guard (list_at func 2))
-        (var clos  (list_at func 3))
+        (var func (field_get (car pats) 1))
+        (var code (field_get func 3))
+        (var guard (field_get func 4))
+        (var clos  (field_get func 5))
 
         (if guard
             (do
