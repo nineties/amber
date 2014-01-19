@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-01-19 21:27:21 nineties $
+; $Id: rowl1-compile.rlc 2014-01-19 23:59:25 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1046,7 +1046,7 @@
     ))
 
 (fun compile_define_global_variable (asm sym val) (
-    (check_redefinition sym)
+    (check_variable sym)
     (compile asm val)
     (put_push asm sym)
     (put_push asm global)
@@ -1110,7 +1110,7 @@
     ))
 
 (fun compile_define_local_variable (asm sym val) (
-    (check_redefinition (variable_name sym))
+    (check_variable (variable_name sym))
     (if (== (node_head sym) Ref) (do
         (compile asm val)
         (put_dup asm)
@@ -1164,7 +1164,10 @@
     (compile asm (assign clsref rhs))
     ))
 
-(fun check_redefinition (sym) (
+(fun check_variable (sym) (
+    (if (|| (!= (node_type sym) @SymbolE) (is_special sym))
+        (throw (invalid_varname current_loc sym))
+        )
     (if (== (symtable_depth variables) 0)
         (if (== (get_slot global sym) @C_UNDEF) return)
         (if (! (symtable_find_local variables sym)) return)
