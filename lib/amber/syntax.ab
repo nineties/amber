@@ -2,7 +2,7 @@ Assign{Slot{Syntax,comment}, Slot{Syntax,shell_style_comment}}
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2014-01-19 12:26:05 nineties $
+# $Id: syntax.ab 2014-01-19 12:29:57 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -347,21 +347,13 @@ ReserveSymbol{not, and, or, when, open, if, else, case, of,
 ## Syntax Sugars
 
 rewrite = fusion(
-        Define{Apply{f, args}, e} -> `Define{!f, Lambda{!args, !e}, partial},
-        rewrite
-        )
-rewrite = fusion(
-        Define{Send{obj, f, args}, e} -> `Define{Slot{!obj, !f}, Lambda{!args, !e}, partial},
-        rewrite
-        )
-rewrite = fusion(
         Assign{Apply{f, args}, e} -> `Assign{!f, Lambda{!args, !e}, partial},
         rewrite
         )
-rewrite = fusion(
-        Assign{Send{obj, f, args}, e} -> `Assign{Slot{!obj, !f}, Lambda{!args, !e}, partial},
-        rewrite
-        )
+
+rewrite(Define{Apply{f, args}, e})     = `Define{!f, Lambda{!args, !e}, partial}
+rewrite(Define{Send{obj, f, args}, e}) = `Define{Slot{!obj, !f}, Lambda{!args, !e}, partial}
+rewrite(Assign{Send{obj, f, args}, e}) = `Assign{Slot{!obj, !f}, Lambda{!args, !e}, partial}
 
 rewrite(+x)         = `uplus(!x)
 rewrite(-x)         = `uminus(!x)
