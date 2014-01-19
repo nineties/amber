@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2013-02-13 02:58:05 nineties $
+; $Id: vm-gc.rlc 2014-01-19 12:15:40 nineties $
 ;
 
 (import "stdlib")
@@ -450,12 +450,13 @@
         (= p @(PDESCR2PAGE p))
         (move_fields p)
         (+= p (* @WORD_SIZE @(OBJECT_WORDS p)))
+        (label retry_move_fields)
         (while (&& (& p @PAGE_MASK) (!= p freep)) (
             (move_fields p)
             (+= p (* @WORD_SIZE @(OBJECT_WORDS p)))
             ))
         (if (== p freep) (
-            (move_wrtable_entries)
+            (if (move_wrtable_entries) ((goto retry_move_fields)))
             ))
         (= page_queue_head @(pdescr->next page_queue_head))
         ))
