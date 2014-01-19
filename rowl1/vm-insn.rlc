@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2014-01-19 13:02:33 nineties $
+; $Id: vm-insn.rlc 2014-01-19 23:15:47 nineties $
 ;
 
 (define gen_field_get (idx) `(
@@ -1463,13 +1463,22 @@
         (asm "addl code_base, %ebx")
         (vmfetch)
         ))
-    ; 'jcall:1' 'size of arguments:1'
-    (jcall ((- 1 (/ arg0 4)) byte) @nil (
+    ; 'jcall:1' 'size of arguments:1' 'self-flag:1'
+    (jcall ((- 1 (/ arg0 4)) byte byte) @nil (
         (asm "movl %ebx, %ecx")
-        (asm "addl $2, %ecx")
+        (asm "addl $3, %ecx")
         (vmubyte 1 %eax)
+        (vmubyte 2 %edx)
         (vmpop %ebx)
+
         (asm "subl $8, %esi") ; for closure-frame
+
+        (asm "testl %edx, %edx")
+        (asm "jz 1f")
+        (asm "addl $4, %esi")
+        (asm "xorl %edx, %edx")
+        (asm "1:")
+
         (asm "movl (%ebx), %ebx") ; pointer to the bytecode
         (vmpush %eax) ; store size of arguments
         (vmpush %ecx) ; store return point

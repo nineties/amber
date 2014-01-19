@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-01-19 12:23:17 nineties $
+; $Id: rowl1-compile.rlc 2014-01-19 21:27:21 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1279,7 +1279,11 @@
     (put_push asm func)
     (put_push asm current_loc)
     (compile_simple_call asm 3 compile_matching)
-    (put_jcall asm (* 4 arity))
+    (put_jcall asm (* 4 arity) @FALSE)
+    ))
+
+(fun get_slot_swap (sym obj) (
+    (return (get_slot obj sym))
     ))
 
 (fun compile_send (asm expr) (
@@ -1296,11 +1300,14 @@
         (incr arity)
         ))
 
-    (compile asm (slot obj sym))
+    (compile asm obj)   ; self;arg1;arg2;...
+    (put_dup asm)       ; self;self;arg1;arg2;..
+    (put_push asm sym)
+    (compile_simple_call asm 2 get_slot_swap)   ; fun;self;arg1;arg2;..
     (put_push asm (slot obj sym))
     (put_push asm current_loc)
     (compile_simple_call asm 3 compile_matching)
-    (put_jcall asm (* 4 arity))
+    (put_jcall asm (* 4 arity) @TRUE)
     ))
 
 (fun compile_unquote (asm expr) (
@@ -1846,7 +1853,7 @@
     (put_push asm (to_sym "at"))
     (put_push asm current_loc)
     (compile_simple_call asm 3 compile_matching)
-    (put_jcall asm (* 4 arity))
+    (put_jcall asm (* 4 arity) @FALSE)
     ))
 
 (fun compile_subscript_assign (asm lhs rhs) (
@@ -1869,7 +1876,7 @@
     (put_push asm (to_sym "store"))
     (put_push asm current_loc)
     (compile_simple_call asm 3 compile_matching)
-    (put_jcall asm (* 4 arity))
+    (put_jcall asm (* 4 arity) @FALSE)
     ))
 
 ; translate
@@ -1936,7 +1943,7 @@
     (put_push asm hdlr)
     (put_push asm current_loc)
     (compile_simple_call asm 3 compile_matching)
-    (put_jcall asm 4)
+    (put_jcall asm 4 @FALSE)
     (set_label asm cont_lbl)
     ))
 
@@ -2125,7 +2132,7 @@
     (put_dup asm)
     (put_push asm current_loc)
     (compile_simple_call asm 3 compile_matching)
-    (put_jcall asm 4)
+    (put_jcall asm 4 @FALSE)
 
     (put_dup asm)
     (put_undef asm)
@@ -2139,7 +2146,7 @@
     (put_dup asm)
     (put_push asm current_loc)
     (compile_simple_call asm 3 compile_matching)
-    (put_jcall asm 4)
+    (put_jcall asm 4 @FALSE)
 
     (put_dup asm)
     (put_undef asm)

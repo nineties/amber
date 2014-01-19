@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlvm-compile.rlc 2014-01-19 13:04:05 nineties $
+; $Id: rlvm-compile.rlc 2014-01-19 14:44:11 nineties $
 ;
 
 (import "stdlib")
@@ -405,7 +405,7 @@
     (var narg (length args))
     (foreach a (reverse args) (compile_expr a nil))
     (compile_expr bytecode nil)
-    (emit_insn `(jcall (byte @(* 4 narg))))
+    (emit_insn `(jcall (byte @(* 4 narg)) (byte 0)))
     (if drop (emit_insn `drop))
     ))
 
@@ -807,6 +807,7 @@ a   (emit_insn (label cont_lbl))
         ((== `return expr) (do (assert "return" drop) (emit_insn `return)))
         ((== `break expr) (do (assert "break" drop) (compile_break expr)))
         ((== `continue expr) (do (assert "continue" drop) (compile_continue expr)))
+        ((== `getself expr) (if (not drop) (emit_insn `self)))
         ((char? expr) (compile_int_lit (char2int expr) drop))
         ((int? expr) (compile_int_lit expr drop))
         ((string? expr) (compile_string_lit expr drop))
