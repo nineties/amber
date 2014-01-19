@@ -2,7 +2,7 @@ Assign{Slot{Syntax,comment}, Slot{Syntax,shell_style_comment}}
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2013-11-26 12:44:02 nineties $
+# $Id: syntax.ab 2014-01-19 12:26:05 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -180,6 +180,8 @@ postfix_expr
         # Domain Pattern
       | primary_expr "@" postfix_expr
         { MakeObject{Quote{Domain}, List{node0, node2}} }
+      | postfix_expr "." symbol "(" delimited(expr, ",") ")"
+        { MakeObject{Quote{Send}, List{node0, node2, node4}} }
       | postfix_expr "." symbol
         { MakeObject{Quote{Slot}, List{node0, node2}} }
       | primary_expr "^" postfix_expr
@@ -349,7 +351,15 @@ rewrite = fusion(
         rewrite
         )
 rewrite = fusion(
+        Define{Send{obj, f, args}, e} -> `Define{Slot{!obj, !f}, Lambda{!args, !e}, partial},
+        rewrite
+        )
+rewrite = fusion(
         Assign{Apply{f, args}, e} -> `Assign{!f, Lambda{!args, !e}, partial},
+        rewrite
+        )
+rewrite = fusion(
+        Assign{Send{obj, f, args}, e} -> `Assign{Slot{!obj, !f}, Lambda{!args, !e}, partial},
         rewrite
         )
 

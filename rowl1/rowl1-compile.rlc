@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-01-17 23:31:45 nineties $
+; $Id: rowl1-compile.rlc 2014-01-19 12:23:17 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1282,6 +1282,27 @@
     (put_jcall asm (* 4 arity))
     ))
 
+(fun compile_send (asm expr) (
+    (var obj  (node_arg expr 0))
+    (var sym  (node_arg expr 1))
+    (var args (node_arg expr 2))
+    
+    ; eval and push arguments from right to left
+    (= args (list_reverse args))
+    (var arity 0)
+    (while args (do
+        (compile asm (car args))
+        (= args (cdr args))
+        (incr arity)
+        ))
+
+    (compile asm (slot obj sym))
+    (put_push asm (slot obj sym))
+    (put_push asm current_loc)
+    (compile_simple_call asm 3 compile_matching)
+    (put_jcall asm (* 4 arity))
+    ))
+
 (fun compile_unquote (asm expr) (
     (throw (exception current_loc (string "unquotation outside quasi-quotation")))
     ))
@@ -2155,6 +2176,7 @@
     (add_compiler global (domainP Float) compile_const)
 
     (add_compiler global (make_object2 Apply DontCare listT) compile_apply)
+    (add_compiler global (make_object3 Send DontCare symT listT) compile_send)
 
     (add_compiler global (qquote (unquote (unquote DontCare))) compile_unquote)
     (add_compiler global (qquote (quote (unquote DontCare))) compile_quote)
