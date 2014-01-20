@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-01-20 10:36:16 nineties $
+; $Id: rowl1-compile.rlc 2014-01-20 11:27:05 nineties $
 ;
 
 (import "rlvm-compile")
@@ -638,6 +638,7 @@
     ))
 
 (var closure_frame null)
+(var compiling_lambda @FALSE)
 
 (export fun compile_main (expr) (
     (var asm (make_assembler))
@@ -1255,6 +1256,9 @@
     ))
 
 (fun compile_getself (asm expr) (
+    (if (! compiling_lambda)
+        (throw (exception current_loc (string "`self' outside lambda")))
+        )
     (put_self asm)
     ))
 
@@ -1977,6 +1981,8 @@
 	))
 
 (fun compile_lambda_main (asm args body guard cls) (
+    (var save_compiling_lambda compiling_lambda)
+    (= compiling_lambda @TRUE)
     (var asm_body (make_assembler))
     (if (!= guard noguard)
         (do
@@ -1990,6 +1996,7 @@
             (put_ireturn asm_body)
             (put_push asm (make_function args (get_code asm_body) 0))
         ))
+    (= compiling_lambda save_compiling_lambda)
     ))
 
 (fun compile_lambda_ (asm expr cls) (
