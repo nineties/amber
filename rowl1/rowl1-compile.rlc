@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-01-20 01:43:08 nineties $
+; $Id: rowl1-compile.rlc 2014-01-20 09:14:25 nineties $
 ;
 
 (import "rlvm-compile")
@@ -434,15 +434,14 @@
     ))
 
 (export fun fusion_function (fun1 fun2) (
+    (if (&& (! (is_function fun1)) (!= fun1 @C_UNDEF))
+        (throw (type_error current_loc (string "function") fun1))
+        )
+    (if (&& (! (is_function fun2)) (!= fun2 @C_UNDEF))
+        (throw (type_error current_loc (string "function") fun2))
+        )
     (if (== fun1 @C_UNDEF) (return fun2))
     (if (== fun2 @C_UNDEF) (return fun1))
-    (if (! (is_function fun1))
-        (throw (type_error current_loc (string "function1") fun1))
-        )
-    (if (! (is_function fun2))
-        (throw (type_error current_loc (string "function2") fun2))
-        )
-
     (return (variant @BoundFunctionE 3 0 fun1 fun2))
     ))
 
@@ -635,7 +634,7 @@
         (throw (undefined_fun current_loc sym))
         ))
     (if (! (is_function func))
-        (throw (type_error current_loc (string "function3") func))
+        (throw (type_error current_loc (string "function") func))
         )
     (return (compile_matching current_loc sym func))
     ))
@@ -647,6 +646,7 @@
 (var closure_frame null)
 
 (export fun compile_main (expr) (
+    (debugpf expr)
     (var asm (make_assembler))
     (var tbl (make_symtable 10))
     (symtable_push tbl)
@@ -2256,7 +2256,7 @@
     (add_function2 global (to_sym "mul") funT funT compose_function 0)
 
     ; horizontal composition
-    (add_function2 global (to_sym "fusion") funT funT fusion_function 0)
+    (add_function2 global (to_sym "fusion") DontCare DontCare fusion_function 0)
     ))
 
 (export fun add_compiler (mod pat func) (
