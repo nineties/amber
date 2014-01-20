@@ -103,11 +103,11 @@
     ))
 
 (fun eval (expr) (
-    (return (byterun (lookup_func global Eval) expr))
+    (return (runcode (lookup_func global Eval) expr))
     ))
 
 (fun rewrite (expr) (
-    (var new_expr (byterun (lookup_func global Rewrite) expr))
+    (var new_expr (runcode (lookup_func global Rewrite) expr))
     (if (== new_expr @C_UNDEF) (= new_expr expr))
     (if (!= new_expr expr) (return (rewrite new_expr)))
     (= expr new_expr)
@@ -235,7 +235,7 @@
     ))
 
 (fun default_eval (expr) (
-    (return (byterun (compile_main (rewrite expr))))
+    (return (runcode (compile_main (rewrite expr))))
     ))
 
 (fun eval_located (expr) (
@@ -277,7 +277,7 @@
 (fun eval_exit (expr) (
     (= atexit_list (list_reverse atexit_list))
     (while atexit_list (do
-        (byterun (get_bytecode (car atexit_list)))
+        (runcode (get_bytecode (car atexit_list)))
         (= atexit_list (cdr atexit_list))
         ))
     (exit 0)
@@ -286,7 +286,7 @@
 (fun exit_ (status) (
     (= atexit_list (list_reverse atexit_list))
     (while atexit_list (do
-        (byterun (get_bytecode (car atexit_list)))
+        (runcode (get_bytecode (car atexit_list)))
         (= atexit_list (cdr atexit_list))
         ))
     (exit (unbox status))

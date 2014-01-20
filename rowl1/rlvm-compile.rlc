@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlvm-compile.rlc 2014-01-19 14:44:11 nineties $
+; $Id: rlvm-compile.rlc 2014-01-20 17:00:36 nineties $
 ;
 
 (import "stdlib")
@@ -401,7 +401,7 @@
         (otherwise (error "compile_call: not reachable here"))
         )))
 
-(define compile_byterun ((_ bytecode . args) drop) (do
+(define compile_runcode ((_ bytecode . args) drop) (do
     (var narg (length args))
     (foreach a (reverse args) (compile_expr a nil))
     (compile_expr bytecode nil)
@@ -860,7 +860,7 @@ a   (emit_insn (label cont_lbl))
         ((== `list_len (car expr)) (compile_list_len expr drop))
         ((== `box (car expr)) (compile_expr `(+ (<< @(cadr expr) 1) 1) drop))
         ((== `unbox (car expr)) (compile_expr `(>> @(cadr expr) 1) drop))
-        ((== `byterun (car expr)) (compile_byterun expr drop))
+        ((== `runcode (car expr)) (compile_runcode expr drop))
         ((== `ludiv (car expr)) (compile_ludiv expr drop))
         ((and (== 3 (length expr)) (binary_operator? (car expr)))
             (compile_binexpr expr drop))

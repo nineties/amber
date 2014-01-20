@@ -249,7 +249,7 @@
     ))
 
 (export fun parse (name p) (
-    (return (byterun (lookup_func syntax (to_sym name)) p))
+    (return (runcode (lookup_func syntax (to_sym name)) p))
     ))
 
 (export fun parse_success (p) (
@@ -877,9 +877,9 @@
     (var whitespace (lookup_func syntax (to_sym "whitespace")))
     (var comment    (lookup_func syntax (to_sym "comment")))
     (while @TRUE (do
-        (byterun whitespace p)
+        (runcode whitespace p)
         (if @(PARSED p) continue)
-        (byterun comment p)
+        (runcode comment p)
         (if @(PARSED p) continue)
         break
         ))
@@ -895,11 +895,11 @@
     (var whitespace   (lookup_func syntax (to_sym "whitespace")))
     (var comment (lookup_func syntax (to_sym "comment")))
     (while @TRUE (do
-        (byterun whitespace p)
+        (runcode whitespace p)
         (if @(PARSED p) continue)
         (parse_char p '\n')
         (if @(PARSED p) continue)
-        (byterun comment p)
+        (runcode comment p)
         (if @(PARSED p) continue)
         break
         ))
@@ -1896,7 +1896,7 @@
     (var ent (struct 1 state @TRUE @FALSE @FALSE))
     (memotable_add tbl key pos (field_get p 7) ent)
     (label retry_lbl)
-    (byterun (compile_matching loc sym fun) p)
+    (runcode (compile_matching loc sym fun) p)
 
     (if (field_get ent 2)
         (if (&& @(PARSED p)

@@ -23,7 +23,7 @@
 
 (var coerce (to_sym "coerce"))
 (export fun do_coerce (a b) (
-    (var r (byterun (lookup_func global coerce) a b))
+    (var r (runcode (lookup_func global coerce) a b))
     (if (== r @C_UNDEF) (return r))
     (if (|| (!= (node_type r) @ListE) (!= (list_len r) 2)) (do
         (throw (exception current_loc (string "coerce must returns [a, b]")))
@@ -42,7 +42,7 @@
             (make_object1 (to_sym "rhs") b)
             ))
         )
-    (return (byterun (lookup_func global sym) (car r) (cadr r)))
+    (return (runcode (lookup_func global sym) (car r) (cadr r)))
     ))
 
 (export fun do_coerce_internal (a b) (
@@ -174,7 +174,7 @@
 (fun int_times (n f) (
     (var code (get_bytecode f))
     (for i 0 (unbox n) (do
-        (byterun code (box i))
+        (runcode code (box i))
         ))
     (return @C_NIL)
     ))

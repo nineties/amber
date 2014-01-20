@@ -45,7 +45,7 @@
     (for i 0 n1 (do
         (var v1 (node_arg a i))
         (var v2 (node_arg b i))
-        (if (&& (!= v1 v2) (== (byterun eql v1 v2) @C_FALSE))
+        (if (&& (!= v1 v2) (== (runcode eql v1 v2) @C_FALSE))
             (return @C_FALSE)
             )
         ))
@@ -62,9 +62,9 @@
     (var hash (lookup_func global (to_sym "hash")))
     (var val 0)
     (for i 0 (node_size obj)
-        (+= val (* (unbox (byterun hash (node_arg obj i))) 13))
+        (+= val (* (unbox (runcode hash (node_arg obj i))) 13))
         )
-    (+= val (unbox (byterun hash (node_head obj))))
+    (+= val (unbox (runcode hash (node_head obj))))
     (return (box val))
     ))
 
@@ -84,7 +84,7 @@
 (fun _subst_loop (obj code) (
     (var new_obj @C_NIL)
     (label again)
-    (= new_obj (byterun code obj))
+    (= new_obj (runcode code obj))
     (if (!= new_obj obj) (do
         (= obj new_obj)
         (goto again)
