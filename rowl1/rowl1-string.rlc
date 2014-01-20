@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-string.rlc 2013-10-26 18:21:29 nineties $
+; $Id: rowl1-string.rlc 2014-01-20 12:33:33 nineties $
 ;
 
 (import "rlvm-compile")
@@ -48,11 +48,19 @@
     (return (strcat a b))
     ))
 
+(fun to_s_check (obj) (
+    (var s (call1 (to_sym "to_s") obj))
+    (if (== s @C_UNDEF)
+        (throw (make_object3 Exception current_loc (string "Can not convert to string") obj)) 
+        )
+    (return s)
+    ))
+
 (fun s_add2 (a b) (
-    (var to_s (to_sym "to_s"))
-    (= a (call1 to_s a))
-    (= b (call1 to_s b))
-    (return (strcat a b))
+    (= a (to_s_check a))
+    (= b (to_s_check b))
+    (var s (strcat a b))
+    (return s)
     ))
 
 (fun s_mul (a n) (
