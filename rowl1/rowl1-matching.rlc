@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2014-01-21 09:26:09 nineties $
+; $Id: rowl1-matching.rlc 2014-01-21 19:06:44 nineties $
 ;
 
 (import "rlvm-compile")
@@ -19,7 +19,7 @@
 ; pattern matrix (((p11 p12 .. ) e1 g1) ((p21 p22 ..) e2 g2) ..)
 
 (var dontcareP (to_sym "%DontCare"))
-(var ellipsisP (to_sym "%Ellipsis"))
+(var restP     (to_sym "%Rest"))
 (var varP      (to_sym "%Var"))
 (var domP      (to_sym "%Domain"))
 
@@ -64,7 +64,7 @@
     (compile_matching_function asm loc obj def exit_lbl)
 
     (set_label asm exit_lbl)
-    (put_args asm)
+    (put_args asm 0)
     (put_self asm)
     (put_push asm def)
     (compile_simple_call asm 3 matching_failed_error)
@@ -83,7 +83,7 @@
     ; here, `def' has form of Function{ ... }, BuiltinFunction{ ...} or BoundFunction{ ... }
 
     ; construct pattern matrix 
-    (var mat (construct_pattern_matrix def))
+    (var mat (construct_pattern_matrix def 0))
 
     (var args 0)
     (var idx (- (list_len (caar mat)) 1))
@@ -96,55 +96,31 @@
     (compile_matching_main asm args mat exit)
     ))
 
-(fun construct_pattern_matrix (def) (
-    ; compute maximum arity
-    (var len (max_arity def))
-    (return (construct_pattern_matrix_sub len def 0))
-    ))
-
-(fun construct_pattern_matrix_sub (len def tl) (
+(fun construct_pattern_matrix (def tl) (
     (var ty (node_type def))
     (if (|| (== ty @FunctionE) (== ty @BuiltinFunctionE))
-        (return (cons (construct_row len def) tl))
+        (return (cons (construct_row def) tl))
         )
     (if (== ty @BoundFunctionE) (do
         (var fun1 (field_get def 2))
         (var fun2 (field_get def 3))
-        (= tl (construct_pattern_matrix_sub len fun2 tl))
-        (return (construct_pattern_matrix_sub len fun1 tl))
+        (= tl (construct_pattern_matrix fun2 tl))
+        (return (construct_pattern_matrix fun1 tl))
         ))
-    (throw (string "BUG: construct_pattern_matrix_sub"))
+    (throw (string "BUG: construct_pattern_matrix"))
     ))
 
-(fun max_arity (def) (
-    (var ty (node_type def))
-    (if (|| (== ty @FunctionE) (== ty @BuiltinFunctionE))
-        (return (list_len (field_get def 2)))
-        )
-    (if (== ty @BoundFunctionE) (do
-        (var len1 (max_arity (field_get def 2)))
-        (var len2 (max_arity (field_get def 3)))
-        (if (< len1 len2)
-            (return len2)
-            (return len1)
-            )
-        ))
-    (throw (string "BUG: max_arity"))
-    ))
-
-(fun construct_row (len def) (
+(fun construct_row (def) (
     (var args  (field_get def 2))
-    (= args (setup_args len args))
-    (return (struct 2 args def))
+    (return (struct 2 (setup_patterns args) def))
     ))
 
-(fun setup_args (len args) (
-    (if (== len 0) (return 0))
-    (if (! args) (return (diag_list len dontcareP)))
-    (return (cons (setup_pat (car args)) (setup_args (- len 1) (cdr args))))
+(fun setup_patterns (args) (
+    (if (! args) (return 0))
+    (return (cons (setup_pattern (car args)) (setup_patterns (cdr args))))
     ))
 
-(fun setup_pat (pat) (
+(fun setup_pattern (pat) (
     (if (== pat DontCare)
         (return dontcareP)
         )
@@ -159,15 +135,15 @@
         (return pat)
         )
     (if (== hd Domain) (do
-        (var lhs (setup_pat (node_arg pat 0)))
+        (var lhs (setup_pattern (node_arg pat 0)))
         (var dom (node_arg pat 1))
         (if (is_symbol dom)
             (return (make_object2 domP lhs dom))
-            (return (setup_pat dom))
+            (return (setup_pattern dom))
             )
         ))
-    (if (== hd Ellipsis)
-        (return ellipsisP)
+    (if (== hd Rest)
+        (return restP)
         )
     (if (== hd List)
         (return (setup_pat_list pat))
@@ -179,62 +155,62 @@
         (return (node_arg pat 0))
         )
     (if (== hd QuasiQuote)
-        (return (qquote_pat (node_arg pat 0) 0))
+        (return (qquote_pattern (node_arg pat 0) 0))
         )
     (= pat (copy pat))
     (for i 0 (node_size pat)
-        (node_arg_set pat i (setup_pat (node_arg pat i)))
+        (node_arg_set pat i (setup_pattern (node_arg pat i)))
         )
     (return pat)
     ))
 
 (fun setup_pat_list (list) (
     (if (! list) (return 0))
-    (return (cons (setup_pat (car list)) (setup_pat_list (cdr list))))
+    (return (cons (setup_pattern (car list)) (setup_pat_list (cdr list))))
     ))
 
 (fun setup_pat_tuple (t) (
     (var n (seq_size t))
     (var p (allocate_tuple n))
     (for i 0 n (do
-        (array_set object p i (setup_pat (array_get object t i)))
+        (array_set object p i (setup_pattern (array_get object t i)))
         ))
     (return p)
     ))
 
-(fun qquote_pat_list (pat level) (
+(fun qquote_pattern_list (pat level) (
     (var ret 0)
     (while pat (do
-        (= ret (cons (qquote_pat (car pat) level) ret))
+        (= ret (cons (qquote_pattern (car pat) level) ret))
         (= pat (cdr pat))
         ))
     (return (list_reverse ret))
     ))
 
-(fun qquote_pat_tuple (pat level) (
+(fun qquote_pattern_tuple (pat level) (
     (var n (seq_size pat))
     (var p (allocate_tuple n))
     (for i 0 n (do
-        (array_set object p i (qquote_pat (array_get object pat i) level))
+        (array_set object p i (qquote_pattern (array_get object pat i) level))
         ))
     (return p)
     ))
 
-(fun qquote_pat (pat level) (
+(fun qquote_pattern (pat level) (
     (var hd (node_bhead pat))
     (if (|| (== hd BSymbol) (|| (== hd BInt) (== hd BString)))
         (return pat)
         )
     (if (== hd List)
-        (return (qquote_pat_list pat level))
+        (return (qquote_pattern_list pat level))
         )
     (if (== hd Tuple)
-        (return (qquote_pat_tuple pat level))
+        (return (qquote_pattern_tuple pat level))
         )
     (if (== hd Unquote) (do
         (if (== level 0)
-            (return (setup_pat (node_arg pat 0)))
-            (return (qquote_pat (node_arg pat 0) (- level 1)))
+            (return (setup_pattern (node_arg pat 0)))
+            (return (qquote_pattern (node_arg pat 0) (- level 1)))
             )
         )
     (if (== hd QuasiQuote)
@@ -242,7 +218,7 @@
         ))
     (= pat (copy pat))
     (for i 0 (node_size pat)
-        (node_arg_set pat i (qquote_pat (node_arg pat i) level))
+        (node_arg_set pat i (qquote_pattern (node_arg pat i) level))
         )
     (return pat)
     ))
@@ -325,7 +301,7 @@
         (compile_matching_main asm (cdr args) pats exit)
         return
         ))
-    (if (== p ellipsisP) (do
+    (if (== p restP) (do
         (= pats (shift_pat pats))
         (compile_matching_main asm args pats exit)
         return
@@ -339,6 +315,16 @@
         return
         ))
     (var hd (node_bhead p))
+    (if (== hd VariableLength) (do
+        (compile_operand asm (car args) @C_NIL)
+        (put_check_int asm exit)
+        (compile_operand asm (car args) @C_NIL)
+        (put_imm_int asm (box (node_arg_int p 0)))
+        (put_if_lt asm exit)
+        (= pats (shift_pat pats))
+        (compile_matching_main asm (cdr args) pats exit)
+        return
+        ))
     (if (== hd BSymbol) (do
         (compile_operand asm (car args) @C_NIL)
         (put_push asm p)
@@ -371,7 +357,7 @@
         return
         ))
     (if (== hd List) (do
-        (if (is_ellipsis_list p)
+        (if (is_abbrev_list p)
             (do
                 (var len (- (list_len p) 1))
                 (compile_operand asm (car args) @C_NIL)
@@ -415,7 +401,7 @@
     (compile_operand asm (car args) @C_NIL)
     (compile_head_check asm hd exit)
 
-    (if (is_ellipsis_node p size)
+    (if (is_abbrev_node p size)
         (if (> size 1) (do
             (compile_operand asm (car args) @C_NIL)
             (compile_simple_call asm 1 node_size)
@@ -440,10 +426,10 @@
     (compile_matching_main asm args pats exit)
     ))
 
-(fun is_ellipsis_list (pats) (
+(fun is_abbrev_list (pats) (
     (while pats (do
-        (if (== (car pats) ellipsisP) (do
-            (if (cdr pats) (throw (exception current_loc (string "ellipsis-pattern must be placed at the end of the list"))))
+        (if (== (car pats) restP) (do
+            (if (cdr pats) (throw (exception current_loc (string "rest-pattern must be placed at the end of the list"))))
             (return @TRUE)
             ))
         (= pats (cdr pats))
@@ -451,9 +437,9 @@
     (return @FALSE)
     ))
 
-(fun is_ellipsis_node (expr size) (
+(fun is_abbrev_node (expr size) (
     (if (== size 0) (return @FALSE))
-    (if (== (node_arg expr (- size 1)) ellipsisP)
+    (if (== (node_arg expr (- size 1)) restP)
         (return @TRUE)
         (return @FALSE)
         )
@@ -734,13 +720,13 @@
     (var p (caaar pats))
     (var len (list_len (caaar pats)))
     (= pats (cdr pats))
-    (if (is_ellipsis_list p)
+    (if (is_abbrev_list p)
         (do
             (while pats (do
                 (var nd (caaar pats))
                 (if (|| (!= (node_bhead nd) List)
                     (|| (!= (list_len nd) len)
-                        (! (is_ellipsis_list nd))))
+                        (! (is_abbrev_list nd))))
                     break)
                 (= pats (cdr pats))
                 (incr n)
@@ -752,7 +738,7 @@
                 (var nd (caaar pats))
                 (if (|| (!= (node_bhead nd) List)
                     (|| (!= (list_len nd) len)
-                        (is_ellipsis_list nd)))
+                        (is_abbrev_list nd)))
                     break)
                 (= pats (cdr pats))
                 (incr n)
@@ -792,13 +778,13 @@
     (var hd (node_bhead p))
     (var size (node_size p))
     (= pats (cdr pats))
-    (if (is_ellipsis_node p size)
+    (if (is_abbrev_node p size)
         (do
             (while pats (do
                 (var nd (caaar pats))
                 (if (|| (!= (node_bhead nd) hd)
                     (|| (!= (node_size nd) size)
-                        (! (is_ellipsis_node nd size))))
+                        (! (is_abbrev_node nd size))))
                     break)
                 (= pats (cdr pats))
                 (incr n)
@@ -810,7 +796,7 @@
                 (var nd (caaar pats))
                 (if (|| (!= (node_bhead nd) hd)
                     (|| (!= (node_size nd) size)
-                        (is_ellipsis_node nd size)))
+                        (is_abbrev_node nd size)))
                     break)
                 (= pats (cdr pats))
                 (incr n)

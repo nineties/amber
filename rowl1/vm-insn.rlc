@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2014-01-21 09:20:13 nineties $
+; $Id: vm-insn.rlc 2014-01-21 19:16:20 nineties $
 ;
 
 (define gen_field_get (idx) `(
@@ -1237,12 +1237,14 @@
         (vmpush %eax)
         ))
     ; arguments
-    (args (1) @true (
+    (args (1 byte) @true (
         (asm "subl $12, %esp")
         (asm "movl 8(%edi), %ecx") ; %ecx = 4 * arity
         (asm "leal 16(%edi,%ecx,1), %eax")
         (asm "movl %eax, (%esp)")
         (asm "shrl $2, %ecx")
+        (vmubyte 1 %eax) ; offset
+        (asm "subl %eax, %ecx")
         (asm "movl %ecx, 8(%esp)")
         (asm "movl $0, 4(%esp)")
         (asm "1:")

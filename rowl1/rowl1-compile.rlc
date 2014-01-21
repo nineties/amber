@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-01-21 15:31:10 nineties $
+; $Id: rowl1-compile.rlc 2014-01-21 19:16:44 nineties $
 ;
 
 (import "rlvm-compile")
@@ -417,9 +417,21 @@
     (return (variant @FunctionE 5 0 args code guard clos use_self))
     ))
 
+(fun args_len (args) (
+    (var len 0)
+    (while args (do
+        (if (== (node_bhead (car args)) Rest) (do
+            (return (make_object1 VariableLength (box len)))
+            ))
+        (+= len 1)
+        (= args (cdr args))
+        ))
+    (return (box len))
+    ))
+
 (fun make_function (args code guard use_self) (
-    (var arity (list_len args))
-    (= args (cons (box arity) args))
+    (var arity (args_len args))
+    (= args (cons arity args))
     (return (alloc_function args code guard 0 use_self))
     ))
 
@@ -428,8 +440,8 @@
     ))
 
 (fun make_builtin_function (args func guard use_self) (
-    (var arity (list_len args))
-    (= args (cons (box arity) args))
+    (var arity (args_len args))
+    (= args (cons arity args))
     (return (alloc_builtin_function args func guard use_self))
     ))
 
@@ -868,7 +880,18 @@
         ))
     (var idx 0)
     (while args (do
-        (setup_arg tbl (make_arg idx) (car args) 0)
+        (var arg (car args))
+        (if (== (node_bhead arg) Rest) (do
+            (if (cdr args)
+                (throw (exception current_loc (string
+                        "\"...\" must be the last argument")))
+                )
+            (if (== (node_size arg) 0) return)
+            (var v (node_arg_symbol arg 0))
+            (symtable_add tbl v (make_args_from idx))
+            return
+            ))
+        (setup_arg tbl (make_arg idx) arg 0)
         (= args (cdr args))
         (+= idx 1)
         ))
@@ -897,13 +920,13 @@
         (var idx 0)
         (while arg (do
             (var a (car arg))
-            (if (== (node_bhead a) Ellipsis) (do
+            (if (== (node_bhead a) Rest) (do
                 (if (cdr arg)
                     (throw (exception current_loc (string
-                        "\"...\" node must be placed last in the order of arguments")))
+                        "\"...\" must be the last argument")))
                     )
+                (if (== (node_size a) 0) return)
                 (var v (node_arg_symbol a 0))
-                (if (== v @C_NIL) return)
                 (= obj (make_list_from obj idx))
                 (symtable_add tbl v obj)
                 return
@@ -921,18 +944,16 @@
     (if (== argty QuasiQuote)
         (return (setup_arg tbl obj (node_arg arg 0) (+ level 1)))
         )
-    (if (== argty Ellipsis)
-        (throw (exception current_loc (string "Variable-length arguments is not allowed")))
-        )
+
     (for i 0 (node_size arg) (do
         (var a (node_arg arg i))
-        (if (== (node_bhead a) Ellipsis) (do
+        (if (== (node_bhead a) Rest) (do
             (if (!= (+ i 1) (node_size arg))
                 (throw (exception current_loc (string
-                    "\"...\" must be placed last in the order of arguments"
-                ))))
+                        "\"...\" must be the last argument")))
+                )
+            (if (== (node_size a) 0) return)
             (var v (node_arg_symbol a 0))
-            (if (== v @C_NIL) return)
             (= obj (make_restof obj i))
             (symtable_add tbl v obj)
             return
@@ -957,6 +978,10 @@
     (return (make_object1 Argument (box idx)))
     ))
 
+(export fun make_args_from (idx) (
+    (return (make_object1 ArgumentsFrom (box idx)))
+    ))
+
 (export fun make_list_at (obj idx) (
     (return (make_object2 ListAt obj (box idx)))
     ))
@@ -979,10 +1004,10 @@
     (var func (get_slot mod sym))
     (if (!= func @C_UNDEF)
         (if (&& (is_function func) (is_function newfunc))
-            (set_slot mod sym (fusion_function newfunc func))
+            (return (set_slot mod sym (fusion_function newfunc func)))
             (throw (redefined_slot current_loc mod sym))
             )
-        (set_slot mod sym newfunc)
+        (return (set_slot mod sym newfunc))
         )
     ))
 
@@ -1219,6 +1244,10 @@
         ))
     (if (== ty Argument) (do
         (put_arg asm (node_arg_int opd 0))
+        return
+        ))
+    (if (== ty ArgumentsFrom) (do
+        (put_args asm (node_arg_int opd 0))
         return
         ))
     (if (== ty ListAt) (do

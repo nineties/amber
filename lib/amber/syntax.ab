@@ -2,7 +2,7 @@ Assign{Slot{Syntax,comment}, Slot{Syntax,shell_style_comment}}
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2014-01-20 00:08:11 nineties $
+# $Id: syntax.ab 2014-01-21 19:07:13 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -166,7 +166,7 @@ primary_expr
         { MakeObject{Quote{Tuple}, node1} }
       | "self"  { Quote{GetSelf{}} }
       | atom
-      | "..."   { Quote{Ellipsis{nil}} }
+      | "..."   { Quote{Rest{}} }
 
 postfix_expr
         # Function Application
@@ -175,9 +175,9 @@ postfix_expr
         # Subscription
       | postfix_expr "[" delimited(expr, ",") "]"
         { MakeObject{Quote{Subscript}, List{node0, node2}} }
-      | # Ellipsis Pattern
+      | # RestOf Pattern
         postfix_expr "..."
-        { MakeObject{Quote{Ellipsis}, List{node0}} }
+        { MakeObject{Quote{Rest}, List{node0}} }
         # Domain Pattern
       | primary_expr "@" postfix_expr
         { MakeObject{Quote{Domain}, List{node0, node2}} }
