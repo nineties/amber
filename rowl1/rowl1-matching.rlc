@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2014-01-17 23:30:52 nineties $
+; $Id: rowl1-matching.rlc 2014-01-21 09:26:09 nineties $
 ;
 
 (import "rlvm-compile")
@@ -36,6 +36,20 @@
     (compile_simple_call asm 2 trace_func)
     ))
 
+(var no_matching_exception @C_FALSE)
+(export fun set_matching_exception (bool) (
+    (var old no_matching_exception)
+    (= no_matching_exception bool)
+    (return old)
+    ))
+
+(fun matching_failed_error (obj self args) (
+    (if (== no_matching_exception @C_TRUE)
+        (return @C_UNDEF)
+        )
+    (throw (matching_failed obj self args))
+    ))
+
 (export fun compile_matching (loc obj def) (
     (if (! (is_function def))
         (throw (type_error loc (string "function") def))
@@ -50,7 +64,10 @@
     (compile_matching_function asm loc obj def exit_lbl)
 
     (set_label asm exit_lbl)
-    (put_undef asm)
+    (put_args asm)
+    (put_self asm)
+    (put_push asm def)
+    (compile_simple_call asm 3 matching_failed_error)
     (put_ireturn asm)
 
     (var code (get_code asm))
@@ -238,60 +255,49 @@
         (var code 0)
         (var guard 0)
         (var clos 0)
+        (var use_self @FALSE)
         (if (== ty @FunctionE)
             (do
                 (= code (field_get func 3))
                 (= guard (field_get func 4))
                 (= clos (field_get func 5))
+                (= use_self (field_get func 6))
             )
-            (= guard (field_get func 3))
-            )
-
-        (if guard
-            (do
-                (var guard_failed (fresh_label asm))
-                (if clos (do
-                    (put_push asm clos)
-                    (put_store_closure asm)
-                    ))
-                (put_code asm guard)
-                (put_if_false asm guard_failed)
-
-                (if (== ty @FunctionE)
-                    (do
-                        (put_push asm code)
-                        (put_jjump asm)
-                    )
-                    (do
-                        (put_imm_int32 asm (field_get func 4))
-                        (put_aforward asm)
-                    ))
-
-                (set_label asm guard_failed)
-                (if (cdr pats) (do
-                    (= pats (cdr pats))
-                    (goto compile_matching_main_loop)
-                    ))
-            )
-            (do
-                (if clos (do
-                    (put_push asm clos)
-                    (put_store_closure asm)
-                    ))
-
-                (if (== ty @FunctionE)
-                    (do
-                        (put_push asm code)
-                        (put_jjump asm)
-                    )
-                    (do
-                        (put_imm_int32 asm (field_get func 4))
-                        (put_aforward asm)
-                    ))
-
-                return
+            (do 
+                (= guard (field_get func 3))
+                (= use_self (field_get func 5))
             ))
-        (put_goto asm exit)
+
+        (var check_failed (fresh_label asm))
+        (if use_self (do
+            (put_self asm)
+            (put_if_undef asm check_failed)
+            ))
+        (if clos (do
+            (put_push asm clos)
+            (put_store_closure asm)
+            ))
+        (if guard (do
+            (put_code asm guard)
+            (put_if_false asm check_failed)
+            ))
+        (if (== ty @FunctionE)
+            (do
+                (put_push asm code)
+                (put_jjump asm)
+            )
+            (do
+                (put_imm_int32 asm (field_get func 4))
+                (put_aforward asm)
+            ))
+        (if (|| guard use_self) (do
+            (set_label asm check_failed)
+            (if (cdr pats) (do
+                (= pats (cdr pats))
+                (goto compile_matching_main_loop)
+                ))
+            (put_goto asm exit)
+            ))
         return
         ))
     (var x (split_pattern_matrix pats)) ; (single . remain)

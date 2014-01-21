@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2013-11-26 09:24:34 nineties $
+; $Id: rowl1-interp.rlc 2014-01-20 23:02:26 nineties $
 ;
 
 (import "rlvm-compile")
@@ -108,7 +108,6 @@
 
 (fun rewrite (expr) (
     (var new_expr (runcode (lookup_func global Rewrite) expr))
-    (if (== new_expr @C_UNDEF) (= new_expr expr))
     (if (!= new_expr expr) (return (rewrite new_expr)))
     (= expr new_expr)
     (if (is_atom expr) (return expr))
@@ -242,6 +241,8 @@
     (set_loc (node_arg expr 0))
     (return (eval (node_arg expr 1)))
     ))
+
+(fun rewrite_donothing (expr) ((return expr)))
 
 (fun rewrite_located (expr) (
     (node_arg_set expr 1 (rewrite (node_arg expr 1)))
@@ -455,6 +456,7 @@
         (set_slot global (to_sym "shell_mode") @C_FALSE)
         )
     
+    (add_function1 global Rewrite DontCare rewrite_donothing 0)
     (add_function1 global Rewrite (domainP Located) rewrite_located 0)
     (add_function1 global Eval DontCare default_eval 0)
     (add_function1 global Eval (domainP Located) eval_located 0)

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-01-17 23:14:25 nineties $
+; $Id: rowl1-packrat.rlc 2014-01-21 00:15:35 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1127,9 +1127,12 @@
     ))
 @(MEMOIZE statement)
 
+(extern fun set_matching_exception)
 (export fun parse_toplevel (p) (
+    (var save (set_matching_exception @C_TRUE))
     (= syntax (get_slot global Syntax))
     (parse "toplevel_statement" p)
+    (set_matching_exception save)
     ))
 
 (fun parse_toplevel_statement (p) (
@@ -1158,8 +1161,10 @@
     ))
 
 (export fun parse_shell (p) (
+    (var save (set_matching_exception @C_TRUE))
     (= syntax (get_slot global Syntax))
     (parse "shell_statement" p)
+    (set_matching_exception save)
     ))
 
 (fun parse_shell_statement (p) (
@@ -1940,10 +1945,6 @@
 
 (export fun add_reserve_symbol (sym) (
     (= reserved_symbols (cons sym reserved_symbols))
-    ))
-
-(fun return_true (p) (
-    (return @C_TRUE)
     ))
 
 (extern object global)

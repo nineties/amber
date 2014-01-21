@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-01-20 11:27:05 nineties $
+; $Id: rowl1-compile.rlc 2014-01-20 21:17:27 nineties $
 ;
 
 (import "rlvm-compile")
@@ -413,24 +413,24 @@
     (return ret)
     ))
 
-(fun alloc_function (args code guard clos) (
-    (return (variant @FunctionE 5 0 args code guard clos))
+(fun alloc_function (args code guard clos use_self) (
+    (return (variant @FunctionE 5 0 args code guard clos use_self))
     ))
 
-(fun make_function (args code guard) (
+(fun make_function (args code guard use_self) (
     (var arity (list_len args))
     (= args (cons (box arity) args))
-    (return (alloc_function args code guard 0))
+    (return (alloc_function args code guard 0 use_self))
     ))
 
-(fun alloc_builtin_function (args func guard) (
-    (return (variant @BuiltinFunctionE 3 0 args guard func))
+(fun alloc_builtin_function (args func guard use_self) (
+    (return (variant @BuiltinFunctionE 3 0 args guard func use_self))
     ))
 
-(fun make_builtin_function (args func guard) (
+(fun make_builtin_function (args func guard use_self) (
     (var arity (list_len args))
     (= args (cons (box arity) args))
-    (return (alloc_builtin_function args func guard))
+    (return (alloc_builtin_function args func guard use_self))
     ))
 
 (export fun fusion_function (fun1 fun2) (
@@ -639,6 +639,7 @@
 
 (var closure_frame null)
 (var compiling_lambda @FALSE)
+(var use_self @FALSE)
 
 (export fun compile_main (expr) (
     (var asm (make_assembler))
@@ -1259,6 +1260,7 @@
     (if (! compiling_lambda)
         (throw (exception current_loc (string "`self' outside lambda")))
         )
+    (= use_self @TRUE)
     (put_self asm)
     ))
 
@@ -1983,20 +1985,23 @@
 (fun compile_lambda_main (asm args body guard cls) (
     (var save_compiling_lambda compiling_lambda)
     (= compiling_lambda @TRUE)
+    (var save_use_self use_self)
+    (= use_self @FALSE)
     (var asm_body (make_assembler))
     (if (!= guard noguard)
         (do
             (var asm_guard (make_assembler))
             (compile_function asm_body asm_guard args body guard cls)
             (put_ireturn asm_body)
-            (put_push asm (make_function args (get_code asm_body) (get_code asm_guard)))
+            (put_push asm (make_function args (get_code asm_body) (get_code asm_guard) use_self))
         )
         (do
             (compile_function asm_body 0 args body noguard cls)
             (put_ireturn asm_body)
-            (put_push asm (make_function args (get_code asm_body) 0))
+            (put_push asm (make_function args (get_code asm_body) 0 use_self))
         ))
     (= compiling_lambda save_compiling_lambda)
+    (= use_self save_use_self)
     ))
 
 (fun compile_lambda_ (asm expr cls) (
@@ -2024,7 +2029,8 @@
     (var args (field_get lam 2))
     (var body (field_get lam 3))
     (var guard (field_get lam 4))
-    (return (alloc_function args body guard clos))
+    (var use_self (field_get lam 6))
+    (return (alloc_function args body guard clos use_self))
     ))
 
 (fun compile_closure (asm expr) (
@@ -2104,27 +2110,27 @@
     ))
 
 (export fun add_function0 (mod sym func guard) (
-    (append_function mod sym (make_builtin_function 0 func guard))
+    (append_function mod sym (make_builtin_function 0 func guard @FALSE))
     ))
 
 (export fun add_function1 (mod sym pat func guard) (
-    (append_function mod sym (make_builtin_function (list1 pat) func guard))
+    (append_function mod sym (make_builtin_function (list1 pat) func guard @FALSE))
     ))
 
 (export fun add_function2 (mod sym pat1 pat2 func guard) (
-    (append_function mod sym (make_builtin_function (list2 pat1 pat2) func guard))
+    (append_function mod sym (make_builtin_function (list2 pat1 pat2) func guard @FALSE))
     ))
 
 (export fun add_function3 (mod sym pat1 pat2 pat3 func guard) (
-    (append_function mod sym (make_builtin_function (list3 pat1 pat2 pat3) func guard))
+    (append_function mod sym (make_builtin_function (list3 pat1 pat2 pat3) func guard @FALSE))
     ))
 
 (export fun add_function4 (mod sym pat1 pat2 pat3 pat4 func guard) (
-    (append_function mod sym (make_builtin_function (list4 pat1 pat2 pat3 pat4) func guard))
+    (append_function mod sym (make_builtin_function (list4 pat1 pat2 pat3 pat4) func guard @FALSE))
     ))
 
 (export fun add_function5 (mod sym pat1 pat2 pat3 pat4 pat5 func guard) (
-    (append_function mod sym (make_builtin_function (list5 pat1 pat2 pat3 pat4 pat5) func guard))
+    (append_function mod sym (make_builtin_function (list5 pat1 pat2 pat3 pat4 pat5) func guard @FALSE))
     ))
 
 (fun compile_ (expr) (
@@ -2168,7 +2174,7 @@
     (set_label asm lbl2)
 
     (put_ireturn asm)
-    (return (make_function (list1 x) (get_code asm) 0))
+    (return (make_function (list1 x) (get_code asm) 0 @FALSE))
     ))
 
 (export fun setup_builtin_compilers () (
