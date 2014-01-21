@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-01-20 21:17:27 nineties $
+; $Id: rowl1-compile.rlc 2014-01-21 15:31:10 nineties $
 ;
 
 (import "rlvm-compile")
@@ -436,6 +436,8 @@
 (export fun fusion_function (fun1 fun2) (
     (if (== fun1 @C_UNDEF) (return fun2))
     (if (== fun2 @C_UNDEF) (return fun1))
+    (if (! (is_function fun1)) (throw (type_error current_loc (string "function") fun1)))
+    (if (! (is_function fun2)) (throw (type_error current_loc (string "function") fun2)))
     (return (variant @BoundFunctionE 3 0 fun1 fun2))
     ))
 
@@ -702,7 +704,7 @@
     (if (== f @C_UNDEF)
         (return (set_slot obj sym val))
         )
-    (if (is_function f)
+    (if (&& (is_function val) (is_function f))
         (return (set_slot obj sym (fusion_function val f)))
         )
     (throw (redefined_slot current_loc obj sym))
@@ -976,7 +978,10 @@
 (fun append_function (mod sym newfunc) (
     (var func (get_slot mod sym))
     (if (!= func @C_UNDEF)
-        (set_slot mod sym (fusion_function newfunc func))
+        (if (&& (is_function func) (is_function newfunc))
+            (set_slot mod sym (fusion_function newfunc func))
+            (throw (redefined_slot current_loc mod sym))
+            )
         (set_slot mod sym newfunc)
         )
     ))
