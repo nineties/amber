@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2013 nineties
 ;
-; $Id: rowl1-module.rlc 2014-01-23 02:34:27 nineties $
+; $Id: rowl1-module.rlc 2014-01-23 05:19:24 nineties $
 ;
 
 (import "rlvm-compile")
@@ -21,7 +21,31 @@
 (export fun make_module (sym) (
     (var mod (make_object1 Module sym))
     (set_slot mod (to_sym "variables") (list1 (to_sym "variables")))
+    (add_module_variable mod (to_sym "imports") 0)
     (return mod)
+    ))
+
+; variables are sorted.
+(fun insert_variable (v list) (
+    (if (! list) (return (list1 v)))
+    (if (== (car list) v) (return list))
+    (var c (strcmp (symbol_name (car list)) (symbol_name v)))
+    (if (== c 0) (return list))
+    (if (< c 0) (return (cons (car list) (insert_variable v (cdr list)))))
+    (return (cons v list))
+    ))
+
+(export fun add_module_variable (mod sym val) (
+    (if (!= (node_head mod) Module)
+        (throw (type_error current_loc (string "Module") mod))
+        )
+    (var list (get_slot mod (to_sym "variables")))
+    (if (!= (node_type list) @ListE)
+        (throw (type_error current_loc (string "List") mod))
+        )
+    (set_slot mod (to_sym "variables") (insert_variable sym list))
+    (set_slot mod sym val)
+    (return val)
     ))
 
 (export fun enter_module (global sym) (
@@ -35,8 +59,8 @@
     (if (!= (node_bhead mod) Module)
         (throw (type_error current_loc (string "Module") mod))
         )
-    (set_slot mod proto global)
-    (set_slot global sym mod)
+    (add_module_variable mod proto global)
+    (add_module_variable global sym mod)
     (return mod)
     ))
 

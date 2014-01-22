@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-01-23 02:36:02 nineties $
+; $Id: rowl1-interp.rlc 2014-01-23 04:06:58 nineties $
 ;
 
 (import "rlvm-compile")
@@ -300,22 +300,8 @@
     (return @C_NIL)
     ))
 
-(export fun add_module_variable (mod sym val) (
-    (if (!= (node_head mod) Module)
-        (throw (type_error current_loc (string "Module") mod))
-        )
-    (var list (get_slot mod (to_sym "variables")))
-    (if (!= (node_type list) @ListE)
-        (throw (type_error current_loc (string "List") mod))
-        )
-    (set_slot mod (to_sym "variables") (list_insert_uniq sym list))
-    (set_slot mod sym val)
-    (return val)
-    ))
-
 
 (var import_dirs null)
-(var imported_files null)
 
 ; XXX: fix this
 (fun add_import_dir (path) (
@@ -330,15 +316,12 @@
     (= import_dirs (cdr import_dirs))
     ))
 
-(fun add_imported_file (path) (
-    ; XXX: fixme. canonicalize the `path'
-    (= imported_files (cons (string path) imported_files))
-    ))
-
-(fun is_already_imported (path) (
-    (var list imported_files)
+(fun is_already_imported (list file) (
+    (if (!= (node_type list) @ListE)
+        (throw (type_error current_loc (string "List") list))
+        )
     (while list (do
-        (if (streq path (car list))
+        (if (streq file (car list))
             (return @TRUE)
             )
         (= list (cdr list))
@@ -380,6 +363,13 @@
                 (var fullpath (join (list3 (car dirs) (string "/") file)))
                 (if (file_exists fullpath) (do
                     (var mod_sym (to_sym (car list)))
+
+                    (var imports (get_slot global (to_sym "imports")))
+                    (if (is_already_imported imports file)
+                        (return @C_FALSE)
+                        )
+                    (set_slot global (to_sym "imports") (cons file imports))
+
                     (var ichan (open_in fullpath))
                     (var fd (open "."))
                     (chdir (car dirs))
