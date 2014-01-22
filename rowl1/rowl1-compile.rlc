@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-01-21 19:16:44 nineties $
+; $Id: rowl1-compile.rlc 2014-01-23 01:46:17 nineties $
 ;
 
 (import "rlvm-compile")
@@ -37,6 +37,7 @@
 
 (extern fun set_slot)
 (extern fun get_slot)
+(extern fun add_module_variable)
 
 (fun trace_func (msg val) (
     (debugs msg)
@@ -722,6 +723,17 @@
     (throw (redefined_slot current_loc obj sym))
     ))
 
+(fun append_module_slot (obj sym val) (
+    (var f (get_slot obj sym))
+    (if (== f @C_UNDEF)
+        (return (add_module_variable obj sym val))
+        )
+    (if (&& (is_function val) (is_function f))
+        (return (set_slot obj sym (fusion_function val f)))
+        )
+    (throw (redefined_slot current_loc obj sym))
+    ))
+
 ; obj.f
 (fun compile_slot (asm expr) (
     (var obj (node_arg expr 0))
@@ -1004,10 +1016,10 @@
     (var func (get_slot mod sym))
     (if (!= func @C_UNDEF)
         (if (&& (is_function func) (is_function newfunc))
-            (return (set_slot mod sym (fusion_function newfunc func)))
+            (return (add_module_variable mod sym (fusion_function newfunc func)))
             (throw (redefined_slot current_loc mod sym))
             )
-        (return (set_slot mod sym newfunc))
+        (return (add_module_variable mod sym newfunc))
         )
     ))
 
@@ -1075,7 +1087,7 @@
     (compile asm val)
     (put_push asm sym)
     (put_push asm global)
-    (compile_simple_call asm 3 set_slot)
+    (compile_simple_call asm 3 add_module_variable)
     ))
 
 ; translate
@@ -1124,7 +1136,7 @@
         (compile asm lam)
         (put_push asm sym)
         (compile asm obj)
-        (compile_simple_call asm 3 append_slot)
+        (compile_simple_call asm 3 append_module_slot)
         return
         ))
 
@@ -1862,7 +1874,7 @@
         (compile asm rhs)
         (put_push asm (node_arg_symbol v 0))
         (put_push asm global)
-        (compile_simple_call asm 3 set_slot)
+        (compile_simple_call asm 3 add_module_variable)
         return
         ))
 

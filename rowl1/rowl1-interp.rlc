@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-01-22 23:48:44 nineties $
+; $Id: rowl1-interp.rlc 2014-01-23 02:36:02 nineties $
 ;
 
 (import "rlvm-compile")
@@ -12,6 +12,7 @@
 
 (import "rowl1-util")
 (import "rowl1-node")
+(import "rowl1-module")
 (import "rowl1-error")
 (import "rowl1-object")
 (import "rowl1-symtable")
@@ -57,10 +58,10 @@
 
 (fun eval_main (file ichan argc argv) (
     (= current_loc no_loc)
-    (= global (make_object1 Module Amber))
+    (= global (make_module Amber))
     (= variables (make_symtable 10))
     (set_slot global Amber global)
-    (set_slot global Syntax (make_object1 Module Syntax))
+    (set_slot global Syntax (make_module Syntax))
 
     (setup_argv argc argv)
     (setup_globals)
@@ -299,31 +300,19 @@
     (return @C_NIL)
     ))
 
-(export fun enter_module (sym) (
-    (var mod (get_slot_norec global sym))
-    (if (== mod @C_UNDEF)
-        (= mod (make_object1 Module sym))
-        )
-    (if (== mod global)
-        (throw (make_object3 Exception current_loc (string "recursive dependency detected") mod))
-        )
-    (if (!= (node_bhead mod) Module)
+(export fun add_module_variable (mod sym val) (
+    (if (!= (node_head mod) Module)
         (throw (type_error current_loc (string "Module") mod))
         )
-    (set_slot mod proto global)
-    (set_slot global sym mod)
-    (= global mod)
-    (return global)
+    (var list (get_slot mod (to_sym "variables")))
+    (if (!= (node_type list) @ListE)
+        (throw (type_error current_loc (string "List") mod))
+        )
+    (set_slot mod (to_sym "variables") (list_insert_uniq sym list))
+    (set_slot mod sym val)
+    (return val)
     ))
 
-(export fun exit_module () (
-    (var mod (get_slot global proto))
-    (if (!= (node_bhead mod) Module)
-        (throw (type_error current_loc (string "Module") mod))
-        )
-    (= global mod)
-    (return global)
-    ))
 
 (var import_dirs null)
 (var imported_files null)
@@ -375,9 +364,9 @@
                     (var fd (open "."))
                     (chdir fullpath)
                     (var mod_sym (to_sym dir))
-                    (enter_module mod_sym)
+                    (= global (enter_module global mod_sym))
                     (var r (import_lib_rec (cdr list) @FALSE))
-                    (exit_module)
+                    (= global (exit_module global))
                     (fchdir fd)
                     (set_loc no_loc)
                     (return r)
@@ -395,7 +384,7 @@
                     (var fd (open "."))
                     (chdir (car dirs))
 
-                    (enter_module mod_sym)
+                    (= global (enter_module global mod_sym))
 
                     (var p (make_parser fullpath ichan))
                     (set_loc (get_loc p))
@@ -405,7 +394,8 @@
                     (interpret p)
                     (if save_shell_mode_p (set_shell_mode))
 
-                    (exit_module)
+                    (= global (exit_module global))
+
                     (fchdir fd)
                     (close_in ichan)
                     (set_loc no_loc)
@@ -416,44 +406,6 @@
         ))
         (throw (not_found current_loc (car list)))
     ))
-
-;(fun import_lib (path) (
-;    (= path (add_extension ".ab" path))
-;    (var dir import_dirs)
-;    (while dir (do
-;        (var fullpath (build_path (car dir) path ""))
-;        (if (file_exists fullpath) (do
-;            (if (is_already_imported fullpath)
-;                (return @C_FALSE)
-;                )
-;            (add_imported_file fullpath)
-;
-;            (var ichan (open_in fullpath))
-;            (var fd (open "."))
-;            (var dir (get_directory fullpath))
-;            (chdir dir)
-;            (add_import_dir dir)
-;
-;            (var p (make_parser fullpath ichan))
-;            (set_loc (get_loc p))
-;
-;            (var save_shell_mode_p (in_shell_mode))
-;            (unset_shell_mode)
-;            (interpret p)
-;            (if save_shell_mode_p (set_shell_mode))
-;
-;            (pop_import_dir)
-;
-;            (fchdir fd)
-;            (close_in ichan)
-;
-;            (set_loc no_loc)
-;            (return @C_TRUE)
-;            ))
-;        (= dir (cdr dir))
-;        ))
-;    (throw (not_found current_loc (string path)))
-;    ))
 
 (var pre_imports null)
 (export fun set_pre_imports (sym) (
@@ -556,8 +508,6 @@
     (add_function1 global (to_sym "import") stringT import_lib 0)
     (add_function1 global (to_sym "exit") intT exit_ 0)
     (add_function1 global (to_sym "atexit") funT at_exit 0)
-    (add_function1 global (to_sym "enter_module") symT enter_module 0)
-    (add_function0 global (to_sym "exit_module") exit_module 0)
     ))
 
 (extern fun setup_pprint)

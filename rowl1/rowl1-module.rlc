@@ -1,0 +1,51 @@
+;
+; rowl - 1st generation
+; Copyright (C) 2013 nineties
+;
+; $Id: rowl1-module.rlc 2014-01-23 02:34:27 nineties $
+;
+
+(import "rlvm-compile")
+(import "rowl1-types")
+
+(compile `object `(
+
+(import "rowl1-util")
+(import "rowl1-node")
+(import "rowl1-object")
+(import "rowl1-error")
+
+(extern object global)
+(extern object current_loc)
+
+(export fun make_module (sym) (
+    (var mod (make_object1 Module sym))
+    (set_slot mod (to_sym "variables") (list1 (to_sym "variables")))
+    (return mod)
+    ))
+
+(export fun enter_module (global sym) (
+    (var mod (get_slot_norec global sym))
+    (if (== mod @C_UNDEF)
+        (= mod (make_module sym))
+        )
+    (if (== mod global)
+        (throw (make_object3 Exception current_loc (string "recursive dependency detected") mod))
+        )
+    (if (!= (node_bhead mod) Module)
+        (throw (type_error current_loc (string "Module") mod))
+        )
+    (set_slot mod proto global)
+    (set_slot global sym mod)
+    (return mod)
+    ))
+
+(export fun exit_module (global) (
+    (var mod (get_slot global proto))
+    (if (!= (node_bhead mod) Module)
+        (throw (type_error current_loc (string "Module") mod))
+        )
+    (return mod)
+    ))
+
+   ))
