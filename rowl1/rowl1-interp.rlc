@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-01-21 16:21:16 nineties $
+; $Id: rowl1-interp.rlc 2014-01-22 11:30:49 nineties $
 ;
 
 (import "rlvm-compile")
@@ -297,6 +297,29 @@
     (return @C_NIL)
     ))
 
+(fun enter_module (sym) (
+    (var mod (get_slot global sym))
+    (if (== mod @C_UNDEF)
+        (= mod (make_object1 Module sym))
+        )
+    (if (!= (node_bhead mod) Module)
+        (throw (type_error current_loc (string "Module") mod))
+        )
+    (set_slot mod proto global)
+    (set_slot global sym mod)
+    (= global mod)
+    (return global)
+    ))
+
+(fun exit_module () (
+    (var mod (get_slot global proto))
+    (if (!= (node_bhead mod) Module)
+        (throw (type_error current_loc (string "Module") mod))
+        )
+    (= global mod)
+    (return global)
+    ))
+
 (var import_dirs null)
 (var imported_files null)
 
@@ -473,6 +496,8 @@
     (add_function1 global (to_sym "import") stringT import_lib 0)
     (add_function1 global (to_sym "exit") intT exit_ 0)
     (add_function1 global (to_sym "atexit") funT at_exit 0)
+    (add_function1 global (to_sym "enter_module") symT enter_module 0)
+    (add_function0 global (to_sym "exit_module") exit_module 0)
     ))
 
 (extern fun setup_pprint)
