@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-object.rlc 2014-01-21 22:21:00 nineties $
+; $Id: rowl1-object.rlc 2014-01-22 10:02:27 nineties $
 ;
 
 (import "rlvm-compile")
@@ -18,8 +18,8 @@
 (extern object current_loc)
 
 (var slots (make_wrtable))
-(var trait (to_sym "trait"))
-(var trait_tbl (make_wrtable))
+(var proto (to_sym "proto"))
+(var proto_tbl (make_wrtable))
 (var initialize (to_sym "initialize"))
 
 (extern fun tuple_at)
@@ -27,7 +27,7 @@
 
 (export fun make_clone (obj) (
     (var clone (_copy obj))
-    (set_slot clone trait obj)
+    (set_slot clone proto obj)
     (var init (get_slot clone initialize))
     (if (!= init @C_UNDEF)
         (= clone (runcode (get_bytecode init) clone))
@@ -66,7 +66,7 @@
     (label retry)
     (var v (wrtable_find tbl obj))
     (if (== v @C_UNDEF) (do
-        (= obj (wrtable_find trait_tbl obj))
+        (= obj (wrtable_find proto_tbl obj))
         (if (== obj @C_UNDEF) (return (wrtable_find tbl @C_UNDEF)))
         (goto retry)
         ))
@@ -74,7 +74,7 @@
     ))
 
 (export fun setup_object (global) (
-    (wrtable_add slots trait trait_tbl)
+    (wrtable_add slots proto proto_tbl)
 
     (add_function1 global (to_sym "clone") DontCare make_clone 0)
     (add_function3 global (to_sym "set_slot") DontCare symT DontCare set_slot 0)
