@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-01-22 17:54:37 nineties $
+; $Id: rowl1-interp.rlc 2014-01-22 23:48:44 nineties $
 ;
 
 (import "rlvm-compile")
@@ -69,15 +69,17 @@
     (init_parser_funcs (get_slot global Syntax))
     (set_loc no_loc)
 
-    (add_import_dir "/usr/lib/amber/")
-    (import_lib "amber/syntax.ab")
-    (import_lib "std/string.ab")
-    (import_lib "std/numeric.ab")
-    (import_lib "std/format.ab")
-    (import_lib "std/list.ab")
-    (import_lib "std/array.ab")
-    (import_lib "std/table.ab")
-    (import_lib "std/io/io.ab")
+    (add_import_dir "/usr/lib/amber")
+    (import_lib (list1 (string "Syntax")))
+
+    ;(import_lib "amber/syntax.ab")
+    ;(import_lib "std/string.ab")
+    ;(import_lib "std/numeric.ab")
+    ;(import_lib "std/format.ab")
+    ;(import_lib "std/list.ab")
+    ;(import_lib "std/array.ab")
+    ;(import_lib "std/table.ab")
+    ;(import_lib "std/io/io.ab")
 
     (add_import_dir (get_directory file))
     (add_import_dir (get_env "PWD"))
@@ -106,7 +108,7 @@
     ))
 
 (fun rewrite (expr) (
-    (var new_expr (runcode (lookup_func global Rewrite) expr))
+    (var new_expr (runcode (lookup_func (get_slot global Syntax) Rewrite) expr))
     (if (!= new_expr expr) (return (rewrite new_expr)))
     (= expr new_expr)
     (if (is_atom expr) (return expr))
@@ -200,7 +202,7 @@
 (extern fun ary_push)
 (fun interpret_shell (p) (
     (var outputs (ary_new))
-    (enable_shell_syntax)
+    (import_lib (list2 (string "Syntax") (string "Shell")))
     (set_slot global (to_sym "shell_outputs") outputs)
     (ary_push outputs @C_UNDEF)
     (while 1 (do
@@ -297,10 +299,13 @@
     (return @C_NIL)
     ))
 
-(fun enter_module (sym) (
-    (var mod (get_slot global sym))
+(export fun enter_module (sym) (
+    (var mod (get_slot_norec global sym))
     (if (== mod @C_UNDEF)
         (= mod (make_object1 Module sym))
+        )
+    (if (== mod global)
+        (throw (make_object3 Exception current_loc (string "recursive dependency detected") mod))
         )
     (if (!= (node_bhead mod) Module)
         (throw (type_error current_loc (string "Module") mod))
@@ -311,7 +316,7 @@
     (return global)
     ))
 
-(fun exit_module () (
+(export fun exit_module () (
     (var mod (get_slot global proto))
     (if (!= (node_bhead mod) Module)
         (throw (type_error current_loc (string "Module") mod))
@@ -325,11 +330,6 @@
 
 ; XXX: fix this
 (fun add_import_dir (path) (
-    (if (== (array_get char path (- (strlen path) 1)) '/')
-        (= path (string path))
-        (= path (strcat path "/"))
-        )
-
     (if (!= (array_get char path 0) '/')
         (= path (strcat (strcat (get_env "PWD") "/") path))
         )
@@ -357,43 +357,103 @@
     (return @FALSE)
     ))
 
-(fun import_lib (path) (
-    (= path (add_extension ".ab" path))
-    (var dir import_dirs)
-    (while dir (do
-        (var fullpath (build_path (car dir) path ""))
-        (if (file_exists fullpath) (do
-            (if (is_already_imported fullpath)
-                (return @C_FALSE)
-                )
-            (add_imported_file fullpath)
-
-            (var ichan (open_in fullpath))
-            (var fd (open "."))
-            (var dir (get_directory fullpath))
-            (chdir dir)
-            (add_import_dir dir)
-
-            (var p (make_parser fullpath ichan))
-            (set_loc (get_loc p))
-
-            (var save_shell_mode_p (in_shell_mode))
-            (unset_shell_mode)
-            (interpret p)
-            (if save_shell_mode_p (set_shell_mode))
-
-            (pop_import_dir)
-
-            (fchdir fd)
-            (close_in ichan)
-
-            (set_loc no_loc)
-            (return @C_TRUE)
-            ))
-        (= dir (cdr dir))
-        ))
-    (throw (not_found current_loc (string path)))
+(fun import_lib (list) (
+    (return (import_lib_rec list @TRUE))
     ))
+
+(fun import_lib_rec (list top) (
+    (var dirs (list1 (string ".")))
+    (if top (= dirs (list_append dirs import_dirs)))
+    (if (cdr list)
+        (do
+            ; ;; import A.B...
+            ; change working directory to A then import B...
+            (var dir (car list))
+            (while dirs (do
+                (var fullpath (join (list3 (car dirs) (string "/") dir)))
+                (if (file_exists fullpath) (do
+                    (var fd (open "."))
+                    (chdir fullpath)
+                    (var mod_sym (to_sym dir))
+                    (enter_module mod_sym)
+                    (var r (import_lib_rec (cdr list) @FALSE))
+                    (exit_module)
+                    (fchdir fd)
+                    (set_loc no_loc)
+                    (return r)
+                    ))
+                (= dirs (cdr dirs))
+                ))
+        )
+        (do
+            (var file (strcat (car list) ".ab"))
+            (while dirs (do
+                (var fullpath (join (list3 (car dirs) (string "/") file)))
+                (if (file_exists fullpath) (do
+                    (var mod_sym (to_sym (car list)))
+                    (var ichan (open_in fullpath))
+                    (var fd (open "."))
+                    (chdir (car dirs))
+
+                    (enter_module mod_sym)
+
+                    (var p (make_parser fullpath ichan))
+                    (set_loc (get_loc p))
+
+                    (var save_shell_mode_p (in_shell_mode))
+                    (unset_shell_mode)
+                    (interpret p)
+                    (if save_shell_mode_p (set_shell_mode))
+
+                    (exit_module)
+                    (fchdir fd)
+                    (close_in ichan)
+                    (set_loc no_loc)
+                    (return @C_TRUE)
+                    ))
+                (= dirs (cdr dirs))
+                ))
+        ))
+        (throw (not_found current_loc (car list)))
+    ))
+
+;(fun import_lib (path) (
+;    (= path (add_extension ".ab" path))
+;    (var dir import_dirs)
+;    (while dir (do
+;        (var fullpath (build_path (car dir) path ""))
+;        (if (file_exists fullpath) (do
+;            (if (is_already_imported fullpath)
+;                (return @C_FALSE)
+;                )
+;            (add_imported_file fullpath)
+;
+;            (var ichan (open_in fullpath))
+;            (var fd (open "."))
+;            (var dir (get_directory fullpath))
+;            (chdir dir)
+;            (add_import_dir dir)
+;
+;            (var p (make_parser fullpath ichan))
+;            (set_loc (get_loc p))
+;
+;            (var save_shell_mode_p (in_shell_mode))
+;            (unset_shell_mode)
+;            (interpret p)
+;            (if save_shell_mode_p (set_shell_mode))
+;
+;            (pop_import_dir)
+;
+;            (fchdir fd)
+;            (close_in ichan)
+;
+;            (set_loc no_loc)
+;            (return @C_TRUE)
+;            ))
+;        (= dir (cdr dir))
+;        ))
+;    (throw (not_found current_loc (string path)))
+;    ))
 
 (var pre_imports null)
 (export fun set_pre_imports (sym) (
@@ -477,9 +537,9 @@
         (set_slot global (to_sym "shell_mode") @C_TRUE)
         (set_slot global (to_sym "shell_mode") @C_FALSE)
         )
-    
-    (add_function1 global Rewrite DontCare rewrite_donothing 0)
-    (add_function1 global Rewrite (domainP Located) rewrite_located 0)
+    (var syntax (get_slot global Syntax)) 
+    (add_function1 syntax Rewrite DontCare rewrite_donothing 0)
+    (add_function1 syntax Rewrite (domainP Located) rewrite_located 0)
     (add_function1 global Eval DontCare default_eval 0)
     (add_function1 global Eval (domainP Located) eval_located 0)
     (add_function1 global Eval (make_object1 Import listT) eval_import 0)

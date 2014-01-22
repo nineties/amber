@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-01-21 00:15:35 nineties $
+; $Id: rowl1-packrat.rlc 2014-01-23 00:03:10 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1251,16 +1251,9 @@
 
 (fun compile_parser_element (pat ws) (
     (var hd (node_bhead pat))
-    (if (== hd BSymbol)
-        (return (parse_with_check
-            (apply (slot Syntax pat) (list1 PVar)) ws))
+    (if (|| (== hd BSymbol) (== hd Slot))
+        (return (parse_with_check (apply (slot Syntax pat) (list1 PVar)) ws))
         )
-    (if (== hd Slot) (do
-        (var obj (node_arg pat 0))
-        (var sym (node_arg pat 1))
-        (return (parse_with_check
-            (apply (slot (slot obj Syntax) sym) (list1 PVar)) ws))
-        ))
     (if (== hd BString)
         (return (parse_with_check
             (apply (syntax_func "text") (list2 PVar pat)) ws)))
@@ -1720,12 +1713,9 @@
     (return (block (list2 p (apply (syntax_func "%apply_located") (list1 PVar)))))
     ))
 
-; parsewith{ sym } is translated to
+; parsewith{ sym }
 (fun compile_parse_with (sym ws) (
-    (if (== (node_bhead sym) Slot)
-        (= sym (slot (slot (node_arg sym 0) Syntax) (node_arg sym 1)))
-        (= sym (slot Syntax sym))
-        )
+    (= sym (slot Syntax sym))
     (return (parse_with_check (apply sym (list1 PVar)) ws))
     ))
 
@@ -1932,13 +1922,6 @@
     (var parser (apply (syntax_func "%call_parser")
             (list4 PVar (quote lhs) (quote key) parser_body)))
     (+= key_idx 1)
-
-    ; DefineSyntax{mod.sym, ...} defines mod.syntax.sym
-    ; DefineSyntax{sym, ...} defines synta.sym
-    (if (== (node_bhead lhs) Slot)
-        (= lhs (slot (slot (node_arg lhs 0) Syntax) (node_arg lhs 1)))
-        (= lhs (slot Syntax lhs))
-        )
 
     (return (make_object3 Define lhs (lambda (make_object2 When (list1 (make_object2 Domain PVar Parser)) parser) @C_TRUE) (to_sym "partial")))
     ))

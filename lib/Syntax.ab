@@ -1,8 +1,8 @@
-Assign{Slot{Syntax,comment}, Slot{Syntax,shell_style_comment}}
+Assign{comment, shell_style_comment}
 
 # Copyright (C) 2010 nineties
 #
-# $Id: syntax.ab 2014-01-21 19:07:13 nineties $
+# $Id: Syntax.ab 2014-01-22 23:28:34 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -35,7 +35,7 @@ Assign{Slot{Syntax,comment}, Slot{Syntax,shell_style_comment}}
 DefineSyntax{
     character_set,
     List{Tuple{List{Many1{Choice{List{'\\', any}, List{Not{"]"}, any}}}},
-        Apply{Slot{Syntax,input_text}, List{parser,begin,end}}}
+        Apply{input_text, List{parser,begin,end}}}
     }
 }
 
@@ -203,7 +203,7 @@ pattern ::= quote_expr
 term    ::= primary_expr
 
 ## enable use of quotation expressions for following definitions.
-Assign{Slot{Syntax,expr}, Slot{Syntax,quote_expr}}
+Assign{expr, quote_expr}
 
 prefix_expr
     ::= "+"          quote_expr { `UnaryPlus{!node1} }
@@ -295,9 +295,10 @@ assign_expr
       | pattern "%=" assign_expr  { `ModAssign{!node0, !node2} }
       | pattern "<<=" assign_expr { `ShiftLAssign{!node0, !node2} }
       | pattern ">>=" assign_expr { `ShiftRAssign{!node0, !node2} }
+      | pattern "|=" assign_expr  { `FusionAssign{!node0, !node2} }
       | multi_lambda_expr
 
-Assign{Syntax.expr, Syntax.assign_expr}
+Assign{expr, assign_expr}
 
 ### Statements
 statement
@@ -410,50 +411,32 @@ rewrite(x is not y) = `(not identical(!x, !y))
         }
     }
 
-    rewrite(x += y)     = rewrite_operator_assign(x, y, \add)
-    rewrite(x -= y)     = rewrite_operator_assign(x, y, \sub)
-    rewrite(x *= y)     = rewrite_operator_assign(x, y, \mul)
-    rewrite(x ^= y)     = rewrite_operator_assign(x, y, \pow)
-    rewrite(x /= y)     = rewrite_operator_assign(x, y, \div)
-    rewrite(x %= y)     = rewrite_operator_assign(x, y, \mod)
-    rewrite(x <<= y)    = rewrite_operator_assign(x, y, \shiftL)
-    rewrite(x >>= y)    = rewrite_operator_assign(x, y, \shiftR)
+    rewrite(x += y)  = rewrite_operator_assign(x, y, \add)
+    rewrite(x -= y)  = rewrite_operator_assign(x, y, \sub)
+    rewrite(x *= y)  = rewrite_operator_assign(x, y, \mul)
+    rewrite(x ^= y)  = rewrite_operator_assign(x, y, \pow)
+    rewrite(x /= y)  = rewrite_operator_assign(x, y, \div)
+    rewrite(x %= y)  = rewrite_operator_assign(x, y, \mod)
+    rewrite(x <<= y) = rewrite_operator_assign(x, y, \shiftL)
+    rewrite(x >>= y) = rewrite_operator_assign(x, y, \shiftR)
+    rewrite(x |= y)  = rewrite_operator_assign(x, y, \fusion)
 }
 
-### Extend primary_expr so as to enable use $... to refer nodes
-# of syntax-tree only in parser_action.
+# Extend primary_expr to enable dollar sign ($) in parser action.
+primary_expr_act
+    ::= "$" decimal { to_sym("node" + node1) }
+      | "$input"    { \input_text(parser,begin,end) }
+    
+primary_expr_act |= primary_expr
 
-Action: `Module{ParserAction}
-Action.Syntax: `Module{Syntax}
-
-Action.primary_expr ::= "$" decimal { to_sym("node" + node1) }
-                      | "$input"    { \Syntax.input_text(parser,begin,end) }
-
-### FIXME: This is a temporary dirty hack.
-Syntax.primary_expr_act: Syntax.primary_expr | Action.Syntax.primary_expr
-Syntax.parser_action_old: Syntax.parser_action
-Syntax.parser_action = parser -> {
-    save_primary_expr: Syntax.primary_expr
-    Syntax.primary_expr = Syntax.primary_expr_act
-    r: Syntax.parser_action_old(parser)
-    Syntax.primary_expr = save_primary_expr
+parser_action_old: parser_action
+parser_action = parser -> {
+    save_primary_expr: primary_expr
+    primary_expr = primary_expr_act
+    r: parser_action_old(parser)
+    primary_expr = save_primary_expr
     r
 }
 
-
-### Syntax definitions which are effective only in shell-mode.
-Shell: `Module{Shell}
-Shell.Syntax: `Module{Syntax}
-
-Shell.primary_expr ::= "%" decimal
-                 {
-                    if ($1 == 0 or $1 > size(shell_outputs)) {
-                        throw `Error{!LOCATION, "The argument of % must be a line number"}
-                    }
-                    `shell_outputs[!$1]
-                 }
-                     | "%"         { `shell_outputs[0] }
-
-enable_shell_syntax(): {
-    Syntax.primary_expr = Syntax.primary_expr | Shell.Syntax.primary_expr
-}
+IO.print(IO.stdout, Syntax.primary_expr)
+IO.print(IO.stdout, "\n")

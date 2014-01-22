@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-object.rlc 2014-01-22 10:02:27 nineties $
+; $Id: rowl1-object.rlc 2014-01-22 23:43:46 nineties $
 ;
 
 (import "rlvm-compile")
@@ -73,12 +73,22 @@
     (return v)
     ))
 
+(export fun get_slot_norec (obj sym _) (
+    (if (|| (!= (node_type sym) @SymbolE) (is_special sym))
+        (throw (invalid_slotname current_loc sym))
+        )
+    (var tbl (wrtable_find slots sym))
+    (if (== tbl @C_UNDEF) (return @C_UNDEF))
+    (return (wrtable_find tbl obj))
+    ))
+
 (export fun setup_object (global) (
     (wrtable_add slots proto proto_tbl)
 
     (add_function1 global (to_sym "clone") DontCare make_clone 0)
     (add_function3 global (to_sym "set_slot") DontCare symT DontCare set_slot 0)
     (add_function2 global (to_sym "get_slot") DontCare DontCare get_slot 0)
+    (add_function3 global (to_sym "get_slot") DontCare DontCare (quote (to_sym "norec")) get_slot_norec 0)
     ))
 
     ))
