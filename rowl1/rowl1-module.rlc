@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2013 nineties
 ;
-; $Id: rowl1-module.rlc 2014-01-23 05:19:24 nineties $
+; $Id: rowl1-module.rlc 2014-01-23 10:36:11 nineties $
 ;
 
 (import "rlvm-compile")
@@ -21,7 +21,7 @@
 (export fun make_module (sym) (
     (var mod (make_object1 Module sym))
     (set_slot mod (to_sym "variables") (list1 (to_sym "variables")))
-    (add_module_variable mod (to_sym "imports") 0)
+    (store_variable mod (to_sym "imports") 0)
     (return mod)
     ))
 
@@ -35,7 +35,7 @@
     (return (cons v list))
     ))
 
-(export fun add_module_variable (mod sym val) (
+(export fun store_variable (mod sym val) (
     (if (!= (node_head mod) Module)
         (throw (type_error current_loc (string "Module") mod))
         )
@@ -59,8 +59,8 @@
     (if (!= (node_bhead mod) Module)
         (throw (type_error current_loc (string "Module") mod))
         )
-    (add_module_variable mod proto global)
-    (add_module_variable global sym mod)
+    (store_variable mod proto global)
+    (store_variable global sym mod)
     (return mod)
     ))
 
