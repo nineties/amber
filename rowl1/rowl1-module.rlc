@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2013 nineties
 ;
-; $Id: rowl1-module.rlc 2014-01-23 10:36:11 nineties $
+; $Id: rowl1-module.rlc 2014-01-24 21:18:20 nineties $
 ;
 
 (import "rlvm-compile")
@@ -18,10 +18,14 @@
 (extern object global)
 (extern object current_loc)
 
-(export fun make_module (sym) (
+(export fun create_module (sym) (
+    (if (&& (!= (node_bhead global) Module) (!= global @C_UNDEF))
+        (throw (type_error current_loc (string "a module") global))
+        )
     (var mod (make_object1 Module sym))
     (set_slot mod (to_sym "variables") (list1 (to_sym "variables")))
     (store_variable mod (to_sym "imports") 0)
+    (store_variable mod proto global)
     (return mod)
     ))
 
@@ -51,7 +55,7 @@
 (export fun enter_module (global sym) (
     (var mod (get_slot_norec global sym))
     (if (== mod @C_UNDEF)
-        (= mod (make_module sym))
+        (= mod (create_module sym))
         )
     (if (== mod global)
         (throw (make_object3 Exception current_loc (string "recursive dependency detected") mod))

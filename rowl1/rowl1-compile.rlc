@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-01-23 01:46:17 nineties $
+; $Id: rowl1-compile.rlc 2014-01-25 08:11:28 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1225,7 +1225,7 @@
         ))
     ))
 
-(fun load_global_variable (sym) (
+(fun load_global_variable (global sym) (
     (var v (get_slot global sym))
     (if (== v @C_UNDEF)
         (throw (undefined_var current_loc sym))
@@ -1242,7 +1242,8 @@
     (var ty (node_bhead opd))
     (if (== ty GlobalVariable) (do
         (put_push asm sym)
-        (compile_simple_call asm 1 load_global_variable)
+        (put_push asm global)
+        (compile_simple_call asm 2 load_global_variable)
         return
         ))
     (if (== ty LocalVariable) (do

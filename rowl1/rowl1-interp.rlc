@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-01-23 05:37:03 nineties $
+; $Id: rowl1-interp.rlc 2014-01-25 08:15:46 nineties $
 ;
 
 (import "rlvm-compile")
@@ -58,20 +58,25 @@
 
 (fun eval_main (file ichan argc argv) (
     (= current_loc no_loc)
-    (= global (make_module Amber))
+
+    (= global @C_UNDEF)
+    (= global (create_module Amber))
     (= variables (make_symtable 10))
-    (set_slot global Amber global)
-    (set_slot global Syntax (make_module Syntax))
+    (store_variable global Amber global)
+
+    (var syntax (create_module Syntax))
+    (store_variable global Syntax syntax)
+    (store_variable syntax proto global)
 
     (setup_argv argc argv)
     (setup_globals)
     (setup_builtin_compilers)
     (init_lib)
-    (init_parser_funcs (get_slot global Syntax))
+    (init_parser_funcs syntax)
     (set_loc no_loc)
 
-    (add_import_dir "/usr/lib/amber")
-    (import_lib (list1 (string "Syntax")))
+    (add_load_dir "/usr/lib/amber")
+    (load_lib "Syntax.ab")
 
     ;(import_lib "amber/syntax.ab")
     ;(import_lib "std/string.ab")
@@ -82,8 +87,8 @@
     ;(import_lib "std/table.ab")
     ;(import_lib "std/io/io.ab")
 
-    (add_import_dir (get_directory file))
-    (add_import_dir (get_env "PWD"))
+    (add_load_dir (get_directory file))
+    (add_load_dir (get_env "PWD"))
 
     (pre_import_lib)
 
@@ -203,8 +208,8 @@
 (extern fun ary_push)
 (fun interpret_shell (p) (
     (var outputs (ary_new))
-    (import_lib (list2 (string "Syntax") (string "Shell")))
-    (set_slot global (to_sym "shell_outputs") outputs)
+    (eval (apply (slot (slot (to_sym "Syntax") (to_sym "Shell")) (to_sym "enable_shell_syntax")) 0))
+    (store_variable global (to_sym "shell_outputs") outputs)
     (ary_push outputs @C_UNDEF)
     (while 1 (do
         (try 
@@ -301,19 +306,21 @@
     ))
 
 
-(var import_dirs null)
+(var load_dirs null)
 
 ; XXX: fix this
-(fun add_import_dir (path) (
+(fun add_load_dir (path) (
     (if (!= (array_get char path 0) '/')
         (= path (strcat (strcat (get_env "PWD") "/") path))
         )
-    
-    (= import_dirs (cons path import_dirs))
+    (if (!= (array_get char path (- (strlen path) 1)) '/')
+        (= path (strcat path "/"))
+        )
+    (= load_dirs (cons path load_dirs))
     ))
 
 (fun pop_import_dir () (
-    (= import_dirs (cdr import_dirs))
+    (= load_dirs (cdr load_dirs))
     ))
 
 (fun is_already_imported (list file) (
@@ -330,12 +337,13 @@
     ))
 
 (fun import_lib (list) (
-    (return (import_lib_rec list @TRUE))
+    (throw (string "import_lib"))
+    ;(return (import_lib_rec list @TRUE))
     ))
 
 (fun import_lib_rec (list top) (
     (var dirs (list1 (string ".")))
-    (if top (= dirs (list_append dirs import_dirs)))
+    (if top (= dirs (list_append dirs load_dirs)))
     (if (cdr list)
         (do
             ; ;; import A.B...
@@ -434,16 +442,15 @@
     (return v)
     ))
 
-(fun load_ (path) (
-    (var dir import_dirs)
+(fun load_lib (path) (
+    (var dir load_dirs)
     (while dir (do
-        (var fullpath (build_path (car dir) path ""))
+        (var fullpath (strcat (car dir) path))
         (if (file_exists fullpath) (do
             (var ichan (open_in fullpath))
             (var fd (open "."))
             (var dir (get_directory fullpath))
             (chdir dir)
-            (add_import_dir dir)
 
             (var p (make_parser fullpath ichan))
             (set_loc (get_loc p))
@@ -452,8 +459,6 @@
             (unset_shell_mode)
             (interpret p)
             (if save_shell_mode_p (set_shell_mode))
-
-            (pop_import_dir)
 
             (fchdir fd)
             (close_in ichan)
@@ -464,6 +469,23 @@
         (= dir (cdr dir))
         ))
     (throw (not_found current_loc (string path)))
+    ))
+
+(fun push_global (mod) (
+    (if (!= (get_slot mod proto) global)
+        (throw (make_object3 Exception current_loc (string "can not push module") mod))
+        )
+    (= global mod)
+    (return mod)
+    ))
+
+(fun pop_global () (
+    (var mod (get_slot global proto))
+    (if (!= (node_bhead mod) Module)
+        (throw (type_error current_loc (string "Module") mod))
+        )
+    (= global mod)
+    (return mod)
     ))
 
 (fun setup_globals () (
@@ -488,8 +510,10 @@
 
     (add_function1 global Eval (quote (to_sym "exit")) eval_exit 0)
 
-    (add_function1 global (to_sym "load") stringT load_ 0)
-    (add_function1 global (to_sym "import") stringT import_lib 0)
+    (add_function1 global (to_sym "load") stringT load_lib 0)
+    (add_function1 global (to_sym "push_global") (domainP Module) push_global 0)
+    (add_function0 global (to_sym "pop_global") pop_global 0)
+    (add_function1 global (to_sym "create_module") symT create_module 0)
     (add_function1 global (to_sym "exit") intT exit_ 0)
     (add_function1 global (to_sym "atexit") funT at_exit 0)
     ))

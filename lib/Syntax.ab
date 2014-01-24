@@ -1,8 +1,17 @@
+" Copyright (C) 2010 nineties "
+" $Id: Syntax.ab 2014-01-25 08:13:26 nineties $ "
+
+" Syntax definition of the Amber language. "
+" This file will be loaded first. "
+
+" Enter Syntax module. Since we still don't have utilities for modules, manipulate Global module manually. "
+Apply{push_global, List{Syntax}}
+
 Assign{comment, shell_style_comment}
 
 # Copyright (C) 2010 nineties
 #
-# $Id: Syntax.ab 2014-01-23 05:25:03 nineties $
+# $Id: Syntax.ab 2014-01-25 08:13:26 nineties $
 
 # Syntax definition of the Amber language.
 # This file will be loaded first.
@@ -440,3 +449,25 @@ parser_action = parser -> {
     primary_expr = save_primary_expr
     r
 }
+
+# Extension of primary_expr to enable percent sign (%) in shell mode.
+Shell: create_module(\Shell)
+push_global(Shell)
+
+primary_expr ::= "%" decimal
+                 {
+                    if ($1 == 0 or $1 > size(shell_outputs)) {
+                        throw `Error{!LOCATION, "The argument of % must be a line number"}
+                    }
+                    `shell_outputs[!$1]
+                 }
+                     | "%"         { `shell_outputs[0] }
+
+enable_shell_syntax(): {
+    Syntax.primary_expr |= primary_expr
+}
+
+pop_global()
+
+# Exit Syntax module.
+pop_global()
