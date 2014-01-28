@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-01-28 19:10:10 nineties $ "
+" $Id: Syntax.ab 2014-01-28 23:42:09 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -493,7 +493,31 @@ macro(ArithAssign{QuoteSyntax{x[idxs...]}, e, op}) = {
 }
 
 # For-statement for containers. 
+macro(For{i, container, body}) = {
+    iter: unique_sym("iter")
+    value: unique_sym("value")
+    `{
+        !iter : (!container).each()
+        !value: nil
+        while ((!value = (!iter)()) != undef) {
+            !i: !value
+            !body
+        }
+    }
+}
 
-
-
+# For-statement for ranges.
+macro(QuoteSyntax{For{i, Range{a, b}, body}}) = {
+    j: unique_sym("j")
+    n: unique_sym("n")
+    `{
+        !j: !a
+        !n: !b
+        while (!j <= !n) {
+            !i: !j
+            !body
+            !j += 1
+        }
+    }
+}
 

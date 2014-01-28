@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-01-28 19:06:22 nineties $
+; $Id: rowl1-compile.rlc 2014-01-28 23:44:14 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1712,70 +1712,6 @@
     (= continue_labels (cdr continue_labels))
     ))
 
-; translate for i in ary body to
-;
-; {
-;     iter: ary.each
-;     v: nil
-;     while ((v = iter()) != undef) {
-;         i = v
-;         body
-;     }
-; }
-
-(fun compile_for (asm expr) (
-    (var i (node_arg expr 0))
-    (var ary (node_arg expr 1))
-    (var body (node_arg expr 2))
-    (var iter (to_unique_sym "iterator"))
-    (var v (to_unique_sym "value"))
-    (compile asm
-        (block (list3
-            (defvar iter (apply (to_sym "each") (list1 ary)))
-            (defvar v @C_NIL)
-            (make_object2 While
-                (make_object1 Not (apply (to_sym "equal") (list2
-                (assign v (apply iter 0)) @C_UNDEF)))
-                (block (list2
-                    (defvar i v)
-                    body
-                    )))
-            )))
-    ))
-
-; translate for i in a..b body to
-;
-; j: a
-; n: b
-; while (j <= n) {
-;     i: j
-;     body
-;     j += 1
-; }
-
-(fun compile_range_for (asm expr) (
-    (var i (node_arg expr 0))
-    (var rng (node_arg expr 1))
-    (var a (node_arg rng 0))
-    (var b (node_arg rng 1))
-    (var body (node_arg expr 2))
-    (var j   (to_unique_sym "j"))
-    (var n (to_unique_sym "n"))
-
-    (compile asm
-        (block (list3
-            (defvar j a)
-            (defvar n b)
-            (make_object3 While
-                (apply (to_sym "le") (list2 j n))
-                (block (list2
-                    (defvar i j)
-                    body
-                    ))
-                (assign j (apply (to_sym "add") (list2 j (box 1)))))
-            )))
-    ))
-
 (fun compile_break (asm expr) (
     (if (! break_labels)
         (throw (exception current_loc (string "`break' statement outside loop")))
@@ -2211,12 +2147,6 @@
 	(add_compiler mod (ifelse DontCare DontCare DontCare) compile_ifelse)
     (add_compiler mod (make_object2 While DontCare DontCare) compile_while)
     (add_compiler mod (make_object3 While DontCare DontCare DontCare) compile_while)
-    (add_compiler mod (make_object3 For DontCare DontCare DontCare)
-        compile_for
-        )
-    (add_compiler mod (make_object3 For DontCare
-        (make_object2 Range DontCare DontCare) DontCare)
-        compile_range_for)
     (add_compiler mod (make_object0 Break) compile_break) 
     (add_compiler mod (make_object0 Continue) compile_continue)
     (add_compiler mod (make_object1 Return DontCare) compile_return)
