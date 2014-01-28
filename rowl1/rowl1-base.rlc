@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-base.rlc 2014-01-27 08:02:22 nineties $
+; $Id: rowl1-base.rlc 2014-01-28 12:06:45 nineties $
 ;
 
 (import "rlvm-compile")
@@ -19,14 +19,6 @@
 
 (extern object global)
 (extern object current_loc)
-
-(fun _head (o) (
-    (return (node_head o))
-    ))
-
-(fun _args (o) (
-    (return (node_args o))
-    ))
 
 (fun _equal (a b) (
     (var eql (lookup_func global (to_sym "equal")))
@@ -122,13 +114,19 @@
     (return copy)
     ))
 
+(fun _is_atom (obj) (
+    (if (is_atom obj)
+        (return @C_TRUE)
+        (return @C_FALSE)
+        )
+    ))
+
 (export fun setup_base (mod) (
-    ;(add_function1 mod (to_sym "head") DontCare _head 0)
-    ;(add_function1 mod (to_sym "arguments") DontCare _args 0)
-
+    (add_function1 mod (to_sym "head") DontCare node_head 0)
+    (add_function1 mod (to_sym "arguments") DontCare node_args 0)
     (add_function2 mod (to_sym "equal") DontCare DontCare _equal 0)
-
     (add_function2 mod (to_sym "identical") DontCare DontCare _identical 0)
+    (add_function1 mod (to_sym "is_atom") DontCare _is_atom 0)
 
     ;(add_function1 mod (to_sym "hash") DontCare _hash 0)
     ;(add_function2 mod (to_sym "at") DontCare intT _at 0)

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2014-01-24 19:26:23 nineties $
+; $Id: rowl1-list.rlc 2014-01-28 12:08:59 nineties $
 ;
 
 (import "rlvm-compile")
@@ -22,13 +22,6 @@
 
 (fun index_out_of_range (list idx) (
     (throw (out_of_range current_loc list (box idx)))
-    ))
-
-(fun ls_new (n f) (
-    (var new_ls 0)
-    (var code (get_bytecode f))
-    (for i 0 n (= new_ls (cons (runcode code (box i)) new_ls)))
-    (return (list_reverse new_ls))
     ))
 
 (export fun list_at_check (ls i) (
@@ -164,21 +157,19 @@
     (return (list_reverse new_ls))
     ))
 
-(export fun setup_list (global) (
-    (var mod (set_undef_slot global (to_sym "List") (create_module (to_sym "List"))))
-    (add_function2 mod (to_sym "new") intT funT ls_new 0)
-    (add_function1 global (to_sym "length") listT ls_length 0)
-    (add_function1 global (to_sym "size") listT ls_length 0)
-    (add_function2 global (to_sym "cons") DontCare listT ls_cons 0)
-    (add_function1 global (to_sym "car") listT ls_car 0)
-    (add_function1 global (to_sym "cdr") listT ls_cdr 0)
-    (add_function2 global (to_sym "at") listT intT ls_at 0)
-    (add_function3 global (to_sym "store") listT intT DontCare ls_store 0)
-    (add_function1 global (to_sym "reverse") listT ls_reverse 0)
-    (add_function2 global (to_sym "append") listT listT ls_append 0)
-    (add_function2 global (to_sym "map") funT listT ls_map 0)
-    (add_function3 global (to_sym "foldl") funT DontCare listT ls_foldl 0)
-    (add_function3 global (to_sym "foldr") funT listT DontCare ls_foldr 0)
+(export fun setup_list (mod) (
+    (add_function1 mod (to_sym "list_length") listT ls_length 0)
+    (add_function1 mod (to_sym "list_size") listT ls_length 0)
+    (add_function2 mod (to_sym "list_cons") DontCare listT ls_cons 0)
+    (add_function1 mod (to_sym "list_car") listT ls_car 0)
+    (add_function1 mod (to_sym "list_cdr") listT ls_cdr 0)
+    (add_function2 mod (to_sym "list_at") listT intT ls_at 0)
+    (add_function3 mod (to_sym "list_store") listT intT DontCare ls_store 0)
+    (add_function1 mod (to_sym "list_reverse") listT ls_reverse 0)
+    (add_function2 mod (to_sym "list_append") listT listT ls_append 0)
+    (add_function2 mod (to_sym "list_map") funT listT ls_map 0)
+    (add_function3 mod (to_sym "list_foldl") funT DontCare listT ls_foldl 0)
+    (add_function3 mod (to_sym "list_foldr") funT listT DontCare ls_foldr 0)
     ))
 
     ))

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-01-28 00:25:15 nineties $
+; $Id: rowl1-interp.rlc 2014-01-28 11:37:50 nineties $
 ;
 
 (import "rlvm-compile")
@@ -22,7 +22,7 @@
 
 (export var amber null)
 (export var global null)
-(export var builtin null)
+(export var prim null)
 (export var variables null)
 (export var current_loc null)
 
@@ -78,16 +78,15 @@
     (store_variable amber Amber amber)
     (= global amber)
 
-    ; Primitive Module
-    (= builtin (create_module Primitive)) ; Primitive functions
-    (store_variable global Primitive builtin)
+    ; Prim Module
+    (= prim (create_module Prim)) ; Prim functions
+    (store_variable global Prim prim)
 
     ; Setup built-in objects and functions.
     (setup_argv argc argv)
-    (setup_global)
-    (setup_builtin_compilers builtin)
-    (init_lib builtin)
-    (init_parser_funcs builtin) 
+    (setup_builtin_compilers prim)
+    (init_lib prim)
+    (init_parser_funcs prim) 
 
     ; Boot Amber
     (set_loc no_loc)
@@ -95,7 +94,7 @@
     (store_variable amber (to_sym "LOADPATH") load_path)
     (ary_push load_path (string "/usr/lib/amber"))
     (ary_push load_path (string "."))
-    (setup_minimal_interpreter builtin)
+    (setup_minimal_interpreter prim)
     (load_file "Boot.ab")
 
     ;; Boot Amber
@@ -407,16 +406,6 @@
     (return (get_slot global sym))
     ))
 
-(fun setup_global () (
-    ;(store_variable amber (to_sym "LOCATION") current_loc)
-    ;(store_variable amber (to_sym "PROMPT") (string "amber"))
-    ;(if (in_shell_mode)
-    ;    (store_variable amber (to_sym "shell_mode") @C_TRUE)
-    ;    (store_variable amber (to_sym "shell_mode") @C_FALSE)
-    ;    )
-
-    ))
-
 (fun setup_global_methods () (
     ;(var syntax (get_slot global Syntax)) 
     ;(add_function1 syntax Rewrite DontCare rewrite_donothing 0)
@@ -441,52 +430,53 @@
     (store_variable to (to_sym sym1) f)
     ))
 
-(fun setup_minimal_interpreter (builtin) (
+(fun setup_minimal_interpreter (prim) (
     ; parser
     (var syntax (create_module Syntax))
     (store_variable global Syntax syntax)
     (store_variable syntax proto global)
     
-    (copy_variable syntax "text" builtin "parse_text")
-    (copy_variable syntax "any" builtin "parse_any")
-    (copy_variable syntax "blank" builtin "parse_blank")
-    (copy_variable syntax "spaces" builtin "parse_spaces")
-    (copy_variable syntax "comment" builtin "parse_comment")
-    (copy_variable syntax "decimal" builtin "parse_decimal")
-    (copy_variable syntax "binary" builtin "parse_binary")
-    (copy_variable syntax "octal" builtin "parse_octal")
-    (copy_variable syntax "hex" builtin "parse_hex")
-    (copy_variable syntax "integer" builtin "parse_integer")
-    (copy_variable syntax "float" builtin "parse_float")
-    (copy_variable syntax "string" builtin "parse_string")
-    (copy_variable syntax "string_d" builtin "parse_string_d")
-    (copy_variable syntax "string_s" builtin "parse_string_s")
-    (copy_variable syntax "symbol" builtin "parse_symbol")
-    (copy_variable syntax "atom" builtin "parse_atom")
-    (copy_variable syntax "fullform" builtin "parse_fullform")
-    (copy_variable syntax "expr" builtin "parse_expr")
-    (copy_variable syntax "stmt" builtin "parse_stmt")
+    (copy_variable syntax "text" prim "parse_text")
+    (copy_variable syntax "any" prim "parse_any")
+    (copy_variable syntax "blank" prim "parse_blank")
+    (copy_variable syntax "spaces" prim "parse_spaces")
+    (copy_variable syntax "comment" prim "parse_comment")
+    (copy_variable syntax "decimal" prim "parse_decimal")
+    (copy_variable syntax "binary" prim "parse_binary")
+    (copy_variable syntax "octal" prim "parse_octal")
+    (copy_variable syntax "hex" prim "parse_hex")
+    (copy_variable syntax "integer" prim "parse_integer")
+    (copy_variable syntax "float" prim "parse_float")
+    (copy_variable syntax "string" prim "parse_string")
+    (copy_variable syntax "string_d" prim "parse_string_d")
+    (copy_variable syntax "string_s" prim "parse_string_s")
+    (copy_variable syntax "symbol" prim "parse_symbol")
+    (copy_variable syntax "atom" prim "parse_atom")
+    (copy_variable syntax "fullform" prim "parse_fullform")
+    (copy_variable syntax "expr" prim "parse_expr")
+    (copy_variable syntax "stmt" prim "parse_stmt")
 
     ; compiler
-    (copy_variable global "compile" builtin "compile")
+    (copy_variable global "compile" prim "compile")
 
     ; evaluator
-    (add_function1 builtin Eval DontCare builtin_eval 0)
-    (add_function1 builtin (to_sym "load") stringT load_file 0)
-    (add_function1 builtin (to_sym "create_module") symT create_module 0)
-    (add_function1 builtin (to_sym "enter_module") (domainP Module) enter_module 0)
-    (add_function0 builtin (to_sym "exit_module") exit_module 0)
+    (add_function1 prim Eval DontCare builtin_eval 0)
+    (add_function1 prim (to_sym "load") stringT load_file 0)
+    (add_function1 prim (to_sym "create_module") symT create_module 0)
+    (add_function1 prim (to_sym "enter_module") (domainP Module) enter_module 0)
+    (add_function0 prim (to_sym "exit_module") exit_module 0)
+    (add_function1 prim (to_sym "debugpf") DontCare debugpf 0)
 
-    (copy_variable global "eval" builtin "eval")
-    (copy_variable global "load" builtin "load")
+    (copy_variable global "eval" prim "eval")
+    (copy_variable global "load" prim "load")
 
     ; important functions
-    (copy_variable global "equal" builtin "equal")
-    (copy_variable global "identical" builtin "identical")
-    (copy_variable global "fusion" builtin "fusion_function")
-    (copy_variable global "create_module" builtin "create_module")
-    (copy_variable global "enter_module" builtin "enter_module")
-    (copy_variable global "exit_module" builtin "exit_module")
+    (copy_variable global "equal" prim "equal")
+    (copy_variable global "identical" prim "identical")
+    (copy_variable global "fusion" prim "fusion_function")
+    (copy_variable global "create_module" prim "create_module")
+    (copy_variable global "enter_module" prim "enter_module")
+    (copy_variable global "exit_module" prim "exit_module")
     ))
 
 (extern fun setup_pprint)
@@ -518,7 +508,7 @@
     ;(setup_float mod)
     ;(setup_random mod)
     (setup_io mod)
-    ;(setup_list mod)
+    (setup_list mod)
     ;(setup_tuple mod)
     ;(setup_array mod)
     ;(setup_table mod)

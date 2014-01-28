@@ -1,12 +1,12 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-01-28 07:33:13 nineties $ "
+" $Id: Syntax.ab 2014-01-28 12:43:04 nineties $ "
 
 " Syntax definition of the Amber language. "
 
 " Enable DefSyntax{...} expression. "
 Define{eval, Lambda{List{Domain{stmt, DefineSyntax}},
     Apply{eval, List{
-        Apply{Slot{Primitive, compile_define_syntax}, List{stmt}}
+        Apply{Slot{Prim, compile_define_syntax}, List{stmt}}
     }}},
     incremental
 }
@@ -15,7 +15,7 @@ Define{eval, Lambda{List{Domain{stmt, DefineSyntax}},
 Apply{enter_module, List{Syntax}}
 
 " Enable comment syntax. "
-Assign{comment, Slot{Primitive, parse_shell_style_comment}}
+Assign{comment, Slot{Prim, parse_shell_style_comment}}
 
 ### Syntax definition
 # Amber's parser uses Parsing Expression Grammer (PEG) 
@@ -353,9 +353,9 @@ stmt
 primary_expr_act
     ::= "$" decimal
         {
-            Primitive.to_sym(
-                Primitive.string_add("node",
-                Primitive.int_to_s(node1)))
+            Prim.to_sym(
+                Prim.string_add("node",
+                Prim.int_to_s(node1)))
         }
       | "$input"    { \input_text(parser, begin, end) }
     
@@ -376,14 +376,14 @@ enter_module(Shell)
 
 primary_expr ::= "%" decimal
                  {
-                    if (Primitive.int_equal(node1, 0) or
-                        Primitive.int_gt(node1, array_size(shell_outputs))) {
+                    if (Prim.int_equal(node1, 0) or
+                        Prim.int_gt(node1, array_size(shell_outputs))) {
                         throw `SyntaxError{!LOCATION,
                             "The argument of % must be a line number"}
                     }
-                    `Primitive.array_at(shell_outputs, [!node1])
+                    `Prim.array_at(shell_outputs, [!node1])
                  }
-               | "%" { `Primitive.array_at(shell_outputs[0]) }
+               | "%" { `Prim.array_at(shell_outputs[0]) }
 
 exit_module()
 
@@ -391,46 +391,61 @@ enable_shell_syntax: () -> {
     primary_expr = fusion(primary_expr, Shell.primary_expr)
 }
 
-### Enable Macro
+### Macro
 macro: expr -> expr
 
 eval = expr -> {
-    Primitive.eval(expr)
+    expand_macro: expr -> {
+        new_expr: macro(expr)
+        while (NotEqual{new_expr, expr}) {
+            expr = new_expr
+            new_expr = macro(expr)
+        }
+        if (Prim.is_atom(new_expr))
+            return new_expr
+        head: Prim.head(new_expr)
+        args: Prim.arguments(new_expr)
+        args = Prim.list_map(expand_macro, args)
+        MakeObject{head, args}
+    } 
+    Prim.eval(expand_macro(expr))
 }
 
-### Syntax Sugars
+macro = fusion(
+    (Assign{Apply{f, args}, e}) -> `Assign{!f, Lambda{!args, !e}, incremental},
+    macro
+    )
 
-#
-#rewrite = fusion(
-#        Assign{Apply{f, args}, e} -> `Assign{!f, Lambda{!args, !e}, incremental},
-#        rewrite
-#        )
-#
-#rewrite(Define{Apply{f, args}, e})     = `Define{!f, Lambda{!args, !e}, incremental}
-#rewrite(Define{Send{obj, f, args}, e}) = `Define{Slot{!obj, !f}, Lambda{!args, !e}, incremental}
-#rewrite(Assign{Send{obj, f, args}, e}) = `Assign{Slot{!obj, !f}, Lambda{!args, !e}, incremental}
-#
-#rewrite(+x)         = `uplus(!x)
-#rewrite(-x)         = `uminus(!x)
-#rewrite(x + y)      = `add(!x, !y)
-#rewrite(x - y)      = `sub(!x, !y)
-#rewrite(x * y)      = `mul(!x, !y)
-#rewrite(x ^ y)      = `pow(!x, !y)
-#rewrite(x / y)      = `div(!x, !y)
-#rewrite(x % y)      = `mod(!x, !y)
-#rewrite(x << y)     = `shiftL(!x, !y)
-#rewrite(x >> y)     = `shiftR(!x, !y)
-#rewrite(x | y)      = `fusion(!x, !y)
-#rewrite(x < y)      = `lt(!x, !y)
-#rewrite(x > y)      = `gt(!x, !y)
-#rewrite(x <= y)     = `le(!x, !y)
-#rewrite(x >= y)     = `ge(!x, !y)
-#rewrite(x == y)     = `equal(!x, !y)
-#rewrite(x != y)     = `(not equal(!x, !y))
-#rewrite(x is y)     = `identical(!x, !y)
-#rewrite(x is not y) = `(not identical(!x, !y))
-#
+macro(Define{Apply{f, args}, e})     = `Define{!f, Lambda{!args, !e}, incremental}
+macro(Define{Send{obj, f, args}, e}) = `Define{Slot{!obj, !f}, Lambda{!args, !e}, incremental}
+macro(Assign{Send{obj, f, args}, e}) = `Assign{Slot{!obj, !f}, Lambda{!args, !e}, incremental}
+
+macro(+x)         = `uplus(!x)
+macro(-x)         = `uminus(!x)
+macro(x + y)      = `add(!x, !y)
+macro(x - y)      = `sub(!x, !y)
+macro(x * y)      = `mul(!x, !y)
+macro(x ^ y)      = `pow(!x, !y)
+macro(x / y)      = `div(!x, !y)
+macro(x % y)      = `mod(!x, !y)
+macro(x << y)     = `shiftL(!x, !y)
+macro(x >> y)     = `shiftR(!x, !y)
+macro(x | y)      = `fusion(!x, !y)
+macro(x < y)      = `lt(!x, !y)
+macro(x > y)      = `gt(!x, !y)
+macro(x <= y)     = `le(!x, !y)
+macro(x >= y)     = `ge(!x, !y)
+macro(x == y)     = `equal(!x, !y)
+macro(x != y)     = `(not equal(!x, !y))
+macro(x is y)     = `identical(!x, !y)
+macro(x is not y) = `(not identical(!x, !y))
+macro(x[i])       = `!at(!x, !i)
+macro(x[i] = e)   = `!store(!x, !i, !e)
+
 #{
+#    macro_assignment_operator(lhs, rhs, operator): {
+#    }
+#
 #    rewrite_operator_assign(lhs, rhs, op): {
 #        split: (Subscript{lhs, args}) -> {
 #                    stmt: []
@@ -474,8 +489,6 @@ eval = expr -> {
 #    rewrite(x >>= y) = rewrite_operator_assign(x, y, \shiftR)
 #    rewrite(x |= y)  = rewrite_operator_assign(x, y, \fusion)
 #}
-#
-#
 
 # Exit Syntax module.
 exit_module()
