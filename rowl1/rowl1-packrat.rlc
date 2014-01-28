@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-01-27 22:54:31 nineties $
+; $Id: rowl1-packrat.rlc 2014-01-28 10:23:44 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1252,7 +1252,7 @@
     (if (&& ws (! nospace_p))
         (do
             (var code 0)
-            (var state (unique_sym))
+            (var state (to_unique_sym "state"))
             (= code (cons (defvar state (gen_copy_parser_state)) code))
             (= code (cons (gen_parse_spaces) code))
             (= code (cons p code))
@@ -1436,7 +1436,7 @@
         )
 
     (var body 0)
-    (var ret (unique_sym))
+    (var ret (to_unique_sym "ret"))
     (= body (cons (defvar ret 0) body))
     (while elems (do
         (= body (cons (compile_parser_element (car elems) ws) body))
@@ -1490,7 +1490,7 @@
 ; Parsed{reverse(elems)}
 
 (fun compile_many (elem ws) (
-    (var elems (unique_sym))
+    (var elems (to_unique_sym "elems"))
 
     (var loop_body 0)
     (= loop_body (cons (compile_parser_element elem @TRUE) loop_body))
@@ -1527,7 +1527,7 @@
 ; }
 
 (fun compile_many1 (elem ws) (
-    (var elems (unique_sym))
+    (var elems (to_unique_sym "elems"))
 
     (var loop_body 0)
     (= loop_body (cons (compile_parser_element elem @TRUE) loop_body))
@@ -1577,10 +1577,10 @@
 ; }
 
 (fun compile_aligned (elem ws) (
-    (var state (unique_sym))
-    (var elems (unique_sym))
-    (var clmn  (unique_sym))
-    (var indent_save (unique_sym))
+    (var state (to_unique_sym "state"))
+    (var elems (to_unique_sym "elems"))
+    (var clmn  (to_unique_sym "clmn "))
+    (var indent_save (to_unique_sym "indent_save"))
 
     (var loop_body 0)
     (= loop_body (cons (assign elems (apply_util "%cons" (list2 (gen_get_token) elems))) loop_body))
@@ -1647,8 +1647,8 @@
 ; }
 
 (fun compile_delimited0 (p delim ws) (
-    (var state (unique_sym))
-    (var elems (unique_sym))
+    (var state (to_unique_sym "state"))
+    (var elems (to_unique_sym "elems"))
 
     (var loop_body 0)
     (= loop_body (cons (gen_set_parser_state state PVar) loop_body))
@@ -1680,8 +1680,8 @@
     ))
 
 (fun compile_delimited (p delim minlen ws) (
-    (var state (unique_sym))
-    (var elems (unique_sym))
+    (var state (to_unique_sym "state"))
+    (var elems (to_unique_sym "elems"))
 
     (var loop_body 0)
     (= loop_body (cons (gen_set_parser_state state PVar) loop_body))
@@ -1743,7 +1743,7 @@
 ; } else
 ;   Parsed{loc(v), Some{val(v)}}
 (fun compile_option (p ws) (
-    (var state (unique_sym))
+    (var state (to_unique_sym "state"))
     (return (block (list3
         (defvar state (gen_copy_parser_state))
         (compile_parser_element p ws)
@@ -1764,7 +1764,7 @@
 ; reset_parser_position(parser, state)
 ; v
 (fun compile_and (p ws) (
-    (var state (unique_sym))
+    (var state (to_unique_sym "state"))
     (return (block (list3
         (defvar state (gen_copy_parser_state))
         (compile_parser_element p ws)
@@ -1779,7 +1779,7 @@
 ; reset_parser_position(parser, state)
 ; negate(v,p)
 (fun compile_not (p ws) (
-    (var state (unique_sym))
+    (var state (to_unique_sym "state"))
     (return (block (list4
         (defvar state (gen_copy_parser_state))
         (compile_parser_element p ws)
@@ -1803,7 +1803,7 @@
 
     (var idx 0)
     (var body 0)
-    (var bpos (unique_sym))
+    (var bpos (to_unique_sym "bpos"))
 
     (= body (cons (defvar bpos (apply_util "%get_pos" (list1 PVar))) body))
 
@@ -1857,8 +1857,8 @@
     (+= idx 1)
 
     (var body 0)
-    (var state (unique_sym))
-    (var error (unique_sym))
+    (var state (to_unique_sym "state"))
+    (var error (to_unique_sym "error"))
 
     (= body (cons (defvar state (gen_copy_parser_state)) body))
     (while elems (do

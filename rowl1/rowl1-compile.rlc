@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-01-27 18:20:08 nineties $
+; $Id: rowl1-compile.rlc 2014-01-28 10:21:10 nineties $
 ;
 
 (import "rlvm-compile")
@@ -195,7 +195,7 @@
                 )
             (if (symtable_find tbl expr)
                 (do
-                    (var new_sym (unique_sym))
+                    (var new_sym (to_unique_sym (symbol_name expr)))
                     (symtable_add tbl expr new_sym)
                     (if (list_member expr (field_get chk 0)) (do
                         (field_set rep 0 (cons (struct 2 expr new_sym)
@@ -383,7 +383,7 @@
     (var hd (node_bhead expr))
     (if (== hd Quote) (return expr))
     (if (== hd Subscript) (do
-        (var v (unique_sym))
+        (var v (to_unique_sym "v"))
         (field_set ret 1 (cons v (field_get ret 1)))
         (field_set ret 2 (cons expr (field_get ret 2)))
         (return v)
@@ -844,7 +844,7 @@
     (= body (scan_clsvars body tbl))
 
     ; this function needs to allocate an environment for closures.
-    (var newcls (unique_sym)) ; closures' environment.
+    (var newcls (to_unique_sym "closure")) ; closures' environment.
     (var clssize (setup_closure_env tbl newcls))
     (if (> clssize 0) (do
         (= body (subst_clsvars tbl newcls body))
@@ -1111,7 +1111,7 @@
     (var pattern (field_get tup 0))
     (var tvars   (field_get tup 1))
     (var rvars   (field_get tup 2))
-    (var t (unique_sym))
+    (var t (to_unique_sym "t"))
     (compile asm (apply (lambda
         (list1 (make_object2 Domain t pattern))
         (list_append tvars (list1 t))) (list1 val)))
@@ -1727,8 +1727,8 @@
     (var i (node_arg expr 0))
     (var ary (node_arg expr 1))
     (var body (node_arg expr 2))
-    (var iter (unique_sym))
-    (var v (unique_sym))
+    (var iter (to_unique_sym "iterator"))
+    (var v (to_unique_sym "value"))
     (compile asm
         (block (list3
             (defvar iter (apply (to_sym "each") (list1 ary)))
@@ -1759,8 +1759,8 @@
     (var a (node_arg rng 0))
     (var b (node_arg rng 1))
     (var body (node_arg expr 2))
-    (var j   (unique_sym))
-    (var n (unique_sym))
+    (var j   (to_unique_sym "j"))
+    (var n (to_unique_sym "n"))
 
     (compile asm
         (block (list3
@@ -1906,7 +1906,7 @@
     (var tvars   (field_get tup 1))
     (var rvars   (field_get tup 2))
 
-    (var t (unique_sym))
+    (var t (to_unique_sym "t"))
     (compile asm (apply (lambda
         (list1 (make_object2 Domain t pattern))
         (list_append tvars (list1 t))) (list1 rhs)))
@@ -2137,7 +2137,7 @@
 
 ; g * f == (x -> g(f(x)))
 (export fun compose_function (g f) (
-    (var x (unique_sym))
+    (var x (to_unique_sym "x"))
     (var asm (make_assembler))
     (var lbl1 (fresh_label asm))
     (var lbl2 (fresh_label asm))

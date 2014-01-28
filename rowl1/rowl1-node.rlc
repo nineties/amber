@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2014-01-28 10:06:09 nineties $
+; $Id: rowl1-node.rlc 2014-01-28 10:17:44 nineties $
 ;
 
 (import "rlvm-compile")
@@ -156,6 +156,7 @@
     (= name (strdup name))
     (var sym (variant @SymbolE 1 name builtin_symbol_index_gen))
     (-= builtin_symbol_index_gen 1)
+    (idtable_add symbol_table name sym)
     (return sym)
     ))
 
@@ -170,6 +171,9 @@
     ))
 
 (export fun to_unique_sym (name) (
+    (var sym (variant @SymbolE 1 (strdup name) symbol_index_gen))
+    (+= symbol_index_gen 1)
+    (return sym)
     ))
 
 (extern fun is_letter)
@@ -188,14 +192,6 @@
         (string "invalid identifier string")
         name
         ))
-    ))
-
-(export fun unique_sym () (
-    (return (gensym "x"))
-    ))
-
-(export fun gensym (name) (
-    (return (to_sym (strcat name (itos symbol_index_gen))))
     ))
 
 (export fun is_builtin_sym (sym) (
