@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-01-28 17:23:44 nineties $ "
+" $Id: Syntax.ab 2014-01-28 19:10:10 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -326,8 +326,6 @@ stmt
         { `While{!node1, !node2} }
       | <<multiline>> "for" "(" pattern "in" expr ")" block
         { `For{!node2, !node4, !node6} }
-      | <<multiline>> "reverse_for" "(" pattern "in" expr ")" block
-        { `RevFor{!node2, !node4, !node6} }
       | "continue"
         { `Continue{} }
       | "break"
@@ -385,39 +383,62 @@ primary_expr ::= "%" decimal
                  }
                | "%" { `Prim.array_at(shell_outputs[0]) }
 
-exit_module()
+exit_module()   # Shell
 
 enable_shell_syntax: () -> {
     primary_expr = fusion(primary_expr, Shell.primary_expr)
 }
 
-### Macro
-macro: expr -> expr
+exit_module()   # Syntax
 
-eval = expr -> {
-    expand_macro: expr -> {
-        new_expr: macro(expr)
-        while (NotEqual{new_expr, expr}) {
-            expr = new_expr
-            new_expr = macro(expr)
+### Macro
+macro: e -> e
+expand_macro: expr -> {
+    expand_macro_iter: (expr, level) -> {
+        if (Equal{level, 0}) {
+            new_expr: macro(expr)
+            while (NotEqual{new_expr, expr}) {
+                expr = new_expr
+                new_expr = macro(expr)
+            }
         }
+
+        head: Prim.head(expr)
+
+        if (Equal{level, 0} and Equal{head, \QuoteSyntax})
+            return Prim.at(expr, 0)
+        else if (Equal{head, \QuasiQuoteSyntax}) {
+            level = Prim.int_add(level, 1)
+            expr = Prim.at(expr, 0)
+        } else if (Equal{head, \UnquoteSyntax}) {
+            level = Prim.int_sub(level, 1)
+            expr = Prim.at(expr, 0)
+        } else if (Equal{level, 0} and Equal{head, \Quote})
+            return expr
+        else if (Equal{head, \QuasiQuote})
+            level = Prim.int_add(level, 1)
+        else if (Equal{head, \Unquote})
+            level = Prim.int_sub(level, 1)
+
+        if (Prim.int_lt(level, 0))
+            throw `LogicError{!LOCATION, "Unquotation outside quasi-quotation"}
 
         if (Prim.is_atom(expr))
             return expr
-        head: Prim.head(expr)
+
+        head = Prim.head(expr)
         args: Prim.arguments(expr)
-        args = Prim.list_map(expand_macro, args)
+        args = Prim.list_map(e -> expand_macro_iter(e, level), args)
         MakeObject{head, args}
-    } 
+    }
 
-    Prim.eval(expand_macro(expr))
-}
+    expand_macro_iter(expr, 0)
+} 
 
-macro = fusion(
-    (Assign{Apply{f, args}, e}) -> `Assign{!f, Lambda{!args, !e}, incremental},
-    macro
-    )
+# Expand macros only once before eval.
+Amber.before_eval = expand_macro
 
+macro = fusion((Assign{Apply{f, args}, e}) -> `Assign{!f, Lambda{!args, !e}, incremental}, macro)
 macro(Define{Apply{f, args}, e})     = `Define{!f, Lambda{!args, !e}, incremental}
 macro(Define{Send{obj, f, args}, e}) = `Define{Slot{!obj, !f}, Lambda{!args, !e}, incremental}
 macro(Assign{Send{obj, f, args}, e}) = `Assign{Slot{!obj, !f}, Lambda{!args, !e}, incremental}
@@ -452,12 +473,14 @@ macro(x >>= y) = `ArighmeticAssign(x, y, \shiftR_assign)
 macro(x |= y)  = `ArighmeticAssign(x, y, \fusion_assign)
 
 # Subscript syntax is not built-in. We need macros.
-macro(ArithAssign{x[idxs...], e, op}) = {
+macro(x[idxs...])     = `Apply{at, !Prim.cons(x, idxs)}
+macro(QuoteSyntax{x[!idxs...]} = e) = `Apply{store, !Prim.cons(x, Prim.cons(e, idxs))}
+macro(ArithAssign{QuoteSyntax{x[idxs...]}, e, op}) = {
     # We have to consider that evaluation of `x' and `idxs' may have
     # side-effects. So, we translate x[a,b] op= e to
     # { y = x; t1 = a; t2 = b; y[t1, t2] = op(y[t1, t2], e) }
     stmt1: `Define{!unique_sym("x"), !x}
-    stmt2: Prim.list_map(e -> `Define{!unique_sym("t"), !idxs})
+    stmt2: Prim.list_map(i -> `Define{!unique_sym("t"), !i}, idxs)
     y: at(stmt1, 0)
     ts: Prim.list_map(e -> at(e, 0), stmt2)
 
@@ -468,9 +491,9 @@ macro(ArithAssign{x[idxs...], e, op}) = {
         )
     }
 }
-macro(x[idxs...] = e) = `Apply{store, !Prim.cons(x, Prim.cons(e, idxs))}
-macro(x[idxs...])     = `Apply{at, !Prim.cons(x, idxs)}
 
-# Exit Syntax module.
-exit_module()
+# For-statement for containers. 
+
+
+
 
