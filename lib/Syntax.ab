@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-01-28 12:43:04 nineties $ "
+" $Id: Syntax.ab 2014-01-28 17:23:44 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -401,13 +401,15 @@ eval = expr -> {
             expr = new_expr
             new_expr = macro(expr)
         }
-        if (Prim.is_atom(new_expr))
-            return new_expr
-        head: Prim.head(new_expr)
-        args: Prim.arguments(new_expr)
+
+        if (Prim.is_atom(expr))
+            return expr
+        head: Prim.head(expr)
+        args: Prim.arguments(expr)
         args = Prim.list_map(expand_macro, args)
         MakeObject{head, args}
     } 
+
     Prim.eval(expand_macro(expr))
 }
 
@@ -420,75 +422,54 @@ macro(Define{Apply{f, args}, e})     = `Define{!f, Lambda{!args, !e}, incrementa
 macro(Define{Send{obj, f, args}, e}) = `Define{Slot{!obj, !f}, Lambda{!args, !e}, incremental}
 macro(Assign{Send{obj, f, args}, e}) = `Assign{Slot{!obj, !f}, Lambda{!args, !e}, incremental}
 
-macro(+x)         = `uplus(!x)
-macro(-x)         = `uminus(!x)
-macro(x + y)      = `add(!x, !y)
-macro(x - y)      = `sub(!x, !y)
-macro(x * y)      = `mul(!x, !y)
-macro(x ^ y)      = `pow(!x, !y)
-macro(x / y)      = `div(!x, !y)
-macro(x % y)      = `mod(!x, !y)
-macro(x << y)     = `shiftL(!x, !y)
-macro(x >> y)     = `shiftR(!x, !y)
-macro(x | y)      = `fusion(!x, !y)
-macro(x < y)      = `lt(!x, !y)
-macro(x > y)      = `gt(!x, !y)
-macro(x <= y)     = `le(!x, !y)
-macro(x >= y)     = `ge(!x, !y)
-macro(x == y)     = `equal(!x, !y)
-macro(x != y)     = `(not equal(!x, !y))
-macro(x is y)     = `identical(!x, !y)
-macro(x is not y) = `(not identical(!x, !y))
-macro(x[i])       = `!at(!x, !i)
-macro(x[i] = e)   = `!store(!x, !i, !e)
+macro(+x)          = `uplus(!x)
+macro(-x)          = `uminus(!x)
+macro(x + y)       = `add(!x, !y)
+macro(x - y)       = `sub(!x, !y)
+macro(x * y)       = `mul(!x, !y)
+macro(x ^ y)       = `pow(!x, !y)
+macro(x / y)       = `div(!x, !y)
+macro(x % y)       = `mod(!x, !y)
+macro(x << y)      = `shiftL(!x, !y)
+macro(x >> y)      = `shiftR(!x, !y)
+macro(x | y)       = `fusion(!x, !y)
+macro(x < y)       = `lt(!x, !y)
+macro(x > y)       = `gt(!x, !y)
+macro(x <= y)      = `le(!x, !y)
+macro(x >= y)      = `ge(!x, !y)
+macro(x == y)      = `equal(!x, !y)
+macro(x != y)      = `(not equal(!x, !y))
+macro(x is y)      = `identical(!x, !y)
+macro(x is not y)  = `(not identical(!x, !y))
+macro(x += y)  = `ArithAssign(x, y, \add_assign)
+macro(x -= y)  = `ArighmeticAssign(x, y, \sub_assign)
+macro(x *= y)  = `ArighmeticAssign(x, y, \mul_assign)
+macro(x ^= y)  = `ArighmeticAssign(x, y, \pow_assign)
+macro(x /= y)  = `ArighmeticAssign(x, y, \div_assign)
+macro(x %= y)  = `ArighmeticAssign(x, y, \mod_assign)
+macro(x <<= y) = `ArighmeticAssign(x, y, \shiftL_assign)
+macro(x >>= y) = `ArighmeticAssign(x, y, \shiftR_assign)
+macro(x |= y)  = `ArighmeticAssign(x, y, \fusion_assign)
 
-#{
-#    macro_assignment_operator(lhs, rhs, operator): {
-#    }
-#
-#    rewrite_operator_assign(lhs, rhs, op): {
-#        split: (Subscript{lhs, args}) -> {
-#                    stmt: []
-#                    new_args: []
-#                    new_lhs: lhs
-#
-#                    for (a in args) {
-#                        if (head(a) != \Symbol) {
-#                            t: genSym()
-#                            stmt = cons(`Define{!t, !a}, stmt)
-#                            new_args = cons(t, new_args)
-#                        } else
-#                            new_args = cons(a, new_args)
-#                    }
-#                    new_args = reverse(new_args)
-#
-#                    if (head(lhs) != \Symbol) {
-#                        t: genSym()
-#                        stmt = cons(`Define{!t, !lhs}, stmt)
-#                        new_lhs = t
-#                    }
-#
-#                    (`Subscript{!new_lhs, !new_args}, `Seq{!stmt})
-#                }
-#            | x -> (x, nil)
-#
-#        (x, s): split(lhs)
-#        `{
-#            !s
-#            !x = (!op)(!x, !rhs)
-#        }
-#    }
-#
-#    rewrite(x += y)  = rewrite_operator_assign(x, y, \add)
-#    rewrite(x -= y)  = rewrite_operator_assign(x, y, \sub)
-#    rewrite(x *= y)  = rewrite_operator_assign(x, y, \mul)
-#    rewrite(x ^= y)  = rewrite_operator_assign(x, y, \pow)
-#    rewrite(x /= y)  = rewrite_operator_assign(x, y, \div)
-#    rewrite(x %= y)  = rewrite_operator_assign(x, y, \mod)
-#    rewrite(x <<= y) = rewrite_operator_assign(x, y, \shiftL)
-#    rewrite(x >>= y) = rewrite_operator_assign(x, y, \shiftR)
-#    rewrite(x |= y)  = rewrite_operator_assign(x, y, \fusion)
-#}
+# Subscript syntax is not built-in. We need macros.
+macro(ArithAssign{x[idxs...], e, op}) = {
+    # We have to consider that evaluation of `x' and `idxs' may have
+    # side-effects. So, we translate x[a,b] op= e to
+    # { y = x; t1 = a; t2 = b; y[t1, t2] = op(y[t1, t2], e) }
+    stmt1: `Define{!unique_sym("x"), !x}
+    stmt2: Prim.list_map(e -> `Define{!unique_sym("t"), !idxs})
+    y: at(stmt1, 0)
+    ts: Prim.list_map(e -> at(e, 0), stmt2)
+
+    `Block{
+        !Prim.list_append(
+            Prim.cons(stmt1, stmt2),
+            [`Assign{Subscript{!y, !ts}, Apply{!op, [Subscript{!y, !ts}, !e]}}]
+        )
+    }
+}
+macro(x[idxs...] = e) = `Apply{store, !Prim.cons(x, Prim.cons(e, idxs))}
+macro(x[idxs...])     = `Apply{at, !Prim.cons(x, idxs)}
 
 # Exit Syntax module.
 exit_module()
