@@ -6,7 +6,7 @@
 " Enable DefSyntax{...} expression. "
 Define{eval, Lambda{List{Domain{stmt, DefineSyntax}},
     Apply{eval, List{
-        Apply{Slot{Builtin, compile_define_syntax}, List{stmt}}
+        Apply{Slot{Primitive, compile_define_syntax}, List{stmt}}
     }}},
     incremental
 }
@@ -15,7 +15,7 @@ Define{eval, Lambda{List{Domain{stmt, DefineSyntax}},
 Apply{enter_module, List{Syntax}}
 
 " Enable comment syntax. "
-Assign{comment, Slot{Builtin, parse_shell_style_comment}}
+Assign{comment, Slot{Primitive, parse_shell_style_comment}}
 
 ### Syntax definition
 # Amber's parser uses Parsing Expression Grammer (PEG) 
@@ -353,9 +353,9 @@ stmt
 primary_expr_act
     ::= "$" decimal
         {
-            Builtin.to_sym(
-                Builtin.string_add("node",
-                Builtin.int_to_s(node1)))
+            Primitive.to_sym(
+                Primitive.string_add("node",
+                Primitive.int_to_s(node1)))
         }
       | "$input"    { \input_text(parser, begin, end) }
     
@@ -376,14 +376,14 @@ enter_module(Shell)
 
 primary_expr ::= "%" decimal
                  {
-                    if (Builtin.int_equal(node1, 0) or
-                        Builtin.int_gt(node1, array_size(shell_outputs))) {
+                    if (Primitive.int_equal(node1, 0) or
+                        Primitive.int_gt(node1, array_size(shell_outputs))) {
                         throw `SyntaxError{!LOCATION,
                             "The argument of % must be a line number"}
                     }
-                    `Builtin.array_at(shell_outputs, [!node1])
+                    `Primitive.array_at(shell_outputs, [!node1])
                  }
-               | "%" { `Builtin.array_at(shell_outputs[0]) }
+               | "%" { `Primitive.array_at(shell_outputs[0]) }
 
 exit_module()
 
@@ -395,7 +395,7 @@ enable_shell_syntax: () -> {
 macro: expr -> expr
 
 eval = expr -> {
-    Builtin.eval(expr)
+    Primitive.eval(expr)
 }
 
 ### Syntax Sugars
