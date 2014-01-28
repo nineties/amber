@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-wrtable.rlc 2014-01-18 19:49:03 nineties $
+; $Id: vm-prim-wrtable.rlc 2014-01-26 19:31:05 nineties $
 ;
 
 ; Weak reference table from object to object
@@ -142,6 +142,31 @@
     (set entry 1 (get table 1))
     (set table 1 entry)
     (set table 3 (+ (get table 3) 1))
+    (= stop_GC @FALSE)
+    ))
+
+(export prim_wrtable_del)
+(fun prim_wrtable_del (table key) (
+    (= stop_GC @TRUE)
+
+    (int size (get table 2))
+    (void* bucket (get table 0))
+    (int h (% key size))
+    (void* entry (get bucket h))
+    (void* prev 0)
+    (while entry (
+        (void* e_key (get entry 2))
+        (if (== key e_key) (
+            (if prev
+                ((set prev 0 (get entry 0)))
+                ((set bucket h (get entry 0)))
+                )
+            (= stop_GC @FALSE)
+            (return)
+            ))
+        (= prev entry)
+        (= entry (get entry 0))
+        ))
     (= stop_GC @FALSE)
     ))
 

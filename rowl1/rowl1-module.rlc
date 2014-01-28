@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2013 nineties
 ;
-; $Id: rowl1-module.rlc 2014-01-24 21:18:20 nineties $
+; $Id: rowl1-module.rlc 2014-01-27 18:01:04 nineties $
 ;
 
 (import "rlvm-compile")
@@ -20,11 +20,13 @@
 
 (export fun create_module (sym) (
     (if (&& (!= (node_bhead global) Module) (!= global @C_UNDEF))
-        (throw (type_error current_loc (string "a module") global))
+        (throw (invalid_argument
+            "1st argument of create_module(sym@Symbol)"
+            sym
+            ))
         )
     (var mod (make_object1 Module sym))
     (set_slot mod (to_sym "variables") (list1 (to_sym "variables")))
-    (store_variable mod (to_sym "imports") 0)
     (store_variable mod proto global)
     (return mod)
     ))
@@ -34,10 +36,18 @@
     (if (! list) (return (list1 v)))
     (if (== (car list) v) (return list))
     (var c (strcmp (symbol_name (car list)) (symbol_name v)))
-    (if (== c 0) (return list))
     (if (< c 0) (return (cons (car list) (insert_variable v (cdr list)))))
     (return (cons v list))
     ))
+
+(fun remove_variable (v list) (
+    (if (! list) (return 0))
+    (if (== (car list) v) (return (cdr list)))
+    (var c (strcmp (symbol_name (car list)) (symbol_name v)))
+    (if (< c 0) (return list))
+    (return (cons (car list) (remove_variable v (cdr list))))
+    ))
+
 
 (export fun store_variable (mod sym val) (
     (if (!= (node_head mod) Module)
@@ -47,33 +57,12 @@
     (if (!= (node_type list) @ListE)
         (throw (type_error current_loc (string "List") mod))
         )
-    (set_slot mod (to_sym "variables") (insert_variable sym list))
+    (if (!= val @C_UNDEF)
+        (set_slot mod (to_sym "variables") (insert_variable sym list))
+        (set_slot mod (to_sym "variables") (remove_variable sym list))
+        )
     (set_slot mod sym val)
     (return val)
-    ))
-
-(export fun enter_module (global sym) (
-    (var mod (get_slot_norec global sym))
-    (if (== mod @C_UNDEF)
-        (= mod (create_module sym))
-        )
-    (if (== mod global)
-        (throw (make_object3 Exception current_loc (string "recursive dependency detected") mod))
-        )
-    (if (!= (node_bhead mod) Module)
-        (throw (type_error current_loc (string "Module") mod))
-        )
-    (store_variable mod proto global)
-    (store_variable global sym mod)
-    (return mod)
-    ))
-
-(export fun exit_module (global) (
-    (var mod (get_slot global proto))
-    (if (!= (node_bhead mod) Module)
-        (throw (type_error current_loc (string "Module") mod))
-        )
-    (return mod)
     ))
 
    ))

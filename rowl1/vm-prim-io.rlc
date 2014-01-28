@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-io.rlc 2013-02-10 17:51:21 nineties $
+; $Id: vm-prim-io.rlc 2014-01-28 00:22:52 nineties $
 ;
 
 (import "stdlib")
@@ -13,7 +13,14 @@
 (var SYS_OPEN 5)
 (var SYS_CLOSE 6)
 (var SYS_CHDIR 12)
+(var SYS_LSTAT 107)
 (var SYS_FCHDIR 133)
+(var SYS_GETCWD 183)
+
+(var ST_MODE_OFFSET 24)
+(var ST_MODE_SIZE 4)
+(var IFLNK 0120000)
+(var IFMT 0170000)
 
 (var O_RDONLY 0)
 (var O_WRONLY 1)
@@ -35,6 +42,9 @@
 (extern void* make_carray)
 (extern void* prim_make_struct3)
 (extern void* prim_make_struct4)
+(extern void* prim_string)
+(extern void* prim_strlcpy)
+(extern void* prim_strlcat)
 
 (fun strlen (str) (
     (int len 0)
@@ -43,6 +53,24 @@
         (incr len)
         ))
     (return len)
+    ))
+
+(fun strchr (str c) (
+    (while (!= (*8 str) '\0') (
+        (if (== (*8 str) c) ((return str)))
+        (incr str)
+        ))
+    (if (== c 0) ((return str)))
+    (return 0)
+    ))
+
+(fun strrchr (str c) (
+    (void* p (+ (+ str (strlen str)) 1))
+    (while (&& (!= str p) (!= (*8 p) c)) (
+        (decr p)
+        ))
+    (if (== (*8 p) c) ((return p)))
+    (return 0)
     ))
 
 ; I/O functions
@@ -494,6 +522,96 @@
 (export prim_error)
 (fun prim_error (msg) (
     (error msg)
+    ))
+
+(fun realpath_error (path) (
+    (prim_output_string stderr "ERROR: failed to get absolute path of '")
+    (prim_output_string stderr path)
+    (prim_output_string stderr "'\n")
+    (exit 1)
+    ))
+
+(char[] @PATH_MAX resolved)
+(char[] @PATH_MAX left)
+(char[] @PATH_MAX next_token)
+(char[] @PATH_MAX symlink)
+(char[] 144 stat) ; sizeof(struct stat) XXX it should not be hardcoded.
+
+(export prim_realpath)
+(fun prim_realpath (path) (
+    (int resolved_len 0)
+    (int left_len 0)
+    (int symlinks 0)
+    (void* p 0)
+    (void* q 0)
+    (void* s 0)
+    (if (== ([]8 path 0) '/')
+        (
+            ([]=8 resolved 0 '/')
+            ([]=8 resolved 1 0)
+            (if (! ([]8 path 1)) (
+                (return (prim_string resolved))
+                ))
+            (= resolved_len 1)
+            (= left_len (prim_strlcpy left (+ path 1) @PATH_MAX))
+        )
+        (
+            (if (== (syscall @SYS_GETCWD resolved @PATH_MAX) 0) (
+                (prim_output_string stderr "ERROR: failed to get current working directory\n")
+                (exit 1)
+                ))
+            (= resolved_len (strlen resolved))
+            (= left_len (prim_strlcpy left path @PATH_MAX))
+        ))
+    (if (|| (>= left_len @PATH_MAX) (>= resolved_len @PATH_MAX)) (
+        (realpath_error path)
+        ))
+
+    (while (> left_len 0) (
+        (label cont)
+        (= p (strchr left '/'))
+        (if p
+            ((= s p))
+            ((= s (+ left left_len)))
+            )
+        (if (>= (- s left) @PATH_MAX) ((realpath_error path)))
+        (prim_memcpy next_token left (- s left))
+        ([]=8 next_token (- s left) '\0')
+        (-= left_len (- s left))
+        (if p ((prim_memcpy left (+ s 1) (+ left_len 1))))
+        (if (!= ([]8 resolved (- resolved_len 1)) '/') (
+            (if (>= resolved_len @PATH_MAX) ((realpath_error path)))
+            ([]=8 resolved resolved_len '/')
+            (+= resolved_len 1)
+            ([]=8 resolved resolved_len '\0')
+            ))
+        (if (! ([]8 next_token 0)) ((goto cont)))
+        (if (! (prim_strcmp next_token ".")) ((goto cont)))
+        (if (! (prim_strcmp next_token "..")) (
+            (if (> resolved_len 1) (
+                ([]=8 resolved (- resolved_len 1) '\0')
+                (= q (+ (strrchr resolved '/') 1))
+                ([]=8 q 0 '\0')
+                (= resolved_len (- q resolved))
+                ))
+            (goto cont)
+            ))
+        (= resolved_len (prim_strlcat resolved next_token @PATH_MAX))
+        (if (>= resolved_len @PATH_MAX) ((realpath_error path)))
+        (if (syscall @SYS_LSTAT resolved stat) (
+            (realpath_error path)
+            ))
+
+        (if (== (& ([] (+ stat @ST_MODE_OFFSET) 0) @IFMT) @IFLNK) (
+            (prim_output_string stderr "ERROR: symbolic link is not supported\n")
+            (exit 1)
+            ))
+        ))
+
+    (if (&& (> resolved_len 1) (== ([]8 resolved (- resolved_len 1)) '/')) (
+        ([]=8 resolved (- resolved_len 1) 0)
+        ))
+    (return (prim_string resolved))
     ))
 
 (export init_prim_io)

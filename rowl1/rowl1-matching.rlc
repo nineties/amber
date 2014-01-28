@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2014-01-21 19:06:44 nineties $
+; $Id: rowl1-matching.rlc 2014-01-27 18:00:25 nineties $
 ;
 
 (import "rlvm-compile")
@@ -52,7 +52,7 @@
 
 (export fun compile_matching (loc obj def) (
     (if (! (is_function def))
-        (throw (type_error loc (string "function") def))
+        (throw (type_error loc (string "function") obj))
         )
 
     (var cache (field_get def 1))
@@ -86,13 +86,12 @@
     (var mat (construct_pattern_matrix def 0))
 
     (var args 0)
-    (var idx (- (list_len (caar mat)) 1))
+    (var idx  @ARITY_MAX)
     (while (> idx 0) (do
         (decr idx)
         (= args (cons (make_arg idx) args))
         ))
     (= args (cons (get_arity) args))
-
     (compile_matching_main asm args mat exit)
     ))
 
@@ -224,7 +223,7 @@
     ))
 
 (fun compile_matching_main (asm args pats exit) (
-    (if (== (caar pats) 0) (do
+    (if (! (field_get (car pats) 0)) (do
         (label compile_matching_main_loop)
         (var func (field_get (car pats) 1))
         (var ty (node_type func))
@@ -809,7 +808,8 @@
 (fun shift_pat (pats) (
     (var list pats)
     (while list (do
-        (setcar list (cons (cdaar list) (cdar list)))
+        (var st (car list))
+        (field_set st 0 (cdr (field_get st 0)))
         (= list (cdr list))
         ))
     (return pats)

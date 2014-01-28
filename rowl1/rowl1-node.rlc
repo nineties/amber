@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2014-01-22 10:36:10 nineties $
+; $Id: rowl1-node.rlc 2014-01-28 10:06:09 nineties $
 ;
 
 (import "rlvm-compile")
@@ -14,7 +14,7 @@
 
 (extern object current_loc)
 
-; symbol table (symbols are globally unique)
+; symbol table
 (var symbol_table (init_symbol_table (make_idtable)))
 (var symbol_index_gen 0)
 (var builtin_symbol_index_gen -1)
@@ -120,7 +120,7 @@
 (export var VariableLength (to_sym "%VariableLength"))
 
 (export var Assembler        (to_builtin_sym "Assembler"))
-(export var Builtin          (to_builtin_sym "Builtin"))
+(export var BuiltinType      (to_builtin_sym "BuiltinType"))
 (export var Bytecode         (to_builtin_sym "Bytecode"))
 (export var Function         (to_builtin_sym "Function"))
 (export var Closure          (to_builtin_sym "Closure"))
@@ -128,11 +128,11 @@
 (export var OutputFileStream (to_builtin_sym "OutputFileStream"))
 (export var StringIO         (to_builtin_sym "StringIO"))
 
-(export var Global (to_sym "Global"))
-(export var Amber  (to_sym "Amber"))
-(export var Syntax (to_sym "Syntax"))
+(export var Amber   (to_sym "Amber"))
+(export var Builtin (to_sym "Builtin"))
+(export var Syntax  (to_sym "Syntax"))
 
-; Builtin headers
+; BuiltinType headers
 (export var BSymbol (to_builtin_sym "Symbol"))
 (export var BInt    (to_builtin_sym "Int"))
 (export var BString (to_builtin_sym "String"))
@@ -167,6 +167,9 @@
     (+= symbol_index_gen 1)
     (idtable_add symbol_table name sym)
     (return sym)
+    ))
+
+(export fun to_unique_sym (name) (
     ))
 
 (extern fun is_letter)
@@ -228,7 +231,7 @@
         (if (== (get_sequence_tag obj) @SEQ_TUPLE) (return @TupleE))
         (if (== (get_sequence_tag obj) @SEQ_ARRAY) (return @ArrayE))
         ))
-    (return @BuiltinE)
+    (return @BuiltinTypeE)
     ))
 
 (export fun is_symbol (obj) (
@@ -338,7 +341,7 @@
         (@IntE              . (return Int))
         (@StringE           . (return String))
         (@FloatE            . (return Float))
-        (@BuiltinE          . (return Builtin))
+        (@BuiltinTypeE          . (return BuiltinType))
         (default            . (not_reachable "node_head"))
         ))
     ))
@@ -365,7 +368,7 @@
         (@IntE              . (return BInt))
         (@StringE           . (return BString))
         (@FloatE            . (return BFloat))
-        (@BuiltinE          . (return Builtin))
+        (@BuiltinTypeE          . (return BuiltinType))
         (default            . (not_reachable "node_bhead"))
         ))
     ))
@@ -681,7 +684,7 @@
         (@IntE              . (return (string "Int")))
         (@StringE           . (return (string "String")))
         (@FloatE            . (return (string "Float")))
-        (@BuiltinE          . (return (string "Builtin")))
+        (@BuiltinTypeE          . (return (string "BuiltinType")))
         (default            . (not_reachable "output_type"))
         ))
     ))

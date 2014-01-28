@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-01-25 08:15:46 nineties $
+; $Id: rowl1-interp.rlc 2014-01-28 00:25:15 nineties $
 ;
 
 (import "rlvm-compile")
@@ -20,13 +20,21 @@
 (import "rowl1-packrat")
 (import "rowl1-pprint")
 
+(export var amber null)
 (export var global null)
+(export var builtin null)
 (export var variables null)
 (export var current_loc null)
 
+(extern fun ary_new)
+(extern fun ary_at)
+(extern fun ary_store)
+(extern fun ary_push)
+(extern fun ary_size)
+
 (export fun set_loc (loc) (
     (= current_loc loc)
-    (set_slot global (to_sym "LOCATION") loc)
+    (store_variable global (to_sym "LOCATION") loc)
     ))
 
 (export fun eval_shell () (
@@ -34,6 +42,7 @@
     (try
         (return (eval_main "amber" stdin 0 0))
         (catch e (do
+            (= global amber)
             (output_string stderr "Uncaught exception: ")
             (pprint stderr e)
             (output_string stderr "\n")
@@ -47,6 +56,7 @@
     (try
         (= r (eval_main path ichan argc argv))
         (catch e (do
+            (= global amber)
             (output_string stderr "Unaught exception: ")
             (pprint stderr e)
             (output_string stderr "\n")
@@ -59,51 +69,67 @@
 (fun eval_main (file ichan argc argv) (
     (= current_loc no_loc)
 
-    (= global @C_UNDEF)
-    (= global (create_module Amber))
+    ; Local variable table
     (= variables (make_symtable 10))
-    (store_variable global Amber global)
 
-    (var syntax (create_module Syntax))
-    (store_variable global Syntax syntax)
-    (store_variable syntax proto global)
+    ; Global Module
+    (= global @C_UNDEF)
+    (= amber (create_module Amber))
+    (store_variable amber Amber amber)
+    (= global amber)
 
+    ; Builtin Module
+    (= builtin (create_module Builtin)) ; Builtin functions
+    (store_variable global Builtin builtin)
+
+    ; Setup built-in objects and functions.
     (setup_argv argc argv)
-    (setup_globals)
-    (setup_builtin_compilers)
-    (init_lib)
-    (init_parser_funcs syntax)
+    (setup_global)
+    (setup_builtin_compilers builtin)
+    (init_lib builtin)
+    (init_parser_funcs builtin) 
+
+    ; Boot Amber
     (set_loc no_loc)
+    (var load_path (ary_new)) 
+    (store_variable amber (to_sym "LOADPATH") load_path)
+    (ary_push load_path (string "/usr/lib/amber"))
+    (ary_push load_path (string "."))
+    (setup_minimal_interpreter builtin)
+    (load_file "Boot.ab")
 
-    (add_load_dir "/usr/lib/amber")
-    (load_lib "Syntax.ab")
+    ;; Boot Amber
+    ;(load_file "Boot.ab")
+    ;(load_file "Syntax.ab")
+    ;(load_file "Module.ab")
+    ;(load_file "Object.ab")
 
-    ;(import_lib "amber/syntax.ab")
-    ;(import_lib "std/string.ab")
-    ;(import_lib "std/numeric.ab")
-    ;(import_lib "std/format.ab")
-    ;(import_lib "std/list.ab")
-    ;(import_lib "std/array.ab")
-    ;(import_lib "std/table.ab")
-    ;(import_lib "std/io/io.ab")
+    ;;(load_file "Syntax.ab")
 
-    (add_load_dir (get_directory file))
-    (add_load_dir (get_env "PWD"))
+    ;;(import_lib "amber/syntax.ab")
+    ;;(import_lib "std/string.ab")
+    ;;(import_lib "std/numeric.ab")
+    ;;(import_lib "std/format.ab")
+    ;;(import_lib "std/list.ab")
+    ;;(import_lib "std/array.ab")
+    ;;(import_lib "std/table.ab")
+    ;;(import_lib "std/io/io.ab")
 
-    (pre_import_lib)
+    ;(add_load_dir (get_directory file))
+    ;(add_load_dir (get_env "PWD"))
 
-    (var p (make_parser file ichan))
+    ;(var p (make_parser file ichan))
 
-    (if (in_shell_mode)
-        (interpret_shell p)
-        (do
-            (var fd (open "."))
-            (var dir (get_directory file))
-            (chdir dir)
-            (interpret p)
-            (fchdir fd)
-        )
-        )
+    ;(if (in_shell_mode)
+    ;    (interpret_shell p)
+    ;    (do
+    ;        (var fd (open "."))
+    ;        (var dir (get_directory file))
+    ;        (chdir dir)
+    ;        (interpret p)
+    ;        (fchdir fd)
+    ;    )
+    ;    )
     (eval_exit @C_NIL)
 
     (return 0)
@@ -203,9 +229,6 @@
     (= current_loc no_loc)
     ))
 
-(extern fun ary_new)
-(extern fun ary_store)
-(extern fun ary_push)
 (fun interpret_shell (p) (
     (var outputs (ary_new))
     (eval (apply (slot (slot (to_sym "Syntax") (to_sym "Shell")) (to_sym "enable_shell_syntax")) 0))
@@ -240,6 +263,14 @@
     (output_char stdout '\n')
     ))
 
+(fun builtin_eval (expr) (
+    (if (== (node_head expr) Located) (do
+        (set_loc (node_arg expr 0))
+        (return (eval (node_arg expr 1)))
+        ))
+    (return (runcode (compile_main expr)))
+    ))
+
 (fun default_eval (expr) (
     (return (runcode (compile_main (rewrite expr))))
     ))
@@ -254,20 +285,6 @@
 (fun rewrite_located (expr) (
     (node_arg_set expr 1 (rewrite (node_arg expr 1)))
     (return expr)
-    ))
-
-(fun eval_define_syntax (expr) (
-    (var lhs (node_arg expr 0))
-    (var elm (node_arg expr 1))
-    (eval (compile_define_syntax lhs elm))
-    (return @C_NIL)
-    ))
-
-(fun eval_reserve_symbol (expr) (
-    (for i 0 (node_size expr)
-        (add_reserve_symbol (node_arg expr i))
-        )
-    (return @C_NIL)
     ))
 
 (fun eval_seq (expr) (
@@ -305,24 +322,6 @@
     (return @C_NIL)
     ))
 
-
-(var load_dirs null)
-
-; XXX: fix this
-(fun add_load_dir (path) (
-    (if (!= (array_get char path 0) '/')
-        (= path (strcat (strcat (get_env "PWD") "/") path))
-        )
-    (if (!= (array_get char path (- (strlen path) 1)) '/')
-        (= path (strcat path "/"))
-        )
-    (= load_dirs (cons path load_dirs))
-    ))
-
-(fun pop_import_dir () (
-    (= load_dirs (cdr load_dirs))
-    ))
-
 (fun is_already_imported (list file) (
     (if (!= (node_type list) @ListE)
         (throw (type_error current_loc (string "List") list))
@@ -336,116 +335,23 @@
     (return @FALSE)
     ))
 
-(fun import_lib (list) (
-    (throw (string "import_lib"))
-    ;(return (import_lib_rec list @TRUE))
-    ))
-
-(fun import_lib_rec (list top) (
-    (var dirs (list1 (string ".")))
-    (if top (= dirs (list_append dirs load_dirs)))
-    (if (cdr list)
-        (do
-            ; ;; import A.B...
-            ; change working directory to A then import B...
-            (var dir (car list))
-            (while dirs (do
-                (var fullpath (join (list3 (car dirs) (string "/") dir)))
-                (if (file_exists fullpath) (do
-                    (var fd (open "."))
-                    (chdir fullpath)
-                    (var mod_sym (to_sym dir))
-                    (= global (enter_module global mod_sym))
-                    (var r (import_lib_rec (cdr list) @FALSE))
-                    (= global (exit_module global))
-                    (fchdir fd)
-                    (set_loc no_loc)
-                    (return r)
-                    ))
-                (= dirs (cdr dirs))
-                ))
-        )
-        (do
-            (var file (strcat (car list) ".ab"))
-            (while dirs (do
-                (var fullpath (join (list3 (car dirs) (string "/") file)))
-                (if (file_exists fullpath) (do
-                    (var mod_sym (to_sym (car list)))
-
-                    (var imports (get_slot global (to_sym "imports")))
-                    (if (is_already_imported imports file)
-                        (return @C_FALSE)
-                        )
-                    (set_slot global (to_sym "imports") (cons file imports))
-
-                    (var ichan (open_in fullpath))
-                    (var fd (open "."))
-                    (chdir (car dirs))
-
-                    (= global (enter_module global mod_sym))
-
-                    (var p (make_parser fullpath ichan))
-                    (set_loc (get_loc p))
-
-                    (var save_shell_mode_p (in_shell_mode))
-                    (unset_shell_mode)
-                    (interpret p)
-                    (if save_shell_mode_p (set_shell_mode))
-
-                    (= global (exit_module global))
-
-                    (fchdir fd)
-                    (close_in ichan)
-                    (set_loc no_loc)
-                    (return @C_TRUE)
-                    ))
-                (= dirs (cdr dirs))
-                ))
-        ))
-        (throw (not_found current_loc (car list)))
-    ))
-
-(var pre_imports null)
-(export fun set_pre_imports (sym) (
-    (= pre_imports (string sym))
-    ))
-
-(fun pre_import_lib () (
-    (if (! pre_imports) return)
-    (import_lib pre_imports)
-    ))
-
-(fun eval_import (expr) (
-    (var list (node_arg_list expr 0))
-    (var list_ list)
-    (while list_ (do
-        (setcar list_ (symbol_name (car list_)))
-        (= list_ (cdr list_))
-        ))
-    (return (import_lib list))
-    ))
-
 (fun setup_argv (argc argv) (
     (var ARGV (ary_new))
-    (set_slot global (to_sym "ARGV") ARGV)
+    (store_variable amber (to_sym "ARGV") ARGV)
     (if (== argc 0) return)
     (for i 1 argc (do
         (ary_push ARGV (string (array_get string argv i)))
         ))
     ))
 
-(export fun prompt_string () (
-    (var v (get_slot global (to_sym "PROMPT")))
-    (if (!= (node_type v) @StringE)
-        (return (string "<invalid prompt string>"))
-        )
-    (return v)
-    ))
+(fun load_file (path) (
+    (var dirs (get_slot amber (to_sym "LOADPATH")))
+    (if (!= (node_type dirs) @ArrayE) (goto load_error))
+    (for i 0 (unbox (ary_size dirs)) (do
+        (var dir (ary_at dirs i))
+        (if (!= (node_type dir) @StringE) (goto load_error))
 
-(fun load_lib (path) (
-    (var dir load_dirs)
-    (while dir (do
-        (var fullpath (strcat (car dir) path))
+        (var fullpath (strcat (strcat dir "/") path))
         (if (file_exists fullpath) (do
             (var ichan (open_in fullpath))
             (var fd (open "."))
@@ -466,20 +372,29 @@
             (set_loc no_loc)
             (return @C_NIL)
             ))
-        (= dir (cdr dir))
         ))
     (throw (not_found current_loc (string path)))
+
+    (label load_error)
+    (throw (logic_error1 current_loc
+        (string "LOADPATH must be an array of strings")
+        dirs))
     ))
 
-(fun push_global (mod) (
+(fun enter_module (mod) (
+    (if (!= (symtable_depth variables) 0)
+        (throw (logic_error current_loc
+            (string "enter_module() can be called only in top-scope")))
+        )
     (if (!= (get_slot mod proto) global)
-        (throw (make_object3 Exception current_loc (string "can not push module") mod))
+        (throw (logic_error current_loc
+            (string "The argument of enter_module() must be direct submodule of global-module")))
         )
     (= global mod)
     (return mod)
     ))
 
-(fun pop_global () (
+(fun exit_module () (
     (var mod (get_slot global proto))
     (if (!= (node_bhead mod) Module)
         (throw (type_error current_loc (string "Module") mod))
@@ -488,34 +403,90 @@
     (return mod)
     ))
 
-(fun setup_globals () (
-    (set_slot global (to_sym "LOCATION") current_loc)
-    (set_slot global (to_sym "PROMPT") (string "amber"))
+(export fun load_global (sym) (
+    (return (get_slot global sym))
+    ))
 
-    (if (in_shell_mode)
-        (set_slot global (to_sym "shell_mode") @C_TRUE)
-        (set_slot global (to_sym "shell_mode") @C_FALSE)
+(fun setup_global () (
+    ;(store_variable amber (to_sym "LOCATION") current_loc)
+    ;(store_variable amber (to_sym "PROMPT") (string "amber"))
+    ;(if (in_shell_mode)
+    ;    (store_variable amber (to_sym "shell_mode") @C_TRUE)
+    ;    (store_variable amber (to_sym "shell_mode") @C_FALSE)
+    ;    )
+
+    ))
+
+(fun setup_global_methods () (
+    ;(var syntax (get_slot global Syntax)) 
+    ;(add_function1 syntax Rewrite DontCare rewrite_donothing 0)
+    ;(add_function1 syntax Rewrite (domainP Located) rewrite_located 0)
+    ;(add_function1 global Eval DontCare default_eval 0)
+    ;(add_function1 global Eval (domainP Located) eval_located 0)
+    ;(add_function1 global Eval (make_object1 Import listT) eval_import 0)
+
+    ;(add_function1 global Eval (make_object1 Seq listT) eval_seq 0)
+
+    ;(add_function1 global Eval (quote (to_sym "exit")) eval_exit 0)
+
+    ;(add_function1 global (to_sym "exit") intT exit_ 0)
+    ;(add_function1 global (to_sym "atexit") funT at_exit 0)
+    ))
+
+(fun copy_variable (to sym1 from sym2) (
+    (var f (get_slot from (to_sym sym2)))
+    (if (== f @C_UNDEF)
+        (throw (not_found current_loc (to_sym sym2)))
         )
-    (var syntax (get_slot global Syntax)) 
-    (add_function1 syntax Rewrite DontCare rewrite_donothing 0)
-    (add_function1 syntax Rewrite (domainP Located) rewrite_located 0)
-    (add_function1 global Eval DontCare default_eval 0)
-    (add_function1 global Eval (domainP Located) eval_located 0)
-    (add_function1 global Eval (make_object1 Import listT) eval_import 0)
+    (store_variable to (to_sym sym1) f)
+    ))
 
-    (add_function1 global Eval (make_object1 Seq listT) eval_seq 0)
+(fun setup_minimal_interpreter (builtin) (
+    ; parser
+    (var syntax (create_module Syntax))
+    (store_variable global Syntax syntax)
+    (store_variable syntax proto global)
+    
+    (copy_variable syntax "text" builtin "parse_text")
+    (copy_variable syntax "any" builtin "parse_any")
+    (copy_variable syntax "blank" builtin "parse_blank")
+    (copy_variable syntax "spaces" builtin "parse_spaces")
+    (copy_variable syntax "comment" builtin "parse_comment")
+    (copy_variable syntax "decimal" builtin "parse_decimal")
+    (copy_variable syntax "binary" builtin "parse_binary")
+    (copy_variable syntax "octal" builtin "parse_octal")
+    (copy_variable syntax "hex" builtin "parse_hex")
+    (copy_variable syntax "integer" builtin "parse_integer")
+    (copy_variable syntax "float" builtin "parse_float")
+    (copy_variable syntax "string" builtin "parse_string")
+    (copy_variable syntax "string_d" builtin "parse_string_d")
+    (copy_variable syntax "string_s" builtin "parse_string_s")
+    (copy_variable syntax "symbol" builtin "parse_symbol")
+    (copy_variable syntax "atom" builtin "parse_atom")
+    (copy_variable syntax "fullform" builtin "parse_fullform")
+    (copy_variable syntax "expr" builtin "parse_expr")
+    (copy_variable syntax "stmt" builtin "parse_stmt")
 
-    (add_function1 global Eval (make_object2 DefSyntax DontCare DontCare) eval_define_syntax 0)
-    (add_function1 global Eval (domainP ReserveSymbol) eval_reserve_symbol 0)
+    ; compiler
+    (copy_variable global "compile" builtin "compile")
 
-    (add_function1 global Eval (quote (to_sym "exit")) eval_exit 0)
+    ; evaluator
+    (add_function1 builtin Eval DontCare builtin_eval 0)
+    (add_function1 builtin (to_sym "load") stringT load_file 0)
+    (add_function1 builtin (to_sym "create_module") symT create_module 0)
+    (add_function1 builtin (to_sym "enter_module") (domainP Module) enter_module 0)
+    (add_function0 builtin (to_sym "exit_module") exit_module 0)
 
-    (add_function1 global (to_sym "load") stringT load_lib 0)
-    (add_function1 global (to_sym "push_global") (domainP Module) push_global 0)
-    (add_function0 global (to_sym "pop_global") pop_global 0)
-    (add_function1 global (to_sym "create_module") symT create_module 0)
-    (add_function1 global (to_sym "exit") intT exit_ 0)
-    (add_function1 global (to_sym "atexit") funT at_exit 0)
+    (copy_variable global "eval" builtin "eval")
+    (copy_variable global "load" builtin "load")
+
+    ; important functions
+    (copy_variable global "equal" builtin "equal")
+    (copy_variable global "identical" builtin "identical")
+    (copy_variable global "fusion" builtin "fusion_function")
+    (copy_variable global "create_module" builtin "create_module")
+    (copy_variable global "enter_module" builtin "enter_module")
+    (copy_variable global "exit_module" builtin "exit_module")
     ))
 
 (extern fun setup_pprint)
@@ -534,23 +505,23 @@
 (extern fun setup_table)
 ;(extern fun setup_gc)
 
-(fun init_lib () (
-    (setup_base global)
-    (setup_pprint global)
-    (setup_symbol global)
-    (setup_object global)
+(fun init_lib (mod) (
+    (setup_base mod)
+    ;(setup_pprint mod)
+    ;(setup_symbol mod)
+    ;(setup_object mod)
 
-    (setup_math global)
-    (setup_numeric global)
-    (setup_string global)
-    (setup_bigint global)
-    (setup_float global)
-    (setup_random global)
-    (setup_io global)
-    (setup_list global)
-    (setup_tuple global)
-    (setup_array global)
-    (setup_table global)
+    ;(setup_math mod)
+    (setup_numeric mod)
+    (setup_string mod)
+    ;(setup_bigint mod)
+    ;(setup_float mod)
+    ;(setup_random mod)
+    (setup_io mod)
+    ;(setup_list mod)
+    ;(setup_tuple mod)
+    ;(setup_array mod)
+    ;(setup_table mod)
 ;    (setup_gc)
     ))
 

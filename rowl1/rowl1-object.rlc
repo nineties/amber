@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-object.rlc 2014-01-24 20:35:32 nineties $
+; $Id: rowl1-object.rlc 2014-01-26 11:56:10 nineties $
 ;
 
 (import "rlvm-compile")
@@ -36,10 +36,17 @@
     (return clone)
     ))
 
+(fun remove_slot (obj sym) (
+    (var tbl (wrtable_find slots sym))
+    (if (!= tbl @C_UNDEF) (wrtable_del tbl sym))
+    (return @C_UNDEF)
+    ))
+
 (export fun set_slot (obj sym val) (
     (if (|| (!= (node_type sym) @SymbolE) (is_special sym))
         (throw (invalid_slotname current_loc sym))
         )
+    (if (== val @C_UNDEF) (return (remove_slot obj sym)))
     (var tbl (wrtable_find slots sym))
     (if (== tbl @C_UNDEF) (do
         (= tbl (make_wrtable))
