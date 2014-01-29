@@ -1,6 +1,6 @@
 " 
     Copyright (C) 2010 nineties
-    $Id: Syntax.ab 2014-01-29 13:56:21 nineties $
+    $Id: Syntax.ab 2014-01-29 14:25:31 nineties $
 "
 
 " Syntax definition of the Amber language. "
@@ -350,7 +350,7 @@ primary_expr_act
         {
             Prim.to_sym(
                 Prim.string_add("node",
-                Prim.int_to_s(node1)))
+                Prim.int_to_string(node1)))
         }
       | "$input"    { \input_text(parser, begin, end) }
     
@@ -371,8 +371,8 @@ enter_module(Shell)
 
 primary_expr ::= "%" decimal
                  {
-                    if (Prim.int_equal(node1, 0) or
-                        Prim.int_gt(node1, array_size(shell_outputs))) {
+                    if (Prim.equal?(node1, 0) or
+                        Prim.int_greater_than?(node1, array_size(shell_outputs))) {
                         throw `SyntaxError{!LOCATION,
                             "The argument of % must be a line number"}
                     }
@@ -417,10 +417,10 @@ expand_macro: expr -> {
         else if (Equal{head, \Unquote})
             level = Prim.int_sub(level, 1)
 
-        if (Prim.int_less_than(level, 0))
+        if (Prim.int_less_than?(level, 0))
             throw `LogicError{!LOCATION, "Unquotation outside quasi-quotation"}
 
-        if (Prim.is_atom(expr))
+        if (Prim.atom?(expr))
             return expr
 
         head = Prim.head(expr)
@@ -429,7 +429,9 @@ expand_macro: expr -> {
         MakeObject{head, args}
     }
 
-    expand_macro_iter(expr, 0)
+    e: expand_macro_iter(expr, 0)
+    Prim.debugpf(e)
+    e
 } 
 
 # Expand macros only once before eval.
@@ -449,14 +451,14 @@ macro(x ^ y)       = `pow(!x, !y)
 macro(x / y)       = `div(!x, !y)
 macro(x % y)       = `mod(!x, !y)
 macro(x | y)       = `fusion(!x, !y)
-macro(x < y)       = `less_than(!x, !y)
-macro(x > y)       = `greater_than(!x, !y)
-macro(x <= y)      = `less_equal(!x, !y)
-macro(x >= y)      = `greater_equal(!x, !y)
-macro(x == y)      = `equal(!x, !y)
-macro(x != y)      = `(not equal(!x, !y))
-macro(x is y)      = `identical(!x, !y)
-macro(x is not y)  = `(not identical(!x, !y))
+macro(x < y)       = `less_than?(!x, !y)
+macro(x > y)       = `greater_than?(!x, !y)
+macro(x <= y)      = `less_equal?(!x, !y)
+macro(x >= y)      = `greater_equal?(!x, !y)
+macro(x == y)      = `equal?(!x, !y)
+macro(x != y)      = `(not equal?(!x, !y))
+macro(x is y)      = `identical?(!x, !y)
+macro(x is not y)  = `(not identical?(!x, !y))
 macro(x += y)  = `ArithAssign{!x, !y, add!}
 macro(x -= y)  = `ArithAssign{!x, !y, sub!}
 macro(x *= y)  = `ArithAssign{!x, !y, mul!}

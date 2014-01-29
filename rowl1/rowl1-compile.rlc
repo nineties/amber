@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-01-29 13:44:31 nineties $
+; $Id: rowl1-compile.rlc 2014-01-29 14:32:19 nineties $
 ;
 
 (import "rlvm-compile")
@@ -447,8 +447,6 @@
     ))
 
 (export fun fusion_function (fun1 fun2) (
-    (if (== fun1 @C_UNDEF) (return fun2))
-    (if (== fun2 @C_UNDEF) (return fun1))
     (if (! (is_function fun1)) (throw (type_error current_loc (string "function") fun1)))
     (if (! (is_function fun2)) (throw (type_error current_loc (string "function") fun2)))
     (return (variant @BoundFunctionE 3 0 fun1 fun2))
@@ -1889,7 +1887,7 @@
     ))
 
 (fun compile_eq (asm expr) (
-    (compile asm (make_object2 Apply (to_sym "equal") (node_args expr)))
+    (compile asm (make_object2 Apply (to_sym "equal?") (node_args expr)))
     ))
 
 (fun compile_ne (asm expr) (
@@ -2175,8 +2173,6 @@
 
     ; horizontal composition
     (add_function2 mod (to_sym "fusion_function") funT funT fusion_function 0)
-    (add_function2 mod (to_sym "fusion_function") @C_UNDEF funT fusion_function 0)
-    (add_function2 mod (to_sym "fusion_function") funT @C_UNDEF fusion_function 0)
     ))
 
 (export fun add_compiler (mod pat func) (
