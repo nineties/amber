@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-numeric.rlc 2014-01-27 21:12:05 nineties $
+; $Id: rowl1-numeric.rlc 2014-01-29 10:24:29 nineties $
 ;
 
 (import "rlvm-compile")
@@ -20,62 +20,6 @@
 
 (extern object current_loc)
 (extern object global)
-
-(var coerce (to_sym "coerce"))
-(export fun do_coerce (a b) (
-    (var r (runcode (lookup_func global coerce) a b))
-    (if (== r @C_UNDEF) (return r))
-    (if (|| (!= (node_type r) @ListE) (!= (list_len r) 2)) (do
-        (throw (exception current_loc (string "coerce must returns [a, b]")))
-        ))
-    (return r)
-    ))
-
-
-(export fun binary_coerce (sym a b) (
-    (var r (do_coerce a b))
-    (if (== r @C_UNDEF)
-        (throw (make_object5 Exception current_loc
-            (string "Unknown binary operation")
-            (make_object1 (to_sym "method") sym)
-            (make_object1 (to_sym "lhs") a)
-            (make_object1 (to_sym "rhs") b)
-            ))
-        )
-    (return (runcode (lookup_func global sym) (car r) (cadr r)))
-    ))
-
-(export fun do_coerce_internal (a b) (
-    (var lty (node_type a))
-    (var rty (node_type b))
-    (if (== lty rty) (return (list2 a b)))
-    (if (== lty @IntE) 
-        (if (== rty @BigIntE) (return (ib_coerce a b))
-        (if (== rty @FloatE)  (return (if_coerce a b))
-            (return @C_UNDEF)
-            ))
-    (if (== lty @BigIntE)
-        (if (== rty @IntE)   (return (bi_coerce a b))
-        (if (== rty @FloatE) (return (bf_coerce a b))
-            (return @C_UNDEF)
-            ))
-    (if (== lty @FloatE)
-        (if (== rty @IntE)    (return (fi_coerce a b))
-        (if (== rty @BigIntE) (return (fb_coerce a b))
-            (return @C_UNDEF)
-            )))))
-    (return @C_UNDEF)
-    ))
-
-(fun num_add (a b) ((return (binary_coerce (to_sym "add") a b))))
-(fun num_sub (a b) ((return (binary_coerce (to_sym "sub") a b))))
-(fun num_mul (a b) ((return (binary_coerce (to_sym "mul") a b))))
-(fun num_div (a b) ((return (binary_coerce (to_sym "div") a b))))
-(fun num_mod (a b) ((return (binary_coerce (to_sym "mod") a b))))
-(fun num_lt (a b) ((return (binary_coerce (to_sym "lt") a b))))
-(fun num_gt (a b) ((return (binary_coerce (to_sym "gt") a b))))
-(fun num_le (a b) ((return (binary_coerce (to_sym "le") a b))))
-(fun num_ge (a b) ((return (binary_coerce (to_sym "ge") a b))))
 
 (fun int_uplus (x) (
     (return x)
@@ -171,27 +115,8 @@
     (return n)
     ))
 
-(fun int_times (n f) (
-    (var code (get_bytecode f))
-    (for i 0 (unbox n) (do
-        (runcode code (box i))
-        ))
-    (return @C_NIL)
-    ))
-
 (export fun setup_numeric (builtin) (
-    ; default implementations using coerce
-    ;(add_function2 builtin (to_sym "add") DontCare DontCare num_add 0) 
-    ;(add_function2 builtin (to_sym "sub") DontCare DontCare num_sub 0)
-    ;(add_function2 builtin (to_sym "mul") DontCare DontCare num_mul 0)
-    ;(add_function2 builtin (to_sym "div") DontCare DontCare num_div 0)
-    ;(add_function2 builtin (to_sym "mod") DontCare DontCare num_mod 0)
-    ;(add_function2 builtin (to_sym "lt") DontCare DontCare num_lt 0)
-    ;(add_function2 builtin (to_sym "gt") DontCare DontCare num_gt 0)
-    ;(add_function2 builtin (to_sym "le") DontCare DontCare num_le 0)
-    ;(add_function2 builtin (to_sym "ge") DontCare DontCare num_ge 0)
-
-    ; integer arithmetic
+    (set_special_proto (box 0))
     (add_function1 builtin (to_sym "int_uplus") intT int_uplus 0)
     (add_function1 builtin (to_sym "int_uminus") intT int_uminus 0)
     (add_function2 builtin (to_sym "int_add") intT intT int_add 0)
@@ -209,9 +134,6 @@
     (add_function1 builtin (to_sym "int_abs") intT int_abs 0)
     (add_function1 builtin (to_sym "int_to_s") intT int_to_s 0)
     (add_function1 builtin (to_sym "int_hash") intT int_hash 0)
-
-    (add_function2 builtin (to_sym "times") intT funT int_times 0) 
-
     (set_slot builtin (to_sym "INTEGER_MIN") (box @FIXNUM_MIN))
     (set_slot builtin (to_sym "INTEGER_MAX") (box @FIXNUM_MAX))
     ))

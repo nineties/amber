@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-object.rlc 2014-01-26 11:56:10 nineties $
+; $Id: rowl1-object.rlc 2014-01-29 09:52:14 nineties $
 ;
 
 (import "rlvm-compile")
@@ -22,6 +22,7 @@
 (var proto_tbl (make_wrtable))
 (var dummy (wrtable_add slots proto proto_tbl))
 (var initialize (to_sym "initialize"))
+(var proto_special null)
 
 (extern fun tuple_at)
 (extern fun _copy)
@@ -65,7 +66,14 @@
     (return (set_slot obj sym val))
     ))
 
+(fun get_proto (obj) (
+    (var p (wrtable_find proto_tbl obj))
+    (if (!= p @C_UNDEF) (return p))
+    (return (array_get object proto_special (node_type obj)))
+    ))
+
 (export fun get_slot (obj sym) (
+    (if (== sym proto) (return (get_proto obj)))
     (if (|| (!= (node_type sym) @SymbolE) (is_special sym))
         (throw (invalid_slotname current_loc sym))
         )
@@ -74,7 +82,7 @@
     (label retry)
     (var v (wrtable_find tbl obj))
     (if (== v @C_UNDEF) (do
-        (= obj (wrtable_find proto_tbl obj))
+        (= obj (get_proto obj))
         (if (== obj @C_UNDEF) (return (wrtable_find tbl @C_UNDEF)))
         (goto retry)
         ))
@@ -82,6 +90,7 @@
     ))
 
 (export fun get_slot_norec (obj sym _) (
+    (if (== sym proto) (return (get_proto obj)))
     (if (|| (!= (node_type sym) @SymbolE) (is_special sym))
         (throw (invalid_slotname current_loc sym))
         )
@@ -90,12 +99,20 @@
     (return (wrtable_find tbl obj))
     ))
 
-(export fun setup_object (global) (
+(export fun set_special_proto (obj) (
+    (array_set object proto_special (node_type obj) obj)
+    ))
 
-    (add_function1 global (to_sym "clone") DontCare make_clone 0)
-    (add_function3 global (to_sym "set_slot") DontCare symT DontCare set_slot 0)
-    (add_function2 global (to_sym "get_slot") DontCare DontCare get_slot 0)
-    (add_function3 global (to_sym "get_slot") DontCare DontCare (quote (to_sym "norec")) get_slot_norec 0)
+(export fun setup_object (mod) (
+    (= proto_special (allocate_array @NUM_NODE_TYPE))
+    (for i 0 @NUM_NODE_TYPE
+        (array_set object proto_special i @C_UNDEF)
+        )
+
+    (add_function1 mod (to_sym "clone") DontCare make_clone 0)
+    (add_function3 mod (to_sym "set_slot") DontCare symT DontCare set_slot 0)
+    (add_function2 mod (to_sym "get_slot") DontCare DontCare get_slot 0)
+    (add_function3 mod (to_sym "get_slot") DontCare DontCare (quote (to_sym "norec")) get_slot_norec 0)
     ))
 
     ))

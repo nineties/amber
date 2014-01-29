@@ -1,5 +1,7 @@
-" Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-01-28 23:42:09 nineties $ "
+" 
+    Copyright (C) 2010 nineties
+    $Id: Syntax.ab 2014-01-29 02:09:48 nineties $
+"
 
 " Syntax definition of the Amber language. "
 
@@ -269,15 +271,15 @@ ternary_expr
         { `IfElse{!node0, !node2, !node4} }
       | seqor_expr
 
-guard_expr ::= ternary_expr
+guard_clause ::= "when" ternary_expr { node1 }
 
 argument_list
-    ::= "(" delimited(pattern, ",") ")" "when" guard_expr
-        { `When{!node1, !node4} }
+    ::= "(" delimited(pattern, ",") ")" guard_clause
+        { `When{!node1, !node3} }
       | "(" delimited(pattern, ",") ")"
         { node1 }
-      | !"{" pattern "when" guard_expr
-        { `When{List{!node1}, !node3} }
+      | !"{" pattern guard_clause
+        { `When{List{!node1}, !node2} }
       | !"{" pattern
         { List{node1} }
 
@@ -341,6 +343,8 @@ stmt
       | <<multiline>> "try" block "catch" multi_lambda_expr
         { `Try{!node1, !node3} }
 
+      | <<multiline>> primary_expr argument_list ":" stmt
+        { `Define{!node0, Lambda{!node1, !node2}, incremental} }
       | <<multiline>> pattern ":" stmt
         { `Define{!node0, !node2} }
 
@@ -479,8 +483,8 @@ macro(ArithAssign{QuoteSyntax{x[idxs...]}, e, op}) = {
     # We have to consider that evaluation of `x' and `idxs' may have
     # side-effects. So, we translate x[a,b] op= e to
     # { y = x; t1 = a; t2 = b; y[t1, t2] = op(y[t1, t2], e) }
-    stmt1: `Define{!unique_sym("x"), !x}
-    stmt2: Prim.list_map(i -> `Define{!unique_sym("t"), !i}, idxs)
+    stmt1: `Define{!unique_symbol(\x), !x}
+    stmt2: Prim.list_map(i -> `Define{!unique_symbol(\t), !i}, idxs)
     y: at(stmt1, 0)
     ts: Prim.list_map(e -> at(e, 0), stmt2)
 
@@ -494,8 +498,8 @@ macro(ArithAssign{QuoteSyntax{x[idxs...]}, e, op}) = {
 
 # For-statement for containers. 
 macro(For{i, container, body}) = {
-    iter: unique_sym("iter")
-    value: unique_sym("value")
+    iter:  Prim.unique_symbol(\iter)
+    value: Prim.unique_symbol(\value)
     `{
         !iter : (!container).each()
         !value: nil
@@ -508,8 +512,8 @@ macro(For{i, container, body}) = {
 
 # For-statement for ranges.
 macro(QuoteSyntax{For{i, Range{a, b}, body}}) = {
-    j: unique_sym("j")
-    n: unique_sym("n")
+    j: Prim.unique_symbol(\j)
+    n: Prim.unique_symbol(\n)
     `{
         !j: !a
         !n: !b
