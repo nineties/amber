@@ -1,6 +1,6 @@
 " Language:	Amber
 " Maintainer:	nineties <nineties48@gmail.com>
-" $Id: amber.vim 2013-10-09 11:13:25 nineties $
+" $Id: amber.vim 2014-01-29 17:34:32 nineties $
 
 if exists("b:current_syntax")
 "    finish
@@ -9,11 +9,11 @@ endif
 syn case match " case sensitive
 
 syn keyword amberConstant    true false nil undef
-syn keyword amberStatement   module return import open in continue break throw try catch scope new
+syn keyword amberStatement   module return import hiding open in continue break throw try catch scope new
 syn keyword amberConditional if else when and or not case of
 syn keyword amberRepeat      while for reverse_for
 
-syn match   amberStandardConstant    "stdin\|stdout\|stderr"
+syn match   amberSpecialConstant    "stdin\|stdout\|stderr"
 
 syn keyword amberTodo        contained Todo TODO Fixme FIXME XXX
 
@@ -23,7 +23,7 @@ syn match   amberCharacter   "'[^']*'" contains=amberSpecial
 
 syn region  amberString      start=+"+ skip=+\\\\\|\\"+ end=+"+ contains=amberSpecial
 
-syn match   amberOperator    "=>\|<=>\|!\|\\\|\`\|@\|:\|\<make\>"
+syn match   amberOperator    "=\|!\|\\\|\`\|@\|:"
 
 syn match   amberHeader      "\<[A-Z][a-zA-Z0-9_]*"
 
@@ -39,7 +39,7 @@ syn match   amberFloat       display "\d\+\.\d*\(e[-+]\=\d\+\)"
 syn region  amberComment start=/#/ end=/$/ contains=amberTodo
 
 hi def link amberHeader              Type
-hi def link amberStandardConstant    Identifier
+hi def link amberSpecialConstant     Identifier
 hi def link amberOperator            Operator
 hi def link amberConstant            Constant
 hi def link amberStatement           Statement

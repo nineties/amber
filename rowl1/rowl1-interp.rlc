@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-01-29 14:18:50 nineties $
+; $Id: rowl1-interp.rlc 2014-01-29 17:16:36 nineties $
 ;
 
 (import "rlvm-compile")
@@ -91,9 +91,9 @@
     ; Boot Amber
     (set_loc no_loc)
     (var load_path (ary_new)) 
-    (store_variable amber (to_sym "LOADPATH") load_path)
-    (ary_push load_path (string "/usr/lib/amber"))
+    (store_variable amber (to_sym "AMBERPATH") load_path)
     (ary_push load_path (string "."))
+    (ary_push load_path (string "/usr/lib/amber"))
     (setup_minimal_interpreter prim)
     (load_file "Boot.ab")
 
@@ -353,10 +353,10 @@
     ))
 
 (fun load_file (path) (
-    (var dirs (get_slot amber (to_sym "LOADPATH")))
+    (var dirs (get_slot amber (to_sym "AMBERPATH")))
     (if (!= (node_type dirs) @ArrayE) (goto load_error))
     (for i 0 (unbox (ary_size dirs)) (do
-        (var dir (ary_at dirs i))
+        (var dir (ary_at dirs (box i)))
         (if (!= (node_type dir) @StringE) (goto load_error))
 
         (var fullpath (strcat (strcat dir "/") path))
@@ -385,7 +385,7 @@
 
     (label load_error)
     (throw (logic_error1 current_loc
-        (string "LOADPATH must be an array of strings")
+        (string "AMBERPATH must be an array of strings")
         dirs))
     ))
 

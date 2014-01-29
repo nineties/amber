@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-01-29 13:51:33 nineties $
+; $Id: rowl1-packrat.rlc 2014-01-29 18:03:01 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1940,6 +1940,10 @@
     (var parser (apply_util "%call_parser"
             (list4 PVar (quote lhs) (quote key) parser_body)))
     (+= key_idx 1)
+    (if (== (node_head lhs) Slot)
+        (= lhs (slot (node_arg lhs 0) (slot Syntax (node_arg lhs 1))))
+        (= lhs (slot Syntax lhs))
+        )
 
     (return (make_object3 Define lhs (lambda (make_object2 When (list1 (make_object2 Domain PVar Parser)) parser) @C_TRUE) (to_sym "incremental")))
     ))
