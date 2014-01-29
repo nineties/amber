@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-float.rlc 2014-01-29 00:44:45 nineties $
+; $Id: rowl1-float.rlc 2014-01-29 14:10:10 nineties $
 ;
 
 ; Since Amber has no 64-bit integer, this source code uses bignums instead.
@@ -631,10 +631,12 @@
     (= a (copy_float a))
     (return (fdiv a b))
     ))
-(fun float_lt (a b) ((if (f< a b) (return @C_TRUE) (return @C_FALSE))))
-(fun float_gt (a b) ((if (f> a b) (return @C_TRUE) (return @C_FALSE))))
-(fun float_le (a b) ((if (f<= a b) (return @C_TRUE) (return @C_FALSE))))
-(fun float_ge (a b) ((if (f>= a b) (return @C_TRUE) (return @C_FALSE))))
+(fun float_compare (a b) (
+    (if (f< a b) (return (box -1))
+    (if (f== a b) (return (box 0))
+        (return (box 1))
+        ))
+    ))
 (fun float_eq (a b) ((if (f== a b) (return @C_TRUE) (return @C_FALSE))))
 
 (fun float_abs (n) (
@@ -668,13 +670,11 @@
     (add_function2 mod (to_sym "float_sub") floatT floatT float_sub 0)
     (add_function2 mod (to_sym "float_mul") floatT floatT float_mul 0)
     (add_function2 mod (to_sym "float_div") floatT floatT float_div 0)
-    (add_function2 mod (to_sym "float_lt") floatT floatT float_lt 0)
-    (add_function2 mod (to_sym "float_gt") floatT floatT float_gt 0)
-    (add_function2 mod (to_sym "float_le") floatT floatT float_le 0)
-    (add_function2 mod (to_sym "float_ge") floatT floatT float_ge 0)
-    (add_function2 mod (to_sym "float_equal") floatT floatT float_eq 0)
-    (add_function1 mod (to_sym "float_abs") floatT float_abs 0)
+    (add_function2 mod (to_sym "compare") floatT floatT float_compare 0)
     (add_function2 mod (to_sym "float_pow") floatT intT float_ipow 0)
+    (add_function2 mod (to_sym "float_equal") floatT floatT float_eq 0)
+
+    (add_function1 mod (to_sym "float_abs") floatT float_abs 0)
     ))
 
    ))

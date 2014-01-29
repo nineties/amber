@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-01-28 10:23:44 nineties $
+; $Id: rowl1-packrat.rlc 2014-01-29 13:51:33 nineties $
 ;
 
 (import "rlvm-compile")
@@ -955,6 +955,8 @@
     (while (is_identchar (lookahead p)) (do
         (getc p)
         ))
+    (var c (lookahead p))
+    (if (|| (== c '!') (== c '?')) (getc p))
     (var s (to_sym (extract_string p begin (field_get p 6))))
     
     (var reserved_symbols (get_slot (load_global Syntax) (to_sym "reserved_symbols")))
@@ -1706,7 +1708,7 @@
         body))
     (= body (cons (gen_reset_parser_position PVar state) body))
     (= body (cons (mkif
-        (apply_util "%lt"
+        (apply_util "%less_than"
             (list2 (apply_util "%length" (list1 elems))
                 (box minlen))) (block (list2
         (gen_noparse (string "The number of elements is insufficient"))
@@ -1970,7 +1972,7 @@
     (add_function2 utilities (to_sym "%cons") DontCare DontCare __cons 0)
     (add_function1 utilities (to_sym "%reverse") DontCare __reverse 0)
     (add_function1 utilities (to_sym "%length") DontCare __length 0)
-    (add_function2 utilities (to_sym "%lt") intT intT __lt 0)
+    (add_function2 utilities (to_sym "%less_than") intT intT __lt 0)
 
     (add_function2 mod (to_sym "parse_text") (domainP Parser) stringT parse_text 0)
 

@@ -1,10 +1,56 @@
 # Copyright (C) 2010 nineties
-# $Id: Numeric.ab 2014-01-29 08:22:06 nineties $
+# $Id: Numeric.ab 2014-01-29 14:10:41 nineties $
 
-# Type Casting 
-cast(h, v) when head(v) == h: v
-cast(\Float, v@Int): int_to_float(v)
-cast(\Int, v@Float): float_to_int(v)
 
 # Default implementations
-add(a, b): arithmetic_cast(a, b, \add, add)
+binary_coerce(a, b): 
+    throw `LogicError{!LOCATION, "Can not convert to same type.", a, b}
+binary_coerce(a, b) when head(a)==head(b): (a, b)
+binary_coerce(a@Int, b@Float): (a.to_f(), b)
+binary_coerce(a@Float, b@Int): (a, b.to_f())
+
+perform_binary_operation(a, b, fun): {
+    (a, b) = binary_coerce(a, b)
+    fun(a, b)
+}
+
+add(a, b): perform_binary_operation(a, b, add)
+sub(a, b): perform_binary_operation(a, b, sub)
+mul(a, b): perform_binary_operation(a, b, mul)
+div(a, b): perform_binary_operation(a, b, div)
+mod(a, b): perform_binary_operation(a, b, mod)
+pow(a, b): perform_binary_operation(a, b, pow)
+add!: add
+sub!: sub
+mul!: mul
+pow!: pow
+div!: div
+mod!: mod
+
+compare(a, b): perform_binary_operation(a, b, compare)
+less_than(a, b):      compare(a, b) < 0
+greater_than(a, b):   compare(a, b) > 0
+less_gequal(a, b):    compare(a, b) <= 0
+greater_gequal(a, b): compare(a, b) >= 0
+
+uplus(a): a
+uminus(a): -1 * a
+
+# Integer and Floating-point
+INTEGER_MIN: Prim.INTEGER_MIN
+INTEGER_MAX: Prim.INTEGER_MAX
+
+uplus = Prim.int_uplus | Prim.float_uplus | uplus
+uminus = Prim.int_uminus | Prim.float_uminus | uminus
+add = Prim.int_add | Prim.float_add | add
+sub = Prim.int_sub | Prim.float_sub | sub
+mul = Prim.int_mul | Prim.float_mul | mul
+div = Prim.int_div | Prim.float_div | div
+mod = Prim.int_mod | Prim.float_mod | mod
+pow = Prim.int_pow | Prim.float_pow | pow
+shiftL: Prim.int_shiftL
+shiftR: Prim.int_shiftR
+
+compare: Prim.int_compare | Prim.float_compare
+equal = Prim.float_equal | equal
+

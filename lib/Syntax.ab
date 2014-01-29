@@ -1,6 +1,6 @@
 " 
     Copyright (C) 2010 nineties
-    $Id: Syntax.ab 2014-01-29 02:09:48 nineties $
+    $Id: Syntax.ab 2014-01-29 13:56:21 nineties $
 "
 
 " Syntax definition of the Amber language. "
@@ -230,22 +230,17 @@ additive_expr
       | additive_expr '-' multiplicative_expr { `Sub{!node0, !node2} }
       | multiplicative_expr
 
-shift_expr
-    ::= shift_expr "<<" additive_expr    { `ShiftL{!node0, !node2} }
-      | shift_expr ">>" additive_expr    { `ShiftR{!node0, !node2} }
-      | additive_expr
-
 range_expr
-    ::= shift_expr ".." shift_expr { `Range{!node0, !node2} }
-      | "range" "[" shift_expr "," shift_expr "]"
+    ::= additive_expr ".." additive_expr { `Range{!node0, !node2} }
+      | "range" "[" additive_expr "," additive_expr "]"
         { `Range{!node2, !node4} }
-      | "range" "(" shift_expr "," shift_expr ")"
+      | "range" "(" additive_expr "," additive_expr ")"
         { `Range{!node2, !node4, \Open} }
-      | "range" "(" shift_expr "," shift_expr "]"
+      | "range" "(" additive_expr "," additive_expr "]"
         { `Range{!node2, !node4, \LeftOpen} }
-      | "range" "[" shift_expr "," shift_expr ")"
+      | "range" "[" additive_expr "," additive_expr ")"
         { `Range{!node2, !node4, \RightOpen} }
-      | shift_expr
+      | additive_expr
 
 rel_expr
     ::= range_expr "<"  range_expr { `LessThan{!node0, !node2} }
@@ -301,8 +296,6 @@ assign_expr
       | pattern "^=" assign_expr  { `PowAssign{!node0, !node2} }
       | pattern "/=" assign_expr  { `DivAssign{!node0, !node2} }
       | pattern "%=" assign_expr  { `ModAssign{!node0, !node2} }
-      | pattern "<<=" assign_expr { `ShiftLAssign{!node0, !node2} }
-      | pattern ">>=" assign_expr { `ShiftRAssign{!node0, !node2} }
       | pattern "|=" assign_expr  { `FusionAssign{!node0, !node2} }
       | multi_lambda_expr
 
@@ -424,7 +417,7 @@ expand_macro: expr -> {
         else if (Equal{head, \Unquote})
             level = Prim.int_sub(level, 1)
 
-        if (Prim.int_lt(level, 0))
+        if (Prim.int_less_than(level, 0))
             throw `LogicError{!LOCATION, "Unquotation outside quasi-quotation"}
 
         if (Prim.is_atom(expr))
@@ -455,26 +448,22 @@ macro(x * y)       = `mul(!x, !y)
 macro(x ^ y)       = `pow(!x, !y)
 macro(x / y)       = `div(!x, !y)
 macro(x % y)       = `mod(!x, !y)
-macro(x << y)      = `shiftL(!x, !y)
-macro(x >> y)      = `shiftR(!x, !y)
 macro(x | y)       = `fusion(!x, !y)
-macro(x < y)       = `lt(!x, !y)
-macro(x > y)       = `gt(!x, !y)
-macro(x <= y)      = `le(!x, !y)
-macro(x >= y)      = `ge(!x, !y)
+macro(x < y)       = `less_than(!x, !y)
+macro(x > y)       = `greater_than(!x, !y)
+macro(x <= y)      = `less_equal(!x, !y)
+macro(x >= y)      = `greater_equal(!x, !y)
 macro(x == y)      = `equal(!x, !y)
 macro(x != y)      = `(not equal(!x, !y))
 macro(x is y)      = `identical(!x, !y)
 macro(x is not y)  = `(not identical(!x, !y))
-macro(x += y)  = `ArithAssign(x, y, \add_assign)
-macro(x -= y)  = `ArighmeticAssign(x, y, \sub_assign)
-macro(x *= y)  = `ArighmeticAssign(x, y, \mul_assign)
-macro(x ^= y)  = `ArighmeticAssign(x, y, \pow_assign)
-macro(x /= y)  = `ArighmeticAssign(x, y, \div_assign)
-macro(x %= y)  = `ArighmeticAssign(x, y, \mod_assign)
-macro(x <<= y) = `ArighmeticAssign(x, y, \shiftL_assign)
-macro(x >>= y) = `ArighmeticAssign(x, y, \shiftR_assign)
-macro(x |= y)  = `ArighmeticAssign(x, y, \fusion_assign)
+macro(x += y)  = `ArithAssign{!x, !y, add!}
+macro(x -= y)  = `ArithAssign{!x, !y, sub!}
+macro(x *= y)  = `ArithAssign{!x, !y, mul!}
+macro(x ^= y)  = `ArithAssign{!x, !y, pow!}
+macro(x /= y)  = `ArithAssign{!x, !y, div!}
+macro(x %= y)  = `ArithAssign{!x, !y, mod!}
+macro(x |= y)  = `ArithAssign{!x, !y, fusion!}
 
 # Subscript syntax is not built-in. We need macros.
 macro(x[idxs...])     = `Apply{at, !Prim.cons(x, idxs)}

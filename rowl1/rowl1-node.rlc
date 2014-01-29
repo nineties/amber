@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2014-01-28 18:17:54 nineties $
+; $Id: rowl1-node.rlc 2014-01-29 13:51:22 nineties $
 ;
 
 (import "rlvm-compile")
@@ -182,9 +182,14 @@
     (var len (strlen name))
     (if (! len) (goto to_sym_error))
     (if (! (is_letter (array_get char name 0))) (goto to_sym_error))
-    (for i 1 len (do
+    (for i 1 (- len 1) (do
         (if (! (is_identchar (array_get char name i))) (goto to_sym_error))
         ))
+    (var last (array_get char name (- len 1)))
+    (if (&& (! (is_identchar last)) (&& (!= last '!') (!= last '?')))
+        (goto to_sym_error)
+        )
+
     (return (to_sym name))
     (label to_sym_error)
     (throw (invalid_argument current_loc
