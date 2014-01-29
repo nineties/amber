@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2013 nineties
 ;
-; $Id: rowl1-module.rlc 2014-01-27 18:01:04 nineties $
+; $Id: rowl1-module.rlc 2014-01-29 21:23:49 nineties $
 ;
 
 (import "rlvm-compile")
@@ -26,43 +26,8 @@
             ))
         )
     (var mod (make_object1 Module sym))
-    (set_slot mod (to_sym "variables") (list1 (to_sym "variables")))
-    (store_variable mod proto global)
+    (set_slot mod proto global)
     (return mod)
-    ))
-
-; variables are sorted.
-(fun insert_variable (v list) (
-    (if (! list) (return (list1 v)))
-    (if (== (car list) v) (return list))
-    (var c (strcmp (symbol_name (car list)) (symbol_name v)))
-    (if (< c 0) (return (cons (car list) (insert_variable v (cdr list)))))
-    (return (cons v list))
-    ))
-
-(fun remove_variable (v list) (
-    (if (! list) (return 0))
-    (if (== (car list) v) (return (cdr list)))
-    (var c (strcmp (symbol_name (car list)) (symbol_name v)))
-    (if (< c 0) (return list))
-    (return (cons (car list) (remove_variable v (cdr list))))
-    ))
-
-
-(export fun store_variable (mod sym val) (
-    (if (!= (node_head mod) Module)
-        (throw (type_error current_loc (string "Module") mod))
-        )
-    (var list (get_slot mod (to_sym "variables")))
-    (if (!= (node_type list) @ListE)
-        (throw (type_error current_loc (string "List") mod))
-        )
-    (if (!= val @C_UNDEF)
-        (set_slot mod (to_sym "variables") (insert_variable sym list))
-        (set_slot mod (to_sym "variables") (remove_variable sym list))
-        )
-    (set_slot mod sym val)
-    (return val)
     ))
 
    ))

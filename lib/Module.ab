@@ -1,5 +1,5 @@
 # Copyright (C) 2010 nineties
-# $Id: Module.ab 2014-01-29 17:52:53 nineties $
+# $Id: Module.ab 2014-01-29 19:53:22 nineties $
 
 # process of "import A.B.C"
 #
@@ -10,4 +10,16 @@
 # 5. exit_module()
 # 6. Change directory to original directory.
 #
+
+macro(Import{[M @ Symbol]}): {
+    script: Prim.string_add(Prim.symbol_to_string(M), ".ab")
+    hidden: Prim.unique_symbol(M)
+    `Seq{[
+        (!M: enter_module(\!M)),
+        enter_module(\!hidden),
+        load(!script),
+        exit_module(),
+        exit_module()
+    ]}
+}
 

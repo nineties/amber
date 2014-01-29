@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-01-29 14:32:19 nineties $
+; $Id: rowl1-compile.rlc 2014-01-29 22:20:12 nineties $
 ;
 
 (import "rlvm-compile")
@@ -12,6 +12,7 @@
 
 (import "rowl1-util")
 (import "rowl1-node")
+(import "rowl1-module")
 (import "rowl1-error")
 (import "rowl1-symtable")
 (import "rowl1-assemble")
@@ -37,7 +38,6 @@
 
 (extern fun set_slot)
 (extern fun get_slot)
-(extern fun store_variable)
 
 (fun trace_func (msg val) (
     (debugs msg)
@@ -727,7 +727,7 @@
 (fun append_module_slot (obj sym val) (
     (var f (get_slot obj sym))
     (if (== f @C_UNDEF)
-        (return (store_variable obj sym val))
+        (return (set_slot obj sym val))
         )
     (if (&& (is_function val) (is_function f))
         (return (set_slot obj sym (fusion_function val f)))
@@ -1017,10 +1017,10 @@
     (var func (get_slot mod sym))
     (if (!= func @C_UNDEF)
         (if (&& (is_function func) (is_function newfunc))
-            (return (store_variable mod sym (fusion_function newfunc func)))
+            (return (set_slot mod sym (fusion_function newfunc func)))
             (throw (redefined_slot current_loc mod sym))
             )
-        (return (store_variable mod sym newfunc))
+        (return (set_slot mod sym newfunc))
         )
     ))
 
@@ -1087,7 +1087,7 @@
     (compile asm val)
     (put_push asm sym)
     (put_push asm global)
-    (compile_simple_call asm 3 store_variable)
+    (compile_simple_call asm 3 set_slot)
     ))
 
 ; translate
@@ -1756,7 +1756,7 @@
         (compile asm rhs)
         (put_push asm (node_arg_symbol v 0))
         (put_push asm global)
-        (compile_simple_call asm 3 store_variable)
+        (compile_simple_call asm 3 set_slot)
         return
         ))
 

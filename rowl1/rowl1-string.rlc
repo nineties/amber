@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-string.rlc 2014-01-27 22:55:31 nineties $
+; $Id: rowl1-string.rlc 2014-01-29 19:35:39 nineties $
 ;
 
 (import "rlvm-compile")
@@ -41,10 +41,6 @@
     (return (box h))
     ))
 
-(fun s_to_s (s) (
-    (return s)
-    ))
-
 (fun s_add (a b) (
     (return (strcat a b))
     ))
@@ -58,6 +54,9 @@
     ))
 
 (fun s_add2 (a b) (
+    (debugs "s_add2\n")
+    (debugpf a)
+    (debugpf b)
     (= a (to_s_check a))
     (= b (to_s_check b))
     (var s (strcat a b))
@@ -202,24 +201,23 @@
     (return @C_NIL)
     ))
 
-(export fun setup_string (global) (
-    (add_function1 global (to_sym "string_length") stringT s_size 0)
-    (add_function2 global (to_sym "string_equal") stringT stringT s_equal 0)
-    (add_function1 global (to_sym "string_hash") stringT s_hash 0)
-    (add_function1 global (to_sym "string_to_s") stringT s_to_s 0)
-    (add_function2 global (to_sym "string_add") stringT stringT s_add 0)
-    (add_function2 global (to_sym "string_add") stringT DontCare s_add2 0)
-    (add_function2 global (to_sym "string_add") DontCare stringT s_add2 0)
+(export fun setup_string (mod) (
+    (add_function1 mod (to_sym "string_length") stringT s_size 0)
+    (add_function2 mod (to_sym "string_equal?") stringT stringT s_equal 0)
+    (add_function1 mod (to_sym "string_hash") stringT s_hash 0)
+    (add_function2 mod (to_sym "string_add") stringT DontCare s_add2 0)
+    (add_function2 mod (to_sym "string_add") DontCare stringT s_add2 0)
+    (add_function2 mod (to_sym "string_add") stringT stringT s_add 0)
 
-    (add_function1 global (to_sym "code_to_char") intT s_char 0)
-    (add_function1 global (to_sym "char_to_code") stringT s_code 0) 
+    (add_function1 mod (to_sym "code_to_char") intT s_char 0)
+    (add_function1 mod (to_sym "char_to_code") stringT s_code 0) 
 
-    (add_function2 global (to_sym "string_at") stringT intT s_at 0)
-    (add_function2 global (to_sym "string_at") stringT irangeT s_at_range 0)
-    (add_function3 global (to_sym "string_store") stringT intT stringT s_store 0)
-    (add_function1 global (to_sym "string_unescape") stringT s_unescape 0)
-    (add_function2 global (to_sym "string_contain") stringT stringT s_contain 0)
-    (add_function2 global (to_sym "string_split") stringT stringT s_split 0)
+    (add_function2 mod (to_sym "string_at") stringT intT s_at 0)
+    (add_function2 mod (to_sym "string_at") stringT irangeT s_at_range 0)
+    (add_function3 mod (to_sym "string_store") stringT intT stringT s_store 0)
+    (add_function1 mod (to_sym "string_unescape") stringT s_unescape 0)
+    (add_function2 mod (to_sym "string_contain") stringT stringT s_contain 0)
+    (add_function2 mod (to_sym "string_split") stringT stringT s_split 0)
 
     ; StringIO module
     ;(var sioT (domainP StringIO))

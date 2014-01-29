@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-01-29 17:16:36 nineties $
+; $Id: rowl1-interp.rlc 2014-01-29 21:30:44 nineties $
 ;
 
 (import "rlvm-compile")
@@ -92,6 +92,7 @@
     (set_loc no_loc)
     (var load_path (ary_new)) 
     (store_variable amber (to_sym "AMBERPATH") load_path)
+    (store_variable amber (to_sym "LOADED") (ary_new))
     (ary_push load_path (string "."))
     (ary_push load_path (string "/usr/lib/amber"))
     (setup_minimal_interpreter prim)
@@ -272,10 +273,31 @@
     ))
 
 (fun builtin_eval (expr) (
-    (if (== (node_head expr) Located) (do
+    (var hd (node_head expr))
+    (if (== hd Located) (do
         (set_loc (node_arg expr 0))
         (return (eval (node_arg expr 1)))
-        ))
+        )
+    (if (== hd Block) (do
+        (var list (node_arg_list expr 0))
+        (enter_module (to_unique_sym "Hidden"))
+        (var v @C_NIL)
+        (while list (do
+            (= v (runcode (compile_main (car list))))
+            (= list (cdr list))
+            ))
+        (exit_module)
+        (return v)
+        )
+    (if (== hd Seq) (do
+        (var list (node_arg_list expr 0))
+        (var v @C_NIL)
+        (while list (do
+            (= v (runcode (compile_main (car list))))
+            (= list (cdr list))
+            ))
+        (return v)
+        ))))
     (return (runcode (compile_main expr)))
     ))
 
@@ -354,13 +376,23 @@
 
 (fun load_file (path) (
     (var dirs (get_slot amber (to_sym "AMBERPATH")))
+    (var loaded (get_slot amber (to_sym "LOADED")))
     (if (!= (node_type dirs) @ArrayE) (goto load_error))
+    (if (!= (node_type loaded) @ArrayE) (goto load_error))
     (for i 0 (unbox (ary_size dirs)) (do
         (var dir (ary_at dirs (box i)))
         (if (!= (node_type dir) @StringE) (goto load_error))
-
         (var fullpath (strcat (strcat dir "/") path))
         (if (file_exists fullpath) (do
+            ; multiple load check.
+            (= fullpath (realpath fullpath))
+            (for i 0 (unbox (ary_size loaded)) (do
+                (if (streq (ary_at loaded (box i)) fullpath)
+                    (return @C_FALSE)
+                    )
+                ))
+            (ary_push loaded fullpath)
+
             (var ichan (open_in fullpath))
             (var fd (open "."))
             (var dir (get_directory fullpath))
@@ -378,7 +410,7 @@
             (close_in ichan)
 
             (set_loc no_loc)
-            (return @C_NIL)
+            (return @C_TRUE)
             ))
         ))
     (throw (not_found current_loc (string path)))
@@ -389,10 +421,14 @@
         dirs))
     ))
 
-(fun enter_module (mod) (
+(fun enter_module (sym) (
     (if (!= (symtable_depth variables) 0)
         (throw (logic_error current_loc
             (string "enter_module() can be called only in top-scope")))
+        )
+    (var mod (load_global sym))
+    (if (== mod @C_UNDEF)
+        (= mod (create_module sym))
         )
     (if (!= (get_slot mod proto) global)
         (throw (logic_error current_loc
@@ -472,7 +508,7 @@
     (add_function1 prim Eval DontCare builtin_eval 0)
     (add_function1 prim (to_sym "load") stringT load_file 0)
     (add_function1 prim (to_sym "create_module") symT create_module 0)
-    (add_function1 prim (to_sym "enter_module") (domainP Module) enter_module 0)
+    (add_function1 prim (to_sym "enter_module") symT enter_module 0)
     (add_function0 prim (to_sym "exit_module") exit_module 0)
     (add_function1 prim (to_sym "debugpf") DontCare debugpf 0)
 
