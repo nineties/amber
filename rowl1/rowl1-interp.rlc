@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-01-29 21:30:44 nineties $
+; $Id: rowl1-interp.rlc 2014-01-31 18:42:59 nineties $
 ;
 
 (import "rlvm-compile")
@@ -34,7 +34,7 @@
 
 (export fun set_loc (loc) (
     (= current_loc loc)
-    (store_variable global (to_sym "LOCATION") loc)
+    (set_slot global (to_sym "LOCATION") loc)
     ))
 
 (export fun eval_shell () (
@@ -75,12 +75,12 @@
     ; Global Module
     (= global @C_UNDEF)
     (= amber (create_module Amber))
-    (store_variable amber Amber amber)
+    (set_slot amber Amber amber)
     (= global amber)
 
     ; Prim Module
     (= prim (create_module Prim)) ; Prim functions
-    (store_variable global Prim prim)
+    (set_slot global Prim prim)
 
     ; Setup built-in objects and functions.
     (setup_argv argc argv)
@@ -91,8 +91,8 @@
     ; Boot Amber
     (set_loc no_loc)
     (var load_path (ary_new)) 
-    (store_variable amber (to_sym "AMBERPATH") load_path)
-    (store_variable amber (to_sym "LOADED") (ary_new))
+    (set_slot amber (to_sym "AMBERPATH") load_path)
+    (set_slot amber (to_sym "LOADED") (ary_new))
     (ary_push load_path (string "."))
     (ary_push load_path (string "/usr/lib/amber"))
     (setup_minimal_interpreter prim)
@@ -241,7 +241,7 @@
 (fun interpret_shell (p) (
     (var outputs (ary_new))
     (eval_top (apply (slot (slot (to_sym "Syntax") (to_sym "Shell")) (to_sym "enable_shell_syntax")) 0))
-    (store_variable global (to_sym "shell_outputs") outputs)
+    (set_slot global (to_sym "shell_outputs") outputs)
     (ary_push outputs @C_UNDEF)
     (while 1 (do
         (try 
@@ -280,10 +280,10 @@
         )
     (if (== hd Block) (do
         (var list (node_arg_list expr 0))
-        (enter_module (to_unique_sym "Hidden"))
+        (enter_module (to_unique_sym "Block"))
         (var v @C_NIL)
         (while list (do
-            (= v (runcode (compile_main (car list))))
+            (= v (eval (car list)))
             (= list (cdr list))
             ))
         (exit_module)
@@ -293,7 +293,7 @@
         (var list (node_arg_list expr 0))
         (var v @C_NIL)
         (while list (do
-            (= v (runcode (compile_main (car list))))
+            (= v (eval (car list)))
             (= list (cdr list))
             ))
         (return v)
@@ -367,7 +367,7 @@
 
 (fun setup_argv (argc argv) (
     (var ARGV (ary_new))
-    (store_variable amber (to_sym "ARGV") ARGV)
+    (set_slot amber (to_sym "ARGV") ARGV)
     (if (== argc 0) return)
     (for i 1 argc (do
         (ary_push ARGV (string (array_get string argv i)))
@@ -472,15 +472,24 @@
     (if (== f @C_UNDEF)
         (throw (not_found current_loc (to_sym sym2)))
         )
-    (store_variable to (to_sym sym1) f)
+    (set_slot to (to_sym sym1) f)
+    ))
+
+(fun define_variable (sym val) (
+    (return (set_slot global sym val))
+    ))
+
+(fun define_variable_incremental (sym val _) (
+    (return (set_slot_incremental global sym val))
     ))
 
 (fun setup_minimal_interpreter (prim) (
     ; parser
     (var syntax (create_module Syntax))
-    (store_variable global Syntax syntax)
-    (store_variable syntax proto global)
+    (set_slot global Syntax syntax)
+    (set_slot syntax proto global)
     
+    (copy_variable syntax "word" prim "parse_word")
     (copy_variable syntax "text" prim "parse_text")
     (copy_variable syntax "any" prim "parse_any")
     (copy_variable syntax "blank" prim "parse_blank")
@@ -496,6 +505,7 @@
     (copy_variable syntax "string_d" prim "parse_string_d")
     (copy_variable syntax "string_s" prim "parse_string_s")
     (copy_variable syntax "symbol" prim "parse_symbol")
+    (copy_variable syntax "reserved_symbol" prim "parse_reserved_symbol")
     (copy_variable syntax "atom" prim "parse_atom")
     (copy_variable syntax "fullform" prim "parse_fullform")
     (copy_variable syntax "expr" prim "parse_expr")
@@ -510,6 +520,8 @@
     (add_function1 prim (to_sym "create_module") symT create_module 0)
     (add_function1 prim (to_sym "enter_module") symT enter_module 0)
     (add_function0 prim (to_sym "exit_module") exit_module 0)
+    (add_function2 prim (to_sym "define_variable") symT DontCare define_variable 0)
+    (add_function3 prim (to_sym "define_variable") symT DontCare (quote (to_sym "incremental")) define_variable_incremental 0)
     (add_function1 prim (to_sym "debugpf") DontCare debugpf 0)
 
     (copy_variable global "eval" prim "eval")

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-01-29 18:03:01 nineties $
+; $Id: rowl1-packrat.rlc 2014-01-31 11:23:27 nineties $
 ;
 
 (import "rlvm-compile")
@@ -131,6 +131,7 @@
     ))
 
 (fun hash (sym pos) (
+    (var h (field_get sym @SymbolIndex))
     (var h (field_get sym @SymbolIndex))
     (= h (+ (* 7 h) pos))
     (return h)
@@ -392,6 +393,16 @@
         (if (|| (== c '\n') (== c '\0')) (return 0))
         ))
     (return -1)
+    ))
+
+(fun lookbehind (p) (
+    (var buf (field_get p 4))
+    (var vec (field_get buf 0))
+    (var idx (field_get p 6))
+    (if (|| (== idx 0) (== (cvector_size vec) 0))
+        (return -1)
+        )
+    (return (cvector_at vec (- idx 1)))
     ))
 
 (fun lookahead (p) (
@@ -671,6 +682,17 @@
     (return (mayparse p (strcat "expect token: '" (strcat str "'"))))
     ))
 
+(fun parse_word (p sym) (
+    (if (is_identchar (lookbehind p))
+        (return (noparse p "not beggining of a word"))
+        )
+    (var r (parse_text p (symbol_name sym)))
+    (if (! (is_end_of_token p))
+        (return (noparse p "not end of a word"))
+        )
+    (return r)
+    ))
+
 ; parse_integers
 ; multi-precision integer is not supported for now
 (extern fun parse_bint)
@@ -945,11 +967,13 @@
 @(MEMOIZE C_style_comment)
 
 (fun parse_symbol_ (p) (
+    (var state (copy_parser_state p))
+    (if (is_identchar (lookbehind p))
+        (return (noparse p "not beggining of a symbol"))
+        )
     (var c (lookahead p))
     (if (< c 0) (return (mayparse p "expect a symbol")))
     (if (! (is_letter c)) (return (noparse p "expect a symbol")))
-
-    (var state (copy_parser_state p))
 
     (var begin (field_get p 6))
     (while (is_identchar (lookahead p)) (do
@@ -958,23 +982,39 @@
     (var c (lookahead p))
     (if (|| (== c '!') (== c '?')) (getc p))
     (var s (to_sym (extract_string p begin (field_get p 6))))
-    
-    (var reserved_symbols (get_slot (load_global Syntax) (to_sym "reserved_symbols")))
-    (if (!= reserved_symbols @C_UNDEF) (do
-        (if (!= (node_type reserved_symbols) @ListE)
-            (throw (logic_error current_loc (string
-                "'reserved_symbols' must be a list of symbols")))
-            )
-        (if (list_member s reserved_symbols) (do
-            (noparse p (strcat "reserved symbol: " (symbol_name s)))
-            (reset_parser_position p state)
-            (return @C_FALSE)
-            ))
+    (if (is_reserved_symbol s) (do
+        (noparse p (strcat "reserved symbol: " (symbol_name s)))
+        (reset_parser_position p state)
+        (return @C_FALSE)
         ))
-
     (return (parsed p s))
     ))
 @(MEMOIZE symbol)
+
+(fun parse_reserved_symbol_ (p) (
+    (var state (copy_parser_state p))
+    (if (is_identchar (lookbehind p))
+        (return (noparse p "not beggining of a symbol"))
+        )
+    (var c (lookahead p))
+    (if (< c 0) (return (mayparse p "expect a symbol")))
+    (if (! (is_letter c)) (return (noparse p "expect a symbol")))
+
+    (var begin (field_get p 6))
+    (while (is_identchar (lookahead p)) (do
+        (getc p)
+        ))
+    (var c (lookahead p))
+    (if (|| (== c '!') (== c '?')) (getc p))
+    (var s (to_sym (extract_string p begin (field_get p 6))))
+    (if (! (is_reserved_symbol s)) (do
+        (noparse p (strcat "not reserved symbol: " (symbol_name s)))
+        (reset_parser_position p state)
+        (return @C_FALSE)
+        ))
+    (return (parsed p s))
+    ))
+@(MEMOIZE reserved_symbol)
 
 ; single-quoted string literal
 ;   Only escape sequence \' is interpreted.
@@ -1265,11 +1305,28 @@
     (return p)
     ))
 
+(fun is_reserved_symbol (sym) (
+    (if (!= (node_type sym) @SymbolE) (return @FALSE))
+    (var reserved_symbols (get_slot (load_global Syntax) (to_sym "reserved_symbols")))
+    (if (!= reserved_symbols @C_UNDEF) (do
+        (if (!= (node_type reserved_symbols) @ListE)
+            (throw (logic_error current_loc (string
+                "'reserved_symbols' must be a list of symbols")))
+            )
+        (return (list_member sym reserved_symbols))
+        ))
+    (return @FALSE)
+    ))
+
 (fun compile_parser_element (pat ws) (
-    (var hd (node_bhead pat))
-    (if (|| (== hd BSymbol) (== hd Slot))
-        (return (parse_with_check (apply (slot Syntax pat) (list1 PVar)) ws))
+    (if (is_reserved_symbol pat) (do
+        (return (parse_with_check
+            (apply (syntax_func "word") (list2 PVar (quote pat))) ws)))
         )
+    (var hd (node_bhead pat))
+    (if (|| (== hd BSymbol) (== hd Slot)) (do
+        (return (parse_with_check (apply (slot Syntax pat) (list1 PVar)) ws))
+        ))
     (if (== hd BString)
         (return (parse_with_check
             (apply (syntax_func "text") (list2 PVar pat)) ws)))
@@ -1979,6 +2036,7 @@
     (add_function2 utilities (to_sym "%less_than") intT intT __lt 0)
 
     (add_function2 mod (to_sym "parse_text") (domainP Parser) stringT parse_text 0)
+    (add_function2 mod (to_sym "parse_word") (domainP Parser) symT parse_word 0)
 
     (add_parser mod (to_sym "parse_any") parse_any_char)
     (add_parser mod (to_sym "parse_blank") parse_blank)
@@ -1994,6 +2052,7 @@
     (add_parser mod (to_sym "parse_string_d") parse_string_d)
     (add_parser mod (to_sym "parse_string_s") parse_string_s)
     (add_parser mod (to_sym "parse_symbol") parse_symbol)
+    (add_parser mod (to_sym "parse_reserved_symbol") parse_reserved_symbol)
     (add_parser mod (to_sym "parse_atom") parse_atom)
     (add_parser mod (to_sym "parse_fullform") parse_fullform)
     (add_parser mod (to_sym "parse_expr") parse_expr)

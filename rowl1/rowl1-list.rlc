@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2014-01-28 15:51:36 nineties $
+; $Id: rowl1-list.rlc 2014-01-31 18:26:21 nineties $
 ;
 
 (import "rlvm-compile")
@@ -19,6 +19,7 @@
 (import "rowl1-error")
 
 (extern object current_loc)
+(extern object global)
 
 (fun index_out_of_range (list idx) (
     (throw (out_of_range current_loc list (box idx)))
@@ -90,8 +91,38 @@
     (return (list_reverse new_ls))
     ))
 
+(fun ls_member (v ls) (
+    (var eql (lookup_func global (to_sym "equal?")))
+    (while ls (do
+        (if (== (runcode eql v (car ls)) @C_TRUE)
+            (return @C_TRUE)
+            )
+        (= ls (cdr ls))
+        ))
+    (return @C_FALSE)
+    ))
+
+(fun ls_insert_uniq (v ls) (
+    (if (== (ls_member v ls) @C_TRUE) (return ls))
+    (return (cons v ls))
+    ))
+
 (fun ls_foldl (f v ls) (
     (if (! ls) (return v))
+    (var code (get_bytecode f))
+    (while ls (do
+        (= v (runcode code v (car ls)))
+        (= ls (cdr ls))
+        ))
+    (return v)
+    ))
+
+(fun ls_foldl1 (f ls) (
+    (if (! ls)
+        (throw (invalid_argument current_loc (string "foldl1 requires non-empty list") ls))
+        )
+    (var v (car ls))
+    (= ls (cdr ls))
     (var code (get_bytecode f))
     (while ls (do
         (= v (runcode code v (car ls)))
@@ -108,6 +139,22 @@
 (fun ls_foldr (f ls v) (
     (var code (get_bytecode f))
     (return (foldr ls v code))
+    ))
+
+(fun foldr1 (ls code) (
+    (if (! (cdr ls))
+        (return (car ls))
+        (return (runcode code (car ls) (foldr1 (cdr ls) code)))
+        )
+    ))
+
+(fun ls_foldr1 (f ls) (
+    (if (! ls)
+        (throw (invalid_argument current_loc (string "foldr1 requires non-empty list") ls))
+        )
+    (var code (get_bytecode f))
+    (var v (foldr1 ls code))
+    (return v)
     ))
 
 (extern fun tuple2)
@@ -168,8 +215,12 @@
     (add_function1 mod (to_sym "list_reverse") listT ls_reverse 0)
     (add_function2 mod (to_sym "list_append") listT listT ls_append 0)
     (add_function2 mod (to_sym "list_map") funT listT ls_map 0)
+    (add_function2 mod (to_sym "list_member") DontCare listT ls_member 0)
+    (add_function2 mod (to_sym "list_insert_unique") DontCare listT ls_insert_uniq 0)
     (add_function3 mod (to_sym "list_foldl") funT DontCare listT ls_foldl 0)
+    (add_function2 mod (to_sym "list_foldl1") funT listT ls_foldl1 0)
     (add_function3 mod (to_sym "list_foldr") funT listT DontCare ls_foldr 0)
+    (add_function2 mod (to_sym "list_foldr1") funT listT ls_foldr1 0)
     ))
 
     ))

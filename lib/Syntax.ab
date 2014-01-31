@@ -1,6 +1,6 @@
 " 
     Copyright (C) 2010 nineties
-    $Id: Syntax.ab 2014-01-29 22:20:37 nineties $
+    $Id: Syntax.ab 2014-01-31 11:18:27 nineties $
 "
 
 " Syntax definition of the Amber language. "
@@ -53,6 +53,7 @@ DefineSyntax{
         Tuple{List{"."}, Quote{any}},
         Tuple{List{string}, node0},
         Tuple{List{symbol}, node0},
+        Tuple{List{reserved_symbol}, node0},
         Tuple{List{"(", syntax_element, ")"}, node1},
         Tuple{List{"(", Many1{syntax_element}, ")"}, node1, multiline},
         Tuple{List{"[", "^", character_set, "]"},
@@ -138,17 +139,16 @@ DefineSyntax{
 }
 
 ### enable the syntax_declaration statement.
-DefineSyntax{stmt, List{ Tuple{List{syntax_declaration}, node0}}
-}
+DefineSyntax{stmt, List{ Tuple{List{syntax_declaration}, node0}}}
 
 ### Reserved Symbols
 # The following symbols never been parsed as symbols.
 
 Define{reserved_symbols, List{
-    Quote{not}, Quote{and}, Quote{or}, Quote{when}, Quote{if}, Quote{else},
+    Quote{self}, Quote{is}, Quote{not}, Quote{and}, Quote{or}, Quote{when}, Quote{if}, Quote{else},
     Quote{case}, Quote{of}, Quote{while}, Quote{for}, Quote{in},
     Quote{continue}, Quote{break}, Quote{return}, Quote{throw}, Quote{try},
-    Quote{catch}, Quote{import}, Quote{hiding}
+    Quote{catch}, Quote{import}, Quote{hiding}, Quote{export}
 }}
 
 ### Expressions
@@ -169,7 +169,7 @@ primary_expr
       # Tuple literal
       | <<multiline>> "(" delimited2(expr, ",") ")"
         { MakeObject{Quote{Tuple}, node1} }
-      | "self"  { Quote{GetSelf{}} }
+      | self    { Quote{GetSelf{}} }
       | atom
       | "..."   { Quote{Rest{}} }
 
@@ -213,7 +213,7 @@ Assign{Slot{Syntax, expr}, Slot{Syntax, quote_expr}}
 prefix_expr
     ::= "+"          quote_expr { `UnaryPlus{!node1} }
       | "-" !decimal quote_expr { `UnaryMinus{!node2} }
-      | "not" quote_expr        { `Not{!node1} }
+      | not quote_expr          { `Not{!node1} }
       | quote_expr
 
 multiplicative_expr
@@ -229,33 +229,25 @@ additive_expr
 
 range_expr
     ::= additive_expr ".." additive_expr { `Range{!node0, !node2} }
-      | "range" "[" additive_expr "," additive_expr "]"
-        { `Range{!node2, !node4} }
-      | "range" "(" additive_expr "," additive_expr ")"
-        { `Range{!node2, !node4, \Open} }
-      | "range" "(" additive_expr "," additive_expr "]"
-        { `Range{!node2, !node4, \LeftOpen} }
-      | "range" "[" additive_expr "," additive_expr ")"
-        { `Range{!node2, !node4, \RightOpen} }
       | additive_expr
 
 rel_expr
-    ::= range_expr "<"  range_expr { `LessThan{!node0, !node2} }
-      | range_expr "<=" range_expr { `LessEqual{!node0, !node2} }
-      | range_expr ">"  range_expr { `GreaterThan{!node0, !node2} }
-      | range_expr ">=" range_expr { `GreaterEqual{!node0, !node2} }
-      | range_expr "==" range_expr { `Equal{!node0, !node2} }
-      | range_expr "!=" range_expr { `NotEqual{!node0, !node2} }
-      | range_expr "is" range_expr { `Identical{!node0, !node2} }
-      | range_expr "is" "not" range_expr { `NotIdentical{!node0, !node3} }
+    ::= range_expr "<"  range_expr   { `LessThan{!node0, !node2} }
+      | range_expr "<=" range_expr   { `LessEqual{!node0, !node2} }
+      | range_expr ">"  range_expr   { `GreaterThan{!node0, !node2} }
+      | range_expr ">=" range_expr   { `GreaterEqual{!node0, !node2} }
+      | range_expr "==" range_expr   { `Equal{!node0, !node2} }
+      | range_expr "!=" range_expr   { `NotEqual{!node0, !node2} }
+      | range_expr is range_expr     { `Identical{!node0, !node2} }
+      | range_expr is not range_expr { `NotIdentical{!node0, !node3} }
       | range_expr
 
 seqand_expr
-    ::= rel_expr "and" seqand_expr { `SeqAnd{!node0, !node2} }
+    ::= rel_expr and seqand_expr { `SeqAnd{!node0, !node2} }
       | rel_expr
 
 seqor_expr
-    ::= seqand_expr "or" seqor_expr { `SeqOr{!node0, !node2} }
+    ::= seqand_expr or seqor_expr { `SeqOr{!node0, !node2} }
       | seqand_expr
 
 ternary_expr
@@ -263,7 +255,7 @@ ternary_expr
         { `IfElse{!node0, !node2, !node4} }
       | seqor_expr
 
-guard_clause ::= "when" ternary_expr { node1 }
+guard_clause ::= when ternary_expr { node1 }
 
 argument_list
     ::= "(" delimited(pattern, ",") ")" guard_clause
@@ -306,45 +298,43 @@ stmt
       | stmt ";"
         { `Seq{[!node0, nil]} }
 
-      | <<multiline>> "if" term stmt "else" stmt
+      | <<multiline>> if term stmt else stmt
         { `IfElse{!node1, !node2, !node4} }
-      | <<multiline>> "if" term stmt
+      | <<multiline>> if term stmt
         { `If{!node1, !node2} }
 
-      | <<multiline>> "case" term "of" multi_lambda_expr
+      | <<multiline>> case term of multi_lambda_expr
         { `Apply{!node3, [!node1]} }
 
-      | <<multiline>> "while" term block
+      | <<multiline>> while term block
         { `While{!node1, !node2} }
-      | <<multiline>> "for" "(" pattern "in" expr ")" block
+      | <<multiline>> for "(" pattern in expr ")" block
         { `For{!node2, !node4, !node6} }
-      | "continue"
+      | continue
         { `Continue{} }
-      | "break"
+      | break
         { `Break{} }
-
-      | "return" expr
+      | return expr
         { `Return{!node1} }
-      | "return"
+      | return
         { `Return{nil} }
-
-      | "throw" expr
+      | throw expr
         { `Throw{!node1} }
-      | <<multiline>> "try" block "catch" multi_lambda_expr
+      | <<multiline>> try block catch multi_lambda_expr
         { `Try{!node1, !node3} }
-
       | <<multiline>> primary_expr argument_list ":" stmt
         { `Define{!node0, Lambda{!node1, !node3}, incremental} }
       | <<multiline>> pattern ":" stmt
         { `Define{!node0, !node2} }
 
-      | "import" delimited1(symbol, ".") "(" delimited1(symbol, ",") ")"
+      | import delimited1(symbol, ".") "(" delimited1(symbol, ",") ")"
         { `Import{!node1, !node3} }
-      | "import" delimited1(symbol, ".") "hiding" "(" delimited1(symbol, ",") ")"
+      | import delimited1(symbol, ".") hiding "(" delimited1(symbol, ",") ")"
         { `Import{!node1, Hiding{!node4}} } 
-      | "import" delimited1(symbol, ".")
+      | import delimited1(symbol, ".")
         { `Import{!node1} }
-
+      | export symbol+
+        { `Export{!node1} }
 
 # Extend primary_expr to enable dollar sign ($) in parser action.
 primary_expr_act

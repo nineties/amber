@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-string.rlc 2014-01-29 19:35:39 nineties $
+; $Id: rowl1-string.rlc 2014-01-31 18:05:52 nineties $
 ;
 
 (import "rlvm-compile")
@@ -54,13 +54,40 @@
     ))
 
 (fun s_add2 (a b) (
-    (debugs "s_add2\n")
-    (debugpf a)
-    (debugpf b)
     (= a (to_s_check a))
     (= b (to_s_check b))
     (var s (strcat a b))
     (return s)
+    ))
+
+(fun s_join (list d) (
+    (if (! list) (return (string "")))
+    (var len 0)
+    (var dlen (strlen d))
+    (var n 0)
+    (var list_ list)
+    (while list_ (do
+        (var s (car list_))
+        (if (!= (node_type s) @StringE)
+            (throw (invalid_argument current_loc
+                (string "join requires list of strings")
+                list))
+            )
+        (+= len (strlen s))
+        (+= n 1)
+        (= list_ (cdr list_))
+        ))
+    (+= len (* (- n 1) dlen))
+    (var str (allocate_string len))
+    (var p 0)
+    (while list (do
+        (+= p (strcpy (+ str p) (car list)))
+        (if (cdr list)
+            (+= p (strcpy (+ str p) d))
+            )
+        (= list (cdr list))
+        ))
+    (return str)
     ))
 
 (fun s_unescape (s) (
@@ -208,6 +235,7 @@
     (add_function2 mod (to_sym "string_add") stringT DontCare s_add2 0)
     (add_function2 mod (to_sym "string_add") DontCare stringT s_add2 0)
     (add_function2 mod (to_sym "string_add") stringT stringT s_add 0)
+    (add_function2 mod (to_sym "string_join") listT stringT s_join 0)
 
     (add_function1 mod (to_sym "code_to_char") intT s_char 0)
     (add_function1 mod (to_sym "char_to_code") stringT s_code 0) 
