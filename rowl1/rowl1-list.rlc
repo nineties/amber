@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2014-01-31 18:26:21 nineties $
+; $Id: rowl1-list.rlc 2014-02-01 20:15:56 nineties $
 ;
 
 (import "rlvm-compile")
@@ -137,8 +137,7 @@
     ))
 
 (fun ls_foldr (f ls v) (
-    (var code (get_bytecode f))
-    (return (foldr ls v code))
+    (return (foldr ls v (get_bytecode f)))
     ))
 
 (fun foldr1 (ls code) (
@@ -204,6 +203,25 @@
     (return (list_reverse new_ls))
     ))
 
+(fun ls_rem_ (ls a eql) (
+    (if (! ls) (return 0))
+    (if (== (runcode eql (car ls) a) @C_TRUE)
+        (return (cdr ls))
+        (return (cons (car ls) (ls_rem_ (cdr ls) a eql)))
+        )
+    ))
+; Remove elements of b from a, if a has multiple elements only the first one 
+; will be removed. For example  ls_sub([1,0,1],[1,2]) == [0,1]
+(fun ls_sub_ (a b eql) (
+    (if (! b) (return a))
+    (return (ls_sub_ (ls_rem_ a (car b) eql) (cdr b) eql))
+    ))
+
+(fun ls_sub (a b) (
+    (var eql (lookup_func global (to_sym "equal?")))
+    (return (ls_sub_ a b eql))
+    ))
+
 (export fun setup_list (mod) (
     (add_function2 mod (to_sym "cons") DontCare listT ls_cons 0)
     (add_function1 mod (to_sym "car") listT ls_car 0)
@@ -221,6 +239,7 @@
     (add_function2 mod (to_sym "list_foldl1") funT listT ls_foldl1 0)
     (add_function3 mod (to_sym "list_foldr") funT listT DontCare ls_foldr 0)
     (add_function2 mod (to_sym "list_foldr1") funT listT ls_foldr1 0)
+    (add_function2 mod (to_sym "list_subtract") listT listT ls_sub 0)
     ))
 
     ))

@@ -1,5 +1,5 @@
 # Copyright (C) 2010 nineties
-# $Id: Module.ab 2014-02-01 15:43:11 nineties $
+# $Id: Module.ab 2014-02-01 20:06:07 nineties $
 
 Module: enter_module(\Module)
 
@@ -10,42 +10,58 @@ Module: enter_module(\Module)
     import_variables(mod @ Module, vars @ List):
         Prim.list_map(v -> import_variable(mod, v), vars)
 
+    expand_import([M], script): `Seq{[
+        ((!M):enter_module(\!M)),
+        If{not Prim.has_slot?(!M, \exports), ((!M).exports=[])},
+        (private: enter_module(\private)),
+        load(!script),
+        exit_module(),
+        exit_module()
+    ]}
+    expand_import([M,rest...], script): `Seq{[
+        ((!M):enter_module(\!M)),
+        If{not Prim.has_slot?(!M, \exports), ((!M).exports=[])},
+        !expand_import(rest, script),
+        exit_module()
+    ]}
+
+    buildpath(mods): Prim.string_add(Prim.string_join(
+            Prim.list_map(Prim.symbol_to_string, mods), "/")
+            , ".ab")
+
 exit_module()
 
-macro(Import{symbols}): {
-    script:
-        Prim.string_add(
-        Prim.string_join(
-            Prim.list_map(Prim.symbol_to_string, symbols), "/")
-        , ".ab")
-
-    mod: Prim.list_foldl1((l, r) -> `Slot{!l, !r}, symbols)
-
-    expand_import:
-        [M] -> `Seq{[
-            ((!M):enter_module(\!M)),
-            If{not Prim.has_slot?(!M, \exports), ((!M).exports=[])},
-            (private: enter_module(\private)),
-            load(!script),
-            exit_module(),
-            exit_module()
-        ]}
-        | [M,rest...] -> `Seq{[
-            ((!M):enter_module(\!M)),
-            If{not Prim.has_slot?(!M, \exports), ((!M).exports=[])},
-            !expand_import(rest),
-            exit_module()
-        ]}
-
+macro(Import{mods}): {
+    script: Module.buildpath(mods)
+    mod: Prim.list_foldl1((l, r) -> `Slot{!l, !r}, mods)
     `Seq{[
-        !expand_import(symbols),
+        !Module.expand_import(mods, script),
         Module.import_variables(!mod, (!mod).exports)
     ]}
 }
 
-macro(Export{vars}): {
+macro(QuoteSyntax{ Import{mods, vars} }): {
+    script: Module.buildpath(mods)
+    mod: Prim.list_foldl1((l, r) -> `Slot{!l, !r}, mods)
     `Seq{[
-        Seq{!Prim.list_map(v -> `Prim.set_slot(private.proto, \!v, !v), vars)},
-        `(exports = Prim.list_foldr(Prim.list_insert_unique, \!vars, exports))
+        !Module.expand_import(mods, script),
+        Module.import_variables(!mod, \!vars)
     ]}
 }
+
+macro(QuoteSyntax{ Import{mods, Hiding{vars}} }): {
+    script: Module.buildpath(mods)
+    mod: Prim.list_foldl1((l, r) -> `Slot{!l, !r}, mods)
+    `Seq{[
+        !Module.expand_import(mods, script),
+        Module.import_variables(!mod,
+            Prim.list_subtract((!mod).exports, \!vars)
+            )
+    ]}
+}
+
+macro(Export{vars}):
+    `Seq{[
+        Seq{!Prim.list_map(v -> `Prim.set_slot(private.proto, \!v, !v), vars)},
+        exports = Prim.list_foldr(Prim.list_insert_unique, \!vars, exports)
+    ]}
