@@ -1,5 +1,5 @@
 # Copyright (C) 2010 nineties
-# $Id: Module.ab 2014-01-31 19:10:30 nineties $
+# $Id: Module.ab 2014-02-01 15:43:11 nineties $
 
 Module: enter_module(\Module)
 
@@ -24,13 +24,15 @@ macro(Import{symbols}): {
     expand_import:
         [M] -> `Seq{[
             ((!M):enter_module(\!M)),
-            If{(!M).exports == undef, ((!M).exports=[])},
+            If{not Prim.has_slot?(!M, \exports), ((!M).exports=[])},
+            (private: enter_module(\private)),
             load(!script),
+            exit_module(),
             exit_module()
         ]}
         | [M,rest...] -> `Seq{[
             ((!M):enter_module(\!M)),
-            If{(!M).exports == undef, ((!M).exports=[])},
+            If{not Prim.has_slot?(!M, \exports), ((!M).exports=[])},
             !expand_import(rest),
             exit_module()
         ]}
@@ -42,5 +44,8 @@ macro(Import{symbols}): {
 }
 
 macro(Export{vars}): {
-    `(exports = Prim.list_foldr(Prim.list_insert_unique, \!vars, exports))
+    `Seq{[
+        Seq{!Prim.list_map(v -> `Prim.set_slot(private.proto, \!v, !v), vars)},
+        `(exports = Prim.list_foldr(Prim.list_insert_unique, \!vars, exports))
+    ]}
 }

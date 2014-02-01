@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-object.rlc 2014-01-31 18:36:20 nineties $
+; $Id: rowl1-object.rlc 2014-02-01 15:45:52 nineties $
 ;
 
 (import "rlvm-compile")
@@ -30,7 +30,7 @@
 (export fun make_clone (obj) (
     (var clone (_copy obj))
     (set_slot clone proto obj)
-    (var init (get_slot clone initialize))
+    (var init (get_slot_nocheck clone initialize))
     (if (!= init @C_UNDEF)
         (= clone (runcode (get_bytecode init) clone))
         )
@@ -55,7 +55,7 @@
     ))
 
 (export fun set_slot_incremental (obj sym val) (
-    (var f (get_slot obj sym))
+    (var f (get_slot_nocheck obj sym))
     (if (== f @C_UNDEF) (return (set_slot obj sym val)))
     (if (&& (is_function f) (is_function val))
         (return (set_slot obj sym (fusion_function val f)))
@@ -64,7 +64,7 @@
     ))
 
 (export fun set_undef_slot (obj sym val) (
-    (var v (get_slot obj sym))
+    (var v (get_slot_nocheck obj sym))
     (if (!= v @C_UNDEF) (return v))
     (return (set_slot obj sym val))
     ))
@@ -87,7 +87,7 @@
     (return (array_get object proto_special (node_type obj)))
     ))
 
-(export fun get_slot (obj sym) (
+(export fun get_slot_nocheck (obj sym) (
     (if (== sym proto) (return (get_proto obj)))
     (var tbl (wrtable_find slots sym))
     (if (== tbl @C_UNDEF) (return @C_UNDEF))
@@ -101,6 +101,15 @@
     (return v)
     ))
 
+(export fun get_slot (obj sym) (
+    (var v (get_slot_nocheck obj sym))
+    (if (== v @C_UNDEF)
+        (throw (undefined_var current_loc sym))
+        )
+    (return v)
+    ))
+
+
 (export fun get_slot_norec (obj sym _) (
     (if (== sym proto) (return (get_proto obj)))
     (var tbl (wrtable_find slots sym))
@@ -110,6 +119,13 @@
 
 (export fun set_special_proto (obj) (
     (array_set object proto_special (node_type obj) obj)
+    ))
+
+(export fun has_slot_p (obj sym) (
+    (if (!= (get_slot_nocheck obj sym) @C_UNDEF)
+        (return @C_TRUE)
+        (return @C_FALSE)
+        )
     ))
 
 (export fun setup_object (mod) (
@@ -123,6 +139,7 @@
     (add_function4 mod (to_sym "set_slot") DontCare symT DontCare (quote (to_sym "incremental")) set_slot_incremental 0)
     (add_function2 mod (to_sym "get_slot") DontCare DontCare get_slot 0)
     (add_function3 mod (to_sym "get_slot") DontCare DontCare (quote (to_sym "norec")) get_slot_norec 0)
+    (add_function2 mod (to_sym "has_slot?") DontCare symT has_slot_p 0)
     ))
 
     ))

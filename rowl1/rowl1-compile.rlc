@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-01-31 18:58:25 nineties $
+; $Id: rowl1-compile.rlc 2014-02-01 13:06:11 nineties $
 ;
 
 (import "rlvm-compile")
@@ -39,6 +39,7 @@
 (extern fun set_slot)
 (extern fun overwrite_slot)
 (extern fun get_slot)
+(extern fun get_slot_nocheck)
 
 (fun trace_func (msg val) (
     (debugs msg)
@@ -61,7 +62,7 @@
 (fun lookup_symbol_check (sym) (
     (var v (symtable_find variables sym))
     (if v (return v))
-    (= v (get_slot global sym))
+    (= v (get_slot_nocheck global sym))
     (if (!= v @C_UNDEF) (return (make_gvar sym)))
     (throw (undefined_var current_loc sym))
     ))
@@ -69,7 +70,7 @@
 (fun lookup_symbol_current_scope (sym) (
     (if (== (symtable_depth variables) 0)
         (do
-            (var v (get_slot global sym))
+            (var v (get_slot_nocheck global sym))
             (if (== v @C_UNDEF) (return 0))
             (return v)
         )
@@ -134,7 +135,7 @@
             (if (== expr DontCare) (return fv))
             (= fv (list_delete expr fv))
             ; global variables are not free
-            (if (!= (get_slot global expr) @C_UNDEF) (return fv))
+            (if (!= (get_slot_nocheck global expr) @C_UNDEF) (return fv))
             (return (cons expr fv))
             ))
         (return fv)
@@ -637,7 +638,7 @@
 
 (extern fun compile_matching)
 (export fun lookup_func (mod sym) (
-    (var func (get_slot mod sym))
+    (var func (get_slot_nocheck mod sym))
     (if (== func @C_UNDEF) (do
         (throw (undefined_fun current_loc sym))
         ))
@@ -645,7 +646,7 @@
     ))
 
 (export fun lookup_func_nocheck (mod sym) (
-    (var func (get_slot mod sym))
+    (var func (get_slot_nocheck mod sym))
     (if (== func @C_UNDEF) (return 0))
     (return (compile_matching current_loc sym func))
     ))
@@ -708,25 +709,14 @@
     ))
 
 (fun define_slot (obj sym val) (
-    (if (!= (get_slot obj sym) @C_UNDEF)
+    (if (!= (get_slot_nocheck obj sym) @C_UNDEF)
         (throw (redefined_slot current_loc obj sym))
         )
     (return (set_slot obj sym val))
     ))
 
 (fun append_slot (obj sym val) (
-    (var f (get_slot obj sym))
-    (if (== f @C_UNDEF)
-        (return (set_slot obj sym val))
-        )
-    (if (&& (is_function val) (is_function f))
-        (return (set_slot obj sym (fusion_function val f)))
-        )
-    (throw (redefined_slot current_loc obj sym))
-    ))
-
-(fun append_module_slot (obj sym val) (
-    (var f (get_slot obj sym))
+    (var f (get_slot_nocheck obj sym))
     (if (== f @C_UNDEF)
         (return (set_slot obj sym val))
         )
@@ -1015,7 +1005,7 @@
     ))
 
 (fun append_function (mod sym newfunc) (
-    (var func (get_slot mod sym))
+    (var func (get_slot_nocheck mod sym))
     (if (!= func @C_UNDEF)
         (if (&& (is_function func) (is_function newfunc))
             (return (set_slot mod sym (fusion_function newfunc func)))
@@ -1074,12 +1064,10 @@
         (return (unknown_expression current_loc expr))
     (if (|| (== ty BSymbol) (== ty Ref))
         (return (compile_define_local_variable asm lhs rhs))
-    (if (== ty Tuple)
-        (return (compile_define_multi_variable asm lhs rhs))
     (if (== ty Slot)
         (return (compile_define_slot asm lhs rhs))
-        ))))
-    (throw (unknown_expression current_loc expr))
+        (return (compile_define_multi_variable asm lhs rhs))
+        )))
     ))
 
 (fun compile_define_global_variable (asm sym val) (
@@ -1135,7 +1123,7 @@
         (compile asm lam)
         (put_push asm sym)
         (compile asm obj)
-        (compile_simple_call asm 3 append_module_slot)
+        (compile_simple_call asm 3 append_slot)
         return
         ))
 
@@ -1205,7 +1193,7 @@
         (throw (invalid_varname current_loc sym))
         )
     (if (== (symtable_depth variables) 0)
-        (if (== (get_slot global sym) @C_UNDEF) return)
+        (if (== (get_slot_nocheck global sym) @C_UNDEF) return)
         (if (! (symtable_find_local variables sym)) return)
         )
     (throw (redefined_var current_loc sym))
@@ -1224,14 +1212,6 @@
         ))
     ))
 
-(fun load_global_variable (global sym) (
-    (var v (get_slot global sym))
-    (if (== v @C_UNDEF)
-        (throw (undefined_var current_loc sym))
-        )
-    (return v)
-    ))
-
 (export fun compile_operand (asm opd sym) (
     (if (== sym closure_frame) (do
         (put_load_closure asm)
@@ -1242,7 +1222,7 @@
     (if (== ty GlobalVariable) (do
         (put_push asm sym)
         (put_push asm global)
-        (compile_simple_call asm 2 load_global_variable)
+        (compile_simple_call asm 2 get_slot)
         return
         ))
     (if (== ty LocalVariable) (do
@@ -1335,7 +1315,7 @@
     ))
 
 (fun get_slot_swap (sym obj) (
-    (var f (get_slot obj sym))
+    (var f (get_slot_nocheck obj sym))
     (if (== f @C_UNDEF)
         (throw (not_found_slot current_loc obj sym))
         )

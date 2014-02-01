@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-01-31 18:42:59 nineties $
+; $Id: rowl1-interp.rlc 2014-02-01 13:09:24 nineties $
 ;
 
 (import "rlvm-compile")
@@ -426,7 +426,7 @@
         (throw (logic_error current_loc
             (string "enter_module() can be called only in top-scope")))
         )
-    (var mod (load_global sym))
+    (var mod (get_slot_nocheck global sym))
     (if (== mod @C_UNDEF)
         (= mod (create_module sym))
         )
@@ -448,7 +448,7 @@
     ))
 
 (export fun load_global (sym) (
-    (return (get_slot global sym))
+    (return (get_slot_nocheck global sym))
     ))
 
 (fun setup_global_methods () (
@@ -468,7 +468,7 @@
     ))
 
 (fun copy_variable (to sym1 from sym2) (
-    (var f (get_slot from (to_sym sym2)))
+    (var f (get_slot_nocheck from (to_sym sym2)))
     (if (== f @C_UNDEF)
         (throw (not_found current_loc (to_sym sym2)))
         )
