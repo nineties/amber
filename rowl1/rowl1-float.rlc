@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-float.rlc 2014-01-29 14:31:50 nineties $
+; $Id: rowl1-float.rlc 2014-02-02 13:58:45 nineties $
 ;
 
 ; Since Amber has no 64-bit integer, this source code uses bignums instead.
@@ -27,7 +27,7 @@
 (extern object current_loc)
 
 (export fun pp_float (ochan f) (
-    (output_string ochan (float_to_s f))
+    (output_string ochan (float_to_string f))
     ))
 
 (export fun float_sign (f) (
@@ -263,7 +263,7 @@
 
 ; ==== translate floating-point number to ascii-string ====
 
-(fun float_to_s (v) (
+(fun float_to_string (v) (
     (var s 0)
     (var f0 (field_get v 0))
     (var f1 (field_get v 1))
@@ -660,13 +660,16 @@
     ))
 
 (export fun setup_float (mod) (
+    (var trait (make_object1 (to_sym "Trait") (to_sym "Float")))
+    (set_slot mod (to_sym "FloatTrait") trait)
+    (set_special_parent @FloatE trait)
     (set_slot mod (to_sym "infinity") (float_infinity))
 
     (add_function1 mod (to_sym "float_uplus") floatT float_uplus 0)
     (add_function1 mod (to_sym "float_uminus") floatT float_uminus 0)
-    (add_function1 mod (to_sym "float_to_s") floatT float_to_s 0)
+    (add_function1 mod (to_sym "float_to_string") floatT float_to_string 0)
     (add_function1 mod (to_sym "float_hash") floatT float_hash 0)
-    (add_function1 mod (to_sym "float_to_iint") stringT float_to_i 0)
+    (add_function1 mod (to_sym "float_to_int") stringT float_to_i 0)
     (add_function1 mod (to_sym "int_to_float") intT int_to_f 0)
     
     (add_function2 mod (to_sym "float_add") floatT floatT float_add 0)

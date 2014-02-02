@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-object.rlc 2014-02-01 15:45:52 nineties $
+; $Id: rowl1-object.rlc 2014-02-03 08:52:30 nineties $
 ;
 
 (import "rlvm-compile")
@@ -18,18 +18,19 @@
 (extern object current_loc)
 
 (var slots (make_wrtable))
-(var proto (to_sym "proto"))
-(var proto_tbl (make_wrtable))
-(var dummy (wrtable_add slots proto proto_tbl))
+(var parent (to_sym "parent"))
+(var parent_tbl (make_wrtable))
+(var dummy (wrtable_add slots parent parent_tbl))
 (var initialize (to_sym "initialize"))
-(var proto_special null)
+(var parent_special null)
+(var root_object @C_UNDEF)
 
 (extern fun tuple_at)
 (extern fun _copy)
 
 (export fun make_clone (obj) (
     (var clone (_copy obj))
-    (set_slot clone proto obj)
+    (set_slot clone parent obj)
     (var init (get_slot_nocheck clone initialize))
     (if (!= init @C_UNDEF)
         (= clone (runcode (get_bytecode init) clone))
@@ -44,6 +45,9 @@
     ))
 
 (export fun set_slot (obj sym val) (
+    (if (&& (== obj root_object) (== sym parent))
+        (throw (logic_error current_loc (string "Can not assign parent to root-object")))
+        ) 
     (if (== val @C_UNDEF) (return (remove_slot obj sym)))
     (var tbl (wrtable_find slots sym))
     (if (== tbl @C_UNDEF) (do
@@ -60,6 +64,9 @@
     (if (&& (is_function f) (is_function val))
         (return (set_slot obj sym (fusion_function val f)))
         )
+    (debugpf obj)
+    (debugs "HOGE\n")
+    (debugpf current_loc)
     (throw (redefined_var current_loc sym))
     ))
 
@@ -72,7 +79,7 @@
 (export fun overwrite_slot (obj sym val) (
     (var v (get_slot_norec obj sym))
     (while (== v @C_UNDEF) (do
-        (= obj (get_proto obj))
+        (= obj (get_parent obj))
         (if (== obj @C_UNDEF) 
             (throw (undefined_var current_loc sym))
             )
@@ -81,20 +88,23 @@
     (return (set_slot obj sym val))
     ))
 
-(fun get_proto (obj) (
-    (var p (wrtable_find proto_tbl obj))
+(fun get_parent (obj) (
+    (if (== obj root_object) (return @C_UNDEF))
+    (var p (wrtable_find parent_tbl obj))
     (if (!= p @C_UNDEF) (return p))
-    (return (array_get object proto_special (node_type obj)))
+    (= p (array_get object parent_special (node_type obj)))
+    (if (!= p @C_UNDEF) (return p))
+    (return root_object)
     ))
 
 (export fun get_slot_nocheck (obj sym) (
-    (if (== sym proto) (return (get_proto obj)))
+    (if (== sym parent) (return (get_parent obj)))
     (var tbl (wrtable_find slots sym))
     (if (== tbl @C_UNDEF) (return @C_UNDEF))
     (label retry)
     (var v (wrtable_find tbl obj))
     (if (== v @C_UNDEF) (do
-        (= obj (get_proto obj))
+        (= obj (get_parent obj))
         (if (== obj @C_UNDEF) (return (wrtable_find tbl @C_UNDEF)))
         (goto retry)
         ))
@@ -111,28 +121,31 @@
 
 
 (export fun get_slot_norec (obj sym _) (
-    (if (== sym proto) (return (get_proto obj)))
+    (if (== sym parent) (return (get_parent obj)))
     (var tbl (wrtable_find slots sym))
     (if (== tbl @C_UNDEF) (return @C_UNDEF))
     (return (wrtable_find tbl obj))
     ))
 
-(export fun set_special_proto (obj) (
-    (array_set object proto_special (node_type obj) obj)
+(export fun set_special_parent (ty obj) (
+    (array_set object parent_special ty obj)
     ))
 
 (export fun has_slot_p (obj sym) (
-    (if (!= (get_slot_nocheck obj sym) @C_UNDEF)
+    (if (!= (get_slot_norec obj sym) @C_UNDEF)
         (return @C_TRUE)
         (return @C_FALSE)
         )
     ))
 
 (export fun setup_object (mod) (
-    (= proto_special (allocate_array @NUM_NODE_TYPE))
+    (= parent_special (allocate_array @NUM_NODE_TYPE))
     (for i 0 @NUM_NODE_TYPE
-        (array_set object proto_special i @C_UNDEF)
+        (array_set object parent_special i @C_UNDEF)
         )
+
+    (= root_object (make_object1 (to_sym "Trait") (to_sym "Object")))
+    (set_slot mod (to_sym "ObjectTrait") root_object)
 
     (add_function1 mod (to_sym "clone") DontCare make_clone 0)
     (add_function3 mod (to_sym "set_slot") DontCare symT DontCare set_slot 0)

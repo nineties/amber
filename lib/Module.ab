@@ -1,5 +1,5 @@
 # Copyright (C) 2010 nineties
-# $Id: Module.ab 2014-02-01 20:06:07 nineties $
+# $Id: Module.ab 2014-02-03 08:41:54 nineties $
 
 Module: enter_module(\Module)
 
@@ -13,9 +13,7 @@ Module: enter_module(\Module)
     expand_import([M], script): `Seq{[
         ((!M):enter_module(\!M)),
         If{not Prim.has_slot?(!M, \exports), ((!M).exports=[])},
-        (private: enter_module(\private)),
         load(!script),
-        exit_module(),
         exit_module()
     ]}
     expand_import([M,rest...], script): `Seq{[
@@ -61,7 +59,4 @@ macro(QuoteSyntax{ Import{mods, Hiding{vars}} }): {
 }
 
 macro(Export{vars}):
-    `Seq{[
-        Seq{!Prim.list_map(v -> `Prim.set_slot(private.proto, \!v, !v), vars)},
-        exports = Prim.list_foldr(Prim.list_insert_unique, \!vars, exports)
-    ]}
+    `(exports = Prim.list_foldr(Prim.list_insert_unique, \!vars, exports))

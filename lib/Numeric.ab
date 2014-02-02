@@ -1,29 +1,24 @@
-# Copyright (C) 2010 nineties
-# $Id: Numeric.ab 2014-02-01 12:44:58 nineties $
+# Copyright (C) 2014 nineties
+# $Id: Numeric.ab 2014-02-03 00:37:17 nineties $
 
-binary_coerce(a, b): 
-    throw `LogicError{!LOCATION, "Can not convert to same type.", a, b}
-binary_coerce(a, b) when head(a)==head(b): (a, b)
-binary_coerce(a@Int, b@Float): (a.to_f(), b)
-binary_coerce(a@Float, b@Int): (a, b.to_f())
+binary_coerce(a, b): undef
+binary_coerce(a @ Int, b @ Float): (a.to_f(), b)
+binary_coerce(a @ Float, b @ Int): (a, b.to_f())
 
-perform_binary_operation(a, b, fun): {
-    (a, b) = binary_coerce(a, b)
-    fun(a, b)
+perform_binary_operation(a, b, fun, op): {
+    t: binary_coerce(a, b)
+    if (t == undef)
+        throw `LogicError{!LOCATION,
+            "Undefined binary operation", !op, !a, !b}
+    fun(t[0], t[1])
 }
 
-add(a, b): perform_binary_operation(a, b, add)
-sub(a, b): perform_binary_operation(a, b, sub)
-mul(a, b): perform_binary_operation(a, b, mul)
-div(a, b): perform_binary_operation(a, b, div)
-mod(a, b): perform_binary_operation(a, b, mod)
-pow(a, b): perform_binary_operation(a, b, pow)
-add!: add
-sub!: sub
-mul!: mul
-pow!: pow
-div!: div
-mod!: mod
+add(a, b): perform_binary_operation(a, b, add, \add)
+sub(a, b): perform_binary_operation(a, b, sub, \sub)
+mul(a, b): perform_binary_operation(a, b, mul, \mul)
+div(a, b): perform_binary_operation(a, b, div, \div)
+mod(a, b): perform_binary_operation(a, b, mod, \mod)
+pow(a, b): perform_binary_operation(a, b, pow, \pow)
 
 compare(a, b): perform_binary_operation(a, b, compare)
 less_than?(a, b):     compare(a, b) < 0
@@ -54,8 +49,21 @@ equal? = Prim.float_equal? | equal?
 
 infinity: Prim.infinity
 
-export uplus uminus add sub mul div mod pow add! sub! mul! pow! div! mod!
+export uplus uminus add sub mul div mod pow
 export shiftL shiftR
 export compare less_than? greater_than? less_equal? greater_equal? equal?
 export INTEGER_MIN INTEGER_MAX
 export infinity
+
+IntTrait: Prim.IntTrait
+FloatTrait: Prim.FloatTrait
+
+IntTrait.to_i(): self
+IntTrait.to_f(): Prim.int_to_float(self)
+IntTrait.to_s(): Prim.int_to_string(self)
+
+FloatTrait.to_i(): Prim.float_to_int(self)
+FloatTrait.to_f(): self
+FloatTrait.to_s(): Prim.float_to_string(self)
+
+export IntTrait FloatTrait

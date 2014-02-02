@@ -1,27 +1,30 @@
 # Copyright (C) 2010 nineties
-# $Id: Base.ab 2014-01-31 12:14:52 nineties $
+# $Id: Base.ab 2014-02-02 22:54:45 nineties $
 
 # Copy important functions from Prim module.
 
-head:      Prim.head
-arguments: Prim.arguments
-arity:     Prim.arity
-atom?:     Prim.atom?
-at:        Prim.at
-store:     Prim.store
-id(obj): obj
+Object: Prim.ObjectTrait
 
-hash(obj): {
+id(obj): id
+
+Object.head():      Prim.head(self)
+Object.arguments(): Prim.arguments(self)
+Object.arity():     Prim.arity(self)
+Object.atom?():     Prim.atom?(self)
+Object.at(i):       Prim.at(self, i)
+Object.store(i, v): Prim.store(self, i, v)
+
+Object.hash(): {
     h: 0
-    for (arg in obj)
-        h = 13*h + hash(arg)
-    h = 13*h + hash(head(arg))
+    for (arg in self)
+        h = 13*h + arg.hash()
+    h = 13*h + arg.head().hash()
 }
 
-hash(obj) when atom?(obj): hash(head(obj))
+Object.hash() when self.atom?():
+    throw `UndefinedMethod{!LOCATION, hash, !self}
 
 fusion: Prim.fusion_function
-fusion!: fusion
 compose: Prim.compose_function
 
-export head arguments arity atom? at store id hash fusion fusion! compose
+export Object id fusion compose

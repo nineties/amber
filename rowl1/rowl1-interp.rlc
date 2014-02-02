@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-02-01 13:09:24 nineties $
+; $Id: rowl1-interp.rlc 2014-02-03 08:54:46 nineties $
 ;
 
 (import "rlvm-compile")
@@ -430,7 +430,7 @@
     (if (== mod @C_UNDEF)
         (= mod (create_module sym))
         )
-    (if (!= (get_slot mod proto) global)
+    (if (!= (get_slot mod parent) global)
         (throw (logic_error current_loc
             (string "The argument of enter_module() must be direct submodule of global-module")))
         )
@@ -439,7 +439,7 @@
     ))
 
 (fun exit_module () (
-    (var mod (get_slot global proto))
+    (var mod (get_slot global parent))
     (if (!= (node_bhead mod) Module)
         (throw (type_error current_loc (string "Module") mod))
         )
@@ -487,7 +487,7 @@
     ; parser
     (var syntax (create_module Syntax))
     (set_slot global Syntax syntax)
-    (set_slot syntax proto global)
+    (set_slot syntax parent global)
     
     (copy_variable syntax "word" prim "parse_word")
     (copy_variable syntax "text" prim "parse_text")
@@ -561,7 +561,7 @@
     ;(setup_math mod)
     (setup_numeric mod)
     (setup_string mod)
-    ;(setup_bigint mod)
+    (setup_bigint mod)
     (setup_float mod)
     ;(setup_random mod)
     (setup_io mod)

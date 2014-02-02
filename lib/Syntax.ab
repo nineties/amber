@@ -1,6 +1,6 @@
 " 
     Copyright (C) 2010 nineties
-    $Id: Syntax.ab 2014-02-01 16:55:33 nineties $
+    $Id: Syntax.ab 2014-02-02 22:53:34 nineties $
 "
 
 " Syntax definition of the Amber language. "
@@ -145,7 +145,7 @@ DefineSyntax{stmt, List{ Tuple{List{syntax_declaration}, node0}}}
 # The following symbols never been parsed as symbols.
 
 Define{reserved_symbols, List{
-    Quote{self}, Quote{is}, Quote{not}, Quote{and}, Quote{or}, Quote{when}, Quote{if}, Quote{else},
+    Quote{self}, Quote{not}, Quote{and}, Quote{or}, Quote{when}, Quote{if}, Quote{else},
     Quote{case}, Quote{of}, Quote{while}, Quote{for}, Quote{in},
     Quote{continue}, Quote{break}, Quote{return}, Quote{throw}, Quote{try},
     Quote{catch}, Quote{import}, Quote{hiding}, Quote{export}
@@ -238,8 +238,6 @@ rel_expr
       | range_expr ">=" range_expr   { `GreaterEqual{!node0, !node2} }
       | range_expr "==" range_expr   { `Equal{!node0, !node2} }
       | range_expr "!=" range_expr   { `NotEqual{!node0, !node2} }
-      | range_expr is range_expr     { `Identical{!node0, !node2} }
-      | range_expr is not range_expr { `NotIdentical{!node0, !node3} }
       | range_expr
 
 seqand_expr
@@ -322,8 +320,8 @@ stmt
         { `Throw{!node1} }
       | <<multiline>> try block catch multi_lambda_expr
         { `Try{!node1, !node3} }
-      | <<multiline>> primary_expr argument_list ":" stmt
-        { `Define{!node0, Lambda{!node1, !node3}, incremental} }
+      | <<multiline>> pattern guard_clause ":" stmt
+        { `Define{!node0, !node3, !node1} }
       | <<multiline>> pattern ":" stmt
         { `Define{!node0, !node2} }
 
@@ -424,35 +422,38 @@ macro = fusion((Assign{Apply{f, args}, e}) -> `Assign{!f, Lambda{!args, !e}, inc
 macro(Define{Apply{f, args}, e})     = `Define{!f, Lambda{!args, !e}, incremental}
 macro(Define{Send{obj, f, args}, e}) = `Define{Slot{!obj, !f}, Lambda{!args, !e}, incremental}
 macro(Assign{Send{obj, f, args}, e}) = `Assign{Slot{!obj, !f}, Lambda{!args, !e}, incremental}
+macro(Define{Apply{f, args}, e, g})     = `Define{!f, Lambda{When{!args, !g}, !e}, incremental}
+macro(Assign{Apply{f, args}, e, g})     = `Assign{!f, Lambda{When{!args, !g}, !e}, incremental}
+macro(Define{Send{obj, f, args}, e, g}) = `Define{Slot{!obj, !f}, Lambda{When{!args, !g}, !e}, incremental}
+macro(Assign{Send{obj, f, args}, e, g}) = `Assign{Slot{!obj, !f}, Lambda{When{!args, !g}, !e}, incremental}
 
-macro(+x)         = `uplus(!x)
-macro(-x)         = `uminus(!x)
-macro(x + y)      = `add(!x, !y)
-macro(x - y)      = `sub(!x, !y)
-macro(x * y)      = `mul(!x, !y)
-macro(x ^ y)      = `pow(!x, !y)
-macro(x / y)      = `div(!x, !y)
-macro(x % y)      = `mod(!x, !y)
-macro(x | y)      = `fusion(!x, !y)
-macro(x < y)      = `less_than?(!x, !y)
-macro(x > y)      = `greater_than?(!x, !y)
-macro(x <= y)     = `less_equal?(!x, !y)
-macro(x >= y)     = `greater_equal?(!x, !y)
-macro(x == y)     = `equal?(!x, !y)
-macro(x != y)     = `(not equal?(!x, !y))
-macro(x is y)     = `identical?(!x, !y)
-macro(x is not y) = `(not identical?(!x, !y))
-macro(x += y)  = `ArithAssign{!x, !y, add!}
-macro(x -= y)  = `ArithAssign{!x, !y, sub!}
-macro(x *= y)  = `ArithAssign{!x, !y, mul!}
-macro(x ^= y)  = `ArithAssign{!x, !y, pow!}
-macro(x /= y)  = `ArithAssign{!x, !y, div!}
-macro(x %= y)  = `ArithAssign{!x, !y, mod!}
-macro(x |= y)  = `ArithAssign{!x, !y, fusion!}
+macro(+x)     = `uplus(!x)
+macro(-x)     = `uminus(!x)
+macro(x + y)  = `add(!x, !y)
+macro(x - y)  = `sub(!x, !y)
+macro(x * y)  = `mul(!x, !y)
+macro(x ^ y)  = `pow(!x, !y)
+macro(x / y)  = `div(!x, !y)
+macro(x % y)  = `mod(!x, !y)
+macro(x | y)  = `fusion(!x, !y)
+macro(x < y)  = `less_than?(!x, !y)
+macro(x > y)  = `greater_than?(!x, !y)
+macro(x <= y) = `less_equal?(!x, !y)
+macro(x >= y) = `greater_equal?(!x, !y)
+macro(x == y) = `equal?(!x, !y)
+macro(x != y) = `(not equal?(!x, !y))
+macro(x += y) = `ArithAssign{!x, !y, add}
+macro(x -= y) = `ArithAssign{!x, !y, sub}
+macro(x *= y) = `ArithAssign{!x, !y, mul}
+macro(x ^= y) = `ArithAssign{!x, !y, pow}
+macro(x /= y) = `ArithAssign{!x, !y, div}
+macro(x %= y) = `ArithAssign{!x, !y, mod}
+macro(x |= y) = `ArithAssign{!x, !y, fusion}
 
 # Subscript syntax is not built-in. We need macros.
-macro(x[idxs...])     = `Apply{at, !Prim.cons(x, idxs)}
-macro(QuoteSyntax{x[!idxs...]} = e) = `Apply{store, !Prim.cons(x, Prim.cons(e, idxs))}
+macro(x[idxs...]) = `Send{!x, at, !idxs}
+macro(QuoteSyntax{x[!idxs...]} = e)
+    = `Send{!x, store, !Prim.list_append(idxs, [e])}
 macro(ArithAssign{QuoteSyntax{x[idxs...]}, e, op}) = {
     # We have to consider that evaluation of `x' and `idxs' may have
     # side-effects. So, we translate x[a,b] op= e to

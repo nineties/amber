@@ -1,6 +1,6 @@
 " Language:	Amber
 " Maintainer:	nineties <nineties48@gmail.com>
-" $Id: amber.vim 2014-02-01 12:44:25 nineties $
+" $Id: amber.vim 2014-02-01 20:39:58 nineties $
 
 if exists("b:current_syntax")
     finish
@@ -15,7 +15,7 @@ syn keyword amberTodo Todo TODO Fixme FIXME XXX contained
 syn match amberComment  /#.*$/ contains=amberTodo
 syn region amberStringD start=/"/ skip=/\\"/ end=/"/
 syn region amberStringS start=/'/ skip=/\\'/ end=/'/
-syn match amberConstant         /\<[A-Z_]\+\>/
+syn match amberConstant         /\<[A-Z_]\{2}\>/
 syn match amberIdentifier       /\<[a-zA-Z_]\w*[!?]\=/
 syn match amberHead             /\<[A-Z]\w*[!?]\=\>/ contains=amberConstant
 syn match amberNumber           /\<\d\+\>/

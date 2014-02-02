@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-02-01 13:06:11 nineties $
+; $Id: rowl1-compile.rlc 2014-02-02 22:45:36 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1040,6 +1040,9 @@
     (if (&& (== (node_size expr) 3) (== (node_arg expr 2) (to_sym "incremental")))
         (return (compile_define_global_function asm lhs rhs))
         )
+    (if (!= (node_size expr) 2)
+        (throw (unknown_expression current_loc expr))
+        )
     (if (== ty Apply)
         (throw (unknown_expression current_loc expr))
     (if (== ty BSymbol)
@@ -1058,6 +1061,9 @@
     (var rhs (node_arg expr 1))
     (if (&& (== (node_size expr) 3) (== (node_arg expr 2) (to_sym "incremental")))
         (return (compile_define_local_function asm lhs rhs))
+        )
+    (if (!= (node_size expr) 2)
+        (throw (unknown_expression current_loc expr))
         )
     (var ty (node_bhead lhs))
     (if (== ty Apply)
