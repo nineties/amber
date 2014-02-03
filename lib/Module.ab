@@ -1,5 +1,5 @@
 # Copyright (C) 2010 nineties
-# $Id: Module.ab 2014-02-03 17:35:55 nineties $
+# $Id: Module.ab 2014-02-03 21:35:50 nineties $
 
 Module: enter_module(\Module)
 
@@ -10,18 +10,24 @@ Module: enter_module(\Module)
     import_variables(mod @ Module, vars @ List):
         Prim.list_map(v -> import_variable(mod, v), vars)
 
-    expand_import([M], script): `Seq{[
-        ((!M):enter_module(\!M)),
-        If{not Prim.has_slot?(!M, \exports), ((!M).exports=[])},
-        load(!script),
-        exit_module()
-    ]}
-    expand_import([M,rest...], script): `Seq{[
-        ((!M):enter_module(\!M)),
-        If{not Prim.has_slot?(!M, \exports), ((!M).exports=[])},
-        !expand_import(rest, script),
-        exit_module()
-    ]}
+    expand_import([], _): nil
+    expand_import([M,rest...], path): {
+        if (not Prim.string_equal?(path, ""))
+            path = Prim.string_add(path, "/")
+        path = Prim.string_add(path, Prim.symbol_to_string(M))
+
+        loadstmt: case rest of
+              [] -> `load(!Prim.string_add(path, ".ab"))
+            | _  -> `load(!Prim.string_add(path, ".ab"), \nothrow)
+
+        `Seq{[
+            ((!M):enter_module(\!M)),
+            If{not Prim.has_slot?(!M, \exports), ((!M).exports=[])},
+            !loadstmt,
+            !expand_import(rest, path),
+            exit_module()
+        ]}
+    }
 
     buildpath(mods): Prim.string_add(Prim.string_join(
             Prim.list_map(Prim.symbol_to_string, mods), "/")
@@ -30,30 +36,28 @@ Module: enter_module(\Module)
 exit_module()
 
 macro(e @ Import{mods, option}): {
-    script: Module.buildpath(mods)
     mod: Prim.list_foldl1((l, r) -> `Slot{!l, !r}, mods)
-
     case option of
           Some{As{name}}
             -> `Seq{[
-                    !Module.expand_import(mods, script),
+                    !Module.expand_import(mods, ""),
                     (!name : !mod)
                 ]}
         | Some{Hiding{vars}}
             -> `Seq{[
-                    !Module.expand_import(mods, script),
+                    !Module.expand_import(mods, ""),
                     Module.import_variables(!mod,
                         Prim.list_subtract((!mod).exports, \!vars)
                         )
                 ]}
         | Some{vars}
             -> `Seq{[
-                    !Module.expand_import(mods, script),
+                    !Module.expand_import(mods, ""),
                     Module.import_variables(!mod, \!vars)
                 ]}
         | nil
             -> `Seq{[
-                    !Module.expand_import(mods, script),
+                    !Module.expand_import(mods, ""),
                     Module.import_variables(!mod, (!mod).exports)
                 ]}
         | _
