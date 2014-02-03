@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-02-03 17:16:36 nineties $
+; $Id: rowl1-interp.rlc 2014-02-03 17:43:03 nineties $
 ;
 
 (import "rlvm-compile")
@@ -458,22 +458,6 @@
     (return (get_slot_nocheck global sym))
     ))
 
-(fun setup_global_methods () (
-    ;(var syntax (get_slot global Syntax)) 
-    ;(add_function1 syntax Rewrite DontCare rewrite_donothing 0)
-    ;(add_function1 syntax Rewrite (domainP Located) rewrite_located 0)
-    ;(add_function1 global Eval DontCare default_eval 0)
-    ;(add_function1 global Eval (domainP Located) eval_located 0)
-    ;(add_function1 global Eval (make_object1 Import listT) eval_import 0)
-
-    ;(add_function1 global Eval (make_object1 Seq listT) eval_seq 0)
-
-    ;(add_function1 global Eval (quote (to_sym "exit")) eval_exit 0)
-
-    ;(add_function1 global (to_sym "exit") intT exit_ 0)
-    ;(add_function1 global (to_sym "atexit") funT at_exit 0)
-    ))
-
 (fun copy_variable (to sym1 from sym2) (
     (var f (get_slot_nocheck from (to_sym sym2)))
     (if (== f @C_UNDEF)
@@ -519,11 +503,10 @@
     (copy_variable syntax "expr" prim "parse_expr")
     (copy_variable syntax "stmt" prim "parse_stmt")
 
-    ; compiler
-    (copy_variable global "compile" prim "compile")
-
     ; evaluator
     (add_function1 prim Eval DontCare builtin_eval 0)
+    (add_function1 prim (to_sym "exit") intT exit_ 0)
+    (add_function1 prim (to_sym "atexit") funT at_exit 0)
     (add_function1 prim (to_sym "load") stringT load_file 0)
     (add_function1 prim (to_sym "create_module") symT create_module 0)
     (add_function1 prim (to_sym "enter_module") symT enter_module 0)
@@ -532,16 +515,9 @@
     (add_function3 prim (to_sym "define_variable") symT DontCare (quote (to_sym "incremental")) define_variable_incremental 0)
     (add_function1 prim (to_sym "debugpf") DontCare debugpf 0)
 
-    (copy_variable global "eval" prim "eval")
-    (copy_variable global "load" prim "load")
-
     ; important functions
-    (copy_variable global "equal?" prim "equal?")
-    (copy_variable global "identical?" prim "identical?")
-    (copy_variable global "fusion" prim "fusion_function")
-    (copy_variable global "create_module" prim "create_module")
-    (copy_variable global "enter_module" prim "enter_module")
-    (copy_variable global "exit_module" prim "exit_module")
+    (copy_variable global "compile" prim "compile")
+    (copy_variable global "eval" prim "eval")
     ))
 
 (extern fun setup_pprint)
