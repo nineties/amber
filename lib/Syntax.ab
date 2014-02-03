@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-02-03 10:15:52 nineties $ "
+" $Id: Syntax.ab 2014-02-03 17:21:16 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -50,7 +50,7 @@ DefineSyntax{
     List{
         Tuple{List{"."}, Quote{any}},
         Tuple{List{string}, node0},
-        Tuple{List{symbol}, node0},
+        Tuple{List{symbol_without_mark}, node0},
         Tuple{List{reserved_symbol}, node0},
         Tuple{List{"(", syntax_element, ")"}, node1},
         Tuple{List{"(", Many1{syntax_element}, ")"}, node1, multiline},
@@ -143,10 +143,11 @@ DefineSyntax{stmt, List{ Tuple{List{syntax_declaration}, node0}}}
 # The following symbols never been parsed as symbols.
 
 Define{reserved_symbols, List{
-    Quote{self}, Quote{not}, Quote{and}, Quote{or}, Quote{when}, Quote{if}, Quote{else},
-    Quote{case}, Quote{of}, Quote{while}, Quote{for}, Quote{in},
-    Quote{continue}, Quote{break}, Quote{return}, Quote{throw}, Quote{try},
-    Quote{catch}, Quote{import}, Quote{hiding}, Quote{export}
+    Quote{self}, Quote{not}, Quote{and}, Quote{or}, Quote{when},
+    Quote{if}, Quote{else}, Quote{case}, Quote{of}, Quote{while},
+    Quote{for}, Quote{in}, Quote{continue}, Quote{break}, Quote{return},
+    Quote{throw}, Quote{try}, Quote{catch}, Quote{import}, Quote{as},
+    Quote{hiding}, Quote{export}
 }}
 
 ### Expressions
@@ -287,6 +288,12 @@ assign_expr
 Assign{Syntax.expr, Syntax.assign_expr}
 
 ### Statements
+
+import_option
+    ::= as symbol                              { `As{!node1} }
+      |"(" delimited1(symbol, ",") ")"         { node1 }
+      | hiding "(" delimited1(symbol, ",") ")" { `Hiding{!node2} }
+
 stmt
     ::= stmt ";" stmt
         { `Seq{[!node0, !node2]} }
@@ -322,13 +329,8 @@ stmt
         { `Define{!node0, !node3, !node1} }
       | <<multiline>> pattern ":" stmt
         { `Define{!node0, !node2} }
-
-      | import delimited1(symbol, ".") "(" delimited1(symbol, ",") ")"
-        { `Import{!node1, !node3} }
-      | import delimited1(symbol, ".") hiding "(" delimited1(symbol, ",") ")"
-        { `Import{!node1, Hiding{!node4}} } 
-      | import delimited1(symbol, ".")
-        { `Import{!node1} }
+      | import delimited1(symbol, ".") import_option?
+        { `Import{!node1, !node2} }
       | export symbol+
         { `Export{!node1} }
 

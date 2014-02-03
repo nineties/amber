@@ -1,5 +1,5 @@
 # Copyright (C) 2010 nineties
-# $Id: Module.ab 2014-02-03 08:41:54 nineties $
+# $Id: Module.ab 2014-02-03 17:35:55 nineties $
 
 Module: enter_module(\Module)
 
@@ -29,33 +29,35 @@ Module: enter_module(\Module)
 
 exit_module()
 
-macro(Import{mods}): {
+macro(e @ Import{mods, option}): {
     script: Module.buildpath(mods)
     mod: Prim.list_foldl1((l, r) -> `Slot{!l, !r}, mods)
-    `Seq{[
-        !Module.expand_import(mods, script),
-        Module.import_variables(!mod, (!mod).exports)
-    ]}
-}
 
-macro(QuoteSyntax{ Import{mods, vars} }): {
-    script: Module.buildpath(mods)
-    mod: Prim.list_foldl1((l, r) -> `Slot{!l, !r}, mods)
-    `Seq{[
-        !Module.expand_import(mods, script),
-        Module.import_variables(!mod, \!vars)
-    ]}
-}
-
-macro(QuoteSyntax{ Import{mods, Hiding{vars}} }): {
-    script: Module.buildpath(mods)
-    mod: Prim.list_foldl1((l, r) -> `Slot{!l, !r}, mods)
-    `Seq{[
-        !Module.expand_import(mods, script),
-        Module.import_variables(!mod,
-            Prim.list_subtract((!mod).exports, \!vars)
-            )
-    ]}
+    case option of
+          Some{As{name}}
+            -> `Seq{[
+                    !Module.expand_import(mods, script),
+                    (!name : !mod)
+                ]}
+        | Some{Hiding{vars}}
+            -> `Seq{[
+                    !Module.expand_import(mods, script),
+                    Module.import_variables(!mod,
+                        Prim.list_subtract((!mod).exports, \!vars)
+                        )
+                ]}
+        | Some{vars}
+            -> `Seq{[
+                    !Module.expand_import(mods, script),
+                    Module.import_variables(!mod, \!vars)
+                ]}
+        | nil
+            -> `Seq{[
+                    !Module.expand_import(mods, script),
+                    Module.import_variables(!mod, (!mod).exports)
+                ]}
+        | _
+            -> { throw `UnknownExpression{!LOCATION, !e} }
 }
 
 macro(Export{vars}):

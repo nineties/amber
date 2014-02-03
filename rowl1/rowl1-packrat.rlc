@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-02-03 10:14:50 nineties $
+; $Id: rowl1-packrat.rlc 2014-02-03 16:46:42 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1015,6 +1015,30 @@
     (return (parsed p s))
     ))
 @(MEMOIZE reserved_symbol)
+
+(fun parse_symbol_without_mark_ (p) (
+    (var state (copy_parser_state p))
+    (if (is_identchar (lookbehind p))
+        (return (noparse p "not beggining of a symbol"))
+        )
+    (var c (lookahead p))
+    (if (< c 0) (return (mayparse p "expect a symbol")))
+    (if (! (is_letter c)) (return (noparse p "expect a symbol")))
+
+    (var begin (field_get p 6))
+    (while (is_identchar (lookahead p)) (do
+        (getc p)
+        ))
+    (var c (lookahead p))
+    (var s (to_sym (extract_string p begin (field_get p 6))))
+    (if (is_reserved_symbol s) (do
+        (noparse p (strcat "reserved symbol: " (symbol_name s)))
+        (reset_parser_position p state)
+        (return @C_FALSE)
+        ))
+    (return (parsed p s))
+    ))
+@(MEMOIZE symbol_without_mark)
 
 ; single-quoted string literal
 ;   Only escape sequence \' is interpreted.
@@ -2058,6 +2082,7 @@
     (add_parser mod (to_sym "parse_string_d") parse_string_d)
     (add_parser mod (to_sym "parse_string_s") parse_string_s)
     (add_parser mod (to_sym "parse_symbol") parse_symbol)
+    (add_parser mod (to_sym "parse_symbol_without_mark") parse_symbol_without_mark)
     (add_parser mod (to_sym "parse_reserved_symbol") parse_reserved_symbol)
     (add_parser mod (to_sym "parse_atom") parse_atom)
     (add_parser mod (to_sym "parse_fullform") parse_fullform)
