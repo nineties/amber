@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-bigint.rlc 2014-02-03 00:48:55 nineties $
+; $Id: rowl1-bigint.rlc 2014-02-03 10:10:44 nineties $
 ;
 
 (import "rlvm-compile")
@@ -61,6 +61,10 @@
             (field_set b 3 1)
         ))
     (return b)
+    ))
+
+(fun int_to_bint_ (v) (
+    (return (int_to_bint (unbox v)))
     ))
 
 (export fun uint_to_bint (v) (
@@ -610,6 +614,15 @@
     (= b (to_bint b))
     (if (== (bigcmp a b) 0) (return @C_TRUE) (return @C_FALSE))
     ))
+(export fun bint_compare (a b) (
+    (= a (to_bint a))
+    (= b (to_bint b))
+    (var r (bigcmp a b))
+    (if (< r 0) (return (box -1))
+    (if (== r 0) (return (box 0))
+        (return (box 1))
+        ))
+    ))
 
 ; comput a^n by binary method
 (export fun bint_pow (a n) (
@@ -687,24 +700,25 @@
 (extern fun float_uminus)
 
 (export fun setup_bigint (mod) (
-    (add_function1 mod (to_sym "bint_uplus") bintT bint_uplus 0)
-    (add_function1 mod (to_sym "bint_uminus") bintT bint_uminus 0)
+    (var trait (make_object1 (to_sym "Trait") (to_sym "BigInt")))
+    (set_slot mod (to_sym "BigIntTrait") trait)
+    (set_special_parent @BigIntE trait)
+
+    (add_function1 mod (to_sym "int_to_bint") intT int_to_bint_ 0)
     (add_function1 mod (to_sym "bint_to_string") bintT bint_to_s 0)
-    (add_function1 mod (to_sym "bint_hash") bintT bint_hash 0)
     (add_function1 mod (to_sym "string_to_bint") stringT bint_to_i 0)
     (add_function1 mod (to_sym "bint_to_float") bintT bint_to_f 0)
 
+    (add_function1 mod (to_sym "bint_hash") bintT bint_hash 0)
+    (add_function1 mod (to_sym "bint_uminus") bintT bint_uminus 0)
     (add_function2 mod (to_sym "bint_add") bintT bintT bint_add 0)
     (add_function2 mod (to_sym "bint_sub") bintT bintT bint_sub 0)
     (add_function2 mod (to_sym "bint_mul") bintT bintT bint_mul 0)
     (add_function2 mod (to_sym "bint_div") bintT bintT bint_div 0)
     (add_function2 mod (to_sym "bint_mod") bintT bintT bint_mod 0)
     (add_function2 mod (to_sym "bint_pow") bintT bintT bint_pow 0)
-    (add_function2 mod (to_sym "bint_lt") bintT bintT bint_lt 0)
-    (add_function2 mod (to_sym "bint_gt") bintT bintT bint_gt 0)
-    (add_function2 mod (to_sym "bint_le") bintT bintT bint_le 0)
-    (add_function2 mod (to_sym "bint_ge") bintT bintT bint_ge 0)
-    (add_function2 mod (to_sym "bint_equal") bintT bintT bint_eq 0)
+    (add_function2 mod (to_sym "bint_compare") bintT bintT bint_compare 0)
+    (add_function2 mod (to_sym "bint_equal?") bintT bintT bint_eq 0)
     (add_function2 mod (to_sym "bint_shiftL") bintT intT bint_shiftL 0)
     (add_function2 mod (to_sym "bint_shiftR") bintT intT bint_shiftR 0)
 
@@ -715,11 +729,6 @@
     (add_function2 mod (to_sym "bint_pow") intT intT bint_pow 0)
     (add_function2 mod (to_sym "bint_shiftL") intT intT bint_shiftL 0)
     (add_function2 mod (to_sym "bint_shiftR") intT intT bint_shiftR 0)
-
-    (add_function2 mod (to_sym "bint_coerce") intT bintT ib_coerce 0)
-    (add_function2 mod (to_sym "bint_coerce") bintT intT bi_coerce 0)
-    (add_function2 mod (to_sym "bint_coerce") floatT bintT fb_coerce 0)
-    (add_function2 mod (to_sym "bint_coerce") bintT floatT bf_coerce 0)
     ))
 
     ))
