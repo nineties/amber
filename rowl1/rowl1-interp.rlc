@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-02-03 08:54:46 nineties $
+; $Id: rowl1-interp.rlc 2014-02-03 15:32:28 nineties $
 ;
 
 (import "rlvm-compile")
@@ -25,6 +25,7 @@
 (export var prim null)
 (export var variables null)
 (export var current_loc null)
+(var module_stack null)
 
 (extern fun ary_new)
 (extern fun ary_at)
@@ -434,16 +435,22 @@
         (throw (logic_error current_loc
             (string "The argument of enter_module() must be direct submodule of global-module")))
         )
+    (= module_stack (cons mod module_stack))
     (= global mod)
     (return mod)
     ))
 
 (fun exit_module () (
+    (if (! module_stack)
+        (throw (logic_error current_loc
+            (string "Can not exit from global-module")))
+        )
     (var mod (get_slot global parent))
     (if (!= (node_bhead mod) Module)
         (throw (type_error current_loc (string "Module") mod))
         )
     (= global mod)
+    (= module_stack (cdr module_stack))
     (return mod)
     ))
 
@@ -558,12 +565,12 @@
     (setup_object mod)
     (setup_symbol mod)
 
-    ;(setup_math mod)
+    (setup_math mod)
     (setup_numeric mod)
     (setup_string mod)
     (setup_bigint mod)
     (setup_float mod)
-    ;(setup_random mod)
+    (setup_random mod)
     (setup_io mod)
     (setup_list mod)
     ;(setup_tuple mod)
