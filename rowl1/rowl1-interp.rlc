@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-02-04 22:46:42 nineties $
+; $Id: rowl1-interp.rlc 2014-02-04 23:21:15 nineties $
 ;
 
 (import "rlvm-compile")
@@ -412,11 +412,7 @@
     (if (== mod @C_UNDEF)
         (= mod (create_module sym))
         )
-    (if (!= (get_slot mod parent) global)
-        (throw (logic_error current_loc
-            (string "The argument of enter_module() must be direct submodule of global-module")))
-        )
-    (= module_stack (cons mod module_stack))
+    (= module_stack (cons global module_stack))
     (= global mod)
     (return mod)
     ))
@@ -426,10 +422,7 @@
         (throw (logic_error current_loc
             (string "Can not exit from global-module")))
         )
-    (var mod (get_slot global parent))
-    (if (!= (node_bhead mod) Module)
-        (throw (type_error current_loc (string "Module") mod))
-        )
+    (var mod (car module_stack))
     (= global mod)
     (= module_stack (cdr module_stack))
     (return mod)

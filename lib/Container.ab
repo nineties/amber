@@ -1,6 +1,115 @@
 # Copyright (C) 2014 nineties
-# $Id: Container.ab 2014-02-04 15:43:12 nineties $
+# $Id: Container.ab 2014-02-05 02:16:17 nineties $
+
+import Numeric
 
 ContainerTrait: `Trait{Container}
+
+ContainerTrait.empty?(): self.size == 0
+
+ContainerTrait.each(): {
+    seq: self
+    i: 0
+    n: self.size
+    () -> {
+        if (i < n) {
+            i += 1
+            return seq[i-1]
+        }
+        return undef
+    }
+}
+
+ContainerTrait.to_array(): {
+    a: Array.new()
+    for (v in self)
+        a.push(v)
+    a
+}
+
+ContainerTrait.to_list(): {
+    l: []
+    for (v in self)
+        l = cons(v, l)
+    l.reverse()
+}
+
+ContainerTrait.all?(pred): {
+    for (v in self)
+        if (not pred(v))
+            return false
+    return true
+}
+
+ContainerTrait.all?(): self.all?(id)
+
+ContainerTrait.any?(pred): {
+    for (v in self)
+        if (pred(v))
+            return true
+    return false
+}
+
+ContainerTrait.any?(): self.any?(id)
+
+ContainerTrait.count(value): {
+    c: 0
+    for (v in self)
+        if (v == value) c += 1
+    c
+}
+
+ContainerTrait.count(pred @ Function): {
+    c: 0
+    for (v in self)
+        if (pred(v)) c += 1
+    c
+}
+
+ContainerTrait.find(pred): {
+    for (v in self)
+        if (pred(v)) return v
+    return undef
+}
+
+ContainerTrait.findall(pred): {
+    ret: Array.new()
+    for (v in self)
+        if (pred(v)) ret.push(v)
+    return ret
+}
+
+ContainerTrait.partition(pred): {
+    a: Array.new()
+    b: Array.new()
+    for (v in self)
+        if (pred(v)) a.push(v)
+        else b.push(v)
+    (a, b)
+}
+
+ContainerTrait.min(): self.foldl1(min)
+ContainerTrait.max(): self.foldl1(max)
+ContainerTrait.min(cmp): self.foldl1((a, b) -> cmp(a,b) < 0 ? a : b)
+ContainerTrait.max(cmp): self.foldl1((a, b) -> cmp(a,b) > 0 ? a : b)
+
+ContainerTrait.minmax(cmp): {
+    if (self.empty?())
+        throw `InvalidArgument{!LOCATION,
+            "`minmax' requires non empty sequence"
+        }
+
+    m: infinity
+    M: -infinity
+    for (v in self) {
+        m = cmp(m, v) < 0 ? m : v
+        M = cmp(M, v) > 0 ? M : v
+    }
+    (m, M)
+}
+ContainerTrait.minmax(): self.minmax(compare)
+
+ContainerTrait.sum(): self.foldl(add, 0)
+ContainerTrait.product(): self.foldl(mul, 1)
 
 export ContainerTrait

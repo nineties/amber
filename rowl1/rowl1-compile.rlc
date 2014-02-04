@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-02-04 22:25:54 nineties $
+; $Id: rowl1-compile.rlc 2014-02-04 23:59:05 nineties $
 ;
 
 (import "rlvm-compile")
@@ -24,8 +24,8 @@
 (var closed        (to_sym "%closed"))
 
 (export fun unwrap_internal (node) (
-    ;(if (== (node_head node) Ref)
-    ;    (return (unwrap_internal (node_arg node 2))))
+    (if (== (node_head node) Ref)
+        (return (unwrap_internal (node_arg node 2))))
     (return node)
     ))
 
@@ -41,6 +41,7 @@
 (extern fun get_slot)
 (extern fun get_slot_nocheck)
 (extern fun get_slot_unalias)
+(extern fun get_slot_norec)
 
 (fun trace_func (msg val) (
     (debugs msg)
@@ -710,7 +711,7 @@
     ))
 
 (fun define_slot (obj sym val) (
-    (if (!= (get_slot_nocheck obj sym) @C_UNDEF)
+    (if (!= (get_slot_norec obj sym) @C_UNDEF)
         (throw (redefined_slot current_loc obj sym))
         )
     (return (set_slot obj sym val))

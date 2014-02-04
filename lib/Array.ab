@@ -1,16 +1,17 @@
 # Copyright (C) 2014 nineties
-# $Id: Array.ab 2014-02-04 23:05:20 nineties $
+# $Id: Array.ab 2014-02-04 23:51:21 nineties $
 
-import List
+import Container
 
 ArrayTrait: Prim.ArrayTrait
+ArrayTrait.parent = ContainerTrait
 
 new: Prim.array_new
    | Prim.array_new_with_size
    | Prim.array_new_with_size_and_initial_value
-   | (values @ List) -> Prim.list_to_ary(values)
+   | (values @ List) -> Prim.list_to_array(values)
 
-ListTrait.to_array():   Prim.list_to_ary(self)
+ArrayTrait.to_array: id
 ArrayTrait.to_list():   Prim.array_to_list(self)
 
 ArrayTrait.length:      alias(() -> Prim.array_length(self))
@@ -32,5 +33,18 @@ ArrayTrait.foldr(fun, v): Prim.array_foldr(fun, self, v)
 ArrayTrait.foldr1(fun):   Prim.array_foldr1(fun, self)
 
 add = Prim.array_append | add
+
+ArrayTrait.each(): {
+    ary: self
+    i: 0
+    n: ary.size
+    () -> {
+        if (i < n) {
+            i += 1
+            return ary[i-1]
+        }
+        return undef
+    }
+}
 
 export ArrayTrait add
