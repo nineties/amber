@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-object.rlc 2014-02-03 22:31:32 nineties $
+; $Id: rowl1-object.rlc 2014-02-04 11:08:16 nineties $
 ;
 
 (import "rlvm-compile")
@@ -46,8 +46,15 @@
 
 (export fun set_slot (obj sym val) (
     (if (&& (== obj root_object) (== sym parent))
-        (throw (logic_error current_loc (string "Can not assign parent to root-object")))
+        (throw (logic_error current_loc (string "Can not set parent of root-object")))
         ) 
+    (if (== obj @C_UNDEF)
+        (throw (logic_error current_loc (string "Can not set slots of undef")))
+        )
+    (var v (get_slot_nocheck_noalias obj sym))
+    (if (&& (== (node_type v) @AliasE) (field_get v 2))
+        (return (runcode_with_self obj (get_bytecode (field_get v 2)) val))
+        )
     (if (== val @C_UNDEF) (return (remove_slot obj sym)))
     (var tbl (wrtable_find slots sym))
     (if (== tbl @C_UNDEF) (do
@@ -93,7 +100,7 @@
     (return root_object)
     ))
 
-(export fun get_slot_nocheck (obj sym) (
+(fun get_slot_nocheck_noalias (obj sym) (
     (if (== sym parent) (return (get_parent obj)))
     (var tbl (wrtable_find slots sym))
     (if (== tbl @C_UNDEF) (return @C_UNDEF))
@@ -101,10 +108,17 @@
     (var v (wrtable_find tbl obj))
     (if (== v @C_UNDEF) (do
         (= obj (get_parent obj))
-        (if (== obj @C_UNDEF) (return (wrtable_find tbl @C_UNDEF)))
-        (goto retry)
+        (if (!= obj @C_UNDEF) (goto retry))
         ))
     (return v)
+    ))
+
+(export fun get_slot_nocheck (obj sym) (
+    (var v (get_slot_nocheck_noalias obj sym))
+    (if (&& (== (node_type v) @AliasE) (field_get v 1))
+        (return (runcode_with_self obj (get_bytecode (field_get v 1))))
+        (return v)
+        )
     ))
 
 (export fun get_slot (obj sym) (
@@ -120,7 +134,11 @@
     (if (== sym parent) (return (get_parent obj)))
     (var tbl (wrtable_find slots sym))
     (if (== tbl @C_UNDEF) (return @C_UNDEF))
-    (return (wrtable_find tbl obj))
+    (var v (wrtable_find tbl obj))
+    (if (&& (== (node_type v) @AliasE) (field_get v 1))
+        (return (runcode_with_self obj (get_bytecode (field_get v 1))))
+        )
+    (return v)
     ))
 
 (export fun set_special_parent (ty obj) (
@@ -134,13 +152,23 @@
         )
     ))
 
-(export fun setup_object (mod) (
+(fun alias_r (reader) (
+    (return (variant @AliasE 2 reader 0))
+    ))
+
+(fun alias_rw (reader writer) (
+    (return (variant @AliasE 2 reader writer))
+    ))
+
+(export fun setup_object_pre () (
     (= parent_special (allocate_array @NUM_NODE_TYPE))
     (for i 0 @NUM_NODE_TYPE
         (array_set object parent_special i @C_UNDEF)
         )
-
     (= root_object (make_object1 (to_sym "Trait") (to_sym "Object")))
+    ))
+
+(export fun setup_object (mod) (
     (set_slot mod (to_sym "ObjectTrait") root_object)
 
     (add_function1 mod (to_sym "clone") DontCare make_clone 0)
@@ -149,6 +177,9 @@
     (add_function2 mod (to_sym "get_slot") DontCare DontCare get_slot 0)
     (add_function3 mod (to_sym "get_slot") DontCare DontCare (quote (to_sym "norec")) get_slot_norec 0)
     (add_function2 mod (to_sym "has_slot?") DontCare symT has_slot_p 0)
+
+    (add_function1 mod (to_sym "alias") funT alias_r 0)
+    (add_function2 mod (to_sym "alias") funT funT alias_rw 0)
     ))
 
     ))
