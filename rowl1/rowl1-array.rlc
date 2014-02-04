@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-array.rlc 2014-01-27 19:29:43 nineties $
+; $Id: rowl1-array.rlc 2014-02-04 23:05:44 nineties $
 ;
 
 (import "rlvm-compile")
@@ -124,6 +124,18 @@
     (return ary)
     ))
 
+(export fun ary_pop (ary) (
+    (var n (array_size ary))
+    (if (== n 0)
+        (throw (logic_error1 current_loc
+            (string "Can not pop element from empty array")
+            ary
+        )))
+    (var v (array_at ary (- n 1)))
+    (array_resize ary (- n 1))
+    (return v)
+    ))
+
 (export fun array_restof (ary i) (
     (var ls 0)
     (var size (field_get ary 2))
@@ -144,19 +156,6 @@
     (return ls)
     ))
 
-(fun ary_to_list2 (ary i j) (
-    (= i (unbox i))
-    (= j (unbox j))
-    (var ls 0)
-    (var size (field_get ary 2))
-    (if (>= j size) (index_out_of_range ary j))
-    (var buf (field_get ary 1))
-    (rfor k i (+ j 1) (do
-        (= ls (cons (array_get object buf k) ls))
-        ))
-    (return ls)
-    ))
-
 (export fun list_to_ary (ls) (
     (var size (list_len ls))
     (var buf (allocate_array size))
@@ -170,11 +169,14 @@
 (fun ary_reverse (ary) (
     (var size (field_get ary 2))
     (var buf (field_get ary 1))
-    (var rev (allocate_array size))
-    (for i 0 size (do
-        (array_set object rev (- (- size i) 1) (array_get object buf i))
+    (for i 0 (/ size 2) (do
+        (var j (- (- size 1) i))
+        (var a (array_get object buf i))
+        (var b (array_get object buf j))
+        (array_set object buf i b)
+        (array_set object buf j a)
         ))
-    (return (variant @ArrayE 1 rev size size))
+    (return ary)
     ))
 
 (fun ary_append (ary1 ary2) (
@@ -199,26 +201,9 @@
     (var new  (allocate_array size))
     (var code (get_bytecode f))
     (for i 0 size (do
-        (array_set object new i (runcode code (array_get object buf i)))
+        (array_set object buf i (runcode code (array_get object buf i)))
         ))
-    (return (variant @ArrayE 1 new size size))
-    ))
-
-(fun ary_map2 (f ary1 ary2) (
-    (var size1 (field_get ary1 2))
-    (var buf1  (field_get ary1 1))
-    (var size2 (field_get ary2 2))
-    (var buf2  (field_get ary2 1))
-    (var size size1)
-    (if (< size2 size) (= size size2))
-    (var code (get_bytecode f))
-    (var new (allocate_array size))
-    (for i 0 size (do
-        (array_set object new i (runcode code
-            (array_get object buf1 i)
-            (array_get object buf2 i)))
-        ))
-    (return (variant @ArrayE 1 new size size))
+    (return ary)
     ))
 
 (fun ary_foldl (f v ary) (
@@ -226,6 +211,20 @@
     (var size (field_get ary 2))
     (var code (get_bytecode f))
     (for i 0 size (do
+        (= v (runcode code v (array_get object buf i)))
+        ))
+    (return v)
+    ))
+
+(fun ary_foldl1 (f ary) (
+    (var buf (field_get ary 1))
+    (var size (field_get ary 2))
+    (var code (get_bytecode f))
+    (if (== size 0)
+        (throw (invalid_argument current_loc (string "foldl1 requires non-empty array") ary))
+        )
+    (var v (array_get object buf 0))
+    (for i 1 size (do
         (= v (runcode code v (array_get object buf i)))
         ))
     (return v)
@@ -241,27 +240,44 @@
     (return v)
     ))
 
-(export fun setup_array (global) (
-    (var arr (set_undef_slot global (to_sym "Array") (create_module (to_sym "Array"))))
-    (add_function0 arr (to_sym "new") ary_new 0)
-    (add_function1 arr (to_sym "new") intT ary_new2 0)
-    (add_function2 arr (to_sym "new") intT DontCare ary_new3 0)
-    (add_function1 global (to_sym "to_array") listT list_to_ary 0)
-    (add_function1 global  (to_sym "to_list") arrayT ary_to_list 0)
-    (add_function3 global  (to_sym "to_list") arrayT intT intT ary_to_list2 0)
+(fun ary_foldr1 (f ary) (
+    (var buf (field_get ary 1))
+    (var size (field_get ary 2))
+    (var code (get_bytecode f))
+    (if (== size 0)
+        (throw (invalid_argument current_loc (string "foldr1 requires non-empty array") ary))
+        )
+    (var v (array_get object buf (- size 1)))
+    (rfor i 0 (- size 1) (do
+        (= v (runcode code (array_get object buf i) v))
+        ))
+    (return v)
+    ))
 
-    (add_function1 global (to_sym "length") arrayT ary_size 0)
-    (add_function1 global (to_sym "size") arrayT ary_size 0)
-    (add_function2 global (to_sym "at") arrayT intT ary_at 0)
-    (add_function3 global (to_sym "store") arrayT intT DontCare ary_store 0)
-    (add_function2 global (to_sym "push") arrayT DontCare ary_push 0)
+(export fun setup_array (mod) (
+    (var trait (make_object1 (to_sym "Trait") (to_sym "Array")))
+    (set_slot mod (to_sym "ArrayTrait") trait)
+    (set_special_parent @ArrayE trait)
+    (add_function0 mod (to_sym "array_new") ary_new 0)
+    (add_function1 mod (to_sym "array_new_with_size") intT ary_new2 0)
+    (add_function2 mod (to_sym "array_new_with_size_and_initial_value") intT DontCare ary_new3 0)
+    (add_function1 mod (to_sym "list_to_array") listT list_to_ary 0)
+    (add_function1 mod (to_sym "array_to_list") arrayT ary_to_list 0)
 
-    (add_function1 global (to_sym "reverse") arrayT ary_reverse 0)
-    (add_function2 global (to_sym "append") arrayT arrayT ary_append 0)
-    (add_function2 global (to_sym "map") funT arrayT ary_map 0)
-    (add_function3 global (to_sym "map2") funT arrayT arrayT ary_map2 0)
-    (add_function3 global (to_sym "foldl") funT DontCare arrayT ary_foldl 0)
-    (add_function3 global (to_sym "foldr") funT arrayT DontCare ary_foldr 0)
+    (add_function1 mod (to_sym "array_length") arrayT ary_size 0)
+    (add_function1 mod (to_sym "array_size") arrayT ary_size 0)
+    (add_function2 mod (to_sym "array_at") arrayT intT ary_at 0)
+    (add_function3 mod (to_sym "array_store") arrayT intT DontCare ary_store 0)
+    (add_function2 mod (to_sym "array_push") arrayT DontCare ary_push 0)
+    (add_function1 mod (to_sym "array_pop") arrayT ary_pop 0)
+
+    (add_function1 mod (to_sym "array_reverse!") arrayT ary_reverse 0)
+    (add_function2 mod (to_sym "array_append") arrayT arrayT ary_append 0)
+    (add_function2 mod (to_sym "array_map!") funT arrayT ary_map 0)
+    (add_function3 mod (to_sym "array_foldl") funT DontCare arrayT ary_foldl 0)
+    (add_function2 mod (to_sym "array_foldl1") funT arrayT ary_foldl1 0)
+    (add_function3 mod (to_sym "array_foldr") funT arrayT DontCare ary_foldr 0)
+    (add_function2 mod (to_sym "array_foldr1") funT arrayT ary_foldr1 0)
 
     ))
 

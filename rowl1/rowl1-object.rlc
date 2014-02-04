@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-object.rlc 2014-02-04 11:30:53 nineties $
+; $Id: rowl1-object.rlc 2014-02-04 22:30:45 nineties $
 ;
 
 (import "rlvm-compile")
@@ -60,6 +60,24 @@
                 (string "Immutable Slot") obj sym))
             )
         ))
+    (if (== val @C_UNDEF) (return (remove_slot obj sym)))
+    (var tbl (wrtable_find slots sym))
+    (if (== tbl @C_UNDEF) (do
+        (= tbl (make_wrtable))
+        (wrtable_add slots sym tbl)
+        ))
+    (wrtable_add tbl obj val)
+    (return val)
+    ))
+
+(export fun set_slot_unalias (obj sym val) (
+    (if (&& (== obj root_object) (== sym parent))
+        (throw (logic_error current_loc (string "Can not set parent of root-object")))
+        ) 
+    (if (== obj @C_UNDEF)
+        (throw (logic_error current_loc (string "Can not set slots of undef")))
+        )
+    (var v (get_slot_nocheck_noalias obj sym))
     (if (== val @C_UNDEF) (return (remove_slot obj sym)))
     (var tbl (wrtable_find slots sym))
     (if (== tbl @C_UNDEF) (do
@@ -134,8 +152,15 @@
     (return v)
     ))
 
+(export fun get_slot_unalias (obj sym) (
+    (var v (get_slot_nocheck_noalias obj sym))
+    (if (== v @C_UNDEF)
+        (throw (undefined_var current_loc sym))
+        )
+    (return v)
+    ))
 
-(export fun get_slot_norec (obj sym _) (
+(export fun get_slot_norec (obj sym) (
     (if (== sym parent) (return (get_parent obj)))
     (var tbl (wrtable_find slots sym))
     (if (== tbl @C_UNDEF) (return @C_UNDEF))
@@ -178,9 +203,11 @@
 
     (add_function1 mod (to_sym "clone") DontCare make_clone 0)
     (add_function3 mod (to_sym "set_slot") DontCare symT DontCare set_slot 0)
-    (add_function4 mod (to_sym "set_slot") DontCare symT DontCare (quote (to_sym "incremental")) set_slot_incremental 0)
-    (add_function2 mod (to_sym "get_slot") DontCare DontCare get_slot 0)
-    (add_function3 mod (to_sym "get_slot") DontCare DontCare (quote (to_sym "norec")) get_slot_norec 0)
+    (add_function3 mod (to_sym "set_slot_incremental") DontCare symT DontCare set_slot_incremental 0)
+    (add_function3 mod (to_sym "set_slot_unalias") DontCare symT DontCare set_slot_unalias 0)
+    (add_function2 mod (to_sym "get_slot") DontCare symT get_slot 0)
+    (add_function2 mod (to_sym "get_slot_norec") DontCare symT get_slot_norec 0)
+    (add_function2 mod (to_sym "get_slot_unalias") DontCare symT  get_slot_unalias 0)
     (add_function2 mod (to_sym "has_slot?") DontCare symT has_slot_p 0)
 
     (add_function1 mod (to_sym "alias") funT alias_r 0)
