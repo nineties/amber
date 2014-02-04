@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-object.rlc 2014-02-04 11:08:16 nineties $
+; $Id: rowl1-object.rlc 2014-02-04 11:30:53 nineties $
 ;
 
 (import "rlvm-compile")
@@ -52,9 +52,14 @@
         (throw (logic_error current_loc (string "Can not set slots of undef")))
         )
     (var v (get_slot_nocheck_noalias obj sym))
-    (if (&& (== (node_type v) @AliasE) (field_get v 2))
-        (return (runcode_with_self obj (get_bytecode (field_get v 2)) val))
-        )
+    (if (== (node_type v) @AliasE) (do
+        (var f (field_get v 2))
+        (if f
+            (return (runcode_with_self obj (get_bytecode f) val))
+            (throw (logic_error2 current_loc
+                (string "Immutable Slot") obj sym))
+            )
+        ))
     (if (== val @C_UNDEF) (return (remove_slot obj sym)))
     (var tbl (wrtable_find slots sym))
     (if (== tbl @C_UNDEF) (do
