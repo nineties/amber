@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-bigint.rlc 2014-02-05 18:00:23 nineties $
+; $Id: rowl1-bigint.rlc 2014-02-05 21:03:06 nineties $
 ;
 
 (import "rlvm-compile")
@@ -660,23 +660,35 @@
 
 ; compute a^n mod m
 (export fun bint_powmod (a n m) (
+    (= m (norm m))
+    (if (== m 1) ; box(0) == 1
+        (throw (division_by_zero current_loc))
+        )
+    (if (|| (== m 3) (== m -1)) ; box(1) == 3, box(-1) == -1
+        (return (box 0))
+        )
     (= n (norm n))
     (if (== (node_type n) @BigIntE)
         (throw (invalid_argument current_loc (string "exponent is too big") n))
         )
-    (if (== n 1) (return (box 1))) ; 1 == box(0)
+    (if (== n 1) ; box(0) == 1
+        (return (box 1))
+        )
+
     (if (< n 0) (throw (invalid_argument current_loc (string "positive integer is required") n)))
 
     (var v (int_to_bint 1))
     (= a (to_bint a))
     (= n (unbox n))
-    (var m 0x40000000)
-    (while (! (& n m)) (>>= m 1))
+    (= m (to_bint m))
+    (var p 0x40000000)
+    (while (! (& n p)) (>>= p 1))
 
-    (while (> m 0) (do
+    (while (> p 0) (do
         (bigmul v v)
-        (if (& n m) (bigmul v a))
-        (>>= m 1)
+        (if (& n p) (bigmul v a))
+        (= v (bigdiv v m))
+        (>>= p 1)
         ))
     (return (norm v))
     ))

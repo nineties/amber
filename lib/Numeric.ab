@@ -1,28 +1,23 @@
 # Copyright (C) 2014 nineties
-# $Id: Numeric.ab 2014-02-05 19:25:23 nineties $
+# $Id: Numeric.ab 2014-02-05 21:05:16 nineties $
 
-# Numerical types have partial ordering.
-# a < b  <=> a and b are different types and a can be converted to b
-compare_numeric_type(a, b): undef
-compare_numeric_type(a, a): 0
-compare_numeric_type(\Int, \Float): -1
-compare_numeric_type(\Float, \Int): 1
+join_numeric_type(a, b): undef
+join_numeric_type(a, a): a
+join_numeric_type(\Int, \Float): \Float
+join_numeric_type(\Float, \Int): \Float
 
-upcast(a @ Int, \Float): a.to_f()
+upcast(a, h) when a.head == h: a
+upcast(a, \Float): a.to_f()
 
 perform_binary_operation(a, b, fun, op): {
-    case (compare_numeric_type(a.head, b.head)) of
-          undef -> {
-              throw `LogicError{!LOCATION,
-                  "Operands are incompatible", operator{!op}, args{[!a, !b]}}
-          }
-        | 0 -> {
-              throw `LogicError{!LOCATION,
-                  "Operands are incompatible", operator{!op}, args{[!a, !b]}}
-          }
-        | -1 -> { a = upcast(a, b.head) }
-        |  1 -> { b = upcast(b, a.head) }
-    fun(a, b)
+    h: join_numeric_type(a.head, b.head)
+    if (h == undef)
+          throw `LogicError{!LOCATION,
+              "Operands are incompatible.", operator{!op}, args{[!a, !b]}}
+    if (h == a.head and h == b.head)
+          throw `LogicError{!LOCATION,
+              "Undefined binary operation.", operator{!op}, args{[!a, !b]}}
+    fun(upcast(a, h), upcast(b, h))
 }
 
 add(a, b): perform_binary_operation(a, b, add, \add)
@@ -32,7 +27,18 @@ div(a, b): perform_binary_operation(a, b, div, \div)
 mod(a, b): perform_binary_operation(a, b, mod, \mod)
 pow(a, b): perform_binary_operation(a, b, pow, \pow)
 divmod(a, b): (div(a, b), mod(a, b))
-powmod(a, b, c): mod(pow(a, b), c)
+powmod(a, b, c): {
+    h: join_numeric_type(a.head, join_numeric_type(b.head, c.head))
+    if (h == undef)
+          throw `LogicError{!LOCATION,
+              "Operands are incompatible.",
+              operator{powmod}, args{[!a, !b, !c]}}
+    if (h == a.head and h == b.head and h == c.head)
+          throw `LogicError{!LOCATION,
+              "Undefined ternary operation.",
+              operator{powmod}, args{[!a, !b, !c]}}
+    powmod(upcast(a, h), upcast(b, h), upcast(c, h))
+}
 
 compare(a, b): perform_binary_operation(a, b, compare, \compare)
 less_than?(a, b):     compare(a, b) < 0
