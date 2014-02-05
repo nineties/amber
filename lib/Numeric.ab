@@ -1,23 +1,27 @@
 # Copyright (C) 2014 nineties
-# $Id: Numeric.ab 2014-02-05 18:54:08 nineties $
+# $Id: Numeric.ab 2014-02-05 19:25:23 nineties $
 
 # Numerical types have partial ordering.
 # a < b  <=> a and b are different types and a can be converted to b
 compare_numeric_type(a, b): undef
+compare_numeric_type(a, a): 0
 compare_numeric_type(\Int, \Float): -1
 compare_numeric_type(\Float, \Int): 1
 
 upcast(a @ Int, \Float): a.to_f()
 
 perform_binary_operation(a, b, fun, op): {
-    c: compare_numeric_type(a.head, b.head)
-    if (c == undef)
-        throw `LogicError{!LOCATION,
-            "Undefined binary operation", !op, !a, !b}
-    if (c < 0)
-        a = upcast(a, b.head)
-    else
-        b = upcast(b, a.head)
+    case (compare_numeric_type(a.head, b.head)) of
+          undef -> {
+              throw `LogicError{!LOCATION,
+                  "Operands are incompatible", operator{!op}, args{[!a, !b]}}
+          }
+        | 0 -> {
+              throw `LogicError{!LOCATION,
+                  "Operands are incompatible", operator{!op}, args{[!a, !b]}}
+          }
+        | -1 -> { a = upcast(a, b.head) }
+        |  1 -> { b = upcast(b, a.head) }
     fun(a, b)
 }
 
