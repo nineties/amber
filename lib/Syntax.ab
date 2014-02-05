@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-02-05 15:33:45 nineties $ "
+" $Id: Syntax.ab 2014-02-05 18:56:45 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -233,12 +233,13 @@ range_expr
       | additive_expr
 
 rel_expr
-    ::= range_expr "<"  range_expr   { `LessThan{!node0, !node2} }
-      | range_expr "<=" range_expr   { `LessEqual{!node0, !node2} }
-      | range_expr ">"  range_expr   { `GreaterThan{!node0, !node2} }
-      | range_expr ">=" range_expr   { `GreaterEqual{!node0, !node2} }
-      | range_expr "==" range_expr   { `Equal{!node0, !node2} }
-      | range_expr "!=" range_expr   { `NotEqual{!node0, !node2} }
+    ::= range_expr "<"  range_expr  { `LessThan{!node0, !node2} }
+      | range_expr "<=" range_expr  { `LessEqual{!node0, !node2} }
+      | range_expr ">"  range_expr  { `GreaterThan{!node0, !node2} }
+      | range_expr ">=" range_expr  { `GreaterEqual{!node0, !node2} }
+      | range_expr "==" range_expr  { `Equal{!node0, !node2} }
+      | range_expr "!=" range_expr  { `NotEqual{!node0, !node2} }
+      | range_expr "<=>" range_expr { `Compare{!node0, !node2} }
       | range_expr
 
 seqand_expr
@@ -429,29 +430,30 @@ macro(Assign{Apply{f, args}, e, g})     = `Assign{!f, Lambda{When{!args, !g}, !e
 macro(Define{Send{obj, f, args}, e, g}) = `Define{Slot{!obj, !f}, Lambda{When{!args, !g}, !e}, incremental}
 macro(Assign{Send{obj, f, args}, e, g}) = `Assign{Slot{!obj, !f}, Lambda{When{!args, !g}, !e}, incremental}
 
-macro(|x|)    = `abs(!x)
-macro(+x)     = `uplus(!x)
-macro(-x)     = `uminus(!x)
-macro(x + y)  = `add(!x, !y)
-macro(x - y)  = `sub(!x, !y)
-macro(x * y)  = `mul(!x, !y)
-macro(x ^ y)  = `pow(!x, !y)
-macro(x / y)  = `div(!x, !y)
-macro(x % y)  = `mod(!x, !y)
-macro(x | y)  = `fusion(!x, !y)
-macro(x < y)  = `less_than?(!x, !y)
-macro(x > y)  = `greater_than?(!x, !y)
-macro(x <= y) = `less_equal?(!x, !y)
-macro(x >= y) = `greater_equal?(!x, !y)
-macro(x == y) = `equal?(!x, !y)
-macro(x != y) = `(not equal?(!x, !y))
-macro(x += y) = `ArithAssign{!x, !y, add}
-macro(x -= y) = `ArithAssign{!x, !y, sub}
-macro(x *= y) = `ArithAssign{!x, !y, mul}
-macro(x ^= y) = `ArithAssign{!x, !y, pow}
-macro(x /= y) = `ArithAssign{!x, !y, div}
-macro(x %= y) = `ArithAssign{!x, !y, mod}
-macro(x |= y) = `ArithAssign{!x, !y, fusion}
+macro(|x|)     = `abs(!x)
+macro(+x)      = `uplus(!x)
+macro(-x)      = `uminus(!x)
+macro(x + y)   = `add(!x, !y)
+macro(x - y)   = `sub(!x, !y)
+macro(x * y)   = `mul(!x, !y)
+macro(x ^ y)   = `pow(!x, !y)
+macro(x / y)   = `div(!x, !y)
+macro(x % y)   = `mod(!x, !y)
+macro(x | y)   = `fusion(!x, !y)
+macro(x < y)   = `less_than?(!x, !y)
+macro(x > y)   = `greater_than?(!x, !y)
+macro(x <= y)  = `less_equal?(!x, !y)
+macro(x >= y)  = `greater_equal?(!x, !y)
+macro(x == y)  = `equal?(!x, !y)
+macro(x != y)  = `(not equal?(!x, !y))
+macro(x <=> y) = `compare(!x, !y)
+macro(x += y)  = `ArithAssign{!x, !y, add}
+macro(x -= y)  = `ArithAssign{!x, !y, sub}
+macro(x *= y)  = `ArithAssign{!x, !y, mul}
+macro(x ^= y)  = `ArithAssign{!x, !y, pow}
+macro(x /= y)  = `ArithAssign{!x, !y, div}
+macro(x %= y)  = `ArithAssign{!x, !y, mod}
+macro(x |= y)  = `ArithAssign{!x, !y, fusion}
 
 # Subscript syntax is not built-in. We need macros.
 macro(x[idxs...]) = `Send{!x, at, !idxs}
