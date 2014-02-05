@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: Array.ab 2014-02-04 23:51:21 nineties $
+# $Id: Array.ab 2014-02-05 16:02:27 nineties $
 
 import Container
 
@@ -10,6 +10,22 @@ new: Prim.array_new
    | Prim.array_new_with_size
    | Prim.array_new_with_size_and_initial_value
    | (values @ List) -> Prim.list_to_array(values)
+   | (gen @ Function) -> {
+         ary: Prim.array_new()
+         while true {
+             v: gen()
+             if (v == undef) return ary
+             ary.push(v)
+         }
+     }
+   | (iter @ Function, v) -> {
+         ary: Prim.array_new()
+         while true {
+             ary.push(v)
+             v = iter(v)
+             if (v == undef) return ary
+         }
+     }
 
 ArrayTrait.to_array: id
 ArrayTrait.to_list():   Prim.array_to_list(self)
