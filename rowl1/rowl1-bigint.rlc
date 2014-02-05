@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-bigint.rlc 2014-02-05 15:41:00 nineties $
+; $Id: rowl1-bigint.rlc 2014-02-05 15:50:42 nineties $
 ;
 
 (import "rlvm-compile")
@@ -19,6 +19,7 @@
 (import "rowl1-error")
 
 (extern object current_loc)
+(extern fun tuple2)
 
 (export fun pp_bint (ochan n) (
     (output_string ochan (bint_to_s n))
@@ -565,6 +566,12 @@
     (= a (to_bint_copy a))
     (return (norm (bigdiv a (to_bint b))))
     ))
+(fun bint_divmod (a b) (
+    (= a (to_bint_copy a))
+    (var r (bigdiv a (to_bint b)))
+    (return (tuple2 (norm a) (norm r)))
+    ))
+
 (export fun bint_shiftL (a b) (
     (= a (to_bint_copy a))
     (= b (norm b))
@@ -716,6 +723,7 @@
     (add_function2 mod (to_sym "bint_mul") bintT bintT bint_mul 0)
     (add_function2 mod (to_sym "bint_div") bintT bintT bint_div 0)
     (add_function2 mod (to_sym "bint_mod") bintT bintT bint_mod 0)
+    (add_function2 mod (to_sym "bint_divmod") bintT bintT bint_divmod 0)
     (add_function2 mod (to_sym "bint_pow") bintT bintT bint_pow 0)
     (add_function2 mod (to_sym "bint_compare") bintT bintT bint_compare 0)
     (add_function2 mod (to_sym "bint_equal?") bintT bintT bint_eq 0)
