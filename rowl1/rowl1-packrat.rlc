@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-02-03 16:46:42 nineties $
+; $Id: rowl1-packrat.rlc 2014-02-05 23:12:27 nineties $
 ;
 
 (import "rlvm-compile")
@@ -892,24 +892,17 @@
     ))
 @(MEMOIZE float)
 
-(fun parse_blank (p) (
-    (var c (lookahead p))
-    (if (< c 0) (return (mayparse_quiet p)))
-    (if (&& (is_spaces c) (!= c '\n')) (do
-        (getc p)
-        (return (parsed p (ctos c)))
-        ))
-    (return (noparse_quite p))
-    ))
-
 (fun parse_spaces_oneline_ (p) (
     (var pos (get_pos p))
     (var syntax (load_global Syntax))
-    (var blank (lookup_func syntax (to_sym "blank")))
     (var comment (lookup_func_nocheck syntax (to_sym "comment")))
     (while @TRUE (do
-        (runcode blank p)
-        (if @(PARSED p) continue)
+        (var c (lookahead p))
+        (if (< c 0) break)
+        (if (&& (is_spaces c) (!= c '\n')) (do
+            (getc p)
+            continue
+            ))
         (runcode comment p)
         (if @(PARSED p) continue)
         break
@@ -924,13 +917,14 @@
 (fun parse_spaces_ (p) (
     (var pos (get_pos p))
     (var syntax (load_global Syntax))
-    (var blank (lookup_func syntax (to_sym "blank")))
     (var comment (lookup_func_nocheck syntax (to_sym "comment")))
     (while @TRUE (do
-        (runcode blank p)
-        (if @(PARSED p) continue)
-        (parse_char p '\n')
-        (if @(PARSED p) continue)
+        (var c (lookahead p))
+        (if (< c 0) break)
+        (if (is_spaces c) (do
+            (getc p)
+            continue
+            ))
         (runcode comment p)
         (if @(PARSED p) continue)
         break
@@ -966,19 +960,25 @@
     ))
 @(MEMOIZE C_style_comment)
 
-(fun parse_symbol_ (p) (
-    (var state (copy_parser_state p))
+(fun parse_symbol_impl_ (p) (
     (if (is_identchar (lookbehind p))
         (return (noparse p "not beggining of a symbol"))
         )
     (var c (lookahead p))
     (if (< c 0) (return (mayparse p "expect a symbol")))
     (if (! (is_letter c)) (return (noparse p "expect a symbol")))
-
-    (var begin (field_get p 6))
     (while (is_identchar (lookahead p)) (do
         (getc p)
         ))
+    (return (parsed p @C_NIL))
+    ))
+@(MEMOIZE symbol_impl)
+
+(fun parse_symbol_ (p) (
+    (var state (copy_parser_state p))
+    (var begin (field_get p 6))
+    (parse_symbol_impl p)
+    @(CHECK p)
     (var c (lookahead p))
     (if (|| (== c '!') (== c '?')) (getc p))
     (var s (to_sym (extract_string p begin (field_get p 6))))
@@ -993,17 +993,9 @@
 
 (fun parse_reserved_symbol_ (p) (
     (var state (copy_parser_state p))
-    (if (is_identchar (lookbehind p))
-        (return (noparse p "not beggining of a symbol"))
-        )
-    (var c (lookahead p))
-    (if (< c 0) (return (mayparse p "expect a symbol")))
-    (if (! (is_letter c)) (return (noparse p "expect a symbol")))
-
     (var begin (field_get p 6))
-    (while (is_identchar (lookahead p)) (do
-        (getc p)
-        ))
+    (parse_symbol_impl p)
+    @(CHECK p)
     (var c (lookahead p))
     (if (|| (== c '!') (== c '?')) (getc p))
     (var s (to_sym (extract_string p begin (field_get p 6))))
@@ -1018,21 +1010,13 @@
 
 (fun parse_symbol_without_mark_ (p) (
     (var state (copy_parser_state p))
-    (if (is_identchar (lookbehind p))
-        (return (noparse p "not beggining of a symbol"))
-        )
-    (var c (lookahead p))
-    (if (< c 0) (return (mayparse p "expect a symbol")))
-    (if (! (is_letter c)) (return (noparse p "expect a symbol")))
-
     (var begin (field_get p 6))
-    (while (is_identchar (lookahead p)) (do
-        (getc p)
-        ))
+    (parse_symbol_impl p)
+    @(CHECK p)
     (var c (lookahead p))
     (var s (to_sym (extract_string p begin (field_get p 6))))
     (if (is_reserved_symbol s) (do
-        (noparse p (strcat "reserved symbol: " (symbol_name s)))
+        (noparse p (strcat "not reserved symbol: " (symbol_name s)))
         (reset_parser_position p state)
         (return @C_FALSE)
         ))
@@ -2069,7 +2053,6 @@
     (add_function2 mod (to_sym "parse_word") (domainP Parser) symT parse_word 0)
 
     (add_parser mod (to_sym "parse_any") parse_any_char)
-    (add_parser mod (to_sym "parse_blank") parse_blank)
     (add_parser mod (to_sym "parse_comment") parse_fail)
     (add_parser mod (to_sym "parse_spaces") parse_spaces)
     (add_parser mod (to_sym "parse_decimal") parse_decimal)
