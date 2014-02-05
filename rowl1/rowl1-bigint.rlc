@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-bigint.rlc 2014-02-03 10:10:44 nineties $
+; $Id: rowl1-bigint.rlc 2014-02-05 15:41:00 nineties $
 ;
 
 (import "rlvm-compile")
@@ -534,9 +534,13 @@
         )
     ))
 
-(export fun bint_uplus (n) (
-    (return (norm n))
+(fun bint_abs (n) (
+    (if (field_get n 3)
+        (return (bint_uminus n))
+        (return n)
+        )
     ))
+
 (export fun bint_uminus (n) (
     (return (bigneg (to_bint_copy n)))
     ))
@@ -677,11 +681,6 @@
         )
     ))
 
-(export fun ib_coerce (a b) ((return (list2 (int_to_bint (unbox a)) b))))
-(export fun bi_coerce (a b) ((return (list2 a (int_to_bint (unbox b))))))
-(export fun fb_coerce (a b) ((return (list2 a (bint_to_f b)))))
-(export fun bf_coerce (a b) ((return (list2 (bint_to_f a) b))))
-
 ; ==== utilities ===
 (export fun add (x y) (
     (if (&& (& x 1) (& y 1)) (return (int_add2 x y)))
@@ -710,6 +709,7 @@
     (add_function1 mod (to_sym "bint_to_float") bintT bint_to_f 0)
 
     (add_function1 mod (to_sym "bint_hash") bintT bint_hash 0)
+    (add_function1 mod (to_sym "bint_abs") bintT bint_abs 0)
     (add_function1 mod (to_sym "bint_uminus") bintT bint_uminus 0)
     (add_function2 mod (to_sym "bint_add") bintT bintT bint_add 0)
     (add_function2 mod (to_sym "bint_sub") bintT bintT bint_sub 0)

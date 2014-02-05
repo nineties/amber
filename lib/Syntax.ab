@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-02-04 12:02:01 nineties $ "
+" $Id: Syntax.ab 2014-02-05 15:33:45 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -168,9 +168,11 @@ primary_expr
       # Tuple literal
       | <<multiline>> "(" delimited2(expr, ",") ")"
         { MakeObject{Quote{Tuple}, node1} }
-      | self    { Quote{GetSelf{}} }
+      | "|" expr "|" 
+        { MakeObject{Quote{Abs}, List{node1}} }
+      | self            { Quote{GetSelf{}} }
       | atom
-      | "..."   { Quote{Rest{}} }
+      | "..."           { Quote{Rest{}} }
 
 postfix_expr
         # Function Application
@@ -427,6 +429,7 @@ macro(Assign{Apply{f, args}, e, g})     = `Assign{!f, Lambda{When{!args, !g}, !e
 macro(Define{Send{obj, f, args}, e, g}) = `Define{Slot{!obj, !f}, Lambda{When{!args, !g}, !e}, incremental}
 macro(Assign{Send{obj, f, args}, e, g}) = `Assign{Slot{!obj, !f}, Lambda{When{!args, !g}, !e}, incremental}
 
+macro(|x|)    = `abs(!x)
 macro(+x)     = `uplus(!x)
 macro(-x)     = `uminus(!x)
 macro(x + y)  = `add(!x, !y)

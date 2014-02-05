@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2014-02-04 22:53:57 nineties $
+; $Id: rowl1-list.rlc 2014-02-05 10:05:33 nineties $
 ;
 
 (import "rlvm-compile")
@@ -71,14 +71,6 @@
 (fun ls_cdr (a) (
     (if (! a) (index_out_of_range a 1))
     (return (cdr a))
-    ))
-
-(fun ls_reverse (ls) (
-    (return (list_reverse ls))
-    ))
-
-(fun ls_append (a b) (
-    (return (list_append a b))
     ))
 
 (fun ls_map (f ls) (
@@ -222,6 +214,16 @@
     (return (ls_sub_ a b eql))
     ))
 
+(fun ls_intersperse (a ls) (
+    (var ret 0)
+    (while ls (do
+        (= ret (cons (car ls) ret))
+        (= ls (cdr ls))
+        (if ls (= ret (cons a ret)))
+        ))
+    (return (list_reverse ret))
+    ))
+
 (export fun setup_list (mod) (
     (var trait (make_object1 (to_sym "Trait") (to_sym "List")))
     (set_slot mod (to_sym "ListTrait") trait)
@@ -233,8 +235,8 @@
     (add_function1 mod (to_sym "list_length") listT ls_length 0)
     (add_function2 mod (to_sym "list_at") listT intT ls_at 0)
     (add_function3 mod (to_sym "list_store") listT intT DontCare ls_store 0)
-    (add_function1 mod (to_sym "list_reverse") listT ls_reverse 0)
-    (add_function2 mod (to_sym "list_append") listT listT ls_append 0)
+    (add_function1 mod (to_sym "list_reverse") listT list_reverse 0)
+    (add_function2 mod (to_sym "list_append") listT listT list_append 0)
     (add_function2 mod (to_sym "list_map") funT listT ls_map 0)
     (add_function2 mod (to_sym "list_member?") DontCare listT ls_member 0)
     (add_function2 mod (to_sym "list_insert_unique") DontCare listT ls_insert_uniq 0)
@@ -243,6 +245,7 @@
     (add_function3 mod (to_sym "list_foldr") funT listT DontCare ls_foldr 0)
     (add_function2 mod (to_sym "list_foldr1") funT listT ls_foldr1 0)
     (add_function2 mod (to_sym "list_subtract") listT listT ls_sub 0)
+    (add_function2 mod (to_sym "list_intersperse") DontCare listT ls_intersperse 0)
     ))
 
     ))

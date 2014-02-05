@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-02-05 02:36:28 nineties $
+; $Id: rowl1-interp.rlc 2014-02-05 10:31:37 nineties $
 ;
 
 (import "rlvm-compile")
@@ -31,6 +31,7 @@
 (extern fun ary_at)
 (extern fun ary_store)
 (extern fun ary_push)
+(extern fun ary_pop)
 (extern fun ary_size)
 
 (export fun set_loc (loc) (
@@ -97,25 +98,12 @@
     (var load_path (ary_new)) 
     (set_slot amber (to_sym "AMBERPATH") load_path)
     (set_slot amber (to_sym "LOADED") (ary_new))
+    (ary_push load_path (realpath (string ".")))
     (ary_push load_path (string "."))
     (ary_push load_path (string "/usr/lib/amber"))
     (setup_minimal_interpreter prim)
     (load_file "Boot.ab")
-
-    ;(var p (make_parser file ichan))
-
-    ;(if (in_shell_mode)
-    ;    (interpret_shell p)
-    ;    (do
-    ;        (var fd (open "."))
-    ;        (var dir (get_directory file))
-    ;        (chdir dir)
-    ;        (interpret p)
-    ;        (fchdir fd)
-    ;    )
-    ;    )
     (eval_exit @C_NIL)
-
     (return 0)
     ))
 
@@ -392,7 +380,6 @@
 
             (fchdir fd)
             (close_in ichan)
-
             (return @C_TRUE)
             ))
         ))
@@ -513,7 +500,7 @@
 
 (fun init_lib (mod) (
     (setup_base mod)
-    ;(setup_pprint mod)
+    (setup_pprint mod)
     (setup_object mod)
     (setup_symbol mod)
 
