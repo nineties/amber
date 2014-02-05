@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-bigint.rlc 2014-02-05 15:50:42 nineties $
+; $Id: rowl1-bigint.rlc 2014-02-05 18:00:23 nineties $
 ;
 
 (import "rlvm-compile")
@@ -658,6 +658,29 @@
     (return (norm v))
     ))
 
+; compute a^n mod m
+(export fun bint_powmod (a n m) (
+    (= n (norm n))
+    (if (== (node_type n) @BigIntE)
+        (throw (invalid_argument current_loc (string "exponent is too big") n))
+        )
+    (if (== n 1) (return (box 1))) ; 1 == box(0)
+    (if (< n 0) (throw (invalid_argument current_loc (string "positive integer is required") n)))
+
+    (var v (int_to_bint 1))
+    (= a (to_bint a))
+    (= n (unbox n))
+    (var m 0x40000000)
+    (while (! (& n m)) (>>= m 1))
+
+    (while (> m 0) (do
+        (bigmul v v)
+        (if (& n m) (bigmul v a))
+        (>>= m 1)
+        ))
+    (return (norm v))
+    ))
+
 (export fun int_mul2 (a b) (
     (if (== b 1) (return b))    ; 1 == box(0)
     (if (== a 1) (return a))    ; 1 == box(0)
@@ -707,7 +730,7 @@
 
 (export fun setup_bigint (mod) (
     (var trait (make_object1 (to_sym "Trait") (to_sym "BigInt")))
-    (set_slot mod (to_sym "BigInt") trait)
+    (set_slot mod (to_sym "BigIntTrait") trait)
     (set_special_parent @BigIntE trait)
 
     (add_function1 mod (to_sym "int_to_bint") intT int_to_bint_ 0)
@@ -725,6 +748,7 @@
     (add_function2 mod (to_sym "bint_mod") bintT bintT bint_mod 0)
     (add_function2 mod (to_sym "bint_divmod") bintT bintT bint_divmod 0)
     (add_function2 mod (to_sym "bint_pow") bintT bintT bint_pow 0)
+    (add_function3 mod (to_sym "bint_powmod") bintT bintT bintT bint_powmod 0)
     (add_function2 mod (to_sym "bint_compare") bintT bintT bint_compare 0)
     (add_function2 mod (to_sym "bint_equal?") bintT bintT bint_eq 0)
     (add_function2 mod (to_sym "bint_shiftL") bintT intT bint_shiftL 0)

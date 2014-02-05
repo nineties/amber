@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-02-05 10:31:37 nineties $
+; $Id: rowl1-interp.rlc 2014-02-05 16:30:34 nineties $
 ;
 
 (import "rlvm-compile")
@@ -133,7 +133,7 @@
             ))
         (return expr)
         ))
-    (var hd (node_bhead expr))
+    (var hd (node_head expr))
     (if (== hd Quote) (return expr))
     (if (== hd QuasiQuote) (do
         (node_arg_set expr 0 (rewrite_qquote (node_arg expr 0) 0))
@@ -154,7 +154,7 @@
         ))
     (if (== hd Lambda) (do
         (var lhs (node_arg expr 0))
-        (if (== (node_bhead lhs) When)
+        (if (== (node_head lhs) When)
             (node_arg_set lhs 1 (rewrite (node_arg lhs 1)))
             )
         (node_arg_set expr 1 (rewrite (node_arg expr 1)))
@@ -177,7 +177,7 @@
             ))
         (return expr)
         ))
-    (var hd (node_bhead expr))
+    (var hd (node_head expr))
     (if (== hd Unquote) (do
         (if (== level 0)
             (node_arg_set expr 0 (rewrite (node_arg expr 0)))
@@ -346,7 +346,9 @@
     (debugpf ARGV)
     ))
 
-(fun load_file (path) (
+(fun load_file (path) ((return (load_file_impl path @FALSE))))
+(fun load_file_nothrow (path _) ((return (load_file_impl path @TRUE))))
+(fun load_file_impl (path nothrow) (
     (var dirs (get_slot amber (to_sym "AMBERPATH")))
     (var loaded (get_slot amber (to_sym "LOADED")))
     (if (!= (node_type dirs) @ArrayE) (goto load_error))
@@ -383,6 +385,7 @@
             (return @C_TRUE)
             ))
         ))
+    (if nothrow (return @C_FALSE))
     (throw (not_found current_loc (string path)))
 
     (label load_error)
@@ -470,6 +473,7 @@
     (add_function1 prim (to_sym "exit") intT exit_ 0)
     (add_function1 prim (to_sym "atexit") funT at_exit 0)
     (add_function1 prim (to_sym "load") stringT load_file 0)
+    (add_function2 prim (to_sym "load") stringT (quote (to_sym "nothrow")) load_file_nothrow 0)
     (add_function1 prim (to_sym "create_module") symT create_module 0)
     (add_function1 prim (to_sym "enter_module") symT enter_module 0)
     (add_function0 prim (to_sym "exit_module") exit_module 0)

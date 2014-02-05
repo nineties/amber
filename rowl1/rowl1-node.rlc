@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2014-02-04 10:27:07 nineties $
+; $Id: rowl1-node.rlc 2014-02-05 18:44:43 nineties $
 ;
 
 (import "rlvm-compile")
@@ -22,14 +22,9 @@
 ; builtin expression headers and types
 (export var DontCare    (to_sym "_"))
 
-(export var Symbol      (to_sym "Symbol"))
-(export var Int         (to_sym "Int"))
-(export var Float       (to_sym "Float"))
-(export var String      (to_sym "String"))
 (export var Loc         (to_sym "Loc"))
 (export var List        (to_sym "List"))
 (export var Array       (to_sym "Array"))
-(export var Table       (to_sym "Table"))
 (export var Tuple       (to_sym "Tuple"))
 (export var Range       (to_sym "Range"))
 
@@ -105,18 +100,18 @@
 (export var Some   (to_sym "Some"))
 
 ; internal nodes
-(export var GlobalVariable (to_sym "%GlobalVariable")) ; GlobalVariable{sym}
-(export var LocalVariable  (to_sym "%LocalVariable")) ; LocalVariable{idx}
-(export var Argument       (to_sym "%Argument")) ; Argument{idx}
-(export var ArgumentsFrom  (to_sym "%ArgumentsFrom")) ; ArgumentsFrom{idx}
-(export var ListAt         (to_sym "%ListAt"))   ; ListAt{var, idx}
-(export var ListFrom       (to_sym "%ListFrom")) ; ListFrom{var, idx}
-(export var TupleAt        (to_sym "%TupleAt"))  ; TupleAt{var, idx}
-(export var ArrayAt        (to_sym "%ArrayAt"))  ; ArrayAt{var, idx}
-(export var RestOf         (to_sym "%RestOf"))   ; RestOf{var, idx}
-(export var FieldRef       (to_sym "%FieldRef")) ; FieldRef{var, idx}
-(export var Arity          (to_sym "%Arity"))
-(export var VariableLength (to_sym "%VariableLength"))
+(export var GlobalVariable (to_unique_sym "%GlobalVariable")) ; GlobalVariable{sym}
+(export var LocalVariable  (to_unique_sym "%LocalVariable")) ; LocalVariable{idx}
+(export var Argument       (to_unique_sym "%Argument")) ; Argument{idx}
+(export var ArgumentsFrom  (to_unique_sym "%ArgumentsFrom")) ; ArgumentsFrom{idx}
+(export var ListAt         (to_unique_sym "%ListAt"))   ; ListAt{var, idx}
+(export var ListFrom       (to_unique_sym "%ListFrom")) ; ListFrom{var, idx}
+(export var TupleAt        (to_unique_sym "%TupleAt"))  ; TupleAt{var, idx}
+(export var ArrayAt        (to_unique_sym "%ArrayAt"))  ; ArrayAt{var, idx}
+(export var RestOf         (to_unique_sym "%RestOf"))   ; RestOf{var, idx}
+(export var FieldRef       (to_unique_sym "%FieldRef")) ; FieldRef{var, idx}
+(export var Arity          (to_unique_sym "%Arity"))
+(export var VariableLength (to_unique_sym "%VariableLength"))
 
 (export var Assembler        (to_builtin_sym "Assembler"))
 (export var BuiltinType      (to_builtin_sym "BuiltinType"))
@@ -128,17 +123,17 @@
 (export var OutputFileStream (to_builtin_sym "OutputFileStream"))
 (export var StringIO         (to_builtin_sym "StringIO"))
 
-(export var Amber   (to_sym "Amber"))
-(export var Prim (to_sym "Prim"))
-(export var Syntax  (to_sym "Syntax"))
+(export var Amber  (to_sym "Amber"))
+(export var Prim   (to_sym "Prim"))
+(export var Syntax (to_sym "Syntax"))
 
 ; BuiltinType headers
-(export var BSymbol (to_builtin_sym "Symbol"))
-(export var BInt    (to_builtin_sym "Int"))
-(export var BString (to_builtin_sym "String"))
-(export var BBigInt (to_builtin_sym "BigInt"))
-(export var BFloat  (to_builtin_sym "Float"))
-(export var BTable  (to_builtin_sym "Table"))
+(export var Symbol (to_builtin_sym "Symbol"))
+(export var Int    (to_builtin_sym "Int"))
+(export var String (to_builtin_sym "String"))
+(export var BigInt (to_builtin_sym "BigInt"))
+(export var Float  (to_builtin_sym "Float"))
+(export var Table  (to_builtin_sym "Table"))
 
 (extern fun exception)
 (extern fun out_of_range)
@@ -153,6 +148,8 @@
     ))
 
 (export fun to_builtin_sym (name) (
+    (var sym (idtable_find symbol_table name))
+    (if sym (return sym))
     (= name (strdup name))
     (var sym (variant @SymbolE 1 name builtin_symbol_index_gen))
     (-= builtin_symbol_index_gen 1)
@@ -337,7 +334,7 @@
         (@OutputFileStreamE . (return (to_sym "OutputFileStream")))
         (@ParserE           . (return (to_sym "Parser")))
         (@StringIOE         . (return (to_sym "StringIO")))
-        (@BigIntE           . (return Int))
+        (@BigIntE           . (return BigInt))
         (@LocE              . (return Loc))
         (@TupleE            . (return Tuple))
         (@IntE              . (return Int))
@@ -345,34 +342,6 @@
         (@FloatE            . (return Float))
         (@BuiltinTypeE      . (return BuiltinType))
         (default            . (not_reachable "node_head"))
-        ))
-    ))
-
-(export fun node_bhead (node) (
-    (tswitch (node_type node) (
-        (@SymbolE           . (return BSymbol))
-        (@ExprE             . (return (field_get node 0)))
-        (@ListE             . (return List))
-        (@ArrayE            . (return Array))
-        (@TableE            . (return BTable))
-        (@AssemblerE        . (return Assembler))
-        (@BytecodeE         . (return Bytecode))
-        (@FunctionE         . (return Function))
-        (@BuiltinFunctionE  . (return Function))
-        (@BoundFunctionE    . (return Function))
-        (@AliasE            . (return Alias))
-        (@InputFileStreamE  . (return InputFileStream))
-        (@OutputFileStreamE . (return OutputFileStream))
-        (@ParserE           . (return Parser))
-        (@StringIOE         . (return StringIO))
-        (@BigIntE           . (return BBigInt))
-        (@LocE              . (return Loc))
-        (@TupleE            . (return Tuple))
-        (@IntE              . (return BInt))
-        (@StringE           . (return BString))
-        (@FloatE            . (return BFloat))
-        (@BuiltinTypeE          . (return BuiltinType))
-        (default            . (not_reachable "node_bhead"))
         ))
     ))
 
@@ -641,12 +610,12 @@
     ))
 
 ; types
-(export var symT       (domainP BSymbol))
-(export var stringT    (domainP BString))
-(export var intT       (domainP BInt))
-(export var bintT      (domainP BBigInt))
-(export var floatT     (domainP BFloat))
-(export var tableT     (domainP BTable))
+(export var symT       (domainP Symbol))
+(export var stringT    (domainP String))
+(export var intT       (domainP Int))
+(export var bintT      (domainP BigInt))
+(export var floatT     (domainP Float))
+(export var tableT     (domainP Table))
 
 (export var listT      (domainP List))
 (export var arrayT     (domainP Array))
