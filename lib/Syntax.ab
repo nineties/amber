@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-02-05 22:14:39 nineties $ "
+" $Id: Syntax.ab 2014-02-06 10:24:25 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -174,11 +174,6 @@ primary_expr
       | atom
       | "..."           { Quote{Rest{}} }
 
-slot_assign_entry ::= symbol "=" assign_expr  { Tuple{node0, node2} }
-slot_assign
-    ::= slot_assign_entry { List{node0} }
-      | <<multiline>> "{" delimited1(slot_assign_entry, ",") "}" { node1 }
-
 postfix_expr
         # Function Application
     ::= postfix_expr "(" delimited(expr, ",") ")"
@@ -198,8 +193,6 @@ postfix_expr
         { MakeObject{Quote{Slot}, List{node0, node2}} }
       | primary_expr "^" postfix_expr
         { MakeObject{Quote{Power}, List{node0, node2}} }
-      | primary_expr with slot_assign
-        { MakeObject{Quote{InitSlots}, List{node0, node2}} }
       | fullform
       | primary_expr
 
@@ -284,6 +277,11 @@ multi_lambda_expr
         { `Fusion{!node0, !node2} }
       | lambda_expr
 
+slot_assign
+    ::= <<multiline>> "{" delimited1(assign_expr, ",") "}" { node1 }
+      | <<multiline>> "{" aligned(assign_expr) "}" { node1 }
+      | assign_expr { List{node0} }
+
 assign_expr
     ::= pattern "=" assign_expr   { `Assign{!node0, !node2} }
       | pattern "+=" assign_expr  { `AddAssign{!node0, !node2} }
@@ -293,6 +291,8 @@ assign_expr
       | pattern "/=" assign_expr  { `DivAssign{!node0, !node2} }
       | pattern "%=" assign_expr  { `ModAssign{!node0, !node2} }
       | pattern "|=" assign_expr  { `FusionAssign{!node0, !node2} }
+      | pattern with slot_assign
+        { MakeObject{Quote{InitSlots}, List{node0, node2}} }
       | multi_lambda_expr
 
 Assign{Syntax.expr, Syntax.assign_expr}
@@ -522,9 +522,23 @@ macro(QuoteSyntax{For{i, Range{a, b}, body}}) = {
 #
 macro(InitSlots{obj, slots}): {
     t: Prim.unique_symbol(\t)
+    transl(e): case (macro(e)) of
+          (e @ Assign) -> {
+              e[0] = `Slot{!t, !e[0]}
+              e
+          }
+        | e @ Define -> {
+              e[0] = `Slot{!t, !e[0]}
+              e
+          }
+        | _... -> {
+              throw `InvalidSyntax{!LOCATION,
+                  "Invalid syntax of slot assignment.",
+                  slots}
+          }
     `{
         !t: !obj
-        Seq{!Prim.list_map(((x,e)) -> `Assign{Slot{!t, !x}, !e}, slots)}
+        Seq{!Prim.list_map(transl, slots)}
         !t
     }
 }
