@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2014-01-19 12:15:40 nineties $
+; $Id: vm-gc.rlc 2014-02-06 21:31:43 nineties $
 ;
 
 (import "stdlib")
@@ -363,11 +363,10 @@
         (return)
         ))
     (if (== tag @TAG_BYTECODE) (
-        (move_object obj) ; bytecode
-        (move_object (+ obj @(* 2 WORD_SIZE))) ; addrs
-        (void* code ([] obj 0))
-        (void* reloc ([] obj 2))
-        (int n ([] obj 3))
+        (move_object (+ obj @WORD_SIZE)) ; addrs
+        (void* code (+ obj @(* 3 WORD_SIZE)))
+        (void* reloc ([] obj 1))
+        (int n ([] obj 2))
         (for i 0 n (
             (int offs ([] reloc i))
             (move_object (+ code offs))
@@ -408,7 +407,7 @@
     (= num_allocated_pages 0)
 
     ; promote all pages which are refered from machine stack and vm-stack
-    ; NB: scanning from machin register is not necessary because,
+    ; NB: scanning of machin registers is not necessary because
     ;     %ebx (program counter) will be stored in vm-stack and
     ;     other registers are not callee-save registers.
     (scan_machine_stack)
@@ -650,10 +649,6 @@
     (if (! @(IS_POINTER_TO_HEAP obj)) ((return @FALSE)))
     (if (== @(pdescr->generation (ADDR2PDESCR obj)) next_gen)
         ((return @FALSE)))
-    (-= obj @WORD_SIZE)
-    (if @(OBJECT_COPYED obj) (
-        (return @TRUE)
-        ))
     (return @TRUE)
     ))
 
@@ -724,47 +719,41 @@
     ))
 
 ; bytecode
-(export prim_allocate_bytecode)
-(fun prim_allocate_bytecode () (
-    (void* ptr (allocate_object 5))
-    @(SET_HEADER ptr TAG_BYTECODE 0 5)
+(export prim_make_bytecode)
+(fun prim_make_bytecode (code len addrs objs nobj) (
+    (int size (+ 4 (/ (+ len @(- WORD_SIZE 1)) @WORD_SIZE)))
+    (void* ptr (allocate_object size))
+    @(SET_HEADER ptr TAG_BYTECODE 0 size)
     (+= ptr @WORD_SIZE)
-    ([]= ptr 0 0)
-    ([]= ptr 1 0)
-    ([]= ptr 2 0)
-    ([]= ptr 3 0)
-    (return ptr)
-    ))
-
-(fun bytecode_set (ptr code len addrs objs nobj) (
-    ; this function must be atomic
     (for i 0 nobj (
         (int addr ([] addrs i))
         ([]= (+ code addr) 0 ([] objs i))
         ))
-    ([]= ptr 0 code)
-    ([]= ptr 1 len)
-    ([]= ptr 2 addrs)
-    ([]= ptr 3 nobj)
-    ))
-
-(export prim_make_bytecode)
-(fun prim_make_bytecode (code len addrs objs nobj) (
-    (void* ptr (allocate_object 5))
-    @(SET_HEADER ptr TAG_BYTECODE 0 5)
-    (+= ptr @WORD_SIZE)
-    (bytecode_set ptr code len addrs objs nobj)
+    ([]= ptr 0 len)
+    ([]= ptr 1 addrs)
+    ([]= ptr 2 nobj)
+    (prim_memcpy (+ ptr @(* 3 WORD_SIZE)) code len)
     (return ptr)
     ))
 
 (export prim_bytecode_ptr)
 (fun prim_bytecode_ptr (obj) (
-    (return ([] obj 0))
+    (return (+ obj @(* 3 WORD_SIZE)))
     ))
 
 (export prim_bytecode_size)
 (fun prim_bytecode_size (obj) (
+    (return ([] obj 0))
+    ))
+
+(export prim_bytecode_addrs)
+(fun prim_bytecode_addrs (obj) (
     (return ([] obj 1))
+    ))
+
+(export prim_bytecode_nobj)
+(fun prim_bytecode_nobj (obj) (
+    (return ([] obj 2))
     ))
 
 (export prim_allocate_bint)
