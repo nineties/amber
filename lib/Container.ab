@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: Container.ab 2014-02-06 12:36:25 nineties $
+# $Id: Container.ab 2014-02-06 14:59:21 nineties $
 
 import Numeric
 
@@ -10,13 +10,21 @@ ContainerTrait: `Trait{Container} with {
     each() = {
         seq: self
         i: 0
-        n: self.size
         () -> {
-            if (i < n) {
+            if (i < seq.size) {
                 i += 1
                 return seq[i-1]
             }
             return undef
+        }
+    }
+
+    each(callback @ Function) = {
+        iter: self.each()
+        v: iter()
+        while (v != undef) {
+            callback(v)
+            v = iter()
         }
     }
     
