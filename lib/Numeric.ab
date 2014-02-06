@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: Numeric.ab 2014-02-05 21:05:16 nineties $
+# $Id: Numeric.ab 2014-02-06 12:23:32 nineties $
 
 join_numeric_type(a, b): undef
 join_numeric_type(a, a): a
@@ -74,37 +74,36 @@ shiftR: Prim.int_shiftR
 compare = Prim.int_compare | Prim.float_compare | compare
 equal?  = Prim.float_equal? | equal?
 
+min(a, b): a < b ? a : b
+max(a, b): a < b ? b : a
+minmax(a, b): a < b ? (a, b) : (b, a)
+
 infinity: Prim.infinity
 
 export abs uplus uminus add sub mul div mod divmod pow powmod
 export shiftL shiftR
 export compare less_than? greater_than? less_equal? greater_equal? equal?
+export min max minmax
 export INTEGER_MIN INTEGER_MAX
 export infinity
 
 # traits
 NumericTrait: `Trait{Numeric}
-IntegerTrait: `Trait{Integer}
+IntegerTrait: `Trait{Integer}  with parent = NumericTrait
 
-IntTrait: Prim.IntTrait
-FloatTrait: Prim.FloatTrait
-
-IntegerTrait.parent = NumericTrait
-IntTrait.parent = IntegerTrait
-FloatTrait.parent = NumericTrait
-
-IntTrait.to_i(): self
-IntTrait.to_f(): Prim.int_to_float(self)
-IntTrait.to_s(): Prim.int_to_string(self)
-
-FloatTrait.to_i(): Prim.float_to_int(self)
-FloatTrait.to_f(): self
-FloatTrait.to_s(): Prim.float_to_string(self)
+IntTrait: Prim.IntTrait with {
+    parent = IntegerTrait
+    to_i() = self
+    to_f() = Prim.int_to_float(self)
+    to_s() = Prim.int_to_string(self)
+}
+FloatTrait: Prim.FloatTrait with {
+    parent = NumericTrait
+    to_i() = Prim.float_to_int(self)
+    to_f() = self
+    to_s() = Prim.float_to_string(self)
+}
 
 export NumericTrait IntegerTrait IntTrait FloatTrait
 
-min(a, b): a < b ? a : b
-max(a, b): a < b ? b : a
-
-export min max
 

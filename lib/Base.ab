@@ -1,43 +1,43 @@
 # Copyright (C) 2010 nineties
-# $Id: Base.ab 2014-02-05 10:34:48 nineties $
+# $Id: Base.ab 2014-02-06 12:09:05 nineties $
 
-# Copy important functions from Prim module.
+ObjectTrait: Prim.ObjectTrait with {
+    head        = Prim.alias(() -> Prim.head(self))
+    arguments   = Prim.alias(() -> Prim.arguments(self))
+    arity       = Prim.alias(() -> Prim.arity(self))
+    atom?()     = Prim.atom?(self)
+    at(i)       = Prim.at(self, i)
+    store(i, v) = Prim.store(self, i, v)
+    copy()      = Prim.copy(self)
+    to_s()      = fullform(self)
 
-ObjectTrait: Prim.ObjectTrait
+    get_slot(sym)           = Prim.get_slot(self, sym)
+    get_slot(sym, \norec)   = Prim.get_slot_norec(self, sym)
+    get_slot(sym, \unalias) = Prim.get_slot_unalias(self, sym)
+
+    set_slot(sym, val)
+        = Prim.set_slot(self, sym, val)
+    set_slot(sym, val, \incremental)
+        = Prim.set_slot_incremental(self, sym, val)
+    set_slot(sym, val, \unalias)
+        = Prim.set_slot_unalias(self, sym, val)
+
+    hash() = {
+        h: 0
+        for (arg in self)
+            h = 13*h + arg.hash()
+        h = 13*h + arg.head().hash()
+    }
+
+    hash() when self.atom?() = {
+        throw `UndefinedMethod{!LOCATION, hash, !self}
+    }
+}
 
 id(obj): id
 equal?: Prim.equal?
 identical?: Prim.identical?
-
 fullform: Prim.fullform
-
-ObjectTrait.head:        Prim.alias(() -> Prim.head(self))
-ObjectTrait.arguments:   Prim.alias(() -> Prim.arguments(self))
-ObjectTrait.arity:       Prim.alias(() -> Prim.arity(self))
-ObjectTrait.atom?():     Prim.atom?(self)
-ObjectTrait.at(i):       Prim.at(self, i)
-ObjectTrait.store(i, v): Prim.store(self, i, v)
-ObjectTrait.copy():      Prim.copy(self)
-ObjectTrait.to_s():      fullform(self)
-ObjectTrait.get_slot
-    : (sym) -> Prim.get_slot(self, sym)
-    | (sym, \norec) -> Prim.get_slot_norec(self, sym)
-    | (sym, \unalias) -> Prim.get_slot_unalias(self, sym)
-ObjectTrait.set_slot
-    : (sym, val) -> Prim.set_slot(self, sym, val)
-    | (sym, val, \incremental) -> Prim.set_slot_incremental(self, sym, val)
-    | (sym, val, \unalias) -> Prim.set_slot_unalias(self, sym, val)
-
-ObjectTrait.hash(): {
-    h: 0
-    for (arg in self)
-        h = 13*h + arg.hash()
-    h = 13*h + arg.head().hash()
-}
-
-ObjectTrait.hash() when self.atom?():
-    throw `UndefinedMethod{!LOCATION, hash, !self}
-
 fusion: Prim.fusion_function
 compose: Prim.compose_function
 alias: Prim.alias

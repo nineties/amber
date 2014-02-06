@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-02-06 10:24:25 nineties $ "
+" $Id: Syntax.ab 2014-02-06 12:33:56 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -283,7 +283,9 @@ slot_assign
       | assign_expr { List{node0} }
 
 assign_expr
-    ::= pattern "=" assign_expr   { `Assign{!node0, !node2} }
+    ::= pattern guard_clause "=" assign_expr
+            { `Assign{!node0, !node3, !node1} }
+      | pattern "=" assign_expr   { `Assign{!node0, !node2} }
       | pattern "+=" assign_expr  { `AddAssign{!node0, !node2} }
       | pattern "-=" assign_expr  { `SubAssign{!node0, !node2} }
       | pattern "*=" assign_expr  { `MulAssign{!node0, !node2} }
@@ -523,18 +525,18 @@ macro(QuoteSyntax{For{i, Range{a, b}, body}}) = {
 macro(InitSlots{obj, slots}): {
     t: Prim.unique_symbol(\t)
     transl(e): case (macro(e)) of
-          (e @ Assign) -> {
-              e[0] = `Slot{!t, !e[0]}
+          e @ Assign -> {
+              Prim.store(e, 0, `Slot{!t, !Prim.at(e, 0)})
               e
           }
         | e @ Define -> {
-              e[0] = `Slot{!t, !e[0]}
+              Prim.store(e, 0, `Slot{!t, !Prim.at(e, 0)})
               e
           }
-        | _... -> {
+        | e @ ... -> {
               throw `InvalidSyntax{!LOCATION,
                   "Invalid syntax of slot assignment.",
-                  slots}
+                  !e}
           }
     `{
         !t: !obj

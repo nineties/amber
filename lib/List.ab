@@ -1,10 +1,7 @@
 # Copyright (C) 2014 nineties
-# $Id: List.ab 2014-02-05 21:08:18 nineties $
+# $Id: List.ab 2014-02-06 12:37:50 nineties $
 
 import Container
-
-ListTrait: Prim.ListTrait
-ListTrait.parent = ContainerTrait
 
 cons: Prim.cons
 car:  Prim.car
@@ -27,35 +24,36 @@ new: (gen @ Function) -> {
          }
      }
 
-ListTrait.to_array(): Prim.list_to_array(self)
-ListTrait.to_list():  self
+add = Prim.list_append | add
 
-ListTrait.length:        alias(() -> Prim.list_length(self))
-ListTrait.size:          alias(() -> Prim.list_length(self))
-ListTrait.empty?():      self == []
-ListTrait.at(i):         Prim.list_at(self, i)
-ListTrait.store(i, v):   Prim.list_store(self, i, v)
-ListTrait.reverse():     Prim.list_reverse(self)
-ListTrait.map(fun):      Prim.list_map(fun, self)
-ListTrait.member?(v):    Prim.list_member?(self, v)
-ListTrait.foldl(fun, v): Prim.list_foldl(fun, v, self)
-ListTrait.foldl1(fun):   Prim.list_fold1(fun, self)
-ListTrait.foldr(fun, v): Prim.list_foldr(fun, self, v)
-ListTrait.foldr1(fun):   Prim.list_foldr1(fun, self)
-
-ListTrait.each():   {
-    list: self
-    () -> {
-        if (list == [])
-            return undef
-        else {
-            v: car(list)
-            list = cdr(list)
-            v
+ListTrait: Prim.ListTrait with {
+    parent        = ContainerTrait
+    to_array()    = Prim.list_to_array(self)
+    to_list()     = self
+    length        = alias(() -> Prim.list_length(self))
+    size          = alias(() -> Prim.list_length(self))
+    empty?()      = self == []
+    at(i)         = Prim.list_at(self, i)
+    store(i, v)   = Prim.list_store(self, i, v)
+    reverse()     = Prim.list_reverse(self)
+    map(fun)      = Prim.list_map(fun, self)
+    member?(v)    = Prim.list_member?(self, v)
+    foldl(fun, v) = Prim.list_foldl(fun, v, self)
+    foldl1(fun)   = Prim.list_fold1(fun, self)
+    foldr(fun, v) = Prim.list_foldr(fun, self, v)
+    foldr1(fun)   = Prim.list_foldr1(fun, self)
+    each() =   {
+        list: self
+        () -> {
+            if (list == [])
+                return undef
+            else {
+                v: car(list)
+                list = cdr(list)
+                v
+            }
         }
     }
 }
-
-add = Prim.list_append | add
 
 export ListTrait cons car cdr add

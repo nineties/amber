@@ -1,10 +1,7 @@
 # Copyright (C) 2014 nineties
-# $Id: Array.ab 2014-02-05 21:07:54 nineties $
+# $Id: Array.ab 2014-02-06 12:39:08 nineties $
 
 import Container
-
-ArrayTrait: Prim.ArrayTrait
-ArrayTrait.parent = ContainerTrait
 
 new: Prim.array_new
    | Prim.array_new_with_size
@@ -27,39 +24,38 @@ new: Prim.array_new
          }
      }
 
-ArrayTrait.to_array():  self
-ArrayTrait.to_list():   Prim.array_to_list(self)
-
-ArrayTrait.length:      alias(() -> Prim.array_length(self))
-ArrayTrait.size:        alias(() -> Prim.array_length(self))
-ArrayTrait.at(i):       Prim.array_at(self, i)
-ArrayTrait.store(i, v): Prim.array_store(self, i, v)
-ArrayTrait.push(v):     Prim.array_push(self, v)
-ArrayTrait.pop():       Prim.array_pop(self)
-
-ArrayTrait.reverse!():  Prim.array_reverse(self)
-ArrayTrait.reverse():   Prim.array_reverse(self.copy())
-
-ArrayTrait.map!(fun):   Prim.array_map(fun, self)
-ArrayTrait.map(fun):    Prim.array_map(fun, self.copy())
-
-ArrayTrait.foldl(fun, v): Prim.array_foldl(fun, v, self)
-ArrayTrait.foldl1(fun):   Prim.array_foldl1(fun, self)
-ArrayTrait.foldr(fun, v): Prim.array_foldr(fun, self, v)
-ArrayTrait.foldr1(fun):   Prim.array_foldr1(fun, self)
-
 add = Prim.array_append | add
 
-ArrayTrait.each(): {
-    ary: self
-    i: 0
-    n: ary.size
-    () -> {
-        if (i < n) {
-            i += 1
-            return ary[i-1]
+ArrayTrait: Prim.ArrayTrait with {
+    parent        = ContainerTrait
+    to_array()    = self
+    to_list()     = Prim.array_to_list(self)
+    length        = alias(() -> Prim.array_length(self))
+    size          = alias(() -> Prim.array_length(self))
+    at(i)         = Prim.array_at(self, i)
+    store(i, v)   = Prim.array_store(self, i, v)
+    push(v)       = Prim.array_push(self, v)
+    pop()         = Prim.array_pop(self)
+    reverse!()    = Prim.array_reverse(self)
+    reverse()     = Prim.array_reverse(self.copy())
+    map!(fun)     = Prim.array_map(fun, self)
+    map(fun)      = Prim.array_map(fun, self.copy())
+    foldl(fun, v) = Prim.array_foldl(fun, v, self)
+    foldl1(fun)   = Prim.array_foldl1(fun, self)
+    foldr(fun, v) = Prim.array_foldr(fun, self, v)
+    foldr1(fun)   = Prim.array_foldr1(fun, self)
+
+    each() = {
+        ary: self
+        i: 0
+        n: ary.size
+        () -> {
+            if (i < n) {
+                i += 1
+                return ary[i-1]
+            }
+            return undef
         }
-        return undef
     }
 }
 
