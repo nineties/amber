@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-02-09 18:45:21 nineties $
+; $Id: rowl1-compile.rlc 2014-02-09 19:52:08 nineties $
 ;
 
 (import "rlvm-compile")
@@ -815,6 +815,7 @@
 (var break_labels null)
 (var continue_labels null)
 (var compiling_reset @FALSE)
+(var try_nest 0)
 
 (fun get_lvar_idx () (
     (var idx (- (symtable_count variables) lvar_idx_offset))
@@ -863,10 +864,12 @@
     (var save_lvar_idx_offset lvar_idx_offset)
     (var save_break_labels break_labels)
     (var save_continue_labels continue_labels)
+    (var save_try_nest try_nest)
     (= lvar_idx_offset (symtable_count variables))
     (= max_lvar_idx 0)
     (= break_labels 0)
     (= continue_labels 0)
+    (= try_nest 0)
 
     (setup_args variables args)
 
@@ -885,6 +888,7 @@
     (= max_lvar_idx save_max_lvar_idx)
     (= break_labels save_break_labels)
     (= continue_labels save_continue_labels)
+    (= try_nest save_try_nest)
     ))
 
 (fun setup_args (tbl args) (
@@ -1852,6 +1856,7 @@
 
 (fun compile_return (asm expr) (
     (compile asm (node_arg expr 0))
+    (for i 0 try_nest (put_unwind_pop asm))
     (put_ireturn asm)
     ))
 
@@ -1886,7 +1891,9 @@
     (var cont_lbl (fresh_label asm)) 
 
     (put_unwind_push asm hdlr_lbl)
+    (+= try_nest 1)
     (compile asm stmt)
+    (-= try_nest 1)
     (put_unwind_pop asm)
     (put_goto asm cont_lbl)
     (set_label asm hdlr_lbl)
