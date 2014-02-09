@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-02-06 10:20:46 nineties $
+; $Id: rowl1-compile.rlc 2014-02-09 18:24:23 nineties $
 ;
 
 (import "rlvm-compile")
@@ -189,13 +189,16 @@
 ; to
 ; f(... x ... y ...) when x==y : body
 (extern fun _copy)
-(fun alpha_args_iter (tbl chk rep expr level) (
+(fun alpha_args_iter (tbl chk rep expr level check) (
     (if (is_symbol expr) (do
         (if (== expr DontCare) (return expr))
         (if (is_special expr) (return expr))
         (if (== level 0) (do
             (if (symtable_find tbl expr)
                 (do
+                    (if (&& check (symtable_find_local tbl expr))
+                        (throw (redefined_var current_loc expr))
+                        )
                     (var new_sym (to_unique_sym (symbol_name expr)))
                     (symtable_add tbl expr new_sym)
                     (if (list_member expr (field_get chk 0)) (do
@@ -216,7 +219,7 @@
     (if (is_list expr) (do
         (var ls expr)
         (while ls (do
-            (setcar ls (alpha_args_iter tbl chk rep (car ls) level))
+            (setcar ls (alpha_args_iter tbl chk rep (car ls) level check))
             (= ls (cdr ls))
             ))
         (return expr)
@@ -226,10 +229,10 @@
     (if (== hd Domain)
         (if (== level 0) (do
             (node_arg_set expr 0
-                (alpha_args_iter tbl chk rep (node_arg expr 0) 0))
+                (alpha_args_iter tbl chk rep (node_arg expr 0) 0 check))
             (var dom (node_arg expr 1))
             (if (! (is_symbol dom))
-                (node_arg_set expr 1 (alpha_args_iter tbl chk rep dom 0))
+                (node_arg_set expr 1 (alpha_args_iter tbl chk rep dom 0 check))
                 )
             (return expr)
             ))
@@ -238,7 +241,7 @@
 
     (for i 0 (node_size expr)
         (node_arg_set expr i
-            (alpha_args_iter tbl chk rep (node_arg expr i) level))
+            (alpha_args_iter tbl chk rep (node_arg expr i) level check))
         )
     (return expr)
     ))
@@ -255,19 +258,19 @@
     (return guard)
     ))
 
-(fun alpha_args (tbl args) (
+(fun alpha_args (tbl args check) (
     (var chk (struct 1 0))
     (var rep (struct 1 0))
     (if (== (node_head args) When)
         (do
             (node_arg_set args 0
-                (alpha_args_iter tbl chk rep (node_arg args 0) 0)) 
+                (alpha_args_iter tbl chk rep (node_arg args 0) 0 check)) 
             (var guard (alpha tbl (node_arg args 1)))
             (node_arg_set args 1 (setup_guard rep guard))
             (return args)
         )
         (do
-            (= args (alpha_args_iter tbl chk rep args 0))
+            (= args (alpha_args_iter tbl chk rep args 0 check))
             (var guard (setup_guard rep @C_NIL))
             (if (== guard @C_NIL)
                 (return args)
@@ -303,7 +306,7 @@
         (= expr (_copy expr))
         (node_arg_set expr 1 (alpha tbl (node_arg expr 1)))
         (if (!= (node_head (node_arg expr 0)) Apply)
-            (node_arg_set expr 0 (alpha_args tbl (node_arg expr 0)))
+            (node_arg_set expr 0 (alpha_args tbl (node_arg expr 0) @TRUE))
             )
         (return expr)
         ))
@@ -321,7 +324,7 @@
     (if (== hd Lambda) (do
         (symtable_push tbl)
         (= expr (_copy expr))
-        (node_arg_set expr 0 (alpha_args tbl (node_arg expr 0)))
+        (node_arg_set expr 0 (alpha_args tbl (node_arg expr 0) @FALSE))
         (node_arg_set expr 1 (alpha tbl (node_arg expr 1)))
         (symtable_pop tbl)
         (return expr)
@@ -808,11 +811,12 @@
     ))
 
 (var max_lvar_idx 0)
+(var lvar_idx_offset 0)
 (var break_labels null)
 (var continue_labels null)
 
 (fun get_lvar_idx () (
-    (var idx (symtable_count variables))
+    (var idx (- (symtable_count variables) lvar_idx_offset))
     (if (>= idx max_lvar_idx) (= max_lvar_idx (+ idx 1)))
     (return idx)
     ))
@@ -855,8 +859,10 @@
     (put_allocate asm_body 0)
 
     (var save_max_lvar_idx max_lvar_idx)
+    (var save_lvar_idx_offset lvar_idx_offset)
     (var save_break_labels break_labels)
     (var save_continue_labels continue_labels)
+    (= lvar_idx_offset (symtable_count variables))
     (= max_lvar_idx 0)
     (= break_labels 0)
     (= continue_labels 0)
@@ -872,6 +878,7 @@
     (put_operand_byte asm_body (+ cnt_addr 1) max_lvar_idx)
     (symtable_pop variables)
 
+    (= lvar_idx_offset save_lvar_idx_offset)
     (= max_lvar_idx save_max_lvar_idx)
     (= break_labels save_break_labels)
     (= continue_labels save_continue_labels)
@@ -974,7 +981,7 @@
     ))
 
 (export fun get_arity () (
-    (return (make_object Arity 0))
+    (return (make_object0 GetArity))
     ))
 
 (export fun make_arg (idx) (
@@ -1145,6 +1152,7 @@
         (put_dup asm)
         (compile asm (node_arg sym 0))
         (put_fieldset asm (node_arg_int sym 1))
+        return
         ))
     (var info (symtable_find_local variables sym))
     (var idx 0)
@@ -1234,9 +1242,8 @@
         (put_load_lvar asm (node_arg_int opd 0))
         return
         ))
-    (if (== ty Arity) (do
+    (if (== ty GetArity) (do
         (put_arity asm)
-        (put_box asm)
         return
         ))
     (if (== ty Argument) (do
@@ -1845,6 +1852,26 @@
     (put_ireturn asm)
     ))
 
+(fun compile_reset (asm expr) (
+    (var func (node_arg expr 0))
+    (compile asm func)
+    (put_push asm func)
+    (put_push asm current_loc)
+    (compile_simple_call asm 3 compile_matching)
+    (put_reset_push asm)
+    (put_jcall asm 0 @FALSE)
+    (put_reset_pop asm)
+    ))
+
+(fun compile_shift (asm expr) (
+    (var func (node_arg expr 0))
+    (compile asm func)
+    (put_push asm func)
+    (put_push asm current_loc)
+    (compile_simple_call asm 3 compile_matching)
+    (put_shift asm) ; create partial continuation and call given function.
+    ))
+
 ; handler must be a lambda
 (var default_hdler (lambda (to_sym "x") (make_object1 Throw (to_sym "x"))))
 (fun compile_try (asm expr) (
@@ -2147,6 +2174,8 @@
     (add_compiler mod (make_object3 ArithAssign DontCare DontCare DontCare) compile_arithmetic_assign)
 
     (add_compiler mod (make_object2 Slot DontCare symT) compile_slot)
+    (add_compiler mod (make_object1 Reset DontCare) compile_reset)
+    (add_compiler mod (make_object1 Shift DontCare) compile_shift)
 
     ; internal expressions
     (add_compiler mod (make_object2 FieldRef DontCare intT) compile_fieldref)

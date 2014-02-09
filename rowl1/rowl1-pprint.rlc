@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-array.rlc 2014-02-05 10:31:13 nineties $
+; $Id: rowl1-array.rlc 2014-02-09 10:15:29 nineties $
 ;
 
 (import "rlvm-compile")
@@ -60,6 +60,7 @@
         (@FunctionE         . (return (pp_function ochan obj)))
         (@BuiltinFunctionE  . (return (pp_function ochan obj)))
         (@BoundFunctionE    . (return (pp_function ochan obj)))
+        (@ContinuationE     . (return (pp_function ochan obj)))
         (@AliasE            . (return (pp_object ochan "Alias" obj)))
         (@InputFileStreamE  . (return (pp_object ochan "InputFileStream" obj)))
         (@OutputFileStreamE . (return (pp_object ochan "OutputFileStream" obj)))
@@ -111,11 +112,10 @@
     ))
 
 (fun pp_function_body (ochan func) (
-    (if (|| (== (node_type func) @FunctionE) (== (node_type func) @BuiltinFunctionE))
+    (if (|| (== (node_type func) @FunctionE)
+            (== (node_type func) @BuiltinFunctionE))
         (do
-            (output_string ochan "{0x")
-            (output_hex ochan func 8)
-            (output_string ochan "}(")
+            (output_string ochan "(")
             (var args (field_get func 2))
             (= args (cdr args)) ; skip arity
             (while args (do
@@ -125,11 +125,15 @@
                 ))
             (output_char ochan ')')
         )
+    (if (== (node_type func) @ContinuationE)
+        (do
+            (output_string ochan "{continuation}")
+        )
         (do
             (pp_function_body ochan (field_get func 2))
             (output_string ochan ", ")
             (pp_function_body ochan (field_get func 3))
-        ))
+        )))
     ))
 
 (fun pp_function (ochan func) (

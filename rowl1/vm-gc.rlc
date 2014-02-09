@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2014-02-06 21:31:43 nineties $
+; $Id: vm-gc.rlc 2014-02-09 18:25:17 nineties $
 ;
 
 (import "stdlib")
@@ -114,16 +114,17 @@
 (define blockmap->first= (idx val)  `([]= block_map (+ (* @BDESCR_WORD @idx) 1) @val))
 
 ; object tag:
-;          : | 1bit | 20bit | 7bit |  4bit  |
-; padding  : |  --  |  size |    0 | 0b0000 |
-; pstruct  : |  --  |  size | type | 0b0001 |
-; cons     : |  --  |     3 |    0 | 0b0010 |
-; sequence : |  --  |  size | type | 0b0011 |
-; struct   : |  --  |  size | #box | 0b0100 |
-; variant  : |  --  |  size | #box | 0b0101 |
-; bytecode : |  --  |     5 |    0 | 0b0110 |
-; bigint   : |  --  |     5 |    0 | 0b0111 |
-; expr     : |  --  |  size |    0 | 0b1000 |
+;              | 1bit | 20bit | 7bit |  4bit  |
+; padding      |  --  |  size |    0 | 0b0000 |
+; pstruct      |  --  |  size | type | 0b0001 |
+; cons         |  --  |     3 |    0 | 0b0010 |
+; sequence     |  --  |  size | type | 0b0011 |
+; struct       |  --  |  size | #box | 0b0100 |
+; variant      |  --  |  size | #box | 0b0101 |
+; bytecode     |  --  |  size |    0 | 0b0110 |
+; bigint       |  --  |     5 |    0 | 0b0111 |
+; expr         |  --  |  size |    0 | 0b1000 |
+; continuation |  --  |     6 |    0 | 0b1001 |
 
 (define OBJECT_WORDS (addr)  `(& (>> ([] @addr 0) 11) @(- (<< 1 20) 1)))
 (define OBJECT_TAG (addr)    `(& ([] @addr 0) @(- (<< 1 4) 1)))
@@ -756,20 +757,46 @@
     (return ([] obj 2))
     ))
 
+; shift-reset base partial continuation
+(export prim_make_continuation)
+(fun prim_make_continuation (pc base low high) (
+    (-= high @(* 5 WORD_SIZE))  ; remove unnecessary stack words
+    ;(debug "prim_make_continuation\n")
+    ;(debug "pc  =") (debugx pc)
+    ;(debug "base=") (debugx base)
+    ;(debug "low =") (debugx low)
+    ;(debug "high=") (debugx high)
+    ;(debug "size=") (debugi (/ (- high low) @WORD_SIZE))
+    (int size (- high low))
+    (void* stack (prim_allocate_iarray size))
+    (prim_memcpy stack low size)
+    ;(debug "--stack--\n")
+    ;(for i 0 (/ size @WORD_SIZE) (
+    ;    (debugx ([] stack i))
+    ;    ))
+    ;(debug "---------\n")
+    (void* ptr (allocate_object 6))
+    @(SET_HEADER ptr TAG_CONT 0 6)
+    (+= ptr @WORD_SIZE)
+    ([]= ptr 0 pc)
+    ([]= ptr 1 0)   ; cache
+    ([]= ptr 2 (- base low)) ; offset of base ptr
+    ([]= ptr 3 stack)
+    ([]= ptr 4 (/ size @WORD_SIZE))
+    (return ptr)
+    ))
+
+; multiprecision integer
 (export prim_allocate_bint)
 (fun prim_allocate_bint (len) (
+    (void* ary (prim_allocate_iarray len))
     (void* ptr (allocate_object 5))
     @(SET_HEADER ptr TAG_BIGINT 0 5)
     (+= ptr @WORD_SIZE)
-    ([]= ptr 0 0)
+    ([]= ptr 0 ary)
     ([]= ptr 1 1)   ; number of digits
     ([]= ptr 2 len) ; capacity
     ([]= ptr 3 0)   ; sign
-
-    ; XXX: Since prim_allocate_iarray may invoke GC, call it after
-    ; initialization of this object.
-
-    ([]= ptr 0 (prim_allocate_iarray len))   ; digits
     (return ptr)
     ))
 

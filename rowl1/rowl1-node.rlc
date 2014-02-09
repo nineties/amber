@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2014-02-05 18:44:43 nineties $
+; $Id: rowl1-node.rlc 2014-02-08 19:56:45 nineties $
 ;
 
 (import "rlvm-compile")
@@ -70,6 +70,8 @@
 (export var Return      (to_sym "Return"))
 (export var Try         (to_sym "Try"))
 (export var Throw       (to_sym "Throw"))
+(export var Reset       (to_sym "Reset"))
+(export var Shift       (to_sym "Shift"))
 (export var Seq         (to_sym "Seq"))
 (export var Exception   (to_sym "Exception"))
 (export var TopEval     (to_sym "toplevel_eval"))
@@ -110,7 +112,7 @@
 (export var ArrayAt        (to_unique_sym "%ArrayAt"))  ; ArrayAt{var, idx}
 (export var RestOf         (to_unique_sym "%RestOf"))   ; RestOf{var, idx}
 (export var FieldRef       (to_unique_sym "%FieldRef")) ; FieldRef{var, idx}
-(export var Arity          (to_unique_sym "%Arity"))
+(export var GetArity       (to_unique_sym "%GetArity"))
 (export var VariableLength (to_unique_sym "%VariableLength"))
 
 (export var Assembler        (to_builtin_sym "Assembler"))
@@ -224,6 +226,7 @@
     (if (== tag @TAG_CONS) (return @ListE))
     (if (== tag @TAG_EXPR) (return @ExprE))
     (if (== tag @TAG_BYTECODE) (return @BytecodeE))
+    (if (== tag @TAG_CONT) (return @ContinuationE))
     (if (== tag @TAG_BIGINT) (return @BigIntE))
     (if (== tag @TAG_SEQUENCE) (do
         (if (== (get_sequence_tag obj) @SEQ_TUPLE) (return @TupleE))
@@ -264,7 +267,10 @@
     ))
 (export fun is_function (obj) (
     (var ty (node_type obj))
-    (if (|| (|| (== ty @FunctionE) (== ty @BuiltinFunctionE)) (== ty @BoundFunctionE))
+    (if (|| (== ty @FunctionE)
+        (|| (== ty @BuiltinFunctionE)
+        (|| (== ty @BoundFunctionE)
+            (== ty @ContinuationE))))
         (return @TRUE)
         (return @FALSE)
         )
@@ -324,16 +330,17 @@
         (@ListE             . (return List))
         (@ArrayE            . (return Array))
         (@TableE            . (return Table))
-        (@AssemblerE        . (return (to_sym "Assembler")))
-        (@BytecodeE         . (return (to_sym "Bytecode")))
-        (@FunctionE         . (return (to_sym "Function")))
-        (@BuiltinFunctionE  . (return (to_sym "Function")))
-        (@BoundFunctionE    . (return (to_sym "Function")))
-        (@AliasE            . (return (to_sym "Alias")))
-        (@InputFileStreamE  . (return (to_sym "InputFileStream")))
-        (@OutputFileStreamE . (return (to_sym "OutputFileStream")))
-        (@ParserE           . (return (to_sym "Parser")))
-        (@StringIOE         . (return (to_sym "StringIO")))
+        (@AssemblerE        . (return Assembler))
+        (@BytecodeE         . (return Bytecode))
+        (@FunctionE         . (return Function))
+        (@BuiltinFunctionE  . (return Function))
+        (@BoundFunctionE    . (return Function))
+        (@ContinuationE     . (return Function))
+        (@AliasE            . (return Alias))
+        (@InputFileStreamE  . (return InputFileStream))
+        (@OutputFileStreamE . (return OutputFileStream))
+        (@ParserE           . (return Parser))
+        (@StringIOE         . (return StringIO))
         (@BigIntE           . (return BigInt))
         (@LocE              . (return Loc))
         (@TupleE            . (return Tuple))
@@ -646,6 +653,7 @@
         (@FunctionE         . (return (string "Function")))
         (@BuiltinFunctionE  . (return (string "Function")))
         (@BoundFunctionE    . (return (string "Function")))
+        (@ContinuationE     . (return (string "Function")))
         (@AliasE            . (return (string "Alias")))
         (@InputFileStreamE  . (return (string "InputFileStream")))
         (@OutputFileStreamE . (return (string "OutputFileStream")))

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2014-02-07 05:05:11 nineties $
+; $Id: vm-insn.rlc 2014-02-09 18:11:10 nineties $
 ;
 
 (define gen_field_get (idx) `(
@@ -1404,8 +1404,12 @@
         (asm "movl %ebx, %eax")
         (asm "addl $4, %eax")
         (vmpush %eax) ; store return point
-        (vmpush %edi) ; store base pointer
-        (asm "movl %esi, %edi") ; set base pointer
+
+        (asm "movl %edi, %eax") ; old base pointer
+        (asm "subl %esi, %eax")
+        (vmpush %eax) ; store frame size
+
+        (asm "movl %esi, %edi") ; set new base pointer
         (vmsshort 1 %eax) ; offset of address of the function
         (asm "addl %eax, %ebx")
         (vmfetch)
@@ -1419,7 +1423,9 @@
         (asm "movl %ebx, %eax")
         (asm "addl $6, %eax")
         (vmpush %eax) ; store return point
-        (vmpush %edi) ; store base pointer
+        (asm "movl %edi, %eax") ; old base pointer
+        (asm "subl %esi, %eax")
+        (vmpush %eax) ; store frame size
         (asm "movl %esi, %edi") ; set base pointer
         (vmint 1 %eax) ; offset of address of the function
         (asm "addl %eax, %ebx")
@@ -1450,7 +1456,9 @@
         (asm "movl $" @C_UNDEF ", 4(%esi)")
         (vmpush %eax) ; store size of arguments
         (vmpush %ecx) ; store return point
-        (vmpush %edi) ; store base pointer
+        (asm "movl %edi, %eax") ; old base pointer
+        (asm "subl %esi, %eax")
+        (vmpush %eax) ; store frame size
         (asm "movl %esi, %edi") ; set base pointer
         (asm "addl code_base, %ebx")
         (vmfetch)
@@ -1481,7 +1489,9 @@
         (asm "addl $12, %ebx") ; pointer to the bytecode
         (vmpush %eax) ; store size of arguments
         (vmpush %ecx) ; store return point
-        (vmpush %edi) ; store base pointer
+        (asm "movl %edi, %eax") ; old base pointer
+        (asm "subl %esi, %eax")
+        (vmpush %eax) ; store frame size
         (asm "movl %esi, %edi") ; set base pointer
         (vmfetch)
         ))
@@ -1493,7 +1503,9 @@
     (return () @nil  (
         (asm "xorl %ecx, %ecx") ; return value
         (asm "movl %edi, %esi")
-        (vmpop %edi) ; base pointer
+        (vmpop %eax) ; frame size
+        (asm "movl %esi, %edi")
+        (asm "addl %eax, %edi")
         (vmpop %ebx) ; return address
         (vmpop %eax) ; total size of arguments
         (asm "addl $8, %esi") ; closure-frame
@@ -1504,7 +1516,9 @@
     (ireturn () @nil  (
         (asm "movl (%esi), %ecx") ; return value
         (asm "movl %edi, %esi")
-        (vmpop %edi) ; base pointer
+        (vmpop %eax) ; frame size
+        (asm "movl %esi, %edi")
+        (asm "addl %eax, %edi")
         (vmpop %ebx) ; return address
         (vmpop %eax) ; total size of arguments
         (asm "addl $8, %esi") ; closure-frame
@@ -1587,6 +1601,81 @@
         (vmsshort 1 %ecx)
         (asm "cmovne %ecx, %eax")
         (vmsucc %eax)
+        (vmfetch)
+        ))
+    
+    (reset_push () @true (
+        (asm "movl %esi, %eax")
+        (asm "addl $4, %eax")
+        (asm "pushl %eax")
+        (asm "pushl %edi")
+        (asm "movl %ebx, %ecx")
+        (asm "addl $5, %ecx") ; reset_push(1) + jcall(3) + reset_pop(1)
+        (asm "pushl %ecx")
+        ))
+
+    (reset_pop () @true (
+        (asm "addl $12, %esp")
+        ))
+
+    (shift () @nil (
+        (vmsave)
+        (asm "movl 12(%esp), %eax")
+        (asm "pushl %eax")      ; stack top at `reset'
+        (asm "movl %esi, %eax")
+        (asm "addl $4, %eax")
+        (asm "pushl %eax")      ; stack top at `shift'
+        (asm "movl %ebx, %eax")
+        (asm "addl $1, %eax")
+        (asm "pushl %edi")      ; base pointer
+        (asm "pushl %eax")      ; program counter
+        (call prim_make_continuation)
+        (asm "addl $16, %esp")
+        (vmrestore)
+        (vmpop %ebx)
+        (asm "addl $12, %ebx") ; pointer to the bytecode
+        (asm "popl %ecx")
+        (asm "popl %edi")
+        (asm "popl %esi")
+        (vmpush %eax)
+        (asm "subl $8, %esi") ; for closure-frame
+        (asm "movl $" @C_UNDEF ", 4(%esi)")
+        (vmpush 4)    ; store size of arguments
+        (vmpush %ecx) ; store return point
+        (asm "movl %edi, %eax") ; old base pointer
+        (asm "subl %esi, %eax")
+        (vmpush %eax) ; store frame size
+        (asm "movl %esi, %edi") ; set base pointer
+        (vmfetch)
+        ))
+
+    (callc () @nil (
+        (asm "movl 20(%edi), %eax")
+        (asm "pushl %eax")  ; arg0
+        (vmpop %eax)    ; continuation
+        (asm "movl (%eax), %ebx")
+        (asm "movl 8(%eax), %edi")
+        (asm "movl 16(%eax), %ecx") ; size of evacuated stack
+        (asm "movl 12(%eax), %eax")  ; stack bottom
+        (asm "movl %ecx, %edx")
+        (asm "shll $2, %edx")
+        (asm "addl %edx, %eax")
+
+        (asm "1:")
+        (asm "testl %ecx, %ecx")
+        (asm "jz 2f")
+        (asm "subl $4, %esi")
+        (asm "subl $4, %eax")
+        (asm "movl (%eax), %edx")
+        (asm "movl %edx, (%esi)")
+        (asm "subl $1, %ecx")
+        (asm "jmp 1b")
+
+        (asm "2:")
+        (asm "xorl %edx, %edx")
+        (asm "addl %esi, %edi")
+        (asm "popl %eax")
+        (vmpush %eax) ; arg0
         (vmfetch)
         ))
 

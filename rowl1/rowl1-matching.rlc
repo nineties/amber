@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2014-02-05 18:21:16 nineties $
+; $Id: rowl1-matching.rlc 2014-02-09 13:12:23 nineties $
 ;
 
 (import "rlvm-compile")
@@ -105,6 +105,11 @@
         (var fun2 (field_get def 3))
         (= tl (construct_pattern_matrix fun2 tl))
         (return (construct_pattern_matrix fun1 tl))
+        ))
+    (if (== ty @ContinuationE) (do
+        (return (cons
+            (struct 2 (setup_patterns (list2 (box 1) DontCare)) def)
+            tl))
         ))
     (throw (string "BUG: construct_pattern_matrix"))
     ))
@@ -238,10 +243,11 @@
                 (= clos (field_get func 5))
                 (= use_self (field_get func 6))
             )
+        (if (== ty @BuiltinFunctionE)
             (do 
                 (= guard (field_get func 3))
                 (= use_self (field_get func 5))
-            ))
+            )))
 
         (var check_failed (fresh_label asm))
         (if use_self (do
@@ -261,10 +267,15 @@
                 (put_push asm code)
                 (put_jjump asm)
             )
+        (if (== ty @BuiltinFunctionE)
             (do
                 (put_imm_int32 asm (field_get func 4))
                 (put_aforward asm)
-            ))
+            )
+            (do
+                (put_push asm func)
+                (put_callc asm)
+            )))
         (if (|| guard use_self) (do
             (set_label asm check_failed)
             (if (cdr pats) (do
@@ -333,8 +344,10 @@
         return
         ))
     (if (== hd Int) (do
-        (compile_operand asm (car args) @C_NIL)
-        (put_check_int asm exit)
+        (if (!= (node_head (car args)) GetArity) (do
+            (compile_operand asm (car args) @C_NIL)
+            (put_check_int asm exit)
+            ))
         (compile_matching_intlit asm args pats exit)
         return
         ))
@@ -480,8 +493,9 @@
 
     (compile_operand asm (car args) @C_NIL)
 
-    ; unbox
-    (put_unbox asm)
+    (if (!= (node_head (car args)) GetArity)
+        (put_unbox asm)
+        )
 
     (put_tswitch asm ncases)
     (for i 0 ncases
@@ -518,8 +532,9 @@
 
     (compile_operand asm (car args) @C_NIL)
 
-    ; unbox arg
-    (put_unbox asm)
+    (if (!= (node_head (car args)) GetArity)
+        (put_unbox asm)
+        )
 
     (put_lswitch asm max)
     (= cases_copy cases)
