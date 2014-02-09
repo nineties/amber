@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-02-09 19:52:08 nineties $
+; $Id: rowl1-compile.rlc 2014-02-09 22:18:28 nineties $
 ;
 
 (import "rlvm-compile")
@@ -814,7 +814,6 @@
 (var lvar_idx_offset 0)
 (var break_labels null)
 (var continue_labels null)
-(var compiling_reset @FALSE)
 (var try_nest 0)
 
 (fun get_lvar_idx () (
@@ -877,9 +876,7 @@
         (compile asm_guard guard)
         )
 
-    (if compiling_reset (put_reset_push asm_body))
     (compile asm_body body)
-    (if compiling_reset (put_reset_pop asm_body))
 
     (put_operand_byte asm_body (+ cnt_addr 1) max_lvar_idx)
     (symtable_pop variables)
@@ -1326,6 +1323,11 @@
         (incr arity)
         ))
 
+    (if (> arity @ARITY_MAX)
+        (throw (exception1 current_loc (string "too many arguments")
+            (node_arg expr 1)))
+        )
+
     (compile asm func)
     (put_push asm func)
     (put_push asm current_loc)
@@ -1354,6 +1356,11 @@
         (= args (cdr args))
         (incr arity)
         ))
+
+    (if (> arity @ARITY_MAX)
+        (throw (exception1 current_loc (string "too many arguments")
+            (node_arg expr 1)))
+        )
 
     (compile asm obj)   ; self;arg1;arg2;...
     (put_dup asm)       ; self;self;arg1;arg2;..
@@ -1862,15 +1869,13 @@
 
 (fun compile_reset (asm expr) (
     (var func (node_arg expr 0))
-    (var save_compiling_reset compiling_reset)
-    (= compiling_reset @TRUE)
     (compile asm func)
-    (= compiling_reset save_compiling_reset)
-
     (put_push asm func)
     (put_push asm current_loc)
     (compile_simple_call asm 3 compile_matching)
+    (put_reset_push asm)
     (put_jcall asm 0 @FALSE)
+    (put_reset_pop asm)
     ))
 
 (fun compile_shift (asm expr) (

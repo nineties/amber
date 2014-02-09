@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2014-02-09 19:30:28 nineties $
+; $Id: vm-insn.rlc 2014-02-09 22:17:08 nineties $
 ;
 
 (define gen_field_get (idx) `(
@@ -94,6 +94,8 @@
     (foreach o operands (+= len (operand_len o)))
     len
     ))
+
+(var RESET_MARK 0x100)
 
 (var vm_instructions `(
     (nop   () @true ())
@@ -1501,16 +1503,25 @@
         (vmfetch)
         ))
     (return () @nil  (
-        (asm "xorl %ecx, %ecx") ; return value
         (asm "movl %edi, %esi")
         (vmpop %eax) ; frame size
         (asm "movl %esi, %edi")
         (asm "addl %eax, %edi")
         (vmpop %ebx) ; return address
         (vmpop %eax) ; total size of arguments
+        (asm "movzbl %al, %ecx")
+
         (asm "addl $8, %esi") ; closure-frame
-        (asm "addl %eax, %esi")
-        (vmpush %ecx) ; push return value
+        (asm "addl %ecx, %esi")
+        (vmpush 0) ; push return value
+
+        ;(asm "andl $" @RESET_MARK ", %eax")
+        ;(asm "jz 1f")
+        ;(asm "movl resetstack, %ecx")
+        ;(asm "movl 12(%ecx), %ecx")
+        ;(asm "movl %ecx, resetstack")
+        ;(asm "1:")
+
         (vmfetch)
         ))
     (ireturn () @nil  (
@@ -1521,9 +1532,19 @@
         (asm "addl %eax, %edi")
         (vmpop %ebx) ; return address
         (vmpop %eax) ; total size of arguments
+        (asm "movzbl %al, %edx")
         (asm "addl $8, %esi") ; closure-frame
-        (asm "addl %eax, %esi")
+        (asm "addl %edx, %esi")
         (vmpush %ecx) ; push return value
+
+        ;(asm "andl $" @RESET_MARK ", %eax")
+        ;(asm "jz 1f")
+        ;(asm "movl resetstack, %edx")
+        ;(asm "movl 12(%edx), %edx")
+        ;(asm "movl %edx, resetstack")
+        ;(asm "1:")
+        (asm "xorl %edx, %edx")
+
         (vmfetch)
         ))
     ; switch (table search)
@@ -1604,27 +1625,53 @@
         (vmfetch)
         ))
     
+    ; 'rcall:1'
+    (rcall () @nil (
+        (asm "movl %ebx, %ecx")
+        (asm "addl $3, %ecx")
+        (vmpop %ebx)
+        (asm "subl $8, %esi") ; for closure-frame
+        (asm "movl $" @C_UNDEF ", 4(%esi)")
+        (asm "addl $12, %ebx") ; pointer to the bytecode
+        (vmpush @RESET_MARK) ; store size of arguments (== 0) and 'reset' mark
+        (vmpush %ecx) ; store return point
+        (asm "movl %edi, %eax") ; old base pointer
+        (asm "subl %esi, %eax")
+        (vmpush %eax) ; store frame size
+        (asm "movl %esi, %edi") ; set base pointer
+        (vmfetch)
+        ))
     (reset_push () @true (
-        (asm "movl %esi, %eax")
-        (asm "addl $20, %eax")
-        (asm "pushl %eax")
+        (vmsave)
+        (asm "pushl $16")
+        (asm "pushl $" @PLAIN_OTHER)
+        (call allocate_pstruct)
+        (asm "addl $8, %esp")
+        (vmrestore)
 
-        (asm "movl (%edi), %eax")
-        (asm "addl %esi, %eax")
-        (asm "addl $4, %eax")
-        (asm "pushl %eax")
+        (asm "movl %esi, %ecx")
+        (asm "addl $4, %ecx")   ; remove unnecessary frame
+        (asm "movl %ecx, (%eax)")
+        (asm "movl %edi, 4(%eax)")
+        (asm "movl %ebx, %ecx")
+        (asm "addl $5, %ecx")   ; reset_push(1) + rcall(1)
+        (asm "movl %ecx, 8(%eax)")
 
-        (asm "pushl 4(%edi)")
+        (asm "movl resetstack, %ecx")
+        (asm "movl %ecx, 12(%eax)")
+        (asm "movl %eax, resetstack")
         ))
 
     (reset_pop () @true (
-        (asm "addl $12, %esp")
+        (asm "movl resetstack, %ecx")
+        (asm "movl 12(%ecx), %ecx")
+        (asm "movl %ecx, resetstack")
         ))
 
     (shift () @nil (
         (vmsave)
-        (asm "movl 12(%esp), %eax")
-        (asm "pushl %eax")      ; stack top at `reset'
+        (asm "movl resetstack, %edx")
+        (asm "pushl (%edx)")    ; stack top at `reset'
         (asm "movl %esi, %eax")
         (asm "addl $4, %eax")
         (asm "pushl %eax")      ; stack top at `shift'
@@ -1637,9 +1684,15 @@
         (vmrestore)
         (vmpop %ebx)
         (asm "addl $12, %ebx") ; pointer to the bytecode
-        (asm "popl %ecx")
-        (asm "popl %edi")
-        (asm "popl %esi")
+
+        (asm "movl resetstack, %edx")
+        (asm "movl 8(%edx), %ecx")
+        (asm "movl 4(%edx), %edi")
+        (asm "movl (%edx), %esi")
+        (asm "movl 12(%edx), %edx")
+        (asm "movl %edx, resetstack")
+        (asm "xorl %edx, %edx")
+
         (vmpush %eax)
         (asm "subl $8, %esi") ; for closure-frame
         (asm "movl $" @C_UNDEF ", 4(%esi)")
