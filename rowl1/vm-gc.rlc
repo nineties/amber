@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2014-02-09 18:25:17 nineties $
+; $Id: vm-gc.rlc 2014-02-09 19:36:40 nineties $
 ;
 
 (import "stdlib")
@@ -149,6 +149,7 @@
 (extern void* gobject_area_base)
 (extern int num_gobject)
 (extern int wrtable_GC_ran)
+(extern void* exstack)
 
 (byte[] @(* BDESCR_SIZE MAX_BLOCKS) block_map)
 (int stack_base)    ; address of stack bottom
@@ -284,6 +285,16 @@
         ))
     ))
 
+(fun scan_exception_stack () (
+    (void* p exstack)
+    (while p (
+        (promote_page ([] p 0))
+        (promote_page ([] p 1))
+        (promote_page ([] p 2))
+        (= p ([] p 3))
+        ))
+    ))
+
 (fun copy_object (dst src words) (
     (while (> words 0) (
         ([]= dst 0 ([] src 0))
@@ -413,6 +424,7 @@
     ;     other registers are not callee-save registers.
     (scan_machine_stack)
     (scan_vm_stack)
+    (scan_exception_stack)
 
     ; move registered objects
     (for i 0 num_static (
