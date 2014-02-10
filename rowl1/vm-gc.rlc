@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2014-02-09 20:40:15 nineties $
+; $Id: vm-gc.rlc 2014-02-10 13:38:31 nineties $
 ;
 
 (import "stdlib")
@@ -124,7 +124,7 @@
 ; bytecode     |  --  |  size |    0 | 0b0110 |
 ; bigint       |  --  |     5 |    0 | 0b0111 |
 ; expr         |  --  |  size |    0 | 0b1000 |
-; continuation |  --  |     6 |    0 | 0b1001 |
+; continuation |  --  |     7 |    0 | 0b1001 |
 
 (define OBJECT_WORDS (addr)  `(& (>> ([] @addr 0) 11) @(- (<< 1 20) 1)))
 (define OBJECT_TAG (addr)    `(& ([] @addr 0) @(- (<< 1 4) 1)))
@@ -150,6 +150,7 @@
 (extern int num_gobject)
 (extern int wrtable_GC_ran)
 (extern void* exstack)
+(extern void* resetstack)
 
 (byte[] @(* BDESCR_SIZE MAX_BLOCKS) block_map)
 (int stack_base)    ; address of stack bottom
@@ -165,6 +166,8 @@
 (void* freep)    ; pointer to free memory in current free page
 (int free_words) ; size of free area in current page (in words)
 (int num_allocated_pages 0) ; number of allocated pages
+(void* continuation_list 0)
+(int num_seq 0)
 
 (void*[] @MAX_STATICS statics)
 (int num_static)
@@ -291,8 +294,78 @@
         (promote_page ([] p 0))
         (promote_page ([] p 1))
         (promote_page ([] p 2))
+        (promote_page ([] p 3))
         (= p ([] p 3))
         ))
+    ))
+
+(fun scan_reset_stack () (
+    (void* p resetstack)
+    (while p (
+        (promote_page ([] p 0))
+        (promote_page ([] p 1))
+        (promote_page ([] p 2))
+        (promote_page ([] p 3))
+        (= p ([] p 3))
+        ))
+    ))
+
+(fun scan_continuation_list () (
+    (void* p continuation_list)
+    (void* v 0)
+    (int size 0)
+    (promote_page p)
+    (while p (
+        (promote_page ([] p 0)) ; pc
+        (= v ([] p 3))
+        (= size ([] p 4))
+        (for i 0 size (
+            (promote_page ([] v i))
+            ))
+        (promote_page ([] p 5))
+        (= p ([] p 5))
+        ))
+    ))
+
+(fun update_continuation_list () (
+    (= continuation_list (update_continuation_list_iter continuation_list))
+    ))
+
+(fun update_continuation_list_iter (p) (
+    (if (! p) ((return 0)))
+    (if (== @(pdescr->generation (ADDR2PDESCR p)) next_gen) (
+        ([]= p 5 (update_continuation_list_iter ([] p 5)))
+        (return p)
+        ))
+    (void* q (- p @WORD_SIZE))
+    (if @(OBJECT_COPYED q) (
+        (= p @(FORWARD_ADDR q))
+        ([]= p 5 (update_continuation_list_iter ([] p 5)))
+        (return p)
+        ))
+    (return (update_continuation_list_iter ([] p 5)))
+    ))
+
+(fun move_exception_stack () (
+    (void* p exstack)
+    (void* q 0)
+    (while p (
+        (= q (+ p @(* 3 WORD_SIZE)))
+        (= p ([] p 3))
+        (move_object q)
+        ))
+    (move_object (address exstack))
+    ))
+
+(fun move_reset_stack () (
+    (void* p resetstack)
+    (void* q 0)
+    (while p (
+        (= q (+ p @(* 3 WORD_SIZE)))
+        (= p ([] p 3))
+        (move_object q)
+        ))
+    (move_object (address resetstack))
     ))
 
 (fun copy_object (dst src words) (
@@ -324,7 +397,6 @@
         (return)
         ))
 
-
     (int words @(OBJECT_WORDS obj))
     (void* new_obj (allocate_object words))
     (copy_object new_obj obj words)
@@ -346,6 +418,7 @@
         (return)
         ))
     (if (== tag @TAG_SEQUENCE) (
+        (+= num_seq 1)
         (int len (- @(OBJECT_WORDS head) 1)) ; -1 for the header
         (while (> len 0) (
             (move_object obj)
@@ -398,9 +471,13 @@
             ))
         (return)
         ))
+    (if (== tag @TAG_CONT) (
+        (move_object (+ obj @WORD_SIZE))
+        (move_object (+ obj @(* 3 WORD_SIZE)))
+        (return)
+        ))
     (error "move_fields: not reachable")
     ))
-
 
 (export prim_garbage_collect)
 (fun prim_garbage_collect () (
@@ -408,8 +485,7 @@
     ))
 
 (fun garbage_collect () (
-    (if @TRUE (
-    ;(if (|| @IN_GC stop_GC) (
+    (if (|| @IN_GC stop_GC) (
         (alloc_new_block)
         (return)
         ))
@@ -418,6 +494,7 @@
     (= page_queue_head 0)
     (= page_queue_tail 0)
     (= num_allocated_pages 0)
+    (= num_seq 0)
 
     ; promote all pages which are refered from machine stack and vm-stack
     ; NB: scanning of machin registers is not necessary because
@@ -426,6 +503,11 @@
     (scan_machine_stack)
     (scan_vm_stack)
     (scan_exception_stack)
+    (scan_reset_stack)
+    (scan_continuation_list)
+
+    (move_exception_stack)
+    (move_reset_stack)
 
     ; move registered objects
     (for i 0 num_static (
@@ -475,6 +557,7 @@
         ))
 
     (update_wrtable_list)
+    (update_continuation_list)
     (insert_padding)
     (= current_gen next_gen) ; switch to next generation
     ))
@@ -546,6 +629,11 @@
 
 (fun allocate_object (words) (
     (int npage (= npage (>> (- (+ words @PAGE_WORDS) 1) @PAGE_WORDS_SHIFT)))
+    (if (> npage 2000) (
+        (debug "ALLOCATe PAGE")
+        (debugi npage)
+        (debugi words)
+        ))
     (while (> words free_words) (
         (insert_padding)
         (allocate_page npage)
@@ -788,14 +876,16 @@
     ;    (debugx ([] stack i))
     ;    ))
     ;(debug "---------\n")
-    (void* ptr (allocate_object 6))
-    @(SET_HEADER ptr TAG_CONT 0 6)
+    (void* ptr (allocate_object 7))
+    @(SET_HEADER ptr TAG_CONT 0 7)
     (+= ptr @WORD_SIZE)
     ([]= ptr 0 pc)
     ([]= ptr 1 0)   ; cache
     ([]= ptr 2 (- base low)) ; offset of base ptr
     ([]= ptr 3 stack)
     ([]= ptr 4 (/ size @WORD_SIZE))
+    ([]= ptr 5 continuation_list)
+    (= continuation_list ptr)
     (return ptr)
     ))
 

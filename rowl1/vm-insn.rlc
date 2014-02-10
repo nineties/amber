@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2014-02-09 22:17:08 nineties $
+; $Id: vm-insn.rlc 2014-02-10 10:40:04 nineties $
 ;
 
 (define gen_field_get (idx) `(
@@ -95,7 +95,7 @@
     len
     ))
 
-(var RESET_MARK 0x100)
+(var RESET_MARK 0x00000100)
 
 (var vm_instructions `(
     (nop   () @true ())
@@ -1227,14 +1227,14 @@
         ))
     ; number of arguments
     (arity () @true (
-        (asm "movl 8(%edi), %eax") ; %eax = 4 * arity
+        (asm "movzbl 8(%edi), %eax") ; %eax = 4 * arity
         (asm "shrl $2, %eax")
         (vmpush %eax)
         ))
     ; arguments
     (args (byte) @true (
         (asm "subl $12, %esp")
-        (asm "movl 8(%edi), %ecx") ; %ecx = 4 * arity
+        (asm "movzbl 8(%edi), %ecx") ; %ecx = 4 * arity
         (asm "leal 16(%edi,%ecx,1), %eax")
         (asm "movl %eax, (%esp)")
         (asm "shrl $2, %ecx")
@@ -1515,12 +1515,12 @@
         (asm "addl %ecx, %esi")
         (vmpush 0) ; push return value
 
-        ;(asm "andl $" @RESET_MARK ", %eax")
-        ;(asm "jz 1f")
-        ;(asm "movl resetstack, %ecx")
-        ;(asm "movl 12(%ecx), %ecx")
-        ;(asm "movl %ecx, resetstack")
-        ;(asm "1:")
+        (asm "andl $" @RESET_MARK ", %eax")
+        (asm "jz 1f")
+        (asm "movl resetstack, %ecx")
+        (asm "movl 12(%ecx), %ecx")
+        (asm "movl %ecx, resetstack")
+        (asm "1:")
 
         (vmfetch)
         ))
@@ -1537,12 +1537,12 @@
         (asm "addl %edx, %esi")
         (vmpush %ecx) ; push return value
 
-        ;(asm "andl $" @RESET_MARK ", %eax")
-        ;(asm "jz 1f")
-        ;(asm "movl resetstack, %edx")
-        ;(asm "movl 12(%edx), %edx")
-        ;(asm "movl %edx, resetstack")
-        ;(asm "1:")
+        (asm "andl $" @RESET_MARK ", %eax")
+        (asm "jz 1f")
+        (asm "movl resetstack, %edx")
+        (asm "movl 12(%edx), %edx")
+        (asm "movl %edx, resetstack")
+        (asm "1:")
         (asm "xorl %edx, %edx")
 
         (vmfetch)
@@ -1627,8 +1627,25 @@
     
     ; 'rcall:1'
     (rcall () @nil (
+        (vmsave)
+        (asm "pushl $16")
+        (asm "pushl $" @PLAIN_OTHER)
+        (call allocate_pstruct)
+        (asm "addl $8, %esp")
+        (vmrestore)
+        (asm "movl %esi, %ecx")
+        (asm "addl $4, %ecx")   ; remove unnecessary frame
+        (asm "movl %ecx, (%eax)")
+        (asm "movl %edi, 4(%eax)")
         (asm "movl %ebx, %ecx")
-        (asm "addl $3, %ecx")
+        (asm "addl $1, %ecx")
+        (asm "movl %ecx, 8(%eax)")
+        (asm "movl resetstack, %ecx")
+        (asm "movl %ecx, 12(%eax)")
+        (asm "movl %eax, resetstack")
+
+        (asm "movl %ebx, %ecx")
+        (asm "addl $1, %ecx")
         (vmpop %ebx)
         (asm "subl $8, %esi") ; for closure-frame
         (asm "movl $" @C_UNDEF ", 4(%esi)")
@@ -1640,32 +1657,6 @@
         (vmpush %eax) ; store frame size
         (asm "movl %esi, %edi") ; set base pointer
         (vmfetch)
-        ))
-    (reset_push () @true (
-        (vmsave)
-        (asm "pushl $16")
-        (asm "pushl $" @PLAIN_OTHER)
-        (call allocate_pstruct)
-        (asm "addl $8, %esp")
-        (vmrestore)
-
-        (asm "movl %esi, %ecx")
-        (asm "addl $4, %ecx")   ; remove unnecessary frame
-        (asm "movl %ecx, (%eax)")
-        (asm "movl %edi, 4(%eax)")
-        (asm "movl %ebx, %ecx")
-        (asm "addl $5, %ecx")   ; reset_push(1) + rcall(1)
-        (asm "movl %ecx, 8(%eax)")
-
-        (asm "movl resetstack, %ecx")
-        (asm "movl %ecx, 12(%eax)")
-        (asm "movl %eax, resetstack")
-        ))
-
-    (reset_pop () @true (
-        (asm "movl resetstack, %ecx")
-        (asm "movl 12(%ecx), %ecx")
-        (asm "movl %ecx, resetstack")
         ))
 
     (shift () @nil (
@@ -1706,13 +1697,37 @@
         ))
 
     (callc () @nil (
+        ; push reset mark
+        (vmsave)
+        (asm "pushl $16")
+        (asm "pushl $" @PLAIN_OTHER)
+        (call allocate_pstruct)
+        (asm "addl $8, %esp")
+        (vmrestore)
+        (asm "movl %esi, %ecx")
+        (asm "addl $24, %ecx")   ; remove unnecessary frame
+        (asm "movl %ecx, (%eax)")
+
+        (asm "movl (%edi), %ecx") ; frame size
+        (asm "addl $4, %ecx")
+        (asm "addl %edi, %ecx")   ; base pointer of caller
+        (asm "movl %ecx, 4(%eax)")
+
+        (asm "movl 4(%edi), %ecx")
+        (asm "movl %ecx, 8(%eax)") ; return point
+
+        (asm "movl resetstack, %ecx")
+        (asm "movl %ecx, 12(%eax)")
+        (asm "movl %eax, resetstack")
+
         (asm "movl 20(%edi), %eax")
         (asm "pushl %eax")  ; arg0
+        (asm "orl $" @RESET_MARK ", 8(%edi)")
         (vmpop %eax)    ; continuation
         (asm "movl (%eax), %ebx")
         (asm "movl 8(%eax), %edi")
         (asm "movl 16(%eax), %ecx") ; size of evacuated stack
-        (asm "movl 12(%eax), %eax")  ; stack bottom
+        (asm "movl 12(%eax), %eax") ; stack bottom
         (asm "movl %ecx, %edx")
         (asm "shll $2, %edx")
         (asm "addl %edx, %eax")
