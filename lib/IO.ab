@@ -1,0 +1,65 @@
+# Copyright (C) 2014 nineties
+# $Id: IO.ab 2014-02-10 14:04:20 nineties $
+
+stdin:  Prim.stdin
+stdout: Prim.stdout
+stderr: Prim.stderr
+
+export stdin stdout stderr
+
+IOTrait: `Trait{IO}
+InputStreamTrait: `Trait{InputStream} with {
+    parent = IOTrait
+}
+
+OutputStreamTrait: `Trait{OutputStream} with {
+    parent = IOTrait
+    pprint(x) = self.pretty_print(x)
+    print(x) = self.print_string(x.to_s())
+    puts(x) = {
+        self.print(x)
+        self.print("\n")
+    }
+}
+
+InputFileStreamTrait: Prim.InputFileStreamTrait with {
+    parent = InputStreamTrait
+    read_char() =   Prim.read_char(self)
+    read_string() = Prim.read_string(self)
+    read_line() =   Prim.read_line(self)
+    read_int8() =   Prim.read_int8(self)
+    read_uint8() =  Prim.read_uint8(self)
+    read_int16() =  Prim.read_int16(self)
+    read_uint16() = Prim.read_uint16(self)
+    read_int32() =  Prim.read_int32(self)
+    read_uint32() = Prim.read_uint32(self)
+    read_int64() =  Prim.read_int64(self)
+    read_uint64() = Prim.read_uint64(self)
+    read_float() =  Prim.read_float(self)
+}
+
+OutputFileStreamTrait: Prim.OutputFileStreamTrait with {
+    parent = OutputStreamTrait
+    print_string(v) =  Prim.print_string(self, v)
+    write_int8(v) =    Prim.write_int8(self, v)
+    write_uint8(v) =   Prim.write_uint8(self, v)
+    write_int16(v) =   Prim.write_int16(self, v)
+    write_uint16(v) =  Prim.write_uint16(self, v)
+    write_int32(v) =   Prim.write_int32(self, v)
+    write_uint32(v) =  Prim.write_uint32(self, v)
+    write_int64(v) =   Prim.write_int64(self, v)
+    write_uint64(v) =  Prim.write_uint64(self, v)
+    write_string(v) =  Prim.write_string(self, v)
+}
+
+export IOTrait InputStreamTrait OutputStreamTrait
+export InputFileStreamTrait OutputFileStreamTrait
+
+pprint(x):     stdout.pprint(x)
+print(x):      stdout.print(x)
+puts(x):       stdout.puts(x)
+read_char():   stdin.read_char()
+read_string(): stdin.read_string()
+read_line():   stdin.read_line()
+
+export pprint print puts read_char read_string read_line

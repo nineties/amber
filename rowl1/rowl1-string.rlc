@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-string.rlc 2014-02-05 10:52:33 nineties $
+; $Id: rowl1-string.rlc 2014-02-10 14:06:54 nineties $
 ;
 
 (import "rlvm-compile")
@@ -193,9 +193,9 @@
     (return (substr s b e))
     ))
 
-;; StringIO
+;; StringStream
 (export fun new_sio () (
-    (return (variant @StringIOE 1 (make_sio)))
+    (return (variant @StringStreamE 1 (make_sio)))
     ))
 
 (export fun sio_raw (sio) (
@@ -206,18 +206,8 @@
     (return (string (sio_get (field_get io 1))))
     ))
 
-(fun sio_print_symbol (io sym) (
-    (output_string (field_get io 1) (symbol_name sym))
-    (return @C_NIL)
-    ))
-
 (fun sio_print_str (io str) (
     (output_string (field_get io 1) str)
-    (return @C_NIL)
-    ))
-
-(fun sio_print_int (io n) (
-    (output_int (field_get io 1) (unbox n))
     (return @C_NIL)
     ))
 
@@ -241,14 +231,15 @@
     (add_function2 mod (to_sym "string_contain?") stringT stringT s_contain 0)
     (add_function2 mod (to_sym "string_split") stringT stringT s_split 0)
 
-    ; StringIO module
-    (var sioT (domainP StringIO))
+    ; StringStream module
+    (var trait (make_object1 (to_sym "Trait") (to_sym "StringStream")))
+    (set_slot mod (to_sym "StringStreamTrait") trait)
+    (set_special_parent @StringStreamE trait)
 
-    (add_function0 mod (to_sym "stringio_new") new_sio 0)
-    (add_function1 mod (to_sym "stringio_to_s") sioT sio_to_s 0)
-    (add_function2 mod (to_sym "stringio_print") sioT symT sio_print_symbol 0)
-    (add_function2 mod (to_sym "stringio_print") sioT stringT sio_print_str 0)
-    (add_function2 mod (to_sym "stringio_print") sioT intT sio_print_int 0)
+    (var sioT (domainP StringStream))
+    (add_function0 mod (to_sym "sstream_new") new_sio 0)
+    (add_function1 mod (to_sym "sstream_to_string") sioT sio_to_s 0)
+    (add_function2 mod (to_sym "sstream_print_string") sioT stringT sio_print_str 0)
     ))
 
     ))
