@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2014-02-10 12:08:44 nineties $
+; $Id: rowl1-matching.rlc 2014-02-10 17:15:40 nineties $
 ;
 
 (import "rlvm-compile")
@@ -326,10 +326,11 @@
         ))
     (var hd (node_head p))
     (if (== hd VariableLength) (do
+        (if (!= (node_head (car args)) GetArity)
+            (throw (bug (string "compile matching single")))
+            )
         (compile_operand asm (car args) @C_NIL)
-        (put_check_int asm exit)
-        (compile_operand asm (car args) @C_NIL)
-        (put_imm_int asm (box (node_arg_int p 0)))
+        (put_imm_int asm (node_arg_int p 0))
         (put_if_lt asm exit)
         (= pats (shift_pat pats))
         (compile_matching_main asm (cdr args) pats exit)

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-02-05 23:12:27 nineties $
+; $Id: rowl1-packrat.rlc 2014-02-10 15:08:30 nineties $
 ;
 
 (import "rlvm-compile")
@@ -462,7 +462,7 @@
     (field_set p 8 (+ (field_get p 8) 1))
     ))
 
-(export fun flush_parser (p at_error) (
+(export fun flush_parser (p) (
     (var buf (field_get p 4))
     (var cbuf (field_get buf 0))
     (var bufsz (cvector_size cbuf))
@@ -470,7 +470,7 @@
 
     ; XXX: Not good implementation.
     ; Ring buffer is better.
-    (if (|| (>= pos bufsz) at_error) (do
+    (if (|| (>= pos bufsz) (! @(PARSED p))) (do
         (cvector_resize cbuf 0)
         (field_set p 6 0)
         ))
@@ -542,7 +542,7 @@
 (fun prompt_string () (
     (var v (load_global (to_sym "PROMPT")))
     (if (!= (node_type v) @StringE)
-        (throw (type_error current_loc (string "PROMPT must be a string") v))
+        (throw (exception1 current_loc (string "invalid PROMPT prompt string") v))
         )
     (return v)
     ))
@@ -1204,6 +1204,7 @@
     (var save (set_matching_exception @C_TRUE))
     (parse_toplevel_stmt p)
     (set_matching_exception save)
+    (return @(PARSED_FLAG p))
     ))
 
 (fun parse_toplevel_stmt (p) (
@@ -1218,7 +1219,7 @@
     (if (== (parse_char p '\n') @C_FALSE) (return @C_NIL))
 
     (parsed p stmt)
-    (flush_parser p @FALSE)
+    (flush_parser p)
     (return @C_NIL)
     ))
 
@@ -1232,9 +1233,13 @@
     ))
 
 (export fun parse_shell (p) (
+    (var save_shell_mode_p shell_mode_p)
+    (= shell_mode_p @TRUE)
     (var save (set_matching_exception @C_TRUE))
-    (parse "shell_stmt" p)
+    (parse_shell_stmt p)
     (set_matching_exception save)
+    (= shell_mode_p save_shell_mode_p)
+    (return @(PARSED_FLAG p))
     ))
 
 (fun parse_shell_stmt (p) (
@@ -2027,6 +2032,10 @@
     (add_function1 mod sym (domainP Parser) func 0)
     ))
 
+(fun make_parser_ (io) (
+    (return (make_parser (field_get io 1) (field_get io 2)))
+    ))
+
 (export fun init_parser_funcs (mod) (
     (= utilities (create_module (to_sym "%ParserUtilities")))
     (add_function1 utilities (to_sym "%get_column") DontCare get_column 0)
@@ -2081,6 +2090,18 @@
     (add_parser mod (to_sym "parse_C_style_comment") parse_C_style_comment)
 
     (add_function1 mod (to_sym "compile_define_syntax") (domainP DefSyntax) compile_define_syntax 0)
+
+    (var trait (make_object1 (to_sym "Trait") (to_sym "Parser")))
+    (set_slot mod (to_sym "ParserTrait") trait)
+    (set_special_parent @ParserE trait)
+
+    (add_function1 mod (to_sym "parser_new") (domainP InputFileStream) make_parser_ 0)
+    (add_function1 mod (to_sym "parse_shell") (domainP Parser) parse_shell 0)
+    (add_function1 mod (to_sym "parse_toplevel") (domainP Parser) parse_toplevel 0)
+    (add_function1 mod (to_sym "parser_node") (domainP Parser) parsed_token 0)
+    (add_function1 mod (to_sym "parser_error") (domainP Parser) parser_error 0)
+    (add_function1 mod (to_sym "parser_loc") (domainP Parser) get_loc 0)
+    (add_function1 mod (to_sym "parser_flush") (domainP Parser) flush_parser 0)
     ))
 
 (export fun output_syntax_error (loc e) (
