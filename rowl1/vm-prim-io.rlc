@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-io.rlc 2014-02-05 07:40:20 nineties $
+; $Id: vm-prim-io.rlc 2014-02-11 20:09:13 nineties $
 ;
 
 (import "stdlib")
@@ -123,24 +123,30 @@
     (return chan)
     ))
 
-; sio = (buf, -1, pos, capa)    ; StringStream
-(export prim_make_sio)
-(fun prim_make_sio () (
+; iss = (buf, -1, pos, capa)    ; InputStringStream
+(export prim_make_iss)
+(fun prim_make_iss (str) (
+    (return (prim_make_struct4 1 str -1 0 (strlen str)))
+    ))
+
+; oss = (buf, -1, pos, capa)    ; OutputStringStream
+(export prim_make_oss)
+(fun prim_make_oss () (
     (return (prim_make_struct4 1 (make_carray 10) -1 0 10))
     ))
 
-(fun reserve_sio (sio) (
-    (int size (get sio 2))
-    (int new_capa (* 2 (get sio 3)))
+(fun reserve_oss (oss) (
+    (int size (get oss 2))
+    (int new_capa (* 2 (get oss 3)))
     (void* new_buf (make_carray new_capa))
-    (prim_memcpy new_buf (get sio 0) (+ size 1))
-    (set sio 0 new_buf)
-    (set sio 3 new_capa)
+    (prim_memcpy new_buf (get oss 0) (+ size 1))
+    (set oss 0 new_buf)
+    (set oss 3 new_capa)
     ))
 
-(export prim_sio_get)
-(fun prim_sio_get (sio) (
-    (return (get sio 0))
+(export prim_oss_get)
+(fun prim_oss_get (oss) (
+    (return (get oss 0))
     ))
 
 (fun open_error (path) (
@@ -209,6 +215,7 @@
     (if (> remain 0) (
         (prim_memcpy (get ichan 0) (+ (get ichan 0) (get ichan 2)) remain)
         ))
+    (if (< (get ichan 1) 0) ((return)))
     (int sz (syscall @SYS_READ (get ichan 1) (+ (get ichan 0) remain) (- @RDBUFSZ remain)))
     (set ichan 2 0)
     (set ichan 3 (+ sz remain))
@@ -227,6 +234,7 @@
             (return 0)
         )
         (
+            (if (< (get ichan 1) 0) ((return -1)))
             (prim_memcpy ptr chanp bufsz)
             (set ichan 2 end)
             (-= size bufsz)
@@ -234,6 +242,17 @@
             (if (< r size) ((return -1)))
             (return 0)
         ))
+    ))
+
+(export prim_lookahead)
+(fun prim_lookahead (addr ichan) (
+    (fill_ichan ichan 1)
+    (if (== (get ichan 2) (get ichan 3)) (
+        (return -1) ; EOF
+        ))
+    (int c (get8 (get ichan 0) (get ichan 2)))
+    (set addr 0 c)
+    (return 0)
     ))
 
 (export prim_input_uchar)
@@ -394,7 +413,7 @@
     (set ochan 2 new_size)
     (if (> (get ochan 1) 0) ((set ochan 3 (+ (get ochan 3) 1))))
     (if (&& (< (get ochan 1) 0) (== new_size (- (get ochan 3) 1))) (
-        (reserve_sio ochan)
+        (reserve_oss ochan)
         (return)
         ))
     (if (|| (== c '\n') (== new_size @WRBUFSZ)) (

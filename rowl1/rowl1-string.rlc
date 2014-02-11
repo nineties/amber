@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-string.rlc 2014-02-10 14:06:54 nineties $
+; $Id: rowl1-string.rlc 2014-02-11 20:26:08 nineties $
 ;
 
 (import "rlvm-compile")
@@ -194,21 +194,63 @@
     ))
 
 ;; StringStream
-(export fun new_sio () (
-    (return (variant @StringStreamE 1 (make_sio)))
+(export fun new_iss (str) (
+    (return (variant @InputStringStreamE 1 (make_iss str)))
     ))
 
-(export fun sio_raw (sio) (
-    (return (field_get sio 1))
+(export fun new_oss () (
+    (return (variant @OutputStringStreamE 1 (make_oss)))
     ))
 
-(export fun sio_to_s (io) (
-    (return (string (sio_get (field_get io 1))))
+(export fun oss_raw (oss) (
+    (return (field_get oss 1))
     ))
 
-(fun sio_print_str (io str) (
+(export fun oss_to_s (io) (
+    (return (string (oss_get (field_get io 1))))
+    ))
+
+(fun oss_print_str (io str) (
     (output_string (field_get io 1) str)
     (return @C_NIL)
+    ))
+
+; single character is represented as a string of one character
+(fun iss_lookahead (io) (
+    (var c)
+    (if (< (lookahead (address c) (field_get io 1)) 0)
+        (return (to_sym "eof"))
+        )
+    (var s (allocate_string 1))
+    (strlcpy s (address c) 2)
+    (return s)
+    ))
+
+; single character is represented as a string of one character
+(fun iss_read_char (io) (
+    (var c)
+    (if (< (input_char (address c) (field_get io 1)) 0)
+        (return (to_sym "eof"))
+        )
+    (var s (allocate_string 1))
+    (strlcpy s (address c) 2)
+    (return s)
+    ))
+
+(fun iss_read_string (io) (
+    (var s)
+    (if (< (input_string (address s) (field_get io 1)) 0)
+        (return (to_sym "eof"))
+        )
+    (return s)
+    ))
+
+(fun iss_read_line (io) (
+    (var s)
+    (if (< (input_line (address s) (field_get io 1)) 0)
+        (return (to_sym "eof"))
+        )
+    (return s)
     ))
 
 (export fun setup_string (mod) (
@@ -232,14 +274,27 @@
     (add_function2 mod (to_sym "string_split") stringT stringT s_split 0)
 
     ; StringStream module
-    (var trait (make_object1 (to_sym "Trait") (to_sym "StringStream")))
-    (set_slot mod (to_sym "StringStreamTrait") trait)
-    (set_special_parent @StringStreamE trait)
+    (var trait (make_object1 (to_sym "Trait") (to_sym "InputStringStream")))
+    (set_slot mod (to_sym "InputStringStreamTrait") trait)
+    (set_special_parent @InputStringStreamE trait)
 
-    (var sioT (domainP StringStream))
-    (add_function0 mod (to_sym "sstream_new") new_sio 0)
-    (add_function1 mod (to_sym "sstream_to_string") sioT sio_to_s 0)
-    (add_function2 mod (to_sym "sstream_print_string") sioT stringT sio_print_str 0)
+    (var trait (make_object1 (to_sym "Trait") (to_sym "OutputStringStream")))
+    (set_slot mod (to_sym "OutputStringStreamTrait") trait)
+    (set_special_parent @OutputStringStreamE trait)
+
+    (var issT (domainP InputStringStream))
+    (add_function1 mod (to_sym "iss_new") stringT new_iss 0)
+
+    (add_function1 mod (to_sym "iss_lookahead") issT iss_lookahead 0)
+    (add_function1 mod (to_sym "iss_read_char") issT iss_read_char 0)
+    (add_function1 mod (to_sym "iss_read_string") issT iss_read_string 0)
+    (add_function1 mod (to_sym "iss_read_line") issT iss_read_line 0)
+
+    (var ossT (domainP OutputStringStream))
+
+    (add_function0 mod (to_sym "oss_new") new_oss 0)
+    (add_function1 mod (to_sym "oss_to_string") ossT oss_to_s 0)
+    (add_function2 mod (to_sym "oss_print_string") ossT stringT oss_print_str 0)
     ))
 
     ))

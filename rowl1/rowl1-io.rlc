@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-io.rlc 2014-02-05 15:17:56 nineties $
+; $Id: rowl1-io.rlc 2014-02-11 20:11:07 nineties $
 ;
 
 (import "rlvm-compile")
@@ -51,6 +51,17 @@
 (fun io_print_str (f s) (
     (output_string (field_get f 2) s)
     (return @C_NIL)
+    ))
+
+; single character is represented as a string of one character
+(fun io_lookahead (io) (
+    (var c)
+    (if (< (lookahead (address c) (field_get io 2)) 0)
+        (return (to_sym "eof"))
+        )
+    (var s (allocate_string 1))
+    (strlcpy s (address c) 2)
+    (return s)
     ))
 
 ; single character is represented as a string of one character
@@ -252,38 +263,43 @@
     (set_slot mod (to_sym "stderr") (make_ofstream (string "stderr") stderr))
 
     ; file mod
+
+    (var ifT (domainP InputFileStream))
+    (var ofT (domainP OutputFileStream))
+
     (add_function1 mod (to_sym "open_in") stringT io_open_in 0)
     (add_function1 mod (to_sym "open_out") stringT io_open_out 0)
-    (add_function1 mod (to_sym "close") (domainP InputFileStream) io_close_in 0)
-    (add_function1 mod (to_sym "close") (domainP OutputFileStream) io_close_out 0)
-    (add_function1 mod (to_sym "position") (domainP OutputFileStream) io_position 0)
-    (add_function2 mod (to_sym "print_string") (domainP OutputFileStream) stringT io_print_str 0)
+    (add_function1 mod (to_sym "close") ifT io_close_in 0)
+    (add_function1 mod (to_sym "close") ofT io_close_out 0)
+    (add_function1 mod (to_sym "position") ofT io_position 0)
+    (add_function2 mod (to_sym "print_string") ofT stringT io_print_str 0)
 
-    (add_function1 mod (to_sym "read_char") (domainP InputFileStream) io_read_char 0)
-    (add_function1 mod (to_sym "read_string") (domainP InputFileStream) io_read_string 0)
-    (add_function1 mod (to_sym "read_line") (domainP InputFileStream) io_read_line 0)
+    (add_function1 mod (to_sym "lookahead") ifT io_lookahead 0)
+    (add_function1 mod (to_sym "read_char") ifT io_read_char 0)
+    (add_function1 mod (to_sym "read_string") ifT io_read_string 0)
+    (add_function1 mod (to_sym "read_line") ifT io_read_line 0)
 
     ; Binary mod
-    (add_function1 mod (to_sym "read_int8") (domainP InputFileStream) io_read_int8 0)
-    (add_function1 mod (to_sym "read_uint8") (domainP InputFileStream) io_read_uint8 0)
-    (add_function1 mod (to_sym "read_int16") (domainP InputFileStream) io_read_int16 0)
-    (add_function1 mod (to_sym "read_uint16") (domainP InputFileStream) io_read_uint16 0)
-    (add_function1 mod (to_sym "read_int32") (domainP InputFileStream) io_read_int32 0)
-    (add_function1 mod (to_sym "read_uint32") (domainP InputFileStream) io_read_uint32 0)
-    (add_function1 mod (to_sym "read_int64") (domainP InputFileStream) io_read_int64 0)
-    (add_function1 mod (to_sym "read_uint64") (domainP InputFileStream) io_read_uint64 0)
-    (add_function1 mod (to_sym "read_float") (domainP InputFileStream) io_read_float 0)
+    (add_function1 mod (to_sym "read_int8") ifT io_read_int8 0)
+    (add_function1 mod (to_sym "read_uint8") ifT io_read_uint8 0)
+    (add_function1 mod (to_sym "read_int16") ifT io_read_int16 0)
+    (add_function1 mod (to_sym "read_uint16") ifT io_read_uint16 0)
+    (add_function1 mod (to_sym "read_int32") ifT io_read_int32 0)
+    (add_function1 mod (to_sym "read_uint32") ifT io_read_uint32 0)
+    (add_function1 mod (to_sym "read_int64") ifT io_read_int64 0)
+    (add_function1 mod (to_sym "read_uint64") ifT io_read_uint64 0)
+    (add_function1 mod (to_sym "read_float") ifT io_read_float 0)
 
-    (add_function2 mod (to_sym "write_int8") (domainP OutputFileStream) intT io_write_byte8 0)
-    (add_function2 mod (to_sym "write_uint8") (domainP OutputFileStream) intT io_write_byte8 0)
-    (add_function2 mod (to_sym "write_int16") (domainP OutputFileStream) intT io_write_byte16 0)
-    (add_function2 mod (to_sym "write_uint16") (domainP OutputFileStream) intT io_write_byte16 0)
-    (add_function2 mod (to_sym "write_int32") (domainP OutputFileStream) DontCare io_write_byte32 0)
-    (add_function2 mod (to_sym "write_uint32") (domainP OutputFileStream) DontCare io_write_byte32 0)
-    (add_function2 mod (to_sym "write_int64") (domainP OutputFileStream) DontCare io_write_byte64 0)
-    (add_function2 mod (to_sym "write_uint64") (domainP OutputFileStream) DontCare io_write_byte64 0)
-    (add_function2 mod (to_sym "write_float") (domainP OutputFileStream) floatT io_write_float 0)
-    (add_function2 mod (to_sym "write_string") (domainP OutputFileStream) stringT io_print_str 0)
+    (add_function2 mod (to_sym "write_int8") ofT intT io_write_byte8 0)
+    (add_function2 mod (to_sym "write_uint8") ofT intT io_write_byte8 0)
+    (add_function2 mod (to_sym "write_int16") ofT intT io_write_byte16 0)
+    (add_function2 mod (to_sym "write_uint16") ofT intT io_write_byte16 0)
+    (add_function2 mod (to_sym "write_int32") ofT DontCare io_write_byte32 0)
+    (add_function2 mod (to_sym "write_uint32") ofT DontCare io_write_byte32 0)
+    (add_function2 mod (to_sym "write_int64") ofT DontCare io_write_byte64 0)
+    (add_function2 mod (to_sym "write_uint64") ofT DontCare io_write_byte64 0)
+    (add_function2 mod (to_sym "write_float") ofT floatT io_write_float 0)
+    (add_function2 mod (to_sym "write_string") ofT stringT io_print_str 0)
     ))
 
     ))
