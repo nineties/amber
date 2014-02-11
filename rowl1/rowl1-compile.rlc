@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-02-10 18:49:24 nineties $
+; $Id: rowl1-compile.rlc 2014-02-11 13:25:06 nineties $
 ;
 
 (import "rlvm-compile")
@@ -872,9 +872,6 @@
 
     (symtable_push variables)
 
-    (var cnt_addr (get_address asm_body))
-    (put_allocate asm_body 0)
-
     (var save_max_lvar_idx max_lvar_idx)
     (var save_lvar_idx_offset lvar_idx_offset)
     (var save_break_labels break_labels)
@@ -886,15 +883,41 @@
     (= continue_labels 0)
     (= try_nest 0)
 
-    (setup_args variables args)
+    (var cnt_addr 0)
+    (var alias (setup_args variables args 0))
 
+    (if alias (do
+        (var list 0)
+        (if (== guard noguard)
+            (= list (cons body list))
+            (= list (cons guard list))
+            )
+        (while alias (do
+            (var e (car alias))
+            (= list (cons (defvar (field_get e 0) (field_get e 1)) list))
+            (= alias (cdr alias))
+            ))
+        (if (== guard noguard)
+            (= body (seq list))
+            (= guard (seq list))
+            )
+        ))
     (if (!= guard noguard)
-        (compile asm_guard guard)
+        (do
+            (= cnt_addr (get_address asm_guard))
+            (put_allocate asm_guard)
+            (compile asm_guard guard)
         )
-
+        (do
+            (= cnt_addr (get_address asm_body))
+            (put_allocate asm_body)
+        ))
     (compile asm_body body)
 
-    (put_operand_byte asm_body (+ cnt_addr 1) max_lvar_idx)
+    (if (!= guard noguard)
+        (put_operand_byte asm_guard (+ cnt_addr 1) max_lvar_idx)
+        (put_operand_byte asm_body (+ cnt_addr 1) max_lvar_idx)
+        )
     (symtable_pop variables)
 
     (= lvar_idx_offset save_lvar_idx_offset)
@@ -904,7 +927,18 @@
     (= try_nest save_try_nest)
     ))
 
-(fun setup_args (tbl args) (
+(extern fun tuple2)
+(fun add_arg (tbl sym obj alias) (
+    (if (!= (node_head obj) Argument) (do
+        (var tmp (to_unique_sym (symbol_name sym)))
+        (symtable_add tbl tmp obj)
+        (return (cons (tuple2 sym tmp) alias))
+        ))
+    (symtable_add tbl sym obj)
+    (return alias)
+    ))
+
+(fun setup_args (tbl args alias) (
     (if (!= (node_head args) @List)
         (throw (type_error current_loc (string "a list") args)
         ))
@@ -918,32 +952,32 @@
                 )
             (if (== (node_size arg) 0) return)
             (var v (node_arg_symbol arg 0))
-            (symtable_add tbl v (make_args_from idx))
-            return
+            (return (add_arg tbl v (make_args_from idx) alias))
             ))
-        (setup_arg tbl (make_arg idx) arg 0)
+        (= alias (setup_arg tbl (make_arg idx) arg 0 alias))
         (= args (cdr args))
         (+= idx 1)
         ))
+    (return alias)
     ))
 
-(fun setup_arg (tbl obj arg level) (
-    (if (is_special arg) return)
+(fun setup_arg (tbl obj arg level alias) (
+    (if (is_special arg) (return alias))
     (if (is_symbol arg) (do
-        (if (== level 0) (symtable_add tbl arg obj))
-        return
+        (if (== level 0) (= alias (add_arg tbl arg obj alias)))
+        (return alias)
         ))
-    (if (is_atom arg) return)
+    (if (is_atom arg) (return alias))
     (var argty (node_head arg))
     (if (== argty Domain) (do
         (if (== level 0) (do
             (var v (node_arg_symbol arg 0))
-            (symtable_add tbl v obj)
+            (= alias (add_arg tbl v obj alias))
             (var dom (node_arg arg 1))
             (if (! (is_symbol dom))
-                (setup_arg tbl obj dom 0)
+                (= alias (setup_arg tbl obj dom 0 alias))
                 )
-            return
+            (return alias)
             ))
         ))
     (if (== argty List) (do
@@ -957,22 +991,20 @@
                     )
                 (if (== (node_size a) 0) return)
                 (var v (node_arg_symbol a 0))
-                (= obj (make_list_from obj idx))
-                (symtable_add tbl v obj)
-                return
+                (return (add_arg tbl v (make_list_from obj idx) alias))
                 ))
-            (setup_arg tbl (make_list_at obj idx) a level)
+            (= alias (setup_arg tbl (make_list_at obj idx) a level alias))
             (= arg (cdr arg))
             (incr idx)
             ))
-        return
+        (return alias)
         ))
-    (if (== argty Quote) return)
+    (if (== argty Quote) (return alias))
     (if (== argty Unquote) 
-        (return (setup_arg tbl obj (node_arg arg 0) (- level 1)))
+        (return (setup_arg tbl obj (node_arg arg 0) (- level 1) alias))
         )
     (if (== argty QuasiQuote)
-        (return (setup_arg tbl obj (node_arg arg 0) (+ level 1)))
+        (return (setup_arg tbl obj (node_arg arg 0) (+ level 1) alias))
         )
 
     (for i 0 (node_size arg) (do
@@ -984,12 +1016,12 @@
                 )
             (if (== (node_size a) 0) return)
             (var v (node_arg_symbol a 0))
-            (= obj (make_restof obj i))
-            (symtable_add tbl v obj)
-            return
+            (return (add_arg tbl v (make_restof obj i) alias))
             ))
-        (setup_arg tbl (make_object_at arg obj i) (node_arg arg i) level)
+        (= alias (setup_arg tbl (make_object_at arg obj i)
+                (node_arg arg i) level alias))
         ))
+    (return alias)
     ))
 
 (fun make_gvar (sym) (
@@ -1332,6 +1364,12 @@
     
     ; eval and push arguments from right to left
     (= args (list_reverse args))
+
+    (if (&& args (== (node_head (car args)) Rest)) (do
+        (compile_apply_expand asm func args)
+        return
+        ))
+
     (var arity 0)
     (while args (do
         (compile asm (car args))
@@ -1351,6 +1389,50 @@
     (put_jcall asm (* 4 arity) @FALSE)
     ))
 
+(fun variable_length_args_error (args) (
+    (throw (logic_error1 current_loc
+        (string "non-list object is passed as variable-length arguments")
+        args))
+    ))
+
+; Here, args is already reversed.
+(fun compile_apply_expand (asm func args) (
+    (var failed (fresh_label asm))
+    (var call (fresh_label asm))
+    (var arg (car args))
+    (= args (cdr args))
+    (if (!= (node_size arg) 1)
+        (throw (unknown_expression current_loc arg))
+        )
+    (compile asm (node_arg arg 0))
+    (put_dup asm)
+    (put_check_list2 asm failed 0)
+    (put_goto asm call)
+    (set_label asm failed)
+    (compile_simple_call asm 1 variable_length_args_error)
+    (set_label asm call)
+    (compile_simple_call asm 1 list_reverse)
+    (put_expand asm)    ; len;ls0;ls1;...
+    (while args (do
+        (if (== (node_head (car args)) Rest)
+            (throw (logic_error current_loc
+                (string "Variable-length arguments must be placed last")
+                )))
+        (compile asm (car args))
+        (put_swap asm)
+        (put_iadd1 asm)
+        (= args (cdr args))
+        ))
+    (compile asm func)
+    (put_push asm func)
+    (put_push asm current_loc)
+    (compile_simple_call asm 3 compile_matching)
+    (put_swap asm)
+    (put_imm_int asm 4)
+    (put_imul asm)
+    (put_vcall asm @FALSE)
+    ))
+
 (fun get_slot_swap (sym obj) (
     (var f (get_slot_nocheck obj sym))
     (if (== f @C_UNDEF)
@@ -1366,6 +1448,12 @@
     
     ; eval and push arguments from right to left
     (= args (list_reverse args))
+
+    (if (&& args (== (node_head (car args)) Rest)) (do
+        (compile_send_expand asm obj sym args)
+        return
+        ))
+
     (var arity 0)
     (while args (do
         (compile asm (car args))
@@ -1386,6 +1474,47 @@
     (put_push asm current_loc)
     (compile_simple_call asm 3 compile_matching)
     (put_jcall asm (* 4 arity) @TRUE)
+    ))
+
+; Here, args is already reversed.
+(fun compile_send_expand (asm obj sym args) (
+    (var failed (fresh_label asm))
+    (var call (fresh_label asm))
+    (var arg (car args))
+    (= args (cdr args))
+    (if (!= (node_size arg) 1)
+        (throw (unknown_expression current_loc arg))
+        )
+    (compile asm (node_arg arg 0))
+    (put_dup asm)
+    (put_check_list2 asm failed 0)
+    (put_goto asm call)
+    (set_label asm failed)
+    (compile_simple_call asm 1 variable_length_args_error)
+    (set_label asm call)
+    (compile_simple_call asm 1 list_reverse)
+    (put_expand asm)    ; len;ls0;ls1;...
+    (while args (do
+        (if (== (node_head (car args)) Rest)
+            (throw (logic_error current_loc
+                (string "Variable-length arguments must be placed last")
+                )))
+        (compile asm (car args))
+        (put_swap asm)
+        (put_iadd1 asm)
+        (= args (cdr args))
+        ))
+    (put_imm_int asm 4)
+    (put_imul asm)
+    (compile asm obj)   ; self;arity;arg1;arg2;...
+    (put_dup asm)       ; self;self;arity;arg1;arg2;..
+    (put_push asm sym)
+    (compile_simple_call asm 2 get_slot_swap)   ; fun;self;arity;arg1;arg2;..
+    (put_push asm (slot obj sym))
+    (put_push asm current_loc)
+    (compile_simple_call asm 3 compile_matching) ; code;self;arity;arg1;arg2;..
+    (put_rot3 asm)
+    (put_vcall asm @TRUE)
     ))
 
 (fun compile_unquote (asm expr) (
