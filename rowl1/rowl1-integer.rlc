@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-integer.rlc 2014-02-05 16:19:47 nineties $
+; $Id: rowl1-integer.rlc 2014-02-11 21:13:20 nineties $
 ;
 
 (import "rlvm-compile")
@@ -131,12 +131,45 @@
         )
     ))
 
-(export fun int_to_s (n) (
+(export fun int_to_str (n) (
     (return (itos (unbox n)))
     ))
 
 (fun int_hash (n) (
     (return n)
+    ))
+
+(extern fun is_0_9)
+(fun str_to_int (s) (
+    (var sign 1)
+    (var big_p @FALSE)
+    (var n (strlen s))
+    (var i 0)
+    (var c (array_get char s i))
+    (if (== c '-') (do
+        (= sign -1)
+        (+= i 1)
+        (= c (array_get char s i))
+        ))
+    (if (! (is_0_9 c)) (goto str_to_int_error))
+    (+= i 1)
+    (var v (- c '0'))
+    (while (is_0_9 c) (do
+        (= c (- c '0'))
+        (if (> v (/ (- @INTEGER_MAX c) 10))
+            (= big_p @TRUE)
+            )
+        (= v (+ (* v 10) c))
+        (+= i 1)
+        (= c (array_get char s i))
+        ))
+    (if (!= i n) (goto str_to_int_error))
+    (if big_p
+        (return (parse_bint s))
+        (return (box (* sign v)))
+        )
+    (label str_to_int_error)
+    (throw (value_error current_loc (string "Invalid integer format") s))
     ))
 
 (export fun setup_numeric (mod) (
@@ -162,10 +195,12 @@
     (add_function2 mod (to_sym "int_shiftR") intT intT int_shiftR 0)
 
     (add_function1 mod (to_sym "int_abs") intT int_abs 0)
-    (add_function1 mod (to_sym "int_to_string") intT int_to_s 0)
+    (add_function1 mod (to_sym "int_to_strtring") intT int_to_str 0)
     (add_function1 mod (to_sym "int_hash") intT int_hash 0)
     (set_slot mod (to_sym "INTEGER_MIN") (box @FIXNUM_MIN))
     (set_slot mod (to_sym "INTEGER_MAX") (box @FIXNUM_MAX))
+
+    (add_function1 mod (to_sym "string_to_int") stringT str_to_int 0)
     ))
 
     ))

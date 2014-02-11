@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-float.rlc 2014-02-05 18:32:13 nineties $
+; $Id: rowl1-float.rlc 2014-02-11 21:15:45 nineties $
 ;
 
 ; Since Amber has no 64-bit integer, this source code uses bignums instead.
@@ -97,7 +97,9 @@
                 continue
                 ))
             (if (|| (< c '0') (< '9' c))
-                (throw (invalid_format current_loc (string str)))
+                (throw (value_error current_loc
+                    (string "Invalid floating-point format")
+                    (string str)))
                 )
             (= w (+ (* 10 w) (- c '0')))
             (-= r 1)
@@ -118,7 +120,9 @@
         (while (< p slen) (do
             (var c (array_get char str p))
             (if (|| (< c '0') (< '9' c))
-                (throw (invalid_format current_loc (string str)))
+                (throw (value_error current_loc
+                    (string "Invalid floating-point format")
+                    (string str)))
                 )
             (= d (+ (* 10 d) (- c '0')))
             (+= p 1)
@@ -388,52 +392,6 @@
     (return (format_float sign (+ exp n) digits n))
     ))
 
-; v: abs of input floating-point number.
-; f: mantissa (bigint)
-; e: exponent
-;(fun decode_float (sign f e) (
-;    (-= e 52)
-;    (var b (int_to_bint 1))
-;    (var B (int_to_bint 10))
-;    (var round_p (bint_even f))
-;    (if (>= e 0)
-;        (if (== (bint_eq f (bigshl (copy_bint b) 52)) @C_FALSE)
-;            (do
-;                (var be (bigshl (copy_bint b) e))
-;                (var fbe2 (bigshl (bigmul f be) 1))
-;                (return (scale sign fbe2 (int_to_bint 2) be be 0 B round_p round_p))
-;            )
-;            (do
-;                (var be (bigshl (copy_bint b) e))
-;                (var be1 (bigshl (copy_bint be) 1))
-;                (var fbe12 (bigshl (bigmul f be1) 1))
-;                (return (scale sign fbe12 (int_to_bint 4) be1 be 0 B round_p round_p))
-;            ))
-;        (if (|| (== e -1022) (== (bint_eq f (bigshl (copy_bint b) 52)) @C_FALSE))
-;            (return (scale sign (bigshl f 1) (bigshl b (- 1 e)) (int_to_bint 1) (int_to_bint 1) 0 B round_p round_p))
-;            (return (scale sign (bigshl f 2) (bigshl b (- 2 e)) (int_to_bint 2) (int_to_bint 1) 0 B round_p round_p))
-;            ))
-;    ))
-;
-;(fun scale (sign r s mp mm k B low_ok high_ok) (
-;    (var rmp (bigadd (copy_bint r) mp))
-;    (if (|| (&& high_ok (>= (bigcmp rmp s) 0))
-;            (&& (! high_ok) (> (bigcmp rmp s) 0))) (do
-;        (return (scale sign r (bigmul s B) mp mm (+ k 1) B low_ok high_ok)))
-;        )
-;    (bigmul rmp B)
-;    (if (|| (&& high_ok (< (bigcmp rmp s) 0))
-;            (&& (! high_ok) (<= (bigcmp rmp s) 0)))
-;        (return (scale sign (bigmul r B) s (bigmul mp B) (bigmul mm B) (- k 1)
-;                    B low_ok high_ok)))
-;
-;    ; the precision of IEEE 64-bit floating point number is
-;    ; less than or equal 16 digits in base 10.
-;    (var digits (allocate_carray 16))
-;    (var n (generate digits 0 r s mp mm B low_ok high_ok))
-;    (return (format_float sign k digits n))
-;    ))
-;
 ; Format  0.d1 d2 ... dn 10^k to
 ; d1 d2 ..... dn . 0           (when n = k)
 ; d1 d2 ... dk . d(k+1) ... dn (when k > 0 and n > k)
@@ -615,6 +573,10 @@
     (return (itof (unbox n)))
     ))
 
+(fun str_to_f (s) (
+    (return (float_from_s s))
+    ))
+
 (fun float_add (a b) (
     (= a (copy_float a))
     (return (fadd a b))
@@ -674,6 +636,7 @@
     (add_function1 mod (to_sym "float_hash") floatT float_hash 0)
     (add_function1 mod (to_sym "float_to_int") stringT float_to_i 0)
     (add_function1 mod (to_sym "int_to_float") intT int_to_f 0)
+    (add_function1 mod (to_sym "string_to_float") stringT str_to_f 0)
     
     (add_function2 mod (to_sym "float_add") floatT floatT float_add 0)
     (add_function2 mod (to_sym "float_sub") floatT floatT float_sub 0)
