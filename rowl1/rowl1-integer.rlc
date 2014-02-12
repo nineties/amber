@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-integer.rlc 2014-02-11 21:13:20 nineties $
+; $Id: rowl1-integer.rlc 2014-02-12 10:14:04 nineties $
 ;
 
 (import "rlvm-compile")
@@ -172,6 +172,35 @@
     (throw (value_error current_loc (string "Invalid integer format") s))
     ))
 
+(fun int_bnot (a) (
+    (return (box (~ (unbox a))))
+    ))
+
+(fun int_band (a b) (
+    (return (box (& (unbox a) (unbox b))))
+    ))
+(fun int_bor (a b) (
+    (return (box (| (unbox a) (unbox b))))
+    ))
+(fun int_bxor (a b) (
+    (return (box (^ (unbox a) (unbox b))))
+    ))
+(fun int_lshift (a m) (
+    (= m (unbox m))
+    (if (< m 0) (throw (out_of_domain current_loc (to_sym "lshift") m)))
+    (return (box (<< (unbox a) m)))
+    ))
+(fun int_rshift (a m) (
+    (= m (unbox m))
+    (if (< m 0) (throw (out_of_domain current_loc (to_sym "rshift") m)))
+    (return (box (>> (unbox a) m)))
+    ))
+(fun int_logic_rshift (a m) (
+    (= m (unbox m))
+    (if (< m 0) (throw (out_of_domain current_loc (to_sym "logic_rshift") m)))
+    (return (box (shr a (+ m 1))))
+    ))
+
 (export fun setup_numeric (mod) (
     (var trait (make_object1 (to_sym "Trait") (to_sym "Int")))
     (set_slot mod (to_sym "IntTrait") trait)
@@ -195,12 +224,20 @@
     (add_function2 mod (to_sym "int_shiftR") intT intT int_shiftR 0)
 
     (add_function1 mod (to_sym "int_abs") intT int_abs 0)
-    (add_function1 mod (to_sym "int_to_strtring") intT int_to_str 0)
+    (add_function1 mod (to_sym "int_to_string") intT int_to_str 0)
     (add_function1 mod (to_sym "int_hash") intT int_hash 0)
     (set_slot mod (to_sym "INTEGER_MIN") (box @FIXNUM_MIN))
     (set_slot mod (to_sym "INTEGER_MAX") (box @FIXNUM_MAX))
 
     (add_function1 mod (to_sym "string_to_int") stringT str_to_int 0)
+
+    (add_function1 mod (to_sym "int_bnot") intT int_bnot 0)
+    (add_function2 mod (to_sym "int_band") intT intT int_band 0)
+    (add_function2 mod (to_sym "int_bor") intT intT int_bor 0)
+    (add_function2 mod (to_sym "int_bxor") intT intT int_bxor 0)
+    (add_function2 mod (to_sym "int_lshift") intT intT int_lshift 0)
+    (add_function2 mod (to_sym "int_rshift") intT intT int_rshift 0)
+    (add_function2 mod (to_sym "int_logic_rshift") intT intT int_logic_rshift 0)
     ))
 
     ))

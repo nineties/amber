@@ -1,19 +1,40 @@
 # Copyright (C) 2014 nineties
-# $Id: IO/Printf.ab 2014-02-11 19:05:57 nineties $
+# $Id: IO/Printf.ab 2014-02-12 02:56:34 nineties $
 
-parse_format(it) when it.value == "d"
+import InputStringStream as IS
+
+parse_flag(is): {
+    flags: []
+    while true {
+        c: is.lookahead()
+        if (c == '+') {
+            \OutputSign
+        } else if (c == '-') {
+            \LeftAlign
+        } else if (c == '#') {
+            \WithPrefix
+        } else if (c == ' ') {
+            \SpaceFlag
+        } else if (c == '0') {
+            \PadZero
+        }
+    }
+}
+
+parse_format(is): {
+    flag: parse_flag(is)
 }
 
 OutputStreamTrait with {
 
     printf(fmt @ String, args...) = {
-        it: fmt.each()
+        is: IS.new(fmt)
         i: 0
         while true {
-            c: it()
+            c: is.read_char()
             if (c == undef) break
             if (c == "%") {
-                parse_format(it)
+                parse_format(is)
             }
             else
                 self.print_string(c)
