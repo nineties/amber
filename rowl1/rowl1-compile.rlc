@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-02-11 13:25:06 nineties $
+; $Id: rowl1-compile.rlc 2014-02-12 17:09:20 nineties $
 ;
 
 (import "rlvm-compile")
@@ -65,7 +65,7 @@
     (var v (symtable_find variables sym))
     (if v (return v))
     (= v (get_slot_nocheck global sym))
-    (if (!= v @C_UNDEF) (return (make_gvar sym)))
+    (if (!= v @C_NIL) (return (make_gvar sym)))
     (throw (undefined_var current_loc sym))
     ))
 
@@ -73,7 +73,7 @@
     (if (== (symtable_depth variables) 0)
         (do
             (var v (get_slot_nocheck global sym))
-            (if (== v @C_UNDEF) (return 0))
+            (if (== v @C_NIL) (return 0))
             (return v)
         )
         (return (symtable_find_local variables sym))
@@ -137,7 +137,7 @@
             (if (== expr DontCare) (return fv))
             (= fv (list_delete expr fv))
             ; global variables are not free
-            (if (!= (get_slot_nocheck global expr) @C_UNDEF) (return fv))
+            (if (!= (get_slot_nocheck global expr) @C_NIL) (return fv))
             (return (cons expr fv))
             ))
         (return fv)
@@ -641,7 +641,7 @@
 (extern fun compile_matching)
 (export fun lookup_func (mod sym) (
     (var func (get_slot_nocheck mod sym))
-    (if (== func @C_UNDEF) (do
+    (if (== func @C_NIL) (do
         (throw (undefined_fun current_loc sym))
         ))
     (return (compile_matching current_loc sym func))
@@ -649,7 +649,7 @@
 
 (export fun lookup_func_nocheck (mod sym) (
     (var func (get_slot_nocheck mod sym))
-    (if (== func @C_UNDEF) (return 0))
+    (if (== func @C_NIL) (return 0))
     (return (compile_matching current_loc sym func))
     ))
 
@@ -727,7 +727,7 @@
     ))
 
 (fun define_slot (obj sym val) (
-    (if (!= (get_slot_norec obj sym) @C_UNDEF)
+    (if (!= (get_slot_norec obj sym) @C_NIL)
         (throw (redefined_slot current_loc obj sym))
         )
     (return (set_slot obj sym val))
@@ -735,7 +735,7 @@
 
 (fun append_slot (obj sym val) (
     (var f (get_slot_nocheck obj sym))
-    (if (== f @C_UNDEF)
+    (if (== f @C_NIL)
         (return (set_slot obj sym val))
         )
     (if (&& (is_function val) (is_function f))
@@ -1064,7 +1064,7 @@
 
 (fun append_function (mod sym newfunc) (
     (var func (get_slot_nocheck mod sym))
-    (if (!= func @C_UNDEF)
+    (if (!= func @C_NIL)
         (if (&& (is_function func) (is_function newfunc))
             (return (set_slot mod sym (fusion_function newfunc func)))
             (throw (redefined_slot current_loc mod sym))
@@ -1148,13 +1148,11 @@
 ; to
 ;
 ; tmp: ((t@(x, y, z)) -> [x, y, z, t])(e)
-; if tmp == undef then Error
 ; x: decons(tmp)
 ; y: decons(tmp)
 ; z: decons(tmp)
 ; car(tmp)
 (fun compile_define_multi_variable (asm vars val) (
-    (var lbl (fresh_label asm))
     (var tup (unqualified_args vars))
     (var pattern (field_get tup 0))
     (var tvars   (field_get tup 1))
@@ -1163,14 +1161,6 @@
     (compile asm (apply (lambda
         (list1 (make_object2 Domain t pattern))
         (list_append tvars (list1 t))) (list1 val)))
-    (put_dup asm)
-    (put_undef asm)
-    (put_if_ne asm lbl)
-    (put_push asm (make_object2 Define vars val))
-    (compile_simple_call asm 1 matching_failed)
-    (put_throw asm)
-
-    (set_label asm lbl)
     (while rvars (do
         (compile_define asm (make_object2 Define (car rvars) Decons))
         (put_drop asm)
@@ -1258,7 +1248,7 @@
         (throw (invalid_varname current_loc sym))
         )
     (if (== (symtable_depth variables) 0)
-        (if (== (get_slot_nocheck global sym) @C_UNDEF) return)
+        (if (== (get_slot_nocheck global sym) @C_NIL) return)
         (if (! (symtable_find_local variables sym)) return)
         )
     (throw (redefined_var current_loc sym))
@@ -1435,8 +1425,8 @@
 
 (fun get_slot_swap (sym obj) (
     (var f (get_slot_nocheck obj sym))
-    (if (== f @C_UNDEF)
-        (throw (not_found_slot current_loc obj sym))
+    (if (== f @C_NIL)
+        (throw (undefined_slot current_loc obj sym))
         )
     (return f)
     ))
@@ -1978,8 +1968,6 @@
 ; z = decons(tmp)
 ; car(tmp)
 (fun compile_multi_assign (asm lhs rhs) (
-    (var lbl (fresh_label asm))
-
     (var tup (unqualified_args lhs))
     (var pattern (field_get tup 0))
     (var tvars   (field_get tup 1))
@@ -1989,15 +1977,6 @@
     (compile asm (apply (lambda
         (list1 (make_object2 Domain t pattern))
         (list_append tvars (list1 t))) (list1 rhs)))
-
-    (put_dup asm)
-    (put_undef asm)
-    (put_if_ne asm lbl)
-    (put_push asm (assign lhs rhs))
-    (compile_simple_call asm 1 matching_failed)
-    (put_throw asm)
-    (set_label asm lbl)
-
     (while rvars (do
         (compile asm (assign (car rvars) Decons))
         (put_drop asm)
@@ -2248,29 +2227,11 @@
     (put_push asm current_loc)
     (compile_simple_call asm 3 compile_matching)
     (put_jcall asm 4 @FALSE)
-
-    (put_dup asm)
-    (put_undef asm)
-    (put_if_ne asm lbl1)
-    (put_push asm f)
-    (compile_simple_call asm 1 matching_failed)
-    (put_throw asm)
-    (set_label asm lbl1)
-
     (put_push asm g)
     (put_dup asm)
     (put_push asm current_loc)
     (compile_simple_call asm 3 compile_matching)
     (put_jcall asm 4 @FALSE)
-
-    (put_dup asm)
-    (put_undef asm)
-    (put_if_ne asm lbl2)
-    (put_push asm g)
-    (compile_simple_call asm 1 matching_failed)
-    (put_throw asm)
-    (set_label asm lbl2)
-
     (put_ireturn asm)
     (return (make_function (list1 x) (get_code asm) 0 @FALSE))
     ))
@@ -2292,7 +2253,6 @@
     (add_compiler mod (quote @C_TRUE) compile_special)
     (add_compiler mod (quote @C_FALSE) compile_special)
     (add_compiler mod (quote @C_NIL) compile_special)
-    (add_compiler mod (quote @C_UNDEF) compile_special)
     (add_compiler mod intT compile_const_int)
     (add_compiler mod stringT compile_const)
     (add_compiler mod bintT compile_const)

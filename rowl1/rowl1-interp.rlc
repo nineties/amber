@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-02-12 14:35:48 nineties $
+; $Id: rowl1-interp.rlc 2014-02-12 19:03:27 nineties $
 ;
 
 (import "rlvm-compile")
@@ -78,7 +78,7 @@
     (setup_object_pre)
 
     ; Global Module
-    (= global @C_UNDEF)
+    (= global @C_NIL)
     (= amber (create_module Amber))
     (set_slot amber Amber amber)
     (= global amber)
@@ -213,7 +213,7 @@
     (var outputs (ary_new))
     (eval_top (apply (slot (slot (to_sym "Syntax") (to_sym "Shell")) (to_sym "enable_shell_syntax")) 0))
     (set_slot global (to_sym "shell_outputs") outputs)
-    (ary_push outputs @C_UNDEF)
+    (ary_push outputs @C_NIL)
     (while 1 (do
         (try 
             (while 1 (do
@@ -399,7 +399,7 @@
             (string "enter_module() can be called only in top-scope")))
         )
     (var mod (get_slot_nocheck global sym))
-    (if (== mod @C_UNDEF)
+    (if (== mod @C_NIL)
         (= mod (create_module sym))
         )
     (= module_stack (cons global module_stack))
@@ -424,7 +424,7 @@
 
 (fun copy_variable (to sym1 from sym2) (
     (var f (get_slot_nocheck from (to_sym sym2)))
-    (if (== f @C_UNDEF)
+    (if (== f @C_NIL)
         (throw (not_found current_loc (to_sym sym2)))
         )
     (set_slot to (to_sym sym1) f)
@@ -489,6 +489,7 @@
 (extern fun setup_pprint)
 (extern fun setup_base)
 (extern fun setup_symbol)
+(extern fun setup_encoding)
 (extern fun setup_numeric)
 (extern fun setup_bigint)
 (extern fun setup_float)
@@ -506,8 +507,8 @@
     (setup_base mod)
     (setup_pprint mod)
     (setup_object mod)
+    (setup_encoding mod)
     (setup_symbol mod)
-
     (setup_math mod)
     (setup_numeric mod)
     (setup_string mod)

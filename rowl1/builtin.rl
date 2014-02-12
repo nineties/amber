@@ -2,7 +2,7 @@
  % rowl - 1st generation
  % Copyright (C) 2010 nineties
  %
- % $Id: builtin.rl 2010-12-10 03:07:24 nineties $
+ % $Id: builtin.rl 2014-02-12 18:52:03 nineties $
  %);
 
 include(stddef,code);
@@ -802,9 +802,9 @@ rl_put_short: (p0) {
     return nil_sym;
 };
 
-rl_put_long: (p0) {
+rl_put_int: (p0) {
     allocate(1);
-    check_arity(p0, 1, "put_long");
+    check_arity(p0, 1, "put_int");
     x0 = int_value(car(p0));
     putc(x0&255);
     putc((x0/256)&255);
@@ -933,7 +933,7 @@ init_builtin_objects: () {
     register_prim("sappend"    , &rl_sappend);
     register_prim("put_byte"   , &rl_put_byte);
     register_prim("put_short"  , &rl_put_short);
-    register_prim("put_long"   , &rl_put_long);
+    register_prim("put_int"    , &rl_put_int);
     register_prim("put_str"    , &rl_put_str);
     register_prim("assoc"      , &rl_assoc);
 };

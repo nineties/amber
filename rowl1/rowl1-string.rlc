@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-string.rlc 2014-02-11 20:26:08 nineties $
+; $Id: rowl1-string.rlc 2014-02-12 17:23:26 nineties $
 ;
 
 (import "rlvm-compile")
@@ -43,14 +43,6 @@
 
 (fun s_add (a b) (
     (return (strcat a b))
-    ))
-
-(fun to_s_check (obj) (
-    (var s (call1 (to_sym "to_s") obj))
-    (if (== s @C_UNDEF)
-        (throw (make_object3 Exception current_loc (string "Can not convert to string") obj)) 
-        )
-    (return s)
     ))
 
 (fun s_join (list d) (
@@ -219,7 +211,7 @@
 (fun iss_lookahead (io) (
     (var c)
     (if (< (lookahead (address c) (field_get io 1)) 0)
-        (return (to_sym "eof"))
+        (return @C_NIL)
         )
     (var s (allocate_string 1))
     (strlcpy s (address c) 2)
@@ -230,7 +222,7 @@
 (fun iss_read_char (io) (
     (var c)
     (if (< (input_char (address c) (field_get io 1)) 0)
-        (return (to_sym "eof"))
+        (return @C_NIL)
         )
     (var s (allocate_string 1))
     (strlcpy s (address c) 2)
@@ -240,7 +232,7 @@
 (fun iss_read_string (io) (
     (var s)
     (if (< (input_string (address s) (field_get io 1)) 0)
-        (return (to_sym "eof"))
+        (return @C_NIL)
         )
     (return s)
     ))
@@ -248,7 +240,7 @@
 (fun iss_read_line (io) (
     (var s)
     (if (< (input_line (address s) (field_get io 1)) 0)
-        (return (to_sym "eof"))
+        (return @C_NIL)
         )
     (return s)
     ))

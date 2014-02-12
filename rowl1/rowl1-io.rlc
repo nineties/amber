@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-io.rlc 2014-02-11 20:11:07 nineties $
+; $Id: rowl1-io.rlc 2014-02-12 17:20:02 nineties $
 ;
 
 (import "rlvm-compile")
@@ -57,7 +57,7 @@
 (fun io_lookahead (io) (
     (var c)
     (if (< (lookahead (address c) (field_get io 2)) 0)
-        (return (to_sym "eof"))
+        (return @C_NIL)
         )
     (var s (allocate_string 1))
     (strlcpy s (address c) 2)
@@ -68,7 +68,7 @@
 (fun io_read_char (io) (
     (var c)
     (if (< (input_char (address c) (field_get io 2)) 0)
-        (return (to_sym "eof"))
+        (return @C_NIL)
         )
     (var s (allocate_string 1))
     (strlcpy s (address c) 2)
@@ -78,7 +78,7 @@
 (fun io_read_string (io) (
     (var s)
     (if (< (input_string (address s) (field_get io 2)) 0)
-        (return (to_sym "eof"))
+        (return @C_NIL)
         )
     (return s)
     ))
@@ -86,7 +86,7 @@
 (fun io_read_line (io) (
     (var s)
     (if (< (input_line (address s) (field_get io 2)) 0)
-        (return (to_sym "eof"))
+        (return @C_NIL)
         )
     (return s)
     ))
@@ -94,7 +94,7 @@
 (fun io_read_int8 (io) (
     (var n)
     (if (< (input_char (address n) (field_get io 2)) 0)
-        (return (to_sym "eof"))
+        (return @C_NIL)
         )
     (return (box n))
     ))
@@ -102,7 +102,7 @@
 (fun io_read_uint8 (io) (
     (var n)
     (if (< (input_uchar (address n) (field_get io 2)) 0)
-        (return (to_sym "eof"))
+        (return @C_NIL)
         )
     (return (box n))
     ))
@@ -110,7 +110,7 @@
 (fun io_read_int16 (io) (
     (var n)
     (if (< (input_short (address n) (field_get io 2)) 0)
-        (return (to_sym "eof"))
+        (return @C_NIL)
         )
     (return (box n))
     ))
@@ -118,7 +118,7 @@
 (fun io_read_uint16 (io) (
     (var n)
     (if (< (input_ushort (address n) (field_get io 2)) 0)
-        (return (to_sym "eof"))
+        (return @C_NIL)
         )
     (return (box n))
     ))
@@ -126,7 +126,7 @@
 (fun io_read_int32 (io) (
     (var n)
     (if (< (input_int (address n) (field_get io 2)) 0)
-        (return (to_sym "eof"))
+        (return @C_NIL)
         )
     (if (&& (<= n @FIXNUM_MAX) (>= n @FIXNUM_MIN))
         (return (box n))
@@ -137,7 +137,7 @@
 (fun io_read_uint32 (io) (
     (var n)
     (if (< (input_int (address n) (field_get io 2)) 0)
-        (return (to_sym "eof"))
+        (return @C_NIL)
         )
     (if (&& (<= n @FIXNUM_MAX) (>= n 0))
         (return (box n))
@@ -149,10 +149,10 @@
     (var n1)
     (var n2)
     (if (< (input_int (address n1) (field_get io 2)) 0)
-        (return (to_sym "eof"))
+        (return @C_NIL)
         )
     (if (< (input_int (address n2) (field_get io 2)) 0)
-        (return (to_sym "eof"))
+        (return @C_NIL)
         )
 
     (var b (allocate_bint 2))
@@ -173,10 +173,10 @@
     (var n1)
     (var n2)
     (if (< (input_int (address n1) (field_get io 2)) 0)
-        (return (to_sym "eof"))
+        (return @C_NIL)
         )
     (if (< (input_int (address n2) (field_get io 2)) 0)
-        (return (to_sym "eof"))
+        (return @C_NIL)
         )
     (var b (allocate_bint 2))
     (bint_set_digit b 0 n1)
@@ -188,10 +188,10 @@
 (fun io_read_float (io) (
     (var f (allocate_float))
     (if (< (input_int f (field_get io 2)) 0)
-        (return (to_sym "eof"))
+        (return @C_NIL)
         )
     (if (< (input_int (+ f 4) (field_get io 2)) 0)
-        (return (to_sym "eof"))
+        (return @C_NIL)
         )
     (return f)
     ))

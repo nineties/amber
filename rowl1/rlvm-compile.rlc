@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlvm-compile.rlc 2014-02-12 04:47:59 nineties $
+; $Id: rlvm-compile.rlc 2014-02-12 19:04:37 nineties $
 ;
 
 (import "stdlib")
@@ -29,7 +29,9 @@
 (define add_var (name opd) (setcar vtable (cons `(@name . @opd) (car vtable))))
 
 (define unboxed_type? (type) (member? type `(char int)))
-(define unboxed_type_size (type) (assoc type `((char . 1) (int . 4))))
+(define unboxed_type_size (type)
+    (assoc type `((char . 1) (uchar . 1) (short . 2) (ushort . 2)
+                  (int . 4) (uint . 4))))
 
 (var label_id 0)
 (define mklabel () (do
@@ -726,7 +728,7 @@ a   (emit_insn (label cont_lbl))
 
 (define compile_array_get ((_ type ary idx) drop) (do
     (var insn (assoc type
-        `((uchar . array_getu8) (char . array_get8) (short . array_get16) (int . array_get32) (string . array_get32)
+        `((uchar . array_getu8) (char . array_get8) (short . array_get16) (ushort . array_get16) (int . array_get32) (string . array_get32)
           (object . array_get32)
         )))
     (if (not insn) ((error "ERROR: array_get: invalid type " type)))

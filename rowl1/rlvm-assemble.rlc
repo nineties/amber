@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlvm-assemble.rlc 2012-01-23 23:31:36 nineties $
+; $Id: rlvm-assemble.rlc 2014-02-12 18:54:14 nineties $
 ;
 
 (import "stdlib")
@@ -24,6 +24,7 @@
 (var label_addr_table ())
 (var align8_table ()) ; list of (type name value)
 (var align4_table ()) ; list of (type name value)
+(var align2_table ()) ; list of (type name value)
 (var align1_table ()) ; list of (type name value)
 (var value_addr_table ())
 
@@ -77,7 +78,9 @@
         ))
     ))
 
-(define type_length (ty) (assoc ty `((char . 1) (int . 4) (long . 8) (string . 4))))
+(define type_length (ty) (assoc ty `(
+    (char . 1) (uchar . 1) (short . 2) (ushort . 2)
+    (int . 4) (uint . 4) (long . 8) (ulong . 8) (string . 4))))
 (define value_length (ent) (do
     (var type (car ent))
     (var value (caddr ent))
@@ -93,7 +96,8 @@
         ((and (cons? (car decl)) (== `array (caar decl))) (cadr (car decl)))
         (otherwise (car decl))
         ))
-    (assoc ty `((char . 1) (int . 4) (long . 8) (string . 1))))
+    (assoc ty `((char . 1) (uchar . 1) (short . 2) (ushort . 2)
+                (int . 4) (uint . 4) (long . 8) (ulong . 8) (string . 1))))
     )
 
 (var value_area_size 0)
@@ -104,6 +108,10 @@
         (set addr (+ addr (value_length ent)))
         ))
     (foreach ent align4_table (do
+        (push value_addr_table `(@(cadr ent) . @addr))
+        (set addr (+ addr (value_length ent)))
+        ))
+    (foreach ent align2_table (do
         (push value_addr_table `(@(cadr ent) . @addr))
         (set addr (+ addr (value_length ent)))
         ))
@@ -157,6 +165,7 @@
     (var align (get_alignment decl))
     (cond
         ((== align 1) (push align1_table decl))
+        ((== align 2) (push align2_table decl))
         ((== align 4) (push align4_table decl))
         ((== align 8) (push align8_table decl))
         (otherwise (error "invalid declaration: " decl))
@@ -195,14 +204,14 @@
     (cond
         ((== `byte (car opd))    (do (put_byte (cadr opd)) 1))
         ((== `short (car opd))   (do (put_short (cadr opd)) 2))
-        ((== `long (car opd))    (do (put_long (cadr opd)) 4))
+        ((== `long (car opd))    (do (put_int (cadr opd)) 4))
         ((== `label (car opd))   (do (put_short (get_reladdr addr opd)) 2))
         ((== `value (car opd))   (do (put_short (get_valaddr addr (cadr opd))) 2))
         ((== `object (car opd))  (do (put_short (get_objidx addr (cadr opd))) 2))
         ((== `extfun (car opd)) (do
             (if (!= assemble_mode `object) (error "undefined symbol: " (cadr opd)))
             (add_relocate_symbol `fun (cadr opd) (+ current_addr 1))
-            (put_long 0)
+            (put_int 0)
             4
             ))
         ((== `extvalue (car opd)) (do
@@ -270,31 +279,35 @@
 
 (define emit_value ((type name value))
     (cond
-        ((== `int type) (put_long value))
         ((== `char type) (put_byte (if (char? value) (char2int value) value)))
+        ((== `uchar type) (put_byte (if (char? value) (char2int value) value)))
+        ((== `short type) (put_short value))
+        ((== `ushort type) (put_short value))
+        ((== `int type) (put_int value))
+        ((== `uint type) (put_int value))
         ((== `string type) (put_str value))
         ((and (cons? type) (== `array (car type))) (emit_array type value))
         (otherwise (error "emit_value: not implemented"))
         ))
 
 (define emit_exec_header () (do
-    (put_long EXE_MAGIC)
+    (put_int EXE_MAGIC)
     ))
 
 (define emit_export_table () (do
-    (put_long (length export_symbols))
+    (put_int (length export_symbols))
     (foreach ent export_symbols (do
         (var name (symbol2s (car ent)))
         (var type (cadr ent))
         (var addr (cddr ent))
         (put_byte (assoc type `((fun . @RELOC_FUNCTION) (value . @RELOC_VALUE) (object . @RELOC_OBJECT))))
         (put_str name)
-        (put_long addr)
+        (put_int addr)
         ))
     ))
 
 (define emit_relocate_table () (do
-    (put_long (length relocate_symbols))
+    (put_int (length relocate_symbols))
     (foreach ent relocate_symbols (do
         (var name (symbol2s (car ent)))
         (var type (cadr ent))
@@ -304,13 +317,13 @@
         (if (and (!= type `svalue) (!= type `sobject))
             (put_str name)
             )
-        (put_long (length addrs))
-        (foreach addr addrs (put_long addr))
+        (put_int (length addrs))
+        (foreach addr addrs (put_int addr))
         ))
     ))
 
 (define emit_object_header () (do
-    (put_long OBJ_MAGIC)
+    (put_int OBJ_MAGIC)
     ))
 
 (define assemble (mode prog) (do
@@ -321,14 +334,15 @@
         (emit_exec_header)
         (emit_object_header)
         )
-    (put_long object_index) ; # of heap objects
+    (put_int object_index) ; # of heap objects
     (compute_value_addrs)
-    (put_long value_area_size)
+    (put_int value_area_size)
     (foreach v align8_table (error "multi-word values are not supported yet"))
     (foreach v align4_table (emit_value v))
+    (foreach v align2_table (emit_value v))
     (foreach v align1_table (emit_value v))
 
-    (put_long current_addr) ; length of byte codes
+    (put_int current_addr) ; length of byte codes
     (set current_addr 0)
     ; generate functions
     (foreach decl prog (assemble_decl decl))
