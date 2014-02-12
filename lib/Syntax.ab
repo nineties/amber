@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-02-12 17:06:08 nineties $ "
+" $Id: Syntax.ab 2014-02-12 21:28:59 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -532,10 +532,8 @@ macro(QuoteSyntax{For{i, Range{a, b}, body}}) = {
 macro(InitSlots{obj, slots}): {
     t: Prim.unique_symbol(\t)
     transl(e): case (macro(e)) of
-          e @ Assign -> {
-              Prim.store(e, 0, `Slot{!t, !Prim.at(e, 0)})
-              e
-          }
+          Assign{x, e, opts...} ->
+              `Assign{Slot{!t, !x}, !e, !opts...}
         | e @ Define -> {
               Prim.store(e, 0, `Slot{!t, !Prim.at(e, 0)})
               e

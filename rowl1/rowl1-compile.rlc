@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-02-12 17:09:20 nineties $
+; $Id: rowl1-compile.rlc 2014-02-12 21:47:34 nineties $
 ;
 
 (import "rlvm-compile")
@@ -17,11 +17,12 @@
 (import "rowl1-symtable")
 (import "rowl1-assemble")
 
-(var AllocClsEnv   (to_sym "%AllocClosureEnv"))
-(var Ref           (to_sym "%Ref"))
-(var Decons        (to_sym "%Decons"))
-(var noguard       (to_sym "%noguard"))
-(var closed        (to_sym "%closed"))
+(var AllocClsEnv   (to_unique_sym "%AllocClosureEnv"))
+(var Ref           (to_unique_sym "%Ref"))
+(var Decons        (to_unique_sym "%Decons"))
+(var noguard       (to_unique_sym "%noguard"))
+(var closed        (to_unique_sym "%closed"))
+(var expand        (to_unique_sym "%expand"))
 
 (export fun unwrap_internal (node) (
     (if (== (node_head node) Ref)
@@ -1520,6 +1521,14 @@
 (extern fun tuple4)
 (extern fun tuple5)
 
+(fun rest_check (expr val) (
+    (if (!= (node_type val) @ListE)
+        (throw (exception1 current_loc
+            (string "This expression must be evaluated to a list")
+            expr)))
+    (return val)
+    ))
+
 (export fun compile_qquote_main (asm expr level) (
     (var hd (node_head expr))
     (if (== hd Symbol)
@@ -1550,8 +1559,23 @@
         (+= level 1)
         ))
 
-    (put_zero asm)
-    (rfor i 0 (node_size expr) (do
+    (var sz (node_size expr))
+    (var last (node_arg expr (- sz 1)))
+    (if (&& (== level 0)
+        (&& (== (node_head last) Unquote)
+            (== (node_head (node_arg last 0)) Rest)))
+        (do
+            (var arg (node_arg (node_arg last 0) 0))
+            (var type_error (fresh_label asm))
+            (compile asm arg)
+            (put_push asm arg)
+            (compile_simple_call asm 1 rest_check)
+            (-= sz 1)
+        )
+        (do
+            (put_zero asm)
+        ))
+    (rfor i 0 sz (do
         (compile_qquote_main asm (node_arg expr i) level)
         (put_cons asm)
         ))
