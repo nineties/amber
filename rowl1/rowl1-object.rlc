@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-object.rlc 2014-02-04 22:30:45 nineties $
+; $Id: rowl1-object.rlc 2014-02-12 14:42:36 nineties $
 ;
 
 (import "rlvm-compile")
@@ -19,28 +19,23 @@
 
 (var slots (make_wrtable))
 (var parent (to_sym "parent"))
+(var noparent (to_unique_sym "noparent"))
 (var parent_tbl (make_wrtable))
 (var dummy (wrtable_add slots parent parent_tbl))
-(var initialize (to_sym "initialize"))
 (var parent_special null)
 (var root_object @C_UNDEF)
 
 (extern fun tuple_at)
 (extern fun _copy)
 
-(export fun make_clone (obj) (
-    (var clone (_copy obj))
-    (set_slot clone parent obj)
-    (var init (get_slot_nocheck clone initialize))
-    (if (!= init @C_UNDEF)
-        (= clone (runcode (get_bytecode init) clone))
-        )
-    (return clone)
-    ))
-
 (fun remove_slot (obj sym) (
     (var tbl (wrtable_find slots sym))
-    (if (!= tbl @C_UNDEF) (wrtable_del tbl sym))
+    (if (!= tbl @C_UNDEF) (do
+        (if (== sym parent)
+            (wrtable_add tbl obj noparent)
+            (wrtable_del tbl obj)
+            )
+        ))
     (return @C_UNDEF)
     ))
 
@@ -117,6 +112,7 @@
 (fun get_parent (obj) (
     (if (== obj root_object) (return @C_UNDEF))
     (var p (wrtable_find parent_tbl obj))
+    (if (== p noparent) (return @C_UNDEF))
     (if (!= p @C_UNDEF) (return p))
     (= p (array_get object parent_special (node_type obj)))
     (if (!= p @C_UNDEF) (return p))
@@ -201,7 +197,6 @@
 (export fun setup_object (mod) (
     (set_slot mod (to_sym "ObjectTrait") root_object)
 
-    (add_function1 mod (to_sym "clone") DontCare make_clone 0)
     (add_function3 mod (to_sym "set_slot") DontCare symT DontCare set_slot 0)
     (add_function3 mod (to_sym "set_slot_incremental") DontCare symT DontCare set_slot_incremental 0)
     (add_function3 mod (to_sym "set_slot_unalias") DontCare symT DontCare set_slot_unalias 0)

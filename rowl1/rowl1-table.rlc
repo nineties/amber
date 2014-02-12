@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-table.rlc 2014-01-24 19:27:22 nineties $
+; $Id: rowl1-table.rlc 2014-02-12 15:29:15 nineties $
 ;
 
 (import "rlvm-compile")
@@ -20,6 +20,7 @@
 
 (extern object global)
 (extern object current_loc)
+(extern fun tuple2)
 
 (array int prime_numbers (
     5 11 17 37 67 131 257 521 1031 2053 4099 8209 16411 32771 65537 131101
@@ -47,16 +48,9 @@
     ))
 
 (export fun table_new () (
-    (return (table_new_with_hint 10
-        (lookup_func global (to_sym "hash"))
-        (lookup_func global (to_sym "equal"))
-        ))
-    ))
-
-(export fun table_new2 (hash equal) (
-    (= hash  (get_bytecode hash))
-    (= equal (get_bytecode equal))
-    (return (table_new_with_hint 10 hash equal))
+    (var hash (lookup_func global (to_sym "hash")))
+    (var eql  (lookup_func global (to_sym "equal?")))
+    (return (table_new_with_hint 10 hash eql))
     ))
 
 (export fun table_size (tbl) (
@@ -107,7 +101,6 @@
     (var hash (field_get tbl 2))
     (var eql  (field_get tbl 3))
     (var size (seq_size bucket))
-
     (var hash_value (unbox (runcode hash key)))
     (var h (% hash_value size))
     (var entry (array_get object bucket h))
@@ -120,6 +113,18 @@
         ))
     (table_add tbl hash_value key val hash)
     (return val)
+    ))
+
+(export fun table_at_by_idx (tbl idx) (
+    (var entry (field_get tbl 4))
+    (while entry (do
+        (if (== idx 0)
+            (return (tuple2 (field_get entry 0) (field_get entry 1)))
+            )
+        (-= idx 1)
+        (= entry (field_get entry 3))
+        ))
+    (throw (out_of_range current_loc tbl (box idx)))
     ))
 
 (fun table_at (tbl key) (
@@ -188,7 +193,6 @@
     (return tbl)
     ))
 
-(extern fun tuple2)
 (export fun table_to_list (tbl) (
     (var list 0)
     (var entry (field_get tbl 4))
@@ -217,20 +221,22 @@
     (return list)
     ))
 
-(export fun setup_table (global) (
-    (var mod (set_undef_slot global (to_sym "Table") (create_module (to_sym "Table"))))
-    (add_function0 mod (to_sym "new") table_new 0)
-    (add_function2 mod (to_sym "new") funT funT table_new2 0)
-    (add_function1 global (to_sym "to_table") listT list_to_table 0)
-    (add_function2 global (to_sym "at") tableT DontCare table_at 0)
-    (add_function3 global (to_sym "store") tableT DontCare DontCare table_store 0)
-    (add_function1 global (to_sym "size") tableT table_size 0)
+(export fun setup_table (mod) (
+    (var trait (make_object1 (to_sym "Trait") (to_sym "Table")))
+    (set_slot mod (to_sym "TableTrait") trait)
+    (set_special_parent @TableE trait)
 
-    (add_function1 global (to_sym "to_list") tableT table_to_list 0)
+    (add_function0 mod (to_sym "table_new") table_new 0)
+    (add_function1 mod (to_sym "list_to_table") listT list_to_table 0)
+    (add_function2 mod (to_sym "table_at") tableT DontCare table_at 0)
+    (add_function3 mod (to_sym "table_store") tableT DontCare DontCare table_store 0)
+    (add_function1 mod (to_sym "table_size") tableT table_size 0)
 
-    (add_function1 global (to_sym "keys") tableT table_keys 0) 
-    (add_function1 global (to_sym "values") tableT table_values 0)
-    (add_function1 global (to_sym "pairs") tableT table_to_list 0)
+    (add_function1 mod (to_sym "table_to_list") tableT table_to_list 0)
+
+    (add_function1 mod (to_sym "table_keys") tableT table_keys 0) 
+    (add_function1 mod (to_sym "table_values") tableT table_values 0)
+    (add_function1 mod (to_sym "table_pairs") tableT table_to_list 0)
     ))
 
     ))

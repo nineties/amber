@@ -1,15 +1,16 @@
 # Copyright (C) 2010 nineties
-# $Id: Base.ab 2014-02-11 14:34:10 nineties $
+# $Id: Base.ab 2014-02-12 15:31:46 nineties $
 
 ObjectTrait: Prim.ObjectTrait with {
-    head        = Prim.alias(() -> Prim.head(self))
-    arguments   = Prim.alias(() -> Prim.arguments(self))
-    arity       = Prim.alias(() -> Prim.arity(self))
-    atom?()     = Prim.atom?(self)
-    at(i)       = Prim.at(self, i)
-    store(i, v) = Prim.store(self, i, v)
-    copy()      = Prim.copy(self)
-    to_s()      = fullform(self)
+    head            = Prim.alias(() -> Prim.head(self))
+    arguments       = Prim.alias(() -> Prim.arguments(self))
+    arity           = Prim.alias(() -> Prim.arity(self))
+    get_arg(i)      = Prim.at(self, i)
+    sotre_arg(i, v) = Prim.store(self, i, v)
+    at(i)           = Prim.at(self, i)
+    store(i, v)     = Prim.store(self, i, v)
+    copy()          = Prim.copy(self)
+    to_s()          = fullform(self)
 
     get_slot(sym)           = Prim.get_slot(self, sym)
     get_slot(sym, \norec)   = Prim.get_slot_norec(self, sym)
@@ -23,17 +24,6 @@ ObjectTrait: Prim.ObjectTrait with {
         = Prim.set_slot_unalias(self, sym, val)
 
     has_slot?(sym) = Prim.has_slot?(self, sym)
-
-    hash() = {
-        h: 0
-        for (arg in self)
-            h = 13*h + arg.hash()
-        h = 13*h + arg.head().hash()
-    }
-
-    hash() when self.atom?() = {
-        throw `UndefinedMethod{!LOCATION, hash, !self}
-    }
 }
 
 id(obj): id
@@ -45,4 +35,10 @@ fusion!: Prim.fusion_function
 compose: Prim.compose_function
 alias: Prim.alias
 
-export ObjectTrait id equal? identical? fullform fusion fusion! compose alias
+hash(obj): {
+    h: 0
+    n: obj.arity
+    for (i in 0..n-1) 
+        h = 13*h + hash(obj.get_arg(i))
+    13*h + hash(obj.head)
+}

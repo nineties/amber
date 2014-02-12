@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2014-01-24 19:26:41 nineties $
+; $Id: rowl1-list.rlc 2014-02-12 15:01:04 nineties $
 ;
 
 (import "rlvm-compile")
@@ -55,27 +55,8 @@
     (return t)
     ))
 
-(fun tp_new (n) (
-    (= n (unbox n))
-    (var t (allocate_tuple n))
-    (for i 0 n (do
-        (array_set object t i @C_UNDEF)
-        ))
-    (return t)
-    ))
-
 (fun tp_length (t) (
     (return (box (seq_size t)))
-    ))
-
-(fun tp_hash (t) (
-    (var f (lookup_func global (to_sym "hash")))
-    (var n (seq_size t))
-    (var h 0)
-    (for i 0 n (do
-        (= h (+ (* h 13) (unbox (runcode f (array_get object t i)))))
-        ))
-    (return (box h))
     ))
 
 (fun tp_equal (t1 t2) (
@@ -148,15 +129,15 @@
     (return t)
     ))
 
-(export fun setup_tuple (global) (
-    (var mod (set_undef_slot global (to_sym "Tuple") (create_module (to_sym "Tuple"))))
-    (add_function1 mod (to_sym "new") intT tp_new 0)
-    (add_function1 global (to_sym "length") tupleT tp_length 0)
-    (add_function1 global (to_sym "size") tupleT tp_length 0)
-    (add_function1 global (to_sym "hash") tupleT tp_hash 0)
-    (add_function2 global (to_sym "equal") tupleT tupleT tp_equal 0)
-    (add_function2 global (to_sym "at") tupleT intT tp_at 0)
-    (add_function3 global (to_sym "store") tupleT intT DontCare tp_store 0)
+(export fun setup_tuple (mod) (
+    (var trait (make_object1 (to_sym "Trait") (to_sym "Tuple")))
+    (set_slot mod (to_sym "TupleTrait") trait)
+    (set_special_parent @TupleE trait)
+    (add_function1 mod (to_sym "tuple_length") tupleT tp_length 0)
+    (add_function1 mod (to_sym "tuple_size") tupleT tp_length 0)
+    (add_function2 mod (to_sym "tuple_equal?") tupleT tupleT tp_equal 0)
+    (add_function2 mod (to_sym "tuple_at") tupleT intT tp_at 0)
+    (add_function3 mod (to_sym "tuple_store") tupleT intT DontCare tp_store 0)
     ))
 
     ))

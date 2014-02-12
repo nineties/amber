@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2014-02-11 19:09:23 nineties $
+; $Id: rowl1-node.rlc 2014-02-12 15:20:23 nineties $
 ;
 
 (import "rlvm-compile")
@@ -356,21 +356,25 @@
 
 ; number of arguments
 (extern fun array_size)
+(extern fun table_size)
 (export fun node_size (expr) (
-    (if (is_atom expr) (return 1))
+    (if (is_atom expr) (return 0))
     (if (is_list expr) (return (list_len expr)))
     (if (is_tuple expr) (return (seq_size expr)))
     (if (is_array expr) (return (array_size expr)))
+    (if (is_table expr) (return (table_size expr)))
     (return (expr_size expr))
     ))
 
 (extern fun tuple_to_list)
 (extern fun ary_to_list)
+(extern fun table_to_list)
 (export fun node_args (expr) (
     (if (is_atom expr) (return 0))
     (if (is_list expr) (return expr))
     (if (is_tuple expr) (return (tuple_to_list expr)))
     (if (is_array expr) (return (ary_to_list expr)))
+    (if (is_table expr) (return (table_to_list expr)))
     (var args 0)
     (rfor i 0 (node_size expr)
         (= args (cons (node_arg expr i) args))
@@ -400,6 +404,7 @@
 (extern fun list_at_check)
 (extern fun tuple_at)
 (extern fun array_at)
+(extern fun table_at_by_idx)
 (export fun node_arg (expr idx) (
     (if (is_atom expr) 
         (throw (out_of_range current_loc expr (box idx)))
@@ -407,6 +412,7 @@
     (if (is_list expr)  (return (list_at_check expr idx)))
     (if (is_tuple expr) (return (tuple_at expr idx)))
     (if (is_array expr) (return (array_at expr idx)))
+    (if (is_table expr) (return (table_at_by_idx expr idx)))
 
     (if (>= idx (expr_size expr))
         (throw (out_of_range current_loc expr (box idx))))
