@@ -1,9 +1,9 @@
 " Copyright (C) 2014 nineties "
-" $Id: Boot.ab 2014-02-12 17:07:52 nineties $ "
+" $Id: boot.ab 2014-02-15 18:53:14 nineties $ "
 
 " We write comments as string literals until we define comment syntax. "
 
-" Copy important functions from the module `Prim` to the global-module. "
+" Copy important functions from the module `Prim' to the global-module. "
 Define{load,          Slot{Prim, load}}
 Define{exit,          Slot{Prim, exit}}
 Define{create_module, Slot{Prim, create_module}}
@@ -22,53 +22,80 @@ load("Base.ab")
 # Setup module system.
 load("Module.ab")
 
-import Numeric
-import String
-import Symbol
-import Enumerable
-import Tuple
-import List
-import Array
-import Table
-import IO
-import IO.Printf
-import Parser
+# Setup trait system.
+import Trait
 
-if (ARGV.empty?()) {
-    Syntax.enable_shell_syntax()
-    shell_outputs: Array.new()
-    shell_outputs.push(nil)
-
-    PROMPT = "amber"
-    p: Parser.new(stdin)
-
-    while true {
-        try {
-            if (p.parse_shell()) {
-                expr: p.node
-                if (Prim.has_slot?(Amber, \before_eval))
-                    expr = Amber.before_eval(expr)
-                v: Amber.eval(expr)
-                if (Prim.has_slot?(Amber, \after_eval))
-                    v = Amber.after_eval(v)
-                printf("=> %p\n", v)
-                shell_outputs[0] = v
-                shell_outputs.push(v)
-            } else {
-                #stderr.puts(p.error_string)
-            }
-        } catch e -> {
-            stderr.puts(e)
-        }
-    }
-
-    #while true {
-    #    try {
-    #    } catch e -> {
-    #        stderr.printf("Error: %p", e)
-    #    }
-    #}
-} else {
-    load(ARGV[0])
-    exit(0)
+Prim.ArrayTrait with {
+    parent = Trait.Stack
+    push!(v): Prim.array_push!(self, v)
+    pop!():   Prim.array_pop!(self)
+    size:     alias(() -> Prim.array_size(self))
+    empty?(): self.size == 0
+    top():    Prim.array_at(self, self.size-1) 
 }
+
+x: Prim.list_to_array([1,2,3,4,5])
+Prim.debugpf(x)
+Prim.debugpf(Trait.Stack.clear!)
+x.dup!()
+Prim.debugpf(x)
+
+
+# Import standard traits.
+#inputtable
+#stackable
+
+#import Trait.
+#
+## Import standard libraries.
+#import String
+#import Symbol
+
+#import Symbol
+#import Enumerable
+#import Tuple
+#import List
+#import Array
+#import Table
+#import IO
+#import IO.Printf
+#import Parser
+#
+#if (ARGV.empty?()) {
+#    Syntax.enable_shell_syntax()
+#    shell_outputs: Array.new()
+#    shell_outputs.push(nil)
+#
+#    PROMPT = "amber"
+#    p: Parser.new(stdin)
+#
+#    while true {
+#        try {
+#            if (p.parse_shell()) {
+#                expr: p.node
+#                if (Prim.has_slot?(Amber, \before_eval))
+#                    expr = Amber.before_eval(expr)
+#                v: Amber.eval(expr)
+#                if (Prim.has_slot?(Amber, \after_eval))
+#                    v = Amber.after_eval(v)
+#                printf("=> %p\n", v)
+#                shell_outputs[0] = v
+#                shell_outputs.push(v)
+#            } else {
+#                #stderr.puts(p.error_string)
+#            }
+#        } catch e -> {
+#            stderr.puts(e)
+#        }
+#    }
+#
+#    #while true {
+#    #    try {
+#    #    } catch e -> {
+#    #        stderr.printf("Error: %p", e)
+#    #    }
+#    #}
+#} else {
+#    load(ARGV[0])
+#    exit(0)
+#}

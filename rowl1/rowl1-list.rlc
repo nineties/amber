@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2014-02-05 10:05:33 nineties $
+; $Id: rowl1-list.rlc 2014-02-15 14:19:25 nineties $
 ;
 
 (import "rlvm-compile")
@@ -83,6 +83,15 @@
     (return (list_reverse new_ls))
     ))
 
+(fun ls_foreach (f ls) (
+    (var code (get_bytecode f))
+    (while ls (do
+        (runcode code (car ls))
+        (= ls (cdr ls))
+        ))
+    (return @C_NIL)
+    ))
+
 (fun ls_member (v ls) (
     (var eql (lookup_func global (to_sym "equal?")))
     (while ls (do
@@ -97,6 +106,14 @@
 (fun ls_insert_uniq (v ls) (
     (if (== (ls_member v ls) @C_TRUE) (return ls))
     (return (cons v ls))
+    ))
+
+(fun ls_join (ls1 ls2) (
+    (while ls1 (do
+        (= ls2 (ls_insert_uniq (car ls1) ls2))
+        (= ls1 (cdr ls1))
+        ))
+    (return ls2)
     ))
 
 (fun ls_foldl (f v ls) (
@@ -238,8 +255,10 @@
     (add_function1 mod (to_sym "list_reverse") listT list_reverse 0)
     (add_function2 mod (to_sym "list_append") listT listT list_append 0)
     (add_function2 mod (to_sym "list_map") funT listT ls_map 0)
+    (add_function2 mod (to_sym "list_foreach") funT listT ls_foreach 0)
     (add_function2 mod (to_sym "list_member?") DontCare listT ls_member 0)
     (add_function2 mod (to_sym "list_insert_unique") DontCare listT ls_insert_uniq 0)
+    (add_function2 mod (to_sym "list_join") listT listT ls_join 0)
     (add_function3 mod (to_sym "list_foldl") funT DontCare listT ls_foldl 0)
     (add_function2 mod (to_sym "list_foldl1") funT listT ls_foldl1 0)
     (add_function3 mod (to_sym "list_foldr") funT listT DontCare ls_foldr 0)

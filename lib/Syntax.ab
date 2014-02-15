@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-02-12 21:28:59 nineties $ "
+" $Id: Syntax.ab 2014-02-15 13:14:52 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -8,13 +8,13 @@ Define{eval, Lambda{List{Domain{stmt, DefineSyntax}},
     Apply{eval, List{
         Apply{Slot{Prim, compile_define_syntax}, List{stmt}}
     }}},
-    incremental
+    fusion
 }
 
 " Enable comment syntax. "
 Assign{Slot{Syntax, comment}, Slot{Prim, parse_shell_style_comment}}
 
-### Syntax definition
+### syntax definition
 # Amber's parser uses Parsing Expression Grammer (PEG) 
 
 ## syntax elements
@@ -142,7 +142,7 @@ DefineSyntax{stmt, List{ Tuple{List{syntax_declaration}, node0}}}
 ### Reserved Symbols
 # The following symbols never been parsed as symbols.
 
-Define{reserved_symbols, List{
+Define{Slot{Syntax, reserved_symbols}, List{
     Quote{self}, Quote{not}, Quote{and}, Quote{or}, Quote{when},
     Quote{if}, Quote{else}, Quote{case}, Quote{of}, Quote{while},
     Quote{for}, Quote{in}, Quote{continue}, Quote{break}, Quote{return},
@@ -280,9 +280,9 @@ multi_lambda_expr
       | lambda_expr
 
 slot_assign
-    ::= <<multiline>> "{" delimited1(assign_expr, ",") "}" { node1 }
-      | <<multiline>> "{" aligned(assign_expr) "}" { node1 }
-      | assign_expr { List{node0} }
+    ::= <<multiline>> "{" delimited1(stmt, ",") "}" { node1 }
+      | <<multiline>> "{" aligned(stmt) "}" { node1 }
+      | stmt { List{node0} }
 
 continuation_expr
     ::= reset multi_lambda_expr { `Reset{!node1} }
@@ -301,7 +301,7 @@ assign_expr
       | pattern "%=" assign_expr  { `ModAssign{!node0, !node2} }
       | pattern "|=" assign_expr  { `FusionAssign{!node0, !node2} }
       | pattern with slot_assign
-        { MakeObject{Quote{InitSlots}, List{node0, node2}} }
+        { MakeObject{Quote{WithSlots}, List{node0, node2}} }
       | continuation_expr
 
 Assign{Syntax.expr, Syntax.assign_expr}
@@ -357,7 +357,7 @@ stmt
 primary_expr_act
     ::= "$" decimal
         {
-            Prim.to_sym(
+            Prim.string_to_symbol(
                 Prim.string_add("node",
                 Prim.int_to_string(node1)))
         }
@@ -406,13 +406,13 @@ expand_macro: expr -> {
         head: Prim.head(expr)
 
         if (Equal{level, 0} and Equal{head, \QuoteSyntax})
-            return Prim.at(expr, 0)
+            return Prim.get_arg(expr, 0)
         else if (Equal{head, \QuasiQuoteSyntax}) {
             level = Prim.int_add(level, 1)
-            expr = Prim.at(expr, 0)
+            expr = Prim.get_arg(expr, 0)
         } else if (Equal{head, \UnquoteSyntax}) {
             level = Prim.int_sub(level, 1)
-            expr = Prim.at(expr, 0)
+            expr = Prim.get_arg(expr, 0)
         } else if (Equal{level, 0} and Equal{head, \Quote})
             return expr
         else if (Equal{head, \QuasiQuote})
@@ -437,14 +437,14 @@ expand_macro: expr -> {
 # Expand macros only once before eval.
 Amber.before_eval = expand_macro
 
-macro = fusion((Assign{Apply{f, args}, e}) -> `Assign{!f, Lambda{!args, !e}, incremental}, macro)
-macro(Define{Apply{f, args}, e})     = `Define{!f, Lambda{!args, !e}, incremental}
-macro(Define{Send{obj, f, args}, e}) = `Define{Slot{!obj, !f}, Lambda{!args, !e}, incremental}
-macro(Assign{Send{obj, f, args}, e}) = `Assign{Slot{!obj, !f}, Lambda{!args, !e}, incremental}
-macro(Define{Apply{f, args}, e, g})     = `Define{!f, Lambda{When{!args, !g}, !e}, incremental}
-macro(Assign{Apply{f, args}, e, g})     = `Assign{!f, Lambda{When{!args, !g}, !e}, incremental}
-macro(Define{Send{obj, f, args}, e, g}) = `Define{Slot{!obj, !f}, Lambda{When{!args, !g}, !e}, incremental}
-macro(Assign{Send{obj, f, args}, e, g}) = `Assign{Slot{!obj, !f}, Lambda{When{!args, !g}, !e}, incremental}
+macro = fusion((Assign{Apply{f, args}, e}) -> `Assign{!f, Lambda{!args, !e}, fusion}, macro)
+macro(Define{Apply{f, args}, e})     = `Define{!f, Lambda{!args, !e}, fusion}
+macro(Define{Send{obj, f, args}, e}) = `Define{Slot{!obj, !f}, Lambda{!args, !e}, fusion}
+macro(Assign{Send{obj, f, args}, e}) = `Assign{Slot{!obj, !f}, Lambda{!args, !e}, fusion}
+macro(Define{Apply{f, args}, e, g})     = `Define{!f, Lambda{When{!args, !g}, !e}, fusion}
+macro(Assign{Apply{f, args}, e, g})     = `Assign{!f, Lambda{When{!args, !g}, !e}, fusion}
+macro(Define{Send{obj, f, args}, e, g}) = `Define{Slot{!obj, !f}, Lambda{When{!args, !g}, !e}, fusion}
+macro(Assign{Send{obj, f, args}, e, g}) = `Assign{Slot{!obj, !f}, Lambda{When{!args, !g}, !e}, fusion}
 
 macro(|x|)     = `abs(!x)
 macro(+x)      = `uplus(!x)
@@ -472,17 +472,17 @@ macro(x %= y)  = `ArithAssign{!x, !y, mod!}
 macro(x |= y)  = `ArithAssign{!x, !y, fusion!}
 
 # Subscript syntax is not built-in. We need macros.
-macro(x[idxs...]) = `Send{!x, at, !idxs}
+macro(x[idxs...]) = `Send{!x, get, !idxs}
 macro(QuoteSyntax{x[idxs...]} = e)
-    = `Send{!x, store, !Prim.list_append(idxs, [e])}
+    = `Send{!x, set, !Prim.list_append(idxs, [e])}
 macro(ArithAssign{QuoteSyntax{x[idxs...]}, e, op}) = {
     # We have to consider that evaluation of `x' and `idxs' may have
     # side-effects. So, we translate x[a,b] op= e to
     # { y = x; t1 = a; t2 = b; y[t1, t2] = op(y[t1, t2], e) }
     stmt1: `Define{!unique_symbol(\x), !x}
     stmt2: Prim.list_map(i -> `Define{!unique_symbol(\t), !i}, idxs)
-    y: at(stmt1, 0)
-    ts: Prim.list_map(e -> at(e, 0), stmt2)
+    y: Prim.get_arg(stmt1, 0)
+    ts: Prim.list_map(e -> Prim.get_arg(e, 0), stmt2)
 
     `Block{
         !Prim.list_append(
@@ -529,15 +529,15 @@ macro(QuoteSyntax{For{i, Range{a, b}, body}}) = {
 #
 # { t: obj; t.a = p; t.b = q; t.c = r; t }
 #
-macro(InitSlots{obj, slots}): {
+macro(WithSlots{obj, slots}): {
     t: Prim.unique_symbol(\t)
     transl(e): case (macro(e)) of
           Assign{x, e, opts...} ->
               `Assign{Slot{!t, !x}, !e, !opts...}
-        | e @ Define -> {
-              Prim.store(e, 0, `Slot{!t, !Prim.at(e, 0)})
-              e
-          }
+        | Define{x, e, opts...} ->
+              `Define{Slot{!t, !x}, !e, !opts...}
+        | Apply{f, args} ->
+              `Send{!t, !f, !args}
         | e @ ... -> {
               throw `InvalidSyntax{!LOCATION,
                   "Invalid syntax of slot assignment.",
@@ -549,3 +549,8 @@ macro(InitSlots{obj, slots}): {
         !t
     }
 }
+
+## Utilities
+Syntax.add_reserved_symbl(sym):
+    Syntax.reserved_symbols =
+        Prim.list_insert_unique(sym, Syntax.reserved_symbols)

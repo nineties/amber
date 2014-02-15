@@ -1,39 +1,37 @@
 # Copyright (C) 2010 nineties
-# $Id: Base.ab 2014-02-12 16:16:12 nineties $
+# $Id: Base.ab 2014-02-15 13:08:52 nineties $
+
+# Chain of obj.parent.parent... eventually reaches `nil',
+# so we can use nil as the root object of parent chain.
 
 nil with {
     head            = Prim.alias(() -> Prim.head(self))
     arguments       = Prim.alias(() -> Prim.arguments(self))
     arity           = Prim.alias(() -> Prim.arity(self))
-    get_arg(i)      = Prim.at(self, i)
-    sotre_arg(i, v) = Prim.store(self, i, v)
-    at(i)           = Prim.at(self, i)
-    store(i, v)     = Prim.store(self, i, v)
     copy()          = Prim.copy(self)
     to_s()          = fullform(self)
 
-    get_slot(sym)           = Prim.get_slot(self, sym)
-    get_slot(sym, \norec)   = Prim.get_slot_norec(self, sym)
-    get_slot(sym, \unalias) = Prim.get_slot_unalias(self, sym)
+    get(i @ Int)                = Prim.get_arg(self, i)
+    get(sym @ Symbol)           = Prim.get_slot(self, sym)
+    get(sym @ Symbol, \norec)   = Prim.get_slot_norec(self, sym)
+    get(sym @ Symbol, \unalias) = Prim.get_slot_unalias(self, sym)
 
-    set_slot(sym, val)
-        = Prim.set_slot(self, sym, val)
-    set_slot(sym, val, \incremental)
-        = Prim.set_slot_incremental(self, sym, val)
-    set_slot(sym, val, \unalias)
-        = Prim.set_slot_unalias(self, sym, val)
+    set(i @ Int, v) = Prim.set_arg(self, i, v)
+    set(sym @ Symbol, v) = Prim.set_slot(self, sym, v)
+    set(sym @ Symbol, v, \fusion) = Prim.set_slot_fusion(self, sym, v)
+    set(sym @ Symbol, v, \unalias) = Prim.set_slot_unalias(self, sym, v)
 
     has_slot?(sym) = Prim.has_slot?(self, sym)
 }
 
-id(obj): id
-equal?: Prim.equal?
+id(obj):    obj
+equal?:     Prim.equal?
 identical?: Prim.identical?
-fullform: Prim.fullform
-fusion: Prim.fusion_function
-fusion!: Prim.fusion_function
-compose: Prim.compose_function
-alias: Prim.alias
+fullform:   Prim.fullform
+fusion:     Prim.fusion_function
+fusion!:    Prim.fusion_function
+compose:    Prim.compose_function
+alias:      Prim.alias
 
 hash(obj): {
     h: 0

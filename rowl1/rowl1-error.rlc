@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2014-02-12 21:43:54 nineties $
+; $Id: rowl1-node.rlc 2014-02-15 05:03:49 nineties $
 ;
 
 (import "rlvm-compile")
@@ -86,11 +86,16 @@
     ))
 
 (export fun matching_failed (pat self args) (
-    (return (make_object4 (to_sym "MatchingFailed") current_loc
-        (make_object1 (to_sym "function") pat)
-        (make_object1 (to_sym "self") self)
-        (make_object1 (to_sym "args") args)
-        ))
+    (if (== self @C_UNDEF)
+        (return (make_object3 (to_sym "MatchingFailed") current_loc
+            (make_object1 (to_sym "function") pat)
+            (make_object1 (to_sym "args") args)
+            ))
+        (return (make_object4 (to_sym "MatchingFailed") current_loc
+            (make_object1 (to_sym "function") pat)
+            (make_object1 (to_sym "self") self)
+            (make_object1 (to_sym "args") args)
+            )))
     ))
 
 (export fun unknown_field (loc head sym) (

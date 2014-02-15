@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-02-12 22:02:32 nineties $
+; $Id: rowl1-interp.rlc 2014-02-15 18:09:20 nineties $
 ;
 
 (import "rlvm-compile")
@@ -84,8 +84,10 @@
     (remove_parent amber)
     (= global amber)
 
-    ; Prim Module
-    (= prim (create_module Prim)) ; Prim functions
+    (remove_parent @C_NIL)
+
+    ; prim Module
+    (= prim (create_module Prim)) ; prim functions
     (set_slot global Prim prim)
 
     ; Setup built-in objects and functions.
@@ -212,7 +214,7 @@
 
 (fun interpret_shell (p) (
     (var outputs (ary_new))
-    (eval_top (apply (slot (slot (to_sym "Syntax") (to_sym "Shell")) (to_sym "enable_shell_syntax")) 0))
+    (eval_top (apply (slot (slot (to_sym "syntax") (to_sym "shell")) (to_sym "enable_shell_syntax")) 0))
     (set_slot global (to_sym "shell_outputs") outputs)
     (ary_push outputs @C_NIL)
     (while 1 (do
@@ -435,8 +437,8 @@
     (return (set_slot global sym val))
     ))
 
-(fun define_variable_incremental (sym val _) (
-    (return (set_slot_incremental global sym val))
+(fun define_variable_fusion (sym val _) (
+    (return (set_slot_fusion global sym val))
     ))
 
 (fun setup_minimal_interpreter (prim) (
@@ -477,7 +479,7 @@
     (add_function1 prim (to_sym "enter_module") symT enter_module 0)
     (add_function0 prim (to_sym "exit_module") exit_module 0)
     (add_function2 prim (to_sym "define_variable") symT DontCare define_variable 0)
-    (add_function3 prim (to_sym "define_variable") symT DontCare (quote (to_sym "incremental")) define_variable_incremental 0)
+    (add_function3 prim (to_sym "define_variable") symT DontCare (quote (to_sym "fusion")) define_variable_fusion 0)
     (add_function1 prim (to_sym "debugpf") DontCare debugpf 0)
 
     ; important functions

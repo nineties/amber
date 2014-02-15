@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-02-12 21:47:34 nineties $
+; $Id: rowl1-compile.rlc 2014-02-15 18:13:43 nineties $
 ;
 
 (import "rlvm-compile")
@@ -25,8 +25,8 @@
 (var expand        (to_unique_sym "%expand"))
 
 (export fun unwrap_internal (node) (
-    (if (== (node_head node) Ref)
-        (return (unwrap_internal (node_arg node 2))))
+    ;(if (== (node_head node) Ref)
+    ;    (return (unwrap_internal (node_arg node 2))))
     (return node)
     ))
 
@@ -38,6 +38,7 @@
 (extern fun set_loc)
 
 (extern fun set_slot)
+(extern fun set_slot_fusion)
 (extern fun overwrite_slot)
 (extern fun get_slot)
 (extern fun get_slot_nocheck)
@@ -92,15 +93,17 @@
         (return arg)
         ))
     (var hd (node_head node))
+    (if (== hd Slot)
+        (return (iter_args f (node_arg node 0) arg level))
     (if (== hd Ref)
         (if (== level 0)
             (return (f (node_arg_symbol node 2) arg))
             (return arg)
-        ))
-    (if (== hd Quote) (return arg))
+        )
+    (if (== hd Quote) (return arg)
     (if (== hd QuasiQuote) (+= level 1)
     (if (== hd Unquote)    (-= level 1)
-        ))
+        )))))
     (for i 0 (node_size node)
         (= arg (iter_args f (node_arg node i) arg level))
         )
@@ -306,7 +309,7 @@
     (if (== hd Define) (do
         (= expr (_copy expr))
         (node_arg_set expr 1 (alpha tbl (node_arg expr 1)))
-        (if (!= (node_head (node_arg expr 0)) Apply)
+        (if (!= (node_head (node_arg expr 0)) Slot)
             (node_arg_set expr 0 (alpha_args tbl (node_arg expr 0) @TRUE))
             )
         (return expr)
@@ -734,17 +737,6 @@
     (return (set_slot obj sym val))
     ))
 
-(fun append_slot (obj sym val) (
-    (var f (get_slot_nocheck obj sym))
-    (if (== f @C_NIL)
-        (return (set_slot obj sym val))
-        )
-    (if (&& (is_function val) (is_function f))
-        (return (set_slot obj sym (fusion_function val f)))
-        )
-    (throw (redefined_slot current_loc obj sym))
-    ))
-
 ; obj.f
 (fun compile_slot (asm expr) (
     (var obj (node_arg expr 0))
@@ -1096,7 +1088,7 @@
     (var lhs (node_arg expr 0))
     (var rhs (node_arg expr 1))
     (var ty (node_head lhs))
-    (if (&& (== (node_size expr) 3) (== (node_arg expr 2) (to_sym "incremental")))
+    (if (&& (== (node_size expr) 3) (== (node_arg expr 2) (to_sym "fusion")))
         (return (compile_define_global_function asm lhs rhs))
         )
     (if (!= (node_size expr) 2)
@@ -1118,7 +1110,7 @@
 (fun compile_define_local (asm expr) (
     (var lhs (node_arg expr 0))
     (var rhs (node_arg expr 1))
-    (if (&& (== (node_size expr) 3) (== (node_arg expr 2) (to_sym "incremental")))
+    (if (&& (== (node_size expr) 3) (== (node_arg expr 2) (to_sym "fusion")))
         (return (compile_define_local_function asm lhs rhs))
         )
     (if (!= (node_size expr) 2)
@@ -1178,7 +1170,7 @@
         (compile asm lam)
         (put_push asm sym)
         (compile asm obj)
-        (compile_simple_call asm 3 append_slot)
+        (compile_simple_call asm 3 set_slot_fusion)
         return
         ))
 
@@ -1218,7 +1210,7 @@
         (compile asm lam)
         (put_push asm sym)
         (compile asm obj)
-        (compile_simple_call asm 3 append_slot)
+        (compile_simple_call asm 3 set_slot_fusion)
         return
         ))
 
@@ -1893,7 +1885,7 @@
     (var lty (node_head lhs))
 
     ; f(x) = e is equivarent to f = x -> e | f
-    (if (&& (== (node_size expr) 3) (== (node_arg expr 2) (to_sym "incremental"))) (do
+    (if (&& (== (node_size expr) 3) (== (node_arg expr 2) (to_sym "fusion"))) (do
         (if (== lty Slot)
             (return (compile_define asm expr))
             (return (compile asm (assign lhs (apply (to_sym "fusion") (list2 rhs lhs)))))

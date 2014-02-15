@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-object.rlc 2014-02-12 22:27:18 nineties $
+; $Id: rowl1-object.rlc 2014-02-15 18:07:09 nineties $
 ;
 
 (import "rlvm-compile")
@@ -43,8 +43,8 @@
         (var f (field_get v 2))
         (if f
             (return (runcode_with_self obj (get_bytecode f) val))
-            (throw (logic_error2 current_loc
-                (string "Immutable Slot") obj sym))
+            ;(throw (logic_error2 current_loc
+            ;    (string "Immutable Slot") obj sym))
             )
         ))
     (var tbl (wrtable_find slots sym))
@@ -66,8 +66,8 @@
     (return val)
     ))
 
-(export fun set_slot_incremental (obj sym val) (
-    (var f (get_slot_nocheck obj sym))
+(export fun set_slot_fusion (obj sym val) (
+    (var f (get_slot_nocheck_noalias obj sym))
     (if (&& (is_function f) (is_function val))
         (return (set_slot obj sym (fusion_function val f)))
         )
@@ -126,7 +126,10 @@
     ))
 
 (export fun get_slot (obj sym) (
-    (var v (get_slot_nocheck obj sym))
+    (var v (get_slot_nocheck_noalias obj sym))
+    (if (&& (== (node_type v) @AliasE) (field_get v 1))
+        (return (runcode_with_self obj (get_bytecode (field_get v 1))))
+        )
     (if (== v @C_UNDEF)
         (throw (undefined_var current_loc sym))
         )
@@ -186,7 +189,7 @@
 
 (export fun setup_object (mod) (
     (add_function3 mod (to_sym "set_slot") DontCare symT DontCare set_slot 0)
-    (add_function3 mod (to_sym "set_slot_incremental") DontCare symT DontCare set_slot_incremental 0)
+    (add_function3 mod (to_sym "set_slot_fusion") DontCare symT DontCare set_slot_fusion 0)
     (add_function3 mod (to_sym "set_slot_unalias") DontCare symT DontCare set_slot_unalias 0)
     (add_function2 mod (to_sym "get_slot") DontCare symT get_slot 0)
     (add_function2 mod (to_sym "get_slot_norec") DontCare symT get_slot_norec 0)
