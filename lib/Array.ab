@@ -1,7 +1,7 @@
 # Copyright (C) 2014 nineties
-# $Id: Array.ab 2014-02-06 14:56:37 nineties $
+# $Id: Array.ab 2014-02-16 01:15:46 nineties $
 
-import Enumerable
+import Trait
 
 new: Prim.array_new
    | Prim.array_new_with_size
@@ -12,13 +12,13 @@ new: Prim.array_new
          while true {
              v: gen()
              if (v == nil) return ary
-             ary.push(v)
+             ary.push_back(v)
          }
      }
    | (iter @ Function, v) -> {
          ary: Prim.array_new()
          while true {
-             ary.push(v)
+             ary.push_back(v)
              v = iter(v)
              if (v == nil) return ary
          }
@@ -26,19 +26,19 @@ new: Prim.array_new
 
 add = Prim.array_append | add
 
-ArrayTrait: Prim.ArrayTrait with {
-    parent        = EnumerableTrait
+trait Array {
+    extends(Trait.Collection)
+
     to_array()    = self
     to_list()     = Prim.array_to_list(self)
-    length        = alias(() -> Prim.array_length(self))
     size          = alias(() -> Prim.array_length(self))
-    at(i)         = Prim.array_at(self, i)
-    store(i, v)   = Prim.array_store(self, i, v)
-    push(v)       = Prim.array_push(self, v)
-    pop()         = Prim.array_pop(self)
-    reverse!()    = Prim.array_reverse(self)
+    get(i)        = Prim.array_at(self, i)
+    set(i, v)     = Prim.array_store(self, i, v)
+    push_back(v)  = Prim.array_push(self, v)
+    pop_back(v)   = Prim.array_pop(self)
+    reverse()     = Prim.array_reverse(self)
     reverse()     = Prim.array_reverse(self.copy())
-    map!(fun)     = Prim.array_map(fun, self)
+    map(fun)      = Prim.array_map(fun, self)
     map(fun)      = Prim.array_map(fun, self.copy())
     foldl(fun, v) = Prim.array_foldl(fun, v, self)
     foldl1(fun)   = Prim.array_foldl1(fun, self)
@@ -46,4 +46,4 @@ ArrayTrait: Prim.ArrayTrait with {
     foldr1(fun)   = Prim.array_foldr1(fun, self)
 }
 
-export ArrayTrait add
+export add

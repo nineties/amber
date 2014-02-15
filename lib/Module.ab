@@ -1,11 +1,12 @@
 # Copyright (C) 2010 nineties
-# $Id: Module.ab 2014-02-15 13:08:34 nineties $
+# $Id: Module.ab 2014-02-16 00:03:51 nineties $
 
 Module: enter_module(\Module)
 
     # import mod.var to global module.
-    import_variable(mod @ Module, var @ Symbol):
+    import_variable(mod @ Module, var @ Symbol): {
         Prim.define_variable(var, Prim.get_slot(mod, var), \fusion)
+    }
 
     import_variables(mod @ Module, vars @ List):
         Prim.list_foreach(v -> import_variable(mod, v), vars)
@@ -21,7 +22,7 @@ Module: enter_module(\Module)
             | _  -> `load(!Prim.string_add(path, ".ab"), \nothrow)
 
         `Seq{[
-            ((!M):enter_module(\!M)),
+            enter_module(\!M),
             If{not Prim.has_slot?(!M, \exports), ((!M).exports=[])},
             !loadstmt,
             !expand_import(rest, path),

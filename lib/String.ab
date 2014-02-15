@@ -1,5 +1,8 @@
 # Copyright (C) 2014 nineties
-# $Id: String.ab 2014-02-12 14:55:44 nineties $
+# $Id: String.ab 2014-02-15 21:16:29 nineties $
+
+import Numeric
+import Trait
 
 Numeric.join_numeric_type(a, b @ String): \String
 Numeric.join_numeric_type(a @ String, b): \String
@@ -9,30 +12,21 @@ add    = Prim.string_add | add
 equal? = Prim.string_equal? | equal?
 hash   = Prim.string_hash | hash
 
-StringTrait: Prim.StringTrait with {
-    length      = alias(() -> Prim.string_length(self))
-    size        = alias(() -> Prim.string_length(self))
-    at(i)       = Prim.string_at(self, i)
-    contain?(s) = Prim.string_contain?(self, s)
-    unescape()  = Prim.unescape(self)
-    split(sep)  = Prim.split(self, sep)
-    to_code()   = Prim.char_to_code(self)
-    to_s()      = self
-    to_i()      = Prim.string_to_int(self)
-    to_f()      = Prim.string_to_float(self)
-    each() = {
-        str: self
-        i: 0
-        () -> {
-            if (i < str.size) {
-                i += 1
-                return str[i-1]
-            }
-            return nil
-        }
-    }
+trait String {
+    length:      alias(() -> Prim.string_length(self))
+    size:        alias(() -> Prim.string_length(self))
+    at(i):       Prim.string_at(self, i)
+    contain?(s): Prim.string_contain?(self, s)
+    unescape():  Prim.unescape(self)
+    split(sep):  Prim.split(self, sep)
+    to_code():   Prim.char_to_code(self)
+    to_s():      self
+    to_i():      Prim.string_to_int(self)
+    to_f():      Prim.string_to_float(self)
 }
 
-IntTrait.to_char():      Prim.code_to_char(self)
+Trait.Int.to_char(): Prim.code_to_char(self)
 
-export add equal? StringTrait
+Prim.set_parents(\String, Trait.String)
+
+export add equal?

@@ -1,5 +1,7 @@
 # Copyright (C) 2014 nineties
-# $Id: Numeric.ab 2014-02-12 14:56:18 nineties $
+# $Id: Numeric.ab 2014-02-16 00:52:25 nineties $
+
+import Trait
 
 join_numeric_type(a, b): nil
 join_numeric_type(a, a): a
@@ -45,20 +47,20 @@ less_than?(a, b):     compare(a, b) < 0
 greater_than?(a, b):  compare(a, b) > 0
 less_equal?(a, b):    compare(a, b) <= 0
 greater_equal?(a, b): compare(a, b) >= 0
-less_than? = Prim.int_less_than? | less_than?
-greater_than? = Prim.int_greater_than? | greater_than?
-less_equal? = Prim.int_less_equal? | less_equal?
+less_than?     = Prim.int_less_than? | less_than?
+greater_than?  = Prim.int_greater_than? | greater_than?
+less_equal?    = Prim.int_less_equal? | less_equal?
 greater_equal? = Prim.int_greater_equal? | greater_equal?
 
 abs(a): a >= 0 ? a : -a
 uminus(a): -1 * a
 
-add!: add
-sub!: sub
-mul!: mul
-pow!: pow
-div!: div
-mod!: mod
+add!(a,b): add(a,b)
+sub!(a,b): sub(a,b)
+mul!(a,b): mul(a,b)
+pow!(a,b): pow(a,b)
+div!(a,b): div(a,b)
+mod!(a,b): mod(a,b)
 
 # Integer and Floating-point
 INTEGER_MIN: Prim.INTEGER_MIN
@@ -66,13 +68,13 @@ INTEGER_MAX: Prim.INTEGER_MAX
 
 uplus: Prim.int_uplus | Prim.float_uplus
 uminus = Prim.int_uminus | Prim.float_uminus | uminus
-abs = Prim.int_abs | Prim.float_abs | abs
-add = Prim.int_add | Prim.float_add | add
-sub = Prim.int_sub | Prim.float_sub | sub
-mul = Prim.int_mul | Prim.float_mul | mul
-div = Prim.int_div | Prim.float_div | div
-mod = Prim.int_mod | mod
-pow = Prim.int_pow | Prim.float_pow | pow
+abs    = Prim.int_abs | Prim.float_abs | abs
+add    = Prim.int_add | Prim.float_add | add
+sub    = Prim.int_sub | Prim.float_sub | sub
+mul    = Prim.int_mul | Prim.float_mul | mul
+div    = Prim.int_div | Prim.float_div | div
+mod    = Prim.int_mod | mod
+pow    = Prim.int_pow | Prim.float_pow | pow
 powmod = Prim.int_powmod | powmod
 shiftL: Prim.int_shiftL
 shiftR: Prim.int_shiftR
@@ -96,22 +98,18 @@ export INTEGER_MIN INTEGER_MAX
 export infinity
 
 # traits
-NumericTrait: `Trait{Numeric}
-IntegerTrait: `Trait{Integer}  with parent = NumericTrait
 
-IntTrait: Prim.IntTrait with {
-    parent = IntegerTrait
-    to_i() = self
-    to_f() = Prim.int_to_float(self)
-    to_s() = Prim.int_to_string(self)
-}
-FloatTrait: Prim.FloatTrait with {
-    parent = NumericTrait
-    to_i() = Prim.float_to_int(self)
-    to_f() = self
-    to_s() = Prim.float_to_string(self)
+trait Int {
+    to_i(): self
+    to_f(): Prim.int_to_float(self)
+    to_s(): Prim.int_to_string(self)
 }
 
-export NumericTrait IntegerTrait IntTrait FloatTrait
+trait Float {
+    to_i(): Prim.float_to_int(self)
+    to_f(): self
+    to_s(): Prim.float_to_string(self)
+}
 
-
+Prim.set_parents(\Int, Trait.Int)
+Prim.set_parents(\Float, Trait.Float)

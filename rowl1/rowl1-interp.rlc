@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-02-15 18:09:20 nineties $
+; $Id: rowl1-interp.rlc 2014-02-16 00:03:44 nineties $
 ;
 
 (import "rlvm-compile")
@@ -19,6 +19,8 @@
 (import "rowl1-compile")
 (import "rowl1-packrat")
 (import "rowl1-pprint")
+(import "rowl1-tuple")
+(import "rowl1-array")
 
 (export var amber null)
 (export var global null)
@@ -26,13 +28,6 @@
 (export var variables null)
 (export var current_loc null)
 (var module_stack null)
-
-(extern fun ary_new)
-(extern fun ary_at)
-(extern fun ary_store)
-(extern fun ary_push)
-(extern fun ary_pop)
-(extern fun ary_size)
 
 (export fun set_loc (loc) (
     (= current_loc loc)
@@ -101,9 +96,8 @@
     (var load_path (ary_new)) 
     (set_slot amber (to_sym "AMBERPATH") load_path)
     (set_slot amber (to_sym "LOADED") (ary_new))
-    (ary_push load_path (realpath (string ".")))
-    (ary_push load_path (string "."))
-    (ary_push load_path (string "/usr/lib/amber"))
+    (ary_push load_path (tuple2 (string "/usr/lib/amber") amber))
+    (ary_push load_path (tuple2 (realpath (string ".")) amber))
     (setup_minimal_interpreter prim)
     (load_file "Boot.ab")
     (eval_exit @C_NIL)
@@ -348,6 +342,15 @@
         ))
     ))
 
+(fun new_dir (dirs path) (
+    (for i 0 (array_size dirs) (do
+        (if (streq (tuple_at (array_at dirs i) 0) path)
+            (return @FALSE)
+            )
+        ))
+    (return @TRUE)
+    ))
+
 (fun load_file (path) ((return (load_file_impl path @FALSE))))
 (fun load_file_nothrow (path _) ((return (load_file_impl path @TRUE))))
 (fun load_file_impl (path nothrow) (
@@ -355,14 +358,16 @@
     (var loaded (get_slot amber (to_sym "LOADED")))
     (if (!= (node_type dirs) @ArrayE) (goto load_error))
     (if (!= (node_type loaded) @ArrayE) (goto load_error))
-    (for i 0 (unbox (ary_size dirs)) (do
-        (var dir (ary_at dirs (box i)))
+    (rfor i 0 (array_size dirs) (do
+        (var t (ary_at dirs (box i)))
+        (var dir (tuple_at t 0))
+        (var mod (tuple_at t 1))
         (if (!= (node_type dir) @StringE) (goto load_error))
         (var fullpath (strcat (strcat dir "/") path))
         (if (file_exists fullpath) (do
             ; multiple load check.
             (= fullpath (realpath fullpath))
-            (for i 0 (unbox (ary_size loaded)) (do
+            (for i 0 (array_size loaded) (do
                 (if (streq (ary_at loaded (box i)) fullpath)
                     (return @C_FALSE)
                     )
@@ -372,6 +377,8 @@
             (var ichan (open_in fullpath))
             (var fd (open "."))
             (var dir (get_directory fullpath))
+            (var new_dir_p (new_dir dirs dir))
+            (if new_dir_p (ary_push dirs (tuple2 (string dir) global)))
             (chdir dir)
 
             (var p (make_parser fullpath ichan))
@@ -382,6 +389,7 @@
             (interpret p)
             (if save_shell_mode_p (set_shell_mode))
 
+            (if new_dir_p (ary_pop dirs))
             (fchdir fd)
             (close_in ichan)
             (return @C_TRUE)
@@ -396,15 +404,47 @@
         dirs))
     ))
 
+(fun find_parent (sym) (
+    (var dirs (get_slot amber (to_sym "AMBERPATH")))
+    (if (!= (node_type dirs) @ArrayE) (goto load_error))
+    (rfor i 0 (array_size dirs) (do
+        (var t (ary_at dirs (box i)))
+        (var dir (tuple_at t 0))
+        (var mod (tuple_at t 1))
+        (if (!= (node_type dir) @StringE) (goto load_error))
+        (var fullpath (strcat (strcat dir "/") 
+            (strcat (symbol_name sym) ".ab")))
+        (if (file_exists fullpath) (return mod))
+        ))
+    (return 0)
+    (label load_error)
+    (throw (logic_error1 current_loc
+        (string "AMBERPATH must be an array of strings")
+        dirs))
+    ))
+
 (fun enter_module (sym) (
     (if (!= (symtable_depth variables) 0)
         (throw (logic_error current_loc
             (string "enter_module() can be called only in top-scope")))
         )
     (var mod (get_slot_nocheck global sym))
-    (if (== mod @C_NIL)
-        (= mod (create_module sym))
-        )
+    (if (== mod @C_NIL) (do
+        (var p (find_parent sym))
+        (if (! p) (= p global))
+        (= mod (make_object1 Module sym))
+        (set_slot p sym mod)
+        (set_slot mod parent p)
+        ))
+    
+    (var stack module_stack)
+    (while stack (do
+        (if (== mod (car stack))
+            (throw (exception2 current_loc 
+                (string "Recursive dependency")
+                global mod)))
+        (= stack (cdr stack))
+        ))
     (= module_stack (cons global module_stack))
     (= global mod)
     (return mod)

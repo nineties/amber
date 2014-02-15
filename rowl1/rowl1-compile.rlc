@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-02-15 18:13:43 nineties $
+; $Id: rowl1-compile.rlc 2014-02-16 00:51:53 nineties $
 ;
 
 (import "rlvm-compile")
@@ -39,8 +39,9 @@
 
 (extern fun set_slot)
 (extern fun set_slot_fusion)
-(extern fun overwrite_slot)
+(extern fun set_slot_overwrite)
 (extern fun get_slot)
+(extern fun get_slot_nocheck_noalias)
 (extern fun get_slot_nocheck)
 (extern fun get_slot_unalias)
 (extern fun get_slot_norec)
@@ -55,6 +56,7 @@
     (put_push asm (string msg))
     (compile_simple_call asm 2 trace_func)
     ))
+
 
 ; variable table
 (fun lookup_symbol (sym) (
@@ -1055,6 +1057,25 @@
     (return (make_object2 RestOf obj (box idx)))
     ))
 
+(fun assign_variable (self global sym val) (
+    (var v (set_slot_overwrite self sym val))
+    (if (!= v @C_UNDEF) (return v))
+    (= v (set_slot_overwrite global sym val))
+    (if (== v @C_UNDEF)
+        (throw (undefined_var current_loc sym))
+        )
+    (return v)
+    ))
+
+(fun load_variable (self global sym) (
+    (var v (get_slot_nocheck_noalias self sym))
+    (if (&& (== (node_type v) @AliasE) (field_get v 1))
+        (return (runcode_with_self self (get_bytecode (field_get v 1))))
+        )
+    (if (!= v @C_UNDEF) (return v))
+    (return (get_slot_unalias global sym))
+    ))
+
 (fun append_function (mod sym newfunc) (
     (var func (get_slot_nocheck mod sym))
     (if (!= func @C_NIL)
@@ -1270,7 +1291,8 @@
     (if (== ty GlobalVariable) (do
         (put_push asm sym)
         (put_push asm global)
-        (compile_simple_call asm 2 get_slot_unalias)
+        (put_self asm)
+        (compile_simple_call asm 3 load_variable)
         return
         ))
     (if (== ty LocalVariable) (do
@@ -1915,7 +1937,8 @@
         (compile asm rhs)
         (put_push asm (node_arg_symbol v 0))
         (put_push asm global)
-        (compile_simple_call asm 3 overwrite_slot)
+        (put_self asm)
+        (compile_simple_call asm 4 assign_variable)
         return
         ))
 
@@ -1944,9 +1967,9 @@
     (if (== lty Slot)
         (return (compile_arithmetic_assign_slot asm lhs rhs fun))
         )
-    (if (|| (is_symbol lhs) (|| (== lty FieldRef) (== lty Ref)))
+    (if (|| (is_symbol lhs) (|| (== lty FieldRef) (== lty Ref))) (do
         (return (compile_assign asm (assign lhs (apply fun (list2 lhs rhs)))))
-        )
+        ))
 
     (throw (unknown_expression current_loc expr))
     ))

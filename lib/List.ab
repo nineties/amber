@@ -1,7 +1,7 @@
 # Copyright (C) 2014 nineties
-# $Id: List.ab 2014-02-12 10:53:27 nineties $
+# $Id: List.ab 2014-02-16 01:15:33 nineties $
 
-import Enumerable
+import Trait
 
 cons: Prim.cons
 car:  Prim.car
@@ -26,15 +26,15 @@ new: (gen @ Function) -> {
 
 add = Prim.list_append | add
 
-ListTrait: Prim.ListTrait with {
-    parent        = EnumerableTrait
+trait List {
+    extends(Trait.Collection)
+
     to_array()    = Prim.list_to_array(self)
     to_list()     = self
-    length        = alias(() -> Prim.list_length(self))
     size          = alias(() -> Prim.list_length(self))
-    empty?()      = self == []
-    at(i)         = Prim.list_at(self, i)
-    store(i, v)   = Prim.list_store(self, i, v)
+    empty?        = alias(() -> self == [])
+    get(i)        = Prim.list_at(self, i)
+    set(i, v)     = Prim.list_store(self, i, v)
     reverse()     = Prim.list_reverse(self)
     map(fun)      = Prim.list_map(fun, self)
     member?(v)    = Prim.list_member?(self, v)
@@ -42,18 +42,8 @@ ListTrait: Prim.ListTrait with {
     foldl1(fun)   = Prim.list_fold1(fun, self)
     foldr(fun, v) = Prim.list_foldr(fun, self, v)
     foldr1(fun)   = Prim.list_foldr1(fun, self)
-    each() = {
-        list: self
-        () -> {
-            if (list == [])
-                return nil
-            else {
-                v: car(list)
-                list = cdr(list)
-                v
-            }
-        }
-    }
 }
 
-export ListTrait cons car cdr
+Prim.set_parents(\List, Trait.List)
+
+export cons car cdr

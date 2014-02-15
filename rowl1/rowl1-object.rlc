@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-object.rlc 2014-02-15 18:07:09 nineties $
+; $Id: rowl1-object.rlc 2014-02-15 20:31:31 nineties $
 ;
 
 (import "rlvm-compile")
@@ -80,12 +80,12 @@
     (return (set_slot obj sym val))
     ))
 
-(export fun overwrite_slot (obj sym val) (
+(export fun set_slot_overwrite (obj sym val) (
     (var v (get_slot_norec_ obj sym))
     (while (== v @C_UNDEF) (do
         (= obj (get_parent obj))
         (if (|| (== obj @C_NIL) (== obj @C_UNDEF))
-            (throw (undefined_var current_loc sym))
+            (return @C_UNDEF)
             )
         (= v (get_slot_norec_ obj sym))
         ))
@@ -101,7 +101,7 @@
     (return @C_NIL)
     ))
 
-(fun get_slot_nocheck_noalias (obj sym) (
+(export fun get_slot_nocheck_noalias (obj sym) (
     (if (== sym parent) (return (get_parent obj)))
     (var tbl (wrtable_find slots sym))
     (if (== tbl @C_UNDEF) (return @C_UNDEF))
@@ -163,6 +163,7 @@
 
 (export fun set_special_parent (ty obj) (
     (array_set object parent_special ty obj)
+    (return obj)
     ))
 
 (export fun has_slot_p (obj sym) (
@@ -187,6 +188,33 @@
         )
     ))
 
+(fun set_parents (h parent) (
+    (if (== h Symbol) (return (set_special_parent @SymbolE parent))
+    (if (== h List) (return (set_special_parent @ListE parent))
+    (if (== h Array) (return (set_special_parent @ArrayE parent))
+    (if (== h Table) (return (set_special_parent @TableE parent))
+    (if (== h Assembler) (return (set_special_parent @AssemblerE parent))
+    (if (== h Bytecode) (return (set_special_parent @BytecodeE parent))
+    (if (== h Function) (return (set_special_parent @FunctionE parent))
+    (if (== h Function) (return (set_special_parent @BuiltinFunctionE parent))
+    (if (== h Function) (return (set_special_parent @BoundFunctionE parent))
+    (if (== h Function) (return (set_special_parent @ContinuationE parent))
+    (if (== h Alias) (return (set_special_parent @AliasE parent))
+    (if (== h InputFileStream) (return (set_special_parent @InputFileStreamE parent))
+    (if (== h OutputFileStream) (return (set_special_parent @OutputFileStreamE parent))
+    (if (== h InputStringStream) (return (set_special_parent @InputStringStreamE parent))
+    (if (== h OutputStringStream) (return (set_special_parent @OutputStringStreamE parent))
+    (if (== h Parser) (return (set_special_parent @ParserE parent))
+    (if (== h BigInt) (return (set_special_parent @BigIntE parent))
+    (if (== h Loc) (return (set_special_parent @LocE parent))
+    (if (== h Tuple) (return (set_special_parent @TupleE parent))
+    (if (== h Int) (return (set_special_parent @IntE parent))
+    (if (== h String) (return (set_special_parent @StringE parent))
+    (if (== h Float) (return (set_special_parent @FloatE parent))
+        ))))))))))))))))))))))
+    (throw (exception1 current_loc (string "Not builtin type") h))
+    ))
+
 (export fun setup_object (mod) (
     (add_function3 mod (to_sym "set_slot") DontCare symT DontCare set_slot 0)
     (add_function3 mod (to_sym "set_slot_fusion") DontCare symT DontCare set_slot_fusion 0)
@@ -198,6 +226,8 @@
 
     (add_function1 mod (to_sym "alias") funT alias_r 0)
     (add_function2 mod (to_sym "alias") funT funT alias_rw 0)
+
+    (add_function2 mod (to_sym "set_parents") symT DontCare set_parents 0)
     ))
 
     ))

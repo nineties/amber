@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-array.rlc 2014-02-15 18:37:56 nineties $
+; $Id: rowl1-array.rlc 2014-02-16 01:13:26 nineties $
 ;
 
 (import "rlvm-compile")
@@ -96,7 +96,8 @@
 
 (export fun array_at (ary i) (
     (var size (array_size ary))
-    (if (< i size) (return (array_get object (field_get ary 1) i)))
+    (if (&& (>= i 0) (< i size))
+        (return (array_get object (field_get ary 1) i)))
     (index_out_of_range ary i)
     ))
 
@@ -255,9 +256,6 @@
     ))
 
 (export fun setup_array (mod) (
-    (var trait (make_object1 (to_sym "Trait") (to_sym "Array")))
-    (set_slot mod (to_sym "ArrayTrait") trait)
-    (set_special_parent @ArrayE trait)
     (add_function0 mod (to_sym "array_new") ary_new 0)
     (add_function1 mod (to_sym "array_new_with_size") intT ary_new2 0)
     (add_function2 mod (to_sym "array_new_with_size_and_initial_value") intT DontCare ary_new3 0)
@@ -268,12 +266,12 @@
     (add_function1 mod (to_sym "array_size") arrayT ary_size 0)
     (add_function2 mod (to_sym "array_at") arrayT intT ary_at 0)
     (add_function3 mod (to_sym "array_store") arrayT intT DontCare ary_store 0)
-    (add_function2 mod (to_sym "array_push!") arrayT DontCare ary_push 0)
-    (add_function1 mod (to_sym "array_pop!") arrayT ary_pop 0)
+    (add_function2 mod (to_sym "array_push") arrayT DontCare ary_push 0)
+    (add_function1 mod (to_sym "array_pop") arrayT ary_pop 0)
 
-    (add_function1 mod (to_sym "array_reverse!") arrayT ary_reverse 0)
+    (add_function1 mod (to_sym "array_reverse") arrayT ary_reverse 0)
     (add_function2 mod (to_sym "array_append") arrayT arrayT ary_append 0)
-    (add_function2 mod (to_sym "array_map!") funT arrayT ary_map 0)
+    (add_function2 mod (to_sym "array_map") funT arrayT ary_map 0)
     (add_function3 mod (to_sym "array_foldl") funT DontCare arrayT ary_foldl 0)
     (add_function2 mod (to_sym "array_foldl1") funT arrayT ary_foldl1 0)
     (add_function3 mod (to_sym "array_foldr") funT arrayT DontCare ary_foldr 0)
