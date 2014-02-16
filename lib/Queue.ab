@@ -1,0 +1,55 @@
+# Copyright (C) 2014 nineties
+# $Id: Queue.ab 2014-02-16 11:13:46 nineties $
+
+import Collection
+
+trait Queue {
+    extends(Collection)
+    require(\enq, \deq, \front)
+
+    # Enqueue values from give Iterable object.
+    enq_values(seq): {
+        it: seq.iterator()
+        while (not it.end?) enq(it.next())
+        self
+    }
+    enq_values(seq, n @ Int): {
+        it: seq.iterator()
+        for (i in 1..n) enq(it.next())
+        self
+    }
+
+    # Deque `n' elements and return them as a list.
+    deq(n @ Int): {
+        v: deq()
+        cons(v, deq(n-1))
+    }
+    deq(0): []
+
+    # Drop elements.
+    drop(): deq(); self
+    drop(n @ Int): {
+        for (i in 1..n) deq()
+        self
+    }
+
+    # Remove all elements from the queue.
+    clear(): while (not empty?) pop()
+
+    # Drop elements.
+    drop(): deq(); self
+    drop(n @ Int): {
+        for (i in 1..n) drop()
+        self
+    }
+
+    # Reverse the order of elements. O(n).
+    reverse(): {
+        stack: Array.new()
+        while (not self.empty?)
+            stack.push_back(self.deq())
+        while (not stack.empty?)
+            self.enq(stack.pop_back())
+        self
+    }
+}

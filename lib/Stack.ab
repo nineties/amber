@@ -1,0 +1,58 @@
+# Copyright (C) 2014 nineties
+# $Id: Stack.ab 2014-02-16 11:13:35 nineties $
+
+import Collection
+
+trait Stack {
+    extends(Collection)
+    require(\push, \pop, \top)
+
+    # Push values from given Iterable object.
+    push_values(seq): {
+        it: seq.iterator()
+        while (not it.end?) push(it.next())
+        self
+    }
+    push_values(seq, n @ Int): {
+        it: seq.iterator()
+        for (i in 1..n) push(it.next())
+        self
+    }
+
+    # Remove `n' elements and return them as a list.
+    pop(n @ Int): {
+        v: pop()
+        cons(v, pop(n-1))
+    }
+    pop(0): []
+
+    # Drop elements.
+    drop(): pop(); self
+    drop(n @ Int): {
+        for (i in 1..n) pop()
+        self
+    }
+
+    # Remove all elements from the stack.
+    clear(): {
+        while (not empty?) pop()
+        self
+    }
+
+    # Duplicate `top'.
+    dup(): push(top())
+
+    # Duplicate `top' `n' times.
+    dup(n @ Int): {
+        for (i in 1..n) dup()
+        self
+    }
+
+    # Rotate `n` elements by sliding `m' elements.
+    rotate(n @ Int, m @Int): {
+        tmp: Array.new(n)
+        for (i in 0..n-1) tmp[(i + m) % n] = pop()
+        for (i in 1..n) push(tmp[n-i])
+        self
+    }
+}

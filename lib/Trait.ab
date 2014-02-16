@@ -1,0 +1,89 @@
+# Copyright (C) 2014 nineties
+# $Id: Trait.ab 2014-02-16 02:55:15 nineties $
+
+TraitOfTraits: `Trait{Trait} with {
+    # Import methods from given trait.
+    extends(...):
+        throw `LogicError{!LOCATION,
+            "Traits can exntend Trait{...} objects"}
+
+    extends(from @ Trait{from_name @ Symbol}): {
+        to: self
+
+        if (from.has_slot?(\before_extend))
+            from.before_extend(to)
+
+        # When A extends B, obj.B? == true if `obj' is a child of A.
+        name?: Prim.string_to_symbol(
+                Prim.string_add(Prim.symbol_to_string(from_name), "?"))
+        to.set(name?, true)
+
+        # Copy slots from `from' to `to'.
+        Prim.list_foreach(
+            v -> {
+                to.set(v, from.get(v, \unalias))
+                to.required_slots = Prim.list_insert_unique(v, to.required_slots)
+            },
+            from.required_slots)
+        Prim.list_foreach(
+            v -> {
+                to.set(v, from.get(v, \unalias), \fusion)
+                to.exports = Prim.list_insert_unique(v, to.exports)
+            },
+            from.exports)
+
+        if (from.has_slot?(\after_extend))
+            from.after_extend(to)
+    }
+
+    # Add var to required_slots.
+    require(vars...): {
+        t : self
+        Prim.list_foreach(v -> t.require(v), vars);
+    }
+    require(var @ Symbol): {
+        t: self
+        t.required_slots = Prim.list_insert_unique(var, t.required_slots)
+        t.set(var, alias(() -> {
+            throw `MissingRequiredSlot{!LOCATION, !self, !var}
+            }))
+    }
+}
+
+new(name @ Symbol): {
+    # When create trat A, slot A? is defined.
+    name?: Prim.string_to_symbol(
+            Prim.string_add(Prim.symbol_to_string(name), "?"))
+
+    nil.set(name?, false)
+
+    `Trait{!name} with {
+        parent = TraitOfTraits
+    
+        # Names of slots which will be exported to other extender traits.
+        exports = []
+    
+        # Names of slots which extender traits must have.
+        required_slots = []
+    
+        set(name?, true)
+    }
+}
+
+# We recommend using `Trait' module as the namespace for traits.
+# Definition of new trait `A' in namespace `Trait' can be written as
+#
+# Trait.A: Trait.new(\A) with { ... slots ... }
+#
+# Here, we provide syntax sugar for this.
+#
+#   trait A { ... slots ... }
+
+Syntax.add_reserved_symbol(\trait)
+stmt ::= trait symbol slot_assign {
+            `{
+                if (not Prim.has_slot?(Trait, \!$1))
+                    Define{Slot{Trait, !$1}, Trait.new(\!$1)}
+                WithSlots{Slot{Trait, !$1}, !$2}
+            }
+         } 
