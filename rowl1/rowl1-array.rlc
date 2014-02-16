@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-array.rlc 2014-02-16 01:13:26 nineties $
+; $Id: rowl1-array.rlc 2014-02-16 23:29:06 nineties $
 ;
 
 (import "rlvm-compile")
@@ -196,6 +196,19 @@
     (return (variant @ArrayE 1 new new_size new_size))
     ))
 
+(fun ary_append_bang (ary1 ary2) (
+    (var size1 (field_get ary1 2))
+    (var size2 (field_get ary2 2))
+    (var new_size (+ size1 size2))
+    (array_resize ary1 new_size)
+    (var buf1  (field_get ary1 1))
+    (var buf2  (field_get ary2 1))
+    (for i 0 size2 
+        (array_set object buf1 (+ i size1) (array_get object buf2 i))
+        )
+    (return ary1)
+    ))
+
 (fun ary_map (f ary) (
     (var size (field_get ary 2))
     (var buf  (field_get ary 1))
@@ -271,6 +284,7 @@
 
     (add_function1 mod (to_sym "array_reverse") arrayT ary_reverse 0)
     (add_function2 mod (to_sym "array_append") arrayT arrayT ary_append 0)
+    (add_function2 mod (to_sym "array_append!") arrayT arrayT ary_append_bang 0)
     (add_function2 mod (to_sym "array_map") funT arrayT ary_map 0)
     (add_function3 mod (to_sym "array_foldl") funT DontCare arrayT ary_foldl 0)
     (add_function2 mod (to_sym "array_foldl1") funT arrayT ary_foldl1 0)

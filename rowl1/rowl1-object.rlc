@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-object.rlc 2014-02-15 20:31:31 nineties $
+; $Id: rowl1-object.rlc 2014-02-16 16:42:41 nineties $
 ;
 
 (import "rlvm-compile")
@@ -38,14 +38,14 @@
     ))
 
 (export fun set_slot (obj sym val) (
+    (return (set_slot_ obj obj sym val))
+    ))
+
+(fun set_slot_ (self obj sym val) (
     (var v (get_slot_nocheck_noalias obj sym))
     (if (== (node_type v) @AliasE) (do
         (var f (field_get v 2))
-        (if f
-            (return (runcode_with_self obj (get_bytecode f) val))
-            ;(throw (logic_error2 current_loc
-            ;    (string "Immutable Slot") obj sym))
-            )
+        (if f (return (runcode_with_self self (get_bytecode f) val)))
         ))
     (var tbl (wrtable_find slots sym))
     (if (== tbl @C_UNDEF) (do
@@ -71,7 +71,7 @@
     (if (&& (is_function f) (is_function val))
         (return (set_slot obj sym (fusion_function val f)))
         )
-    (return (set_slot obj sym val))
+r   (return (set_slot obj sym val))
     ))
 
 (export fun set_undef_slot (obj sym val) (
@@ -81,15 +81,16 @@
     ))
 
 (export fun set_slot_overwrite (obj sym val) (
-    (var v (get_slot_norec_ obj sym))
+    (var self obj)
+    (var v (get_slot_norec_ self obj sym))
     (while (== v @C_UNDEF) (do
         (= obj (get_parent obj))
         (if (|| (== obj @C_NIL) (== obj @C_UNDEF))
             (return @C_UNDEF)
             )
-        (= v (get_slot_norec_ obj sym))
+        (= v (get_slot_norec_ self obj sym))
         ))
-    (return (set_slot obj sym val))
+    (return (set_slot_ self obj sym val))
     ))
 
 (fun get_parent (obj) (
@@ -144,19 +145,19 @@
     (return v)
     ))
 
-(fun get_slot_norec_ (obj sym) (
+(fun get_slot_norec_ (self obj sym) (
     (if (== sym parent) (return (get_parent obj)))
     (var tbl (wrtable_find slots sym))
     (if (== tbl @C_UNDEF) (return @C_UNDEF))
     (var v (wrtable_find tbl obj))
     (if (&& (== (node_type v) @AliasE) (field_get v 1))
-        (return (runcode_with_self obj (get_bytecode (field_get v 1))))
+        (return (runcode_with_self self (get_bytecode (field_get v 1))))
         )
     (return v)
     ))
 
 (export fun get_slot_norec (obj sym) (
-    (var v (get_slot_norec_ obj sym))
+    (var v (get_slot_norec_ obj obj sym))
     (if (== v @C_UNDEF) (return @C_NIL))
     (return v)
     ))
@@ -167,7 +168,7 @@
     ))
 
 (export fun has_slot_p (obj sym) (
-    (if (!= (get_slot_norec_ obj sym) @C_UNDEF)
+    (if (!= (get_slot_norec_ obj obj sym) @C_UNDEF)
         (return @C_TRUE)
         (return @C_FALSE)
         )

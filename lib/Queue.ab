@@ -1,35 +1,35 @@
 # Copyright (C) 2014 nineties
-# $Id: Queue.ab 2014-02-16 11:13:46 nineties $
+# $Id: Queue.ab 2014-02-16 17:43:22 nineties $
 
 import Collection
 
 trait Queue {
-    extends(Collection)
-    require(\enq, \deq, \front)
+    extend Collection
+    require enqueue dequeue front
 
     # Enqueue values from give Iterable object.
     enq_values(seq): {
         it: seq.iterator()
-        while (not it.end?) enq(it.next())
+        while (not it.end?) enqueue(it.next())
         self
     }
     enq_values(seq, n @ Int): {
         it: seq.iterator()
-        for (i in 1..n) enq(it.next())
+        for (i in 1..n) enqueue(it.next())
         self
     }
 
     # Deque `n' elements and return them as a list.
-    deq(n @ Int): {
-        v: deq()
-        cons(v, deq(n-1))
+    dequeue(n @ Int): {
+        v: dequeue()
+        cons(v, dequeue(n-1))
     }
-    deq(0): []
+    dequeue(0): []
 
     # Drop elements.
-    drop(): deq(); self
+    drop(): dequeue(); self
     drop(n @ Int): {
-        for (i in 1..n) deq()
+        for (i in 1..n) dequeue()
         self
     }
 
@@ -37,7 +37,7 @@ trait Queue {
     clear(): while (not empty?) pop()
 
     # Drop elements.
-    drop(): deq(); self
+    drop(): dequeue(); self
     drop(n @ Int): {
         for (i in 1..n) drop()
         self
@@ -47,9 +47,9 @@ trait Queue {
     reverse(): {
         stack: Array.new()
         while (not self.empty?)
-            stack.push_back(self.deq())
+            stack.push_back(self.dequeue())
         while (not stack.empty?)
-            self.enq(stack.pop_back())
+            self.enqueue(stack.pop_back())
         self
     }
 }

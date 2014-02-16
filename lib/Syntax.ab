@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-02-16 02:55:04 nineties $ "
+" $Id: Syntax.ab 2014-02-16 18:53:59 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -151,7 +151,7 @@ Define{Slot{Syntax, reserved_symbols}, List{
 }}
 
 ### Expressions
-block_body ::= aligned(located(stmt)) { QuasiQuote{Block{Unquote{node0}}} }
+block_body ::= aligned(stmt) { QuasiQuote{Block{Unquote{node0}}} }
 
 primary_block ::= <<multiline>> "{" block_body "}" { node1 }
 
@@ -279,10 +279,12 @@ multi_lambda_expr
         { `Fusion{!node0, !node2} }
       | lambda_expr
 
+slot_assign_stmt ::= stmt
+
 slot_assign
-    ::= <<multiline>> "{" delimited1(stmt, ",") "}" { node1 }
-      | <<multiline>> "{" aligned(stmt) "}" { node1 }
-      | stmt { List{node0} }
+    ::= <<multiline>> "{" delimited1(slot_assign_stmt, ",") "}" { node1 }
+      | <<multiline>> "{" aligned(slot_assign_stmt) "}" { node1 }
+      | slot_assign_stmt { List{node0} }
 
 continuation_expr
     ::= reset multi_lambda_expr { `Reset{!node1} }
@@ -487,7 +489,7 @@ macro(ArithAssign{QuoteSyntax{x[idxs...]}, e, op}) = {
     `Block{
         !Prim.list_append(
             Prim.cons(stmt1, stmt2),
-            [`Assign{Subscript{!y, !ts}, Apply{!op, [Subscript{!y, !ts}, !e]}}]
+            [`Assign{Subscript{!y, !ts}, Send{Subscript{!y, !ts}, !op, [!e]}}]
         )
     }
 }

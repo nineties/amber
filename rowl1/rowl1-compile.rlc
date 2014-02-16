@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-02-16 00:51:53 nineties $
+; $Id: rowl1-compile.rlc 2014-02-16 18:56:09 nineties $
 ;
 
 (import "rlvm-compile")
@@ -63,14 +63,6 @@
     (var v (symtable_find variables sym))
     (if v (return v))
     (return (make_gvar sym))
-    ))
-
-(fun lookup_symbol_check (sym) (
-    (var v (symtable_find variables sym))
-    (if v (return v))
-    (= v (get_slot_nocheck global sym))
-    (if (!= v @C_NIL) (return (make_gvar sym)))
-    (throw (undefined_var current_loc sym))
     ))
 
 (fun lookup_symbol_current_scope (sym) (
@@ -1931,7 +1923,7 @@
         (return (compile_multi_assign asm lhs rhs))
         )
 
-    (var v (lookup_symbol_check lhs))
+    (var v (lookup_symbol lhs))
     (var vty (node_head v))
     (if (== vty GlobalVariable) (do
         (compile asm rhs)
@@ -1968,7 +1960,7 @@
         (return (compile_arithmetic_assign_slot asm lhs rhs fun))
         )
     (if (|| (is_symbol lhs) (|| (== lty FieldRef) (== lty Ref))) (do
-        (return (compile_assign asm (assign lhs (apply fun (list2 lhs rhs)))))
+        (return (compile_assign asm (assign lhs (send lhs fun (list1 rhs)))))
         ))
 
     (throw (unknown_expression current_loc expr))
@@ -1990,7 +1982,7 @@
     (put_push asm fun)
     (put_push asm current_loc)
     (compile_simple_call asm 3 compile_matching)
-    (put_jcall asm (* 4 2) @FALSE)  ; val; obj
+    (put_jcall asm 4 @TRUE)  ; val; obj
     (put_push asm sym)  ; sym; val; obj
     (compile_simple_call asm 3 set_slot_roll)
     ))

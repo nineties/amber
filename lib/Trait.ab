@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: Trait.ab 2014-02-16 02:55:15 nineties $
+# $Id: Trait.ab 2014-02-16 13:53:52 nineties $
 
 TraitOfTraits: `Trait{Trait} with {
     # Import methods from given trait.
@@ -22,9 +22,9 @@ TraitOfTraits: `Trait{Trait} with {
         Prim.list_foreach(
             v -> {
                 to.set(v, from.get(v, \unalias))
-                to.required_slots = Prim.list_insert_unique(v, to.required_slots)
+                to.requirements = Prim.list_insert_unique(v, to.requirements)
             },
-            from.required_slots)
+            from.requirements)
         Prim.list_foreach(
             v -> {
                 to.set(v, from.get(v, \unalias), \fusion)
@@ -36,16 +36,16 @@ TraitOfTraits: `Trait{Trait} with {
             from.after_extend(to)
     }
 
-    # Add var to required_slots.
-    require(vars...): {
+    # Add var to requirements.
+    add_required_slots(vars): {
         t : self
-        Prim.list_foreach(v -> t.require(v), vars);
+        Prim.list_foreach(v -> t.add_required_slots(v), vars);
     }
-    require(var @ Symbol): {
+    add_required_slots(var @ Symbol): {
         t: self
-        t.required_slots = Prim.list_insert_unique(var, t.required_slots)
+        t.requirements = Prim.list_insert_unique(var, t.requirements)
         t.set(var, alias(() -> {
-            throw `MissingRequiredSlot{!LOCATION, !self, !var}
+                throw `MissingRequiredSlot{!LOCATION, !self, !var}
             }))
     }
 }
@@ -64,7 +64,7 @@ new(name @ Symbol): {
         exports = []
     
         # Names of slots which extender traits must have.
-        required_slots = []
+        requirements = []
     
         set(name?, true)
     }
@@ -80,6 +80,9 @@ new(name @ Symbol): {
 #   trait A { ... slots ... }
 
 Syntax.add_reserved_symbol(\trait)
+Syntax.add_reserved_symbol(\require)
+Syntax.add_reserved_symbol(\extend)
+
 stmt ::= trait symbol slot_assign {
             `{
                 if (not Prim.has_slot?(Trait, \!$1))
@@ -87,3 +90,5 @@ stmt ::= trait symbol slot_assign {
                 WithSlots{Slot{Trait, !$1}, !$2}
             }
          } 
+slot_assign_stmt ::= require symbol+     { `add_required_slots(\!$1) }
+                   | extend postfix_expr { `extends(!$1) }
