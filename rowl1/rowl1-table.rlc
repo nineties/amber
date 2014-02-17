@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-table.rlc 2014-02-17 00:09:31 nineties $
+; $Id: rowl1-table.rlc 2014-02-17 21:28:09 nineties $
 ;
 
 (import "rlvm-compile")
@@ -19,7 +19,6 @@
 (import "rowl1-pprint")
 
 (extern object global)
-(extern object current_loc)
 (extern fun tuple2)
 
 (array int prime_numbers (
@@ -61,8 +60,7 @@
 (fun rehash (tbl) (
     (var num_ent (field_get tbl 5))
     (var new_size (array_get int prime_numbers (bsr num_ent)))
-    (if (! new_size) (throw
-        (exception current_loc (string "rehash: too many entries"))))
+    (if (! new_size) (throw (exception (string "rehash: too many entries"))))
     (var bucket (allocate_array new_size))
     (var entry (field_get tbl 4))
     (while entry (do
@@ -124,7 +122,7 @@
         (-= idx 1)
         (= entry (field_get entry 3))
         ))
-    (throw (out_of_range current_loc tbl (box idx)))
+    (throw (out_of_range tbl (box idx)))
     ))
 
 (export fun table_at (tbl key) (
@@ -185,7 +183,7 @@
     (while list (do
         (var ent (car list))
         (if (|| (!= (node_head ent) Tuple) (!= (node_size ent) 2))
-            (throw (invalid_argument current_loc (string "Arguments of Table must be list of pairs") orig))
+            (throw (invalid_argument (string "Arguments of Table must be list of pairs") orig))
             )
         (table_store tbl (node_arg ent 0) (node_arg ent 1))
         (= list (cdr list))

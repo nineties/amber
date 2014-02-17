@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-object.rlc 2014-02-17 16:09:00 nineties $
+; $Id: rowl1-object.rlc 2014-02-17 21:26:55 nineties $
 ;
 
 (import "rlvm-compile")
@@ -14,8 +14,6 @@
 (import "rowl1-node")
 (import "rowl1-compile")
 (import "rowl1-error")
-
-(extern object current_loc)
 
 (var slots (make_wrtable))
 (var parent (to_sym "parent"))
@@ -131,16 +129,14 @@ r   (return (set_slot obj sym val))
     (if (&& (== (node_type v) @AliasE) (field_get v 1))
         (return (runcode_with_self obj (get_bytecode (field_get v 1))))
         )
-    (if (== v @C_UNDEF)
-        (throw (undefined_var current_loc sym))
-        )
+    (if (== v @C_UNDEF) (throw (undefined_var sym)))
     (return v)
     ))
 
 (export fun get_slot_unalias (obj sym) (
     (var v (get_slot_nocheck_noalias obj sym))
     (if (== v @C_UNDEF)
-        (throw (undefined_var current_loc sym))
+        (throw (undefined_var sym))
         )
     (return v)
     ))
@@ -232,7 +228,7 @@ r   (return (set_slot obj sym val))
     (if (== h String) (return (set_special_parent @StringE parent))
     (if (== h Float) (return (set_special_parent @FloatE parent))
         ))))))))))))))))))))))
-    (throw (exception1 current_loc (string "Not builtin type") h))
+    (throw (exception1 (string "Not builtin type") h))
     ))
 
 (export fun setup_object (mod) (

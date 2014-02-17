@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-bigint.rlc 2014-02-15 22:31:23 nineties $
+; $Id: rowl1-bigint.rlc 2014-02-17 21:27:26 nineties $
 ;
 
 (import "rlvm-compile")
@@ -18,7 +18,6 @@
 (import "rowl1-assemble")
 (import "rowl1-error")
 
-(extern object current_loc)
 (extern fun tuple2)
 
 (export fun pp_bint (ochan n) (
@@ -120,7 +119,7 @@
 ; u = u/v and returns u%v (signs are ignored)
 (fun bigdiv_nat (u v) (
     (if (bint_is_zero v)
-        (throw (division_by_zero current_loc))
+        (throw (division_by_zero))
         )
     (var c (bigcmp u v))
     (if (== c 0) (do
@@ -363,7 +362,6 @@
             (var c (array_get char str p))
             (if (|| (< c '0') (< '9' c))
                 (throw (value_error
-                    current_loc
                     (string "Invalid integer format")
                     (string str)))
                 )
@@ -579,7 +577,7 @@
     (= a (to_bint_copy a))
     (= b (norm b))
     (if (== (node_type b) @BigIntE)
-        (throw (invalid_argument current_loc (string "shift length is too long") b))
+        (throw (invalid_argument (string "shift length is too long") b))
         )
     (= b (unbox b))
     (if (> b 0)
@@ -593,7 +591,7 @@
     (= a (to_bint_copy a))
     (= b (norm b))
     (if (== (node_type b) @BigIntE)
-        (throw (invalid_argument current_loc (string "shift length is too long") b))
+        (throw (invalid_argument (string "shift length is too long") b))
         )
     (= b (unbox b))
     (if (> b 0)
@@ -642,10 +640,10 @@
 (export fun bint_pow (a n) (
     (= n (norm n))
     (if (== (node_type n) @BigIntE)
-        (throw (invalid_argument current_loc (string "exponent is too big") n))
+        (throw (invalid_argument (string "exponent is too big") n))
         )
     (if (== n 1) (return (box 1))) ; 1 == box(0)
-    (if (< n 0) (throw (invalid_argument current_loc (string "positive integer is required") n)))
+    (if (< n 0) (throw (invalid_argument (string "positive integer is required") n)))
 
     (var v (int_to_bint 1))
     (= a (to_bint a))
@@ -665,20 +663,20 @@
 (export fun bint_powmod (a n m) (
     (= m (norm m))
     (if (== m 1) ; box(0) == 1
-        (throw (division_by_zero current_loc))
+        (throw (division_by_zero))
         )
     (if (|| (== m 3) (== m -1)) ; box(1) == 3, box(-1) == -1
         (return (box 0))
         )
     (= n (norm n))
     (if (== (node_type n) @BigIntE)
-        (throw (invalid_argument current_loc (string "exponent is too big") n))
+        (throw (invalid_argument (string "exponent is too big") n))
         )
     (if (== n 1) ; box(0) == 1
         (return (box 1))
         )
 
-    (if (< n 0) (throw (invalid_argument current_loc (string "positive integer is required") n)))
+    (if (< n 0) (throw (invalid_argument (string "positive integer is required") n)))
 
     (var v (int_to_bint 1))
     (= a (to_bint a))

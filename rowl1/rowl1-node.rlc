@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2014-02-16 18:51:43 nineties $
+; $Id: rowl1-node.rlc 2014-02-17 21:24:09 nineties $
 ;
 
 (import "rlvm-compile")
@@ -11,8 +11,6 @@
 (compile `object `(
 
 (import "rowl1-util")
-
-(extern object current_loc)
 
 ; symbol table
 (var symbol_table (init_symbol_table (make_idtable)))
@@ -192,10 +190,7 @@
 
     (return (to_sym name))
     (label to_sym_error)
-    (throw (invalid_argument current_loc
-        (string "invalid identifier string")
-        name
-        ))
+    (throw (invalid_argument (string "invalid identifier string") name))
     ))
 
 (export fun is_builtin_sym (sym) (
@@ -385,7 +380,7 @@
 (extern fun array_restof)
 (export fun node_restof (expr i) (
     (if (is_atom expr)
-        (throw (out_of_range current_loc expr (box i)))
+        (throw (out_of_range expr (box i)))
         )
     (if (is_list expr) (do
         (for j 0 i (= expr (cdr expr)))
@@ -406,7 +401,7 @@
 (extern fun table_at_by_idx)
 (export fun node_arg (expr idx) (
     (if (is_atom expr) 
-        (throw (out_of_range current_loc expr (box idx)))
+        (throw (out_of_range expr (box idx)))
         )
     (if (is_list expr)  (return (list_at_check expr idx)))
     (if (is_tuple expr) (return (tuple_at expr idx)))
@@ -414,13 +409,13 @@
     (if (is_table expr) (return (table_at_by_idx expr idx)))
 
     (if (>= idx (expr_size expr))
-        (throw (out_of_range current_loc expr (box idx))))
+        (throw (out_of_range expr (box idx))))
     (return (array_get object expr (+ idx 1)))
     ))
 
 (export fun check_type (arg type) (
     (if (!= (node_type arg) type)
-        (throw (type_error current_loc (type_string type arg) arg))
+        (throw (type_error (type_string type arg) arg))
         )
     ))
 
@@ -452,13 +447,13 @@
 (extern fun array_store)
 (export fun node_arg_set (expr idx val) (
     (if (is_atom expr)
-        (throw (invalid_argument current_loc
+        (throw (invalid_argument
         (string "Can't modify fields of builtin object") expr)))
     (if (is_list expr)  (return (list_store_check expr idx val)))
     (if (is_tuple expr) (return (tuple_store expr idx val)))
     (if (is_array expr) (return (array_store expr idx val)))
     (var n (expr_size expr))
-    (if (>= idx n) (throw (out_of_range current_loc expr (box idx))))
+    (if (>= idx n) (throw (out_of_range expr (box idx))))
     (array_set object expr (+ idx 1) val)
     ))
 
@@ -517,10 +512,10 @@
 (extern fun list_to_ary)
 (export fun make_object (head args) (
     (if (!= (node_type head) @SymbolE)
-        (throw (exception current_loc (string "the 1st argument of MakeObject must be a Symbol")))
+        (throw (exception (string "the 1st argument of MakeObject must be a Symbol")))
         )
     (if (!= (node_type args) @ListE)
-        (throw (exception current_loc (string "the 2nd argument of MakeObject must be a List")))
+        (throw (exception (string "the 2nd argument of MakeObject must be a List")))
         )
 
     (if (is_builtin_sym head)

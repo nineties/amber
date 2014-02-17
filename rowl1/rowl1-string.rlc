@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-string.rlc 2014-02-15 22:31:01 nineties $
+; $Id: rowl1-string.rlc 2014-02-17 21:29:20 nineties $
 ;
 
 (import "rlvm-compile")
@@ -17,7 +17,6 @@
 (import "rowl1-compile")
 (import "rowl1-error")
 
-(extern object current_loc)
 (extern fun ary_new)
 (extern fun ary_push)
 
@@ -54,10 +53,7 @@
     (while list_ (do
         (var s (car list_))
         (if (!= (node_type s) @StringE)
-            (throw (invalid_argument current_loc
-                (string "join requires list of strings")
-                list))
-            )
+            (throw (invalid_argument (string "join requires list of strings") list)))
         (+= len (strlen s))
         (+= n 1)
         (= list_ (cdr list_))
@@ -128,7 +124,7 @@
 
 (fun s_code (s) (
     (var len (strlen s))
-    (if (!= len 1) (throw (invalid_argument current_loc
+    (if (!= len 1) (throw (invalid_argument
         (string "`code' requires a string of length 1")
         s)))
     (return (box (array_get char s 0)))
@@ -136,7 +132,7 @@
 
 (fun s_char (i) (
     (= i (unbox i))
-    (if (& i 0xffffff00) (throw (invalid_argument current_loc
+    (if (& i 0xffffff00) (throw (invalid_argument
         (string "`char' requires number between 0 and 255")
         (box i))))
     (return (ctos i))
@@ -147,19 +143,19 @@
     (var len (strlen s))
     (if (< i 0) (+= i len))
     (if (|| (>= i len) (< i 0))
-        (throw (out_of_range current_loc s (box i))))
+        (throw (out_of_range s (box i))))
     (return (ctos (array_get char s i)))
     ))
 
 (fun s_store (s i c) (
     (if (!= (strlen c) 1)
-        (throw (invalid_argument current_loc (string "2nd argument of store for String must be one character") c))
+        (throw (invalid_argument (string "2nd argument of store for String must be one character") c))
         )
     (= i (unbox i))
     (var len (strlen s))
     (if (< i 0) (+= i len))
     (if (|| (>= i len) (< i 0))
-        (throw (out_of_range current_loc s (box i))))
+        (throw (out_of_range s (box i))))
     (array_set char s i (array_get char c 0))
     (return c)
     ))
@@ -177,10 +173,10 @@
     (if (< b 0) (+= b len))
     (if (< e 0) (+= e len))
     (if (> b e)
-        (throw (invalid_argument current_loc (string "Not valid range") r))
+        (throw (invalid_argument (string "Not valid range") r))
         )
     (if (|| (>= e len) (< b 0))
-        (throw (out_of_range current_loc s r))
+        (throw (out_of_range s r))
         )
     (return (substr s b e))
     ))

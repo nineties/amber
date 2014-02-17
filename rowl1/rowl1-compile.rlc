@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-02-16 18:56:09 nineties $
+; $Id: rowl1-compile.rlc 2014-02-17 22:22:14 nineties $
 ;
 
 (import "rlvm-compile")
@@ -34,7 +34,6 @@
 
 (extern object global)
 (extern object variables)
-(extern object current_loc)
 (extern fun set_loc)
 
 (extern fun set_slot)
@@ -195,7 +194,7 @@
             (if (symtable_find tbl expr)
                 (do
                     (if (&& check (symtable_find_local tbl expr))
-                        (throw (redefined_var current_loc expr))
+                        (throw (redefined_var expr))
                         )
                     (var new_sym (to_unique_sym (symbol_name expr)))
                     (symtable_add tbl expr new_sym)
@@ -449,8 +448,8 @@
     ))
 
 (export fun fusion_function (fun1 fun2) (
-    (if (! (is_function fun1)) (throw (type_error current_loc (string "function") fun1)))
-    (if (! (is_function fun2)) (throw (type_error current_loc (string "function") fun2)))
+    (if (! (is_function fun1)) (throw (type_error (string "function") fun1)))
+    (if (! (is_function fun2)) (throw (type_error (string "function") fun2)))
     (return (variant @BoundFunctionE 3 0 fun1 fun2))
     ))
 
@@ -640,19 +639,19 @@
 (export fun lookup_func (mod sym) (
     (var func (get_slot_nocheck mod sym))
     (if (== func @C_NIL) (do
-        (throw (undefined_fun current_loc sym))
+        (throw (undefined_fun sym))
         ))
-    (return (compile_matching current_loc sym func))
+    (return (compile_matching sym func))
     ))
 
 (export fun lookup_func_nocheck (mod sym) (
     (var func (get_slot_nocheck mod sym))
     (if (== func @C_NIL) (return 0))
-    (return (compile_matching current_loc sym func))
+    (return (compile_matching sym func))
     ))
 
 (export fun get_bytecode (func) (
-    (return (compile_matching current_loc func func))
+    (return (compile_matching func func))
     ))
 
 (var closure_frame null)
@@ -705,14 +704,12 @@
     ))
 
 (fun topscope_only (asm expr) (
-    (throw (unexpected_error current_loc
-        (string "Allowed only in top-level scope")
-        expr))
+    (throw (unexpected_error (string "Allowed only in top-level scope") expr))
     ))
 
 (fun check_arg_size (name size expr) (
     (if (!= (node_size expr) size)
-        (throw (type_error current_loc
+        (throw (type_error 
             (strcat "expression with "
             (strcat (itos size) " arguments"))
             expr
@@ -721,12 +718,12 @@
     ))
 
 (fun compile_error (asm expr) (
-    (throw (unknown_expression current_loc expr))
+    (throw (unknown_expression expr))
     ))
 
 (fun define_slot (obj sym val) (
     (if (!= (get_slot_norec obj sym) @C_NIL)
-        (throw (redefined_slot current_loc obj sym))
+        (throw (redefined_slot obj sym))
         )
     (return (set_slot obj sym val))
     ))
@@ -764,7 +761,6 @@
     ))
 
 (fun compile_located (asm expr) (
-    (set_loc (node_arg expr 0))
     (compile asm (node_arg expr 1))
     ))
 
@@ -927,15 +923,14 @@
 
 (fun setup_args (tbl args alias) (
     (if (!= (node_head args) @List)
-        (throw (type_error current_loc (string "a list") args)
+        (throw (type_error (string "a list") args)
         ))
     (var idx 0)
     (while args (do
         (var arg (car args))
         (if (== (node_head arg) Rest) (do
             (if (cdr args)
-                (throw (exception current_loc (string
-                        "\"...\" must be the last argument")))
+                (throw (exception (string "\"...\" must be the last argument")))
                 )
             (if (== (node_size arg) 0) return)
             (var v (node_arg_symbol arg 0))
@@ -973,8 +968,7 @@
             (var a (car arg))
             (if (== (node_head a) Rest) (do
                 (if (cdr arg)
-                    (throw (exception current_loc (string
-                        "\"...\" must be the last argument")))
+                    (throw (exception (string "\"...\" must be the last argument")))
                     )
                 (if (== (node_size a) 0) return)
                 (var v (node_arg_symbol a 0))
@@ -998,8 +992,7 @@
         (var a (node_arg arg i))
         (if (== (node_head a) Rest) (do
             (if (!= (+ i 1) (node_size arg))
-                (throw (exception current_loc (string
-                        "\"...\" must be the last argument")))
+                (throw (exception (string "\"...\" must be the last argument")))
                 )
             (if (== (node_size a) 0) return)
             (var v (node_arg_symbol a 0))
@@ -1054,7 +1047,7 @@
     (if (!= v @C_UNDEF) (return v))
     (= v (set_slot_overwrite global sym val))
     (if (== v @C_UNDEF)
-        (throw (undefined_var current_loc sym))
+        (throw (undefined_var sym))
         )
     (return v)
     ))
@@ -1073,7 +1066,7 @@
     (if (!= func @C_NIL)
         (if (&& (is_function func) (is_function newfunc))
             (return (set_slot mod sym (fusion_function newfunc func)))
-            (throw (redefined_slot current_loc mod sym))
+            (throw (redefined_slot mod sym))
             )
         (return (set_slot mod sym newfunc))
         )
@@ -1105,10 +1098,10 @@
         (return (compile_define_global_function asm lhs rhs))
         )
     (if (!= (node_size expr) 2)
-        (throw (unknown_expression current_loc expr))
+        (throw (unknown_expression expr))
         )
     (if (== ty Apply)
-        (throw (unknown_expression current_loc expr))
+        (throw (unknown_expression expr))
     (if (== ty Symbol)
         (return (compile_define_global_variable asm lhs rhs))
     (if (== ty Slot)
@@ -1127,11 +1120,11 @@
         (return (compile_define_local_function asm lhs rhs))
         )
     (if (!= (node_size expr) 2)
-        (throw (unknown_expression current_loc expr))
+        (throw (unknown_expression expr))
         )
     (var ty (node_head lhs))
     (if (== ty Apply)
-        (return (unknown_expression current_loc expr))
+        (return (unknown_expression expr))
     (if (|| (== ty Symbol) (== ty Ref))
         (return (compile_define_local_variable asm lhs rhs))
     (if (== ty Slot)
@@ -1228,7 +1221,7 @@
         ))
 
     (if (&& (!= ty Symbol) (!= ty Ref))
-        (throw (unknown_expression current_loc (make_object2 Define lhs lam))) 
+        (throw (unknown_expression (make_object2 Define lhs lam))) 
         )
 
     (if (symtable_find_local variables (variable_name lhs))
@@ -1251,26 +1244,21 @@
 
 (fun check_variable (sym) (
     (if (|| (!= (node_type sym) @SymbolE) (is_special sym))
-        (throw (invalid_varname current_loc sym))
+        (throw (invalid_varname sym))
         )
     (if (== (symtable_depth variables) 0)
         (if (== (get_slot_nocheck global sym) @C_NIL) return)
         (if (! (symtable_find_local variables sym)) return)
         )
-    (throw (redefined_var current_loc sym))
+    (throw (redefined_var sym))
     ))
 
 (fun check_init (sym info) (
     (if (!= (node_head info) GlobalVariable) (do
-        (throw (unexpected_error current_loc
-            (string "module variable is required")
-            sym))
+        (throw (unexpected_error (string "module variable is required") sym))
         ))
     (var box (node_arg info 0))
-    (if (! box) (do
-        (var loc (node_arg info 1))
-        (throw (undefined_var loc sym))
-        ))
+    (if (! box) (throw (undefined_var sym)))
     ))
 
 (export fun compile_operand (asm opd sym) (
@@ -1345,7 +1333,7 @@
 
 (fun compile_getself (asm expr) (
     (if (! compiling_lambda)
-        (throw (exception current_loc (string "`self' outside lambda")))
+        (throw (exception (string "`self' outside lambda")))
         )
     (= use_self @TRUE)
     (put_self asm)
@@ -1375,19 +1363,50 @@
         ))
 
     (if (> arity @ARITY_MAX)
-        (throw (exception1 current_loc (string "too many arguments")
+        (throw (exception1 (string "too many arguments")
             (node_arg expr 1)))
         )
 
     (compile asm func)
     (put_push asm func)
-    (put_push asm current_loc)
-    (compile_simple_call asm 3 compile_matching)
+    (compile_simple_call asm 2 compile_matching)
     (put_jcall asm (* 4 arity) @FALSE)
     ))
 
+(fun compile_apply_with_self (asm expr) (
+    (var self (node_arg expr 0))
+    (var func (node_arg expr 1))
+    (var args (node_arg expr 2))
+    
+    ; eval and push arguments from right to left
+    (= args (list_reverse args))
+
+    (if (&& args (== (node_head (car args)) Rest)) (do
+        (compile_apply_expand asm func args)
+        return
+        ))
+
+    (var arity 0)
+    (while args (do
+        (compile asm (car args))
+        (= args (cdr args))
+        (incr arity)
+        ))
+
+    (if (> arity @ARITY_MAX)
+        (throw (exception1 (string "too many arguments")
+            (node_arg expr 1)))
+        )
+
+    (compile asm self)
+    (compile asm func)
+    (put_push asm func)
+    (compile_simple_call asm 2 compile_matching)
+    (put_jcall asm (* 4 arity) @TRUE)
+    ))
+
 (fun variable_length_args_error (args) (
-    (throw (logic_error1 current_loc
+    (throw (logic_error1 
         (string "non-list object is passed as variable-length arguments")
         args))
     ))
@@ -1399,7 +1418,7 @@
     (var arg (car args))
     (= args (cdr args))
     (if (!= (node_size arg) 1)
-        (throw (unknown_expression current_loc arg))
+        (throw (unknown_expression arg))
         )
     (compile asm (node_arg arg 0))
     (put_dup asm)
@@ -1412,7 +1431,7 @@
     (put_expand asm)    ; len;ls0;ls1;...
     (while args (do
         (if (== (node_head (car args)) Rest)
-            (throw (logic_error current_loc
+            (throw (logic_error
                 (string "Variable-length arguments must be placed last")
                 )))
         (compile asm (car args))
@@ -1422,8 +1441,7 @@
         ))
     (compile asm func)
     (put_push asm func)
-    (put_push asm current_loc)
-    (compile_simple_call asm 3 compile_matching)
+    (compile_simple_call asm 2 compile_matching)
     (put_swap asm)
     (put_imm_int asm 4)
     (put_imul asm)
@@ -1433,7 +1451,7 @@
 (fun get_slot_swap (sym obj) (
     (var f (get_slot_nocheck obj sym))
     (if (== f @C_NIL)
-        (throw (undefined_slot current_loc obj sym))
+        (throw (undefined_slot obj sym))
         )
     (return f)
     ))
@@ -1459,7 +1477,7 @@
         ))
 
     (if (> arity @ARITY_MAX)
-        (throw (exception1 current_loc (string "too many arguments")
+        (throw (exception1 (string "too many arguments")
             (node_arg expr 1)))
         )
 
@@ -1468,8 +1486,7 @@
     (put_push asm sym)
     (compile_simple_call asm 2 get_slot_swap)   ; fun;self;arg1;arg2;..
     (put_push asm (slot obj sym))
-    (put_push asm current_loc)
-    (compile_simple_call asm 3 compile_matching)
+    (compile_simple_call asm 2 compile_matching)
     (put_jcall asm (* 4 arity) @TRUE)
     ))
 
@@ -1480,7 +1497,7 @@
     (var arg (car args))
     (= args (cdr args))
     (if (!= (node_size arg) 1)
-        (throw (unknown_expression current_loc arg))
+        (throw (unknown_expression arg))
         )
     (compile asm (node_arg arg 0))
     (put_dup asm)
@@ -1493,9 +1510,7 @@
     (put_expand asm)    ; len;ls0;ls1;...
     (while args (do
         (if (== (node_head (car args)) Rest)
-            (throw (logic_error current_loc
-                (string "Variable-length arguments must be placed last")
-                )))
+            (throw (logic_error (string "Variable-length arguments must be placed last"))))
         (compile asm (car args))
         (put_swap asm)
         (put_iadd1 asm)
@@ -1508,14 +1523,13 @@
     (put_push asm sym)
     (compile_simple_call asm 2 get_slot_swap)   ; fun;self;arity;arg1;arg2;..
     (put_push asm (slot obj sym))
-    (put_push asm current_loc)
-    (compile_simple_call asm 3 compile_matching) ; code;self;arity;arg1;arg2;..
+    (compile_simple_call asm 2 compile_matching) ; code;self;arity;arg1;arg2;..
     (put_rot3 asm)
     (put_vcall asm @TRUE)
     ))
 
 (fun compile_unquote (asm expr) (
-    (throw (exception current_loc (string "unquotation outside quasi-quotation")))
+    (throw (exception (string "unquotation outside quasi-quotation")))
     ))
 
 (fun compile_quote (asm expr) (
@@ -1529,9 +1543,7 @@
 
 (fun rest_check (expr val) (
     (if (!= (node_type val) @ListE)
-        (throw (exception1 current_loc
-            (string "This expression must be evaluated to a list")
-            expr)))
+        (throw (exception1 (string "This expression must be evaluated to a list") expr)))
     (return val)
     ))
 
@@ -1645,7 +1657,7 @@
             (put_push asm Range)
             (compile_simple_call asm 4 make_object3)
         )
-        (throw (unknown_expression current_loc expr))
+        (throw (unknown_expression expr))
         ))
     ))
 
@@ -1881,14 +1893,14 @@
 
 (fun compile_break (asm expr) (
     (if (! break_labels)
-        (throw (exception current_loc (string "`break' statement outside loop")))
+        (throw (exception (string "`break' statement outside loop")))
         )
     (put_goto asm (unbox (car break_labels)))
     ))
 
 (fun compile_continue (asm expr) (
     (if (! continue_labels)
-        (throw (exception current_loc (string "`continue' statement outside loop")))
+        (throw (exception (string "`continue' statement outside loop")))
         )
     (put_goto asm (unbox (car continue_labels)))
     ))
@@ -1907,7 +1919,7 @@
         ))
 
     (if (== lty Apply)
-        (throw (unknown_expression current_loc expr))
+        (throw (unknown_expression expr))
         )
     (if (== lty Slot)
         (return (compile_assign_slot asm lhs rhs))
@@ -1944,7 +1956,7 @@
         (put_store_arg asm (node_arg_int v 0))
         return
         )))
-    (throw (logic_error1 current_loc (string "Can not modify a field of an argument") lhs))
+    (throw (logic_error1 (string "Can not modify a field of an argument") lhs))
     ))
 
 (fun compile_arithmetic_assign (asm expr) (
@@ -1954,7 +1966,7 @@
 
     (var lty (node_head lhs))
     (if (== lty Apply)
-        (throw (unknown_expression current_loc expr))
+        (throw (unknown_expression expr))
         )
     (if (== lty Slot)
         (return (compile_arithmetic_assign_slot asm lhs rhs fun))
@@ -1963,7 +1975,7 @@
         (return (compile_assign asm (assign lhs (send lhs fun (list1 rhs)))))
         ))
 
-    (throw (unknown_expression current_loc expr))
+    (throw (unknown_expression expr))
     ))
 
 (fun set_slot_roll (sym val obj) (
@@ -1980,8 +1992,7 @@
     (put_swap asm)      ; obj; rhs; obj
     (compile asm fun)   ; fun; obj; rhs; obj
     (put_push asm fun)
-    (put_push asm current_loc)
-    (compile_simple_call asm 3 compile_matching)
+    (compile_simple_call asm 2 compile_matching)
     (put_jcall asm 4 @TRUE)  ; val; obj
     (put_push asm sym)  ; sym; val; obj
     (compile_simple_call asm 3 set_slot_roll)
@@ -2026,8 +2037,7 @@
     (var func (node_arg expr 0))
     (compile asm func)
     (put_push asm func)
-    (put_push asm current_loc)
-    (compile_simple_call asm 3 compile_matching)
+    (compile_simple_call asm 2 compile_matching)
     (put_rcall asm)
     ))
 
@@ -2035,8 +2045,7 @@
     (var func (node_arg expr 0))
     (compile asm func)
     (put_push asm func)
-    (put_push asm current_loc)
-    (compile_simple_call asm 3 compile_matching)
+    (compile_simple_call asm 2 compile_matching)
     (put_shift asm) ; create partial continuation and call given function.
     ))
 
@@ -2059,8 +2068,7 @@
     ; here, the thrown exception is on the top of stack.
     (compile asm (apply (to_sym "fusion") (list2 hdlr default_hdler)))
     (put_push asm hdlr)
-    (put_push asm current_loc)
-    (compile_simple_call asm 3 compile_matching)
+    (compile_simple_call asm 2 compile_matching)
     (put_jcall asm 4 @FALSE)
     (set_label asm cont_lbl)
     ))
@@ -2207,7 +2215,7 @@
         (return (node_arg_symbol lhs 2))
         )
     (if (is_symbol lhs) (return lhs))
-    (throw (type_error current_loc (string "a symbol") lhs))
+    (throw (type_error (string "a symbol") lhs))
     ))
 
 ; f(x) = e is equivarent to f = f | (x -> e)
@@ -2255,13 +2263,11 @@
     (put_arg0 asm)
     (put_push asm f)
     (put_dup asm)
-    (put_push asm current_loc)
-    (compile_simple_call asm 3 compile_matching)
+    (compile_simple_call asm 2 compile_matching)
     (put_jcall asm 4 @FALSE)
     (put_push asm g)
     (put_dup asm)
-    (put_push asm current_loc)
-    (compile_simple_call asm 3 compile_matching)
+    (compile_simple_call asm 2 compile_matching)
     (put_jcall asm 4 @FALSE)
     (put_ireturn asm)
     (return (make_function (list1 x) (get_code asm) 0 @FALSE))
@@ -2290,6 +2296,7 @@
     (add_compiler mod (domainP Float) compile_const)
 
     (add_compiler mod (make_object2 Apply DontCare listT) compile_apply)
+    (add_compiler mod (make_object3 Apply DontCare DontCare listT) compile_apply_with_self)
     (add_compiler mod (make_object3 Send DontCare symT listT) compile_send)
 
     (add_compiler mod (qquote (unquote (unquote DontCare))) compile_unquote)

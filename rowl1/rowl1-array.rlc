@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-array.rlc 2014-02-17 09:06:04 nineties $
+; $Id: rowl1-array.rlc 2014-02-17 21:28:39 nineties $
 ;
 
 (import "rlvm-compile")
@@ -19,10 +19,8 @@
 (import "rowl1-error")
 (import "rowl1-table")
 
-(extern object current_loc)
-
 (fun index_out_of_range (ary idx) (
-    (throw (out_of_range current_loc ary (box idx)))
+    (throw (out_of_range ary (box idx)))
     ))
 
 (export fun ary_new () (
@@ -72,7 +70,7 @@
 
 (fun array_resize (ary new_size) (
     (if (< new_size 0)
-        (throw (invalid_argument current_loc (string "size of array must not be negative") (box new_size)))
+        (throw (invalid_argument (string "size of array must not be negative") (box new_size)))
         )
     (var buf (field_get ary 1))
     (var size (field_get ary 2))
@@ -129,10 +127,7 @@
 (export fun ary_pop (ary) (
     (var n (array_size ary))
     (if (== n 0)
-        (throw (logic_error1 current_loc
-            (string "Can not pop element from empty array")
-            ary
-        )))
+        (throw (logic_error1 (string "Can not pop element from empty array") ary)))
     (var v (array_at ary (- n 1)))
     (array_resize ary (- n 1))
     (return v)
@@ -266,7 +261,7 @@
     (var size (field_get ary 2))
     (var code (get_bytecode f))
     (if (== size 0)
-        (throw (invalid_argument current_loc (string "foldl1 requires non-empty array") ary))
+        (throw (invalid_argument (string "foldl1 requires non-empty array") ary))
         )
     (var v (array_get object buf 0))
     (for i 1 size (do
@@ -290,7 +285,7 @@
     (var size (field_get ary 2))
     (var code (get_bytecode f))
     (if (== size 0)
-        (throw (invalid_argument current_loc (string "foldr1 requires non-empty array") ary))
+        (throw (invalid_argument (string "foldr1 requires non-empty array") ary))
         )
     (var v (array_get object buf (- size 1)))
     (rfor i 0 (- size 1) (do

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2014-02-15 22:30:36 nineties $
+; $Id: rowl1-list.rlc 2014-02-17 21:28:23 nineties $
 ;
 
 (import "rlvm-compile")
@@ -18,11 +18,10 @@
 (import "rowl1-assemble")
 (import "rowl1-error")
 
-(extern object current_loc)
 (extern object global)
 
 (fun index_out_of_range (list idx) (
-    (throw (out_of_range current_loc list (box idx)))
+    (throw (out_of_range list (box idx)))
     ))
 
 (export fun list_at_check (ls i) (
@@ -128,7 +127,7 @@
 
 (fun ls_foldl1 (f ls) (
     (if (! ls)
-        (throw (invalid_argument current_loc (string "foldl1 requires non-empty list") ls))
+        (throw (invalid_argument (string "foldl1 requires non-empty list") ls))
         )
     (var v (car ls))
     (= ls (cdr ls))
@@ -158,7 +157,7 @@
 
 (fun ls_foldr1 (f ls) (
     (if (! ls)
-        (throw (invalid_argument current_loc (string "foldr1 requires non-empty list") ls))
+        (throw (invalid_argument (string "foldr1 requires non-empty list") ls))
         )
     (var code (get_bytecode f))
     (var v (foldr1 ls code))
@@ -184,9 +183,7 @@
     (while ls (do
         (var t (car ls))
         (if (!= (node_type t) @TupleE)
-            (throw (invalid_argument current_loc
-                (string "List of tuples is required")
-                orig)))
+            (throw (invalid_argument (string "List of tuples is required") orig)))
         (= left (cons (tuple_at t 0) left))
         (= right (cons (tuple_at t 1) right))
         (= ls (cdr ls))
@@ -200,9 +197,7 @@
     (while ls (do
         (var t (car ls))
         (if (!= (node_type t) @ListE)
-            (throw (invalid_argument current_loc
-                (string "`flatten' requires list of lists")
-                original)))
+            (throw (invalid_argument (string "`flatten' requires list of lists") original)))
         (while t (do
             (= new_ls (cons (car t) new_ls))
             (= t (cdr t))

@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-02-17 21:06:20 nineties $ "
+" $Id: Syntax.ab 2014-02-17 22:46:27 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -35,7 +35,6 @@ Assign{Slot{Syntax, comment}, Slot{Prim, parse_shell_style_comment}}
 # delimited(p, d)  : sequence of p delimited by d
 # delimited1(p, d) : sequence of p delimited by d (one or many)
 # delimited2(p, d) : sequence of p delimited by d (two or many)
-# located(p)       : parse p with location
 # parsewith(p)     : do parse using p (p can refer previous tokens)
 
 DefineSyntax{
@@ -84,8 +83,6 @@ DefineSyntax{
             QuasiQuote{Delimited1{Unquote{node2}, Unquote{node4}}}, multiline},
         Tuple{List{"delimited2", "(", syntax_element, ",", syntax_element, ")"},
             QuasiQuote{Delimited2{Unquote{node2}, Unquote{node4}}}, multiline},
-        Tuple{List{"located", "(", syntax_element, ")"},
-            QuasiQuote{Located{Unquote{node2}}}, multiline},
         Tuple{List{"parsewith", "(", symbol, ")"},
             QuasiQuote{ParseWith{Unquote{node2}}}, multiline},
         Tuple{List{primary_syntax_element}, node0}
@@ -187,7 +184,7 @@ postfix_expr
         postfix_expr "..."
         { MakeObject{Quote{Rest}, List{node0}} }
         # Domain Pattern
-      | primary_expr "@" postfix_expr
+      | primary_expr "@" fullform_expr
         { MakeObject{Quote{Domain}, List{node0, node2}} }
       | postfix_expr "." symbol "(" delimited(expr, ",") ")"
         { MakeObject{Quote{Send}, List{node0, node2, node4}} }
@@ -210,7 +207,7 @@ quote_expr
         { MakeObject{Quote{QuasiQuote}, List{node1}} }
       | "!"  quote_expr
         { MakeObject{Quote{Unquote}, List{node1}} }
-      | postfix_expr
+      | fullform_expr
 
 pattern ::= quote_expr
 term    ::= primary_expr
@@ -387,8 +384,7 @@ primary_expr_shell
         {
             if (Prim.equal?(node1, 0) or
                 Prim.int_greater_than?(node1, array_size(shell_outputs))) {
-                    throw `SyntaxError{!LOCATION,
-                        "The argument of % must be a line number"}
+                    throw `SyntaxError{"The argument of % must be a line number"}
             }
             `Prim.array_at(shell_outputs, [!node1])
         }
@@ -428,7 +424,7 @@ expand_macro: expr -> {
             level = Prim.int_sub(level, 1)
 
         if (Prim.int_less_than?(level, 0))
-            throw `LogicError{!LOCATION, "Unquotation outside quasi-quotation"}
+            throw `LogicError{"Unquotation outside quasi-quotation"}
 
         if (Prim.atom?(expr))
             return expr
@@ -545,9 +541,7 @@ macro(WithSlots{obj, slots}): {
         | Apply{f, args} ->
               `Send{self, !f, !args}
         | e @ ... -> {
-              throw `InvalidSyntax{!LOCATION,
-                  "Invalid syntax of slot assignment.",
-                  !e}
+              throw `InvalidSyntax{"Invalid syntax of slot assignment.", !e}
           }
     `Apply{!obj, () -> {
         Seq{!Prim.list_map(transl, slots)}

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2014-02-12 17:12:43 nineties $
+; $Id: rowl1-matching.rlc 2014-02-17 21:20:59 nineties $
 ;
 
 (import "rlvm-compile")
@@ -22,8 +22,6 @@
 (var restP     (to_sym "%Rest"))
 (var varP      (to_sym "%Var"))
 (var domP      (to_sym "%Domain"))
-
-(extern object current_loc)
 
 (fun trace_func (msg val) (
     (debugs msg)
@@ -50,9 +48,9 @@
     (throw (matching_failed obj self args))
     ))
 
-(export fun compile_matching (loc obj def) (
+(export fun compile_matching (obj def) (
     (if (! (is_function def))
-        (throw (type_error loc (string "function") obj))
+        (throw (type_error (string "function") obj))
         )
 
     (var cache (field_get def 1))
@@ -61,7 +59,7 @@
     (var asm (make_assembler))
     (var exit_lbl (fresh_label asm))
 
-    (compile_matching_function asm loc obj def exit_lbl)
+    (compile_matching_function asm obj def exit_lbl)
 
     (set_label asm exit_lbl)
     (put_args asm 0)
@@ -75,9 +73,9 @@
     (return code)
     ))
 
-(fun compile_matching_function (asm loc obj def exit) (
+(fun compile_matching_function (asm obj def exit) (
     (if (! (is_function def))
-        (throw (type_error loc (string "function") def))
+        (throw (type_error (string "function") def))
         )
 
     ; here, `def' has form of Function{ ... }, BuiltinFunction{ ...} or BoundFunction{ ... }
@@ -443,7 +441,7 @@
 (fun is_abbrev_list (pats) (
     (while pats (do
         (if (== (car pats) restP) (do
-            (if (cdr pats) (throw (exception current_loc (string "rest-pattern must be placed at the end of the list"))))
+            (if (cdr pats) (throw (exception (string "rest-pattern must be placed at the end of the list"))))
             (return @TRUE)
             ))
         (= pats (cdr pats))

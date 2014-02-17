@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-02-17 16:23:34 nineties $
+; $Id: rowl1-interp.rlc 2014-02-17 22:49:47 nineties $
 ;
 
 (import "rlvm-compile")
@@ -26,7 +26,8 @@
 (export var global null)
 (export var prim null)
 (export var variables null)
-(export var current_loc null)
+
+(var current_loc null)
 (var module_stack null)
 
 (export fun set_loc (loc) (
@@ -40,7 +41,8 @@
         (return (eval_main "amber" stdin 0 0))
         (catch e (do
             (= global amber)
-            (output_string stderr "Uncaught exception: ")
+            (pp_loc stderr  current_loc)
+            (output_string stderr " Uncaught exception: ")
             (pprint stderr e)
             (output_string stderr "\n")
             (return 1)
@@ -54,7 +56,8 @@
         (= r (eval_main path ichan argc argv))
         (catch e (do
             (= global amber)
-            (output_string stderr "Unaught exception: ")
+            (pp_loc stderr current_loc)
+            (output_string stderr " Unaught exception: ")
             (pprint stderr e)
             (output_string stderr "\n")
             (= r 1)
@@ -192,21 +195,6 @@
     (return (runcode (compile_main expr)))
     ))
 
-(fun eval_located (expr) (
-    (set_loc (node_arg expr 0))
-    (return (eval (node_arg expr 1)))
-    ))
-
-(fun eval_seq (expr) (
-    (var stmts (node_arg expr 0))
-    (var v @C_NIL)
-    (while stmts (do
-        (= v (eval (car stmts)))
-        (= stmts (cdr stmts))
-        ))
-    (return v)
-    ))
-
 (var atexit_list null)
 
 (fun eval_exit (expr) (
@@ -234,7 +222,7 @@
 
 (fun is_already_imported (list file) (
     (if (!= (node_type list) @ListE)
-        (throw (type_error current_loc (string "List") list))
+        (throw (type_error (string "List") list))
         )
     (while list (do
         (if (streq file (car list))
@@ -308,12 +296,10 @@
             ))
         ))
     (if nothrow (return @C_FALSE))
-    (throw (not_found current_loc (string path)))
+    (throw (not_found (string path)))
 
     (label load_error)
-    (throw (logic_error1 current_loc
-        (string "AMBERPATH must be an array of strings")
-        dirs))
+    (throw (logic_error1 (string "AMBERPATH must be an array of strings") dirs))
     ))
 
 (fun find_parent (sym) (
@@ -330,16 +316,12 @@
         ))
     (return 0)
     (label load_error)
-    (throw (logic_error1 current_loc
-        (string "AMBERPATH must be an array of strings")
-        dirs))
+    (throw (logic_error1 (string "AMBERPATH must be an array of strings") dirs))
     ))
 
 (fun enter_module (sym) (
     (if (!= (symtable_depth variables) 0)
-        (throw (logic_error current_loc
-            (string "enter_module() can be called only in top-scope")))
-        )
+        (throw (logic_error (string "enter_module() can be called only in top-scope"))))
     (var mod (get_slot_nocheck global sym))
     (if (== mod @C_NIL) (do
         (var p (find_parent sym))
@@ -352,9 +334,7 @@
     (var stack module_stack)
     (while stack (do
         (if (== mod (car stack))
-            (throw (exception2 current_loc 
-                (string "Recursive dependency")
-                global mod)))
+            (throw (exception2 (string "Recursive dependency") global mod)))
         (= stack (cdr stack))
         ))
     (= module_stack (cons global module_stack))
@@ -364,9 +344,7 @@
 
 (fun exit_module () (
     (if (! module_stack)
-        (throw (logic_error current_loc
-            (string "Can not exit from global-module")))
-        )
+        (throw (logic_error (string "Can not exit from global-module"))))
     (var mod (car module_stack))
     (= global mod)
     (= module_stack (cdr module_stack))
@@ -380,7 +358,7 @@
 (fun copy_variable (to sym1 from sym2) (
     (var f (get_slot_nocheck from (to_sym sym2)))
     (if (== f @C_NIL)
-        (throw (not_found current_loc (to_sym sym2)))
+        (throw (not_found (to_sym sym2)))
         )
     (set_slot to (to_sym sym1) f)
     ))
