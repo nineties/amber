@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-02-16 00:03:44 nineties $
+; $Id: rowl1-interp.rlc 2014-02-17 16:23:34 nineties $
 ;
 
 (import "rlvm-compile")
@@ -117,83 +117,6 @@
     (return (runcode (lookup_func global Eval) expr))
     ))
 
-(fun rewrite (expr) (
-    (var new_expr (runcode (lookup_func (get_slot global Syntax) Rewrite) expr))
-    (if (!= new_expr expr) (return (rewrite new_expr)))
-    (= expr new_expr)
-    (if (is_atom expr) (return expr))
-    (if (is_list expr) (do
-        (var ls expr)
-        (while ls (do
-            (setcar ls (rewrite (car ls)))
-            (= ls (cdr ls))
-            ))
-        (return expr)
-        ))
-    (var hd (node_head expr))
-    (if (== hd Quote) (return expr))
-    (if (== hd QuasiQuote) (do
-        (node_arg_set expr 0 (rewrite_qquote (node_arg expr 0) 0))
-        (return expr)
-        ))
-
-    ; Don't rewrite patterns but rewrite guard expressions
-    (if (== hd Define) (do
-        (var lhs (node_arg expr 0))
-        (if (== (node_head lhs) Apply) (do
-            (var guard (node_arg lhs 1))
-            (if (== (node_head guard) When)
-                (node_arg_set guard 1 (rewrite (node_arg guard 1)))
-                )
-            ))
-        (node_arg_set expr 1 (rewrite (node_arg expr 1)))
-        (return expr)
-        ))
-    (if (== hd Lambda) (do
-        (var lhs (node_arg expr 0))
-        (if (== (node_head lhs) When)
-            (node_arg_set lhs 1 (rewrite (node_arg lhs 1)))
-            )
-        (node_arg_set expr 1 (rewrite (node_arg expr 1)))
-        (return expr)
-        ))
-
-    (for i 0 (node_size expr) (do
-        (node_arg_set expr i (rewrite (node_arg expr i)))
-        ))
-    (return expr)
-    ))
-
-(fun rewrite_qquote (expr level) (
-    (if (is_atom expr) (return expr))
-    (if (is_list expr) (do
-        (var ls expr)
-        (while ls (do
-            (setcar ls (rewrite_qquote (car ls) level))
-            (= ls (cdr ls))
-            ))
-        (return expr)
-        ))
-    (var hd (node_head expr))
-    (if (== hd Unquote) (do
-        (if (== level 0)
-            (node_arg_set expr 0 (rewrite (node_arg expr 0)))
-            (node_arg_set expr 0
-                (rewrite_qquote (node_arg expr 0) (- level 1)))
-            )
-        (return expr)
-        )
-    (if (== hd QuasiQuote)
-        (+= level 1)
-        ))
-
-    (for i 0 (node_size expr)
-        (node_arg_set expr i
-            (rewrite_qquote (node_arg expr i) level))
-        )
-    (return expr)
-    ))
-
 (fun interpret (p) (
     (while 1 (do
         (parse_toplevel p)
@@ -269,20 +192,9 @@
     (return (runcode (compile_main expr)))
     ))
 
-(fun default_eval (expr) (
-    (return (runcode (compile_main (rewrite expr))))
-    ))
-
 (fun eval_located (expr) (
     (set_loc (node_arg expr 0))
     (return (eval (node_arg expr 1)))
-    ))
-
-(fun rewrite_donothing (expr) ((return expr)))
-
-(fun rewrite_located (expr) (
-    (node_arg_set expr 1 (rewrite (node_arg expr 1)))
-    (return expr)
     ))
 
 (fun eval_seq (expr) (

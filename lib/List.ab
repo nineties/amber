@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: List.ab 2014-02-17 10:15:45 nineties $
+# $Id: List.ab 2014-02-17 16:12:20 nineties $
 
 import Collection
 
@@ -42,6 +42,25 @@ trait List {
     foldl1(fun)   = Prim.list_fold1(fun, self)
     foldr(fun, v) = Prim.list_foldr(fun, self, v)
     foldr1(fun)   = Prim.list_foldr1(fun, self)
+
+    extend Iterable
+
+    Iterator = Trait.new(\ListIterator) with {
+        extend ForwardIterator
+        extend MutableIterator
+
+        list   = alias(0)
+        next?  = alias(() -> list != [])
+        next() = {
+            v: car(list)
+            list = cdr(list)
+            v
+        }
+
+        value = alias(() -> list[0], (v) -> {list[0] = v})
+    }
+
+    iterator() = `Iterator{!self} with parent = Iterator
 }
 
 Prim.set_builtin_parent(\List, Trait.List)

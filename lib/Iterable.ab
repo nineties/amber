@@ -1,11 +1,17 @@
 # Copyright (C) 2014 nineties
-# $Id: Iterable.ab 2014-02-16 23:47:35 nineties $
+# $Id: Iterable.ab 2014-02-17 17:50:10 nineties $
 
 trait Iterable {
-    require iterator
+    require iterator Iterator
 }
 
-## 
+
+trait RandomIterable {
+    extend Iterable
+    require first last
+    first() = iterator()
+}
+
 trait ForwardIterator {
     require next next?
 }
@@ -17,6 +23,39 @@ trait BidirectionalIterator {
 
 trait RandomAccessIterator {
     extend BidirectionalIterator
-    require begin end advance advance? add! sub!
+    require advance distance set get
+
+    next() = advance(1)
+    next?  = alias(() -> advance?(1))
+    prev() = advance(-1)
+    prev?  = alias(() -> advance?(-1))
+
+    add!(d @ Int) = advance(d)
+    sub!(d @ Int) = advance(-d)
+
+    value = alias(() -> get(0), (v) -> set{0, v})
+}
+
+sub(a, b) when a.RandomAccessIterator? and b.RandomAccessIterator? :
+    b.distance(a)
+
+trait MutableIterator{
+    require value value?
+}
+
+trait ImmutableIterator{
+    require value value?
+}
+
+trait InsertAfterIterator {
+    require insertafter
+}
+
+trait InsertBeforeIterator {
+    require insertbefore
+}
+
+trait EraseIterator {
+    require erase
 }
 

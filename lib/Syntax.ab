@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-02-16 18:53:59 nineties $ "
+" $Id: Syntax.ab 2014-02-17 21:06:20 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -191,13 +191,18 @@ postfix_expr
         { MakeObject{Quote{Domain}, List{node0, node2}} }
       | postfix_expr "." symbol "(" delimited(expr, ",") ")"
         { MakeObject{Quote{Send}, List{node0, node2, node4}} }
+      | "." symbol
+        { MakeObject{Quote{Slot}, List{Quote{GetSelf{}}, node2}} }
       | postfix_expr "." symbol
         { MakeObject{Quote{Slot}, List{node0, node2}} }
       | primary_expr "^" postfix_expr
         { MakeObject{Quote{Power}, List{node0, node2}} }
-      | fullform
       | primary_expr
 
+fullform_expr
+    ::= fullform
+      | postfix_expr
+    
 quote_expr
     ::= "\\" quote_expr
         { MakeObject{Quote{Quote}, List{node1}} }
@@ -532,24 +537,22 @@ macro(QuoteSyntax{For{i, Range{a, b}, body}}) = {
 # { t: obj; t.a = p; t.b = q; t.c = r; t }
 #
 macro(WithSlots{obj, slots}): {
-    t: Prim.unique_symbol(\t)
     transl(e): case (macro(e)) of
           Assign{x, e, opts...} ->
-              `Assign{Slot{!t, !x}, !e, !opts...}
+              `Assign{Slot{self, !x}, !e, !opts...}
         | Define{x, e, opts...} ->
-              `Define{Slot{!t, !x}, !e, !opts...}
+              `Define{Slot{self, !x}, !e, !opts...}
         | Apply{f, args} ->
-              `Send{!t, !f, !args}
+              `Send{self, !f, !args}
         | e @ ... -> {
               throw `InvalidSyntax{!LOCATION,
                   "Invalid syntax of slot assignment.",
                   !e}
           }
-    `{
-        !t: !obj
+    `Apply{!obj, () -> {
         Seq{!Prim.list_map(transl, slots)}
-        !t
-    }
+        self
+    }, []}
 }
 
 ## Utilities

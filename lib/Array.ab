@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: Array.ab 2014-02-17 10:15:36 nineties $
+# $Id: Array.ab 2014-02-17 20:53:41 nineties $
 
 import Collection
 
@@ -48,6 +48,43 @@ trait Array {
 
     add!(other)   = Prim.array_append!(self, other)
     sub!(other)   = Prim.array_diff!(self, other)
+
+    extend RandomIterable
+
+    Iterator = Trait.new(\ArrayIterator) with {
+        extend RandomAccessIterator
+        extend MutableIterator
+        extend InsertAfterIterator
+        extend InsertBeforeIterator
+        extend EraseIterator
+
+        array  = alias(0)
+        index  = alias(1)
+
+        advance?(d @ Int) = (index + d >= 0 and index + d < array.size)
+        advance(d @ Int) = {
+            i: index + d
+            if (i < 0 or i >= array.size)
+                throw `IndexOutOfRange{!LOCATION, !array, !i}
+            index = i
+            self
+        }
+
+        get(i)    = array[index+i]
+        set(i, v) = {array[index+i] = v}
+
+        distance(other): {
+            if (not identical?(self.array, other.array))
+                throw `LogicError{!LOCATION,
+                    "Comparison of two iterators of different arrays",
+                    self, other}
+            other.index - self.index
+        }
+    }
+
+    iterator() = `Iterator{!self, 0} with parent = Trait.Array.Iterator
+    begin = iterator
+    end() = iterator().advance(self.size-1)
 }
 
 Prim.set_builtin_parent(\Array, Trait.Array)

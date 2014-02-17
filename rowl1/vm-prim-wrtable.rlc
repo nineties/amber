@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-wrtable.rlc 2014-02-16 13:06:35 nineties $
+; $Id: vm-prim-wrtable.rlc 2014-02-17 15:43:59 nineties $
 ;
 
 ; Weak reference table from object to object
@@ -22,8 +22,8 @@
 ;     3 : # of entries
 ;
 ; table entry
-;     0 : pointer to the next entry in bucket
-;     1 : pointer to the next entry in list of entries
+;     0 : pointer to the next entry in the bucket
+;     1 : pointer to the next entry in the list of entries
 ;     2 : the key
 ;     3 : the value
 ;     4 : true is this entry is alive
@@ -184,11 +184,17 @@
     (while entry (
         (void* e_key (get entry 2))
         (if (== key e_key) (
-            (return (get entry 3))
+            (void* v (get entry 3))
+            (return v)
             ))
         (= entry (get entry 0))
         ))
     (return @C_UNDEF)
+    ))
+
+(export prim_wrtable_entries)
+(fun prim_wrtable_entries (table) (
+    (return (get table 1))
     ))
 
 (export init_prim_wrtable)

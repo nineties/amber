@@ -1,5 +1,5 @@
 # Copyright (C) 2010 nineties
-# $Id: Base.ab 2014-02-16 16:30:07 nineties $
+# $Id: Base.ab 2014-02-17 14:59:30 nineties $
 
 # Chain of obj.parent.parent... eventually reaches `nil',
 # so we can use nil as the root object of parent chain.
@@ -11,17 +11,22 @@ nil with {
     copy()          = Prim.copy(self)
     to_s()          = fullform(self)
 
-    get(i @ Int)                = Prim.get_arg(self, i)
-    get(sym @ Symbol)           = Prim.get_slot(self, sym)
-    get(sym @ Symbol, \norec)   = Prim.get_slot_norec(self, sym)
-    get(sym @ Symbol, \unalias) = Prim.get_slot_unalias(self, sym)
+    get_slot(sym @ Symbol)           = Prim.get_slot(self, sym)
+    get_slot(sym @ Symbol, \norec)   = Prim.get_slot_norec(self, sym)
+    get_slot(sym @ Symbol, \unalias) = Prim.get_slot_unalias(self, sym)
+    set_slot(sym @ Symbol, v)           = Prim.set_slot(self, sym, v)
+    set_slot(sym @ Symbol, v, \fusion)  = Prim.set_slot_fusion(self, sym, v)
+    set_slot(sym @ Symbol, v, \unalias) = Prim.set_slot_unalias(self, sym, v)
+
+    get(i @ Int) = Prim.get_arg(self, i)
+    get = get | get_slot
 
     set(i @ Int, v) = Prim.set_arg(self, i, v)
-    set(sym @ Symbol, v) = Prim.set_slot(self, sym, v)
-    set(sym @ Symbol, v, \fusion) = Prim.set_slot_fusion(self, sym, v)
-    set(sym @ Symbol, v, \unalias) = Prim.set_slot_unalias(self, sym, v)
+    set = set | set_slot
 
     has_slot?(sym) = Prim.has_slot?(self, sym)
+
+    each_slots(fun @ Function) = Prim.each_slots(self, fun)
 }
 
 id(obj):    obj

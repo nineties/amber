@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: Trait.ab 2014-02-17 10:15:01 nineties $
+# $Id: Trait.ab 2014-02-17 15:28:39 nineties $
 
 TraitOfTraits: `Trait{Trait} with {
     # Import methods from given trait.
@@ -13,25 +13,15 @@ TraitOfTraits: `Trait{Trait} with {
         if (from.has_slot?(\before_extend))
             from.before_extend(to)
 
-        # When A extends B, obj.B? == true if `obj' is a child of A.
-        name?: Prim.string_to_symbol(
-                Prim.string_add(Prim.symbol_to_string(from_name), "?"))
-        to.set(name?, true)
-
         # Copy slots from `from' to `to'.
         Prim.list_foreach(
             v -> {
-                to.set(v, from.get(v, \unalias))
+                to.set_slot(v, from.get_slot(v, \unalias))
                 to.requirements = Prim.list_insert_unique(v, to.requirements)
             },
-            from.requirements)
-        Prim.list_foreach(
-            v -> {
-                to.set(v, from.get(v, \unalias), \fusion)
-                to.exports = Prim.list_insert_unique(v, to.exports)
-            },
-            from.exports)
-
+            from.requirements
+            )
+        from.each_slots((sym, v) -> to.set_slot(sym, v, \fusion))
         if (from.has_slot?(\after_extend))
             from.after_extend(to)
     }
@@ -44,7 +34,7 @@ TraitOfTraits: `Trait{Trait} with {
     add_required_slots(var @ Symbol): {
         t: self
         t.requirements = Prim.list_insert_unique(var, t.requirements)
-        t.set(var, alias(() -> {
+        t.set_slot(var, alias(() -> {
                 throw `MissingRequiredSlot{!LOCATION, !self, !var}
             }))
     }
@@ -59,9 +49,6 @@ new(name @ Symbol): {
 
     `Trait{!name} with {
         parent = TraitOfTraits
-    
-        # Names of slots which will be exported to other extender traits.
-        exports = []
     
         # Names of slots which extender traits must have.
         requirements = []
