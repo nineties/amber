@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-array.rlc 2014-02-16 23:29:06 nineties $
+; $Id: rowl1-array.rlc 2014-02-17 09:06:04 nineties $
 ;
 
 (import "rlvm-compile")
@@ -17,6 +17,7 @@
 (import "rowl1-compile")
 (import "rowl1-assemble")
 (import "rowl1-error")
+(import "rowl1-table")
 
 (extern object current_loc)
 
@@ -209,6 +210,36 @@
     (return ary1)
     ))
 
+(fun ary_diff (ary1 ary2) (
+    (var tbl (table_new))
+    (for i 0 (array_size ary2) (do
+        (table_store tbl (array_at ary2 i) @C_TRUE)
+        ))
+    (var new (ary_new))
+    (for i 0 (array_size ary1) (do
+        (var v (array_at ary1 i))
+        (if (== (table_at tbl v) @C_TRUE) continue)
+        (ary_push new v)
+        ))
+    (return new)
+    ))
+
+(fun ary_diff_bang (ary1 ary2) (
+    (var tbl (table_new))
+    (for i 0 (array_size ary2) (do
+        (table_store tbl (array_at ary2 i) @C_TRUE)
+        ))
+    (var j 0)
+    (for i 0 (array_size ary1) (do
+        (var v (array_at ary1 i))
+        (if (== (table_at tbl v) @C_TRUE) continue)
+        (array_store ary1 j v)
+        (+= j 1)
+        ))
+    (array_resize ary1 j)
+    (return ary1)
+    ))
+
 (fun ary_map (f ary) (
     (var size (field_get ary 2))
     (var buf  (field_get ary 1))
@@ -285,6 +316,8 @@
     (add_function1 mod (to_sym "array_reverse") arrayT ary_reverse 0)
     (add_function2 mod (to_sym "array_append") arrayT arrayT ary_append 0)
     (add_function2 mod (to_sym "array_append!") arrayT arrayT ary_append_bang 0)
+    (add_function2 mod (to_sym "array_diff") arrayT arrayT ary_diff 0)
+    (add_function2 mod (to_sym "array_diff!") arrayT arrayT ary_diff_bang 0)
     (add_function2 mod (to_sym "array_map") funT arrayT ary_map 0)
     (add_function3 mod (to_sym "array_foldl") funT DontCare arrayT ary_foldl 0)
     (add_function2 mod (to_sym "array_foldl1") funT arrayT ary_foldl1 0)
