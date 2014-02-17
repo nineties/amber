@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-02-17 22:49:47 nineties $
+; $Id: rowl1-interp.rlc 2014-02-17 22:54:13 nineties $
 ;
 
 (import "rlvm-compile")
@@ -12,7 +12,6 @@
 
 (import "rowl1-util")
 (import "rowl1-node")
-(import "rowl1-module")
 (import "rowl1-error")
 (import "rowl1-object")
 (import "rowl1-symtable")
@@ -317,6 +316,18 @@
     (return 0)
     (label load_error)
     (throw (logic_error1 (string "AMBERPATH must be an array of strings") dirs))
+    ))
+
+(export fun create_module (sym) (
+    (if (&& (!= (node_head global) Module) (!= global @C_NIL))
+        (throw (invalid_argument
+            "1st argument of create_module(sym@Symbol)"
+            sym
+            ))
+        )
+    (var mod (make_object1 Module sym))
+    (set_slot mod parent global)
+    (return mod)
     ))
 
 (fun enter_module (sym) (
