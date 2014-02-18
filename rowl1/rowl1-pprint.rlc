@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-array.rlc 2014-02-17 21:31:13 nineties $
+; $Id: rowl1-array.rlc 2014-02-18 17:20:44 nineties $
 ;
 
 (import "rlvm-compile")
@@ -112,6 +112,7 @@
         (do
             (output_string ochan "(")
             (var args (field_get func 2))
+            (var keys (field_get func 3))
             (= args (cdr args)) ; skip arity
             (while args (do
                 (pprint ochan (car args))
@@ -119,6 +120,15 @@
                 (if args (output_string ochan ", "))
                 ))
             (output_char ochan ')')
+            (if keys (do
+                (var n (seq_size keys))
+                (output_string ochan "{")
+                (for i 0 n (do
+                    (pprint ochan (array_get object keys i))
+                    (if (!= i (- n 1)) (output_string ochan ", "))
+                    ))
+                (output_string ochan "}")
+                ))
         )
     (if (== (node_type func) @ContinuationE)
         (do

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-02-18 16:20:29 nineties $
+; $Id: rowl1-compile.rlc 2014-02-18 18:08:17 nineties $
 ;
 
 (import "rlvm-compile")
@@ -423,8 +423,8 @@
     (return ret)
     ))
 
-(fun alloc_function (args code guard clos use_self) (
-    (return (variant @FunctionE 5 0 args code guard clos use_self))
+(fun alloc_function (args keys code guard clos use_self) (
+    (return (variant @FunctionE 6 0 args keys code guard clos use_self))
     ))
 
 (fun args_len (args) (
@@ -439,10 +439,10 @@
     (return (box len))
     ))
 
-(fun make_function (args code guard use_self) (
+(fun make_function (args keys code guard use_self) (
     (var arity (args_len args))
     (= args (cons arity args))
-    (return (alloc_function args code guard 0 use_self))
+    (return (alloc_function args keys code guard 0 use_self))
     ))
 
 (fun alloc_builtin_function (args func guard use_self) (
@@ -939,7 +939,7 @@
     (= break_labels save_break_labels)
     (= continue_labels save_continue_labels)
     (= try_nest save_try_nest)
-    (return (tuple2 args keywords))
+    (return (tuple2 args keyarray))
     ))
 
 (fun add_arg (tbl sym obj alias) (
@@ -989,7 +989,7 @@
     (var t (list_split (list_copy args_) idx))
     (return (tuple3 alias (car t) (cdr t)))
     (label invalid_argument)
-    (throw (invalid_argument_order
+    (throw (logic_error1
         (string "The order of arguments is invalid")
         args_))
     ))
@@ -1082,6 +1082,7 @@
 
 (fun setup_keyword_array (keywords) (
     (var len (list_len keywords))
+    (if (== len 0) (return 0))
     (var sorted (sort_keywords keywords))
     (var ary (array object len))
     (var i 0)
@@ -1499,7 +1500,7 @@
         (while args (do
             (if (|| (== (node_head (car args)) Rest)
                     (== (node_head (car args)) Keyword))
-                (throw (invalid_argument_order
+                (throw (logic_error1
                     (string "The order of arguments is invalid")
                     args_))
                     )
@@ -2194,14 +2195,14 @@
             (= args (tuple_at t 0))
             (var keys (tuple_at t 1))
             (put_ireturn asm_body)
-            (put_push asm (make_function args (get_code asm_body) (get_code asm_guard) use_self))
+            (put_push asm (make_function args keys (get_code asm_body) (get_code asm_guard) use_self))
         )
         (do
             (var t (compile_function asm_body 0 args body noguard cls))
             (= args (tuple_at t 0))
             (var keys (tuple_at t 1))
             (put_ireturn asm_body)
-            (put_push asm (make_function args (get_code asm_body) 0 use_self))
+            (put_push asm (make_function args keys (get_code asm_body) 0 use_self))
         ))
     (= compiling_lambda save_compiling_lambda)
     (= use_self save_use_self)
@@ -2230,10 +2231,11 @@
 
 (fun build_closure (lam clos) (
     (var args (field_get lam 2))
-    (var body (field_get lam 3))
-    (var guard (field_get lam 4))
-    (var use_self (field_get lam 6))
-    (return (alloc_function args body guard clos use_self))
+    (var keys (field_get lam 3))
+    (var body (field_get lam 4))
+    (var guard (field_get lam 5))
+    (var use_self (field_get lam 7))
+    (return (alloc_function args keys body guard clos use_self))
     ))
 
 (fun compile_closure (asm expr) (
@@ -2357,7 +2359,7 @@
     (compile_simple_call asm 2 compile_matching)
     (put_jcall asm 4 @FALSE)
     (put_ireturn asm)
-    (return (make_function (list1 x) (get_code asm) 0 @FALSE))
+    (return (make_function (list1 x) 0 (get_code asm) 0 @FALSE))
     ))
 
 (export fun setup_builtin_compilers (mod) (

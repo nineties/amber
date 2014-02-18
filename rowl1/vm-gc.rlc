@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2014-02-10 13:38:31 nineties $
+; $Id: vm-gc.rlc 2014-02-18 18:02:45 nineties $
 ;
 
 (import "stdlib")
@@ -628,12 +628,10 @@
     ))
 
 (fun allocate_object (words) (
-    (int npage (= npage (>> (- (+ words @PAGE_WORDS) 1) @PAGE_WORDS_SHIFT)))
-    (if (> npage 2000) (
-        (debug "ALLOCATe PAGE")
-        (debugi npage)
-        (debugi words)
+    (if (== words 1) (
+        (error "Every object must be bigger than 2 words.\n")
         ))
+    (int npage (= npage (>> (- (+ words @PAGE_WORDS) 1) @PAGE_WORDS_SHIFT)))
     (while (> words free_words) (
         (insert_padding)
         (allocate_page npage)
@@ -773,6 +771,7 @@
 ; sequence of boxed objects
 (export allocate_sequence)
 (fun allocate_sequence (type nelem) (
+    (if (== nelem 0) ((incr nelem)))
     (int size (+ nelem 1))
     (void* ptr (allocate_object size))
     (memset ptr 0 (* @WORD_SIZE size))
