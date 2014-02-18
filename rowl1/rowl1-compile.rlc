@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-02-18 13:08:44 nineties $
+; $Id: rowl1-compile.rlc 2014-02-18 16:20:29 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1464,16 +1464,51 @@
     (compile_operand asm (lookup_symbol sym) sym)
     ))
 
-(fun compile_apply (asm expr) (
-    (var func (node_arg expr 0))
-    (var args (node_arg expr 1))
-    
-    ; eval and push arguments from right to left
-    (= args (list_reverse args))
+(fun variable_length_args_error (args) (
+    (throw (logic_error1 
+        (string "non-list object is passed as variable-length arguments")
+        args))
+    ))
 
-    (if (&& args (== (node_head (car args)) Rest)) (do
-        (compile_apply_expand asm func args)
-        return
+; Push arguments (except keyword arguments) in reversed order.
+(fun compile_args (asm args) (
+    (var args_ args)
+    (= args (list_reverse args))
+    (var keywords 0)
+    (while (&& args (== (node_head (car args)) Keyword)) (do
+        (= keywords (cons (car args) keywords))
+        (= args (cdr args))
+        ))
+    (if (&& args (== (== node_head (car args)) Rest)) (do
+        (var failed (fresh_label asm))
+        (var reverse (fresh_label asm))
+        (var arg (cdr args))
+        (= args (cdr args))
+
+        (compile asm (node_arg arg 0))
+        (put_dup asm)
+        (put_check_list2 asm failed 0) ; check whether the argument is list.
+        (put_goto asm reverse)
+        (set_label asm failed)
+        (compile_simple_call asm 1 variable_length_args_error)
+        (set_label asm reverse)
+        (compile_simple_call asm 1 list_reverse)
+        (put_expand asm)    ; len;le0;le1;...
+
+        ; XXX: We should implement `rotate' instruction.
+        (while args (do
+            (if (|| (== (node_head (car args)) Rest)
+                    (== (node_head (car args)) Keyword))
+                (throw (invalid_argument_order
+                    (string "The order of arguments is invalid")
+                    args_))
+                    )
+            (compile asm (car args))
+            (put_swap asm)
+            (put_iadd1 asm)
+            (= args (cdr args))
+            ))
+        (return (tuple2 (box -1) keywords))
         ))
 
     (var arity 0)
@@ -1482,16 +1517,28 @@
         (= args (cdr args))
         (incr arity)
         ))
+    (return (tuple2 (box arity) keywords))
+    ))
 
-    (if (> arity @ARITY_MAX)
-        (throw (exception1 (string "too many arguments")
-            (node_arg expr 1)))
-        )
+(fun compile_apply (asm expr) (
+    (var func (node_arg expr 0))
+    (var args (node_arg expr 1))
+    
+    (var t (compile_args asm args))
+    (var arity (unbox (tuple_at t 0)))
+    (var keys  (tuple_at t 1))
 
     (compile asm func)
     (put_push asm func)
     (compile_simple_call asm 2 compile_matching)
-    (put_jcall asm (* 4 arity) @FALSE)
+    (if (>= arity 0)
+        (put_jcall asm (* 4 arity) @FALSE)
+        (do
+            (put_swap asm)
+            (put_imm_int asm 4)
+            (put_imul asm)
+            (put_vcall asm @FALSE)
+        ))
     ))
 
 (fun compile_apply_with_self (asm expr) (
@@ -1499,74 +1546,28 @@
     (var func (node_arg expr 1))
     (var args (node_arg expr 2))
     
-    ; eval and push arguments from right to left
-    (= args (list_reverse args))
-
-    (if (&& args (== (node_head (car args)) Rest)) (do
-        (compile_apply_expand asm func args)
-        return
-        ))
-
-    (var arity 0)
-    (while args (do
-        (compile asm (car args))
-        (= args (cdr args))
-        (incr arity)
-        ))
-
-    (if (> arity @ARITY_MAX)
-        (throw (exception1 (string "too many arguments")
-            (node_arg expr 1)))
-        )
-
+    (var t (compile_args asm args))
+    (var arity (unbox (tuple_at t 0)))
+    (var keys  (tuple_at t 1))
+    
     (compile asm self)
-    (compile asm func)
-    (put_push asm func)
-    (compile_simple_call asm 2 compile_matching)
-    (put_jcall asm (* 4 arity) @TRUE)
-    ))
-
-(fun variable_length_args_error (args) (
-    (throw (logic_error1 
-        (string "non-list object is passed as variable-length arguments")
-        args))
-    ))
-
-; Here, args is already reversed.
-(fun compile_apply_expand (asm func args) (
-    (var failed (fresh_label asm))
-    (var call (fresh_label asm))
-    (var arg (car args))
-    (= args (cdr args))
-    (if (!= (node_size arg) 1)
-        (throw (unknown_expression arg))
+    (if (>= arity 0)
+        (do
+            (compile asm func)
+            (put_push asm func)
+            (compile_simple_call asm 2 compile_matching)
+            (put_jcall asm (* 4 arity) @TRUE)
         )
-    (compile asm (node_arg arg 0))
-    (put_dup asm)
-    (put_check_list2 asm failed 0)
-    (put_goto asm call)
-    (set_label asm failed)
-    (compile_simple_call asm 1 variable_length_args_error)
-    (set_label asm call)
-    (compile_simple_call asm 1 list_reverse)
-    (put_expand asm)    ; len;ls0;ls1;...
-    (while args (do
-        (if (== (node_head (car args)) Rest)
-            (throw (logic_error
-                (string "Variable-length arguments must be placed last")
-                )))
-        (compile asm (car args))
-        (put_swap asm)
-        (put_iadd1 asm)
-        (= args (cdr args))
+        (do
+            (put_swap asm)
+            (compile asm func)
+            (put_push asm func)
+            (compile_simple_call asm 2 compile_matching)
+            (put_swap asm)
+            (put_imm_int asm 4)
+            (put_imul asm)
+            (put_vcall asm asm @TRUE)
         ))
-    (compile asm func)
-    (put_push asm func)
-    (compile_simple_call asm 2 compile_matching)
-    (put_swap asm)
-    (put_imm_int asm 4)
-    (put_imul asm)
-    (put_vcall asm @FALSE)
     ))
 
 (fun get_slot_swap (sym obj) (
@@ -1582,71 +1583,32 @@
     (var sym  (node_arg expr 1))
     (var args (node_arg expr 2))
     
-    ; eval and push arguments from right to left
-    (= args (list_reverse args))
+    (var t (compile_args asm args))
+    (var arity (unbox (tuple_at t 0)))
+    (var keys  (tuple_at t 1))
 
-    (if (&& args (== (node_head (car args)) Rest)) (do
-        (compile_send_expand asm obj sym args)
-        return
-        ))
-
-    (var arity 0)
-    (while args (do
-        (compile asm (car args))
-        (= args (cdr args))
-        (incr arity)
-        ))
-
-    (if (> arity @ARITY_MAX)
-        (throw (exception1 (string "too many arguments")
-            (node_arg expr 1)))
+    (if (>= arity 0)
+        (do
+            (compile asm obj)   ; self;arg1;arg2;...
+            (put_dup asm)       ; self;self;arg1;arg2;..
+            (put_push asm sym)
+            (compile_simple_call asm 2 get_slot_swap)   ; fun;self;arg1;arg2;..
+            (put_push asm (slot obj sym))
+            (compile_simple_call asm 2 compile_matching)
+            (put_jcall asm (* 4 arity) @TRUE)
         )
-
-    (compile asm obj)   ; self;arg1;arg2;...
-    (put_dup asm)       ; self;self;arg1;arg2;..
-    (put_push asm sym)
-    (compile_simple_call asm 2 get_slot_swap)   ; fun;self;arg1;arg2;..
-    (put_push asm (slot obj sym))
-    (compile_simple_call asm 2 compile_matching)
-    (put_jcall asm (* 4 arity) @TRUE)
-    ))
-
-; Here, args is already reversed.
-(fun compile_send_expand (asm obj sym args) (
-    (var failed (fresh_label asm))
-    (var call (fresh_label asm))
-    (var arg (car args))
-    (= args (cdr args))
-    (if (!= (node_size arg) 1)
-        (throw (unknown_expression arg))
-        )
-    (compile asm (node_arg arg 0))
-    (put_dup asm)
-    (put_check_list2 asm failed 0)
-    (put_goto asm call)
-    (set_label asm failed)
-    (compile_simple_call asm 1 variable_length_args_error)
-    (set_label asm call)
-    (compile_simple_call asm 1 list_reverse)
-    (put_expand asm)    ; len;ls0;ls1;...
-    (while args (do
-        (if (== (node_head (car args)) Rest)
-            (throw (logic_error (string "Variable-length arguments must be placed last"))))
-        (compile asm (car args))
-        (put_swap asm)
-        (put_iadd1 asm)
-        (= args (cdr args))
+        (do
+            (put_imm_int asm 4)
+            (put_imul asm)
+            (compile asm obj)   ; self;arity;arg1;arg2;...
+            (put_dup asm)       ; self;self;arity;arg1;arg2;..
+            (put_push asm sym)
+            (compile_simple_call asm 2 get_slot_swap)   ; fun;self;arity;arg1;arg2;..
+            (put_push asm (slot obj sym))
+            (compile_simple_call asm 2 compile_matching) ; code;self;arity;arg1;arg2;..
+            (put_rot3 asm)
+            (put_vcall asm @TRUE)
         ))
-    (put_imm_int asm 4)
-    (put_imul asm)
-    (compile asm obj)   ; self;arity;arg1;arg2;...
-    (put_dup asm)       ; self;self;arity;arg1;arg2;..
-    (put_push asm sym)
-    (compile_simple_call asm 2 get_slot_swap)   ; fun;self;arity;arg1;arg2;..
-    (put_push asm (slot obj sym))
-    (compile_simple_call asm 2 compile_matching) ; code;self;arity;arg1;arg2;..
-    (put_rot3 asm)
-    (put_vcall asm @TRUE)
     ))
 
 (fun compile_unquote (asm expr) (
