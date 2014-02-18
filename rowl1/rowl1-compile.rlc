@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-02-17 23:46:00 nineties $
+; $Id: rowl1-compile.rlc 2014-02-18 13:08:44 nineties $
 ;
 
 (import "rlvm-compile")
@@ -24,8 +24,8 @@
 (var expand        (to_unique_sym "%expand"))
 
 (export fun unwrap_internal (node) (
-    ;(if (== (node_head node) Ref)
-    ;    (return (unwrap_internal (node_arg node 2))))
+    (if (== (node_head node) Ref)
+        (return (unwrap_internal (node_arg node 2))))
     (return node)
     ))
 
@@ -43,6 +43,9 @@
 (extern fun get_slot_nocheck)
 (extern fun get_slot_unalias)
 (extern fun get_slot_norec)
+(extern fun tuple2)
+(extern fun tuple3)
+(extern fun tuple_at)
 
 (fun trace_func (msg val) (
     (debugs msg)
@@ -221,7 +224,7 @@
         (return expr)
         ))
     (var hd (node_head expr))
-    (if (== hd Quote) (return expr))
+    (if (== hd Quote) (return expr)
     (if (== hd Domain)
         (if (== level 0) (do
             (node_arg_set expr 0
@@ -232,8 +235,14 @@
                 )
             (return expr)
             ))
+    (if (== hd Keyword)
+        (if (== level 0) (do
+            (node_arg_set expr 0
+                (alpha_args_iter tbl chk rep (node_arg expr 0) 0 check))
+            (return expr)
+            ))
     (if (== hd QuasiQuote) (+= level 1)
-    (if (== hd Unquote) (-= level 1))))
+    (if (== hd Unquote) (-= level 1))))))
 
     (for i 0 (node_size expr)
         (node_arg_set expr i
@@ -866,7 +875,11 @@
     (= try_nest 0)
 
     (var cnt_addr 0)
-    (var alias (setup_args variables args 0))
+    (var t (setup_args variables args 0))
+    (var alias    (tuple_at t 0))
+    (= args       (tuple_at t 1))
+    (var keywords (tuple_at t 2))
+    (var keyarray (setup_keyword_array keywords))
 
     (if alias (do
         (var list 0)
@@ -884,6 +897,25 @@
             (= guard (seq list))
             )
         ))
+
+    (if keywords (do
+        (var list 0)
+        (if (== guard noguard)
+            (= list (cons body list))
+            (= list (cons guard list))
+            )
+        (while keywords (do
+            (var v (node_arg_symbol (car keywords) 0))
+            (var e (node_arg (car keywords) 1))
+            (= list (cons (keyword_init v e keyarray) list))
+            (= keywords (cdr keywords))
+            ))
+        (if (== guard noguard)
+            (= body (seq list))
+            (= guard (seq list))
+            )
+        ))
+
     (if (!= guard noguard)
         (do
             (= cnt_addr (get_address asm_guard))
@@ -907,9 +939,9 @@
     (= break_labels save_break_labels)
     (= continue_labels save_continue_labels)
     (= try_nest save_try_nest)
+    (return (tuple2 args keywords))
     ))
 
-(extern fun tuple2)
 (fun add_arg (tbl sym obj alias) (
     (if (!= (node_head obj) Argument) (do
         (var tmp (to_unique_sym (symbol_name sym)))
@@ -921,25 +953,45 @@
     ))
 
 (fun setup_args (tbl args alias) (
+    (var args_ args)
     (if (!= (node_head args) @List)
         (throw (type_error (string "a list") args)
         ))
     (var idx 0)
+    ; Setup usual arguments
     (while args (do
         (var arg (car args))
-        (if (== (node_head arg) Rest) (do
-            (if (cdr args)
-                (throw (exception (string "\"...\" must be the last argument")))
-                )
-            (if (== (node_size arg) 0) return)
-            (var v (node_arg_symbol arg 0))
-            (return (add_arg tbl v (make_args_from idx) alias))
-            ))
+        (if (|| (== (node_head arg) Rest) (== (node_head arg) Keyword)) break)
         (= alias (setup_arg tbl (make_arg idx) arg 0 alias))
         (= args (cdr args))
         (+= idx 1)
         ))
-    (return alias)
+    (if (! args) (return (tuple3 alias args_ 0)))
+
+    ; Setup variable arguments 
+    (if (== (node_head (car args)) Rest) (do
+        (if (> (node_size (car args)) 0) (do
+            (var v (node_arg_symbol (car args) 0))
+            (= alias (add_arg tbl v (make_args_from idx) alias))
+            ))
+        (+= idx 1)
+        (= args (cdr args))
+        ))
+    (if (! args) (return (tuple3 alias args_ 0)))
+
+    ; Setup keyword arguments
+    (while args (do
+        (var arg (car args))
+        (if (!= (node_head arg) Keyword) (goto invalid_argument))
+        (var v (node_arg_symbol arg 0))
+        (= args (cdr args))
+        ))
+    (var t (list_split (list_copy args_) idx))
+    (return (tuple3 alias (car t) (cdr t)))
+    (label invalid_argument)
+    (throw (invalid_argument_order
+        (string "The order of arguments is invalid")
+        args_))
     ))
 
 (fun setup_arg (tbl obj arg level alias) (
@@ -950,7 +1002,7 @@
         ))
     (if (is_atom arg) (return alias))
     (var argty (node_head arg))
-    (if (== argty Domain) (do
+    (if (== argty Domain)
         (if (== level 0) (do
             (var v (node_arg_symbol arg 0))
             (= alias (add_arg tbl v obj alias))
@@ -960,7 +1012,13 @@
                 )
             (return alias)
             ))
-        ))
+        )
+    (if (== argty Keyword)
+        (if (== level 0) (do
+            (var v (node_arg_symbol arg 0))
+            (return (add_arg tbl v obj alias))
+            ))
+        )
     (if (== argty List) (do
         (var idx 0)
         (while arg (do
@@ -1001,6 +1059,70 @@
                 (node_arg arg i) level alias))
         ))
     (return alias)
+    ))
+
+(fun insert_keyword (k sorted) (
+    (if (! sorted) (return (list1 k)))
+    (var a (node_arg_symbol k 0))
+    (var b (node_arg_symbol (car sorted) 0))
+    (if (< (field_get a @SymbolIndex) (field_get b @SymbolIndex))
+        (return (cons k sorted))
+        (return (cons (car sorted) (insert_keyword k (cdr sorted))))
+        )
+    ))
+
+(fun sort_keywords (list) (
+    (var sorted 0)
+    (while list (do
+        (= sorted (insert_keyword (car list) sorted))
+        (= list (cdr list))
+        ))
+    (return sorted)
+    ))
+
+(fun setup_keyword_array (keywords) (
+    (var len (list_len keywords))
+    (var sorted (sort_keywords keywords))
+    (var ary (array object len))
+    (var i 0)
+    (while sorted (do
+        (array_set object ary i (node_arg_symbol (car sorted) 0))
+        (= sorted (cdr sorted))
+        (+= i 1)
+        ))
+    (return ary)
+    ))
+
+; f(..., k = e...): ...
+;
+; k: keyword[i]
+; if (k == undef)
+;   k = e
+(fun keyword_init (v e tbl) (
+    (return (defvar v (make_object2 KeywordArg (box (keyword_index v tbl)) e))
+        )
+    ))
+
+(fun keyword_index (v tbl) (
+    (for i 0 (seq_size tbl) (do
+        (if (== v (array_get object tbl i)) (return i))
+        ))
+    (throw (not_reachable "keyword_index"))
+    ))
+
+(fun compile_keyword_arg (asm expr) (
+    (var idx (node_arg_int expr 0))
+    (var e   (node_arg expr 1))
+    (var lbl (fresh_label asm))
+    (var exit (fresh_label asm))
+    (put_undef asm idx)
+    (put_dup asm)
+    (put_if_undef asm lbl)
+    (put_goto asm exit)
+    (set_label asm lbl)
+    (put_drop asm)
+    (compile asm e)
+    (set_label asm exit)
     ))
 
 (fun make_gvar (sym) (
@@ -2106,12 +2228,16 @@
     (if (!= guard noguard)
         (do
             (var asm_guard (make_assembler))
-            (compile_function asm_body asm_guard args body guard cls)
+            (var t (compile_function asm_body asm_guard args body guard cls))
+            (= args (tuple_at t 0))
+            (var keys (tuple_at t 1))
             (put_ireturn asm_body)
             (put_push asm (make_function args (get_code asm_body) (get_code asm_guard) use_self))
         )
         (do
-            (compile_function asm_body 0 args body noguard cls)
+            (var t (compile_function asm_body 0 args body noguard cls))
+            (= args (tuple_at t 0))
+            (var keys (tuple_at t 1))
             (put_ireturn asm_body)
             (put_push asm (make_function args (get_code asm_body) 0 use_self))
         ))
@@ -2335,6 +2461,7 @@
     (add_compiler mod (make_object1 Shift DontCare) compile_shift)
 
     ; internal expressions
+    (add_compiler mod (make_object2 KeywordArg intT DontCare) compile_keyword_arg)
     (add_compiler mod (make_object2 FieldRef DontCare intT) compile_fieldref)
     (add_compiler mod (make_object1 AllocClsEnv intT) compile_alloc_clsenv)
     (add_compiler mod (make_object2 Closure DontCare DontCare) compile_closure)

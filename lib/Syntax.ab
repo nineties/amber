@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-02-17 22:46:27 nineties $ "
+" $Id: Syntax.ab 2014-02-18 00:28:13 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -173,12 +173,16 @@ primary_expr
       | atom
       | "..."           { Quote{Rest{}} }
 
+argument ::= symbol "=" assign_expr
+             { QuasiQuote{Keyword{Unquote{node0}, Unquote{node2}}} }
+           | expr
+
 postfix_expr
         # Function Application
-    ::= postfix_expr "(" delimited(expr, ",") ")"
+    ::= postfix_expr "(" delimited(argument, ",") ")"
         { MakeObject{Quote{Apply}, List{node0, node2}} }
         # Subscription
-      | postfix_expr "[" delimited(expr, ",") "]"
+      | postfix_expr "[" delimited(argument, ",") "]"
         { MakeObject{Quote{Subscript}, List{node0, node2}} }
       | # RestOf Pattern
         postfix_expr "..."
@@ -186,7 +190,7 @@ postfix_expr
         # Domain Pattern
       | primary_expr "@" fullform_expr
         { MakeObject{Quote{Domain}, List{node0, node2}} }
-      | postfix_expr "." symbol "(" delimited(expr, ",") ")"
+      | postfix_expr "." symbol "(" delimited(argument, ",") ")"
         { MakeObject{Quote{Send}, List{node0, node2, node4}} }
       | "." symbol
         { MakeObject{Quote{Slot}, List{Quote{GetSelf{}}, node2}} }
@@ -262,9 +266,9 @@ ternary_expr
 guard_clause ::= when ternary_expr { node1 }
 
 argument_list
-    ::= "(" delimited(pattern, ",") ")" guard_clause
+    ::= "(" delimited(argument, ",") ")" guard_clause
         { `When{!node1, !node3} }
-      | "(" delimited(pattern, ",") ")"
+      | "(" delimited(argument, ",") ")"
         { node1 }
       | !"{" pattern guard_clause
         { `When{List{!node1}, !node2} }
@@ -294,9 +298,7 @@ continuation_expr
       | multi_lambda_expr
 
 assign_expr
-    ::= pattern guard_clause "=" assign_expr
-            { `Assign{!node0, !node3, !node1} }
-      | pattern "=" assign_expr   { `Assign{!node0, !node2} }
+    ::= pattern "=" assign_expr   { `Assign{!node0, !node2} }
       | pattern "+=" assign_expr  { `AddAssign{!node0, !node2} }
       | pattern "-=" assign_expr  { `SubAssign{!node0, !node2} }
       | pattern "*=" assign_expr  { `MulAssign{!node0, !node2} }
