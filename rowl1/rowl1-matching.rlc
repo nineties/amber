@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2014-02-19 00:31:27 nineties $
+; $Id: rowl1-matching.rlc 2014-02-19 18:04:29 nineties $
 ;
 
 (import "rlvm-compile")
@@ -225,6 +225,43 @@
     (return pat)
     ))
 
+(fun matching_keywords (args keys) (
+    (if (! args) (do
+        (var n (seq_size keys))
+        (var values (array object n))
+        (for i 0 n (array_set object values i @C_UNDEF))
+        (return values)
+        ))
+    (var vars (field_get args 0))
+    (var vals (field_get args 1))
+    (var argslen (seq_size vars))
+    (var keyslen (seq_size keys))
+    (if (> argslen keyslen) (return 0))
+    (var values (array object keyslen))
+    (var i 0)
+    (var j 0)
+    (for j 0 keyslen (do
+        (if (== i argslen)
+            (do
+                (array_set object values j @C_UNDEF)
+                continue
+            ))
+        (var vi (array_get object vars i))
+        (var vj (array_get object keys j))
+        (if (== vi vj)
+            (do
+                (array_set object values j (array_get object vals i))
+                (+= i 1)
+            )
+        (if (< (field_get vi @SymbolIndex) (field_get vj @SymbolIndex))
+            (return 0)
+            (do
+                (array_set object values j @C_UNDEF)
+            )))
+        ))
+    (return values)
+    ))
+
 (fun compile_matching_main (asm args pats exit) (
     (if (! (field_get (car pats) 0)) (do
         (label compile_matching_main_loop)
@@ -235,6 +272,7 @@
         (var guard 0)
         (var clos 0)
         (var use_self @FALSE)
+        (var nlocal 0)
         (if (== ty @FunctionE)
             (do
                 (= keys (field_get func 3))
@@ -242,6 +280,7 @@
                 (= guard (field_get func 5))
                 (= clos (field_get func 6))
                 (= use_self (field_get func 7))
+                (= nlocal (field_get func 8))
             )
         (if (== ty @BuiltinFunctionE)
             (do 
@@ -250,6 +289,7 @@
             )))
 
         (var check_failed (fresh_label asm))
+        (if (> nlocal 0) (put_allocate asm nlocal))
         (if use_self (do
             (put_self asm)
             (put_if_undef asm check_failed)
@@ -257,6 +297,13 @@
         (if clos (do
             (put_push asm clos)
             (put_store_closure asm)
+            ))
+        (if keys (do
+            (put_push asm keys)
+            (put_keys asm)
+            (compile_simple_call asm 2 matching_keywords)
+            (put_dup asm)
+            (put_if_zero asm check_failed)
             ))
         (if guard (do
             (put_code asm guard)
@@ -276,7 +323,7 @@
                 (put_push asm func)
                 (put_callc asm)
             )))
-        (if (|| guard use_self) (do
+        (if (|| guard (|| use_self keys)) (do
             (set_label asm check_failed)
             (put_deallocate asm)
             (if (cdr pats) (do

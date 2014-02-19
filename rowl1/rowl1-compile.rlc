@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-02-19 11:08:04 nineties $
+; $Id: rowl1-compile.rlc 2014-02-19 17:53:55 nineties $
 ;
 
 (import "rlvm-compile")
@@ -423,8 +423,8 @@
     (return ret)
     ))
 
-(fun alloc_function (args keys code guard clos use_self) (
-    (return (variant @FunctionE 6 0 args keys code guard clos use_self))
+(fun alloc_function (args keys code guard clos use_self nlocal) (
+    (return (variant @FunctionE 6 0 args keys code guard clos use_self nlocal))
     ))
 
 (fun args_len (args) (
@@ -439,10 +439,10 @@
     (return (box len))
     ))
 
-(fun make_function (args keys code guard use_self) (
+(fun make_function (args keys code guard use_self nlocal) (
     (var arity (args_len args))
     (= args (cons arity args))
-    (return (alloc_function args keys code guard 0 use_self))
+    (return (alloc_function args keys code guard 0 use_self nlocal))
     ))
 
 (fun alloc_builtin_function (args func guard use_self) (
@@ -904,10 +904,12 @@
             (= list (cons body list))
             (= list (cons guard list))
             )
+        (var drop @C_TRUE)
         (while keywords (do
             (var v (node_arg_symbol (car keywords) 0))
             (var e (node_arg (car keywords) 1))
-            (= list (cons (keyword_init v e keyarray) list))
+            (= list (cons (keyword_init v e keyarray drop) list))
+            (= drop @C_FALSE)
             (= keywords (cdr keywords))
             ))
         (if (== guard noguard)
@@ -916,30 +918,18 @@
             )
         ))
 
-    (if (!= guard noguard)
-        (do
-            (= cnt_addr (get_address asm_guard))
-            (put_allocate asm_guard)
-            (compile asm_guard guard)
-        )
-        (do
-            (= cnt_addr (get_address asm_body))
-            (put_allocate asm_body)
-        ))
+    (if (!= guard noguard) (compile asm_guard guard))
     (compile asm_body body)
 
-    (if (!= guard noguard)
-        (put_operand_byte asm_guard (+ cnt_addr 1) max_lvar_idx)
-        (put_operand_byte asm_body (+ cnt_addr 1) max_lvar_idx)
-        )
     (symtable_pop variables)
 
+    (var num_lvar max_lvar_idx)
     (= lvar_idx_offset save_lvar_idx_offset)
     (= max_lvar_idx save_max_lvar_idx)
     (= break_labels save_break_labels)
     (= continue_labels save_continue_labels)
     (= try_nest save_try_nest)
-    (return (tuple2 args keyarray))
+    (return (tuple3 args keyarray (box num_lvar)))
     ))
 
 (fun add_arg (tbl sym obj alias) (
@@ -1099,8 +1089,9 @@
 ; k: keyword[i]
 ; if (k == undef)
 ;   k = e
-(fun keyword_init (v e tbl) (
-    (return (defvar v (make_object2 KeywordArg (box (keyword_index v tbl)) e))
+(fun keyword_init (v e tbl drop) (
+    (return (defvar v (make_object3 KeywordArg
+        (box (keyword_index v tbl)) e drop))
         )
     ))
 
@@ -1112,18 +1103,23 @@
     ))
 
 (fun compile_keyword_arg (asm expr) (
-    (var idx (node_arg_int expr 0))
-    (var e   (node_arg expr 1))
+    (var idx  (node_arg_int expr 0))
+    (var e    (node_arg expr 1))
+    (var drop (node_arg expr 2))
     (var lbl (fresh_label asm))
     (var exit (fresh_label asm))
-    (put_undef asm idx)
-    (put_dup asm)
-    (put_if_undef asm lbl)
+    ; Here, stack top is array of keyword values.
+    (if (== drop @C_FALSE)
+        (put_dup asm)           ; array;array
+        )
+    (put_fieldget asm idx)  ; value;array
+    (put_dup asm)           ; value;value;array
+    (put_if_undef asm lbl)  ; value;array
     (put_goto asm exit)
     (set_label asm lbl)
-    (put_drop asm)
-    (compile asm e)
-    (set_label asm exit)
+    (put_drop asm)          ; array
+    (compile asm e)         ; value;array
+    (set_label asm exit)    ; value;array
     ))
 
 (fun make_gvar (sym) (
@@ -1523,8 +1519,6 @@
     ))
 
 (fun keyword_arg_array (len vars values) (
-    (debugpf vars)
-    (debugpf values)
     (var ary1 (array object len))
     (var ary2 (array object len))
     (for i 0 len (do
@@ -1822,9 +1816,17 @@
         ))
     ))
 
+(fun compile_toplevel_block (asm expr) (
+    (var addr (get_address asm))
+    (put_allocate asm 0)
+    (var t (compile_function asm 0 0 expr noguard @C_NIL))
+    (var nlocal (unbox (field_get t 2)))
+    (put_operand_byte asm (+ addr 1) nlocal)
+    ))
+
 (fun compile_block (asm expr) (
     (if (== (symtable_depth variables) 0)
-        (return (compile_function asm 0 0 expr noguard @C_NIL))
+        (return (compile_toplevel_block asm expr))
         )
     (var exprs (node_arg expr 0))
     (symtable_push variables)
@@ -1834,7 +1836,7 @@
 
 (fun compile_breakable (asm expr) (
     (if (== (symtable_depth variables) 0)
-        (return (compile_function asm 0 0 expr noguard @C_NIL))
+        (return (compile_toplevel_block asm expr))
         )
     (var break_lbl (fresh_label asm))
     (var exit_lbl  (fresh_label asm))
@@ -1853,14 +1855,14 @@
 
 (fun compile_if (asm expr) (
     (if (== (symtable_depth variables) 0)
-        (return (compile_function asm 0 0 expr noguard @C_NIL))
+        (return (compile_toplevel_block asm expr))
         )
     (compile_ifelse_main asm (node_arg expr 0) (node_arg expr 1) @C_NIL)
     ))
 
 (fun compile_ifelse (asm expr) (
     (if (== (symtable_depth variables) 0)
-        (return (compile_function asm 0 0 expr noguard @C_NIL))
+        (return (compile_toplevel_block asm expr))
         )
     (compile_ifelse_main asm (node_arg expr 0) (node_arg expr 1) (node_arg expr 2))
     ))
@@ -2003,7 +2005,7 @@
 ;
 (fun compile_while (asm expr) (
     (if (== (symtable_depth variables) 0)
-        (return (compile_function asm 0 0 expr noguard @C_NIL))
+        (return (compile_toplevel_block asm expr))
         )
 
     (var cnd (node_arg expr 0))
@@ -2259,15 +2261,17 @@
             (var t (compile_function asm_body asm_guard args body guard cls))
             (= args (tuple_at t 0))
             (var keys (tuple_at t 1))
+            (var nlocal (tuple_at t 2))
             (put_ireturn asm_body)
-            (put_push asm (make_function args keys (get_code asm_body) (get_code asm_guard) use_self))
+            (put_push asm (make_function args keys (get_code asm_body) (get_code asm_guard) use_self nlocal))
         )
         (do
             (var t (compile_function asm_body 0 args body noguard cls))
             (= args (tuple_at t 0))
             (var keys (tuple_at t 1))
+            (var nlocal (tuple_at t 2))
             (put_ireturn asm_body)
-            (put_push asm (make_function args keys (get_code asm_body) 0 use_self))
+            (put_push asm (make_function args keys (get_code asm_body) 0 use_self nlocal))
         ))
     (= compiling_lambda save_compiling_lambda)
     (= use_self save_use_self)
@@ -2300,7 +2304,8 @@
     (var body (field_get lam 4))
     (var guard (field_get lam 5))
     (var use_self (field_get lam 7))
-    (return (alloc_function args keys body guard clos use_self))
+    (var nlocal (field_get lam 8))
+    (return (alloc_function args keys body guard clos use_self nlocal))
     ))
 
 (fun compile_closure (asm expr) (
@@ -2424,7 +2429,7 @@
     (compile_simple_call asm 2 compile_matching)
     (put_jcall asm 4 0)
     (put_ireturn asm)
-    (return (make_function (list1 x) 0 (get_code asm) 0 @FALSE))
+    (return (make_function (list1 x) 0 (get_code asm) 0 @FALSE 0))
     ))
 
 (export fun setup_builtin_compilers (mod) (
@@ -2490,7 +2495,7 @@
     (add_compiler mod (make_object1 Shift DontCare) compile_shift)
 
     ; internal expressions
-    (add_compiler mod (make_object2 KeywordArg intT DontCare) compile_keyword_arg)
+    (add_compiler mod (make_object3 KeywordArg intT DontCare DontCare) compile_keyword_arg)
     (add_compiler mod (make_object2 FieldRef DontCare intT) compile_fieldref)
     (add_compiler mod (make_object1 AllocClsEnv intT) compile_alloc_clsenv)
     (add_compiler mod (make_object2 Closure DontCare DontCare) compile_closure)
