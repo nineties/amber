@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2014-02-18 15:06:15 nineties $
+; $Id: vm-insn.rlc 2014-02-19 11:11:54 nineties $
 ;
 
 (define gen_field_get (idx) `(
@@ -108,13 +108,49 @@
         (asm "movl %eax, 4(%esi)")
         (asm "movl %ecx, (%esi)")
         ))
-    (rot3 () @true ( ;a;b;c => c;a;b
-        (asm "movl 8(%esi), %eax")
-        (asm "movl 4(%esi), %ecx")
-        (asm "movl %ecx, 8(%esi)")
-        (asm "movl (%esi), %ecx")
-        (asm "movl %ecx, 4(%esi)")
-        (asm "movl %eax, (%esi)")
+    ; 'rot:1' 'number of elements:1' 'shift:1'
+    (rot (byte byte) @true (
+        (vmubyte 1 %edx)
+        (vmubyte 2 %ecx)
+        (asm "shll $2, %edx")
+        (asm "movl %esi, %eax")
+        (asm "addl %edx, %eax")
+
+        (asm "1:")
+        (asm "testl %ecx, %ecx")
+        (asm "jz 2f")
+        (asm "subl $4, %eax")
+        (asm "pushl (%eax)")
+        (asm "subl $1, %ecx")
+        (asm "jmp 1b")
+
+        (asm "2:")
+        (asm "movl %esi, %ecx")
+        (asm "addl %edx, %ecx")
+
+        (asm "3:")
+        (asm "subl $4, %eax")
+        (asm "subl $4, %ecx")
+        (asm "movl (%eax), %edx")
+        (asm "movl %edx, (%ecx)")
+        (asm "cmpl %esi, %eax")
+        (asm "je 4f")
+        (asm "jmp 3b")
+
+        (asm "4:")
+        (vmubyte 2 %ecx)
+        (asm "movl %esi, %eax")
+        (asm "5:")
+        (asm "testl %ecx, %ecx")
+        (asm "jz 6f")
+        (asm "popl %edx")
+        (asm "movl %edx, (%eax)")
+        (asm "subl $1, %ecx")
+        (asm "addl $4, %eax")
+        (asm "jmp 5b")
+
+        (asm "6:")
+        (asm "xorl %edx, %edx")
         ))
     (imm_im1   () @true ((vmpush $-1)))
     (imm_i0    () @true ((vmpush %edx))) ; also used for 'nil'
@@ -1247,7 +1283,7 @@
     (args (byte) @true (
         (asm "subl $12, %esp")
         (asm "movzbl 8(%edi), %ecx") ; %ecx = 4 * arity
-        (asm "leal 16(%edi,%ecx,1), %eax")
+        (asm "leal 20(%edi,%ecx,1), %eax")
         (asm "movl %eax, (%esp)")
         (asm "shrl $2, %ecx")
         (vmubyte 1 %eax) ; offset
@@ -1432,6 +1468,9 @@
     (lcall (laddr byte) @nil (
         (asm "subl $12, %esi") ; stp -> |closure|kwarg|self|
         (asm "movl $" @C_UNDEF ", 8(%esi)")
+        (asm "movl $0, 4(%esi)")
+        (asm "movl $0, (%esi)")
+
         (vmubyte 5 %eax)
         (vmpush %eax) ; store size of arguments
         (asm "movl %ebx, %eax")
@@ -1468,6 +1507,9 @@
         (vmpop %ebx)
         (asm "subl $12, %esi") ; stp -> |closure|kwarg|self|
         (asm "movl $" @C_UNDEF ", 8(%esi)")
+        (asm "movl $0, 4(%esi)")
+        (asm "movl $0, (%esi)")
+
         (vmpush %eax) ; store size of arguments
         (vmpush %ecx) ; store return point
         (asm "movl %edi, %eax") ; old base pointer
@@ -1492,15 +1534,40 @@
         (vmubyte 2 %edx)
         (vmpop %ebx)
 
-        (asm "subl $12, %esi") ; stp -> |closure|kwarg|self|
+        (asm "testl $1, %edx")
+        (asm "jz 1f")
+        (asm "testl $2, %edx")
+        (asm "jz 2f")
+        ; call with self and keyword arg
+        (asm "subl $4, %esi")
+        (asm "movl $0, (%esi)")
+        (asm "jmp 5f")
+        (asm "2:")
+        ; call with self
+        (asm "subl $8, %esi")
+        (asm "movl $0, (%esi)")
+        (asm "movl $0, 4(%esi)")
+        (asm "jmp 5f")
+        (asm "1:")
+        (asm "testl $2, %edx")
+        (asm "jz 4f")
+        ; call with keyword arg
+        (asm "subl $8, %esi")
+        (asm "movl 8(%esi), %eax")
+        (asm "movl %eax, 4(%esi)")
+        (asm "movl $0, (%esi)")
         (asm "movl 20(%edi), %eax")
         (asm "movl %eax, 8(%esi)")
-
-        (asm "testl %edx, %edx")
-        (asm "jz 1f")
-        (asm "addl $4, %esi")
+        (asm "jmp 5f")
+        (asm "4:")
+        ; call with no keyword arg and self
+        (asm "subl $12, %esi")
+        (asm "movl $0, (%esi)")
+        (asm "movl $0, 4(%esi)")
+        (asm "movl 20(%edi), %eax")
+        (asm "movl %eax, 8(%esi)")
+        (asm "5:")
         (asm "xorl %edx, %edx")
-        (asm "1:")
 
         (asm "popl %eax")
         (asm "addl $12, %ebx") ; pointer to the bytecode
@@ -1587,15 +1654,41 @@
         (vmpop %ebx)
         (asm "pushl %eax")
 
-        (asm "subl $12, %esi") ; stp -> |closure|kwarg|self|
+        (asm "testl $1, %edx")
+        (asm "jz 1f")
+        (asm "testl $2, %edx")
+        (asm "jz 2f")
+        ; call with self and keyword arg
+        (asm "subl $4, %esi")
+        (asm "movl $0, (%esi)")
+        (asm "jmp 5f")
+        (asm "2:")
+        ; call with self
+        (asm "subl $8, %esi")
+        (asm "movl $0, (%esi)")
+        (asm "movl $0, 4(%esi)")
+        (asm "jmp 5f")
+        (asm "1:")
+        (asm "testl $2, %edx")
+        (asm "jz 4f")
+        ; call with keyword arg
+        (asm "subl $8, %esi")
+        (asm "movl 8(%esi), %eax")
+        (asm "movl %eax, 4(%esi)")
+        (asm "movl $0, (%esi)")
         (asm "movl 20(%edi), %eax")
         (asm "movl %eax, 8(%esi)")
-
-        (asm "testl %edx, %edx")
-        (asm "jz 1f")
-        (asm "addl $4, %esi")
+        (asm "jmp 5f")
+        (asm "4:")
+        ; call with no keyword arg and self
+        (asm "subl $12, %esi")
+        (asm "movl $0, (%esi)")
+        (asm "movl $0, 4(%esi)")
+        (asm "movl 20(%edi), %eax")
+        (asm "movl %eax, 8(%esi)")
+        (asm "5:")
         (asm "xorl %edx, %edx")
-        (asm "1:")
+
 
         (asm "popl %eax")
         (asm "addl $12, %ebx") ; pointer to the bytecode
@@ -1710,6 +1803,9 @@
         (asm "subl $12, %esi") ; stp -> |closure|kwarg|self|
         (asm "movl 20(%edi), %eax")
         (asm "movl %eax, 8(%esi)")
+        (asm "movl $0, 4(%esi)")
+        (asm "movl $0, (%esi)")
+
         (asm "addl $12, %ebx") ; pointer to the bytecode
         (vmpush @RESET_MARK) ; store size of arguments (== 0) and 'reset' mark
         (vmpush %ecx) ; store return point
@@ -1749,6 +1845,9 @@
         (asm "subl $12, %esi") ; stp -> |closure|kwarg|self|
         (asm "movl 20(%edi), %eax")
         (asm "movl %eax, 8(%esi)")
+        (asm "movl $0, 4(%esi)")
+        (asm "movl $0, (%esi)")
+
         (vmpush 4)    ; store size of arguments
         (vmpush %ecx) ; store return point
         (asm "movl %edi, %eax") ; old base pointer

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-02-18 18:08:17 nineties $
+; $Id: rowl1-compile.rlc 2014-02-19 11:08:04 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1480,10 +1480,10 @@
         (= keywords (cons (car args) keywords))
         (= args (cdr args))
         ))
-    (if (&& args (== (== node_head (car args)) Rest)) (do
+    (if (&& args (== (node_head (car args)) Rest)) (do
         (var failed (fresh_label asm))
         (var reverse (fresh_label asm))
-        (var arg (cdr args))
+        (var arg (car args))
         (= args (cdr args))
 
         (compile asm (node_arg arg 0))
@@ -1497,6 +1497,7 @@
         (put_expand asm)    ; len;le0;le1;...
 
         ; XXX: We should implement `rotate' instruction.
+        (var rot 1)
         (while args (do
             (if (|| (== (node_head (car args)) Rest)
                     (== (node_head (car args)) Keyword))
@@ -1505,10 +1506,10 @@
                     args_))
                     )
             (compile asm (car args))
-            (put_swap asm)
-            (put_iadd1 asm)
+            (+= rot 1)
             (= args (cdr args))
             ))
+        (if (> rot 1) (put_rot asm rot 1))
         (return (tuple2 (box -1) keywords))
         ))
 
@@ -1521,6 +1522,35 @@
     (return (tuple2 (box arity) keywords))
     ))
 
+(fun keyword_arg_array (len vars values) (
+    (debugpf vars)
+    (debugpf values)
+    (var ary1 (array object len))
+    (var ary2 (array object len))
+    (for i 0 len (do
+        (array_set object ary1 i (car vars))
+        (array_set object ary2 i (car values))
+        (= vars (cdr vars))
+        (= values (cdr values))
+        ))
+    (return (tuple2 ary1 ary2))
+    ))
+
+(fun compile_keyword_arg_array (asm keys) (
+    (= keys (list_reverse (sort_keywords keys)))
+    (var list 0)
+    (var vars 0)
+    (while keys (do
+        (= list (cons (node_arg (car keys) 1) list))
+        (= vars (cons (node_arg_symbol (car keys) 0) vars))
+        (= keys (cdr keys))
+        ))
+    (compile asm list)
+    (put_push asm vars)
+    (put_imm_int asm (list_len vars))
+    (compile_simple_call asm 3 keyword_arg_array)
+    ))
+
 (fun compile_apply (asm expr) (
     (var func (node_arg expr 0))
     (var args (node_arg expr 1))
@@ -1529,16 +1559,31 @@
     (var arity (unbox (tuple_at t 0)))
     (var keys  (tuple_at t 1))
 
-    (compile asm func)
-    (put_push asm func)
-    (compile_simple_call asm 2 compile_matching)
+    (var flag 0)
+    (if keys (= flag 2))
+
     (if (>= arity 0)
-        (put_jcall asm (* 4 arity) @FALSE)
         (do
-            (put_swap asm)
+            (if keys (compile_keyword_arg_array asm keys))
+            (compile asm func)
+            (put_push asm func)
+            (compile_simple_call asm 2 compile_matching)
+            (put_jcall asm (* 4 arity) flag)
+            )
+        (do
+            (var rot 2)
+            (if keys (do
+                (compile_keyword_arg_array asm keys)
+                (+= rot 1)
+                ))
+
+            (compile asm func)
+            (put_push asm func)
+            (compile_simple_call asm 2 compile_matching)
+            (put_rot asm rot 1)
             (put_imm_int asm 4)
             (put_imul asm)
-            (put_vcall asm @FALSE)
+            (put_vcall asm flag)
         ))
     ))
 
@@ -1550,24 +1595,31 @@
     (var t (compile_args asm args))
     (var arity (unbox (tuple_at t 0)))
     (var keys  (tuple_at t 1))
+    (var flag 1)
+    (if keys (|= flag 2))
     
     (compile asm self)
     (if (>= arity 0)
         (do
+            (if keys (compile_keyword_arg_array asm keys))
             (compile asm func)
             (put_push asm func)
             (compile_simple_call asm 2 compile_matching)
-            (put_jcall asm (* 4 arity) @TRUE)
+            (put_jcall asm (* 4 arity) flag)
         )
         (do
-            (put_swap asm)
+            (var rot 3)
+            (if keys (do
+                (compile_keyword_arg_array asm keys)
+                (+= rot 1)
+                ))
             (compile asm func)
             (put_push asm func)
             (compile_simple_call asm 2 compile_matching)
-            (put_swap asm)
+            (put_rot asm rot 1)
             (put_imm_int asm 4)
             (put_imul asm)
-            (put_vcall asm asm @TRUE)
+            (put_vcall asm asm flag)
         ))
     ))
 
@@ -1587,28 +1639,41 @@
     (var t (compile_args asm args))
     (var arity (unbox (tuple_at t 0)))
     (var keys  (tuple_at t 1))
+    (var flag 1)
+    (if keys (|= flag 2))
 
     (if (>= arity 0)
         (do
             (compile asm obj)   ; self;arg1;arg2;...
             (put_dup asm)       ; self;self;arg1;arg2;..
+            (if keys (do
+                (compile_keyword_arg_array asm keys)
+                (put_swap asm) ; self;kwarg;self;arg1;arg2;..
+                ))
             (put_push asm sym)
             (compile_simple_call asm 2 get_slot_swap)   ; fun;self;arg1;arg2;..
             (put_push asm (slot obj sym))
             (compile_simple_call asm 2 compile_matching)
-            (put_jcall asm (* 4 arity) @TRUE)
+            (put_jcall asm (* 4 arity) flag)
         )
         (do
             (put_imm_int asm 4)
             (put_imul asm)
             (compile asm obj)   ; self;arity;arg1;arg2;...
             (put_dup asm)       ; self;self;arity;arg1;arg2;..
+            (if keys (do
+                (compile_keyword_arg_array asm keys)
+                (put_swap asm) ; self;kwarg;self;arity;arg1;arg2;..
+                ))
             (put_push asm sym)
-            (compile_simple_call asm 2 get_slot_swap)   ; fun;self;arity;arg1;arg2;..
+            (compile_simple_call asm 2 get_slot_swap)   ; fun;self;[kwarg];arity;arg1;arg2;..
             (put_push asm (slot obj sym))
-            (compile_simple_call asm 2 compile_matching) ; code;self;arity;arg1;arg2;..
-            (put_rot3 asm)
-            (put_vcall asm @TRUE)
+            (compile_simple_call asm 2 compile_matching) ; code;self;[kwarg];arity;arg1;arg2;..
+            (if keys
+                (put_rot asm 4 1)
+                (put_rot asm 3 1)
+                )
+            (put_vcall asm flag)
         ))
     ))
 
@@ -2153,7 +2218,7 @@
     (compile asm (apply (to_sym "fusion") (list2 hdlr default_hdler)))
     (put_push asm hdlr)
     (compile_simple_call asm 2 compile_matching)
-    (put_jcall asm 4 @FALSE)
+    (put_jcall asm 4 0)
     (set_label asm cont_lbl)
     ))
 
@@ -2353,11 +2418,11 @@
     (put_push asm f)
     (put_dup asm)
     (compile_simple_call asm 2 compile_matching)
-    (put_jcall asm 4 @FALSE)
+    (put_jcall asm 4 0)
     (put_push asm g)
     (put_dup asm)
     (compile_simple_call asm 2 compile_matching)
-    (put_jcall asm 4 @FALSE)
+    (put_jcall asm 4 0)
     (put_ireturn asm)
     (return (make_function (list1 x) 0 (get_code asm) 0 @FALSE))
     ))
