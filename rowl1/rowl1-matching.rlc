@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2014-02-19 18:04:29 nineties $
+; $Id: rowl1-matching.rlc 2014-02-19 18:18:18 nineties $
 ;
 
 (import "rlvm-compile")
@@ -41,11 +41,11 @@
     (return old)
     ))
 
-(fun matching_failed_error (obj self args) (
+(fun matching_failed_error (obj def args) (
     (if (== no_matching_exception @C_TRUE)
         (return @C_NIL)
         )
-    (throw (matching_failed obj self args))
+    (throw (matching_failed obj def args))
     ))
 
 (export fun compile_matching (obj def) (
@@ -64,8 +64,9 @@
     (set_label asm exit_lbl)
     (put_args asm 0)
     (put_self asm)
+    (put_push asm def)
     (put_push asm obj)
-    (compile_simple_call asm 3 matching_failed_error)
+    (compile_simple_call asm 4 matching_failed_error)
     (put_ireturn asm)
 
     (var code (get_code asm))
@@ -82,15 +83,25 @@
 
     ; construct pattern matrix 
     (var mat (construct_pattern_matrix def 0))
+    (var idx (max_arity mat))
 
     (var args 0)
-    (var idx  @ARITY_MAX)
     (while (> idx 0) (do
         (decr idx)
         (= args (cons (make_arg idx) args))
         ))
     (= args (cons (get_arity) args))
     (compile_matching_main asm args mat exit)
+    ))
+
+(fun max_arity (mat) (
+    (var max 0)
+    (while mat (do
+        (var m (list_len (field_get (car mat) 0)))
+        (if (> m max) (= max m))
+        (= mat (cdr mat))
+        ))
+    (return max)
     ))
 
 (fun construct_pattern_matrix (def tl) (
