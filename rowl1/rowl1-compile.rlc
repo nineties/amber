@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-02-19 17:53:55 nineties $
+; $Id: rowl1-compile.rlc 2014-02-19 19:00:02 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1562,7 +1562,7 @@
             (compile asm func)
             (put_push asm func)
             (compile_simple_call asm 2 compile_matching)
-            (put_jcall asm (* 4 arity) flag)
+            (put_jcall asm arity flag)
             )
         (do
             (var rot 2)
@@ -1575,8 +1575,6 @@
             (put_push asm func)
             (compile_simple_call asm 2 compile_matching)
             (put_rot asm rot 1)
-            (put_imm_int asm 4)
-            (put_imul asm)
             (put_vcall asm flag)
         ))
     ))
@@ -1599,7 +1597,7 @@
             (compile asm func)
             (put_push asm func)
             (compile_simple_call asm 2 compile_matching)
-            (put_jcall asm (* 4 arity) flag)
+            (put_jcall asm arity flag)
         )
         (do
             (var rot 3)
@@ -1611,8 +1609,6 @@
             (put_push asm func)
             (compile_simple_call asm 2 compile_matching)
             (put_rot asm rot 1)
-            (put_imm_int asm 4)
-            (put_imul asm)
             (put_vcall asm asm flag)
         ))
     ))
@@ -1648,11 +1644,9 @@
             (compile_simple_call asm 2 get_slot_swap)   ; fun;self;arg1;arg2;..
             (put_push asm (slot obj sym))
             (compile_simple_call asm 2 compile_matching)
-            (put_jcall asm (* 4 arity) flag)
+            (put_jcall asm arity flag)
         )
         (do
-            (put_imm_int asm 4)
-            (put_imul asm)
             (compile asm obj)   ; self;arity;arg1;arg2;...
             (put_dup asm)       ; self;self;arity;arg1;arg2;..
             (if keys (do
@@ -2144,7 +2138,7 @@
     (compile asm fun)   ; fun; obj; rhs; obj
     (put_push asm fun)
     (compile_simple_call asm 2 compile_matching)
-    (put_jcall asm 4 @TRUE)  ; val; obj
+    (put_jcall asm 1 1)  ; val; obj
     (put_push asm sym)  ; sym; val; obj
     (compile_simple_call asm 3 set_slot_roll)
     ))
@@ -2220,7 +2214,7 @@
     (compile asm (apply (to_sym "fusion") (list2 hdlr default_hdler)))
     (put_push asm hdlr)
     (compile_simple_call asm 2 compile_matching)
-    (put_jcall asm 4 0)
+    (put_jcall asm 1 0)
     (set_label asm cont_lbl)
     ))
 
@@ -2366,7 +2360,7 @@
 
 (export fun compile_simple_call (asm arity func) (
     (put_imm_int32 asm func)
-    (put_acall asm (* 4 arity))
+    (put_acall asm arity)
     ))
 
 (fun variable_name (lhs) (
@@ -2423,11 +2417,11 @@
     (put_push asm f)
     (put_dup asm)
     (compile_simple_call asm 2 compile_matching)
-    (put_jcall asm 4 0)
+    (put_jcall asm 1 0)
     (put_push asm g)
     (put_dup asm)
     (compile_simple_call asm 2 compile_matching)
-    (put_jcall asm 4 0)
+    (put_jcall asm 1 0)
     (put_ireturn asm)
     (return (make_function (list1 x) 0 (get_code asm) 0 @FALSE 0))
     ))

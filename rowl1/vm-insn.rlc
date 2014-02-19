@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-insn.rlc 2014-02-19 18:04:21 nineties $
+; $Id: vm-insn.rlc 2014-02-19 19:00:29 nineties $
 ;
 
 (define gen_field_get (idx) `(
@@ -1446,11 +1446,12 @@
         (vmint 1 %eax)
         (vmpush %eax)
         ))
-    ; 'call:1' 'relative address of the function:2' 'size of arguments:1'
+    ; 'call:1' 'relative address of the function:2' 'number of arguments:1'
     (call (addr byte) @nil  (
         (asm "subl $12, %esi")
         (asm "movl $" @C_UNDEF ", 8(%esi)")
         (vmubyte 3 %eax)
+        (asm "shll $2, %eax")
         (vmpush %eax) ; store size of arguments
         (asm "movl %ebx, %eax")
         (asm "addl $4, %eax")
@@ -1465,7 +1466,7 @@
         (asm "addl %eax, %ebx")
         (vmfetch)
         ))
-    ; 'lcall:1' 'relative address of the function:4' 'size of arguments:1'
+    ; 'lcall:1' 'relative address of the function:4' 'number of arguments:1'
     (lcall (laddr byte) @nil (
         (asm "subl $12, %esi") ; stp -> |closure|kwarg|self|
         (asm "movl $" @C_UNDEF ", 8(%esi)")
@@ -1473,6 +1474,7 @@
         (asm "movl $0, (%esi)")
 
         (vmubyte 5 %eax)
+        (asm "shll $2, %eax")
         (vmpush %eax) ; store size of arguments
         (asm "movl %ebx, %eax")
         (asm "addl $6, %eax")
@@ -1485,26 +1487,29 @@
         (asm "addl %eax, %ebx")
         (vmfetch)
         ))
-    ; 'pcall:1' 'index of the external function:2' 'size of arguments:1'
+    ; 'pcall:1' 'index of the external function:2' 'number of arguments:1'
     (pcall (prim byte) @true (
         (vmsave)
         (vmushort 1 %eax)
         (vmubyte 3 %ecx)
+        (asm "shll $2, %ecx")
         (asm "pushl %esi") ; push argv
         (asm "pushl %ecx") ; push argsize
         (asm "pushl %eax") ; push index
         (call vm_pcall)
         (asm "addl $12, %esp")
         (vmrestore)
-        (vmubyte 3 %ecx) ; total size of arguments
+        (vmubyte 3 %ecx) ; number of arguments
+        (asm "shll $2, %ecx")
         (asm "addl %ecx, %esi") ; remove arguments from stack
         (vmpush %eax) ; push return value
         ))
-    ; 'acall:1' 'size of arguments:1'
+    ; 'acall:1' 'number of arguments:1'
     (acall (byte) @nil (
         (asm "movl %ebx, %ecx")
         (asm "addl $2, %ecx")
         (vmubyte 1 %eax)
+        (asm "shll $2, %eax")
         (vmpop %ebx)
         (asm "subl $12, %esi") ; stp -> |closure|kwarg|self|
         (asm "movl $" @C_UNDEF ", 8(%esi)")
@@ -1526,11 +1531,12 @@
         (asm "addl code_base, %ebx")
         (vmfetch)
         ))
-    ; 'jcall:1' 'size of arguments:1' 'self-flag:1'
+    ; 'jcall:1' 'number of arguments:1' 'self-flag:1'
     (jcall (byte byte) @nil (
         (asm "movl %ebx, %ecx")
         (asm "addl $3, %ecx")
         (vmubyte 1 %eax)
+        (asm "shll $2, %eax")
         (asm "pushl %eax")
         (vmubyte 2 %edx)
         (vmpop %ebx)
@@ -1646,11 +1652,12 @@
         (asm "xorl %edx, %edx")
         (vmpush %ecx)
         ))
-    ; 'jcall:1' 'self-flag:1'
+    ; 'vcall:1' 'self-flag:1'
     (vcall (byte) @nil (
         (asm "movl %ebx, %ecx")
         (asm "addl $2, %ecx")
         (vmpop %eax)
+        (asm "shll $2, %eax") ; number of arguments
         (vmubyte 1 %edx)
         (vmpop %ebx)
         (asm "pushl %eax")

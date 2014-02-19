@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlvm-compile.rlc 2014-02-18 15:06:56 nineties $
+; $Id: rlvm-compile.rlc 2014-02-19 18:36:34 nineties $
 ;
 
 (import "stdlib")
@@ -365,21 +365,21 @@
 (define compile_prim_call (idx args drop) (do
     (var narg (length args))
     (foreach a (reverse args) (compile_expr a nil))
-    (emit_insn `(pcall (short @idx) (byte @(* 4 narg))))
+    (emit_insn `(pcall (short @idx) (byte @narg)))
     (if drop (emit_insn `drop))
     ))
 
 (define compile_localcall (fun args drop) (do
     (var narg (length args))
     (foreach a (reverse args) (compile_expr a nil))
-    (emit_insn `(call (label @fun) (byte @(* 4 narg))))
+    (emit_insn `(call (label @fun) (byte @narg)))
     (if drop (emit_insn `drop))
     ))
 
 (define compile_extcall (fun args drop) (do
     (var narg (length args))
     (foreach a (reverse args) (compile_expr a nil))
-    (emit_insn `(lcall (extfun @fun) (byte @(* 4 narg))))
+    (emit_insn `(lcall (extfun @fun) (byte @narg)))
     (if drop (emit_insn `drop))
     ))
 
@@ -387,7 +387,7 @@
     (var narg (length args))
     (foreach a (reverse args) (compile_expr a nil))
     (compile_expr fun nil)
-    (emit_insn `(acall (byte @(* 4 narg))))
+    (emit_insn `(acall (byte @narg)))
     (if drop (emit_insn `drop))
     ))
 
@@ -407,7 +407,7 @@
     (var narg (length args))
     (foreach a (reverse args) (compile_expr a nil))
     (compile_expr bytecode nil)
-    (emit_insn `(jcall (byte @(* 4 narg)) (byte 0)))
+    (emit_insn `(jcall (byte @narg) (byte 0)))
     (if drop (emit_insn `drop))
     ))
 
@@ -416,7 +416,7 @@
     (foreach a (reverse args) (compile_expr a nil))
     (compile_expr self nil)
     (compile_expr bytecode nil)
-    (emit_insn `(jcall (byte @(* 4 narg)) (byte 1)))
+    (emit_insn `(jcall (byte @narg) (byte 1)))
     (if drop (emit_insn `drop))
     ))
 
