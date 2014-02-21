@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-object.rlc 2014-02-20 08:08:56 nineties $
+; $Id: rowl1-object.rlc 2014-02-21 13:34:44 nineties $
 ;
 
 (import "rlvm-compile")
@@ -68,70 +68,7 @@
     (return (set_slot_ obj sym val @C_TRUE @C_FALSE @C_TRUE))
     ))
 
-(export fun get_slot_nocheck_noalias (obj sym) (
-    (if (== sym parent) (return (get_parent obj)))
-    (var tbl (wrtable_find slots sym))
-    (if (== tbl @C_UNDEF) (return @C_UNDEF))
-    (label retry)
-    (var v (wrtable_find tbl obj))
-    (if (&& (== v @C_UNDEF) (!= obj @C_NIL)) (do
-        (= obj (get_parent obj))
-        (if (== obj @C_UNDEF) (return @C_UNDEF))
-        (goto retry)
-        ))
-    (return v)
-    ))
-
-(export fun get_slot_nocheck (obj sym) (
-    (var v (get_slot_nocheck_noalias obj sym))
-    (if (&& (== (node_type v) @AliasE) (field_get v 1))
-        (return (runcode_with_self obj (get_bytecode (field_get v 1))))
-    (if (== v @C_UNDEF)
-        (return @C_NIL)
-        (return v)
-        ))
-    ))
-
-(export fun get_slot (obj sym) (
-    (var v (get_slot_nocheck_noalias obj sym))
-    (if (&& (== (node_type v) @AliasE) (field_get v 1))
-        (return (runcode_with_self obj (get_bytecode (field_get v 1))))
-        )
-    (if (== v @C_UNDEF) (throw (undefined_var sym)))
-    (return v)
-    ))
-
-(fun get_slot_table (sym) (
-    (var tbl (wrtable_find slots sym))
-    (if (== tbl @C_UNDEF) (do
-        (= tbl (make_wrtable))
-        (wrtable_add slots sym tbl)
-        ))
-    (return tbl)
-    ))
-
-(fun get_slot_ (obj sym rec alias) (
-    (var ref (get_slot_ref obj sym rec))
-    ;(if (== ref @C_UNDEF)
-    ;    (if (!= check @C_FALSE)
-    ;        (throw (undefined_slot obj sym))
-    ;        (return @C_NIL)
-    ;        ))
-    (var v (field_get ref 3))
-    (if (&& (!= alias @C_FALSE) (&& (== (node_type v) @AliasE) (field_get v 1)))
-        (return (runcode_with_self obj (get_bytecode (field_get v 1))))
-        )
-    (return v)
-    ))
-
 (fun set_slot_ (obj sym val overwrite fusion alias) (
-    (debugs "==== SET_SLOT ====\n")
-    (debugpf obj)
-    (debugpf sym)
-    (debugpf val)
-    (debugpf overwrite)
-    (debugpf fusion)
-    (debugpf alias)
     (if (== sym parent) (return (set_parent obj val)))
     (var ref (get_slot_ref obj sym @C_TRUE))
     (if (&& (!= overwrite @C_FALSE) (== ref @C_UNDEF))
@@ -164,28 +101,42 @@
     (return val)
     ))
 
+(export fun get_slot (obj sym) (
+    (return (get_slot_ obj sym @C_TRUE @C_FALSE @C_TRUE))
+    ))
+
 (export fun get_slot_unalias (obj sym) (
-    (var v (get_slot_nocheck_noalias obj sym))
-    (if (== v @C_UNDEF)
-        (throw (undefined_var sym))
-        )
-    (return v)
+    (return (get_slot_ obj sym @C_TRUE @C_FALSE @C_TRUE))
     ))
 
-(fun get_slot_norec_ (self obj sym) (
-    (if (== sym parent) (return (get_parent obj)))
+(export fun get_slot_nocheck (obj sym) (
+    (return (get_slot_ obj sym @C_TRUE @C_FALSE @C_FALSE))
+    ))
+
+(export fun get_slot_norec_nocheck (obj sym) (
+    (return (get_slot_ obj sym @C_FALSE @C_TRUE @C_FALSE))
+    ))
+
+(fun get_slot_table (sym) (
     (var tbl (wrtable_find slots sym))
-    (if (== tbl @C_UNDEF) (return @C_UNDEF))
-    (var v (wrtable_find tbl obj))
-    (if (&& (== (node_type v) @AliasE) (field_get v 1))
-        (return (runcode_with_self self (get_bytecode (field_get v 1))))
-        )
-    (return v)
+    (if (== tbl @C_UNDEF) (do
+        (= tbl (make_wrtable))
+        (wrtable_add slots sym tbl)
+        ))
+    (return tbl)
     ))
 
-(export fun get_slot_norec (obj sym) (
-    (var v (get_slot_norec_ obj obj sym))
-    (if (== v @C_UNDEF) (return @C_NIL))
+(fun get_slot_ (obj sym rec alias check) (
+    (var ref (get_slot_ref obj sym rec))
+    (if (== ref @C_UNDEF)
+        (if (!= check @C_FALSE)
+            (throw (undefined_slot obj sym))
+            (return @C_NIL)
+            ))
+    (var v (field_get ref 3))
+    (if (&& (!= alias @C_FALSE) (&& (== (node_type v) @AliasE) (field_get v 1)))
+        (return (runcode_with_self obj (get_bytecode (field_get v 1))))
+        )
     (return v)
     ))
 
@@ -195,7 +146,7 @@
     ))
 
 (export fun has_slot_p (obj sym) (
-    (if (!= (get_slot_norec_ obj obj sym) @C_UNDEF)
+    (if (!= (get_slot_ref obj sym @C_FALSE) @C_UNDEF)
         (return @C_TRUE)
         (return @C_FALSE)
         )
@@ -263,7 +214,7 @@
     ))
 
 (export fun setup_object (mod) (
-    (add_function4 mod (to_sym "get_slot") DontCare symT DontCare DontCare get_slot_ 0)
+    (add_function5 mod (to_sym "get_slot") DontCare symT DontCare DontCare DontCare get_slot_ 0)
     (add_function6 mod (to_sym "set_slot") DontCare symT DontCare DontCare DontCare DontCare set_slot_ 0)
     (add_function2 mod (to_sym "has_slot?") DontCare symT has_slot_p 0)
 
