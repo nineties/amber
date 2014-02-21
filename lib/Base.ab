@@ -1,32 +1,24 @@
 # Copyright (C) 2010 nineties
-# $Id: Base.ab 2014-02-17 14:59:30 nineties $
+# $Id: Base.ab 2014-02-20 08:16:52 nineties $
 
 # Chain of obj.parent.parent... eventually reaches `nil',
 # so we can use nil as the root object of parent chain.
 
 nil with {
-    head            = Prim.alias(() -> Prim.head(self))
-    arguments       = Prim.alias(() -> Prim.arguments(self))
-    arity           = Prim.alias(() -> Prim.arity(self))
-    copy()          = Prim.copy(self)
-    to_s()          = fullform(self)
+    .head      = Prim.alias(() -> Prim.head(self))
+    .arguments = Prim.alias(() -> Prim.arguments(self))
+    .arity     = Prim.alias(() -> Prim.arity(self))
+    .to_s()    = fullform(self)
 
-    get_slot(sym @ Symbol)           = Prim.get_slot(self, sym)
-    get_slot(sym @ Symbol, \norec)   = Prim.get_slot_norec(self, sym)
-    get_slot(sym @ Symbol, \unalias) = Prim.get_slot_unalias(self, sym)
-    set_slot(sym @ Symbol, v)           = Prim.set_slot(self, sym, v)
-    set_slot(sym @ Symbol, v, \fusion)  = Prim.set_slot_fusion(self, sym, v)
-    set_slot(sym @ Symbol, v, \unalias) = Prim.set_slot_unalias(self, sym, v)
+    .get_slot(sym @ Symbol, recursive=true, alias=true, check=true)
+        = Prim.get_slot(self, sym, recursive, alias)
+    .set_slot(sym @ Symbol, v, overwrite=false, fusion=true, alias=true)
+        = Prim.set_slot(self, sym, v, overwrite, fusion, alias)
+    .has_slot?(sym) = Prim.has_slot?(self, sym)
 
-    get(i @ Int) = Prim.get_arg(self, i)
-    get = get | get_slot
-
-    set(i @ Int, v) = Prim.set_arg(self, i, v)
-    set = set | set_slot
-
-    has_slot?(sym) = Prim.has_slot?(self, sym)
-
-    each_slots(fun @ Function) = Prim.each_slots(self, fun)
+    .get(i @ Int) = Prim.get_arg(self, i)
+    .set(i @ Int, v) = Prim.set_arg(self, i, v)
+    .each_slots(fun @ Function) = Prim.each_slots(self, fun)
 }
 
 id(obj):    obj

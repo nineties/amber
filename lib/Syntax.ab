@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-02-18 00:28:13 nineties $ "
+" $Id: Syntax.ab 2014-02-20 10:04:20 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -39,7 +39,7 @@ Assign{Slot{Syntax, comment}, Slot{Prim, parse_shell_style_comment}}
 
 DefineSyntax{
     character_set,
-    List{Tuple{List{Many1{Choice{List{'\\', any}, List{Not{"]"}, any}}}},
+    List{Tuple{List{Many1{Choice{List{"\\", any}, List{Not{"]"}, any}}}},
         Apply{input_text, List{parser,begin,end}}}
     }
 }
@@ -193,7 +193,7 @@ postfix_expr
       | postfix_expr "." symbol "(" delimited(argument, ",") ")"
         { MakeObject{Quote{Send}, List{node0, node2, node4}} }
       | "." symbol
-        { MakeObject{Quote{Slot}, List{Quote{GetSelf{}}, node2}} }
+        { MakeObject{Quote{Slot}, List{Quote{GetSelf{}}, node1}} }
       | postfix_expr "." symbol
         { MakeObject{Quote{Slot}, List{node0, node2}} }
       | primary_expr "^" postfix_expr
@@ -214,7 +214,7 @@ quote_expr
       | fullform_expr
 
 pattern ::= quote_expr
-term    ::= primary_expr
+term    ::= postfix_expr
 
 ## enable use of quotation expressions for following definitions.
 Assign{Slot{Syntax, expr}, Slot{Syntax, quote_expr}}
@@ -226,14 +226,14 @@ prefix_expr
       | quote_expr
 
 multiplicative_expr
-    ::= multiplicative_expr '*' prefix_expr { `Mul{!node0, !node2} }
-      | multiplicative_expr '/' prefix_expr { `Div{!node0, !node2} }
-      | multiplicative_expr '%' prefix_expr { `Mod{!node0, !node2} }
+    ::= multiplicative_expr "*" prefix_expr { `Mul{!node0, !node2} }
+      | multiplicative_expr "/" prefix_expr { `Div{!node0, !node2} }
+      | multiplicative_expr "%" prefix_expr { `Mod{!node0, !node2} }
       | prefix_expr
 
 additive_expr
-    ::= additive_expr '+' multiplicative_expr { `Add{!node0, !node2} }
-      | additive_expr '-' multiplicative_expr { `Sub{!node0, !node2} }
+    ::= additive_expr "+" multiplicative_expr { `Add{!node0, !node2} }
+      | additive_expr "-" multiplicative_expr { `Sub{!node0, !node2} }
       | multiplicative_expr
 
 range_expr
@@ -325,6 +325,11 @@ stmt
 
       | stmt ";"
         { `Seq{[!node0, nil]} }
+
+      | postfix_expr delimited1(argument, ",")
+        { MakeObject{Quote{Apply}, List{node0, node1}} }
+      | postfix_expr "." symbol delimited1(argument, ",")
+        { MakeObject{Quote{Send}, List{node0, node2, node3}} }
 
       | <<multiline>> if term stmt else stmt
         { `IfElse{!node1, !node2, !node4} }
@@ -425,10 +430,10 @@ expand_macro: expr -> {
         else if (Equal{head, \Unquote})
             level = Prim.int_sub(level, 1)
 
-        if (Prim.int_less_than?(level, 0))
+        if Prim.int_less_than?(level, 0)
             throw `LogicError{"Unquotation outside quasi-quotation"}
 
-        if (Prim.atom?(expr))
+        if Prim.atom?(expr)
             return expr
 
         head = Prim.head(expr)
@@ -534,22 +539,7 @@ macro(QuoteSyntax{For{i, Range{a, b}, body}}) = {
 #
 # { t: obj; t.a = p; t.b = q; t.c = r; t }
 #
-macro(WithSlots{obj, slots}): {
-    transl(e): case (macro(e)) of
-          Assign{x, e, opts...} ->
-              `Assign{Slot{self, !x}, !e, !opts...}
-        | Define{x, e, opts...} ->
-              `Define{Slot{self, !x}, !e, !opts...}
-        | Apply{f, args} ->
-              `Send{self, !f, !args}
-        | e @ ... -> {
-              throw `InvalidSyntax{"Invalid syntax of slot assignment.", !e}
-          }
-    `Apply{!obj, () -> {
-        Seq{!Prim.list_map(transl, slots)}
-        self
-    }, []}
-}
+macro(WithSlots{obj, init}): `Apply{!obj, () -> { !init; self }, []}
 
 ## Utilities
 Syntax.add_reserved_symbol(sym):

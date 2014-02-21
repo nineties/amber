@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-object.rlc 2014-02-17 21:26:55 nineties $
+; $Id: rowl1-object.rlc 2014-02-20 08:08:56 nineties $
 ;
 
 (import "rlvm-compile")
@@ -25,72 +25,6 @@
 (extern fun tuple_at)
 (extern fun tuple2)
 
-(export fun remove_slot (obj sym) (
-    (var tbl (wrtable_find slots sym))
-    (if (!= tbl @C_UNDEF) (wrtable_del tbl obj))
-    (return @C_NIL)
-    ))
-
-(export fun remove_parent (obj) (
-    (wrtable_add parent_tbl obj noparent)
-    ))
-
-(export fun set_slot (obj sym val) (
-    (return (set_slot_ obj obj sym val))
-    ))
-
-(fun set_slot_ (self obj sym val) (
-    (var v (get_slot_nocheck_noalias obj sym))
-    (if (== (node_type v) @AliasE) (do
-        (var f (field_get v 2))
-        (if f (return (runcode_with_self self (get_bytecode f) val)))
-        ))
-    (var tbl (wrtable_find slots sym))
-    (if (== tbl @C_UNDEF) (do
-        (= tbl (make_wrtable))
-        (wrtable_add slots sym tbl)
-        ))
-    (wrtable_add tbl obj val)
-    (return val)
-    ))
-
-(export fun set_slot_unalias (obj sym val) (
-    (var tbl (wrtable_find slots sym))
-    (if (== tbl @C_UNDEF) (do
-        (= tbl (make_wrtable))
-        (wrtable_add slots sym tbl)
-        ))
-    (wrtable_add tbl obj val)
-    (return val)
-    ))
-
-(export fun set_slot_fusion (obj sym val) (
-    (var f (get_slot_nocheck_noalias obj sym))
-    (if (&& (is_function f) (is_function val))
-        (return (set_slot obj sym (fusion_function val f)))
-        )
-r   (return (set_slot obj sym val))
-    ))
-
-(export fun set_undef_slot (obj sym val) (
-    (var v (get_slot_nocheck obj sym))
-    (if (!= v @C_NIL) (return v))
-    (return (set_slot obj sym val))
-    ))
-
-(export fun set_slot_overwrite (obj sym val) (
-    (var self obj)
-    (var v (get_slot_norec_ self obj sym))
-    (while (== v @C_UNDEF) (do
-        (= obj (get_parent obj))
-        (if (|| (== obj @C_NIL) (== obj @C_UNDEF))
-            (return @C_UNDEF)
-            )
-        (= v (get_slot_norec_ self obj sym))
-        ))
-    (return (set_slot_ self obj sym val))
-    ))
-
 (fun get_parent (obj) (
     (var p (wrtable_find parent_tbl obj))
     (if (== p noparent) (return @C_UNDEF))
@@ -98,6 +32,40 @@ r   (return (set_slot obj sym val))
     (= p (array_get object parent_special (node_type obj)))
     (if (!= p @C_UNDEF) (return p))
     (return @C_NIL)
+    ))
+
+(fun set_parent (obj p) (
+    (wrtable_add parent_tbl obj p)
+    (return p)
+    ))
+
+(fun get_slot_ref (obj sym rec) (
+    (var tbl (wrtable_find slots sym))
+    (if (== tbl @C_UNDEF) (return @C_UNDEF))
+    (label retry)
+    (var v (wrtable_findref tbl obj))
+    (if (&& (&& (== v @C_UNDEF) (!= obj @C_NIL)) (!= rec @C_FALSE)) (do
+        (= obj (get_parent obj))
+        (if (== obj @C_UNDEF) (return @C_UNDEF))
+        (goto retry)
+        ))
+    (return v)
+    ))
+
+(export fun remove_parent (obj) (
+    (wrtable_add parent_tbl obj noparent)
+    ))
+
+(export fun set_slot (obj sym val) (
+    (return (set_slot_ obj sym val @C_FALSE @C_FALSE @C_TRUE))
+    ))
+
+(export fun set_slot_fusion (obj sym val) (
+    (return (set_slot_ obj sym val @C_FALSE @C_TRUE @C_TRUE))
+    ))
+
+(export fun set_slot_overwrite (obj sym val) (
+    (return (set_slot_ obj sym val @C_TRUE @C_FALSE @C_TRUE))
     ))
 
 (export fun get_slot_nocheck_noalias (obj sym) (
@@ -131,6 +99,69 @@ r   (return (set_slot obj sym val))
         )
     (if (== v @C_UNDEF) (throw (undefined_var sym)))
     (return v)
+    ))
+
+(fun get_slot_table (sym) (
+    (var tbl (wrtable_find slots sym))
+    (if (== tbl @C_UNDEF) (do
+        (= tbl (make_wrtable))
+        (wrtable_add slots sym tbl)
+        ))
+    (return tbl)
+    ))
+
+(fun get_slot_ (obj sym rec alias) (
+    (var ref (get_slot_ref obj sym rec))
+    ;(if (== ref @C_UNDEF)
+    ;    (if (!= check @C_FALSE)
+    ;        (throw (undefined_slot obj sym))
+    ;        (return @C_NIL)
+    ;        ))
+    (var v (field_get ref 3))
+    (if (&& (!= alias @C_FALSE) (&& (== (node_type v) @AliasE) (field_get v 1)))
+        (return (runcode_with_self obj (get_bytecode (field_get v 1))))
+        )
+    (return v)
+    ))
+
+(fun set_slot_ (obj sym val overwrite fusion alias) (
+    (debugs "==== SET_SLOT ====\n")
+    (debugpf obj)
+    (debugpf sym)
+    (debugpf val)
+    (debugpf overwrite)
+    (debugpf fusion)
+    (debugpf alias)
+    (if (== sym parent) (return (set_parent obj val)))
+    (var ref (get_slot_ref obj sym @C_TRUE))
+    (if (&& (!= overwrite @C_FALSE) (== ref @C_UNDEF))
+        (throw (undefined_slot obj sym))
+        )
+    (var tbl (get_slot_table sym))
+    (if (== ref @C_UNDEF) (do
+        (wrtable_add tbl obj val)
+        (return val)
+        ))
+    (var v (field_get ref 3))
+    (if (&& (!= fusion @C_FALSE) (&& (is_function v) (is_function val))) (do
+        (var f (fusion_function val v))
+        (if (!= overwrite @C_FALSE)
+            (field_set ref 3 f)
+            (wrtable_add tbl obj f)
+            )
+        (return f)
+        ))
+    (if (&& (!= alias @C_FALSE) 
+        (&& (== (node_type v) @AliasE)
+            (field_get v 2))) (do
+        (var f (field_get v 2))
+        (return (runcode_with_self obj (get_bytecode f) val))
+        ))
+    (if (!= overwrite @C_FALSE)
+        (field_set ref 3 val)
+        (wrtable_add tbl obj val)
+        )
+    (return val)
     ))
 
 (export fun get_slot_unalias (obj sym) (
@@ -232,12 +263,8 @@ r   (return (set_slot obj sym val))
     ))
 
 (export fun setup_object (mod) (
-    (add_function3 mod (to_sym "set_slot") DontCare symT DontCare set_slot 0)
-    (add_function3 mod (to_sym "set_slot_fusion") DontCare symT DontCare set_slot_fusion 0)
-    (add_function3 mod (to_sym "set_slot_unalias") DontCare symT DontCare set_slot_unalias 0)
-    (add_function2 mod (to_sym "get_slot") DontCare symT get_slot 0)
-    (add_function2 mod (to_sym "get_slot_norec") DontCare symT get_slot_norec 0)
-    (add_function2 mod (to_sym "get_slot_unalias") DontCare symT  get_slot_unalias 0)
+    (add_function4 mod (to_sym "get_slot") DontCare symT DontCare DontCare get_slot_ 0)
+    (add_function6 mod (to_sym "set_slot") DontCare symT DontCare DontCare DontCare DontCare set_slot_ 0)
     (add_function2 mod (to_sym "has_slot?") DontCare symT has_slot_p 0)
 
     (add_function2 mod (to_sym "each_slots") DontCare funT each_slots 0)

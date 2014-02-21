@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-02-17 22:54:13 nineties $
+; $Id: rowl1-interp.rlc 2014-02-20 10:01:51 nineties $
 ;
 
 (import "rlvm-compile")
@@ -65,6 +65,10 @@
     (return r)
     ))
 
+(fun version_string () (
+    (return (strcat (strcat (itos @VERSION_MAJOR) ".") (itos @VERSION_MINOR)))
+    ))
+
 (fun eval_main (file ichan argc argv) (
     (= current_loc no_loc)
 
@@ -98,6 +102,7 @@
     (var load_path (ary_new)) 
     (set_slot amber (to_sym "AMBERPATH") load_path)
     (set_slot amber (to_sym "LOADED") (ary_new))
+    (set_slot amber (to_sym "VERSION") (version_string))
     (ary_push load_path (tuple2 (string "/usr/lib/amber") amber))
     (ary_push load_path (tuple2 (realpath (string ".")) amber))
     (setup_minimal_interpreter prim)
@@ -116,6 +121,7 @@
     ))
 
 (fun eval (expr) (
+    (debugpf expr)
     (return (runcode (lookup_func global Eval) expr))
     ))
 
@@ -250,9 +256,7 @@
     (return @TRUE)
     ))
 
-(fun load_file (path) ((return (load_file_impl path @FALSE))))
-(fun load_file_nothrow (path _) ((return (load_file_impl path @TRUE))))
-(fun load_file_impl (path nothrow) (
+(fun load_file (path) (
     (var dirs (get_slot amber (to_sym "AMBERPATH")))
     (var loaded (get_slot amber (to_sym "LOADED")))
     (if (!= (node_type dirs) @ArrayE) (goto load_error))
@@ -294,9 +298,25 @@
             (return @C_TRUE)
             ))
         ))
-    (if nothrow (return @C_FALSE))
     (throw (not_found (string path)))
+    (label load_error)
+    (throw (logic_error1 (string "AMBERPATH must be an array of strings") dirs))
+    ))
 
+(fun loadable (path) (
+    (var dirs (get_slot amber (to_sym "AMBERPATH")))
+    (var loaded (get_slot amber (to_sym "LOADED")))
+    (if (!= (node_type dirs) @ArrayE) (goto load_error))
+    (if (!= (node_type loaded) @ArrayE) (goto load_error))
+    (rfor i 0 (array_size dirs) (do
+        (var t (ary_at dirs (box i)))
+        (var dir (tuple_at t 0))
+        (var mod (tuple_at t 1))
+        (if (!= (node_type dir) @StringE) (goto load_error))
+        (var fullpath (strcat (strcat dir "/") path))
+        (if (file_exists fullpath) (return @C_TRUE))
+        ))
+    (return @C_FALSE)
     (label load_error)
     (throw (logic_error1 (string "AMBERPATH must be an array of strings") dirs))
     ))
@@ -400,8 +420,6 @@
     (copy_variable syntax "integer" prim "parse_integer")
     (copy_variable syntax "float" prim "parse_float")
     (copy_variable syntax "string" prim "parse_string")
-    (copy_variable syntax "string_d" prim "parse_string_d")
-    (copy_variable syntax "string_s" prim "parse_string_s")
     (copy_variable syntax "symbol" prim "parse_symbol")
     (copy_variable syntax "symbol_without_mark" prim "parse_symbol_without_mark")
     (copy_variable syntax "reserved_symbol" prim "parse_reserved_symbol")
@@ -415,7 +433,7 @@
     (add_function1 prim (to_sym "exit") intT exit_ 0)
     (add_function1 prim (to_sym "atexit") funT at_exit 0)
     (add_function1 prim (to_sym "load") stringT load_file 0)
-    (add_function2 prim (to_sym "load") stringT (quote (to_sym "nothrow")) load_file_nothrow 0)
+    (add_function1 prim (to_sym "loadable?") stringT loadable 0)
     (add_function1 prim (to_sym "create_module") symT create_module 0)
     (add_function1 prim (to_sym "enter_module") symT enter_module 0)
     (add_function0 prim (to_sym "exit_module") exit_module 0)

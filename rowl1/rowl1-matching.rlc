@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2014-02-19 18:56:47 nineties $
+; $Id: rowl1-matching.rlc 2014-02-19 23:56:41 nineties $
 ;
 
 (import "rlvm-compile")
@@ -41,11 +41,11 @@
     (return old)
     ))
 
-(fun matching_failed_error (obj def args) (
+(fun matching_failed_error (obj def self args) (
     (if (== no_matching_exception @C_TRUE)
         (return @C_NIL)
         )
-    (throw (matching_failed obj def args))
+    (throw (matching_failed obj def self args))
     ))
 
 (export fun compile_matching (obj def) (
@@ -247,7 +247,6 @@
     (var vals (field_get args 1))
     (var argslen (seq_size vars))
     (var keyslen (seq_size keys))
-    (if (> argslen keyslen) (return 0))
     (var values (array object keyslen))
     (var i 0)
     (var j 0)
@@ -265,11 +264,14 @@
                 (+= i 1)
             )
         (if (< (field_get vi @SymbolIndex) (field_get vj @SymbolIndex))
-            (return 0)
+            (throw (undefined_keyword_argument vi))
             (do
                 (array_set object values j @C_UNDEF)
             )))
         ))
+    (if (< i argslen)
+        (throw (undefined_keyword_argument (array_get object vars i)))
+        )
     (return values)
     ))
 
@@ -300,7 +302,6 @@
             )))
 
         (var check_failed (fresh_label asm))
-        (if (> nlocal 0) (put_allocate asm nlocal))
         (if use_self (do
             (put_self asm)
             (put_if_undef asm check_failed)
@@ -309,12 +310,11 @@
             (put_push asm clos)
             (put_store_closure asm)
             ))
+        (if (> nlocal 0) (put_allocate asm nlocal))
         (if keys (do
             (put_push asm keys)
             (put_keys asm)
             (compile_simple_call asm 2 matching_keywords)
-            (put_dup asm)
-            (put_if_zero asm check_failed)
             ))
         (if guard (do
             (put_code asm guard)

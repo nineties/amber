@@ -1,6 +1,6 @@
 " Language:	Amber
 " Maintainer:	nineties <nineties48@gmail.com>
-" $Id: amber.vim 2014-02-16 13:23:37 nineties $
+" $Id: amber.vim 2014-02-20 09:38:14 nineties $
 
 if exists("b:current_syntax")
     finish
@@ -17,13 +17,14 @@ syn region amberStringD start=/"/ skip=/\\"/ end=/"/ oneline
 syn region amberStringS start=/'/ skip=/\\'/ end=/'/ oneline
 syn match amberConstant         /\<[A-Z_]\{2}\>/
 syn match amberIdentifier       /\<[a-zA-Z_]\w*[!?]\=/
+syn match amberSymbol           /\\[a-zA-Z_]\w*[!?]\=/
 syn match amberHead             /\<[A-Z]\w*[!?]\=\>/ contains=amberConstant
 syn match amberNumber           /\<\d\+\>/
 syn match amberHex              /\<0x\x\+\>/
 syn match amberOctal            /\<0\o\+\>/ contains=amberOctalZero
 syn match amberOctalZero        /\<0\>/
 syn match amberFloat            /\d\+\.\d*\(e[-+]\=\d\+\)/
-syn match amberOperator         /[%&\-=^\\|`@*:+/!?<>]/
+"syn match amberOperator         /[%&\-=^\\|`@*:+/!?<>]/
 syn match amberBlockError       /}/
 syn region amberBlock   start=/{/ end=/}/ contains=ALLBUT,amberBlockError fold
 syn match amberParenError       /)/
@@ -39,8 +40,9 @@ hi link amberComment            Comment
 hi link amberStringS            String
 hi link amberStringD            String
 hi link amberConstant           Constant
+hi link amberSymbol             Constant
 hi link amberHead               Structure
-hi link amberOperator           Operator
+"hi link amberOperator           Operator
 hi link amberBlockError         Error
 hi link amberParenError         Error
 hi link amberlistError          Error

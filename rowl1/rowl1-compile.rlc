@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-02-19 19:00:02 nineties $
+; $Id: rowl1-compile.rlc 2014-02-20 08:10:40 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1160,25 +1160,6 @@
     (return (make_object2 RestOf obj (box idx)))
     ))
 
-(fun assign_variable (self global sym val) (
-    (var v (set_slot_overwrite self sym val))
-    (if (!= v @C_UNDEF) (return v))
-    (= v (set_slot_overwrite global sym val))
-    (if (== v @C_UNDEF)
-        (throw (undefined_var sym))
-        )
-    (return v)
-    ))
-
-(fun load_variable (self global sym) (
-    (var v (get_slot_nocheck_noalias self sym))
-    (if (&& (== (node_type v) @AliasE) (field_get v 1))
-        (return (runcode_with_self self (get_bytecode (field_get v 1))))
-        )
-    (if (!= v @C_UNDEF) (return v))
-    (return (get_slot_unalias global sym))
-    ))
-
 (fun append_function (mod sym newfunc) (
     (var func (get_slot_nocheck mod sym))
     (if (!= func @C_NIL)
@@ -1389,8 +1370,7 @@
     (if (== ty GlobalVariable) (do
         (put_push asm sym)
         (put_push asm global)
-        (put_self asm)
-        (compile_simple_call asm 3 load_variable)
+        (compile_simple_call asm 2 get_slot_unalias)
         return
         ))
     (if (== ty LocalVariable) (do
@@ -2086,8 +2066,7 @@
         (compile asm rhs)
         (put_push asm (node_arg_symbol v 0))
         (put_push asm global)
-        (put_self asm)
-        (compile_simple_call asm 4 assign_variable)
+        (compile_simple_call asm 3 set_slot_overwrite)
         return
         ))
 
@@ -2255,7 +2234,7 @@
             (var t (compile_function asm_body asm_guard args body guard cls))
             (= args (tuple_at t 0))
             (var keys (tuple_at t 1))
-            (var nlocal (tuple_at t 2))
+            (var nlocal (unbox (tuple_at t 2)))
             (put_ireturn asm_body)
             (put_push asm (make_function args keys (get_code asm_body) (get_code asm_guard) use_self nlocal))
         )
@@ -2263,7 +2242,7 @@
             (var t (compile_function asm_body 0 args body noguard cls))
             (= args (tuple_at t 0))
             (var keys (tuple_at t 1))
-            (var nlocal (tuple_at t 2))
+            (var nlocal (unbox (tuple_at t 2)))
             (put_ireturn asm_body)
             (put_push asm (make_function args keys (get_code asm_body) 0 use_self nlocal))
         ))
@@ -2400,6 +2379,10 @@
 
 (export fun add_function5 (mod sym pat1 pat2 pat3 pat4 pat5 func guard) (
     (append_function mod sym (make_builtin_function (list5 pat1 pat2 pat3 pat4 pat5) func guard @FALSE))
+    ))
+
+(export fun add_function6 (mod sym pat1 pat2 pat3 pat4 pat5 pat6 func guard) (
+    (append_function mod sym (make_builtin_function (list6 pat1 pat2 pat3 pat4 pat5 pat6) func guard @FALSE))
     ))
 
 (fun compile_ (expr) (
