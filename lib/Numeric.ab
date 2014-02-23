@@ -1,15 +1,15 @@
 # Copyright (C) 2014 nineties
-# $Id: Numeric.ab 2014-02-17 21:33:43 nineties $
+# $Id: Numeric.ab 2014-02-21 14:48:22 nineties $
 
 import Trait
 
 join_numeric_type(a, b): nil
 join_numeric_type(a, a): a
-join_numeric_type(\Int, \Float): \Float
-join_numeric_type(\Float, \Int): \Float
+join_numeric_type('Int, 'Float): 'Float
+join_numeric_type('Float, 'Int): 'Float
 
 upcast(a, h) when a.head == h: a
-upcast(a, \Float): a.to_f()
+upcast(a, 'Float): a.to_f()
 
 perform_binary_operation(a, b, fun, op): {
     h: join_numeric_type(a.head, b.head)
@@ -20,12 +20,12 @@ perform_binary_operation(a, b, fun, op): {
     fun(upcast(a, h), upcast(b, h))
 }
 
-add(a, b): perform_binary_operation(a, b, add, \add)
-sub(a, b): perform_binary_operation(a, b, sub, \sub)
-mul(a, b): perform_binary_operation(a, b, mul, \mul)
-div(a, b): perform_binary_operation(a, b, div, \div)
-mod(a, b): perform_binary_operation(a, b, mod, \mod)
-pow(a, b): perform_binary_operation(a, b, pow, \pow)
+add(a, b): perform_binary_operation(a, b, add, 'add)
+sub(a, b): perform_binary_operation(a, b, sub, 'sub)
+mul(a, b): perform_binary_operation(a, b, mul, 'mul)
+div(a, b): perform_binary_operation(a, b, div, 'div)
+mod(a, b): perform_binary_operation(a, b, mod, 'mod)
+pow(a, b): perform_binary_operation(a, b, pow, 'pow)
 divmod(a, b): (div(a, b), mod(a, b))
 powmod(a, b, c): {
     h: join_numeric_type(a.head, join_numeric_type(b.head, c.head))
@@ -38,7 +38,7 @@ powmod(a, b, c): {
     powmod(upcast(a, h), upcast(b, h), upcast(c, h))
 }
 
-compare(a, b): perform_binary_operation(a, b, compare, \compare)
+compare(a, b): perform_binary_operation(a, b, compare, 'compare)
 less_than?(a, b):     compare(a, b) < 0
 greater_than?(a, b):  compare(a, b) > 0
 less_equal?(a, b):    compare(a, b) <= 0
@@ -86,27 +86,27 @@ export INTEGER_MIN INTEGER_MAX
 export infinity
 
 nil with {
-    add!(b): add(self,b)
-    sub!(b): sub(self,b)
-    mul!(b): mul(self,b)
-    pow!(b): pow(self,b)
-    div!(b): div(self,b)
-    mod!(b): mod(self,b)
+    .add!(b): add(self,b)
+    .sub!(b): sub(self,b)
+    .mul!(b): mul(self,b)
+    .pow!(b): pow(self,b)
+    .div!(b): div(self,b)
+    .mod!(b): mod(self,b)
 }
 
 # traits
 
 trait Int {
-    to_i(): self
-    to_f(): Prim.int_to_float(self)
-    to_s(): Prim.int_to_string(self)
+    .to_i(): self
+    .to_f(): Prim.int_to_float(self)
+    .to_s(): Prim.int_to_string(self)
 }
 
 trait Float {
-    to_i(): Prim.float_to_int(self)
-    to_f(): self
-    to_s(): Prim.float_to_string(self)
+    .to_i(): Prim.float_to_int(self)
+    .to_f(): self
+    .to_s(): Prim.float_to_string(self)
 }
 
-Prim.set_builtin_parent(\Int, Trait.Int)
-Prim.set_builtin_parent(\Float, Trait.Float)
+Prim.set_builtin_parent('Int, Trait.Int)
+Prim.set_builtin_parent('Float, Trait.Float)

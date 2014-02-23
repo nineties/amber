@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-02-20 10:04:20 nineties $ "
+" $Id: Syntax.ab 2014-02-21 18:50:10 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -205,7 +205,7 @@ fullform_expr
       | postfix_expr
     
 quote_expr
-    ::= "\\" quote_expr
+    ::= "'" quote_expr
         { MakeObject{Quote{Quote}, List{node1}} }
       | "`"  quote_expr
         { MakeObject{Quote{QuasiQuote}, List{node1}} }
@@ -288,8 +288,7 @@ multi_lambda_expr
 slot_assign_stmt ::= stmt
 
 slot_assign
-    ::= <<multiline>> "{" delimited1(slot_assign_stmt, ",") "}" { node1 }
-      | <<multiline>> "{" aligned(slot_assign_stmt) "}" { node1 }
+    ::= <<multiline>> "{" aligned(slot_assign_stmt) "}" { node1 }
       | slot_assign_stmt { List{node0} }
 
 continuation_expr
@@ -372,7 +371,7 @@ primary_expr_act
                 Prim.string_add("node",
                 Prim.int_to_string(node1)))
         }
-      | "$input"    { \input_text(parser, begin, end) }
+      | "$input"    { 'input_text(parser, begin, end) }
     
 Syntax.primary_expr_act = fusion(Syntax.primary_expr_act, Syntax.primary_expr)
 
@@ -415,19 +414,19 @@ expand_macro: expr -> {
 
         head: Prim.head(expr)
 
-        if (Equal{level, 0} and Equal{head, \QuoteSyntax})
+        if (Equal{level, 0} and Equal{head, 'QuoteSyntax})
             return Prim.get_arg(expr, 0)
-        else if (Equal{head, \QuasiQuoteSyntax}) {
+        else if (Equal{head, 'QuasiQuoteSyntax}) {
             level = Prim.int_add(level, 1)
             expr = Prim.get_arg(expr, 0)
-        } else if (Equal{head, \UnquoteSyntax}) {
+        } else if (Equal{head, 'UnquoteSyntax}) {
             level = Prim.int_sub(level, 1)
             expr = Prim.get_arg(expr, 0)
-        } else if (Equal{level, 0} and Equal{head, \Quote})
+        } else if (Equal{level, 0} and Equal{head, 'Quote})
             return expr
-        else if (Equal{head, \QuasiQuote})
+        else if (Equal{head, 'QuasiQuote})
             level = Prim.int_add(level, 1)
-        else if (Equal{head, \Unquote})
+        else if (Equal{head, 'Unquote})
             level = Prim.int_sub(level, 1)
 
         if Prim.int_less_than?(level, 0)
@@ -489,8 +488,8 @@ macro(ArithAssign{QuoteSyntax{x[idxs...]}, e, op}) = {
     # We have to consider that evaluation of `x' and `idxs' may have
     # side-effects. So, we translate x[a,b] op= e to
     # { y = x; t1 = a; t2 = b; y[t1, t2] = op(y[t1, t2], e) }
-    stmt1: `Define{!unique_symbol(\x), !x}
-    stmt2: Prim.list_map(i -> `Define{!unique_symbol(\t), !i}, idxs)
+    stmt1: `Define{!unique_symbol('x), !x}
+    stmt2: Prim.list_map(i -> `Define{!unique_symbol('t), !i}, idxs)
     y: Prim.get_arg(stmt1, 0)
     ts: Prim.list_map(e -> Prim.get_arg(e, 0), stmt2)
 
@@ -504,8 +503,8 @@ macro(ArithAssign{QuoteSyntax{x[idxs...]}, e, op}) = {
 
 # For-statement for containers. 
 macro(For{i, container, body}) = {
-    iter:  Prim.unique_symbol(\iter)
-    value: Prim.unique_symbol(\value)
+    iter:  Prim.unique_symbol('iter)
+    value: Prim.unique_symbol('value)
     `{
         !iter : (!container).each()
         !value: nil
@@ -518,8 +517,8 @@ macro(For{i, container, body}) = {
 
 # For-statement for ranges.
 macro(QuoteSyntax{For{i, Range{a, b}, body}}) = {
-    j: Prim.unique_symbol(\j)
-    n: Prim.unique_symbol(\n)
+    j: Prim.unique_symbol('j)
+    n: Prim.unique_symbol('n)
     `{
         !j: !a
         !n: !b
@@ -539,9 +538,9 @@ macro(QuoteSyntax{For{i, Range{a, b}, body}}) = {
 #
 # { t: obj; t.a = p; t.b = q; t.c = r; t }
 #
-macro(WithSlots{obj, init}): `Apply{!obj, () -> { !init; self }, []}
+macro(WithSlots{obj, init}): `Apply{!obj, () -> { Seq{!init}; self }, []}
 
 ## Utilities
-Syntax.add_reserved_symbol(sym):
-    Syntax.reserved_symbols =
-        Prim.list_insert_unique(sym, Syntax.reserved_symbols)
+Syntax.add_reserved_symbols(syms...):
+    Syntax.reserved_symbols = Prim.list_foldr(
+            Prim.list_insert_unique, syms, Syntax.reserved_symbols)

@@ -1,39 +1,39 @@
 # Copyright (C) 2010 nineties
-# $Id: Module.ab 2014-02-20 00:13:20 nineties $
+# $Id: Module.ab 2014-02-21 18:30:29 nineties $
 
-Module: enter_module(\Module)
+Module: enter_module('Module)
 
-    # import mod.var to global module.
-    import_variable(mod @ Module, var @ Symbol): {
-        Prim.define_variable(var, Prim.get_slot(mod, var, true, false), \fusion)
-    }
+# import mod.var to global module.
+import_variable(mod @ Module, var @ Symbol): {
+    Prim.define_variable(var, Prim.get_slot(mod, var, true, false, true), 'fusion)
+}
 
-    import_variables(mod @ Module, vars @ List):
-        Prim.list_foreach(v -> import_variable(mod, v), vars)
+import_variables(mod @ Module, vars @ List):
+    Prim.list_foreach(v -> import_variable(mod, v), vars)
 
-    expand_import([], _): nil
-    expand_import([M,rest...], path): {
-        if (not Prim.string_equal?(path, ""))
-            path = Prim.string_add(path, "/")
-        path = Prim.string_add(path, Prim.symbol_to_string(M))
-        file: Prim.string_add(path, ".ab")
+expand_import([], _): nil
+expand_import([M,rest...], path): {
+    if (not Prim.string_equal?(path, ""))
+        path = Prim.string_add(path, "/")
+    path = Prim.string_add(path, Prim.symbol_to_string(M))
+    file: Prim.string_add(path, ".ab")
 
-        loadstmt: case rest of
-              [] -> `load(!file)
-            | _  -> `( if Prim.loadable?(!file) load(!file) )
+    loadstmt: case rest of
+          [] -> `load(!file)
+        | _  -> `( if Prim.loadable?(!file) load(!file) )
 
-        `Seq{[
-            enter_module(\!M),
-            If{not Prim.has_slot?(!M, \exports), ((!M).exports=[])},
-            !loadstmt,
-            !expand_import(rest, path),
-            exit_module()
-        ]}
-    }
+    `Seq{[
+        enter_module('!M),
+        If{not Prim.has_slot?(!M, 'exports), ((!M).exports=[])},
+        !loadstmt,
+        !expand_import(rest, path),
+        exit_module()
+    ]}
+}
 
-    buildpath(mods): Prim.string_add(Prim.string_join(
-            Prim.list_map(Prim.symbol_to_string, mods), "/")
-            , ".ab")
+buildpath(mods): Prim.string_add(Prim.string_join(
+        Prim.list_map(Prim.symbol_to_string, mods), "/")
+        , ".ab")
 
 exit_module()
 
@@ -49,13 +49,13 @@ macro(e @ Import{mods, option}): {
             -> `Seq{[
                     !Module.expand_import(mods, ""),
                     Module.import_variables(!mod,
-                        Prim.list_subtract((!mod).exports, \!vars)
+                        Prim.list_subtract((!mod).exports, '!vars)
                         )
                 ]}
         | Some{vars}
             -> `Seq{[
                     !Module.expand_import(mods, ""),
-                    Module.import_variables(!mod, \!vars)
+                    Module.import_variables(!mod, '!vars)
                 ]}
         | nil
             -> `Seq{[
@@ -67,4 +67,4 @@ macro(e @ Import{mods, option}): {
 }
 
 macro(Export{vars}):
-    `(exports = Prim.list_foldr(Prim.list_insert_unique, \!vars, exports))
+    `(exports = Prim.list_foldr(Prim.list_insert_unique, '!vars, exports))
