@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-02-20 10:01:44 nineties $
+; $Id: rowl1-packrat.rlc 2014-02-23 18:31:33 nineties $
 ;
 
 (import "rlvm-compile")
@@ -749,12 +749,21 @@
 @(MEMOIZE decimal)
 
 (fun parse_binary_ (p) (
+    (if (!= (lookahead p) '0') (return @C_FALSE))
+
     (var big_p @FALSE)
     (var begin (field_get p 6))
-
     (var state (copy_parser_state p))
 
-    (if (== (parse_text p "0b") @C_FALSE) (return @C_FALSE))
+    (getc p)
+    (var c (lookahead p))
+
+    (if (&& (!= c 'b') (!= c 'B')) (do
+        (reset_parser_position p state)
+        (return @C_FALSE)
+        ))
+    (getc p)
+
     (if (! (is_01 (lookahead p))) (do
         (noparse p "expect 0 or 1")
         (reset_parser_position p state)
@@ -781,9 +790,21 @@
 @(MEMOIZE binary)
 
 (fun parse_octal_ (p) (
+    (if (!= (lookahead p) '0') (return @C_FALSE))
+
     (var big_p @FALSE)
     (var begin (field_get p 6))
     (var state (copy_parser_state p))
+
+    (getc p)
+    (var c (lookahead p))
+
+    (if (&& (!= c 'o') (!= c 'O')) (do
+        (reset_parser_position p state)
+        (return @C_FALSE)
+        ))
+    (getc p)
+
     (if (== (parse_text p "0o") @C_FALSE) (return @C_FALSE))
     (if (! (is_0_7 (lookahead p))) (do
         (noparse p "expect 0-7")
@@ -811,10 +832,21 @@
 @(MEMOIZE octal)
 
 (fun parse_hex_ (p) (
+    (if (!= (lookahead p) '0') (return @C_FALSE))
+
     (var big_p @FALSE)
     (var begin (field_get p 6))
     (var state (copy_parser_state p))
-    (if (== (parse_text p "0x") @C_FALSE) (return @C_FALSE))
+
+    (getc p)
+    (var c (lookahead p))
+
+    (if (&& (!= c 'x') (!= c 'X')) (do
+        (reset_parser_position p state)
+        (return @C_FALSE)
+        ))
+    (getc p)
+
     (if (! (is_hexdigit (lookahead p))) (do
         (noparse p "expect hex digit")
         (reset_parser_position p state)
@@ -864,7 +896,8 @@
         ))
     (getc p)
     (while (is_0_9 (lookahead p)) (getc p))
-    (if (== (lookahead p) 'e') (do
+    (var c (lookahead p))
+    (if (|| (== c 'e') (== c 'E')) (do
         (getc p)
         (if (== (lookahead p) '-') (getc p))
         (if (! (is_0_9 (lookahead p))) (do

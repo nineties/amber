@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-02-21 18:50:10 nineties $ "
+" $Id: Syntax.ab 2014-02-23 18:14:06 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -226,9 +226,10 @@ prefix_expr
       | quote_expr
 
 multiplicative_expr
-    ::= multiplicative_expr "*" prefix_expr { `Mul{!node0, !node2} }
-      | multiplicative_expr "/" prefix_expr { `Div{!node0, !node2} }
-      | multiplicative_expr "%" prefix_expr { `Mod{!node0, !node2} }
+    ::= multiplicative_expr "*" prefix_expr  { `Mul{!node0, !node2} }
+      | multiplicative_expr "/" prefix_expr  { `Div{!node0, !node2} }
+      | multiplicative_expr "//" prefix_expr { `Quot{!node0, !node2} }
+      | multiplicative_expr "%" prefix_expr  { `Rem{!node0, !node2} }
       | prefix_expr
 
 additive_expr
@@ -303,7 +304,8 @@ assign_expr
       | pattern "*=" assign_expr  { `MulAssign{!node0, !node2} }
       | pattern "^=" assign_expr  { `PowAssign{!node0, !node2} }
       | pattern "/=" assign_expr  { `DivAssign{!node0, !node2} }
-      | pattern "%=" assign_expr  { `ModAssign{!node0, !node2} }
+      | pattern "//=" assign_expr { `QuotAssign{!node0, !node2} }
+      | pattern "%=" assign_expr  { `RemAssign{!node0, !node2} }
       | pattern "|=" assign_expr  { `FusionAssign{!node0, !node2} }
       | pattern with slot_assign
         { MakeObject{Quote{WithSlots}, List{node0, node2}} }
@@ -463,7 +465,8 @@ macro(x - y)   = `sub(!x, !y)
 macro(x * y)   = `mul(!x, !y)
 macro(x ^ y)   = `pow(!x, !y)
 macro(x / y)   = `div(!x, !y)
-macro(x % y)   = `mod(!x, !y)
+macro(x // y)  = `quot(!x, !y)
+macro(x % y)   = `rem(!x, !y)
 macro(x | y)   = `fusion(!x, !y)
 macro(x < y)   = `less_than?(!x, !y)
 macro(x > y)   = `greater_than?(!x, !y)
@@ -477,7 +480,8 @@ macro(x -= y)  = `ArithAssign{!x, !y, sub!}
 macro(x *= y)  = `ArithAssign{!x, !y, mul!}
 macro(x ^= y)  = `ArithAssign{!x, !y, pow!}
 macro(x /= y)  = `ArithAssign{!x, !y, div!}
-macro(x %= y)  = `ArithAssign{!x, !y, mod!}
+macro(x //= y) = `ArithAssign{!x, !y, quot!}
+macro(x %= y)  = `ArithAssign{!x, !y, rem!}
 macro(x |= y)  = `ArithAssign{!x, !y, fusion!}
 
 # Subscript syntax is not built-in. We need macros.
