@@ -1,15 +1,15 @@
 # Copyright (C) 2010 nineties
-# $Id: Base.ab 2014-02-24 16:44:08 nineties $
+# $Id: Base.ab 2014-02-24 22:12:44 nineties $
 
-#= The most basic functions and methods.
+#= The most basic functions and methods. =
 
-#== nil: The root of parent chains.
+#== nil is the root of parent chains. ==
 # From any object `o`, the chain of parents, i.e. o.parent.parent...,
 # eventually reaches `nil`. This means that every slot of `nil` is 
 # accessible to every object.
 #
 # The exception are objects whose parent-slot is removed.
-# You can remove the parent object `o` by `o.remove_slot('parent)`.
+# You can remove the parent of object `o` by `o.remove_slot('parent)`.
 
 nil with {
     # The head symbol.
@@ -39,18 +39,18 @@ nil with {
     #     check==true, return nil when check==false. (default=true)
     # Examples:
     # ----
-    # A: `Object{A}
-    # B: `Object{B}
-    # A.parent = B
-    # A.x = 0
-    # B.y = 1
-    # A.f = alias(reader = () -> 2)
-    # A.get_slot('x)                    # => 0
-    # A.get_slot('y)                    # => 1
-    # A.get_slot('f)                    # => 2
-    # A.get_slot('y, recursive=false)   # => Error UndefinedSlot
-    # A.get_slot('z, check=false)       # => nil
-    # A.get_slot('f, alias=false)       # => @ Alias
+    # > A: `Object{A}
+    # > B: `Object{B}
+    # > A.parent = B
+    # > A.x = 0
+    # > B.y = 1
+    # > A.f = alias(getter = () -> 2)
+    # > A.get_slot('x)                    # => 0
+    # > A.get_slot('y)                    # => 1
+    # > A.get_slot('f)                    # => 2
+    # > A.get_slot('y, recursive=false)   # => Error UndefinedSlot
+    # > A.get_slot('z, check=false)       # => nil
+    # > A.get_slot('f, alias=false)       # => @ Alias
     # ----
     .get_slot(s @ Symbol, recursive=true, alias=true, check=true):
         Prim.get_slot(self, s, recursive, alias, check)
@@ -66,29 +66,29 @@ nil with {
     #   * alias: Resolve Alias objects. (default=true)
     # Examples:
     # ----
-    # A: `Object{A}
-    # B: `Object{B}
-    # A.parent = B
-    # B.x = 0
-    # A.set_slot('y, 0)                            # => 0
-    # A.get_slot('y)                               # => 0
-    # A.set_slot('x, 1, overwrite=true)            # => 1
-    # A.get_slot('x)                               # => 1
-    # A.get_slot('x, recursive=false, check=false) # => nil
-    # A.x = alias(reader = () -> self.z, writer = (v) -> self.z = 1)
-    # A.set_slot('x, 0)                            # => 0
-    # A.get_slot('x)                               # => 1
-    # A.get_slot('z)                               # => 1
-    # A.set_slot('x, 0, alias=false)               # => 0
-    # A.get_slot('x)                               # => 0
-    # A.get_slot('z)                               # => 1
-    # A.f(x @ Int) = "integer"
-    # A.set_slot('f, (x @ String) -> "string")
-    # A.f(0)                                       # => "integer"
-    # A.f("Hello")                                 # => "string"
-    # A.set_slot('f, (x @ String) -> "string", fusion=false)
-    # A.f("Hello")                                 # => "string"
-    # A.f(0)                                       # => Error MatchingFailed
+    # > A: `Object{A}
+    # > B: `Object{B}
+    # > A.parent = B
+    # > B.x = 0
+    # > A.set_slot('y, 0)                            # => 0
+    # > A.get_slot('y)                               # => 0
+    # > A.set_slot('x, 1, overwrite=true)            # => 1
+    # > A.get_slot('x)                               # => 1
+    # > A.get_slot('x, recursive=false, check=false) # => nil
+    # > A.x = alias(getter = () -> self.z, setter = (v) -> self.z = 1)
+    # > A.set_slot('x, 0)                            # => 0
+    # > A.get_slot('x)                               # => 1
+    # > A.get_slot('z)                               # => 1
+    # > A.set_slot('x, 0, alias=false)               # => 0
+    # > A.get_slot('x)                               # => 0
+    # > A.get_slot('z)                               # => 1
+    # > A.f(x @ Int) = "integer"
+    # > A.set_slot('f, (x @ String) -> "string")
+    # > A.f(0)                                       # => "integer"
+    # > A.f("Hello")                                 # => "string"
+    # > A.set_slot('f, (x @ String) -> "string", fusion=false)
+    # > A.f("Hello")                                 # => "string"
+    # > A.f(0)                                       # => Error MatchingFailed
     # ----
     .set_slot(s @ Symbol, v, overwrite=false, fusion=true, alias=true):
         Prim.set_slot(self, s, v, overwrite, fusion, alias)
@@ -144,28 +144,28 @@ compose: Prim.compose_function
 # of the slot is redirected to a function call.
 #
 # A pseudo-attribute `o.f` can be created by `alias` function like:
-# `o.f = alias(reader = () -> e1, writer = (v) -> e2)`.
+# `o.f = alias(getter = () -> e1, setter = (v) -> e2)`.
 # Then `o.f` is equal to call of `() -> e1` with `self==o`.
 # `o.f = v` is also equal to call of `(v) -> e2`. 
 #
-# You can ommit `reader` or `writer`.
-alias(reader=nil, writer=nil): Prim.alias(reader, writer)
+# You can ommit `getter` or `setter`.
+alias(getter=nil, setter=nil): Prim.alias(getter, setter)
 
 # Create an alias to i-th argument.
 #
 # Examples:
 # ----
-# obj: `Object{0}
-# obj.x = alias(0)
-# obj.x     # => 0
-# obj.x = 1
-# obj[0]    # => 1
-# obj[0] = 2
-# obj.x     # => 2
+# > obj: `Object{0}
+# > obj.x = alias(0)
+# > obj.x     # => 0
+# > obj.x = 1
+# > obj[0]    # => 1
+# > obj[0] = 2
+# > obj.x     # => 2
 # ----
 alias(i @ Int): alias(
-        reader = () -> self[i],
-        writer = (v) -> { self[i] = v }
+        getter = () -> self[i],
+        setter = (v) -> { self[i] = v }
         )
 
 # Builtin hash function.

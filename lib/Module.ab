@@ -1,15 +1,66 @@
 # Copyright (C) 2010 nineties
-# $Id: Module.ab 2014-02-21 18:30:29 nineties $
+# $Id: Module.ab 2014-02-25 00:42:57 nineties $
+
+#= Module system =
+#== Basics ==
+# Amber provides very simple module management system that is
+# a module is just a usual object and a module-variable is just a slot
+# of the module-object. The hierarchy of modules can be realized by means
+# of `parent` slot. For example, when objects `A` and `B` are modules
+# and `B.parent == A`, we can think `B` as a direct submodule of `A`.
+# If `A` has a slot `x`, i.e. a module-variable, and `B` doesn't, `B.x`
+# is equal to `A.x`.
+#
+# The hierarchy of modules reflects the hierarchy of directories where
+# scripts are putted in. Here, Amber treats directories specified by the
+# variable `AMBER_PATH` as the root of directories.
+# The root of the module hierarchy is the module named `Amber`, and for a
+# script 'A/B/C.ab' a module `Amber.A.B.C` is assigned.
+#
+# All along the lines of execution of Amber programs, one module-object
+# is specified as a global-module. And global variables are actually
+# module-variables of the global module. When you execute a script `AAA.ab`
+# in a shell by `$ amber AAA.ab`, the global-module in the script is
+# `Amber.AAA`.
+#
+#== Import Module ==
+# Amber executes a statement `import A.B.C` by following steps:
+#   1. Lookup a file 'A/B/C.ab'. If it does not exist, throw a `NotFound` 
+#     exception.
+#   2. When the file is already loaded, goto 6.
+#   3. Switch global-module to `A.B.C`.
+#   4. Execute the script.
+#   5. Switch global-module to the former.
+#   6. Copy designated variables from `A.B.C` to the global-module.
+#
+# In the step 6, any variable will not be copied by default.
+# That is, when you import module `A` by `import A`, you have to specify
+# `A` explicitly to access variables of `A`, e.g. `A.x`.
+#
+# You can specify variables to be copied in the following syntax.
+#   * `import A`: Do not copy any variables.
+#   * `import A (x,y,z)`: Copy `A.x`, `A.y` and `A.z`.
+#   * `import A hiding (x,y,z)`: Copy every variables but `x`, `y` and `z`.
+#   * `import A (*)`: Copy every variables which is visible in `A`.
 
 Module: enter_module('Module)
 
-# import mod.var to global module.
-import_variable(mod @ Module, var @ Symbol): {
-    Prim.define_variable(var, Prim.get_slot(mod, var, true, false, true), 'fusion)
-}
+copy_variable(mod @ Module, x @ Symbol):
+    Prim.define_variable(x,
+            mod.get_slot(x, recursive=true, alias=false, check=true))
 
-import_variables(mod @ Module, vars @ List):
-    Prim.list_foreach(v -> import_variable(mod, v), vars)
+copy_variables(mod, 'All):
+    mod.each_slots((_, x, v) -> Prim.define_variable(x, v))
+copy_variables(mod, Hiding{vars}):
+    mod.each_slots((_, x, v) -> {
+        if (not Prim.list_member?(x, vars))
+            Prim.define_variable(x, v)
+    })
+copy_variables(mod, vars @ List):
+    mod.each_slots((_, x, v) -> {
+        if Prim.list_member?(x, vars)
+            Prim.define_variable(x, v)
+    })
 
 expand_import([], _): nil
 expand_import([M,rest...], path): {
@@ -24,7 +75,6 @@ expand_import([M,rest...], path): {
 
     `Seq{[
         enter_module('!M),
-        If{not Prim.has_slot?(!M, 'exports), ((!M).exports=[])},
         !loadstmt,
         !expand_import(rest, path),
         exit_module()
@@ -40,31 +90,13 @@ exit_module()
 macro(e @ Import{mods, option}): {
     mod: Prim.list_foldl1((l, r) -> `Slot{!l, !r}, mods)
     case option of
-          Some{As{name}}
+          Some{option}
             -> `Seq{[
                     !Module.expand_import(mods, ""),
-                    (!name : !mod)
-                ]}
-        | Some{Hiding{vars}}
-            -> `Seq{[
-                    !Module.expand_import(mods, ""),
-                    Module.import_variables(!mod,
-                        Prim.list_subtract((!mod).exports, '!vars)
-                        )
-                ]}
-        | Some{vars}
-            -> `Seq{[
-                    !Module.expand_import(mods, ""),
-                    Module.import_variables(!mod, '!vars)
+                    Module.copy_variables(!mod, !option)
                 ]}
         | nil
-            -> `Seq{[
-                    !Module.expand_import(mods, ""),
-                    Module.import_variables(!mod, (!mod).exports)
-                ]}
+            -> Module.expand_import(mods, "")
         | _
             -> { throw `UnknownExpression{!e} }
 }
-
-macro(Export{vars}):
-    `(exports = Prim.list_foldr(Prim.list_insert_unique, '!vars, exports))

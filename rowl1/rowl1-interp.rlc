@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-02-21 11:00:38 nineties $
+; $Id: rowl1-interp.rlc 2014-02-24 20:24:31 nineties $
 ;
 
 (import "rlvm-compile")
@@ -100,8 +100,8 @@
     ; Boot Amber
     (set_loc no_loc)
     (var load_path (ary_new)) 
-    (set_slot amber (to_sym "AMBERPATH") load_path)
-    (set_slot amber (to_sym "LOADED") (ary_new))
+    (set_slot amber (to_sym "AMBER_PATH") load_path)
+    (set_slot amber (to_sym "ALREADY_LOADED") (ary_new))
     (set_slot amber (to_sym "VERSION") (version_string))
     (ary_push load_path (tuple2 (string "/usr/lib/amber") amber))
     (ary_push load_path (tuple2 (realpath (string ".")) amber))
@@ -256,8 +256,8 @@
     ))
 
 (fun load_file (path) (
-    (var dirs (get_slot amber (to_sym "AMBERPATH")))
-    (var loaded (get_slot amber (to_sym "LOADED")))
+    (var dirs (get_slot amber (to_sym "AMBER_PATH")))
+    (var loaded (get_slot amber (to_sym "ALREADY_LOADED")))
     (if (!= (node_type dirs) @ArrayE) (goto load_error))
     (if (!= (node_type loaded) @ArrayE) (goto load_error))
     (rfor i 0 (array_size dirs) (do
@@ -299,12 +299,12 @@
         ))
     (throw (not_found (string path)))
     (label load_error)
-    (throw (logic_error1 (string "AMBERPATH must be an array of strings") dirs))
+    (throw (logic_error1 (string "AMBER_PATH must be an array of strings") dirs))
     ))
 
 (fun loadable (path) (
-    (var dirs (get_slot amber (to_sym "AMBERPATH")))
-    (var loaded (get_slot amber (to_sym "LOADED")))
+    (var dirs (get_slot amber (to_sym "AMBER_PATH")))
+    (var loaded (get_slot amber (to_sym "ALREADY_LOADED")))
     (if (!= (node_type dirs) @ArrayE) (goto load_error))
     (if (!= (node_type loaded) @ArrayE) (goto load_error))
     (rfor i 0 (array_size dirs) (do
@@ -317,11 +317,11 @@
         ))
     (return @C_FALSE)
     (label load_error)
-    (throw (logic_error1 (string "AMBERPATH must be an array of strings") dirs))
+    (throw (logic_error1 (string "AMBER_PATH must be an array of strings") dirs))
     ))
 
 (fun find_parent (sym) (
-    (var dirs (get_slot amber (to_sym "AMBERPATH")))
+    (var dirs (get_slot amber (to_sym "AMBER_PATH")))
     (if (!= (node_type dirs) @ArrayE) (goto load_error))
     (rfor i 0 (array_size dirs) (do
         (var t (ary_at dirs (box i)))
@@ -334,7 +334,7 @@
         ))
     (return 0)
     (label load_error)
-    (throw (logic_error1 (string "AMBERPATH must be an array of strings") dirs))
+    (throw (logic_error1 (string "AMBER_PATH must be an array of strings") dirs))
     ))
 
 (export fun create_module (sym) (

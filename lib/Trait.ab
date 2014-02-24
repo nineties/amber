@@ -1,84 +1,94 @@
 # Copyright (C) 2014 nineties
-# $Id: Trait.ab 2014-02-21 18:58:55 nineties $
+# $Id: Trait.ab 2014-02-25 01:28:57 nineties $
 
-TraitOfTraits: `Trait{Trait} with {
-    # Import methods from given trait.
-    .extend_trait(...):
-        throw `LogicError{"Traits can exntend Trait{...} objects"}
+#= Trait system =
+# In Amber, a 'Trait' is just a collection of methods for sharing their
+# implementation among objects. You can define a trait named `A` with a
+# method `f` by the following code.
+# ----
+# trait A {
+#     .f(...): ...
+# }
+# ----
+# The trait `A` is stored to the module `Trait`. So, an object `o` can
+# implements `A.f` by `o.parent = Trait.A`.
+#
+# Traits can be defined by extending others. For example, to define
+# tarit `A` by extending trait `B` and `C`, you can write as follows.
+# ----
+# trait A {
+#     extend 'B, 'C
+#     .f(...): ...
+# }
+# ----
+# When `B` and `C` have functions with same name, they are fusioned and
+# copied to `A`.
+# Example:
+# ----
+# trait B {
+#     .f(x @ Int): "integer"
+# }
+# trait C {
+#     .f(x @ String): "string"
+# }
+# trait A {
+#     extend 'B, 'C
+# }
+#
+# Trait.A.f(0)          # => "integer"
+# Trait.A.f("Hello")    # => "string"
+# ----
 
-    .extend_trait(from @ Trait{from_name @ Symbol}): {
-        to: self
 
-        if (from.has_slot?('before_extend))
-            from.before_extend(to)
+extend_trait(...):
+    throw `LogicError{"Traits can extend Trait{...} objects"}
+extend_trait(from @ Trait{name}): {
+    to: self
 
-        # Copy slots from `from' to `to'.
-        Prim.list_foreach(
-            v -> {
-                to.set_slot(v, from.get_slot(v, alias=false))
-                to.requirements = Prim.list_insert_unique(v, to.requirements)
-            },
-            from.requirements
-            )
-        from.each_slots((sym, v) -> to.set_slot(sym, v, fusion=true))
-        if (from.has_slot?('after_extend))
-            from.after_extend(to)
-    }
-
-    # Add var to requirements.
-    .add_required_slot(var @ Symbol): {
-        t: self
-        t.requirements = Prim.list_insert_unique(var, t.requirements)
-        t.set_slot(var, alias(() -> {
-                throw `MissingRequiredSlot{!self, !var}
-            }))
-    }
-
-    ## Commands ##
-    .extend(syms...): {
-        t: self
-        Prim.list_foreach((s) -> t.extend_trait(Trait.get_slot(s)), syms)
-        self
-    }
-    .require(syms...): {
-        t: self
-        Prim.list_foreach((s) -> t.add_required_slot(s), syms)
-        self
-    }
+    if (from.has_slot?('before_extend))
+        from.before_extend(to)
+    from.each_slots((_, x, v) -> to.set_slot(x, v, fusion=true))
+    if (from.has_slot?('after_extend))
+        from.after_extend(to)
+    self
 }
 
+extend(symbols...): {
+    to: self
+    Prim.list_foreach((s) -> to.extend_trait(Trait.get_slot(s)), symbols)
+    self
+}
+
+add_required_slot(s @ Symbol): {
+    to: self
+    to.set_slot(s, alias(() -> { throw `MissingRequiredSlot{!self, !s} }))
+    self
+}
+
+require(symbols...): {
+    to: self
+    Prim.list_foreach((s) -> to.add_required_slot(s), symbols)
+    self
+}
+
+# Create new trait named `name`.
 new(name @ Symbol): {
-    # When create trat A, slot A? is defined.
+    # When create trait `A`, an attribute `A?` is defined.
     name?: Prim.string_to_symbol(
             Prim.string_add(Prim.symbol_to_string(name), "?"))
 
     nil.set_slot(name?, false)
-
     `Trait{!name} with {
-        .parent = TraitOfTraits
-    
-        # Names of slots which extender traits must have.
-        .requirements = []
-    
         .set_slot(name?, true)
     }
 }
-
-# We recommend using `Trait' module as the namespace for traits.
-# Definition of new trait `A' in namespace `Trait' can be written as
-#
-# Trait.A: Trait.new('A) with { ... slots ... }
-#
-# Here, we provide syntax sugar for this.
-#
-#   trait A { ... slots ... }
 
 Syntax.add_reserved_symbols('trait)
 
 stmt ::= trait symbol slot_assign
         {
             `{
-                if (not Prim.has_slot?(Trait, '!$1))
+                if (not Trait.has_slot?('!$1))
                     Define{Slot{Trait, !$1}, Trait.new('!$1)}
                 WithSlots{Slot{Trait, !$1}, !$2}
             }
