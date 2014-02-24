@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-object.rlc 2014-02-21 19:00:35 nineties $
+; $Id: rowl1-object.rlc 2014-02-24 13:50:27 nineties $
 ;
 
 (import "rlvm-compile")
@@ -43,18 +43,29 @@
 (fun get_slot_ref (obj sym rec) (
     (var tbl (wrtable_find slots sym))
     (if (== tbl @C_UNDEF) (return @C_UNDEF))
-    (label retry)
+    (label loop)
     (var v (wrtable_findref tbl obj))
     (if (&& (&& (== v @C_UNDEF) (!= obj @C_NIL)) (!= rec @C_FALSE)) (do
         (= obj (get_parent obj))
         (if (== obj @C_UNDEF) (return @C_UNDEF))
-        (goto retry)
+        (goto loop)
         ))
     (return v)
     ))
 
 (export fun remove_parent (obj) (
     (wrtable_add parent_tbl obj noparent)
+    ))
+
+(fun remove_slot (obj sym rec) (
+    (var tbl (wrtable_find slots sym))
+    (if (== tbl @C_UNDEF) (return @C_NIL))
+    (label loop)
+    (wrtable_del tbl obj)
+    (if (|| (!= rec @C_FALSE) (== obj @C_NIL)) (return @C_NIL))
+    (= obj (get_parent obj))
+    (if (!= obj @C_UNDEF) (goto loop))
+    (return @C_NIL)
     ))
 
 (export fun set_slot (obj sym val) (
@@ -152,29 +163,36 @@
     (return obj)
     ))
 
-(export fun has_slot_p (obj sym) (
-    (if (!= (get_slot_ref obj sym @C_FALSE) @C_UNDEF)
+(export fun has_slot_p (obj sym rec) (
+    (if (!= (get_slot_ref obj sym rec) @C_UNDEF)
         (return @C_TRUE)
         (return @C_FALSE)
         )
     ))
 
-(fun each_slots (obj fun) (
+(fun each_slots (obj fun rec) (
     (var code (get_bytecode fun))
-    (var ent (wrtable_entries slots))
+    (var ent_ (wrtable_entries slots))
+    (label loop)
+    (var ent ent_)
     (while ent (do
         (var sym (field_get ent 2))
         (if (!= sym parent) (do
             (var tbl (field_get ent 3))
             (var v (wrtable_find tbl obj))
             (if (!= v @C_UNDEF)
-                (runcode code sym v)
+                (runcode code obj sym v)
                 )
             ))
         (= ent (field_get ent 1))
         ))
+    (if (== obj @C_NIL) (return @C_NIL))
     (var p (get_parent obj))
-    (if (!= p @C_UNDEF) (runcode code parent p))
+    (if (!= p @C_UNDEF) (runcode code obj parent p))
+    (if (&& (!= rec @C_FALSE) (!= p @C_UNDEF)) (do
+        (= obj p)
+        (goto loop)
+        ))
     (return @C_NIL)
     ))
 
@@ -223,9 +241,10 @@
 (export fun setup_object (mod) (
     (add_function5 mod (to_sym "get_slot") DontCare symT DontCare DontCare DontCare get_slot_ 0)
     (add_function6 mod (to_sym "set_slot") DontCare symT DontCare DontCare DontCare DontCare set_slot_ 0)
-    (add_function2 mod (to_sym "has_slot?") DontCare symT has_slot_p 0)
+    (add_function3 mod (to_sym "remove_slot") DontCare symT DontCare remove_slot 0)
+    (add_function3 mod (to_sym "has_slot?") DontCare symT DontCare has_slot_p 0)
 
-    (add_function2 mod (to_sym "each_slots") DontCare funT each_slots 0)
+    (add_function3 mod (to_sym "each_slots") DontCare funT DontCare each_slots 0)
 
     (add_function1 mod (to_sym "alias") funT alias_r 0)
     (add_function2 mod (to_sym "alias") funT funT alias_rw 0)

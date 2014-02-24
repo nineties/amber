@@ -1,5 +1,5 @@
 # Copyright (C) 2010 nineties
-# $Id: Base.ab 2014-02-24 12:26:22 nineties $
+# $Id: Base.ab 2014-02-24 13:45:30 nineties $
 
 #= The most basic functions and methods.
 
@@ -13,37 +13,103 @@
 
 nil with {
     # The head symbol.
-    .head :      Prim.pseudo(() -> Prim.head(self))
+    .head :      Prim.alias(() -> Prim.head(self))
 
     # The arity.
     # It is *NOT* the arity of functions.
     # For an object `h{a1, a2, ..., an}`, its `arity` is `n`.
-    .arity :     Prim.pseudo(() -> Prim.arity(self))
+    .arity :     Prim.alias(() -> Prim.arity(self))
 
     # The list of arguments.
-    # IT is *NOT* the arguments of function-calls.
+    # It is *NOT* the arguments of function-calls.
     # For an object `h{a1, a2, ..., an}`, its `arguments` is
     # `[a1, a2, ..., an]`.
-    .arguments : Prim.pseudo(() -> Prim.arguments(self))
+    .arguments : Prim.alias(() -> Prim.arguments(self))
 
     # `i`-th argument of the object.
     .get(i @ Int) : Prim.get_arg(self, i)
     .set(i @ Int, v) : Prim.set_arg(self, i, v)
 
-    # Get slot named `s`. 
-    # 
+    # Get the value of the slot named `s`.
+    #
     # Options:
-    #   * recursive: Lookup parents recursively if the parent-slot exists. (default:true)
-    #   * pseudo: 
-    .get_slot(s @ Symbol, recursive=true, pseudo=true, check=true)
-        = Prim.get_slot(self, s, recursive, pseudo, check)
+    #   * recursive: Lookup parent-slot recursively if it exists. (default=true)
+    #   * alias: Resolve Alias objects. (default=true)
+    #   * check: If slot is not found, throw UndefinedSlot exception when
+    #     check==true, return nil when check==false. (default=true)
+    # Examples:
+    # ----
+    # A: `Object{A}
+    # B: `Object{B}
+    # A.parent = B
+    # A.x = 0
+    # B.y = 1
+    # A.f = alias(() -> 2)
+    # A.get_slot('x)                    # => 0
+    # A.get_slot('y)                    # => 1
+    # A.get_slot('f)                    # => 2
+    # A.get_slot('y, recursive=false)   # => Error UndefinedSlot
+    # A.get_slot('z, check=false)       # => nil
+    # A.get_slot('f, alias=false)       # => @ Alias
+    # ----
+    .get_slot(s @ Symbol, recursive=true, alias=true, check=true):
+        Prim.get_slot(self, s, recursive, alias, check)
 
+    # Set a value `v` to the slot named `s` and return `v`.
+    #
+    # Options:
+    #   * overwrite: Lookup the slot recursively, and overwrite it with
+    #     the value if the slot is found. It not throw UndefinedSlot exception. (default:false)
+    #   * fusion: When `self.s` is a function and `v` is also a function,
+    #     set `fusion(v, self.s)` as the new value. When one of `self.s` or `v` is not a function
+    #     simply put `v` to the slot. (default=true)
+    #   * alias: Resolve Alias objects. (default=true)
+    # Examples:
+    # ----
+    # A: `Object{A}
+    # B: `Object{B}
+    # A.parent = B
+    # B.x = 0
+    # A.set_slot('y, 0)                            # => 0
+    # A.get_slot('y)                               # => 0
+    # A.set_slot('x, 1, overwrite=true)            # => 1
+    # A.get_slot('x)                               # => 1
+    # A.get_slot('x, recursive=false, check=false) # => nil
+    # A.x = alias(() -> self.z, (v) -> self.z = 1)
+    # A.set_slot('x, 0)                            # => 0
+    # A.get_slot('x)                               # => 1
+    # A.get_slot('z)                               # => 1
+    # A.set_slot('x, 0, alias=false)               # => 0
+    # A.get_slot('x)                               # => 0
+    # A.get_slot('z)                               # => 1
+    # A.f(x @ Int) = "integer"
+    # A.set_slot('f, (x @ String) -> "string")
+    # A.f(0)                                       # => "integer"
+    # A.f("Hello")                                 # => "string"
+    # A.set_slot('f, (x @ String) -> "string", fusion=false)
+    # A.f("Hello")                                 # => "string"
+    # A.f(0)                                       # => Error MatchingFailed
+    # ----
+    .set_slot(s @ Symbol, v, overwrite=false, fusion=true, alias=true):
+        Prim.set_slot(self, s, v, overwrite, fusion, alias)
 
-    .set_slot(s @ Symbol, v, overwrite=false, fusion=true, pseudo=true)
-        = Prim.set_slot(self, s, v, overwrite, fusion, pseudo)
-    .has_slot?(s) = Prim.has_slot?(self, s)
+    # Remove a slot named `s` from `self`.
+    #
+    # Option:
+    #   recursive: Remove all slots named `s` of parents. (default=false)
+    .remove_slot(s @ Symbol, recursive=false):
+        Prim.remove_slot(self, s, recursive)
 
-    .each_slots(fun @ Function) = Prim.each_slots(self, fun)
+    # Return true if `self` has a slot named `s`.
+    #
+    # Option:
+    #   recursive: Lookup parents recursively. (default=false)
+    .has_slot?(s, recursive=false) = Prim.has_slot?(self, s, recursive)
+
+    # Apply `fun` to triplets `(object, slot-name, slot-value)` for all slots.
+    # Option:
+    #   recursive: Lookup parents recursively. (default=false)
+    .each_slots(fun @ Function, recursive=false) = Prim.each_slots(self, fun, recursive)
 
     # Convert to string by the function `fullform`.
     .to_s()    = fullform(self)
@@ -56,9 +122,9 @@ fullform:   Prim.fullform
 fusion:     Prim.fusion_function
 fusion!:    Prim.fusion_function
 compose:    Prim.compose_function
-pseudo:      Prim.pseudo
+alias:      Prim.alias
 
-pseudo(i @ Int): pseudo(
+alias(i @ Int): alias(
         () -> self[i],
         (v) -> { self[i] = v }
         )
