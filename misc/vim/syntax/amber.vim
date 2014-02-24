@@ -1,6 +1,6 @@
 " Language:	Amber
 " Maintainer:	nineties <nineties48@gmail.com>
-" $Id: amber.vim 2014-02-20 09:38:14 nineties $
+" $Id: amber.vim 2014-02-24 11:21:32 nineties $
 
 if exists("b:current_syntax")
     finish
@@ -13,8 +13,7 @@ syn keyword amberStatement      when if else case of while for in continue break
 syn keyword amberConditional    not and or
 syn keyword amberTodo Todo TODO Fixme FIXME XXX contained
 syn match amberComment  /#.*$/ contains=amberTodo
-syn region amberStringD start=/"/ skip=/\\"/ end=/"/ oneline
-syn region amberStringS start=/'/ skip=/\\'/ end=/'/ oneline
+syn region amberString          start=/"/ skip=/\\"/ end=/"/ oneline
 syn match amberConstant         /\<[A-Z_]\{2}\>/
 syn match amberIdentifier       /\<[a-zA-Z_]\w*[!?]\=/
 syn match amberSymbol           /\\[a-zA-Z_]\w*[!?]\=/
@@ -32,13 +31,16 @@ syn region amberParen   start=/(/ end=/)/ contains=ALLBUT,amberParenError fold
 syn match amberListError        /\]/
 syn region amberList    start=/\[/ end=/\]/ contains=ALLBUT,amberListError fold
 
+syn match amberSpaceError       display excludenl "\s\+$"
+syn match amberSpaceError       display " \+\t"
+syn match amberSpaceError       display "\t\+ "
+
 hi link amberSpecialSymbol      Constant
 hi link amberStatement          Statement
 hi link amberConditional        Conditional
 hi link amberTodo               Todo
 hi link amberComment            Comment
-hi link amberStringS            String
-hi link amberStringD            String
+hi link amberString             String
 hi link amberConstant           Constant
 hi link amberSymbol             Constant
 hi link amberHead               Structure
@@ -51,7 +53,7 @@ hi link amberHex                Number
 hi link amberOctal              Number
 hi link amberOctalZero          Number
 hi link amberFloat              Float
-
+hi link amberSpaceError         Error
 
 let b:current_syntax = "amber"
 

@@ -1,24 +1,52 @@
 # Copyright (C) 2010 nineties
-# $Id: Base.ab 2014-02-21 18:27:32 nineties $
+# $Id: Base.ab 2014-02-24 12:26:22 nineties $
 
-# Chain of obj.parent.parent... eventually reaches `nil',
-# so we can use nil as the root object of parent chain.
+#= The most basic functions and methods.
+
+#== nil: The root of parent chains.
+# From any object `o`, the chain of parents, i.e. o.parent.parent...,
+# eventually reaches `nil`. This means that every slot of `nil` is 
+# accessible to every object.
+#
+# The exception are objects whose parent-slot is removed.
+# You can remove the parent object `o` by `o.remove_slot('parent)`.
 
 nil with {
-    .head      = Prim.alias(() -> Prim.head(self))
-    .arguments = Prim.alias(() -> Prim.arguments(self))
-    .arity     = Prim.alias(() -> Prim.arity(self))
-    .to_s()    = fullform(self)
+    # The head symbol.
+    .head :      Prim.pseudo(() -> Prim.head(self))
 
-    .get_slot(sym @ Symbol, recursive=true, alias=true, check=true)
-        = Prim.get_slot(self, sym, recursive, alias, check)
-    .set_slot(sym @ Symbol, v, overwrite=false, fusion=true, alias=true)
-        = Prim.set_slot(self, sym, v, overwrite, fusion, alias)
-    .has_slot?(sym) = Prim.has_slot?(self, sym)
+    # The arity.
+    # It is *NOT* the arity of functions.
+    # For an object `h{a1, a2, ..., an}`, its `arity` is `n`.
+    .arity :     Prim.pseudo(() -> Prim.arity(self))
 
-    .get(i @ Int) = Prim.get_arg(self, i)
-    .set(i @ Int, v) = Prim.set_arg(self, i, v)
+    # The list of arguments.
+    # IT is *NOT* the arguments of function-calls.
+    # For an object `h{a1, a2, ..., an}`, its `arguments` is
+    # `[a1, a2, ..., an]`.
+    .arguments : Prim.pseudo(() -> Prim.arguments(self))
+
+    # `i`-th argument of the object.
+    .get(i @ Int) : Prim.get_arg(self, i)
+    .set(i @ Int, v) : Prim.set_arg(self, i, v)
+
+    # Get slot named `s`. 
+    # 
+    # Options:
+    #   * recursive: Lookup parents recursively if the parent-slot exists. (default:true)
+    #   * pseudo: 
+    .get_slot(s @ Symbol, recursive=true, pseudo=true, check=true)
+        = Prim.get_slot(self, s, recursive, pseudo, check)
+
+
+    .set_slot(s @ Symbol, v, overwrite=false, fusion=true, pseudo=true)
+        = Prim.set_slot(self, s, v, overwrite, fusion, pseudo)
+    .has_slot?(s) = Prim.has_slot?(self, s)
+
     .each_slots(fun @ Function) = Prim.each_slots(self, fun)
+
+    # Convert to string by the function `fullform`.
+    .to_s()    = fullform(self)
 }
 
 id(obj):    obj
@@ -28,9 +56,9 @@ fullform:   Prim.fullform
 fusion:     Prim.fusion_function
 fusion!:    Prim.fusion_function
 compose:    Prim.compose_function
-alias:      Prim.alias
+pseudo:      Prim.pseudo
 
-alias(i @ Int): alias(
+pseudo(i @ Int): pseudo(
         () -> self[i],
         (v) -> { self[i] = v }
         )
