@@ -1,5 +1,5 @@
 # Copyright (C) 2010 nineties
-# $Id: Base.ab 2014-02-24 13:45:30 nineties $
+# $Id: Base.ab 2014-02-24 16:44:08 nineties $
 
 #= The most basic functions and methods.
 
@@ -13,22 +13,22 @@
 
 nil with {
     # The head symbol.
-    .head :      Prim.alias(() -> Prim.head(self))
+    .head: Prim.alias(() -> Prim.head(self), nil)
 
     # The arity.
     # It is *NOT* the arity of functions.
     # For an object `h{a1, a2, ..., an}`, its `arity` is `n`.
-    .arity :     Prim.alias(() -> Prim.arity(self))
+    .arity: Prim.alias(() -> Prim.arity(self), nil)
 
     # The list of arguments.
     # It is *NOT* the arguments of function-calls.
     # For an object `h{a1, a2, ..., an}`, its `arguments` is
     # `[a1, a2, ..., an]`.
-    .arguments : Prim.alias(() -> Prim.arguments(self))
+    .arguments: Prim.alias(() -> Prim.arguments(self), nil)
 
     # `i`-th argument of the object.
-    .get(i @ Int) : Prim.get_arg(self, i)
-    .set(i @ Int, v) : Prim.set_arg(self, i, v)
+    .get(i @ Int):    Prim.get_arg(self, i)
+    .set(i @ Int, v): Prim.set_arg(self, i, v)
 
     # Get the value of the slot named `s`.
     #
@@ -44,7 +44,7 @@ nil with {
     # A.parent = B
     # A.x = 0
     # B.y = 1
-    # A.f = alias(() -> 2)
+    # A.f = alias(reader = () -> 2)
     # A.get_slot('x)                    # => 0
     # A.get_slot('y)                    # => 1
     # A.get_slot('f)                    # => 2
@@ -75,7 +75,7 @@ nil with {
     # A.set_slot('x, 1, overwrite=true)            # => 1
     # A.get_slot('x)                               # => 1
     # A.get_slot('x, recursive=false, check=false) # => nil
-    # A.x = alias(() -> self.z, (v) -> self.z = 1)
+    # A.x = alias(reader = () -> self.z, writer = (v) -> self.z = 1)
     # A.set_slot('x, 0)                            # => 0
     # A.get_slot('x)                               # => 1
     # A.get_slot('z)                               # => 1
@@ -115,24 +115,58 @@ nil with {
     .to_s()    = fullform(self)
 }
 
-id(obj):    obj
-equal?:     Prim.equal?
-identical?: Prim.identical?
-fullform:   Prim.fullform
-fusion:     Prim.fusion_function
-fusion!:    Prim.fusion_function
-compose:    Prim.compose_function
-alias:      Prim.alias
+# Identity function.
+id(obj): obj
 
+# Equality function.
+equal?: Prim.equal?
+
+# `identical?(a, b) == true` iff `a` and `b` are exactly same objects.
+identical?: Prim.identical?
+
+# Convert objects to fullform-string, i.e. the form of `h{a1, a2, .., an}`.
+fullform: Prim.fullform
+
+# Fusion two functions. 
+# If `args` is in the domain of `f`, then `fusion(f,g)(args) == f(args)`.
+# Otherwise `fusion(f,g)(args) == g(args)`.
+#
+# `fusion!` is for `f |= g`.
+fusion:  Prim.fusion_function
+fusion!: Prim.fusion_function
+
+# Compose two functions.
+# `compose(f,g)` is logically equal to `x -> f(g(x))`.
+compose: Prim.compose_function
+
+# Create pseudo-attributes.
+# A pseudo-attribute can be seen as a usual slot, but reading and writing
+# of the slot is redirected to a function call.
+#
+# A pseudo-attribute `o.f` can be created by `alias` function like:
+# `o.f = alias(reader = () -> e1, writer = (v) -> e2)`.
+# Then `o.f` is equal to call of `() -> e1` with `self==o`.
+# `o.f = v` is also equal to call of `(v) -> e2`. 
+#
+# You can ommit `reader` or `writer`.
+alias(reader=nil, writer=nil): Prim.alias(reader, writer)
+
+# Create an alias to i-th argument.
+#
+# Examples:
+# ----
+# obj: `Object{0}
+# obj.x = alias(0)
+# obj.x     # => 0
+# obj.x = 1
+# obj[0]    # => 1
+# obj[0] = 2
+# obj.x     # => 2
+# ----
 alias(i @ Int): alias(
-        () -> self[i],
-        (v) -> { self[i] = v }
+        reader = () -> self[i],
+        writer = (v) -> { self[i] = v }
         )
 
-hash(obj): {
-    h: 0
-    n: obj.arity
-    for (i in 0..n-1) 
-        h = 13*h + hash(obj.get_arg(i))
-    13*h + hash(obj.head)
-}
+# Builtin hash function.
+hash: Prim.hash

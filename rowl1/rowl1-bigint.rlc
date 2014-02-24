@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-bigint.rlc 2014-02-24 08:38:50 nineties $
+; $Id: rowl1-bigint.rlc 2014-02-24 16:34:48 nineties $
 ;
 
 (import "rlvm-compile")
@@ -471,17 +471,15 @@
     (return (remove_leading_zeros u))
     ))
 
-(fun bint_hash (n) (
+(export fun bint_hash (n) (
     (var h 0)
     (var digit (field_get n 0))
     (var len   (field_get n 1))
     (for i 0 len (do
-        (= h (+ (* 13 h) (array_get int digit i)))
+        (= h (hashnext h (array_get int digit i)))
         ))
-    (if (== (field_get n 3) 1)
-        (= h (+ (* 13 h) 1))
-        )
-    (return h)
+    (= h (hashnext h -1))
+    (return (box h))
     ))
 
 (fun bint_to_i (str) (
@@ -746,7 +744,6 @@
     (add_function1 mod (to_sym "string_to_bint") stringT bint_to_i 0)
     (add_function1 mod (to_sym "bint_to_float") bintT bint_to_f 0)
 
-    (add_function1 mod (to_sym "bint_hash") bintT bint_hash 0)
     (add_function1 mod (to_sym "bint_abs") bintT bint_abs 0)
     (add_function1 mod (to_sym "bint_uminus") bintT bint_uminus 0)
     (add_function2 mod (to_sym "bint_add") bintT bintT bint_add 0)

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-array.rlc 2014-02-17 23:45:46 nineties $
+; $Id: rowl1-array.rlc 2014-02-24 16:39:13 nineties $
 ;
 
 (import "rlvm-compile")
@@ -17,6 +17,8 @@
 (import "rowl1-assemble")
 (import "rowl1-error")
 (import "rowl1-table")
+
+(extern object global)
 
 (fun index_out_of_range (ary idx) (
     (throw (out_of_range ary (box idx)))
@@ -291,6 +293,17 @@
         (= v (runcode code (array_get object buf i) v))
         ))
     (return v)
+    ))
+
+(export fun ary_hash (ary) (
+    (var hash (lookup_func global (to_sym "hash")))
+    (var buf (field_get ary 1))
+    (var size (field_get ary 2))
+    (var h (hashnext 0 (field_get Array @SymbolIndex)))
+    (for i 0 size (do
+        (= h (hashnext h (unbox (runcode hash (array_get object buf i)))))
+        ))
+    (return (box h))
     ))
 
 (export fun setup_array (mod) (

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2014-02-17 23:46:07 nineties $
+; $Id: rowl1-list.rlc 2014-02-24 16:41:44 nineties $
 ;
 
 (import "rlvm-compile")
@@ -233,6 +233,16 @@
         (if ls (= ret (cons a ret)))
         ))
     (return (list_reverse ret))
+    ))
+
+(export fun ls_hash (ls) (
+    (var hash (lookup_func global (to_sym "hash")))
+    (var h (hashnext 0 (field_get List @SymbolIndex)))
+    (while ls (do
+        (= h (hashnext h (unbox (runcode hash (car ls)))))
+        (= ls (cdr ls))
+        ))
+    (return (box h))
     ))
 
 (export fun setup_list (mod) (

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-string.rlc 2014-02-17 23:46:17 nineties $
+; $Id: rowl1-string.rlc 2014-02-24 16:37:53 nineties $
 ;
 
 (import "rlvm-compile")
@@ -19,31 +19,31 @@
 (extern fun ary_new)
 (extern fun ary_push)
 
-(fun s_size (s) (
+(fun str_size (s) (
     (return (box (strlen s)))
     ))
 
-(fun s_equal (a b) (
+(fun str_equal (a b) (
     (if (streq a b)
         (return @C_TRUE)
         (return @C_FALSE)
         )
     ))
 
-(fun s_hash (s) (
+(export fun str_hash (s) (
     (var len (strlen s))
     (var h 0)
     (for i 0 len (do
-        (+= h (array_get char s i))
+        (= h (hashnext h (array_get char s i)))
         ))
     (return (box h))
     ))
 
-(fun s_add (a b) (
+(fun str_add (a b) (
     (return (strcat a b))
     ))
 
-(fun s_join (list d) (
+(fun str_join (list d) (
     (if (! list) (return (string "")))
     (var len 0)
     (var dlen (strlen d))
@@ -70,14 +70,14 @@
     (return str)
     ))
 
-(fun s_unescape (s) (
+(fun str_unescape (s) (
     (= s (strdup s))
     (unescape_string_d s)
     (return s)
     ))
 
 ; returns true if s1 contains s2 as a sub-string.
-(fun s_contain (s1 s2) (
+(fun str_contain (s1 s2) (
     ; simple method
     (var l1 (strlen s1))
     (var l2 (strlen s2))
@@ -92,23 +92,23 @@
 ; split d d = []
 ; split (d ++ s) d = cons "" (split s d)
 ; split (s1 ++ d ++ s2) d = cons s1 (split s2 d)
-(fun s_split_ (str d i slen dlen) (
+(fun str_split_ (str d i slen dlen) (
     (if (< slen dlen)
         (return (list1 (strldup (+ str i) (+ slen 1))))
         )
     (if (strneq (+ str i) d dlen)
-        (return (cons (string "") (s_split_ str d (+ i dlen) (- slen dlen) dlen)))
+        (return (cons (string "") (str_split_ str d (+ i dlen) (- slen dlen) dlen)))
         )
     (for k i (+ (- (+ i slen) dlen) 1) (do
         (if (strneq (+ str k) d dlen)
             (return (cons (substr str i (- k 1))
-                (s_split_ str d (+ k dlen) (- slen (+ k dlen)) dlen)
+                (str_split_ str d (+ k dlen) (- slen (+ k dlen)) dlen)
                 )))
         ))
     (return (list1 (strldup (+ str i) (+ slen 1))))
     ))
 
-(fun s_split (str d) (
+(fun str_split (str d) (
     (var slen (strlen str))
     (var dlen (strlen d))
     (if (== dlen 0) (do
@@ -118,10 +118,10 @@
             ))
         (return ls)
         ))
-    (return (s_split_ str d 0 slen dlen))
+    (return (str_split_ str d 0 slen dlen))
     ))
 
-(fun s_code (s) (
+(fun str_code (s) (
     (var len (strlen s))
     (if (!= len 1) (throw (invalid_argument
         (string "`code' requires a string of length 1")
@@ -129,7 +129,7 @@
     (return (box (array_get char s 0)))
     ))
 
-(fun s_char (i) (
+(fun str_char (i) (
     (= i (unbox i))
     (if (& i 0xffffff00) (throw (invalid_argument
         (string "`char' requires number between 0 and 255")
@@ -137,7 +137,7 @@
     (return (ctos i))
     ))
 
-(fun s_at (s i) (
+(fun str_at (s i) (
     (= i (unbox i))
     (var len (strlen s))
     (if (< i 0) (+= i len))
@@ -146,7 +146,7 @@
     (return (ctos (array_get char s i)))
     ))
 
-(fun s_store (s i c) (
+(fun str_store (s i c) (
     (if (!= (strlen c) 1)
         (throw (invalid_argument (string "2nd argument of store for String must be one character") c))
         )
@@ -165,7 +165,7 @@
     (return str)
     ))
 
-(fun s_at_range (s r) (
+(fun str_at_range (s r) (
     (var b (node_arg_int r 0))
     (var e (node_arg_int r 1))
     (var len (strlen s))
@@ -241,20 +241,19 @@
     ))
 
 (export fun setup_string (mod) (
-    (add_function1 mod (to_sym "string_length") stringT s_size 0)
-    (add_function2 mod (to_sym "string_equal?") stringT stringT s_equal 0)
-    (add_function1 mod (to_sym "string_hash") stringT s_hash 0)
-    (add_function2 mod (to_sym "string_add") stringT stringT s_add 0)
-    (add_function2 mod (to_sym "string_join") listT stringT s_join 0)
+    (add_function1 mod (to_sym "string_length") stringT str_size 0)
+    (add_function2 mod (to_sym "string_equal?") stringT stringT str_equal 0)
+    (add_function2 mod (to_sym "string_add") stringT stringT str_add 0)
+    (add_function2 mod (to_sym "string_join") listT stringT str_join 0)
 
-    (add_function1 mod (to_sym "code_to_char") intT s_char 0)
-    (add_function1 mod (to_sym "char_to_code") stringT s_code 0) 
+    (add_function1 mod (to_sym "code_to_char") intT str_char 0)
+    (add_function1 mod (to_sym "char_to_code") stringT str_code 0) 
 
-    (add_function2 mod (to_sym "string_at") stringT intT s_at 0)
-    (add_function2 mod (to_sym "string_at") stringT irangeT s_at_range 0)
-    (add_function1 mod (to_sym "string_unescape") stringT s_unescape 0)
-    (add_function2 mod (to_sym "string_contain?") stringT stringT s_contain 0)
-    (add_function2 mod (to_sym "string_split") stringT stringT s_split 0)
+    (add_function2 mod (to_sym "string_at") stringT intT str_at 0)
+    (add_function2 mod (to_sym "string_at") stringT irangeT str_at_range 0)
+    (add_function1 mod (to_sym "string_unescape") stringT str_unescape 0)
+    (add_function2 mod (to_sym "string_contain?") stringT stringT str_contain 0)
+    (add_function2 mod (to_sym "string_split") stringT stringT str_split 0)
 
     ; StringStream module
     (var issT (domainP InputStringStream))

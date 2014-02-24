@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-object.rlc 2014-02-24 13:50:27 nineties $
+; $Id: rowl1-object.rlc 2014-02-24 14:46:38 nineties $
 ;
 
 (import "rlvm-compile")
@@ -105,7 +105,7 @@
         ))
     (if (&& (!= alias @C_FALSE) 
         (&& (== (node_type v) @AliasE)
-            (field_get v 2))) (do
+            (!= (field_get v 2) @C_NIL))) (do
         (var f (field_get v 2))
         (return (runcode_with_self obj (get_bytecode f) val))
         ))
@@ -152,7 +152,9 @@
             (return @C_NIL)
             ))
     (var v (field_get ref 3))
-    (if (&& (!= alias @C_FALSE) (&& (== (node_type v) @AliasE) (field_get v 1)))
+    (if (&& (!= alias @C_FALSE)
+        (&& (== (node_type v) @AliasE) 
+            (!= (field_get v 1) @C_NIL)))
         (return (runcode_with_self obj (get_bytecode (field_get v 1))))
         )
     (return v)
@@ -196,11 +198,23 @@
     (return @C_NIL)
     ))
 
-(fun alias_r (reader) (
-    (return (variant @AliasE 2 reader 0))
-    ))
-
 (fun alias_rw (reader writer) (
+    (if (&& (!= reader @C_NIL) (! (is_function reader))) (do
+        (throw (invalid_argument
+            (string "Reader of pseudo-attribute must be a function")
+            reader
+            ))
+        ))
+    (if (&& (!= writer @C_NIL) (! (is_function writer))) (do
+        (throw (invalid_argument
+            (string "Writer of pseudo-attribute must be a function")
+            writer
+            ))
+        ))
+    (if (&& (== reader @C_NIL) (== writer @C_NIL))
+        (throw (invalid_argument0
+            (string "Reader and Writer are both nil")
+            )))
     (return (variant @AliasE 2 reader writer))
     ))
 
@@ -246,8 +260,7 @@
 
     (add_function3 mod (to_sym "each_slots") DontCare funT DontCare each_slots 0)
 
-    (add_function1 mod (to_sym "alias") funT alias_r 0)
-    (add_function2 mod (to_sym "alias") funT funT alias_rw 0)
+    (add_function2 mod (to_sym "alias") DontCare DontCare alias_rw 0)
 
     (add_function2 mod (to_sym "set_builtin_parent") symT DontCare set_builtin_parent 0)
     ))

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2014-02-17 23:46:23 nineties $
+; $Id: rowl1-list.rlc 2014-02-24 16:35:59 nineties $
 ;
 
 (import "rlvm-compile")
@@ -125,6 +125,16 @@
         (= list (cdr list))
         ))
     (return t)
+    ))
+
+(export fun tuple_hash (tup) (
+    (var hash (lookup_func global (to_sym "hash")))
+    (var h (hashnext 0 (field_get Tuple @SymbolIndex)))
+    (var size (seq_size tup))
+    (for i 0 size (do
+        (= h (hashnext h (unbox (runcode hash (array_get object tup i)))))
+        ))
+    (return (box h))
     ))
 
 (export fun setup_tuple (mod) (

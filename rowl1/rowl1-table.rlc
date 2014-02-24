@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-table.rlc 2014-02-17 23:46:20 nineties $
+; $Id: rowl1-table.rlc 2014-02-24 16:33:42 nineties $
 ;
 
 (import "rlvm-compile")
@@ -216,6 +216,18 @@
         (= entry (field_get entry 3))
         ))
     (return list)
+    ))
+
+(export fun table_hash (tbl) (
+    (var hash (lookup_func global (to_sym "hash")))
+    (var h (hashnext 0 (field_get Table @SymbolIndex)))
+    (var entry (field_get tbl 4))
+    (while entry (do
+        (= h (hashnext h (unbox (runcode hash (field_get entry 0)))))
+        (= h (hashnext h (unbox (runcode hash (field_get entry 1)))))
+        (= entry (field_get entry 3))
+        ))
+    (return (box h))
     ))
 
 (export fun setup_table (mod) (

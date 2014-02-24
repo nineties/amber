@@ -2,13 +2,12 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-random.rlc 2013-03-16 13:33:56 nineties $
+; $Id: vm-prim-random.rlc 2014-02-24 16:59:55 nineties $
 ;
 
 ; Implementation of Mersenne Twister (MT19937).
 ; This code is based on 
 ; http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/MT2002/CODES/mt19937ar.c
-
 
 (import "stdlib")
 (import "vm-compile")
@@ -106,6 +105,21 @@
     (^= y (>> y 18))
 
     (return y)
+    ))
+
+
+; XXX: temporary implementation.
+(int hashA 0)
+(int hashB 0)
+(export prim_hashnext)
+(fun prim_hashnext (h v) (
+    (return (+ (* hashA (+ h v)) hashB))
+    ))
+
+(export prim_setup_hash)
+(fun prim_setup_hash () (
+    (= hashA (+ (<< (prim_randui) 3) 5))
+    (= hashB (prim_randui))
     ))
 
     ))

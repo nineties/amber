@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-02-21 17:56:18 nineties $
+; $Id: rowl1-compile.rlc 2014-02-24 14:06:45 nineties $
 ;
 
 (import "rlvm-compile")
@@ -951,40 +951,35 @@
         (throw (type_error (string "a list") args)
         ))
     (var idx 0)
-    ; Setup usual arguments
+    (var usual 0)
+    (var keyargs 0)
+    ; Setup usual arguments and keyword arguments
     (while args (do
         (var arg (car args))
-        (if (|| (== (node_head arg) Rest) (== (node_head arg) Keyword)) break)
-        (= alias (setup_arg tbl (make_arg idx) arg 0 alias))
+        (if (== (node_head arg) Rest) break)
+        (if (== (node_head arg) Keyword)
+            (do
+                (= keyargs (cons arg keyargs))
+            )
+            (do
+                (= usual (cons arg usual))
+                (= alias (setup_arg tbl (make_arg idx) arg 0 alias))
+                (+= idx 1)
+            ))
         (= args (cdr args))
-        (+= idx 1)
         ))
-    (if (! args) (return (tuple3 alias args_ 0)))
+    (if (! args) (return (tuple3 alias (list_reverse usual) (list_reverse keyargs))))
 
     ; Setup variable arguments 
-    (if (== (node_head (car args)) Rest) (do
-        (if (> (node_size (car args)) 0) (do
-            (var v (node_arg_symbol (car args) 0))
-            (= alias (add_arg tbl v (make_args_from idx) alias))
-            ))
-        (+= idx 1)
-        (= args (cdr args))
+    (if (> (node_size (car args)) 0) (do
+        (var v (node_arg_symbol (car args) 0))
+        (= alias (add_arg tbl v (make_args_from idx) alias))
+        (= usual (cons (car args) usual))
         ))
-    (if (! args) (return (tuple3 alias args_ 0)))
-
-    ; Setup keyword arguments
-    (while args (do
-        (var arg (car args))
-        (if (!= (node_head arg) Keyword) (goto invalid_argument))
-        (var v (node_arg_symbol arg 0))
-        (= args (cdr args))
-        ))
-    (var t (list_split (list_copy args_) idx))
-    (return (tuple3 alias (car t) (cdr t)))
-    (label invalid_argument)
-    (throw (logic_error1
-        (string "The order of arguments is invalid")
-        args_))
+    (if (cdr args) (throw (logic_error1
+            (string "The order of arguments is invalid")
+            args_)))
+    (return (tuple3 alias (list_reverse usual) (list_reverse keyargs)))
     ))
 
 (fun setup_arg (tbl obj arg level alias) (
