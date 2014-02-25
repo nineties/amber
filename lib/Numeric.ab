@@ -1,9 +1,10 @@
 # Copyright (C) 2014 nineties
-# $Id: Numeric.ab 2014-02-25 14:33:05 nineties $
+# $Id: Numeric.ab 2014-02-25 17:44:24 nineties $
 
 INTEGER_WIDTH: Prim.INTEGER_WIDTH
 INTEGER_MIN:   Prim.INTEGER_MIN
 INTEGER_MAX:   Prim.INTEGER_MAX
+infinity: Prim.infinity
 
 #= Fixed-length integers and floating-point numbers. =
 # This module defines numerical operations for fixed-length integers and
@@ -45,7 +46,7 @@ mul    = Prim.int_mul | Prim.float_mul | mul
 # A division with remainder (Euclidean division) and a division with
 # no remainder.
 #
-# The functions `div` (operator: `//`) and `mod` (operator: `%`) are for
+# The functions `div` (operator = `//`) and `mod` (operator = `%`) are for
 # the former and defined as follows:
 # * For any integer a and b (b != 0), there exist unique integers q and r
 #   such that a = bq + r (0 <= r < |b|).
@@ -70,7 +71,8 @@ mul    = Prim.int_mul | Prim.float_mul | mul
 # > divmod(7, 3)    # => (2, 1)
 # ----
 #
-# These operations thwo `DivisionByZero` exception when the division is zero.
+# Exceptions:
+#   DivisionByZero: When the divisor is 0.
 #
 # The function `quo` is for the latter.
 # Examples:
@@ -79,50 +81,70 @@ mul    = Prim.int_mul | Prim.float_mul | mul
 # > 5.3 / 2.5   # => 2.12
 # ----
 #
-# If the divisor is `0` `DivisionByZero` exception is thrown but when
-# it is `0.0` or `-0.0` the results are `infinity` or `-infinity`.
-# This is because we should think that `0.0` is not exactly zero but
-# approximately zero.
+# Exceptions:
+#   DivisionByZero: When the divisor is 0.
+# Note that when the divisor is `0.0` or `-0.0` the result is `infinity`
+# with appropriate sign and no exceptions are thrown. This is because we
+# should think that `0.0` means approximately zero.
 # ----
+# > 1.0/0           # => Error DivisionByZero
 # > 1.0/0.0         # => infinity
 # > 1.0/-0.0        # => -infinity
 # > -1.0/0.0        # => -infinity
 # > -1.0/-0.0       # => infinity
-# > 1.0/0           # => Error DivisionByZero
+# ----
 
 div    = Prim.int_div | div
 mod    = Prim.int_mod | mod
 divmod(a, b): (div(a, b), mod(a, b))
 quo    = Prim.int_quo | Prim.float_quo | quo
 
+#== Power operation ==
+# `pow(a, b)` (operator = '^') is equal to `a` to the power of `b`.
+# Examples:
+# ----
+# > 2^3         # => 8
+# > 2^(1/2)     # => 1.414213562373095
+# > 2^(-3)      # => 0.125
+# ----
+
 pow    = Prim.int_pow | Prim.float_pow | pow
-powmod(a, b, c): perform_ternary_operation(a, b, powmod, 'powmod)
 
-less_than?     = Prim.int_less_than? | less_than?
-greater_than?  = Prim.int_greater_than? | greater_than?
-less_equal?    = Prim.int_less_equal? | less_equal?
+# `powmod(a, b, c)` for integer `a` and natural numbers `b` and `c`,
+# is basically equal to `(a ^ b) % c`. The difference is that
+# `(a ^ b) % c` may overflow when `a` or `b` is too big but
+# `powmod(a, b, c)` never overflow if `c^2` doesn't overflow.
+#
+# Exceptions:
+#   * InvalidArgument: When b < 0 or c < 0.
+#
+# We uses the binary method for both functions.
+# See: http://en.wikipedia.org/wiki/Modular_exponentiation#Right-to-left_binary_method
+#
+# Example:
+# ----
+# powmod(7, 160, 10)    # => 1
+# ----
+
+powmod(a, b, c): perform_ternary_operation(a, b, c, powmod, 'powmod)
+powmod = Prim.int_powmod | powmod
+
+# We use specialized comparison methods for integers for speed,
+# and use `compare` for floating-point numbers.
+less_than?     = Prim.int_less_than?     | less_than?
+greater_than?  = Prim.int_greater_than?  | greater_than?
+less_equal?    = Prim.int_less_equal?    | less_equal?
 greater_equal? = Prim.int_greater_equal? | greater_equal?
+compare = Prim.int_compare | Prim.float_compare | compare
 
+# Several other functions.
 abs(a): a >= 0 ? a : -a
 uminus(a): -1 * a
-
-# Integer and Floating-point
-
-powmod = Prim.int_powmod | powmod
-shiftL: Prim.int_shiftL
-shiftR: Prim.int_shiftR
-
-compare = Prim.int_compare | Prim.float_compare | compare
-equal?  = Prim.float_equal? | equal?
-
 min(a, b): a < b ? a : b
 max(a, b): a < b ? b : a
 minmax(a, b): a < b ? (a, b) : (b, a)
 
-infinity: Prim.infinity
-
-# traits
-
+# Traits.
 trait Int {
     .to_i(): self
     .to_f(): Prim.int_to_float(self)

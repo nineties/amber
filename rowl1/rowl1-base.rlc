@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-base.rlc 2014-02-24 16:38:19 nineties $
+; $Id: rowl1-base.rlc 2014-02-25 17:46:40 nineties $
 ;
 
 (import "rlvm-compile")
@@ -22,13 +22,20 @@
 (fun _node_size (obj) (
     (return (box (node_size obj)))
     ))
-(fun _equal (a b) (
-    (var eql (lookup_func global (to_sym "equal?")))
-    (return (_equal_sub a b eql))
-    ))
 
-(fun _equal_sub (a b eql) (
+(extern fun str_equal)
+(extern fun float_equal)
+(extern fun bint_equal)
+(extern fun ls_equal)
+(fun _equal (a b) (
     (if (== a b) (return @C_TRUE))
+    (var ty1 (node_type a))
+    (var ty2 (node_type b))
+    (if (!= ty1 ty2) (return @C_FALSE))
+    (if (== ty1 @StringE) (return (str_equal a b)))
+    (if (== ty1 @FloatE) (return (float_equal a b)))
+    (if (== ty1 @BigIntE) (return (bint_equal a b)))
+    (if (== ty1 @ListE) (return (ls_equal a b)))
     (if (|| (is_atom a) (is_atom b)) (return @C_FALSE))
     (var hd1 (node_head a))
     (var hd2 (node_head b))
@@ -36,6 +43,7 @@
     (var n1 (node_size a))
     (var n2 (node_size b))
     (if (!= n1 n2) (return @C_FALSE))
+    (var eql (lookup_func global (to_sym "equal?")))
     (for i 0 n1 (do
         (var v1 (node_arg a i))
         (var v2 (node_arg b i))

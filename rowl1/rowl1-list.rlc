@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2014-02-24 16:41:44 nineties $
+; $Id: rowl1-list.rlc 2014-02-25 17:42:11 nineties $
 ;
 
 (import "rlvm-compile")
@@ -60,6 +60,19 @@
 
 (fun ls_cons (a b) (
     (return (cons a b))
+    ))
+
+(export fun ls_equal (a b) (
+    (var eql (lookup_func global (to_sym "equal?")))
+    (while (&& a b) (do
+        (if (== (runcode (car a) (car b)) @C_FALSE) (return @C_FALSE))
+        (= a (cdr a))
+        (= b (cdr b))
+        ))
+    (if (|| a b)
+        (return @C_FALSE)
+        (return @C_TRUE)
+        )
     ))
 
 (fun ls_car (a) (
