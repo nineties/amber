@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-02-24 23:32:36 nineties $ "
+" $Id: Syntax.ab 2014-02-25 10:40:36 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -204,26 +204,26 @@ fullform_expr
     ::= fullform
       | postfix_expr
     
-quote_expr
-    ::= "'" quote_expr
+quoe_expr
+    ::= "'" quoe_expr
         { MakeObject{Quote{Quote}, List{node1}} }
-      | "`"  quote_expr
+      | "`"  quoe_expr
         { MakeObject{Quote{QuasiQuote}, List{node1}} }
-      | "!"  quote_expr
+      | "!"  quoe_expr
         { MakeObject{Quote{Unquote}, List{node1}} }
       | fullform_expr
 
-pattern ::= quote_expr
+pattern ::= quoe_expr
 term    ::= postfix_expr
 
-## enable use of quotation expressions for following definitions.
-Assign{Slot{Syntax, expr}, Slot{Syntax, quote_expr}}
+## enable use of quoation expressions for following definitions.
+Assign{Slot{Syntax, expr}, Slot{Syntax, quoe_expr}}
 
 prefix_expr
-    ::= "+"          quote_expr { `UnaryPlus{!node1} }
-      | "-" !decimal quote_expr { `UnaryMinus{!node2} }
-      | not quote_expr          { `Not{!node1} }
-      | quote_expr
+    ::= "+"          quoe_expr { `UnaryPlus{!node1} }
+      | "-" !decimal quoe_expr { `UnaryMinus{!node2} }
+      | not quoe_expr          { `Not{!node1} }
+      | quoe_expr
 
 multiplicative_expr
     ::= multiplicative_expr "*" prefix_expr  { `Mul{!node0, !node2} }
@@ -430,7 +430,7 @@ expand_macro: expr -> {
             level = Prim.int_sub(level, 1)
 
         if Prim.int_less_than?(level, 0)
-            throw `LogicError{"Unquotation outside quasi-quotation"}
+            throw `LogicError{"Unquoation outside quasi-quoation"}
 
         if Prim.atom?(expr)
             return expr
@@ -463,8 +463,8 @@ macro(x - y)   = `sub(!x, !y)
 macro(x * y)   = `mul(!x, !y)
 macro(x ^ y)   = `pow(!x, !y)
 macro(x / y)   = `div(!x, !y)
-macro(x // y)  = `quot(!x, !y)
-macro(x % y)   = `rem(!x, !y)
+macro(x // y)  = `quo(!x, !y)
+macro(x % y)   = `mod(!x, !y)
 macro(x | y)   = `fusion(!x, !y)
 macro(x < y)   = `less_than?(!x, !y)
 macro(x > y)   = `greater_than?(!x, !y)
@@ -478,8 +478,8 @@ macro(x -= y)  = `ArithAssign{!x, !y, sub!}
 macro(x *= y)  = `ArithAssign{!x, !y, mul!}
 macro(x ^= y)  = `ArithAssign{!x, !y, pow!}
 macro(x /= y)  = `ArithAssign{!x, !y, div!}
-macro(x //= y) = `ArithAssign{!x, !y, quot!}
-macro(x %= y)  = `ArithAssign{!x, !y, rem!}
+macro(x //= y) = `ArithAssign{!x, !y, quo!}
+macro(x %= y)  = `ArithAssign{!x, !y, mod!}
 macro(x |= y)  = `ArithAssign{!x, !y, fusion!}
 
 # Subscript syntax is not built-in. We need macros.

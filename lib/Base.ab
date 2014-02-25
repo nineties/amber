@@ -1,12 +1,11 @@
 # Copyright (C) 2010 nineties
-# $Id: Base.ab 2014-02-24 22:12:44 nineties $
+# $Id: Base.ab 2014-02-25 10:34:57 nineties $
 
-#= The most basic functions and methods. =
+#== The most basic functions and methods. ==
 
-#== nil is the root of parent chains. ==
-# From any object `o`, the chain of parents, i.e. o.parent.parent...,
-# eventually reaches `nil`. This means that every slot of `nil` is 
-# accessible to every object.
+# We chan think `nil` as the common ancestor of objects. From any object
+# `o`, the chain of parents, i.e. o.parent.parent..., eventually reaches
+# `nil`. This means that every slot of `nil` is accessible to every object.
 #
 # The exception are objects whose parent-slot is removed.
 # You can remove the parent of object `o` by `o.remove_slot('parent)`.
@@ -170,3 +169,119 @@ alias(i @ Int): alias(
 
 # Builtin hash function.
 hash: Prim.hash
+
+#== Operators ==
+#=== Mathematical operators ===
+# * `+ a`   : Unary plus. Equivalent to `uplus(a)`.
+# * `- a`   : Unary minus. Equivalent to `uminus(a)`.
+# * `|a|`   : Absolute value. Equivalent to `abs(a)`.
+# * `a + b` : Addition. Equivalent to `add(a, b)`.
+# * `a - b` : Subtraction. Equivalent to `sub(a, b)`.
+# * `a * b` : Multiplication. Equivalent to `mul(a, b)`.
+# * `a ^ b` : Exponential. Equivalent to `pow(a, b)`.
+# * `a / b` : Division. Equivalent to `div(a, b)`.
+# * `a // b`: Quotient of Euclidean division (division with remainder).
+#   Equivalent to `quo(a, b)`.
+# * `a % b` : Remainder of Euclidean division. Equivalent to `mod(a, b)`.
+#
+#=== Comparison operators ===
+# * 'a == b' : Equivalent to `equal?(a, b)`.
+# * 'a != b' : Equivalent to `not equal?(a, b)`.
+# * 'a < b'  : Equivalent to `less_than?(a, b)`.
+# * 'a <= b' : Equivalent to `less_equal?(a, b)`.
+# * 'a > b'  : Equivalent to `greater_than?(a, b)`.
+# * 'a >= b' : Equivalent to `greater_equal?(a, b)`.
+# * 'a <=> b': Equivalent to `compare(a, b)`.
+# Default implementations for `<`, `<=`, `>`, `>=` using `compare` are
+# provided. For example, `a < b` is equivalent to `compare(a, b) < 0`.
+#
+#=== Function fusion ===
+# * 'f | g': Equivalent to `fusion(f, g)`.
+#
+#=== Assignment operators ===
+# * 'a += b' : Equivalent to `a = a.add!(b)`
+# * 'a -= b' : Equivalent to `a = a.sub!(b)`
+# * 'a *= b' : Equivalent to `a = a.mul!(b)`
+# * 'a ^= b' : Equivalent to `a = a.pow!(b)`
+# * 'a /= b' : Equivalent to `a = a.div!(b)`
+# * 'a //= b': Equivalent to `a = a.quo!(b)`
+# * 'a %= b' : Equivalent to `a = a.mod!(b)`
+# * 'a |= b' : Equivalent to `a = a.fusion!(b)`
+#
+# Amber uses different functions for `a op b` and `a op= b`.
+# Our intention is to enable giving efficient implementations to assignment
+# operatorsa which destructively overwrite left-hand-side operands.
+# By default, functions listed above are just aliases of non-destructive
+# ones.
+#
+#=== Implicit type conversion ===
+# Functions for implicit type-conversion for mathematical operators.
+# You can define new implicit type-conversion rule by extending two
+# functions: `typecast` and `typejoin`. Here, we call the head symbol
+# of an object the type of it.
+#
+# `typecast(o,h)` is an object with head `h` converted from `o`. For
+# example, `typecast(1, 'Float) == 1.0`. `typejoin(a,b)` is a common
+# borader concept of type `a` and `b`. For example,
+# `typejoin('Int, 'Float) == 'Float`. `typejoin(a,b) == nil` when such
+# type doesn't exist. If `typejoin(a,b) == c` then `typecast(o1,c)` and
+# `typecast(o2,c)` must be defined where `o1.head == a` and `o2.head == b`.
+#
+# The process of implicit type conversion for operation `a op b` is as
+# follows.
+#   + When `a op b` is defined for the types of `a` and `b`, perform it.
+#   + `h: typejoin(a.head, b.head)`.
+#   + If `h == nil` throw `LogicError exception.
+#   + If `h == a.head and h == b.head` throw `LogicError exception,
+#     because we already know `a op b` is not defined here.
+#   + Perform `typecast(a, h) op typecast(b, h)`.
+
+typecast(a, h) when a.head == h: a
+typejoin(h1, h2): nil
+typejoin(h, h): h
+
+perform_binary_operation(a, b, fun, op): {
+    h: typejoin(a.head, b.head)
+    if (h == nil)
+        throw `LogicError{"Operands are incompatible.", !op, !a, !b}
+    if (h == a.head and h == b.head)
+        throw `LogicError{"Undefined binary operation.", !op, !a, !b}
+    fun(typecast(a, h), typecast(b, h))
+}
+
+perform_ternary_operation(a, b, c, fun, op): {
+    h: typejoin(a.head, typejoin(b.head, c.head))
+    if (h == nil)
+        throw `LogicError{"Operands are incompatible.", !op, !a, !b, !c}
+    if (h == a.head and h == b.head and h == c.head)
+        throw `LogicError{"Undefined ternary operation.", !op, !a, !b, !c}
+    fun(typecast(a, h), typecast(b, h), typecast(c, h))
+}
+
+uplus(a):  throw `LogicError{"No default implementation", uplus}
+uminus(a): -1 * a
+add(a, b): perform_binary_operation(a, b, add, 'add)
+sub(a, b): perform_binary_operation(a, b, sub, 'sub)
+mul(a, b): perform_binary_operation(a, b, mul, 'mul)
+pow(a, b): perform_binary_operation(a, b, pow, 'pow)
+quo(a, b): perform_binary_operation(a, b, quo, 'quo)
+div(a, b): perform_binary_operation(a, b, div, 'div)
+mod(a, b): perform_binary_operation(a, b, mod, 'mod)
+
+nil with {
+    .add!(b):    add(self,b)
+    .sub!(b):    sub(self,b)
+    .mul!(b):    mul(self,b)
+    .pow!(b):    pow(self,b)
+    .quo!(b):    quo(self,b)
+    .div!(b):    div(self,b)
+    .mod!(b):    mod(self,b)
+    .fusion!(b): fusion(self,b)
+}
+
+compare(a, b)        : perform_binary_operation(a, b, compare, 'compare)
+less_than?(a, b)     : compare(a, b) < 0
+greater_than?(a, b)  : compare(a, b) > 0
+less_equal?(a, b)    : compare(a, b) <= 0
+greater_equal?(a, b) : compare(a, b) >= 0
+

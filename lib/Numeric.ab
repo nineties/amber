@@ -1,49 +1,16 @@
 # Copyright (C) 2014 nineties
-# $Id: Numeric.ab 2014-02-24 08:40:06 nineties $
+# $Id: Numeric.ab 2014-02-25 10:26:23 nineties $
 
-import Trait
-
-join_numeric_type(a, b): nil
-join_numeric_type(a, a): a
+typejoin('Int, 'Float): 'Float
 join_numeric_type('Int, 'Float): 'Float
 join_numeric_type('Float, 'Int): 'Float
 
 upcast(a, h) when a.head == h: a
 upcast(a, 'Float): a.to_f()
 
-perform_binary_operation(a, b, fun, op): {
-    h: join_numeric_type(a.head, b.head)
-    if (h == nil)
-          throw `LogicError{"Operands are incompatible.", operator{!op}, args{[!a, !b]}}
-    if (h == a.head and h == b.head)
-          throw `LogicError{"Undefined binary operation.", operator{!op}, args{[!a, !b]}}
-    fun(upcast(a, h), upcast(b, h))
-}
-
-add(a, b): perform_binary_operation(a, b, add, 'add)
-sub(a, b): perform_binary_operation(a, b, sub, 'sub)
-mul(a, b): perform_binary_operation(a, b, mul, 'mul)
-quo(a, b): perform_binary_operation(a, b, quo, 'quo)
-div(a, b): perform_binary_operation(a, b, div, 'div)
-mod(a, b): perform_binary_operation(a, b, mod, 'mod)
-pow(a, b): perform_binary_operation(a, b, pow, 'pow)
 divmod(a, b): (div(a, b), mod(a, b))
-powmod(a, b, c): {
-    h: join_numeric_type(a.head, join_numeric_type(b.head, c.head))
-    if (h == nil)
-          throw `LogicError{"Operands are incompatible.",
-              operator{powmod}, args{[!a, !b, !c]}}
-    if (h == a.head and h == b.head and h == c.head)
-          throw `LogicError{"Undefined ternary operation.",
-              operator{powmod}, args{[!a, !b, !c]}}
-    powmod(upcast(a, h), upcast(b, h), upcast(c, h))
-}
+powmod(a, b, c): perform_ternary_operation(a, b, powmod, 'powmod)
 
-compare(a, b): perform_binary_operation(a, b, compare, 'compare)
-less_than?(a, b):     compare(a, b) < 0
-greater_than?(a, b):  compare(a, b) > 0
-less_equal?(a, b):    compare(a, b) <= 0
-greater_equal?(a, b): compare(a, b) >= 0
 less_than?     = Prim.int_less_than? | less_than?
 greater_than?  = Prim.int_greater_than? | greater_than?
 less_equal?    = Prim.int_less_equal? | less_equal?
@@ -79,23 +46,6 @@ max(a, b): a < b ? b : a
 minmax(a, b): a < b ? (a, b) : (b, a)
 
 infinity: Prim.infinity
-
-export abs uplus uminus add sub mul quo div mod divmod pow powmod
-export shiftL shiftR
-export compare less_than? greater_than? less_equal? greater_equal? equal?
-export min max minmax
-export INTEGER_MIN INTEGER_MAX
-export infinity
-
-nil with {
-    .add!(b): add(self,b)
-    .sub!(b): sub(self,b)
-    .mul!(b): mul(self,b)
-    .pow!(b): pow(self,b)
-    .quo!(b): quo(self,b)
-    .div!(b): div(self,b)
-    .mod!(b): mod(self,b)
-}
 
 # traits
 

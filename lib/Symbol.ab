@@ -1,16 +1,34 @@
 # Copyright (C) 2014 nineties
-# $Id: Symbol.ab 2014-02-15 21:16:23 nineties $
+# $Id: Symbol.ab 2014-02-25 10:10:13 nineties $
 
-import String
-import Trait
+import Numeric (compare)
+
+# A symbol is an object which can be used as the head of an object, a
+# variable, the name of a slot and so on. The name of a symbol must be
+# read as a usual identifier, i.e. [A-Za-z_][A-Za-z0-9_]*[!?]? in regular
+# expression.
+#
+# All symbols except ones which created by `Symbol.unique` are internalized
+# to Amber system. In other words, symbols which have same name are always
+# same object. Therefore, several functions for symbols are faster than
+# ones for strings, e.g. `equal?`, `compare` and `hash`.
 
 trait Symbol {
-    to_s(): Prim.symbol_to_string(self)
+    # The unique identification number.
+    .id: alias(getter = () -> Prim.symbol_id(self))
 }
 
 trait String {
-    to_sym(): Prim.string_to_symbol(self) 
+    # Convert to a symbol. When the string is not valid, throw
+    # `InvalidArgument` error.
+    .to_sym(): Prim.string_to_symbol(self)
 }
 
-unique_sym: Prim.unique_symbol
-hash = Prim.symbol_hash | hash
+# Extend the comparison operator.
+# NB: This function compares id-numbers of symbols, not lexicographic.
+compare = Prim.symbol_compare | compare
+
+# Create a symbol, which is not internalized, with given name.
+unique: Prim.unique_symbol
+
+Prim.set_builtin_parent('Symbol, Trait.Symbol)

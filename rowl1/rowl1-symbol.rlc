@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-symbol.rlc 2014-02-24 16:23:55 nineties $
+; $Id: rowl1-symbol.rlc 2014-02-25 02:35:41 nineties $
 ;
 
 (import "rlvm-compile")
@@ -24,6 +24,10 @@
     (return (symbol_name sym))
     ))
 
+(fun sym_id (sym) (
+    (return (box (field_get sym @SymbolIndex)))
+    ))
+
 (export fun sym_hash (sym) (
     (if (is_special sym) (return (box (hashnext 0 sym)))) ; true, false, nil
     (return (box (hashnext 0 (field_get sym @SymbolIndex))))
@@ -33,10 +37,21 @@
     (return (to_unique_sym (field_get sym 1)))
     ))
 
+(fun sym_compare (s1 s2) (
+    (var i1 (field_get s1 @SymbolIndex))
+    (var i2 (field_get s2 @SymbolIndex))
+    (if (< i1 i2) (return (box -1))
+    (if (== i1 i2) (return (box 0))
+        (return (box 1))
+        ))
+    ))
+
 (export fun setup_symbol (mod) (
     (add_function1 mod (to_sym "string_to_symbol") stringT _to_sym 0)
     (add_function1 mod (to_sym "symbol_to_string") symT sym_to_s 0)
+    (add_function1 mod (to_sym "symbol_id") symT sym_id 0)
     (add_function1 mod (to_sym "unique_symbol") symT sym_unique_sym 0)
+    (add_function2 mod (to_sym "symbol_compare") symT symT sym_compare 0)
     ))
 
     ))
