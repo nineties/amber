@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-float.rlc 2014-02-24 16:38:15 nineties $
+; $Id: rowl1-float.rlc 2014-02-25 14:30:53 nineties $
 ;
 
 ; Since Amber has no 64-bit integer, this source code uses bignums instead.
@@ -25,7 +25,7 @@
 (import "rowl1-bigint")
 
 (export fun pp_float (ochan f) (
-    (output_string ochan (float_to_string f))
+    (output_string ochan (float_to_s f))
     ))
 
 (export fun float_sign (f) (
@@ -144,7 +144,7 @@
 
 ; This implementation is not efficient.
 (fun encode_float (sign f n e) (
-    (if (bint_is_zero f) (return (float_zero)))
+    (if (bint_is_zero f) (return (float_zero sign)))
 
     (= f (to_bint f))
     (if (>= e 0)
@@ -240,7 +240,7 @@
             (var exp (- (- nbits  p) 1))
             (if (< exp -1022) (do
                 ; denormal number
-                (if (<= exp -1075) (return (float_zero)))
+                (if (<= exp -1075) (return (float_zero sign)))
                 (var w (- (+ exp 1022)))
                 (= Rbit 0)
                 (= Gbit 0)
@@ -265,17 +265,19 @@
 
 ; ==== translate floating-point number to ascii-string ====
 
-(fun float_to_string (v) (
+(fun float_to_s (v) (
     (var s 0)
     (var f0 (field_get v 0))
     (var f1 (field_get v 1))
-    (if (&& (! f0) (! f1)) (do
-        (return (string "0.0"))
-        ))
     (if (& f1 0x80000000) (do
         (= s 1)
-        (= v (float_uminus v))
+        (= f1 (& f1 0x7fffffff))
         ))
+    (if (&& (! f0) (! f1)) (do
+        (if s
+            (return (string "-0.0"))
+            (return (string "0.0"))
+        )))
     (var e (- (& (>> f1 20) 0x7ff) 1023))
     (= f1 (& f1 0xfffff))
     
@@ -515,10 +517,13 @@
 ;            ))
 ;    ))
 
-(export fun float_zero () (
+(fun float_zero (sign) (
     (var float (allocate_float))
     (field_set float 0 0)
-    (field_set float 1 0)
+    (if sign
+        (field_set float 1 0x80000000)
+        (field_set float 1 0)
+        )
     (return float)
     ))
 
@@ -588,7 +593,14 @@
     (return (fmul a b))
     ))
 (fun float_quo (a b) (
-    (= a (copy_float a))
+    ; normalization
+    (if (< (field_get b 1) 0)
+        (do
+            (= a (f- (copy_float a)))
+            (= b (f- (copy_float b)))
+        )
+        (= a (copy_float a))
+        )
     (return (fdiv a b))
     ))
 
@@ -627,7 +639,7 @@
 
     (add_function1 mod (to_sym "float_uplus") floatT float_uplus 0)
     (add_function1 mod (to_sym "float_uminus") floatT float_uminus 0)
-    (add_function1 mod (to_sym "float_to_string") floatT float_to_string 0)
+    (add_function1 mod (to_sym "float_to_string") floatT float_to_s 0)
     (add_function1 mod (to_sym "float_to_int") stringT float_to_i 0)
     (add_function1 mod (to_sym "int_to_float") intT int_to_f 0)
     (add_function1 mod (to_sym "string_to_float") stringT str_to_f 0)

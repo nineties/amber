@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-02-25 10:40:36 nineties $ "
+" $Id: Syntax.ab 2014-02-25 14:08:52 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -204,26 +204,26 @@ fullform_expr
     ::= fullform
       | postfix_expr
     
-quoe_expr
-    ::= "'" quoe_expr
+quote_expr
+    ::= "'" quote_expr
         { MakeObject{Quote{Quote}, List{node1}} }
-      | "`"  quoe_expr
+      | "`"  quote_expr
         { MakeObject{Quote{QuasiQuote}, List{node1}} }
-      | "!"  quoe_expr
+      | "!"  quote_expr
         { MakeObject{Quote{Unquote}, List{node1}} }
       | fullform_expr
 
-pattern ::= quoe_expr
+pattern ::= quote_expr
 term    ::= postfix_expr
 
 ## enable use of quoation expressions for following definitions.
-Assign{Slot{Syntax, expr}, Slot{Syntax, quoe_expr}}
+Assign{Slot{Syntax, expr}, Slot{Syntax, quote_expr}}
 
 prefix_expr
-    ::= "+"          quoe_expr { `UnaryPlus{!node1} }
-      | "-" !decimal quoe_expr { `UnaryMinus{!node2} }
-      | not quoe_expr          { `Not{!node1} }
-      | quoe_expr
+    ::= "+"          quote_expr { `UnaryPlus{!node1} }
+      | "-" !decimal quote_expr { `UnaryMinus{!node2} }
+      | not quote_expr          { `Not{!node1} }
+      | quote_expr
 
 multiplicative_expr
     ::= multiplicative_expr "*" prefix_expr  { `Mul{!node0, !node2} }
@@ -462,8 +462,8 @@ macro(x + y)   = `add(!x, !y)
 macro(x - y)   = `sub(!x, !y)
 macro(x * y)   = `mul(!x, !y)
 macro(x ^ y)   = `pow(!x, !y)
-macro(x / y)   = `div(!x, !y)
-macro(x // y)  = `quo(!x, !y)
+macro(x / y)   = `quo(!x, !y)
+macro(x // y)  = `div(!x, !y)
 macro(x % y)   = `mod(!x, !y)
 macro(x | y)   = `fusion(!x, !y)
 macro(x < y)   = `less_than?(!x, !y)

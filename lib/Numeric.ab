@@ -1,14 +1,101 @@
 # Copyright (C) 2014 nineties
-# $Id: Numeric.ab 2014-02-25 10:26:23 nineties $
+# $Id: Numeric.ab 2014-02-25 14:33:05 nineties $
 
-typejoin('Int, 'Float): 'Float
-join_numeric_type('Int, 'Float): 'Float
-join_numeric_type('Float, 'Int): 'Float
+INTEGER_WIDTH: Prim.INTEGER_WIDTH
+INTEGER_MIN:   Prim.INTEGER_MIN
+INTEGER_MAX:   Prim.INTEGER_MAX
 
-upcast(a, h) when a.head == h: a
-upcast(a, 'Float): a.to_f()
+#= Fixed-length integers and floating-point numbers. =
+# This module defines numerical operations for fixed-length integers and
+# floating-point numbers. The head of fixed-length integers is `Int`
+# and of floating-point numbers is `Float.
+#
+# The representation of fixed-length integer is {{INTEGER_WIDTH}} bits of
+# two's complement. The range of them is [{{INTEGER_MIN}}, {{INTEGER_MAX}}].
+# Integer overflow is not detected by default and results are truncated to
+# {{INTEGER_WIDTH}} bits. If you want multi-precision integers, import
+# `Numeric.BigInt` module.
+#
+# The representation of floating-point numbers is IEEE754 double.
+#
+#== Implicit type conversion ==
+# Type conversions between objects and integers or floating-point numbers
+# are done by methods `to_i` and `to_f`. When you implement these methods,
+# `to_i` must returns `Int` type values and `to_f` must returns `Float` types.
+# We extend `typejoin` by `typejoin('Int, 'Float) == 'Float` and
+# `typejoin('Float, 'Int) == 'Int`.
 
+typecast(a, 'Int) =   a.to_i()
+typecast(a, 'Float) = a.to_f()
+typejoin('Int, 'Float) = 'Float
+typejoin('Float, 'Int) = 'Float
+
+#== Addition, Subtraction and Multiplication ==
+# These are very usual ones. We probably need no explanation.
+
+uplus  = Prim.int_uplus | Prim.float_uplus | uplus
+uminus = Prim.int_uminus | Prim.float_uminus | uminus
+abs    = Prim.int_abs | Prim.float_abs | abs
+add    = Prim.int_add | Prim.float_add | add
+sub    = Prim.int_sub | Prim.float_sub | sub
+mul    = Prim.int_mul | Prim.float_mul | mul
+
+#== Division ==
+# Amber distinguishes two kinds of arithmetic division.
+# A division with remainder (Euclidean division) and a division with
+# no remainder.
+#
+# The functions `div` (operator: `//`) and `mod` (operator: `%`) are for
+# the former and defined as follows:
+# * For any integer a and b (b != 0), there exist unique integers q and r
+#   such that a = bq + r (0 <= r < |b|).
+# * Then `div(a, b) == q` and `mod(a, b) == r`.
+# Examples:
+# ----
+# > 7 // 3      # => 2
+# > 7 // -3     # => -2
+# > -7 // 3     # => -3
+# > -7 // -3    # => 3
+# > 7 % 3       # => 1
+# > 7 % -3      # => 1
+# > -7 % 3      # => 2
+# > -7 % -3     # => 2
+# ----
+# Note that `mod(a, b)` is always positive. It follows usual definition of
+# Euclidian division in mathematics. But this behavior is differ from many
+# other programming languages.
+#
+# The function `divmod` computes both.
+# ----
+# > divmod(7, 3)    # => (2, 1)
+# ----
+#
+# These operations thwo `DivisionByZero` exception when the division is zero.
+#
+# The function `quo` is for the latter.
+# Examples:
+# ----
+# > 3 / 2       # => 1.5
+# > 5.3 / 2.5   # => 2.12
+# ----
+#
+# If the divisor is `0` `DivisionByZero` exception is thrown but when
+# it is `0.0` or `-0.0` the results are `infinity` or `-infinity`.
+# This is because we should think that `0.0` is not exactly zero but
+# approximately zero.
+# ----
+# > 1.0/0.0         # => infinity
+# > 1.0/-0.0        # => -infinity
+# > -1.0/0.0        # => -infinity
+# > -1.0/-0.0       # => infinity
+# > 1.0/0           # => Error DivisionByZero
+
+div    = Prim.int_div | div
+mod    = Prim.int_mod | mod
 divmod(a, b): (div(a, b), mod(a, b))
+quo    = Prim.int_quo | Prim.float_quo | quo
+
+pow    = Prim.int_pow | Prim.float_pow | pow
 powmod(a, b, c): perform_ternary_operation(a, b, powmod, 'powmod)
 
 less_than?     = Prim.int_less_than? | less_than?
@@ -20,26 +107,13 @@ abs(a): a >= 0 ? a : -a
 uminus(a): -1 * a
 
 # Integer and Floating-point
-INTEGER_MIN: Prim.INTEGER_MIN
-INTEGER_MAX: Prim.INTEGER_MAX
 
-uplus: Prim.int_uplus | Prim.float_uplus
-uminus = Prim.int_uminus | Prim.float_uminus | uminus
-abs    = Prim.int_abs | Prim.float_abs | abs
-add    = Prim.int_add | Prim.float_add | add
-sub    = Prim.int_sub | Prim.float_sub | sub
-mul    = Prim.int_mul | Prim.float_mul | mul
-quo    = Prim.float_quo | quo
-div    = Prim.int_div | div
-mod    = Prim.int_mod | mod
-pow    = Prim.int_pow | Prim.float_pow | pow
 powmod = Prim.int_powmod | powmod
 shiftL: Prim.int_shiftL
 shiftR: Prim.int_shiftR
 
 compare = Prim.int_compare | Prim.float_compare | compare
 equal?  = Prim.float_equal? | equal?
-hash    = Prim.int_hash | Prim.float_hash | hash
 
 min(a, b): a < b ? a : b
 max(a, b): a < b ? b : a
