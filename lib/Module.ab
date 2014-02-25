@@ -1,5 +1,5 @@
 # Copyright (C) 2010 nineties
-# $Id: Module.ab 2014-02-25 19:07:54 nineties $
+# $Id: Module.ab 2014-02-25 19:40:53 nineties $
 
 #= Module system =
 #== Basics ==
@@ -46,17 +46,29 @@
 Module: enter_module('Module)
 
 copy_variables(mod, 'All):
-    mod.each_slots((_, x, v) -> Prim.define_variable(x, v))
+    Prim.each_slots(mod,
+        (_, x, v) -> {
+            if (x != 'parent)
+                Prim.define_variable(x, v)
+        },
+        true
+        )
 copy_variables(mod, Hiding{vars}):
-    mod.each_slots((_, x, v) -> {
-        if (not Prim.list_member?(x, vars))
-            Prim.define_variable(x, v)
-    })
+    Prim.each_slots(mod,
+        (_, x, v) -> {
+            if (x != 'parent and not Prim.list_member?(x, vars))
+                Prim.define_variable(x, v)
+        },
+        true
+        )
 copy_variables(mod, vars @ List):
-    mod.each_slots((_, x, v) -> {
-        if Prim.list_member?(x, vars)
-            Prim.define_variable(x, v)
-    })
+    Prim.each_slots(mod,
+        (_, x, v) -> {
+            if (x != 'parent and Prim.list_member?(x, vars))
+                Prim.define_variable(x, v)
+        },
+        true
+        )
 
 expand_import([], _): nil
 expand_import([M,rest...], path): {
