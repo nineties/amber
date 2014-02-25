@@ -1,5 +1,5 @@
 # Copyright (C) 2010 nineties
-# $Id: Module.ab 2014-02-25 00:42:57 nineties $
+# $Id: Module.ab 2014-02-25 19:07:54 nineties $
 
 #= Module system =
 #== Basics ==
@@ -45,10 +45,6 @@
 
 Module: enter_module('Module)
 
-copy_variable(mod @ Module, x @ Symbol):
-    Prim.define_variable(x,
-            mod.get_slot(x, recursive=true, alias=false, check=true))
-
 copy_variables(mod, 'All):
     mod.each_slots((_, x, v) -> Prim.define_variable(x, v))
 copy_variables(mod, Hiding{vars}):
@@ -93,7 +89,8 @@ macro(e @ Import{mods, option}): {
           Some{option}
             -> `Seq{[
                     !Module.expand_import(mods, ""),
-                    Module.copy_variables(!mod, !option)
+                    Module.copy_variables(!mod, '!option),
+                    '!mod
                 ]}
         | nil
             -> Module.expand_import(mods, "")

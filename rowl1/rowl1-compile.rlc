@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-02-24 14:06:45 nineties $
+; $Id: rowl1-compile.rlc 2014-02-25 19:08:21 nineties $
 ;
 
 (import "rlvm-compile")
@@ -134,8 +134,6 @@
             (if (is_special expr) (return fv))
             (if (== expr DontCare) (return fv))
             (= fv (list_delete expr fv))
-            ; global variables are not free
-            (if (!= (get_slot_nocheck global expr) @C_NIL) (return fv))
             (return (cons expr fv))
             ))
         (return fv)
@@ -1693,20 +1691,24 @@
         ))
 
     (var sz (node_size expr))
-    (var last (node_arg expr (- sz 1)))
-    (if (&& (== level 0)
-        (&& (== (node_head last) Unquote)
-            (== (node_head (node_arg last 0)) Rest)))
+    (if (== sz 0)
+        (put_zero asm)
         (do
-            (var arg (node_arg (node_arg last 0) 0))
-            (var type_error (fresh_label asm))
-            (compile asm arg)
-            (put_push asm arg)
-            (compile_simple_call asm 1 rest_check)
-            (-= sz 1)
-        )
-        (do
-            (put_zero asm)
+            (var last (node_arg expr (- sz 1)))
+            (if (&& (== level 0)
+                (&& (== (node_head last) Unquote)
+                    (== (node_head (node_arg last 0)) Rest)))
+                (do
+                    (var arg (node_arg (node_arg last 0) 0))
+                    (var type_error (fresh_label asm))
+                    (compile asm arg)
+                    (put_push asm arg)
+                    (compile_simple_call asm 1 rest_check)
+                    (-= sz 1)
+                )
+                (do
+                    (put_zero asm)
+                ))
         ))
     (rfor i 0 sz (do
         (compile_qquote_main asm (node_arg expr i) level)
