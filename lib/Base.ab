@@ -1,5 +1,5 @@
 # Copyright (C) 2010 nineties
-# $Id: Base.ab 2014-02-25 13:48:45 nineties $
+# $Id: Base.ab 2014-02-26 12:47:14 nineties $
 
 #== The most basic functions and methods. ==
 
@@ -43,7 +43,7 @@ nil with {
     # > A.parent = B
     # > A.x = 0
     # > B.y = 1
-    # > A.f = alias(getter = () -> 2)
+    # > A.f = alias(get = () -> 2)
     # > A.get_slot('x)                    # => 0
     # > A.get_slot('y)                    # => 1
     # > A.get_slot('f)                    # => 2
@@ -74,7 +74,7 @@ nil with {
     # > A.set_slot('x, 1, overwrite=true)            # => 1
     # > A.get_slot('x)                               # => 1
     # > A.get_slot('x, recursive=false, check=false) # => nil
-    # > A.x = alias(getter = () -> self.z, setter = (v) -> self.z = 1)
+    # > A.x = alias(get = () -> self.z, set = (v) -> self.z = 1)
     # > A.set_slot('x, 0)                            # => 0
     # > A.get_slot('x)                               # => 1
     # > A.get_slot('z)                               # => 1
@@ -103,15 +103,18 @@ nil with {
     #
     # Option:
     #   recursive: Lookup parents recursively. (default=false)
-    .has_slot?(s, recursive=false) = Prim.has_slot?(self, s, recursive)
+    .has_slot?(s, recursive=false) : Prim.has_slot?(self, s, recursive)
 
     # Apply `fun` to triplets `(object, slot-name, slot-value)` for all slots.
     # Option:
     #   recursive: Lookup parents recursively. (default=false)
-    .each_slots(fun @ Function, recursive=false) = Prim.each_slots(self, fun, recursive)
+    .each_slots(fun @ Function, recursive=false) : Prim.each_slots(self, fun, recursive)
 
     # Convert to string by the function `fullform`.
-    .to_s()    = fullform(self)
+    .to_s() : fullform(self)
+
+    # Evaluate `expression`.
+    .eval(expression) : Prim.eval_with_self(self, expression)
 }
 
 # Identity function.
@@ -143,12 +146,14 @@ compose: Prim.compose_function
 # of the slot is redirected to a function call.
 #
 # A pseudo-attribute `o.f` can be created by `alias` function like:
-# `o.f = alias(getter = () -> e1, setter = (v) -> e2)`.
+# `o.f = alias(get = () -> e1, set = (v) -> e2)`.
 # Then `o.f` is equal to call of `() -> e1` with `self==o`.
 # `o.f = v` is also equal to call of `(v) -> e2`. 
 #
-# You can ommit `getter` or `setter`.
-alias(getter=nil, setter=nil): Prim.alias(getter, setter)
+# You can ommit `get` or `set`.
+alias(get=nil, set=nil): Prim.alias(get, set)
+alias(getter @ Function, setter @ Function): Prim.alias(getter, setter)
+alias(getter @ Function): Prim.alias(getter, nil)
 
 # Create an alias to i-th argument.
 #
@@ -163,8 +168,8 @@ alias(getter=nil, setter=nil): Prim.alias(getter, setter)
 # > obj.x     # => 2
 # ----
 alias(i @ Int): alias(
-        getter = () -> self[i],
-        setter = (v) -> { self[i] = v }
+        get = () -> self[i],
+        set = (v) -> { self[i] = v }
         )
 
 # Builtin hash function.
