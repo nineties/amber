@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-io.rlc 2014-02-11 20:09:13 nineties $
+; $Id: vm-prim-io.rlc 2014-02-26 16:28:47 nineties $
 ;
 
 (import "stdlib")
@@ -43,7 +43,7 @@
 (extern void* prim_make_struct3)
 (extern void* prim_make_struct4)
 (extern void* prim_string)
-(extern void* prim_strlcpy)
+(extern void* prim_strncpy)
 (extern void* prim_strlcat)
 
 (fun strlen (str) (
@@ -572,7 +572,7 @@
                 (return (prim_string resolved))
                 ))
             (= resolved_len 1)
-            (= left_len (prim_strlcpy left (+ path 1) @PATH_MAX))
+            (= left_len (prim_strncpy left (+ path 1) @(- PATH_MAX 1)))
         )
         (
             (if (== (syscall @SYS_GETCWD resolved @PATH_MAX) 0) (
@@ -580,7 +580,7 @@
                 (exit 1)
                 ))
             (= resolved_len (strlen resolved))
-            (= left_len (prim_strlcpy left path @PATH_MAX))
+            (= left_len (prim_strncpy left path @(- PATH_MAX 1)))
         ))
     (if (|| (>= left_len @PATH_MAX) (>= resolved_len @PATH_MAX)) (
         (realpath_error path)

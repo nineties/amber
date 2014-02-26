@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-string.rlc 2014-01-31 18:04:04 nineties $
+; $Id: vm-prim-string.rlc 2014-02-26 16:39:51 nineties $
 ;
 
 (import "stdlib")
@@ -12,9 +12,9 @@
 
 (export prim_string)
 (fun prim_string (str) (
-    (int len (+ (prim_strlen str) 1))
-    (void* ptr (allocate_pstruct @PLAIN_STRING len))
-    (prim_strlcpy ptr str len)
+    (int len (prim_strlen str))
+    (void* ptr (allocate_pstruct @PLAIN_STRING (+ len 1)))
+    (prim_strncpy ptr str len)
     (return ptr)
     ))
 
@@ -132,9 +132,10 @@
     (return len)
     ))
 
-(export prim_strlcpy)
-(fun prim_strlcpy (dst str len) (
-    (for i 0 (- len 1) (
+; `len` the maximum length of characters excluding '\0' which can be copied.
+(export prim_strncpy)
+(fun prim_strncpy (dst str len) (
+    (for i 0 len (
         ([]=8 dst 0 (*8 str))
         (if (== (*8 str) 0) ((return (+ i 1))))
         (incr dst)
@@ -146,16 +147,16 @@
 
 (export prim_strdup)
 (fun prim_strdup (str) (
-    (int len (+ (prim_strlen str) 1))
-    (void* new_str (allocate_pstruct @PLAIN_STRING len))
-    (prim_strlcpy new_str str len)
+    (int len (prim_strlen str))
+    (void* new_str (allocate_pstruct @PLAIN_STRING (+ len 1)))
+    (prim_strncpy new_str str len)
     (return new_str)
     ))
 
-(export prim_strldup)
-(fun prim_strldup (str len) (
+(export prim_strndup)
+(fun prim_strndup (str len) (
     (void* new_str (allocate_pstruct @PLAIN_STRING (+ len 1)))
-    (prim_strlcpy new_str str len)
+    (prim_strncpy new_str str len)
     (return new_str)
     ))
 
@@ -164,19 +165,21 @@
     (int len1 (prim_strlen str1))
     (int len2 (prim_strlen str2))
     (void* dst (allocate_pstruct @PLAIN_STRING (+ (+ len1 len2) 1)))
-    (prim_strlcpy dst str1 (+ len1 1))
-    (prim_strlcpy (+ dst len1) str2 (+ len2 1))
+    (prim_strncpy dst str1 len1)
+    (prim_strncpy (+ dst len1) str2 len2)
     (return dst)
     ))
 
+; Append `src` to `dst`. `len` is the maxmum length of the result
+; excluding '\0'.
 (export prim_strlcat)
 (fun prim_strlcat (dst src len) (
     (int len1 (prim_strlen dst))
     (int len2 (prim_strlen src))
-    (if (> (+ (+ len1 len2) 1) len) (
-        (= len2 (- (- len len1) 1))
+    (if (> (+ len1 len2) len) (
+        (= len2 (- len len1))
         ))
-    (prim_strlcpy (+ dst len1) src (+ len2 1))
+    (prim_strncpy (+ dst len1) src len2)
     (return (+ len1 len2))
     ))
 

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-string.rlc 2014-02-26 15:24:47 nineties $
+; $Id: rowl1-string.rlc 2014-02-26 16:51:01 nineties $
 ;
 
 (import "rlvm-compile")
@@ -94,23 +94,20 @@
     ))
 
 ; Split `str` by delimiter string `d`
-; split d d = []
-; split (d ++ s) d = cons "" (split s d)
-; split (s1 ++ d ++ s2) d = cons s1 (split s2 d)
-(fun str_split_ (str d i slen dlen) (
+(fun str_split_ (str d slen dlen) (
     (if (< slen dlen)
-        (return (list1 (strldup (+ str i) (+ slen 1))))
+        (return (list1 (strdup str)))
         )
-    (if (strneq (+ str i) d dlen)
-        (return (cons (string "") (str_split_ str d (+ i dlen) (- slen dlen) dlen)))
+    (if (strneq str d dlen)
+        (return (cons (string "") (str_split_ (+ str dlen) d (- slen dlen) dlen)))
         )
-    (for k i (+ (- (+ i slen) dlen) 1) (do
-        (if (strneq (+ str k) d dlen)
-            (return (cons (substr str i (- k 1))
-                (str_split_ str d (+ k dlen) (- slen (+ k dlen)) dlen)
-                )))
+    (for i 0 (- slen dlen) (do
+        (if (strneq (+ str i) d dlen)
+            (return (cons (strndup str i) (str_split_ (+ str (+ i dlen)) d
+                (- slen (+ i dlen)) dlen)))
+            )
         ))
-    (return (list1 (strldup (+ str i) (+ slen 1))))
+    (return (list1 (strdup str)))
     ))
 
 (fun str_split (str d) (
@@ -123,7 +120,7 @@
             ))
         (return ls)
         ))
-    (return (str_split_ str d 0 slen dlen))
+    (return (str_split_ str d slen dlen))
     ))
 
 (fun str_code (s) (
@@ -214,7 +211,7 @@
         (return @C_NIL)
         )
     (var s (allocate_string 1))
-    (strlcpy s (address c) 2)
+    (strncpy s (address c) 1)
     (return s)
     ))
 
@@ -225,7 +222,7 @@
         (return @C_NIL)
         )
     (var s (allocate_string 1))
-    (strlcpy s (address c) 2)
+    (strncpy s (address c) 1)
     (return s)
     ))
 
