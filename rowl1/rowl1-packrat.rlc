@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-02-23 18:31:33 nineties $
+; $Id: rowl1-packrat.rlc 2014-02-26 15:26:27 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1044,47 +1044,6 @@
     ))
 @(MEMOIZE symbol_without_mark)
 
-;; single-quoted string literal
-;;   Only escape sequence \' is interpreted.
-;(fun parse_string_s_ (p) (
-;    (var v (lookahead p))
-;    (if (< v 0) (return (mayparse p "expect token: ' (single quote)")))
-;    (if (!= v ''') (return (noparse p "expect token: ' (single quote)")))
-;    (var state (copy_parser_state p))
-;    (getc p)
-;    (var begin (field_get p 6))
-;    (while (!= (lookahead p) ''') (do
-;        (var c (getc p))
-;        (if (< c 0) (do
-;            (mayparse p "expect character")
-;            (reset_parser_position p state)
-;            (return @C_FALSE)
-;            ))
-;        (if (== c '\n')
-;            (return (noparse p "missing terminate character"))
-;            )
-;        (if (== c '\\') (getc p))
-;        ))
-;    (var end (field_get p 6))
-;
-;    (= v (getc p))
-;    (if (< v 0) (do
-;        (mayparse p "expect token: ' (single quote)")
-;        (reset_parser_position p state)
-;        (return @C_FALSE)
-;        ))
-;    (if (!= v ''') (do
-;        (noparse p "expect token: ' (single quote)")
-;        (reset_parser_position p state)
-;        (return @C_FALSE)
-;        ))
-;
-;    (var str (extract_string p begin end))
-;    (unescape_string_s str)
-;    (return (parsed p str))
-;    ))
-;@(MEMOIZE string_s)
-
 ; double-quoted string literal
 (fun parse_string_d_ (p) (
     (var v (lookahead p))
@@ -1125,19 +1084,10 @@
         (return @C_FALSE)
         ))
     (var str (extract_string p begin end))
-    (unescape_string_d str)
+    (unescape_string str)
     (return (parsed p str))
     ))
 @(MEMOIZE string_d)
-
-;(fun parse_string_ (p) (
-;    @(OR p `(string_d string_s))
-;    (if @(PARSED p)
-;        (return @C_TRUE)
-;        (return @C_FALSE)
-;        )
-;    ))
-;@(MEMOIZE string)
 
 (fun parse_fullform_ (p) (
     (var c (lookahead p))
@@ -2070,8 +2020,6 @@
     (add_parser mod (to_sym "parse_integer") parse_integer)
     (add_parser mod (to_sym "parse_float") parse_float)
     (add_parser mod (to_sym "parse_string") parse_string_d)
-    ;(add_parser mod (to_sym "parse_string_d") parse_string_d)
-    ;(add_parser mod (to_sym "parse_string_s") parse_string_s)
     (add_parser mod (to_sym "parse_symbol") parse_symbol)
     (add_parser mod (to_sym "parse_symbol_without_mark") parse_symbol_without_mark)
     (add_parser mod (to_sym "parse_reserved_symbol") parse_reserved_symbol)

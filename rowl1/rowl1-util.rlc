@@ -2,18 +2,20 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-util.rlc 2014-02-20 10:04:32 nineties $
+; $Id: rowl1-util.rlc 2014-02-26 15:57:05 nineties $
 ;
 
 (import "rlvm-compile")
 (import "rowl1-types")
 
 (define PRINTABLE (c) `(&& (<= 0x20 @c) (<= @c 0x7e)))
+
 (compile `object `(
+
+; XXX: Fix bugs of following functions and move them to rowl1-encoding.rlc.
 
 (export fun output_char_escape (ochan t) (
     (if (== t '"')  (return (output_string ochan "\\\"")))
-    (if @(PRINTABLE t) (return (output_char ochan t)))
     (if (== t '\\') (do (output_char ochan '\\') (output_char ochan '\\'))
     (if (== t '\a') (output_string ochan "\\a")
     (if (== t '\b') (output_string ochan "\\b")
@@ -23,6 +25,7 @@
     (if (== t '\t') (output_string ochan "\\t")
     (if (== t '\v') (output_string ochan "\\v")
     (if (== t '\0') (output_string ochan "\\0")
+    (if @(PRINTABLE t) (return (output_char ochan t)))
         (do
             (output_string ochan "\\x")
             (output_hex ochan t 2)
@@ -54,6 +57,7 @@
     (return (ctos c))
     ))
 
+(extern fun value_error)
 (fun unescape_char (c) (
     (if (== c '\\') (return '\\'))
     (if (== c 'a') (return '\a'))
@@ -65,12 +69,34 @@
     (if (== c 'v') (return '\v'))
     (if (== c '0') (return '\0'))
     (if (== c '"') (return '"'))
-    (not_reachable "unescape_char")
+    (throw (value_error (string "Invalid escape sequence.")
+        (string (ctos '\\') (ctos c))))
+    ))
+
+(export fun escape_string (str) (
+    (var len (strlen str))
+    (var size (+ len 5))
+    (var buf (allocate_string size))
+    (var i 0)
+    (var j 0)
+    (while (< i len) (do
+        (var s (escape_char (array_get char str i)))
+        (var l (strlen s))
+        (if (> (+ j l) size) (do
+            (var new_buf (allocate_string (+ (+ j (- len i)) 5)))
+            (strcpy new_buf buf)
+            (= buf new_buf)
+            ))
+        (strcpy (+ buf j) s)
+        (+= j l)
+        (+= i 1)
+        ))
+    (return buf)
     ))
 
 ; unescape double-quoted string.
 ; NB: given argument will be overriden
-(export fun unescape_string_d (str) (
+(export fun unescape_string (str) (
     (var len (strlen str))
     (var i 0)
     (var j 0)
@@ -86,33 +112,6 @@
         ))
     (array_set char str j 0)
     ))
-
-;; unescape single-quoted string.
-;; NB: given argument will be overriden
-;(export fun unescape_string_s (str) (
-;    (var len (strlen str))
-;    (var i 0)
-;    (var j 0)
-;    (while (< i len) (do
-;        (var c (array_get char str i))
-;        (if (== c '\\') (do
-;            (incr i)
-;            (var d (array_get char str i))
-;            (if (|| (== d ''') (== d '\\'))
-;                (array_set char str j d)
-;                (do
-;                    (array_set char str j '\\')
-;                    (incr j)
-;                    (array_set char str j d)
-;                ))
-;            )
-;            (array_set char str j c)
-;            )
-;        (incr i)
-;        (incr j)
-;        ))
-;    (array_set char str j 0)
-;    ))
 
 (export fun list1 (v) (
     (return (cons v 0))

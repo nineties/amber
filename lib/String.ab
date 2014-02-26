@@ -1,23 +1,54 @@
 # Copyright (C) 2014 nineties
-# $Id: String.ab 2014-02-26 12:42:27 nineties $
+# $Id: String.ab 2014-02-26 15:16:16 nineties $
 
-import Numeric
+#= Strings. =
+# The representation of strings are internally null-terminated sequence
+# of 8-bit ascii characters. Multibyte characters are not supported.
+# Amber does not have any specific type of objects for 'characters'.
+# We treat a characters as a string of length one.
+#
+# Amber's string objects are immutable. So several operations such as
+# concatenation of many strings are not efficient. Use `StringIO` module
+# for such operations.
 
-Numeric.join_numeric_type(a, b @ String): 'String
-Numeric.join_numeric_type(a @ String, b): 'String
-upcast(a, 'String): a.to_s()
+typecast(a, 'String) = a.to_s()
+typejoin(a, 'String) = 'String
+typejoin(b, 'String) = 'String
 
-add    = Prim.string_add | add
-equal? = Prim.string_equal? | equal?
-hash   = Prim.string_hash | hash
+# Concatination of two strings.
+# ----
+# > "Hello" + " " + "World"     # => "Hello World"
+# ----
+
+add = Prim.string_add | add
 
 trait String {
+    # Number of characters.
+    # ----
+    # > "Hello World".length    # => 21
+    # ----
     .length:      alias(() -> Prim.string_length(self))
     .size:        alias(() -> Prim.string_length(self))
+
+    # `i`-th character.
     .at(i):       Prim.string_at(self, i)
+
+    # `true` when the string contains `s` as a substring.
     .contain?(s): Prim.string_contain?(self, s)
-    .unescape():  Prim.unescape(self)
-    .split(sep):  Prim.split(self, sep)
+
+    # Convert special ascii characters to escape-sequences.
+    # ----
+    # "Hello World\n".escape()    # => "Hello World\\n"
+    # ----
+    .escape():    Prim.string_escape(self)
+
+    # Convert escape-sequences to corresponding characters.
+    # ----
+    # "Hello World\\n".unescape()    # => "Hello World\n"
+    # ----
+    .unescape():  Prim.string_unescape(self)
+
+    .split(sep):  Prim.string_split(self, sep)
     .to_code():   Prim.char_to_code(self)
     .to_s():      self
     .to_i():      Prim.string_to_int(self)
@@ -27,5 +58,3 @@ trait String {
 Trait.Int.to_char(): Prim.code_to_char(self)
 
 Prim.set_builtin_parent('String, Trait.String)
-
-export add equal?
