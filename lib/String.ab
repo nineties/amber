@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: String.ab 2014-02-26 16:09:45 nineties $
+# $Id: String.ab 2014-02-26 16:59:54 nineties $
 
 #= Strings. =
 # The representation of strings are internally null-terminated sequence
@@ -38,28 +38,48 @@ trait String {
 
     # Convert special ascii characters to escape-sequences.
     # ----
-    # "Hello World\n".escape()      # => "Hello World\\n"
+    # > "Hello World\n".escape()      # => "Hello World\\n"
     # ----
     .escape(): Prim.string_escape(self)
 
     # Convert escape-sequences to corresponding characters.
     # ----
-    # "Hello World\\n".unescape()   # => "Hello World\n"
+    # > "Hello World\\n".unescape()   # => "Hello World\n"
     # ----
     .unescape(): Prim.string_unescape(self)
 
     # Split the string by delimiter string `d` and return a list.
     # ----
-    # "Hello World".split("o")      # => ["Hell", " W", "rld"]
+    # > "Hello World".split("o")      # => ["Hell", " W", "rld"]
     # ----
     .split(d): Prim.string_split(self, d)
 
+    # Convert a character (i.e. a string of length one) to its ascii code.
+    # Exception:
+    #   * InvalidArgument
+    # ----
+    # > "a".to_code()       # => 97
+    # ----
     .to_code(): Prim.char_to_code(self)
+
     .to_s(): self
+
+    # Parse the string as a decimal integer.
+    # Exception:
+    #   * ValueError: Invalid integer format.
     .to_i(): Prim.string_to_int(self)
+
+    # Parse the string as a floating-point number.
+    # Exception:
+    #   * ValueError: Invalid floating-point number format.
     .to_f(): Prim.string_to_float(self)
 }
 
-Trait.Int.to_char(): Prim.code_to_char(self)
+trait Int {
+    # Convert ascii code to a character.
+    # Exception:
+    #   * InvalidArgument
+    .to_char(): Prim.code_to_char(self)
+}
 
 Prim.set_builtin_parent('String, Trait.String)
