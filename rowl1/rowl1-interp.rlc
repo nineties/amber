@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-02-26 00:28:59 nineties $
+; $Id: rowl1-interp.rlc 2014-02-28 18:37:59 nineties $
 ;
 
 (import "rlvm-compile")
@@ -111,7 +111,7 @@
     (return 0)
     ))
 
-(fun eval (expr) (
+(fun evalfull (expr) (
     (var f (lookup_func_nocheck global (to_sym "before_eval")))
     (if f (= expr (runcode f expr)))
     (var v (runcode (lookup_func global Eval) expr))
@@ -120,13 +120,21 @@
     (return v)
     ))
 
-(fun eval_with_self (self expr) (
+(fun evalfull_with_self (self expr) (
     (var f (lookup_func_nocheck global (to_sym "before_eval")))
     (if f (= expr (runcode f expr)))
     (var v (runcode_with_self self (lookup_func global Eval) expr))
     (var g (lookup_func_nocheck global (to_sym "after_eval")))
     (if g (= v (runcode g v)))
     (return v)
+    ))
+
+(fun eval (expr) (
+    (return (runcode (lookup_func global Eval) expr))
+    ))
+
+(fun eval_with_self (self expr) (
+    (return (runcode_with_self self (lookup_func global Eval) expr))
     ))
 
 (fun interpret (p) (
@@ -137,13 +145,13 @@
             (output_syntax_error (get_loc p) (parser_error p))
             (exit 1)
             ))
-        (eval (parsed_token p))
+        (evalfull (parsed_token p))
         ))
     ))
 
 (fun interpret_shell (p) (
     (var outputs (ary_new))
-    (eval (apply (slot (slot (to_sym "syntax") (to_sym "shell")) (to_sym "enable_shell_syntax")) 0))
+    (evalfull (apply (slot (slot (to_sym "syntax") (to_sym "shell")) (to_sym "enable_shell_syntax")) 0))
     (set_slot global (to_sym "shell_outputs") outputs)
     (ary_push outputs @C_NIL)
     (while 1 (do
@@ -155,7 +163,7 @@
                     (flush_parser p)
                     continue
                     ))
-                (var ret (eval (parsed_token p)))
+                (var ret (evalfull (parsed_token p)))
                 (print_result ret)
                 (ary_store outputs (box 0) ret)
                 (ary_push outputs ret)
@@ -435,6 +443,9 @@
     ; evaluator
     (add_function1 prim Eval DontCare builtin_eval 0)
     (add_function2 prim (to_sym "eval_with_self") DontCare DontCare eval_with_self 0)
+    (add_function1 prim (to_sym "eval_full") DontCare evalfull 0)
+    (add_function2 prim (to_sym "eval_with_self_full") DontCare DontCare evalfull_with_self 0)
+
     (add_function1 prim (to_sym "exit") intT exit_ 0)
     (add_function1 prim (to_sym "atexit") funT at_exit 0)
     (add_function1 prim (to_sym "load") stringT load_file 0)
