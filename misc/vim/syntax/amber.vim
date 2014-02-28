@@ -1,12 +1,13 @@
 " Language:	Amber
 " Maintainer:	nineties <nineties48@gmail.com>
-" $Id: amber.vim 2014-02-24 23:32:50 nineties $
+" $Id: amber.vim 2014-02-28 19:17:29 nineties $
 
 if exists("b:current_syntax")
     finish
 endif
 
 syn case match " case sensitive
+syn sync minlines=50
 
 syn keyword amberSpecialSymbol  true false nil undef self stdin stdout stderr infinity
 syn keyword amberStatement      when if else case of while for in continue break return throw try catch import hiding with reset shift trait require extend
