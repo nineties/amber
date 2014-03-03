@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-03-03 14:54:55 nineties $ "
+" $Id: Syntax.ab 2014-03-03 22:18:32 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -85,6 +85,8 @@ DefineSyntax{
             QuasiQuote{Delimited2{Unquote{node2}, Unquote{node4}}}, multiline},
         Tuple{List{"parsewith", "(", symbol, ")"},
             QuasiQuote{ParseWith{Unquote{node2}}}, multiline},
+        Tuple{List{"nospace", "(", syntax_element, ")"},
+            QuasiQuote{NoSpace{Unquote{node2}}}, multiline},
         Tuple{List{primary_syntax_element}, node0}
     }
 }
@@ -177,10 +179,10 @@ argument ::= symbol "=" assign_expr
 
 postfix_expr
         # Function Application
-    ::= postfix_expr "(" delimited(argument, ",") ")"
+    ::= postfix_expr nospace("(") delimited(argument, ",") ")"
         { MakeObject{Quote{Apply}, List{node0, node2}} }
         # Subscription
-      | postfix_expr "[" delimited(argument, ",") "]"
+      | postfix_expr nospace("[") delimited(argument, ",") "]"
         { MakeObject{Quote{Subscript}, List{node0, node2}} }
       | # RestOf Pattern
         postfix_expr "..."
@@ -188,7 +190,7 @@ postfix_expr
         # Domain Pattern
       | primary_expr "@" fullform_expr
         { MakeObject{Quote{Domain}, List{node0, node2}} }
-      | postfix_expr "." symbol "(" delimited(argument, ",") ")"
+      | postfix_expr "." symbol nospace("(") delimited(argument, ",") ")"
         { MakeObject{Quote{Send}, List{node0, node2, node4}} }
       | "." symbol
         { MakeObject{Quote{Slot}, List{Quote{GetSelf{}}, node1}} }
@@ -340,8 +342,8 @@ stmt
 
       | <<multiline>> while term block
         { `While{!node1, !node2} }
-      | <<multiline>> for "(" pattern in expr ")" block
-        { `For{!node2, !node4, !node6} }
+      | <<multiline>> for pattern in expr block
+        { `For{!node1, !node3, !node4} }
       | continue
         { `Continue{} }
       | break
