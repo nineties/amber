@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2014-03-01 14:18:52 nineties $
+; $Id: rowl1-list.rlc 2014-03-04 00:38:59 nineties $
 ;
 
 (import "rlvm-compile")
@@ -16,6 +16,7 @@
 (import "rowl1-compile")
 (import "rowl1-assemble")
 (import "rowl1-error")
+(import "rowl1-table")
 
 (extern object global)
 
@@ -91,6 +92,22 @@
         (= ls (cdr ls))
         ))
     (return (list_reverse new_ls))
+    ))
+
+(fun ls_diff (ls1 ls2) (
+    (var tbl (table_new))
+    (while ls2 (do
+        (table_store tbl (car ls2) @C_TRUE)
+        (= ls2 (cdr ls2))
+        ))
+    (var new 0)
+    (while ls1 (do
+        (if (!= (table_at tbl (car ls1)) @C_TRUE) 
+            (= new (cons (car ls1) new))
+            )
+        (= ls1 (cdr ls1))
+        ))
+    (return (list_reverse new))
     ))
 
 (fun ls_foreach (f ls) (
@@ -266,6 +283,7 @@
     (add_function3 mod (to_sym "list_store") listT intT DontCare ls_store 0)
     (add_function1 mod (to_sym "list_reverse") listT list_reverse 0)
     (add_function2 mod (to_sym "list_append") listT listT list_append 0)
+    (add_function2 mod (to_sym "list_diff") listT listT ls_diff 0)
     (add_function2 mod (to_sym "list_map") funT listT ls_map 0)
     (add_function2 mod (to_sym "list_foreach") funT listT ls_foreach 0)
     (add_function2 mod (to_sym "list_member?") DontCare listT ls_member 0)

@@ -1,92 +1,108 @@
 # Copyright (C) 2014 nineties
-# $Id: Array.ab 2014-02-17 21:33:04 nineties $
+# $Id: Array.ab 2014-03-04 00:58:32 nineties $
 
-import Collection
+import Iterable
 
-new: Prim.array_new
-   | Prim.array_new_with_size
-   | Prim.array_new_with_size_and_initial_value
-   | (values @ List) -> Prim.list_to_array(values)
-   | (gen @ Function) -> {
-         ary: Prim.array_new()
-         while true {
-             v: gen()
-             if (v == nil) return ary
-             ary.push_back(v)
-         }
-     }
-   | (iter @ Function, v) -> {
-         ary: Prim.array_new()
-         while true {
-             ary.push_back(v)
-             v = iter(v)
-             if (v == nil) return ary
-         }
-     }
+#= Array =
+# Dynamic and mutable array.
+# Amber's objects are basically heterogeneous, i.e. you can put any kind
+# of object into one array.
 
+# Create an empty array.
+new(): Prim.array_new_empty()
+
+# Create an array of length `n` whose `i`-th element is `f(i)` 
+new(f @ Function, n @ Int): Prim.array_new(f, n)
+
+# Create an array of length `n` by first element `f0` and recurrence
+# formula `f`.
+new(f @ Function, f0, n @ Int): {
+    ary: Array.new()
+    for i in 1..n {
+        ary.push(f0)
+        f0 = f(f0)
+    }
+    ary
+}
+
+# Create an array whose elements are obtained from an iterable object
+# `container`.
+new(containers) when container.Iterable? : {
+    ary: Array.new()
+    for v in container
+        ary.push(v)
+    ary
+}
+
+# Concatenation of two arrays.
 add = Prim.array_append | add
+
+# Difference of two arrays.
 sub = Prim.array_diff | sub
 
 trait Array {
-    extend Collection
+    # The number of elements.
+    .length: alias(() -> Prim.array_length(self))
+    .size:   alias(() -> Prim.array_length(self))
 
-    to_array()    = self
-    to_list()     = Prim.array_to_list(self)
-    size          = alias(() -> Prim.array_length(self))
-    get(i)        = Prim.array_at(self, i)
-    set(i, v)     = Prim.array_store(self, i, v)
-    push_back(v)  = Prim.array_push(self, v)
-    pop_back()    = Prim.array_pop(self)
-    reverse()     = Prim.array_reverse(self)
-    reverse()     = Prim.array_reverse(self.copy())
-    map(fun)      = Prim.array_map(fun, self)
-    map(fun)      = Prim.array_map(fun, self.copy())
-    foldl(fun, v) = Prim.array_foldl(fun, v, self)
-    foldl1(fun)   = Prim.array_foldl1(fun, self)
-    foldr(fun, v) = Prim.array_foldr(fun, self, v)
-    foldr1(fun)   = Prim.array_foldr1(fun, self)
+    # Return true when `self` is an empty array.
+    .empty?: alias(() -> Prim.array_length(self) == 0)
 
-    add!(other)   = Prim.array_append!(self, other)
-    sub!(other)   = Prim.array_diff!(self, other)
+    # `i`-th element.
+    .get(i @ Int): Prim.array_at(self, i)
 
-    extend RandomIterable
+    # Store `v` to the `i`-th position. When the length of array is
+    # insufficient, it will be resized by length `i+1`. Newly allocated
+    # positions are initialized by `nil`.
+    .set(i @ Int, v): Prim.array_store(self, i, v)
 
-    Iterator = Trait.new(\ArrayIterator) with {
-        extend RandomAccessIterator
-        extend MutableIterator
-        extend InsertAfterIterator
-        extend InsertBeforeIterator
-        extend EraseIterator
+    # Add new element `v` to the last of the array.
+    .push(v): Prim.array_push(self, v)
 
-        array  = alias(0)
-        index  = alias(1)
+    # Pop the last element. When `self` is empty, throw `LogicError` exception.
+    .pop(): Prim.array_pop(self)
 
-        advance?(d @ Int) = (index + d >= 0 and index + d < array.size)
-        advance(d @ Int) = {
-            i: index + d
-            if (i < 0 or i >= array.size)
-                throw `IndexOutOfRange{!array, !i}
-            index = i
-            self
-        }
+    # Do nothing. For consistency with other containers.
+    .to_array(): self
 
-        get(i)    = array[index+i]
-        set(i, v) = {array[index+i] = v}
+    # Create a new list that contains all elements of `self` in the same order.
+    .to_list(): Prim.array_to_list(self)
 
-        distance(other): {
-            if (not identical?(self.array, other.array))
-                throw `LogicError{
-                    "Comparison of two iterators of different arrays",
-                    self, other}
-            other.index - self.index
+    # Reverse the order of `self`.
+    .reverse():  Prim.array_reverse(self)
+    .reverse!(): Prim.array_reverse!(self)
+
+    # Apply `f` to each elements of `self`.
+    .map(f):  Prim.array_map(f, self)
+    .map!(f): Prim.array_map!(f, self)
+
+    # Append `other` to the last of `self` destructively.
+    .add!(other)   = Prim.array_append!(self, other)
+
+    # Remove elements in `other` from `self` destructively.
+    .sub!(other)   = Prim.array_diff!(self, other)
+
+    # Fold elements of `self` by the binary function `f` from left to right.
+    .foldl(f, v): Prim.array_foldl(f, v, self)
+    .foldl(f):    Prim.array_foldl1(f, self)
+
+    # Fold elements of `self` by the binary function `f` from right to left.
+    .foldr(f, v): Prim.array_foldr(f, self, v)
+    .foldr(f):    Prim.array_foldr1(f, self)
+
+
+    extend 'Iterable
+    .each(): {
+        ary: self
+        idx: 0
+
+        () -> {
+            if (idx >= ary.size)
+                return nil
+            idx += 1
+            ary[idx-1]
         }
     }
-
-    iterator() = `Iterator{!self, 0} with parent = Trait.Array.Iterator
-    begin = iterator
-    end() = iterator().advance(self.size-1)
 }
 
-Prim.set_builtin_parent(\Array, Trait.Array)
-
-export add
+Prim.set_builtin_parent('Array, Trait.Array)

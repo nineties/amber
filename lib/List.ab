@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: List.ab 2014-03-04 00:18:06 nineties $
+# $Id: List.ab 2014-03-04 00:56:37 nineties $
 
 import Iterable
 
@@ -18,7 +18,7 @@ first: Prim.list_first
 # `rest([a,b,c,...]) == [b,c,...]`. O(n)
 rest:  Prim.list_rest
 
-# Create a new list of length `n` whose `i`-th element is `f(i)`.
+# Create a list of length `n` whose `i`-th element is `f(i)`.
 # Example:
 # ----
 # > List.new(x -> x^2, 5)       # => [0, 1, 4, 9, 16]
@@ -30,7 +30,7 @@ new(f @ Function, n @ Int): {
     Prim.list_reverse(list)
 }
 
-# Create a new list of length `n` by first element `f0` and recurrence
+# Create a list of length `n` by first element `f0` and recurrence
 # formula `f`.
 # Example:
 # ----
@@ -38,14 +38,14 @@ new(f @ Function, n @ Int): {
 # ----
 new(f @ Function, f0, n @ Int): {
     list: []
-    for i in 0..n-1 {
+    for i in 1..n {
         list = cons(f0, list)
         f0 = f(f0)
     }
     Prim.list_reverse(list)
 }
 
-# Create a new list whose elements are obtained from an iterable object
+# Create a list whose elements are obtained from an iterable object
 # `container`.
 new(container) when container.Iterable? : {
     list: []
@@ -59,6 +59,12 @@ new(container) when container.Iterable? : {
 # > [1,2,3] + [4,5]     # => [1,2,3,4,5]
 # ----
 add = Prim.list_append | add
+
+# Difference of two arrays.
+# ----
+# > [1,2,3,4,5] - [2,3,6]   # => [1,4,5]
+# ----
+sub = Prim.list_diff | sub
 
 trait List {
     # The number of elements.
@@ -78,33 +84,33 @@ trait List {
     # order.
     .to_array(): Prim.list_to_array(self)
 
-    # Create a new list that contains all elements of `self` in the
+    # Create a list that contains all elements of `self` in the
     # reverse order.
     .reverse(): Prim.list_reverse(self)
 
-    # Create a new list by applying `fun` to each elements of `self`.
+    # Create a list by applying `f` to each elements of `self`.
     .map(f): Prim.list_map(f, self)
 
     # Return true when `self` contains `v`.
     .member?(v): Prim.list_member?(self, v)
 
-    # Fold elements of `self` by the binary function `fun` from left to right.
+    # Fold elements of `self` by the binary function `f` from left to right.
     # Example:
     # ----
     # > [1,2,3,4].foldl((x,y)->x+y, 1)  # => (((1+1)+2)+3)+4
     # > [1,2,3,4].foldl((x,y)->x+y)     # => ((1+2)+3)+4
     # ----
-    .foldl(fun, v): Prim.list_foldl(fun, v, self)
-    .foldl1(fun):    Prim.list_fold1(fun, self)
+    .foldl(f, v): Prim.list_foldl(f, v, self)
+    .foldl(f):    Prim.list_fold1(f, self)
 
-    # Fold elements of `self` by the binary function `fun` from right to left.
+    # Fold elements of `self` by the binary function `f` from right to left.
     # Example:
     # ----
     # > [1,2,3,4].foldr((x,y)->x+y, 1)  # => 1+(2+(3+(4+1)))
     # > [1,2,3,4].foldr((x,y)->x+y)     # => 1+(2+(3+4))
     # ----
-    .foldr(fun, v): Prim.list_foldr(fun, self, v)
-    .foldr1(fun):   Prim.list_foldr1(fun, self)
+    .foldr(f, v): Prim.list_foldr(f, self, v)
+    .foldr(f):    Prim.list_foldr1(f, self)
 
     extend 'Iterable
 

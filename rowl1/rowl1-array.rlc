@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-array.rlc 2014-02-24 16:39:13 nineties $
+; $Id: rowl1-array.rlc 2014-03-04 01:01:05 nineties $
 ;
 
 (import "rlvm-compile")
@@ -33,31 +33,31 @@
     (return (variant @ArrayE 1 buf 0 capa))
     ))
 
-(export fun ary_new2 (len) (
+(export fun ary_new2 (f len) (
     (= len (unbox len))
     (var buf (allocate_array len))
+    (var code (get_bytecode f))
     (for i 0 len (do
-        (array_set object buf i @C_NIL)
+        (array_set object buf i (runcode code (box i)))
         ))
     (return (variant @ArrayE 1 buf len len))
     ))
 
-(export fun ary_new3 (len v) (
-    (= len (unbox len))
-    (var buf (allocate_array len))
-    (for i 0 len (do
-        (array_set object buf i v)
-        ))
-    (return (variant @ArrayE 1 buf len len))
+(export fun array_buf (ary) (
+    (return (field_get ary 1))
     ))
 
 (export fun array_size (ary) (
     (return (field_get ary 2))
     ))
 
+(export fun array_capa (ary) (
+    (return (field_get ary 3))
+    ))
+
 (export fun array_copy (ary) (
-    (var len (field_get ary 2))
-    (var buffrom (field_get ary 1))
+    (var len (array_size ary))
+    (var buffrom (array_buf ary))
     (var bufto (allocate_array len))
     (for i 0 len (do
         (array_set object bufto i (array_get object buffrom i))
@@ -66,16 +66,16 @@
     ))
 
 (export fun ary_size (ary) (
-    (return (box (field_get ary 2)))
+    (return (box (array_size ary)))
     ))
 
 (fun array_resize (ary new_size) (
     (if (< new_size 0)
         (throw (invalid_argument (string "size of array must not be negative") (box new_size)))
         )
-    (var buf (field_get ary 1))
-    (var size (field_get ary 2))
-    (var capa (field_get ary 3))
+    (var buf (array_buf ary))
+    (var size (array_size ary))
+    (var capa (array_capa ary))
     (if (<= new_size size) (do
         (for i new_size size (array_set object buf i @C_NIL))
         (field_set ary 2 new_size)
@@ -97,7 +97,7 @@
 (export fun array_at (ary i) (
     (var size (array_size ary))
     (if (&& (>= i 0) (< i size))
-        (return (array_get object (field_get ary 1) i)))
+        (return (array_get object (array_buf ary) i)))
     (index_out_of_range ary i)
     ))
 
@@ -108,11 +108,11 @@
 (export fun array_store (ary i v) (
     (var size (array_size ary))
     (if (< i size) (do
-        (array_set object (field_get ary 1) i v)
+        (array_set object (array_buf ary) i v)
         (return v)
         ))
     (array_resize ary (+ i 1))
-    (array_set object (field_get ary 1) i v)
+    (array_set object (array_buf ary) i v)
     (return v)
     ))
 
@@ -136,8 +136,8 @@
 
 (export fun array_restof (ary i) (
     (var ls 0)
-    (var size (field_get ary 2))
-    (var buf (field_get ary 1))
+    (var size (array_size ary))
+    (var buf (array_buf ary))
     (rfor j i size (do
         (= ls (cons (array_get object buf j) ls))
         ))
@@ -146,8 +146,8 @@
 
 (export fun ary_to_list (ary) (
     (var ls 0)
-    (var size (field_get ary 2))
-    (var buf (field_get ary 1))
+    (var size (array_size ary))
+    (var buf (array_buf ary))
     (rfor i 0 size (do
         (= ls (cons (array_get object buf i) ls))
         ))
@@ -165,8 +165,19 @@
     ))
 
 (fun ary_reverse (ary) (
-    (var size (field_get ary 2))
-    (var buf (field_get ary 1))
+    (var size (array_size ary))
+    (var newbuf (allocate_array size))
+    (var buf (array_buf ary))
+    (for i 0 size (do
+        (array_set object newbuf i
+            (array_get object buf (- (- size i) 1)))
+        ))
+    (return (variant @ArrayE 1 newbuf size size))
+    ))
+    
+(fun ary_reverse_bang (ary) (
+    (var size (array_size ary))
+    (var buf (array_buf ary))
     (for i 0 (/ size 2) (do
         (var j (- (- size 1) i))
         (var a (array_get object buf i))
@@ -237,9 +248,19 @@
     ))
 
 (fun ary_map (f ary) (
-    (var size (field_get ary 2))
-    (var buf  (field_get ary 1))
-    (var new  (allocate_array size))
+    (var size (array_size ary))
+    (var buf  (array_buf ary))
+    (var newbuf (allocate_array size))
+    (var code (get_bytecode f))
+    (for i 0 size (do
+        (array_set object newbuf i (runcode code (array_get object buf i)))
+        ))
+    (return (variant @ArrayE 1 newbuf size size))
+    ))
+
+(fun ary_map_bang (f ary) (
+    (var size (array_size ary))
+    (var buf  (array_buf ary))
     (var code (get_bytecode f))
     (for i 0 size (do
         (array_set object buf i (runcode code (array_get object buf i)))
@@ -248,8 +269,8 @@
     ))
 
 (fun ary_foldl (f v ary) (
-    (var buf (field_get ary 1))
-    (var size (field_get ary 2))
+    (var buf (array_buf ary))
+    (var size (array_size ary))
     (var code (get_bytecode f))
     (for i 0 size (do
         (= v (runcode code v (array_get object buf i)))
@@ -258,8 +279,8 @@
     ))
 
 (fun ary_foldl1 (f ary) (
-    (var buf (field_get ary 1))
-    (var size (field_get ary 2))
+    (var buf (array_buf ary))
+    (var size (array_size ary))
     (var code (get_bytecode f))
     (if (== size 0)
         (throw (invalid_argument (string "foldl1 requires non-empty array") ary))
@@ -272,8 +293,8 @@
     ))
 
 (fun ary_foldr (f ary v) (
-    (var buf (field_get ary 1))
-    (var size (field_get ary 2))
+    (var buf (array_buf ary))
+    (var size (array_size ary))
     (var code (get_bytecode f))
     (rfor i 0 size (do
         (= v (runcode code (array_get object buf i) v))
@@ -282,8 +303,8 @@
     ))
 
 (fun ary_foldr1 (f ary) (
-    (var buf (field_get ary 1))
-    (var size (field_get ary 2))
+    (var buf (array_buf ary))
+    (var size (array_size ary))
     (var code (get_bytecode f))
     (if (== size 0)
         (throw (invalid_argument (string "foldr1 requires non-empty array") ary))
@@ -297,8 +318,8 @@
 
 (export fun ary_hash (ary) (
     (var hash (lookup_func global (to_sym "hash")))
-    (var buf (field_get ary 1))
-    (var size (field_get ary 2))
+    (var buf (array_buf ary))
+    (var size (array_size ary))
     (var h (hashnext 0 (field_get Array @SymbolIndex)))
     (for i 0 size (do
         (= h (hashnext h (unbox (runcode hash (array_get object buf i)))))
@@ -307,9 +328,8 @@
     ))
 
 (export fun setup_array (mod) (
-    (add_function0 mod (to_sym "array_new") ary_new 0)
-    (add_function1 mod (to_sym "array_new_with_size") intT ary_new2 0)
-    (add_function2 mod (to_sym "array_new_with_size_and_initial_value") intT DontCare ary_new3 0)
+    (add_function0 mod (to_sym "array_new_empty") ary_new 0)
+    (add_function2 mod (to_sym "array_new") funT intT ary_new2 0)
     (add_function1 mod (to_sym "list_to_array") listT list_to_ary 0)
     (add_function1 mod (to_sym "array_to_list") arrayT ary_to_list 0)
 
@@ -321,11 +341,13 @@
     (add_function1 mod (to_sym "array_pop") arrayT ary_pop 0)
 
     (add_function1 mod (to_sym "array_reverse") arrayT ary_reverse 0)
+    (add_function1 mod (to_sym "array_reverse!") arrayT ary_reverse_bang 0)
     (add_function2 mod (to_sym "array_append") arrayT arrayT ary_append 0)
     (add_function2 mod (to_sym "array_append!") arrayT arrayT ary_append_bang 0)
     (add_function2 mod (to_sym "array_diff") arrayT arrayT ary_diff 0)
     (add_function2 mod (to_sym "array_diff!") arrayT arrayT ary_diff_bang 0)
     (add_function2 mod (to_sym "array_map") funT arrayT ary_map 0)
+    (add_function2 mod (to_sym "array_map!") funT arrayT ary_map_bang 0)
     (add_function3 mod (to_sym "array_foldl") funT DontCare arrayT ary_foldl 0)
     (add_function2 mod (to_sym "array_foldl1") funT arrayT ary_foldl1 0)
     (add_function3 mod (to_sym "array_foldr") funT arrayT DontCare ary_foldr 0)
