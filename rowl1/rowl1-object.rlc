@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-object.rlc 2014-02-26 12:53:07 nineties $
+; $Id: rowl1-object.rlc 2014-03-03 16:31:27 nineties $
 ;
 
 (import "rlvm-compile")
@@ -15,7 +15,6 @@
 (import "rowl1-compile")
 (import "rowl1-error")
 
-(extern object global)
 (var slots (make_wrtable))
 (var parent (to_sym "parent"))
 (var parent_tbl (make_wrtable))
@@ -84,7 +83,7 @@
     (if (== sym parent) (return (set_parent obj val)))
     (var ref (get_slot_ref obj sym @C_TRUE))
     (if (&& (!= overwrite @C_FALSE) (== ref @C_UNDEF))
-        (if (== obj global)
+        (if (== (node_head obj) Module)
             (throw (undefined_var sym))
             (throw (undefined_slot obj sym))
             )
@@ -146,7 +145,7 @@
     (var ref (get_slot_ref obj sym rec))
     (if (== ref @C_UNDEF)
         (if (!= check @C_FALSE)
-            (if (== obj global)
+            (if (== (node_head obj) Module)
                 (throw (undefined_var sym))
                 (throw (undefined_slot obj sym))
                 )
