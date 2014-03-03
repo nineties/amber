@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-02-28 18:40:48 nineties $ "
+" $Id: Syntax.ab 2014-03-03 14:54:55 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -163,11 +163,9 @@ primary_expr
       # List literal
       | <<multiline>> "[" delimited(expr, ",") "]"  { node1 }
       # Tuple literal
-      | "(" ")"
-        { MakeObject{Quote{Tuple}, List{}} }
       | <<multiline>> "(" delimited2(expr, ",") ")"
         { MakeObject{Quote{Tuple}, node1} }
-      | "|" expr "|" 
+      | "|" expr "|"
         { MakeObject{Quote{Abs}, List{node1}} }
       | self            { Quote{GetSelf{}} }
       | atom
@@ -203,7 +201,7 @@ postfix_expr
 fullform_expr
     ::= fullform
       | postfix_expr
-    
+
 quote_expr
     ::= "'" quote_expr
         { MakeObject{Quote{Quote}, List{node1}} }
@@ -372,7 +370,7 @@ primary_expr_act
                 Prim.int_to_string(node1)))
         }
       | "$input"    { 'input_text(parser, begin, end) }
-    
+
 Syntax.primary_expr_act = fusion(Syntax.primary_expr_act, Syntax.primary_expr)
 
 Syntax.parser_action_old: Syntax.parser_action
@@ -503,7 +501,7 @@ macro(ArithAssign{QuoteSyntax{x[idxs...]}, e, op}) = {
     }
 }
 
-# For-statement for containers. 
+# For-statement for containers.
 macro(For{i, container, body}) = {
     iter:  Prim.unique_symbol('iter)
     value: Prim.unique_symbol('value)
