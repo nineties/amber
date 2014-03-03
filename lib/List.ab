@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: List.ab 2014-03-03 22:07:25 nineties $
+# $Id: List.ab 2014-03-04 00:18:06 nineties $
 
 import Iterable
 
@@ -18,7 +18,11 @@ first: Prim.list_first
 # `rest([a,b,c,...]) == [b,c,...]`. O(n)
 rest:  Prim.list_rest
 
-# List.new(f, n) == [f(0), f(1), ..., f(n-1)]. O(n)
+# Create a new list of length `n` whose `i`-th element is `f(i)`.
+# Example:
+# ----
+# > List.new(x -> x^2, 5)       # => [0, 1, 4, 9, 16]
+# ----
 new(f @ Function, n @ Int): {
     list: []
     for i in 0..n-1
@@ -26,7 +30,12 @@ new(f @ Function, n @ Int): {
     Prim.list_reverse(list)
 }
 
-# List.new(f, f0, n) == [f0, f(f0), f(f(f0)), ..., f(f(...f(f0)...))]. O(n)
+# Create a new list of length `n` by first element `f0` and recurrence
+# formula `f`.
+# Example:
+# ----
+# > List.new(x -> x + 1, 0, 5)      # => [0,1,2,3,4]
+# ----
 new(f @ Function, f0, n @ Int): {
     list: []
     for i in 0..n-1 {
@@ -36,57 +45,79 @@ new(f @ Function, f0, n @ Int): {
     Prim.list_reverse(list)
 }
 
-# Copy elements from an iterable object of finite-length.
+# Create a new list whose elements are obtained from an iterable object
+# `container`.
 new(container) when container.Iterable? : {
     list: []
-    it: container.iterator()
-    while (not it.end?) {
-        list = cons(it.value, list)
-        it.next()
-    }
+    for v in container
+        list = cons(v, list)
     Prim.list_reverse(list)
 }
 
-# Concatenation of two lists. `[a,b,c] + [d,e] == [a,b,c,d,e]`. O(n)
+# Concatenation of two lists.
+# ----
+# > [1,2,3] + [4,5]     # => [1,2,3,4,5]
+# ----
 add = Prim.list_append | add
 
-#trait List {
-#    .extend 'Collection
-#
-#    .to_array()    = Prim.list_to_array(self)
-#    .to_list()     = self
-#    .size          = alias(() -> Prim.list_length(self))
-#    .empty?        = alias(() -> self == [])
-#    .get(i)        = Prim.list_at(self, i)
-#    .set(i, v)     = Prim.list_store(self, i, v)
-#    .reverse()     = Prim.list_reverse(self)
-#    .map(fun)      = Prim.list_map(fun, self)
-#    .member?(v)    = Prim.list_member?(self, v)
-#    .foldl(fun, v) = Prim.list_foldl(fun, v, self)
-#    .foldl1(fun)   = Prim.list_fold1(fun, self)
-#    .foldr(fun, v) = Prim.list_foldr(fun, self, v)
-#    .foldr1(fun)   = Prim.list_foldr1(fun, self)
-#
-#    .extend 'Iterable
-#
-#    .Iterator = Trait.new(\ListIterator) with {
-#        .extend ForwardIterator
-#        .extend MutableIterator
-#
-#        .list   = alias(0)
-#        .next?  = alias(() -> .list != [])
-#        .next() = {
-#            v: car(.list)
-#            .list = cdr(.list)
-#            v
-#        }
-#
-#        .value = alias(() -> .list[0], (v) -> {.list[0] = v})
-#    }
-#
-#    .iterator() = `Iterator{!self} with .parent = Trait.List.Iterator
-#}
-#
-#Prim.set_builtin_parent(\List, Trait.List)
-#
-#export cons car cdr
+trait List {
+    # The number of elements.
+    .length: alias(() -> Prim.list_length(self))
+    .size:   alias(() -> Prim.list_length(self))
+
+    # Return true when `self` is an empty list.
+    .empty?: alias(() -> self == [])
+
+    # `i`-th element.
+    .get(i @ Int): Prim.list_at(self, i)
+
+    # Do nothing. For consistency with other containers.
+    .to_list(): self
+
+    # Create a new array that contains all elements of `self` in the same
+    # order.
+    .to_array(): Prim.list_to_array(self)
+
+    # Create a new list that contains all elements of `self` in the
+    # reverse order.
+    .reverse(): Prim.list_reverse(self)
+
+    # Create a new list by applying `fun` to each elements of `self`.
+    .map(f): Prim.list_map(f, self)
+
+    # Return true when `self` contains `v`.
+    .member?(v): Prim.list_member?(self, v)
+
+    # Fold elements of `self` by the binary function `fun` from left to right.
+    # Example:
+    # ----
+    # > [1,2,3,4].foldl((x,y)->x+y, 1)  # => (((1+1)+2)+3)+4
+    # > [1,2,3,4].foldl((x,y)->x+y)     # => ((1+2)+3)+4
+    # ----
+    .foldl(fun, v): Prim.list_foldl(fun, v, self)
+    .foldl1(fun):    Prim.list_fold1(fun, self)
+
+    # Fold elements of `self` by the binary function `fun` from right to left.
+    # Example:
+    # ----
+    # > [1,2,3,4].foldr((x,y)->x+y, 1)  # => 1+(2+(3+(4+1)))
+    # > [1,2,3,4].foldr((x,y)->x+y)     # => 1+(2+(3+4))
+    # ----
+    .foldr(fun, v): Prim.list_foldr(fun, self, v)
+    .foldr1(fun):   Prim.list_foldr1(fun, self)
+
+    extend 'Iterable
+
+    .each(): {
+        list: self
+        () -> {
+            if (list == [])
+                return nil
+            v: first(list)
+            list = rest(list)
+            return v
+        }
+    }
+}
+
+Prim.set_builtin_parent('List, Trait.List)
