@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: Iterable.ab 2014-03-04 16:04:07 nineties $
+# $Id: Iterable.ab 2014-03-04 16:13:57 nineties $
 
 #= Trait for iteration of containers. =
 # An `Iterable` object must implements method `.each()` which returns a new# iterator for the object.
@@ -156,12 +156,16 @@ trait Iterable {
     }
 }
 
+# Convert given nullary function `f` to an iterable object.
 iterator(f @ Function): {
     f.parent = Trait.Iterable
     f.each() = self
     f
 }
 
+# Create an iterator that returns `v` repeatedly.
+# When `size` option is specified, the iterator returns
+# `size` values.
 repeat(v, size=nil): {
     cnt: 0
     iterator () -> {
@@ -172,6 +176,16 @@ repeat(v, size=nil): {
     }
 }
 
+# Create an iterator that returns sequence of integers.
+# Option:
+#   * begin: The beginning number.
+#   * end: When this option is specified, the iterator returns
+#     numbers only that are less than `end`.
+#   * step: Distance of integers. (default = 1)
+# Example:
+# ----
+# > counter(begin=10, step=2, end=20).to_list()    # => [10,12,14,16,18]
+# ----
 counter(begin = 0, step=1, end = nil): {
     cnt: begin
     iterator () -> {
@@ -183,6 +197,12 @@ counter(begin = 0, step=1, end = nil): {
     }
 }
 
+# Zip multiple iterators into one iterator. The iterator returns values
+# obtained from given iterators as tuples. When one of the given iterators
+# reached end, returns the zipped iterator also ends.
+# ----
+# > zip([1,2,3,4], [4,5,6]).to_list()       # => [(1,4),(2,5),(3,6)]
+# ----
 zip(iterables...)
     when iterables.size >= 2 and iterables.all?(x -> x.Iterable?) : {
     iterators: Tuple.new(iterables.map(x -> x.each()))
@@ -222,6 +242,10 @@ zip(it1, it2, it3) when it1.Iterable? and it2.Iterable? and it3.Iterable? : {
     }
 }
 
+# Create an iterator that returns cartesian products over given iterators.
+# ----
+# > product([1,2,3],[4,5]).to_list()        # => [(1,4),(1,5),(2,4),(2,5),(3,4),(3,5)]
+# ---
 product(iterables...) when iterables.all?(x -> x.Iterable?) : {
     arrays: iterables.map(x -> x.to_array())
     sizes:  arrays.map(x -> x.size)
