@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-03-04 12:12:35 nineties $
+; $Id: rowl1-compile.rlc 2014-03-04 17:03:19 nineties $
 ;
 
 (import "rlvm-compile")
@@ -156,6 +156,11 @@
                 (= fv (fv_iter (node_arg arg 1) 0 fv))
                 )
             (return (delete_args (node_arg expr 0) fv))
+            ))
+        (if (== hd Send) (do
+            (= fv (fv_iter (node_arg expr 0) 0 fv))
+            (= fv (fv_iter (node_arg expr 2) 0 fv))
+            (return fv)
             ))
         (if (== hd Ref)
             (return (fv_iter (node_arg expr 0) 0 fv))
@@ -512,6 +517,11 @@
         ))
     ; Closure has no closure variables since it is already closed.
     (if (== hd Closure) (return expr))
+    (if (== hd Send) (do
+        (node_arg_set expr 0 (scan_clsvars (node_arg expr 0) tbl))
+        (node_arg_set expr 2 (scan_clsvars (node_arg expr 2) tbl))
+        (return expr)
+        ))
     (if (== hd Ref) (return expr))
     (if (== hd Quote) (return expr))
     (if (== hd QuasiQuote) (do
@@ -596,6 +606,11 @@
         (if (== (node_head lhs) When)
             (node_arg_set lhs 1 (subst_clsvars tbl cls (node_arg lhs 1)))
             )
+        (node_arg_set expr 1 (subst_clsvars tbl cls (node_arg expr 1)))
+        (return expr)
+        ))
+    (if (== hd Send) (do
+        (node_arg_set expr 0 (subst_clsvars tbl cls (node_arg expr 0)))
         (node_arg_set expr 1 (subst_clsvars tbl cls (node_arg expr 1)))
         (return expr)
         ))
