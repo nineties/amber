@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-03-03 22:18:32 nineties $ "
+" $Id: Syntax.ab 2014-03-04 08:40:50 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -40,7 +40,7 @@ Assign{Slot{Syntax, comment}, Slot{Prim, parse_shell_style_comment}}
 DefineSyntax{
     character_set,
     List{Tuple{List{Many1{Choice{List{"\\", any}, List{Not{"]"}, any}}}},
-        Apply{input_text, List{parser,begin,end}}}
+        Send{Prim, input_text, List{parser,begin,end}}}
     }
 }
 
@@ -327,11 +327,6 @@ stmt
       | stmt ";"
         { `Seq{[!node0, nil]} }
 
-      | postfix_expr delimited1(argument, ",")
-        { MakeObject{Quote{Apply}, List{node0, node1}} }
-      | postfix_expr "." symbol delimited1(argument, ",")
-        { MakeObject{Quote{Send}, List{node0, node2, node3}} }
-
       | <<multiline>> if term stmt else stmt
         { `IfElse{!node1, !node2, !node4} }
       | <<multiline>> if term stmt
@@ -363,6 +358,12 @@ stmt
       | import delimited1(symbol, ".") import_option?
         { `Import{!node1, !node2} }
 
+      | postfix_expr ![+-] delimited1(argument, ",")
+        { MakeObject{Quote{Apply}, List{node0, node2}} }
+      | postfix_expr "." symbol ![+-] delimited1(argument, ",")
+        { MakeObject{Quote{Send}, List{node0, node2, node4}} }
+
+
 # Extend primary_expr to enable dollar sign ($) in parser action.
 primary_expr_act
     ::= "$" decimal
@@ -371,7 +372,7 @@ primary_expr_act
                 Prim.string_add("node",
                 Prim.int_to_string(node1)))
         }
-      | "$input"    { 'input_text(parser, begin, end) }
+      | "$input"    { 'Prim.input_text(parser, begin, end) }
 
 Syntax.primary_expr_act = fusion(Syntax.primary_expr_act, Syntax.primary_expr)
 
