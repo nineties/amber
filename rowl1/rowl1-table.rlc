@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-table.rlc 2014-02-24 16:33:42 nineties $
+; $Id: rowl1-table.rlc 2014-03-04 23:27:24 nineties $
 ;
 
 (import "rlvm-compile")
@@ -176,16 +176,16 @@
     (output_string ochan "}")
     ))
 
-(export fun list_to_table (list) (
-    (var orig list)
+(export fun iter_to_table (it) (
     (var tbl (table_new))
-    (while list (do
-        (var ent (car list))
-        (if (|| (!= (node_head ent) Tuple) (!= (node_size ent) 2))
-            (throw (invalid_argument (string "Arguments of Table must be list of pairs") orig))
+    (= it (get_bytecode it))
+    (while @TRUE (do
+        (var v (runcode it))
+        (if (== v @C_NIL) break)
+        (if (|| (!= (node_head v) Tuple) (!= (node_size v) 2))
+            (throw (invalid_argument (string "Given iterator returns non key-value pair.") v))
             )
-        (table_store tbl (node_arg ent 0) (node_arg ent 1))
-        (= list (cdr list))
+        (table_store tbl (node_arg v 0) (node_arg v 1))
         ))
     (return tbl)
     ))
@@ -232,7 +232,7 @@
 
 (export fun setup_table (mod) (
     (add_function0 mod (to_sym "table_new") table_new 0)
-    (add_function1 mod (to_sym "list_to_table") listT list_to_table 0)
+    (add_function1 mod (to_sym "iterable_to_table") funT iter_to_table 0)
     (add_function2 mod (to_sym "table_at") tableT DontCare table_at 0)
     (add_function3 mod (to_sym "table_store") tableT DontCare DontCare table_store 0)
     (add_function1 mod (to_sym "table_size") tableT table_size 0)
