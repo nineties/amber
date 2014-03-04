@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: Iterable.ab 2014-03-04 12:55:43 nineties $
+# $Id: Iterable.ab 2014-03-04 16:04:07 nineties $
 
 #= Trait for iteration of containers. =
 # An `Iterable` object must implements method `.each()` which returns a new# iterator for the object.
@@ -219,5 +219,59 @@ zip(it1, it2, it3) when it1.Iterable? and it2.Iterable? and it3.Iterable? : {
         if (v1 == nil or v2 == nil or v3 == nil)
             return nil
         return (v1, v2)
+    }
+}
+
+product(iterables...) when iterables.all?(x -> x.Iterable?) : {
+    arrays: iterables.map(x -> x.to_array())
+    sizes:  arrays.map(x -> x.size)
+    len: arrays.size
+    n: sizes.foldl(mul, 1)
+    i: 0
+    iterator () -> {
+        if (i == n)
+            return nil
+        value: Tuple.new(0, len)
+        j: i
+        for k in len-1..0 {
+            value[k] = arrays[k][i % sizes[k]]
+            j //= sizes[k]
+        }
+        i += 1
+        value
+    }
+}
+
+product(it1, it2) when it1.Iterable? and it2.Iterable? : {
+    ary1: it1.to_array()
+    ary2: it2.to_array()
+    n1: ary1.size
+    n2: ary2.size
+    n:  n1*n2
+    i:  0
+    iterator () -> {
+        if (i == n)
+            return nil
+        value: (ary1[i//n2], ary2[i%n2])
+        i += 1
+        value
+    }
+}
+
+product(it1, it2, it3) when it1.Iterable? and it2.Iterable? and it3.Iterable? : {
+    ary1: it1.to_array()
+    ary2: it2.to_array()
+    ary3: it3.to_array()
+    n1: ary1.size
+    n2: ary2.size
+    n3: ary3.size
+    n:  n1*n2*n3
+    i:  0
+    iterator () -> {
+        if (i == n)
+            return nil
+        value: (ary1[i//(n2*n3)], ary2[(i//n3)%n2], ary3[i%n3])
+        i += 1
+        value
     }
 }
