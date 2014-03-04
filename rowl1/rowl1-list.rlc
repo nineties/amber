@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2014-03-04 11:19:41 nineties $
+; $Id: rowl1-list.rlc 2014-03-04 18:44:14 nineties $
 ;
 
 (import "rlvm-compile")
@@ -274,6 +274,63 @@
     (return (box h))
     ))
 
+(fun merge (ls1 ls2 cmp) (
+    (if (! ls2) (return ls1))
+    (if (! ls1) (return ls2))
+    (var result 0)
+    (while @TRUE (do
+        (if (! ls1) break)
+        (if (! ls2) break)
+        (var r (runcode cmp (car ls1) (car ls2)))
+        (if (! (& r 1))
+            (throw (logic_error (string "Comparison function must returns integer.")))
+            )
+        (= r (unbox r))
+        (if (<= r 0)
+            (do
+                (= result (cons (car ls1) result))
+                (= ls1 (cdr ls1))
+            )
+            (do
+                (= result (cons (car ls2) result))
+                (= ls2 (cdr ls2))
+            ))
+        ))
+    (while ls1 (do
+        (= result (cons (car ls1) result))
+        (= ls1 (cdr ls1))
+        ))
+    (while ls2 (do
+        (= result (cons (car ls2) result))
+        (= ls2 (cdr ls2))
+        ))
+    (return (list_reverse result))
+    ))
+
+(fun merge_sort (head guard cmp) (
+    (if (! head) (return 0))
+    (if (== (cdr head) guard) (return (list1 (car head))))
+
+    ; find middle point.
+    (var left head)
+    (var right head)
+    (while (!= right guard) (do
+        (= left (cdr left))
+        (= right (cdr right))
+        (if (== right guard) break)
+        (= right (cdr right))
+        ))
+    (return (merge
+        (merge_sort head left cmp)
+        (merge_sort left right cmp)
+        cmp))
+    ))
+
+(fun ls_sort (ls cmp) (
+    (= cmp (get_bytecode cmp))
+    (return (merge_sort ls 0 cmp))
+    ))
+
 (export fun setup_list (mod) (
     (add_function2 mod (to_sym "list_cons") DontCare listT ls_cons 0)
     (add_function1 mod (to_sym "list_first") listT ls_car 0)
@@ -295,6 +352,7 @@
     (add_function2 mod (to_sym "list_foldr1") funT listT ls_foldr1 0)
     (add_function2 mod (to_sym "list_subtract") listT listT ls_sub 0)
     (add_function2 mod (to_sym "list_intersperse") DontCare listT ls_intersperse 0)
+    (add_function2 mod (to_sym "list_sort") listT funT ls_sort 0)
     ))
 
     ))
