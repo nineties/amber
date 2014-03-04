@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: Array.ab 2014-03-04 11:50:52 nineties $
+# $Id: Array.ab 2014-03-04 20:41:39 nineties $
 
 #= Array =
 # Dynamic and mutable array.
@@ -25,7 +25,7 @@ new(f @ Function, f0, n @ Int): {
 
 # Create an array whose elements are obtained from an iterable object
 # `container`.
-new(containers) when container.Iterable? : {
+new(container) when container.Iterable? : {
     ary: Array.new()
     for v in container
         ary.push(v)
@@ -88,6 +88,9 @@ trait Array {
     .foldr(f, v): Prim.array_foldr(f, self, v)
     .foldr(f):    Prim.array_foldr1(f, self)
 
+    # Inplace sort.
+    .sort!(cmp @ Function): Prim.array_sort!(self, cmp)
+    .sort!(): Prim.array_sort!(self, compare)
 
     extend 'Iterable
     .each(): {

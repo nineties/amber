@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-array.rlc 2014-03-04 01:01:05 nineties $
+; $Id: rowl1-array.rlc 2014-03-04 22:15:40 nineties $
 ;
 
 (import "rlvm-compile")
@@ -327,6 +327,74 @@
     (return (box h))
     ))
 
+; Inplace intro sort.
+(fun ary_sort_bang (ary cmp) (
+    (= cmp (get_bytecode cmp))
+    (var limit (* 2 (bsr (array_size ary))))
+    (debugs "==== START sort ====\n")
+    (debugi (array_size ary))
+    (debugs "\n")
+    (intro_sort (array_buf ary) 0 (- (array_size ary) 1) cmp limit)
+    (return @C_NIL)
+    ))
+
+(fun compare (cmp a b) (
+    (var r (runcode cmp a b))
+    (if (! (& r 1))
+        (throw (logic_error (string "Comparison function must returns an integer.")))
+        )
+    (return (unbox r))
+    ))
+
+(fun select_pivot (buf beg end cmp) (
+    (var mid (/ (+ beg end) 2))
+    (var a (array_get object buf beg))
+    (var b (array_get object buf end))
+    (var c (array_get object buf mid))
+    (if (< (compare cmp a b) 0)
+        (if (< (compare cmp b c) 0)
+            (return end)
+            (if (< (compare cmp a c) 0)
+                (return mid)
+                (return beg)
+                )
+            )
+        (if (> (compare cmp b c) 0)
+            (return end)
+            (if (< (compare cmp a c) 0)
+                (return beg)
+                (return mid)
+                )
+            )
+        )
+    ))
+
+(fun intro_sort (buf beg end cmp limit) (
+    (if (>= beg end) return)
+
+    (var pivot_index (select_pivot buf beg end cmp))
+    (var pivot (array_get object buf pivot_index))
+
+    ; move pivot to the right most end.
+    (array_set object buf pivot_index (array_get object buf end))
+    (array_set object buf end pivot)
+    (var i beg)
+    (for j beg end (do
+        (var a (array_get object buf j))
+        (if (<= (compare cmp a pivot) 0)
+            (do
+                (var t a)
+                (array_set object buf j (array_get object buf i))
+                (array_set object buf i a)
+                (+= i 1)
+            ))
+        ))
+    (array_set object buf end (array_get object buf i))
+    (array_set object buf i pivot)
+    (intro_sort buf beg (- i 1) cmp (- limit 1))
+    (intro_sort buf (+ i 1) end cmp (- limit 1))
+    ))
+
 (export fun setup_array (mod) (
     (add_function0 mod (to_sym "array_new_empty") ary_new 0)
     (add_function2 mod (to_sym "array_new") funT intT ary_new2 0)
@@ -352,6 +420,8 @@
     (add_function2 mod (to_sym "array_foldl1") funT arrayT ary_foldl1 0)
     (add_function3 mod (to_sym "array_foldr") funT arrayT DontCare ary_foldr 0)
     (add_function2 mod (to_sym "array_foldr1") funT arrayT ary_foldr1 0)
+
+    (add_function2 mod (to_sym "array_sort!") arrayT funT ary_sort_bang 0)
 
     ))
 

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rlvm-compile.rlc 2014-02-19 18:36:34 nineties $
+; $Id: rlvm-compile.rlc 2014-03-04 21:06:08 nineties $
 ;
 
 (import "stdlib")
@@ -356,9 +356,9 @@
 ; translate (cmp a b) to 
 (define compile_conditional (expr drop) (do
     (compile_block `(
-        (var ret 0)
-        (if @expr (incr ret))
-        ret
+        (var __ret__ 0)
+        (if @expr (incr __ret__))
+        __ret__
         ) drop)
     ))
 
@@ -525,13 +525,13 @@
     (push_exit_label)
     (compile_block `(
         (var @it @low)
-        (var end @high)
-        (if (< @it end) (do
+        (var __end__ @high)
+        (if (< @it __end__) (do
             (label @loop_label)
             @body
             (label @(car continue_labels))
             (incr @it)
-            (if (< @it end) (goto @loop_label))
+            (if (< @it __end__) (goto @loop_label))
             ))
         ) drop)
     (pop_exit_label)
@@ -555,13 +555,13 @@
     (push_exit_label)
     (compile_block `(
         (var @it (- @high 1))
-        (var end @low)
-        (if (>= @it end) (do
+        (var __end__ @low)
+        (if (>= @it __end__) (do
             (label @loop_label)
             @body
             (label @(car continue_labels))
             (decr @it)
-            (if (>= @it end) (goto @loop_label))
+            (if (>= @it __end__) (goto @loop_label))
             ))
         ) drop)
     (pop_exit_label)
@@ -570,11 +570,11 @@
 (define compile_list_for ((_ it ls body) drop) (do
     (push_exit_label)
     (compile_block `(
-            (var tmp @ls)
-            (while tmp (do
-                (var @it (car tmp))
+            (var __tmp__ @ls)
+            (while __tmp__ (do
+                (var @it (car __tmp__))
                 @body
-                (= tmp (cdr tmp))
+                (= __tmp__ (cdr __tmp__))
                 ))
         ) drop)
     (pop_exit_label)
