@@ -1,8 +1,148 @@
 # Copyright (C) 2014 nineties
-# $Id: Iterable.ab 2014-03-03 15:49:40 nineties $
+# $Id: Iterable.ab 2014-03-04 12:09:56 nineties $
 
-#= Trait for external iteration =
+#= Trait for iteration of containers. =
+# An `Iterable` object must implements method `.each()` which returns a new# iterator for the object.
+#
+# An iterator of a container is just a closure which returns elements of
+# the container one by one and returns `nil` when it reached the end of
+# the container.
+#
+# Tha trait `Iterable` provides useful functions using the method `.each()`.
 
 trait Iterable {
     require '.each()
+
+    # Internal iteration. Call `callback` for each element of `self`.
+    .each(callback @ Function): {
+        it: self.each()
+        value: nil
+        while ((value = it()) != nil)
+            callback(value)
+        self
+    }
+
+    # Create a new list by collecting values obtained from the iterator.
+    .to_list(): {
+        list: []
+        for v in self
+            list = cons(v, list)
+        list.reverse()
+    }
+
+    # Create a new array by collecting values obtained from the iterator.
+    .to_array(): {
+        ary: Array.new()
+        for v in self
+            ary.push(v)
+        ary
+    }
+
+    # Create a new iterator that returns elements of `self` and their
+    # index as a tuple `(index, value)`.
+    .with_index(): {
+        it: self.each()
+        idx: 0
+
+        iterator () -> {
+            v: it()
+            idx += 1
+            if (v == nil)
+                return nil
+            (idx-1, v)
+        }
+    }
+
+    # Return `true` when all elements of `self` satisfy the predicate `p`.
+    .all?(p @ Function): {
+        for v in self {
+            if not p(v)
+                return false
+        }
+        return true
+    }
+
+    # Return `true` when `self` contains some element which satisfies the
+    # predicate `p`.
+    .any?(p @ Function): {
+        for v in self {
+            if p(v)
+                return true
+        }
+        return false
+    }
+
+    # Return `true` when `self` includes `v`.
+    .include?(v): self.any?(x -> x == v)
+
+    # Create a new iterator from `self` that returns values which satisfy
+    # the predicate `p`.
+    .filter(p @ Function): {
+        it: self.each()
+
+        iterator () -> {
+            value: nil
+            while ((value = it()) != nil) {
+                if p(value)
+                    return value
+            }
+            nil
+        }
+    }
+}
+
+iterator(f @ Function): {
+    f.parent = Trait.Iterable
+    f.each() = self
+    f
+}
+
+counter(begin = 0, step=1, end = nil): {
+    cnt: begin
+    iterator () -> {
+        if (end != nil and cnt >= end)
+            return nil
+        v: cnt
+        cnt += step
+        v
+    }
+}
+
+zip(iterables...)
+    when iterables.size >= 2 and iterables.all?(x -> x.Iterable?) : {
+    iterators: Tuple.new(iterables.map(x -> x.each()))
+    iterator () -> {
+        values: iterators.map(x -> x())
+        for i in 0..values.size-1 {
+            if values[i] == nil
+                return nil
+        }
+        return values
+    }
+}
+
+zip(it1, it2) when it1.Iterable? and it2.Iterable? : {
+    it1 = it1.each()
+    it2 = it2.each()
+    iterator () -> {
+        v1: it1()
+        v2: it2()
+        if (v1 == nil or v2 == nil)
+            return nil
+        return (v1, v2)
+    }
+}
+
+zip(it1, it2, it3) when it1.Iterable? and it2.Iterable? and it3.Iterable? : {
+    it1 = it1.each()
+    it2 = it2.each()
+    it3 = it3.each()
+    iterator () -> {
+        v1: it1()
+        v2: it2()
+        v3: it3()
+        if (v1 == nil or v2 == nil or v3 == nil)
+            return nil
+        return (v1, v2)
+    }
 }

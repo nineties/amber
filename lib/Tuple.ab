@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: Tuple.ab 2014-02-28 18:44:31 nineties $
+# $Id: Tuple.ab 2014-03-04 11:50:39 nineties $
 
 #= Tuple =
 # An n-tuple is an ordered collection of n objects. Tuples do not have
@@ -17,9 +17,32 @@
 # > y              # => 2
 # > z              # => 3
 # ----
+
+new(container) when container.Iterable? :
+    Prim.list_to_tuple(container.to_list())
+
 trait Tuple {
     # The number of elements.
-    .size: alias(() -> Prim.arity(self))
+    .size:   alias(() -> Prim.arity(self))
+    .length: alias(() -> Prim.arity(self))
+
+    # Apply `f` to each element of `self`.
+    .map(f):  Prim.tuple_map(f, self)
+    .map!(f): Prim.tuple_map(f, self)
+
+    extend 'Iterable
+    .each(): {
+        tuple: self
+        idx: 0
+        size: self.size
+
+        iterator () -> {
+            if (idx >= size)
+                return nil
+            idx += 1
+            tuple[idx-1]
+        }
+    }
 }
 
 Prim.set_builtin_parent('Tuple, Trait.Tuple)

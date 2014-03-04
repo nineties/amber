@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-02-26 00:26:07 nineties $
+; $Id: rowl1-compile.rlc 2014-03-04 12:12:35 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1290,6 +1290,11 @@
         (put_fieldset asm (node_arg_int sym 1))
         return
         ))
+
+    ; We need compile `val` before registering `sym` because
+    ; `sym` is not accessible in `val`.
+    (compile asm val)
+
     (var info (symtable_find_local variables sym))
     (var idx 0)
     (if info
@@ -1298,7 +1303,7 @@
             (= idx (get_lvar_idx))
             (symtable_add variables sym (make_lvar idx))
         ))
-    (compile asm val)
+
     (put_dup asm)
     (put_store_lvar asm idx)
     ))

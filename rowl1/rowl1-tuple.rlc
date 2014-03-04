@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2014-02-26 18:50:57 nineties $
+; $Id: rowl1-list.rlc 2014-03-04 11:52:51 nineties $
 ;
 
 (import "rlvm-compile")
@@ -123,6 +123,25 @@
     (return t)
     ))
 
+(export fun tuple_map (f tup) (
+    (var size (seq_size tup))
+    (var t (allocate_tuple size))
+    (var code (get_bytecode f))
+    (for i 0 size (do
+        (array_set object t i (runcode code (array_get object tup i)))
+        ))
+    (return t)
+    ))
+
+(export fun tuple_map_bang (f tup) (
+    (var size (seq_size tup))
+    (var code (get_bytecode f))
+    (for i 0 size (do
+        (array_set object tup i (runcode code (array_get object tup i)))
+        ))
+    (return tup)
+    ))
+
 (export fun tuple_hash (tup) (
     (var hash (lookup_func global (to_sym "hash")))
     (var h (hashnext 0 (field_get Tuple @SymbolIndex)))
@@ -134,6 +153,9 @@
     ))
 
 (export fun setup_tuple (mod) (
+    (add_function1 mod (to_sym "list_to_tuple") listT list_to_tuple 0)
+    (add_function2 mod (to_sym "tuple_map") funT tupleT tuple_map 0)
+    (add_function2 mod (to_sym "tuple_map!") funT tupleT tuple_map_bang 0)
     ))
 
     ))
