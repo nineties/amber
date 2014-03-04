@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: Iterable.ab 2014-03-04 12:50:53 nineties $
+# $Id: Iterable.ab 2014-03-04 12:55:43 nineties $
 
 #= Trait for iteration of containers. =
 # An `Iterable` object must implements method `.each()` which returns a new# iterator for the object.
@@ -83,6 +83,19 @@ trait Iterable {
         for i in 1..n
             it()
         it
+    }
+
+    # Drop elements from the iterator while `p` is satisfied.
+    .dropWhile(p @ Function): {
+        it: self.each()
+        value: nil
+        while ((value = it()) != nil) and p(value)
+            ;
+        iterator () -> {
+            t: value
+            value = it()
+            t
+        }
     }
 
     # Return `true` when all elements of `self` satisfy the predicate `p`.
