@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: Iterable.ab 2014-03-04 12:23:32 nineties $
+# $Id: Iterable.ab 2014-03-04 12:31:59 nineties $
 
 #= Trait for iteration of containers. =
 # An `Iterable` object must implements method `.each()` which returns a new# iterator for the object.
@@ -74,6 +74,26 @@ trait Iterable {
 
     # Return `true` when `self` includes `v`.
     .include?(v): self.any?(x -> x == v)
+
+    # Create new iterator that returns elements of `self` repeatedly.
+    # Example
+    # ----
+    # > [1,2,3].cycle().take(10).to_list()      # => [1,2,3,1,2,3,1,2,3,1]
+    # ----
+    .cycle(): {
+        ary: self.to_array()
+        idx: 0
+        len: ary.size
+
+        if len == 0
+            return (iterator () -> nil)
+
+        iterator () -> {
+            v: ary[idx]
+            idx = (idx + 1) % len
+            v
+        }
+    }
 
     # Create a new iterator from `self` that returns values which satisfy
     # the predicate `p`.
