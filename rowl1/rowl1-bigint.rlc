@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-bigint.rlc 2014-02-25 17:40:49 nineties $
+; $Id: rowl1-bigint.rlc 2014-03-04 17:34:41 nineties $
 ;
 
 (import "rlvm-compile")
@@ -18,6 +18,12 @@
 (import "rowl1-error")
 
 (extern fun tuple2)
+
+(fun nonzero_check (x) (
+    (if (bint_is_zero x)
+        (throw (division_by_zero))
+        )
+    ))
 
 (export fun pp_bint (ochan n) (
     (output_string ochan (bint_to_s n))
@@ -64,6 +70,13 @@
 
 (fun int_to_bint_ (v) (
     (return (int_to_bint (unbox v)))
+    ))
+
+(fun bint_to_int (v) (
+    (var f (norm v))
+    (if (! (& v 1))
+        (throw (value_error (string "Bigint overflows the range of fixed-length integer") v)))
+    (return f)
     ))
 
 (export fun uint_to_bint (v) (
@@ -482,7 +495,7 @@
     (return (box h))
     ))
 
-(fun bint_to_i (str) (
+(fun string_to_bint (str) (
     (return (norm (parse_bint str)))
     ))
 
@@ -533,13 +546,9 @@
         )
     ))
 
-(fun bint_abs (n) (
-    (if (field_get n 3)
-        (return (bint_uminus n))
-        (return n)
-        )
+(fun bint_uplus (n) (
+    (return n)
     ))
-
 (export fun bint_uminus (n) (
     (return (bigneg (to_bint_copy n)))
     ))
@@ -568,6 +577,10 @@
     (= a (to_bint_copy a))
     (var r (bigdiv a (to_bint b)))
     (return (tuple2 (norm a) (norm r)))
+    ))
+(fun bint_quo (a b) (
+    (nonzero_check b)
+    (return (fdiv (bint_to_f a) (bint_to_f b)))
     ))
 
 (export fun bint_shiftL (a b) (
@@ -740,17 +753,19 @@
 
 (export fun setup_bigint (mod) (
     (add_function1 mod (to_sym "int_to_bint") intT int_to_bint_ 0)
+    (add_function1 mod (to_sym "bint_to_int") bintT bint_to_int 0)
     (add_function1 mod (to_sym "bint_to_string") bintT bint_to_s 0)
-    (add_function1 mod (to_sym "string_to_bint") stringT bint_to_i 0)
+    (add_function1 mod (to_sym "string_to_bint") stringT string_to_bint 0)
     (add_function1 mod (to_sym "bint_to_float") bintT bint_to_f 0)
 
-    (add_function1 mod (to_sym "bint_abs") bintT bint_abs 0)
+    (add_function1 mod (to_sym "bint_uplus") bintT bint_uplus 0)
     (add_function1 mod (to_sym "bint_uminus") bintT bint_uminus 0)
     (add_function2 mod (to_sym "bint_add") bintT bintT bint_add 0)
     (add_function2 mod (to_sym "bint_sub") bintT bintT bint_sub 0)
     (add_function2 mod (to_sym "bint_mul") bintT bintT bint_mul 0)
     (add_function2 mod (to_sym "bint_div") bintT bintT bint_div 0)
     (add_function2 mod (to_sym "bint_mod") bintT bintT bint_mod 0)
+    (add_function2 mod (to_sym "bint_quo") bintT bintT bint_quo 0)
     (add_function2 mod (to_sym "bint_divmod") bintT bintT bint_divmod 0)
     (add_function2 mod (to_sym "bint_pow") bintT bintT bint_pow 0)
     (add_function3 mod (to_sym "bint_powmod") bintT bintT bintT bint_powmod 0)
