@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-io.rlc 2014-03-05 16:04:04 nineties $
+; $Id: vm-prim-io.rlc 2014-03-05 16:35:13 nineties $
 ;
 
 (import "stdlib")
@@ -157,8 +157,10 @@
 
 (export prim_close_in)
 (fun prim_close_in (ichan) (
+    (if (! (member ichan_list ichan)) ((return @FALSE)))
     (= ichan_list (remove_from_list ichan_list ichan))
     (syscall @SYS_CLOSE (get ichan 1))
+    (return @TRUE)
     ))
 
 (export prim_file_exists)
@@ -240,9 +242,11 @@
 
 (export prim_close_out)
 (fun prim_close_out (ochan) (
-    (prim_flush ochan)
+    (if (! (member ochan_list ochan)) ((return @FALSE)))
     (= ochan_list (remove_from_list ochan_list ochan))
+    (prim_flush ochan)
     (syscall @SYS_CLOSE (get ochan 1))
+    (return @TRUE)
     ))
 
 (export prim_eof)
