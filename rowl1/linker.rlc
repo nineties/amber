@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: linker.rlc 2014-02-19 18:46:13 nineties $
+; $Id: linker.rlc 2014-03-05 13:01:40 nineties $
 ;
 
 (import "config")
@@ -108,7 +108,8 @@
     ))
 
 (fun load_file (index file) (
-    (var ic (open_in file))
+    (var ic (open_in file @TRUE))
+    (if (! ic) (error "open failed"))
     (var magic (read_int_check ic))
     (if (!= magic @OBJ_MAGIC)
         (error "invalid file format (magic number mismatch)"))
@@ -341,7 +342,8 @@
     ))
 
 (fun output_executable (file) (
-    (var oc (open_out file))
+    (var oc (open_out file @(| O_WRONLY O_CREAT O_TRUNC) @TRUE))
+    (if (! oc) (error "open failed"))
 
     (output_word oc @EXE_MAGIC)
 

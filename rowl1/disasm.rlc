@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: disasm.rlc 2014-02-07 04:59:27 nineties $
+; $Id: disasm.rlc 2014-03-05 12:53:27 nineties $
 ;
 
 (import "config")
@@ -112,12 +112,14 @@
     ))
 
 (fun disasm (file) (
-    (var ic (open_in file))
+    (var ic (open_in file @TRUE))
+    (if (! ic) (error "open failed"))
     (var oc 0)
     (if (== output_file 0)
         (= oc (get_stdout))
-        (= oc (open_out file))
+        (= oc (open_out file @(| O_WRONLY O_CREAT O_TRUNC) @FALSE))
         )
+    (if (! oc) (error "open failed"))
 
     (var magic (read_int_check ic))
     (if (&& (!= magic @OBJ_MAGIC) (!= magic @EXE_MAGIC))

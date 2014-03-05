@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-string.rlc 2014-03-03 15:54:12 nineties $
+; $Id: rowl1-string.rlc 2014-03-05 15:43:55 nineties $
 ;
 
 (import "rlvm-compile")
@@ -183,12 +183,16 @@
     ))
 
 ;; StringStream
-(export fun new_iss (str) (
-    (return (variant @InputStringStreamE 1 (make_iss str)))
+(export fun new_iss (str bin) (
+    (var binmode @FALSE)
+    (if (!= bin @C_FALSE) (= binmode @TRUE))
+    (return (variant @InputStringStreamE 1 (make_iss str binmode)))
     ))
 
-(export fun new_oss () (
-    (return (variant @OutputStringStreamE 1 (make_oss)))
+(export fun new_oss (bin) (
+    (var binmode @FALSE)
+    (if (!= bin @C_FALSE) (= binmode @TRUE))
+    (return (variant @OutputStringStreamE 1 (make_oss binmode)))
     ))
 
 (export fun oss_raw (oss) (
@@ -259,7 +263,7 @@
 
     ; StringStream module
     (var issT (domainP InputStringStream))
-    (add_function1 mod (to_sym "iss_new") stringT new_iss 0)
+    (add_function2 mod (to_sym "iss_new") stringT DontCare new_iss 0)
 
     (add_function1 mod (to_sym "iss_lookahead") issT iss_lookahead 0)
     (add_function1 mod (to_sym "iss_read_char") issT iss_read_char 0)
@@ -268,7 +272,7 @@
 
     (var ossT (domainP OutputStringStream))
 
-    (add_function0 mod (to_sym "oss_new") new_oss 0)
+    (add_function1 mod (to_sym "oss_new") DontCare new_oss 0)
     (add_function1 mod (to_sym "oss_to_string") ossT oss_to_s 0)
     (add_function2 mod (to_sym "oss_print_string") ossT stringT oss_print_str 0)
     ))

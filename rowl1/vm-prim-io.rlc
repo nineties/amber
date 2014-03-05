@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-io.rlc 2014-02-26 16:28:47 nineties $
+; $Id: vm-prim-io.rlc 2014-03-05 16:04:04 nineties $
 ;
 
 (import "stdlib")
@@ -22,13 +22,6 @@
 (var IFLNK 0120000)
 (var IFMT 0170000)
 
-(var O_RDONLY 0)
-(var O_WRONLY 1)
-(var O_RDWR   2)
-(var O_CREAT  64)
-(var O_TRUNC  512)
-(var O_APPEND 1024)
-
 (var STDIN_FD 0)
 (var STDOUT_FD 1)
 (var STDERR_FD 2)
@@ -40,8 +33,7 @@
 (var vm-prim-code `(
 
 (extern void* make_carray)
-(extern void* prim_make_struct3)
-(extern void* prim_make_struct4)
+(extern void* prim_make_struct5)
 (extern void* prim_string)
 (extern void* prim_strncpy)
 (extern void* prim_strlcat)
@@ -89,50 +81,50 @@
 
 (export prim_open)
 (fun prim_open (path) (
-    (int fd (syscall @SYS_OPEN path @O_RDONLY))
-    (if (< fd 0) ((open_error path)))
-    (return fd)
+    (return (syscall @SYS_OPEN path @O_RDONLY))
     ))
 
 (export prim_close)
 (fun prim_close (fd) (
-    (syscall @SYS_CLOSE fd)
+    (return (syscall @SYS_CLOSE fd))
     ))
 
 (export prim_chdir)
 (fun prim_chdir (path) (
-    (syscall @SYS_CHDIR path)
+    (return (syscall @SYS_CHDIR path))
     ))
 
 (export prim_fchdir)
 (fun prim_fchdir (fd) (
-    (syscall @SYS_FCHDIR fd)
+    (return (syscall @SYS_FCHDIR fd))
     ))
 
-; ichan = (buf, fd, beg, end)
-(fun make_ichan (fd) (
-    (void* chan (prim_make_struct4 1 (make_carray @RDBUFSZ) fd 0 0))
+; ichan = (buf, fd, beg, end, binmode)
+(fun make_ichan (fd bin) (
+    (void* chan (prim_make_struct5 1 (make_carray @RDBUFSZ) fd 0 0 bin))
     (= ichan_list (make_cons chan ichan_list))
     (return chan)
     ))
 
-; ochan = (buf, fd, pos in buf, pos)
-(fun make_ochan (fd) (
-    (void* chan (prim_make_struct4 1 (make_carray @WRBUFSZ) fd 0 0))
+; ochan = (buf, fd, pos in buf, pos, binmode)
+(fun make_ochan (fd bin) (
+    (void* chan (prim_make_struct5 1 (make_carray @WRBUFSZ) fd 0 0 bin))
     (= ochan_list (make_cons chan ochan_list))
     (return chan)
     ))
 
-; iss = (buf, -1, pos, capa)    ; InputStringStream
+; iss = (buf, -1, pos, capa, binmode)    ; InputStringStream
 (export prim_make_iss)
-(fun prim_make_iss (str) (
-    (return (prim_make_struct4 1 str -1 0 (strlen str)))
+(fun prim_make_iss (str bin) (
+    (void* ichan (prim_make_struct5 1 str -1 0 (strlen str) bin))
+    (if (! bin) ((replace_input_newline ichan)))
+    (return ichan)
     ))
 
-; oss = (buf, -1, pos, capa)    ; OutputStringStream
+; oss = (buf, -1, pos, capa, binmode)    ; OutputStringStream
 (export prim_make_oss)
-(fun prim_make_oss () (
-    (return (prim_make_struct4 1 (make_carray 10) -1 0 10))
+(fun prim_make_oss (bin) (
+    (return (prim_make_struct5 1 (make_carray 10) -1 0 10 bin))
     ))
 
 (fun reserve_oss (oss) (
@@ -157,10 +149,10 @@
     ))
 
 (export prim_open_in)
-(fun prim_open_in (path) (
+(fun prim_open_in (path bin) (
     (int fd (syscall @SYS_OPEN path @O_RDONLY))
-    (if (< fd 0) ((open_error path)))
-    (return (make_ichan fd))
+    (if (< fd 0) ((return 0)))
+    (return (make_ichan fd bin))
     ))
 
 (export prim_close_in)
@@ -178,15 +170,69 @@
     ))
 
 (export prim_open_out)
-(fun prim_open_out (path) (
-    (int fd (syscall @SYS_OPEN path @(| O_WRONLY O_CREAT O_TRUNC) 0644))
-    (if (< fd 0) ((open_error path)))
-    (return (make_ochan fd))
+(fun prim_open_out (path mode bin) (
+    (int fd (syscall @SYS_OPEN path mode 0644))
+    (if (< fd 0) ((return 0)))
+    (return (make_ochan fd bin))
+    ))
+
+; Convert '\r' and '\r\n' to '\n'. This routine is hard coded for
+; UNIX system.
+(fun replace_input_newline (ichan) (
+    (void* buf (get ichan 0))
+    (int end (get ichan 3))
+    (int read 0)
+    (int write 0)
+    (while (< read end) (
+        (int c ([]8 buf read))
+        (if (== c '\r')
+            (
+                ([]=8 buf write '\n')
+                (incr write)
+                (incr read)
+                (if (== ([]8 buf read) '\n') (
+                    (incr read)
+                    ))
+            )
+            (
+                ([]=8 buf write c)
+                (incr write)
+                (incr read)
+            ))
+        ))
+    (set ichan 3 write)
+    ))
+
+(fun replace_output_newline (ochan) (
+    (void* buf (get ochan 0))
+    (int end (get ochan 2))
+    (int read 0)
+    (int write 0)
+    (while (< read end) (
+        (int c ([]8 buf read))
+        (if (== c '\r')
+            (
+                ([]=8 buf write '\n')
+                (incr write)
+                (incr read)
+                (if (== ([]8 buf read) '\n') (
+                    (incr read)
+                    ))
+            )
+            (
+                ([]=8 buf write c)
+                (incr write)
+                (incr read)
+            ))
+        ))
+    (set ochan 2 write)
     ))
 
 (export prim_flush)
 (fun prim_flush (ochan) (
+    (int binmode (get ochan 4))
     (if (&& (>= (get ochan 1) 0) (> (get ochan 2) 0)) (
+        (if (! binmode) ((replace_output_newline ochan)))
         (syscall @SYS_WRITE (get ochan 1) (get ochan 0) (get ochan 2))
         (set ochan 2 0)
         ))
@@ -219,6 +265,7 @@
     (int sz (syscall @SYS_READ (get ichan 1) (+ (get ichan 0) remain) (- @RDBUFSZ remain)))
     (set ichan 2 0)
     (set ichan 3 (+ sz remain))
+    (if (! (get ichan 4)) ((replace_input_newline ichan)))
     ))
 
 (export prim_input_bytes)
@@ -379,14 +426,6 @@
     (return 0)
     ))
 
-(export prim_position)
-(fun prim_position (ochan) (
-    (if (> (get ochan 1) 0)
-        ((return (get ochan 3)))
-        ((return (get ochan 2)))
-        )
-    ))
-
 (export prim_output_bytes)
 (fun prim_output_bytes (ochan ptr size) (
     (if (== (get ochan 1) @STDERR_FD) (
@@ -543,13 +582,6 @@
     (error msg)
     ))
 
-(fun realpath_error (path) (
-    (prim_output_string stderr "ERROR: failed to get absolute path of '")
-    (prim_output_string stderr path)
-    (prim_output_string stderr "'\n")
-    (exit 1)
-    ))
-
 (char[] @PATH_MAX resolved)
 (char[] @PATH_MAX left)
 (char[] @PATH_MAX next_token)
@@ -583,7 +615,7 @@
             (= left_len (prim_strncpy left path @(- PATH_MAX 1)))
         ))
     (if (|| (>= left_len @PATH_MAX) (>= resolved_len @PATH_MAX)) (
-        (realpath_error path)
+        (return 0)
         ))
 
     (while @TRUE (
@@ -594,13 +626,13 @@
             ((= s p))
             ((= s (+ left left_len)))
             )
-        (if (>= (- s left) @PATH_MAX) ((realpath_error path)))
+        (if (>= (- s left) @PATH_MAX) ((return 0)))
         (prim_memcpy next_token left (- s left))
         ([]=8 next_token (- s left) '\0')
         (-= left_len (- s left))
         (if p ((prim_memcpy left (+ s 1) (+ left_len 1))))
         (if (!= ([]8 resolved (- resolved_len 1)) '/') (
-            (if (>= resolved_len @PATH_MAX) ((realpath_error path)))
+            (if (>= resolved_len @PATH_MAX) ((return 0)))
             ([]=8 resolved resolved_len '/')
             (+= resolved_len 1)
             ([]=8 resolved resolved_len '\0')
@@ -617,9 +649,9 @@
             (goto cont)
             ))
         (= resolved_len (prim_strlcat resolved next_token @PATH_MAX))
-        (if (>= resolved_len @PATH_MAX) ((realpath_error path)))
+        (if (>= resolved_len @PATH_MAX) ((return 0)))
         (if (syscall @SYS_LSTAT resolved stat) (
-            (realpath_error path)
+            (return 0)
             ))
 
         (if (== (& ([] (+ stat @ST_MODE_OFFSET) 0) @IFMT) @IFLNK) (
@@ -636,9 +668,9 @@
 
 (export init_prim_io)
 (fun init_prim_io () (
-    (= stdin  (make_ichan @STDIN_FD))
-    (= stdout (make_ochan @STDOUT_FD))
-    (= stderr (make_ochan @STDERR_FD))
+    (= stdin  (make_ichan @STDIN_FD @FALSE))
+    (= stdout (make_ochan @STDOUT_FD @FALSE))
+    (= stderr (make_ochan @STDERR_FD @FALSE))
     (register_static (address stdin))
     (register_static (address stdout))
     (register_static (address stderr))

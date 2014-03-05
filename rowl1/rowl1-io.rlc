@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-io.rlc 2014-02-26 16:25:55 nineties $
+; $Id: rowl1-io.rlc 2014-03-05 16:02:15 nineties $
 ;
 
 (import "rlvm-compile")
@@ -22,8 +22,12 @@
     (return (variant @InputFileStreamE 2 path in))
     ))
 
-(fun io_open_in (path) (
-    (return (make_ifstream path (open_in path)))
+(fun io_open_in (path bin) (
+    (var binary_mode @FALSE)
+    (if (!= bin @C_FALSE) (= binary_mode @TRUE))
+    (var ichan (open_in path binary_mode))
+    (if (! ichan) (throw (io_error1 (string "Open failed") path)))
+    (return (make_ifstream path ichan))
     ))
 
 (fun io_close_in (st) (
@@ -34,16 +38,21 @@
     (return (variant @OutputFileStreamE 2 path out))
     ))
 
-(fun io_open_out (path) (
-    (return (make_ofstream path (open_out path)))
+(fun io_open_out (path append bin) (
+    (var binary_mode @FALSE)
+    (if (!= bin @C_FALSE) (= binary_mode @TRUE))
+    (var mode @(| O_WRONLY O_CREAT))
+    (if (!= append @C_FALSE)
+        (|= mode @O_APPEND)
+        (|= mode @O_TRUNC)
+        )
+    (var ochan (open_out path mode binary_mode))
+    (if (! ochan) (throw (io_error1 (string "Open failed") path)))
+    (return (make_ofstream path ochan))
     ))
 
 (fun io_close_out (st) (
     (close_out (field_get st 2))
-    ))
-
-(fun io_position (io) (
-    (return (box (position (field_get io 2))))
     ))
 
 (fun io_print_str (f s) (
@@ -253,11 +262,10 @@
     (var ifT (domainP InputFileStream))
     (var ofT (domainP OutputFileStream))
 
-    (add_function1 mod (to_sym "open_in") stringT io_open_in 0)
-    (add_function1 mod (to_sym "open_out") stringT io_open_out 0)
+    (add_function2 mod (to_sym "open_in") stringT DontCare io_open_in 0)
+    (add_function3 mod (to_sym "open_out") stringT DontCare DontCare io_open_out 0)
     (add_function1 mod (to_sym "close") ifT io_close_in 0)
     (add_function1 mod (to_sym "close") ofT io_close_out 0)
-    (add_function1 mod (to_sym "position") ofT io_position 0)
     (add_function2 mod (to_sym "print_string") ofT stringT io_print_str 0)
 
     (add_function1 mod (to_sym "lookahead") ifT io_lookahead 0)
