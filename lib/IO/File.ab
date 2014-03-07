@@ -1,0 +1,49 @@
+# Copyright (C) 2014 nineties
+# $Id: IO/File.ab 2014-03-07 21:51:13 nineties $
+
+# Standard input, standard output and standard error.
+stdin:  Prim.stdin
+stdout: Prim.stdout
+stderr: Prim.stderr
+
+# Open file `path` and create an input stream.
+# Option:
+#   * binary: Binary mode.
+open_in(path @ String, binary=false) : Prim.open_in(path, binary)
+
+# Open file `path` and create an output stream.
+# Option:
+#   * append: Do not truncate existing content of the file and
+#     write new data to the end of the file.
+#   * binary: Binary mode.
+open_out(path @ String, append=false, binary=false) :
+    Prim.open_out(path, append, binary)
+
+trait InputFileStream {
+    extend 'InputStream
+
+    # Close the stream.
+    .close(): Prim.close_in(self)
+
+    # True when the stream is at end of stream.
+    .eos?: alias(() -> Prim.eos?(self))
+
+    # Read one byte from the stream.
+    .read(eoserror=false): Prim.read_char(self, eoserror)
+
+    # Read `n` bytes or until reach EOS and return them as a string.
+    .read(n @ Int, eoserror=false): Prim.read_bytes(self, n, eoserror)
+}
+
+trait OutputFileStream {
+    extend 'OutputStream
+
+    # Close the stream.
+    .close(): Prim.close_out(self)
+
+    # Write string `s` to the stream.
+    .write(s @ String): Prim.print_string(self, s)
+}
+
+Prim.set_builtin_parent('InputFileStream, Trait.InputFileStream)
+Prim.set_builtin_parent('OutputFileStream, Trait.OutputFileStream)
