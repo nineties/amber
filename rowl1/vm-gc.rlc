@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2014-03-05 19:17:56 nineties $
+; $Id: vm-gc.rlc 2014-03-07 18:16:50 nineties $
 ;
 
 (import "stdlib")
@@ -976,9 +976,12 @@
 (export prim_get_pstruct_size)
 (fun prim_get_pstruct_size (obj) (
     (-= obj @WORD_SIZE)
-    (return @(OBJECT_PLAIN_BYTES obj))
+    (int size @(OBJECT_PLAIN_BYTES obj))
+    (if (% size 4)
+        ((return (- size @(* 2 WORD_SIZE))))
+        ((return (- size @WORD_SIZE)))
+        )
     ))
-
 
 (export prim_get_sequence_tag)
 (fun prim_get_sequence_tag (obj) (

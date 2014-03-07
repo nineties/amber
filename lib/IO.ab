@@ -1,27 +1,41 @@
 # Copyright (C) 2014 nineties
-# $Id: IO.ab 2014-03-05 12:40:09 nineties $
+# $Id: IO.ab 2014-03-05 18:32:41 nineties $
 
 #= IO =
-# Buffered IO module.
+# Input and output stream.
 
-# Standard input, standard output and standard error.
-stdin:  Prim.stdin
-stdout: Prim.stdout
-stderr: Prim.stderr
+trait InputStream {
+    require '.read()
+    require '.eos?
 
-# Open file `path` and create an input stream.
-# Option:
-#   * binary: Binary mode.
-open_in(path @ String, binary=false) : Prim.open_in(path, binary)
+    # Read `n` bytes or until reach EOS and return them as a string.
+    .read(n @ Int, eoserror=false): {
+        oss: Prim.oss_new(false)
+        for i in 1..n {
+            if self.eof? {
+                if eoserror
+                    throw `IOError{"End of stream"}
+                else
+                    break
+            }
+            Prim.oss_print_string(oss, self.read())
+        }
+        Prim.oss_to_string(oss)
+    }
 
-# Open file `path` and create an output stream.
-# Option:
-#   * create: Create new file when `path` doesn't exist.
-#   * truncate: Truncate the content of file when `path` exists.
-#   * append: Write to the end of the file always.
-#   * binary: Binary mode.
-open_out(path @ String, append=false, binary=false) :
-    Prim.open_out(path, append, binary)
+    # Skip next one byte in the stream.
+    .skip(): { self.read(); self }
+
+    # Skip `n` bytes or until reach EOS.
+    .skip(n @ Int, eoserror=false): {
+        self.read(n, eoserror)
+        self
+    }
+}
+
+trait OutputStream {
+    require '.write(s @ String)
+}
 
 #
 #InputStreamTrait: `Trait{InputStream} with {

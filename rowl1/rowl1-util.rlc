@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-util.rlc 2014-02-26 15:57:05 nineties $
+; $Id: rowl1-util.rlc 2014-03-05 23:14:13 nineties $
 ;
 
 (import "rlvm-compile")
@@ -15,7 +15,7 @@
 ; XXX: Fix bugs of following functions and move them to rowl1-encoding.rlc.
 
 (export fun output_char_escape (ochan t) (
-    (if (== t '"')  (return (output_string ochan "\\\"")))
+    (if (== t '"')  (output_string ochan "\\\"")
     (if (== t '\\') (do (output_char ochan '\\') (output_char ochan '\\'))
     (if (== t '\a') (output_string ochan "\\a")
     (if (== t '\b') (output_string ochan "\\b")
@@ -25,22 +25,18 @@
     (if (== t '\t') (output_string ochan "\\t")
     (if (== t '\v') (output_string ochan "\\v")
     (if (== t '\0') (output_string ochan "\\0")
-    (if @(PRINTABLE t) (return (output_char ochan t)))
+    (if @(PRINTABLE t) (output_char ochan t)
         (do
             (output_string ochan "\\x")
             (output_hex ochan t 2)
         )
-        )))))))))
+        )))))))))))
     ))
 
-(export fun output_string_escape (ochan str) (
-    (var i 0)
-    (while 1 (do
-        (var c (array_get char str i))
-        (if (! c) break)
-        (output_char_escape ochan c)
-        (incr i)
-    ))
+(export fun output_bytes_escape (ochan str size) (
+    (for i 0 size
+        (output_char_escape ochan (array_get uchar str i))
+        )
     ))
 
 (export fun escape_char (c) (

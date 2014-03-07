@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-array.rlc 2014-02-25 10:38:17 nineties $
+; $Id: rowl1-array.rlc 2014-03-07 09:36:42 nineties $
 ;
 
 (import "rlvm-compile")
@@ -13,6 +13,7 @@
 (import "rowl1-util")
 (import "rowl1-node")
 (import "rowl1-compile")
+(import "rowl1-string")
 
 ; default pretty printer corresponding to lib/amber/syntax.ab
 
@@ -166,8 +167,9 @@
     ))
 
 (fun pp_string (ochan node) (
+    (var size (str_size node))
     (output_char ochan '"')
-    (output_string_escape ochan node)
+    (output_bytes_escape ochan node size)
     (output_char ochan '"')
     (return @C_NIL)
     ))
@@ -185,11 +187,11 @@
     (return @C_NIL)
     ))
 
-(extern fun new_oss)
+(extern fun oss_new)
 (extern fun oss_raw)
 (extern fun oss_to_s)
 (fun _fullform (obj) (
-    (var io (new_oss))
+    (var io (oss_new))
     (var ochan (oss_raw io))
     (_fullform_iter ochan obj)
     (return (oss_to_s io))

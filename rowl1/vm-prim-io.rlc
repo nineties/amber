@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-io.rlc 2014-03-05 16:35:13 nineties $
+; $Id: vm-prim-io.rlc 2014-03-05 20:47:32 nineties $
 ;
 
 (import "stdlib")
@@ -282,7 +282,7 @@
         (
             (prim_memcpy ptr chanp size)
             (set ichan 2 (+ beg size))
-            (return 0)
+            (return size)
         )
         (
             (if (< (get ichan 1) 0) ((return -1)))
@@ -290,8 +290,8 @@
             (set ichan 2 end)
             (-= size bufsz)
             (int r (syscall @SYS_READ (get ichan 1) (+ ptr bufsz) size))
-            (if (< r size) ((return -1)))
-            (return 0)
+            (if (< r size) ((return (+ r bufsz))))
+            (return (+ size bufsz))
         ))
     ))
 

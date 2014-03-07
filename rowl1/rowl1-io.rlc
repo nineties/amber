@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-io.rlc 2014-03-05 16:35:27 nineties $
+; $Id: rowl1-io.rlc 2014-03-05 21:09:20 nineties $
 ;
 
 (import "rlvm-compile")
@@ -17,6 +17,7 @@
 (import "rowl1-error")
 (import "rowl1-pprint")
 (import "rowl1-bigint")
+(import "rowl1-string")
 
 (export fun make_ifstream (path in) (
     (return (variant @InputFileStreamE 2 path in))
@@ -60,7 +61,7 @@
     ))
 
 (fun io_print_str (f s) (
-    (output_string (field_get f 2) s)
+    (output_bytes (field_get f 2) s (str_size s))
     (return @C_NIL)
     ))
 
@@ -76,22 +77,35 @@
     ))
 
 ; single character is represented as a string of one character
-(fun io_read_char (io) (
+(fun io_read_char (io eoserr) (
     (var c)
     (if (< (input_char (address c) (field_get io 2)) 0)
-        (return @C_NIL)
+        (if (== eoserr @C_FALSE)
+            (return @C_NIL)
+            (throw (io_error (string "End of stream.")))
+            )
         )
     (var s (allocate_string 1))
     (strncpy s (address c) 1)
     (return s)
     ))
 
-(fun io_read_string (io) (
-    (var s)
-    (if (< (input_string (address s) (field_get io 2)) 0)
-        (return @C_NIL)
+(fun io_read_bytes (io size eoserr) (
+    (= size (unbox size))
+    (if (<= size 0)
+        (throw (invalid_argument
+            (string "Read size must be positive.")
+            (box size)
+            )))
+    (var s (allocate_string size))
+    (var r (input_bytes (field_get io 2) s size))
+    (if (== r size) (return s))
+    (if (!= eoserr @C_FALSE)
+        (throw (io_error (string "End of stream.")))
         )
-    (return s)
+    (var new_s (allocate_string r))
+    (memcpy new_s s r)
+    (return new_s)
     ))
 
 (fun io_read_line (io) (
@@ -273,9 +287,9 @@
     (add_function2 mod (to_sym "print_string") ofT stringT io_print_str 0)
 
     (add_function1 mod (to_sym "lookahead") ifT io_lookahead 0)
-    (add_function1 mod (to_sym "read_char") ifT io_read_char 0)
-    (add_function1 mod (to_sym "read_string") ifT io_read_string 0)
-    (add_function1 mod (to_sym "read_line") ifT io_read_line 0)
+    (add_function2 mod (to_sym "read_char") ifT DontCare io_read_char 0)
+    (add_function3 mod (to_sym "read_bytes") ifT intT DontCare io_read_bytes 0)
+    (add_function2 mod (to_sym "read_line") ifT DontCare io_read_line 0)
 
     ; Binary mod
     (add_function1 mod (to_sym "read_int8") ifT io_read_int8 0)
