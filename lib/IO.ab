@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: IO.ab 2014-03-08 12:35:51 nineties $
+# $Id: IO.ab 2014-03-08 17:45:48 nineties $
 
 #= IO =
 # Input and output stream.
@@ -8,9 +8,31 @@ trait InputStream {
     require '.read(eoserror=false)
     require '.eos?
 
+    # Read one byte.
+    .read_char(eoserror): .read(eoserror)
+
+    # Read characters until reach "\n", "\0" or EOS. The newline character
+    # will be truncated.
+    .read_line(eoserror): {
+        oss: Prim.oss_new(true)
+        while true {
+            if self.eof? {
+                if eoserror
+                    throw `IOError{"End of stream"}
+                else
+                    break
+            }
+            c: self.read()
+            if (c == "\n")
+                break
+            Prim.oss_print_string(oss, c)
+        }
+        Prim.oss_to_string(oss)
+    }
+
     # Read `n` bytes or until reach EOS and return them as a string.
     .read(n @ Int, eoserror=false): {
-        oss: Prim.oss_new(false)
+        oss: Prim.oss_new(true)
         for i in 1..n {
             if self.eof? {
                 if eoserror
@@ -35,40 +57,16 @@ trait InputStream {
 
 trait OutputStream {
     require '.write(s @ String)
+
+    # Convert an object `o` to a string by `to_s` and output it.
+    print(o): self.write(o.to_s())
+
+    # Ouptut an object `o` and newline.
+    puts(o): { self.print(o); self.write("\n") }
 }
 
-#
-#InputStreamTrait: `Trait{InputStream} with {
-#    require(\put)
-#}
-#
-#OutputStreamTrait: `Trait{OutputStream} with {
-#    require(\next)
-#    require(\get)
-#
-#    pprint(x) = Prim.pretty_print(self, x)
-#    print(x)  = self.print_string(x.to_s())
-#    puts(x)   = {
-#        self.print(x)
-#        self.print("\n")
-#    }
-#}
-#
 #InputFileStreamTrait: Prim.InputFileStreamTrait with {
 #    parent        = InputStreamTrait
-#    lookahead()   = Prim.lookahead(self)
-#    read_char()   = Prim.read_char(self)
-#    read_string() = Prim.read_string(self)
-#    read_line()   = Prim.read_line(self)
-#    read_int8()   = Prim.read_int8(self)
-#    read_uint8()  = Prim.read_uint8(self)
-#    read_int16()  = Prim.read_int16(self)
-#    read_uint16() = Prim.read_uint16(self)
-#    read_int32()  = Prim.read_int32(self)
-#    read_uint32() = Prim.read_uint32(self)
-#    read_int64()  = Prim.read_int64(self)
-#    read_uint64() = Prim.read_uint64(self)
-#    read_float()  = Prim.read_float(self)
 #}
 #
 #OutputFileStreamTrait: Prim.OutputFileStreamTrait with {

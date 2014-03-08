@@ -2,11 +2,13 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-io.rlc 2014-03-07 22:00:43 nineties $
+; $Id: rowl1-io.rlc 2014-03-08 17:58:34 nineties $
 ;
 
 (import "rlvm-compile")
 (import "rowl1-types")
+
+(var BUFSIZE 512)
 
 (compile `object `(
 
@@ -74,10 +76,13 @@
     ))
 
 ; single character is represented as a string of one character
-(fun io_lookahead (io) (
+(fun io_lookahead (io eoserror) (
     (var c)
     (if (< (lookahead (address c) (field_get io 2)) 0)
-        (return @C_NIL)
+        (if (!= eoserror @C_FALSE)
+            (throw (io_error (string "End of stream.")))
+            (return @C_NIL)
+            )
         )
     (var s (allocate_string 1))
     (strncpy s (address c) 1)
@@ -116,50 +121,85 @@
     (return new_s)
     ))
 
-(fun io_read_line (io) (
+(fun io_read_all (io) (
+    (var oss (oss_new @C_TRUE))
+    (var buf (allocate_string @BUFSIZE))
+    (while @TRUE (do
+        (var r (io_read_bytes (field_get io 2) buf @BUFSIZE))
+        (oss_print_str oss buf)
+        (if (< r @BUFSIZE) break)
+        ))
+    (return (oss_to_s oss))
+    ))
+
+(fun io_read_line (io eoserr) (
     (var s)
     (if (< (input_line (address s) (field_get io 2)) 0)
-        (return @C_NIL)
+        (if (!= eoserr @C_FALSE)
+            (throw (io_error (string "End of stream.")))
+            (return @C_NIL)
+            )
         )
     (return s)
     ))
 
-(fun io_read_int8 (io) (
+(fun io_read_str (io) (
+    (var s 0)
+    (input_string (address s) (field_get io 2))
+    (return s)
+    ))
+
+(fun io_read_int8 (io eoserr) (
     (var n)
     (if (< (input_char (address n) (field_get io 2)) 0)
-        (return @C_NIL)
+        (if (!= eoserr @C_FALSE)
+            (throw (io_error (string "End of stream.")))
+            (return @C_NIL)
+            )
         )
     (return (box n))
     ))
 
-(fun io_read_uint8 (io) (
+(fun io_read_uint8 (io eoserr) (
     (var n)
     (if (< (input_uchar (address n) (field_get io 2)) 0)
-        (return @C_NIL)
+        (if (!= eoserr @C_FALSE)
+            (throw (io_error (string "End of stream.")))
+            (return @C_NIL)
+            )
         )
     (return (box n))
     ))
 
-(fun io_read_int16 (io) (
+(fun io_read_int16 (io eoserr) (
     (var n)
     (if (< (input_short (address n) (field_get io 2)) 0)
-        (return @C_NIL)
+        (if (!= eoserr @C_FALSE)
+            (throw (io_error (string "End of stream.")))
+            (return @C_NIL)
+            )
         )
     (return (box n))
     ))
 
-(fun io_read_uint16 (io) (
+(fun io_read_uint16 (io eoserr) (
     (var n)
     (if (< (input_ushort (address n) (field_get io 2)) 0)
-        (return @C_NIL)
+        (if (!= eoserr @C_FALSE)
+            (throw (io_error (string "End of stream.")))
+            (return @C_NIL)
+            )
         )
     (return (box n))
     ))
 
-(fun io_read_int32 (io) (
+(fun io_read_int32 (io eoserr) (
     (var n)
     (if (< (input_int (address n) (field_get io 2)) 0)
-        (return @C_NIL)
+        (if (!= eoserr @C_FALSE)
+            (throw (io_error (string "End of stream.")))
+            (return @C_NIL)
+            )
         )
     (if (&& (<= n @FIXNUM_MAX) (>= n @FIXNUM_MIN))
         (return (box n))
@@ -167,10 +207,13 @@
         )
     ))
 
-(fun io_read_uint32 (io) (
+(fun io_read_uint32 (io eoserr) (
     (var n)
     (if (< (input_int (address n) (field_get io 2)) 0)
-        (return @C_NIL)
+        (if (!= eoserr @C_FALSE)
+            (throw (io_error (string "End of stream.")))
+            (return @C_NIL)
+            )
         )
     (if (&& (<= n @FIXNUM_MAX) (>= n 0))
         (return (box n))
@@ -178,11 +221,14 @@
         )
     ))
 
-(fun io_read_int64 (io) (
+(fun io_read_int64 (io eoserr) (
     (var n1)
     (var n2)
     (if (< (input_int (address n1) (field_get io 2)) 0)
-        (return @C_NIL)
+        (if (!= eoserr @C_FALSE)
+            (throw (io_error (string "End of stream.")))
+            (return @C_NIL)
+            )
         )
     (if (< (input_int (address n2) (field_get io 2)) 0)
         (return @C_NIL)
@@ -202,14 +248,20 @@
     (return (norm b))
     ))
 
-(fun io_read_uint64 (io) (
+(fun io_read_uint64 (io eoserr) (
     (var n1)
     (var n2)
     (if (< (input_int (address n1) (field_get io 2)) 0)
-        (return @C_NIL)
+        (if (!= eoserr @C_FALSE)
+            (throw (io_error (string "End of stream.")))
+            (return @C_NIL)
+            )
         )
     (if (< (input_int (address n2) (field_get io 2)) 0)
-        (return @C_NIL)
+        (if (!= eoserr @C_FALSE)
+            (throw (io_error (string "End of stream.")))
+            (return @C_NIL)
+            )
         )
     (var b (allocate_bint 2))
     (bint_set_digit b 0 n1)
@@ -218,13 +270,19 @@
     (return (norm b))
     ))
 
-(fun io_read_float (io) (
+(fun io_read_float (io eoserr) (
     (var f (allocate_float))
     (if (< (input_int f (field_get io 2)) 0)
-        (return @C_NIL)
+        (if (!= eoserr @C_FALSE)
+            (throw (io_error (string "End of stream.")))
+            (return @C_NIL)
+            )
         )
     (if (< (input_int (+ f 4) (field_get io 2)) 0)
-        (return @C_NIL)
+        (if (!= eoserr @C_FALSE)
+            (throw (io_error (string "End of stream.")))
+            (return @C_NIL)
+            )
         )
     (return f)
     ))
@@ -295,21 +353,23 @@
     (add_function1 mod (to_sym "eos?") ifT io_eos 0)
     (add_function2 mod (to_sym "print_string") ofT stringT io_print_str 0)
 
-    (add_function1 mod (to_sym "lookahead") ifT io_lookahead 0)
+    (add_function2 mod (to_sym "lookahead") ifT DontCare io_lookahead 0)
     (add_function2 mod (to_sym "read_char") ifT DontCare io_read_char 0)
-    (add_function3 mod (to_sym "read_bytes") ifT intT DontCare io_read_bytes 0)
     (add_function2 mod (to_sym "read_line") ifT DontCare io_read_line 0)
+    (add_function3 mod (to_sym "read_bytes") ifT intT DontCare io_read_bytes 0)
+    (add_function1 mod (to_sym "read_all") ifT io_read_all 0)
 
-    ; Binary mod
-    (add_function1 mod (to_sym "read_int8") ifT io_read_int8 0)
-    (add_function1 mod (to_sym "read_uint8") ifT io_read_uint8 0)
-    (add_function1 mod (to_sym "read_int16") ifT io_read_int16 0)
-    (add_function1 mod (to_sym "read_uint16") ifT io_read_uint16 0)
-    (add_function1 mod (to_sym "read_int32") ifT io_read_int32 0)
-    (add_function1 mod (to_sym "read_uint32") ifT io_read_uint32 0)
-    (add_function1 mod (to_sym "read_int64") ifT io_read_int64 0)
-    (add_function1 mod (to_sym "read_uint64") ifT io_read_uint64 0)
-    (add_function1 mod (to_sym "read_float") ifT io_read_float 0)
+    ; Binary mode
+    (add_function1 mod (to_sym "read_string") ifT io_read_str 0)
+    (add_function2 mod (to_sym "read_int8") ifT DontCare io_read_int8 0)
+    (add_function2 mod (to_sym "read_uint8") ifT DontCare io_read_uint8 0)
+    (add_function2 mod (to_sym "read_int16") ifT DontCare io_read_int16 0)
+    (add_function2 mod (to_sym "read_uint16") ifT DontCare io_read_uint16 0)
+    (add_function2 mod (to_sym "read_int32") ifT DontCare io_read_int32 0)
+    (add_function2 mod (to_sym "read_uint32") ifT DontCare io_read_uint32 0)
+    (add_function2 mod (to_sym "read_int64") ifT DontCare io_read_int64 0)
+    (add_function2 mod (to_sym "read_uint64") ifT DontCare io_read_uint64 0)
+    (add_function2 mod (to_sym "read_float") ifT DontCare io_read_float 0)
 
     (add_function2 mod (to_sym "write_int8") ofT intT io_write_byte8 0)
     (add_function2 mod (to_sym "write_uint8") ofT intT io_write_byte8 0)
@@ -320,7 +380,6 @@
     (add_function2 mod (to_sym "write_int64") ofT DontCare io_write_byte64 0)
     (add_function2 mod (to_sym "write_uint64") ofT DontCare io_write_byte64 0)
     (add_function2 mod (to_sym "write_float") ofT floatT io_write_float 0)
-    (add_function2 mod (to_sym "write_string") ofT stringT io_print_str 0)
     ))
 
     ))

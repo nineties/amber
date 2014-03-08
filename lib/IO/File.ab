@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: IO/File.ab 2014-03-07 23:21:58 nineties $
+# $Id: IO/File.ab 2014-03-08 18:01:45 nineties $
 
 # Standard input, standard output and standard error.
 stdin:  Prim.stdin
@@ -9,15 +9,24 @@ stderr: Prim.stderr
 # Open file `path` and create an input stream.
 # Option:
 #   * binary: Binary mode.
-open_in(path @ String, binary=false) : Prim.open_in(path, binary)
+open_in(path @ String, binary=false): {
+    io: Prim.open_in(path, binary)
+    if binary
+        io.parent = Trait.BinaryInputFileStream
+    io
+}
 
 # Open file `path` and create an output stream.
 # Option:
 #   * append: Do not truncate existing content of the file and
 #     write new data to the end of the file.
 #   * binary: Binary mode.
-open_out(path @ String, append=false, binary=false) :
-    Prim.open_out(path, append, binary)
+open_out(path @ String, append=false, binary=false): {
+    io: Prim.open_out(path, append, binary)
+    if binary
+        io.parent = Trait.BinaryOutputFileStream
+    io
+}
 
 trait InputFileStream {
     extend 'InputStream
@@ -33,17 +42,66 @@ trait InputFileStream {
 
     # Read `n` bytes or until reach EOS and return them as a string.
     .read(n @ Int, eoserror=false): Prim.read_bytes(self, n, eoserror)
+
+    # Read characters until reach "\n", "\0" or EOS. The newline character
+    # will be truncated.
+    .read_line(eoserror): Prim.read_line(self, eoserror)
+
+    # Read characters until reach EOS.
+    .read_all(): Prim.read_all(self)
+
+    # Return the next character if any.
+    .lookahead(eoserror=false): Prim.lookahead(self, eoserror)
 }
-#
-#trait OutputFileStream {
-#    extend 'OutputStream
-#
-#    # Close the stream.
-#    .close(): Prim.close_out(self)
-#
-#    # Write string `s` to the stream.
-#    .write(s @ String): Prim.print_string(self, s)
-#}
-#
-#Prim.set_builtin_parent('InputFileStream, Trait.InputFileStream)
-#Prim.set_builtin_parent('OutputFileStream, Trait.OutputFileStream)
+
+
+trait OutputFileStream {
+    extend 'OutputStream
+
+    # Close the stream.
+    .close(): Prim.close_out(self)
+
+    # Output string `s` to the stream.
+    .write(s @ String): Prim.print_string(self, o.to_s())
+}
+
+Prim.set_builtin_parent('InputFileStream, Trait.InputFileStream)
+Prim.set_builtin_parent('OutputFileStream, Trait.OutputFileStream)
+
+trait BinaryInputFileStream {
+    extend 'InputFileStream
+
+    # Read characters until reach "\0" or EOS.
+    .read_string(): Prim.read_string(self)
+
+    # Read signed or unsigned integer with specified precision and
+    # return a fixed-length integer or a multi-precision integer.
+    .read_int8():   Prim.read_int8(self)
+    .read_uint8():  Prim.read_uint8(self)
+    .read_int16():  Prim.read_int16(self)
+    .read_uint16(): Prim.read_uint16(self)
+    .read_int32():  Prim.read_int32(self)
+    .read_uint32(): Prim.read_uint32(self)
+    .read_int64():  Prim.read_int64(self)
+    .read_uint64(): Prim.read_uint64(self)
+
+    # Read IEEE754 double-precision floating point number.
+    .read_float():  Prim.read_float(self)
+}
+
+trait BinaryOutputFileStream {
+    extend 'OutputFileStream
+
+    # Write signed or unsigned integer with specified precision.
+    .write_int8(n):   Prim.write_int8(self, n)
+    .write_uint8(n):  Prim.write_uint8(self, n)
+    .write_int16(n):  Prim.write_int16(self, n)
+    .write_uint16(n): Prim.write_uint16(self, n)
+    .write_int32(n):  Prim.write_int32(self, n)
+    .write_uint32(n): Prim.write_uint32(self, n)
+    .write_int64(n):  Prim.write_int64(self, n)
+    .write_uint64(n): Prim.write_uint64(self, n)
+
+    # Write IEEE754 double-precision floating point number.
+    .write_float(n):  Prim.write_float(self, n)
+}
