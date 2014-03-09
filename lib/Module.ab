@@ -1,5 +1,5 @@
 # Copyright (C) 2010 nineties
-# $Id: Module.ab 2014-03-04 11:19:19 nineties $
+# $Id: Module.ab 2014-03-09 21:59:58 nineties $
 
 #= Module system =
 #== Basics ==
@@ -61,14 +61,10 @@ copy_variables(mod, Hiding{vars}):
         },
         true
         )
+
 copy_variables(mod, vars @ List):
-    Prim.each_slots(mod,
-        (_, x, v) -> {
-            if (x != 'parent and Prim.list_include?(x, vars))
-                Prim.define_variable(x, v)
-        },
-        true
-        )
+    Prim.list_foreach(x -> Prim.define_variable(x,
+                Prim.get_slot(mod, x, true, false, true)), vars)
 
 expand_import([], _): nil
 expand_import([M,rest...], path): {
@@ -95,7 +91,7 @@ buildpath(mods): Prim.string_add(Prim.string_join(
 
 exit_module()
 
-macro(e @ Import{mods, option}): {
+macro(e @ Import{mods, asname, option}): {
     mod: Prim.list_foldl1((l, r) -> `Slot{!l, !r}, mods)
     case option of
           Some{option}
@@ -109,3 +105,4 @@ macro(e @ Import{mods, option}): {
         | _
             -> { throw `UnknownExpression{!e} }
 }
+

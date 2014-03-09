@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-03-05 15:56:28 nineties $
+; $Id: rowl1-interp.rlc 2014-03-09 21:38:39 nineties $
 ;
 
 (import "rlvm-compile")
@@ -195,7 +195,7 @@
         )
     (if (== hd Block) (do
         (var list (node_arg_list expr 0))
-        (enter_module (to_unique_sym "Block"))
+        (enter_block)
         (var v @C_NIL)
         (while list (do
             (= v (eval (car list)))
@@ -303,7 +303,9 @@
             (if (! ichan) (throw (io_error1 (string "Open failed") fullpath)))
             (var dir (get_directory rpath))
             (var new_dir_p (new_dir dirs dir))
-            (if new_dir_p (ary_push dirs (tuple2 (string dir) global)))
+            (if new_dir_p (ary_push dirs
+                (tuple2 (string dir) (get_slot global parent))
+                ))
             (if (< (chdir dir) 0)
                 (throw (io_error (string
                     (strcat "Failed to change directory to " dir)))))
@@ -389,13 +391,16 @@
         (set_slot p sym mod)
         (set_slot mod parent p)
         ))
-    
-    (var stack module_stack)
-    (while stack (do
-        (if (== mod (car stack))
-            (throw (exception2 (string "Recursive dependency") global mod)))
-        (= stack (cdr stack))
-        ))
+    (= module_stack (cons global module_stack))
+    (= global mod)
+    (return mod)
+    ))
+
+(fun enter_block () (
+    (if (!= (symtable_depth variables) 0)
+        (throw (logic_error (string "enter_module() can be called only in top-scope"))))
+    (var mod (make_object1 Module (to_unique_sym "Block")))
+    (set_slot mod parent global)
     (= module_stack (cons global module_stack))
     (= global mod)
     (return mod)
