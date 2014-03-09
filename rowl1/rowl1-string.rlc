@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-string.rlc 2014-03-08 17:34:20 nineties $
+; $Id: rowl1-string.rlc 2014-03-09 18:43:01 nineties $
 ;
 
 (import "rlvm-compile")
@@ -213,41 +213,57 @@
     ))
 
 ; single character is represented as a string of one character
-(fun iss_lookahead (io) (
+(fun iss_lookahead (io eoserr) (
     (var c)
     (if (< (lookahead (address c) (field_get io 1)) 0)
-        (return @C_NIL)
+        (if (!= eoserr @C_FALSE)
+            (throw (io_error (string "End of stream")))
+            (return @C_NIL)
+            )
         )
     (var s (allocate_string 1))
     (strncpy s (address c) 1)
     (return s)
+    ))
+
+(fun iss_eos (io) (
+    (var c)
+    (if (< (lookahead (address c) (field_get io 1)) 0)
+        (return @C_TRUE)
+        (return @C_FALSE)
+        )
     ))
 
 ; single character is represented as a string of one character
-(fun iss_read_char (io) (
+(fun iss_read_char (io eoserr) (
     (var c)
     (if (< (input_char (address c) (field_get io 1)) 0)
-        (return @C_NIL)
+        (if (!= eoserr @C_FALSE)
+            (throw (io_error (string "End of stream")))
+            (return @C_NIL)
+            )
         )
     (var s (allocate_string 1))
     (strncpy s (address c) 1)
     (return s)
     ))
 
-(fun iss_read_string (io) (
-    (var s)
-    (if (< (input_string (address s) (field_get io 1)) 0)
-        (return @C_NIL)
+(fun iss_read_bytes (io size eoserr) (
+    (= size (unbox size))
+    (if (<= size 0)
+        (throw (invalid_argument
+            (string "Read size must be positive.")
+            (box size)
+            )))
+    (var s (allocate_string size))
+    (var r (input_bytes (field_get io 1) s size))
+    (if (== r size) (return s))
+    (if (!= eoserr @C_FALSE)
+        (throw (io_error (string "End of stream.")))
         )
-    (return s)
-    ))
-
-(fun iss_read_line (io) (
-    (var s)
-    (if (< (input_line (address s) (field_get io 1)) 0)
-        (return @C_NIL)
-        )
-    (return s)
+    (var new_s (allocate_string r))
+    (memcpy new_s s r)
+    (return new_s)
     ))
 
 (export fun setup_string (mod) (
@@ -269,10 +285,10 @@
     (var issT (domainP InputStringStream))
     (add_function2 mod (to_sym "iss_new") stringT DontCare iss_new 0)
 
-    (add_function1 mod (to_sym "iss_lookahead") issT iss_lookahead 0)
-    (add_function1 mod (to_sym "iss_read_char") issT iss_read_char 0)
-    (add_function1 mod (to_sym "iss_read_string") issT iss_read_string 0)
-    (add_function1 mod (to_sym "iss_read_line") issT iss_read_line 0)
+    (add_function1 mod (to_sym "iss_eos?") issT iss_eos 0)
+    (add_function2 mod (to_sym "iss_lookahead") issT DontCare iss_lookahead 0)
+    (add_function2 mod (to_sym "iss_read_char") issT DontCare iss_read_char 0)
+    (add_function2 mod (to_sym "iss_read_bytes") issT intT DontCare iss_read_bytes 0)
 
     (var ossT (domainP OutputStringStream))
 
