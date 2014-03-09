@@ -1,66 +1,68 @@
 # Copyright (C) 2014 nineties
-# $Id: IO/Printf.ab 2014-02-12 18:24:26 nineties $
+# $Id: IO/Printf.ab 2014-03-08 19:06:39 nineties $
 
-import InputStringStream
 import Numeric.Bit
 
-FMT_PLUS:  0x01
-FMT_MINUS: 0x02
-FMT_SHARP: 0x04
-FMT_SPACE: 0x08
-FMT_ZERO:  0x10
-
-flag_map: Table.new([
-    ('+',   FMT_PLUS),
-    ('-',   FMT_MINUS),
-    ('#',   FMT_SHARP),
-    (' ',   FMT_SPACE),
-    ('0',   FMT_ZERO)
-])
-
-
-parse_flag(is): {
-    flag: 0
-    while true {
-        c: is.lookahead()
-        if (c == nil) return flag
-        f: flag_map[c]
-        if (f == nil) return flag
-        flag = bor(flag, f)
-        is.read_char()
-    }
-}
-
-parse_width(is): {
-    w: 0
-    while true {
-        c: is.lookahead()
-        CType.isdigit(c)
-    }
-}
-
-parse_format(is): {
-    flag:  parse_flag(is)
-    width: is.read_int()
-}
-
-OutputStreamTrait with {
-
-    printf(fmt @ String, args...) = {
-        is: InputStringStream.new(fmt)
-        i: 0
-        while true {
-            c: is.read_char()
-            if (c == nil) break
-            if (c == "%") {
-                parse_format(is)
-            } else
-                self.print_string(c)
-        }
-    }
-
-}
-
-printf(fmt, args...): stdout.printf(fmt, args...)
-
-export printf
+#import InputStringStream
+#import Numeric.Bit
+#
+#FMT_PLUS:  0x01
+#FMT_MINUS: 0x02
+#FMT_SHARP: 0x04
+#FMT_SPACE: 0x08
+#FMT_ZERO:  0x10
+#
+#flag_map: Table.new([
+#    ('+',   FMT_PLUS),
+#    ('-',   FMT_MINUS),
+#    ('#',   FMT_SHARP),
+#    (' ',   FMT_SPACE),
+#    ('0',   FMT_ZERO)
+#])
+#
+#
+#parse_flag(is): {
+#    flag: 0
+#    while true {
+#        c: is.lookahead()
+#        if (c == nil) return flag
+#        f: flag_map[c]
+#        if (f == nil) return flag
+#        flag = bor(flag, f)
+#        is.read_char()
+#    }
+#}
+#
+#parse_width(is): {
+#    w: 0
+#    while true {
+#        c: is.lookahead()
+#        CType.isdigit(c)
+#    }
+#}
+#
+#parse_format(is): {
+#    flag:  parse_flag(is)
+#    width: is.read_int()
+#}
+#
+#OutputStreamTrait with {
+#
+#    printf(fmt @ String, args...) = {
+#        is: InputStringStream.new(fmt)
+#        i: 0
+#        while true {
+#            c: is.read_char()
+#            if (c == nil) break
+#            if (c == "%") {
+#                parse_format(is)
+#            } else
+#                self.print_string(c)
+#        }
+#    }
+#
+#}
+#
+#printf(fmt, args...): stdout.printf(fmt, args...)
+#
+#export printf
