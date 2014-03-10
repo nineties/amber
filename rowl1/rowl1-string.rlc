@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-string.rlc 2014-03-09 18:43:01 nineties $
+; $Id: rowl1-string.rlc 2014-03-10 10:50:01 nineties $
 ;
 
 (import "rlvm-compile")
@@ -127,6 +127,53 @@
     (return (str_split_ str d slen dlen))
     ))
 
+(fun str_ljust (str w punct) (
+    (= w (unbox w))
+    (var sz (str_size str))
+    (var psz (str_size punct))
+    (if (== psz 0) (do (= punct (string " ")) (= psz 1)))
+    (if (< w sz) (= w sz))
+    (var ret (allocate_string w))
+    (memcpy ret str sz)
+    (for i sz w
+        (array_set char ret i (array_get char punct (% i psz)))
+        )
+    (return ret)
+    )) 
+
+(fun str_rjust (str w punct) (
+    (= w (unbox w))
+    (var sz (str_size str))
+    (var psz (str_size punct))
+    (if (== psz 0) (do (= punct (string " ")) (= psz 1)))
+    (if (< w sz) (= w sz))
+    (var ret (allocate_string w))
+    (memcpy (+ ret (- w sz)) str sz)
+    (for i 0 (- w sz)
+        (array_set char ret i (array_get char punct (% i psz)))
+        )
+    (return ret)
+    ))
+
+(fun str_center (str w punct) (
+    (= w (unbox w))
+    (var sz (str_size str))
+    (var psz (str_size punct))
+    (if (== psz 0) (do (= punct (string " ")) (= psz 1)))
+    (if (< w sz) (= w sz))
+    (var ret (allocate_string w))
+
+    (var left (/ (- w sz) 2))
+    (memcpy (+ ret left) str sz)
+    (for i 0 left
+        (array_set char ret i (array_get char punct (% i psz)))
+        )
+    (for i (+ left sz) w
+        (array_set char ret i (array_get char punct (% i psz)))
+        )
+    (return ret)
+    ))
+
 (fun str_code (s) (
     (var len (str_size s))
     (if (!= len 1) (throw (invalid_argument
@@ -184,6 +231,20 @@
         (throw (out_of_range s r))
         )
     (return (substr s b e))
+    ))
+
+(fun str_substr (s i len) (
+    (= i (unbox i))
+    (= len (unbox len))
+    (var size (str_size s))
+    (if (< i 0) (+= i size))
+    (if (< i 0) (throw (out_of_range s (box (- i size)))))
+    (if (> (+ i len) size)
+        (= len (- size i))
+        )
+    (var ret (allocate_string len))
+    (memcpy ret (+ s i) len)
+    (return ret)
     ))
 
 ;; StringStream
@@ -275,11 +336,16 @@
     (add_function1 mod (to_sym "char_to_code") stringT str_code 0) 
 
     (add_function2 mod (to_sym "string_at") stringT intT str_at 0)
-    (add_function2 mod (to_sym "string_at") stringT irangeT str_at_range 0)
+    (add_function3 mod (to_sym "string_substr") stringT intT intT str_substr 0)
     (add_function1 mod (to_sym "string_escape") stringT str_escape 0)
     (add_function1 mod (to_sym "string_unescape") stringT str_unescape 0)
     (add_function2 mod (to_sym "string_contain?") stringT stringT str_contain 0)
     (add_function2 mod (to_sym "string_split") stringT stringT str_split 0)
+
+
+    (add_function3 mod (to_sym "string_ljust") stringT intT stringT str_ljust 0)
+    (add_function3 mod (to_sym "string_rjust") stringT intT stringT str_rjust 0)
+    (add_function3 mod (to_sym "string_center") stringT intT stringT str_center 0)
 
     ; StringStream module
     (var issT (domainP InputStringStream))
