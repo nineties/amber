@@ -1,70 +1,100 @@
 # Copyright (C) 2014 nineties
-# $Id: IO/Printf.ab 2014-03-09 21:45:22 nineties $
+# $Id: IO/Printf.ab 2014-03-10 12:18:54 nineties $
 
-import Numeric.Bit (lor)
-import IO.StringStream (open_in)
+import Numeric.Bit (lor, ltest)
+import String.Ascii (is_digit?)
 
-Prim.debugpf open_in
+FMT_PLUS:  0x01
+FMT_MINUS: 0x02
+FMT_SHARP: 0x04
+FMT_SPACE: 0x08
+FMT_ZERO:  0x10
 
-#Prim.debugpf IO
-#Prim.each_slots(IO, (_, x, v) -> Prim.debugpf((x,v)), true)
+FLAG_MAP: Table.new([
+    ("+",   FMT_PLUS),
+    ("-",   FMT_MINUS),
+    ("#",   FMT_SHARP),
+    (" ",   FMT_SPACE),
+    ("0",   FMT_ZERO)
+])
 
-#import IO.StringStream (open_in)
-#import String.Ascii (is_digit?)
-#
-#FMT_PLUS:  0x01
-#FMT_MINUS: 0x02
-#FMT_SHARP: 0x04
-#FMT_SPACE: 0x08
-#FMT_ZERO:  0x10
-#
-#FLAG_MAP: Table.new([
-#    ("+",   FMT_PLUS),
-#    ("-",   FMT_MINUS),
-#    ("#",   FMT_SHARP),
-#    (" ",   FMT_SPACE),
-#    ("0",   FMT_ZERO)
-#])
-#
-#parse_flag(is): {
-#    flag: 0
-#    while true {
-#        f: FLAG_MAP[is.lookahead()]
-#        if (f == nil) return flag
-#        flag = lor(flag, f)
-#        is.read()
-#    }
-#}
-#
-#parse_width(is): {
-#    w: 0
-#    while true {
-#        c: is.loookahead()
-#        if not is_digit?(c)
-#            return w
-#        w = w*10 + c.to_i()
-#        is.read()
-#    }
-#}
-#
-#parse_format(is): {
-#}
-#
-#trait OutputStream {
-#    .printf(fmt @ String, args...): {
-#    }
-#}
+printf(oss, fmt @ String, args...): {
+    parse_flag(iss): {
+        flag: 0
+        while true {
+            f: FLAG_MAP[Prim.iss_lookahead(iss, false)]
+            if (f == nil) return flag
+            flag = lor(flag, f)
+            Prim.iss_read_char(iss, false)
+        }
+    }
+
+    parse_number(iss): {
+        if not is_digit?(Prim.iss_lookahead(iss, false))
+            return nil
+        w: 0
+        while true {
+            c: Prim.iss_lookahead(iss, false)
+            if not is_digit?(c)
+                return w
+            w = w*10 + c.to_i()
+            Prim.iss_read_char(iss, false)
+        }
+    }
+
+    parse_prec(iss): {
+        if (Prim.iss_lookahead(iss, false) != ".")
+            return nil
+        Prim.iss_read_char(iss, false)
+        if not is_digit?(Prim.iss_lookahead(iss, false))
+            throw `InvalidFormatString{!fmt}
+        parse_number(iss)
+    }
+
+    print_element(oss,"s",f,w,p,args): {
+        if args == []
+            throw `MissingArgument{"argument for %s"}
+        str: first(args).to_s()
+        if p != nil and p > str.length
+            str = str[0,p]
+        if w == nil
+            oss.print(str)
+        else {
+            if ltest(f, FMT_MINUS)
+                oss.print(str.ljust(w))
+            else
+                oss.print(str.rjust(w))
+        }
+        rest(args)
+    }
+
+    # Create an input string stream.
+    iss: Prim.iss_new(fmt, false)
+    while true {
+        c: Prim.iss_read_char(iss, false)
+        if (c == nil) break
+        if (c != "%")
+            oss.write(c)
+        else {
+            f: parse_flag(iss)
+            w: parse_number(iss)
+            p: parse_prec(iss)
+            t: Prim.iss_read_char(iss, false)
+            args = print_element(oss, t,f,w,p,args)
+        }
+    }
+}
 #
 ##OutputStreamTrait with {
 ##
 ##    printf(fmt @ String, args...) = {
-##        is: InputStringStream.new(fmt)
+##        iss: InputStringStream.new(fmt)
 ##        i: 0
 ##        while true {
-##            c: is.read_char()
+##            c: iss.read_char()
 ##            if (c == nil) break
 ##            if (c == "%") {
-##                parse_format(is)
+##                parse_format(iss)
 ##            } else
 ##                self.print_string(c)
 ##        }
