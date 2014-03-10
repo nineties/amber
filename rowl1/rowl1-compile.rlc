@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-03-09 19:09:07 nineties $
+; $Id: rowl1-compile.rlc 2014-03-10 18:44:27 nineties $
 ;
 
 (import "rlvm-compile")
@@ -312,6 +312,13 @@
     (if (== hd Define) (do
         (= expr (_copy expr))
         (node_arg_set expr 1 (alpha tbl (node_arg expr 1)))
+        (var lhs (node_arg expr 0))
+        (var rhs (node_arg expr 1))
+        (if (&& (== (node_head rhs) Lambda) (== (node_head lhs) Symbol))
+            (if (symtable_find_local tbl lhs)
+                (return (make_object Assign (node_args expr)))
+                )
+            )
         (if (!= (node_head (node_arg expr 0)) Slot)
             (node_arg_set expr 0 (alpha_args tbl (node_arg expr 0) @TRUE))
             )
@@ -984,10 +991,10 @@
     (if (! args) (return (tuple3 alias (list_reverse usual) (list_reverse keyargs))))
 
     ; Setup variable arguments 
+    (= usual (cons (car args) usual))
     (if (> (node_size (car args)) 0) (do
         (var v (node_arg_symbol (car args) 0))
         (= alias (add_arg tbl v (make_args_from idx) alias))
-        (= usual (cons (car args) usual))
         ))
     (if (cdr args) (throw (logic_error1
             (string "The order of arguments is invalid")
