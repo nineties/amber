@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-03-11 22:33:03 nineties $ "
+" $Id: Syntax.ab 2014-03-12 00:01:19 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -528,12 +528,13 @@ macro(QuoteSyntax{For{i, Range{a, b}, body}}) = {
         !j: !a
         !n: !b
         if (!j < !n) {
-            while (!j <= !n) {
+            while (!j < !n) {
                 !i: !j
                 !body
                 !j += 1
             }
         } else {
+            !j -= 1
             while (!j >= !n) {
                 !i: !j
                 !body
@@ -596,11 +597,20 @@ desugar_args(a @ Unquote, vars, checks, level): {
     'Unquote{!arg}
 }
 desugar_args(a @ Domain, vars, checks, 0): {
-    if Prim.head(Prim.get_arg(a, 0)) == 'Symbol
+    v: Prim.get_arg(a, 0)
+    pat: Prim.get_arg(a, 1)
+    if not Prim.array_include?(vars, v)
+        Prim.array_push(vars, v)
+    if Prim.head(pat) == 'Symbol
         return a
-    t: desugar_args(Prim.get_arg(a, 0), vars, checks, 0)
-    `Domain{!t}
+    pat = desugar_args(pat, vars, checks, 0)
+    if Prim.head(pat) == 'Symbol {
+        Prim.array_push(checks, ([`Define{!pat, !v}], true))
+        v
+    } else
+        `Domain{!v, !pat}
 }
+
 desugar_args(orpat @ SeqOr, vars, checks, 0): {
     # Translate `a or b or ..` to [a,b,..]
     t: Prim.unique_symbol('t)
@@ -608,11 +618,16 @@ desugar_args(orpat @ SeqOr, vars, checks, 0): {
     to_list(SeqOr{a, b}): Prim.list_append(to_list(a), to_list(b))
     pats: to_list(orpat)
     n: Prim.array_size(vars)
+    orp_vars: Prim.array_new_empty()
     pats = Prim.list_map(p -> {
                 Prim.array_resize(vars, n)
-                desugar_args(p, vars, checks, 0)
+                p: desugar_args(p, vars, checks, 0)
+                for i in n..Prim.array_size(vars) {
+                    if not Prim.array_include?(orp_vars, vars[i])
+                        Prim.array_push(orp_vars, vars[i])
+                }
+                p
             }, pats)
-    orp_vars: Prim.array_sub(vars, n, Prim.array_size(vars)-n)
     init: Prim.array_to_list(Prim.array_map(x -> `Define{!x, nil}, orp_vars))
     asgn: Prim.list_foldl1((a,b) -> `(!a or !b),
             Prim.list_map(p -> `TryAssign{!p, !t}, pats))
