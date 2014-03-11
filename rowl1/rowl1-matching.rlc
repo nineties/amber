@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2014-03-10 09:56:47 nineties $
+; $Id: rowl1-matching.rlc 2014-03-11 15:37:34 nineties $
 ;
 
 (import "rlvm-compile")
@@ -22,6 +22,9 @@
 (var restP     (to_sym "%Rest"))
 (var varP      (to_sym "%Var"))
 (var domP      (to_sym "%Domain"))
+
+(extern fun tuple2)
+(extern fun tuple_at)
 
 (fun trace_func (msg val) (
     (debugs msg)
@@ -59,15 +62,22 @@
     (var asm (make_assembler))
     (var exit_lbl (fresh_label asm))
 
-    (compile_matching_function asm obj def exit_lbl)
+    (var nocheck (compile_matching_function asm obj def exit_lbl))
 
     (set_label asm exit_lbl)
-    (put_args asm 0)
-    (put_self asm)
-    (put_push asm def)
-    (put_push asm obj)
-    (compile_simple_call asm 4 matching_failed_error)
-    (put_ireturn asm)
+    (if nocheck
+        (do
+            (put_undef asm)
+            (put_ireturn asm)
+        )
+        (do
+            (put_args asm 0)
+            (put_self asm)
+            (put_push asm def)
+            (put_push asm obj)
+            (compile_simple_call asm 4 matching_failed_error)
+            (put_ireturn asm)
+        ))
 
     (var code (get_code asm))
     (field_set def 1 code) ; caching
@@ -83,7 +93,9 @@
 
     ; construct pattern matrix 
     (var mat (construct_pattern_matrix def 0))
-    (var idx (max_arity mat))
+    (var t (max_arity_and_nocheck_flag mat))
+    (var idx     (unbox (tuple_at t 0)))
+    (var nocheck (unbox (tuple_at t 1)))
 
     (var args 0)
     (while (> idx 0) (do
@@ -92,16 +104,19 @@
         ))
     (= args (cons (get_arity) args))
     (compile_matching_main asm args mat exit)
+    (return nocheck)
     ))
 
-(fun max_arity (mat) (
+(fun max_arity_and_nocheck_flag (mat) (
     (var max 0)
+    (var nocheck 1)
     (while mat (do
+        (&= nocheck (field_get (field_get (car mat) 1) 9))
         (var m (list_len (field_get (car mat) 0)))
         (if (> m max) (= max m))
         (= mat (cdr mat))
         ))
-    (return max)
+    (return (tuple2 (box max) (box nocheck)))
     ))
 
 (fun construct_pattern_matrix (def tl) (

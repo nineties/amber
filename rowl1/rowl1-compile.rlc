@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-03-10 18:44:27 nineties $
+; $Id: rowl1-compile.rlc 2014-03-11 15:46:14 nineties $
 ;
 
 (import "rlvm-compile")
@@ -190,7 +190,7 @@
 ; to
 ; f(... x ... y ...) when x==y : body
 (extern fun _copy)
-(fun alpha_args_iter (tbl chk rep expr level check) (
+(fun alpha_args_iter (tbl expr level check) (
     (if (is_symbol expr) (do
         (if (== expr DontCare) (return expr))
         (if (is_special expr) (return expr))
@@ -202,15 +202,10 @@
                         )
                     (var new_sym (to_unique_sym (symbol_name expr)))
                     (symtable_add tbl expr new_sym)
-                    (if (list_member expr (field_get chk 0)) (do
-                        (field_set rep 0 (cons (struct 2 expr new_sym)
-                            (field_get rep 0)))
-                        ))
                     (return new_sym)
                 )
                 (do
                     (symtable_add tbl expr expr)
-                    (field_set chk 0 (cons expr (field_get chk 0)))
                     (return expr)
                 ))
             ))
@@ -220,7 +215,7 @@
     (if (is_list expr) (do
         (var ls expr)
         (while ls (do
-            (setcar ls (alpha_args_iter tbl chk rep (car ls) level check))
+            (setcar ls (alpha_args_iter tbl (car ls) level check))
             (= ls (cdr ls))
             ))
         (return expr)
@@ -230,17 +225,17 @@
     (if (== hd Domain)
         (if (== level 0) (do
             (node_arg_set expr 0
-                (alpha_args_iter tbl chk rep (node_arg expr 0) 0 check))
+                (alpha_args_iter tbl (node_arg expr 0) 0 check))
             (var dom (node_arg expr 1))
             (if (! (is_symbol dom))
-                (node_arg_set expr 1 (alpha_args_iter tbl chk rep dom 0 check))
+                (node_arg_set expr 1 (alpha_args_iter tbl dom 0 check))
                 )
             (return expr)
             ))
     (if (== hd Keyword)
         (if (== level 0) (do
             (node_arg_set expr 0
-                (alpha_args_iter tbl chk rep (node_arg expr 0) 0 check))
+                (alpha_args_iter tbl (node_arg expr 0) 0 check))
             (return expr)
             ))
     (if (== hd QuasiQuote) (+= level 1)
@@ -248,7 +243,7 @@
 
     (for i 0 (node_size expr)
         (node_arg_set expr i
-            (alpha_args_iter tbl chk rep (node_arg expr i) level check))
+            (alpha_args_iter tbl (node_arg expr i) level check))
         )
     (return expr)
     ))
@@ -266,24 +261,15 @@
     ))
 
 (fun alpha_args (tbl args check) (
-    (var chk (struct 1 0))
-    (var rep (struct 1 0))
     (if (== (node_head args) When)
         (do
             (node_arg_set args 0
-                (alpha_args_iter tbl chk rep (node_arg args 0) 0 check)) 
-            (var guard (alpha tbl (node_arg args 1)))
-            (node_arg_set args 1 (setup_guard rep guard))
+                (alpha_args_iter tbl (node_arg args 0) 0 check)) 
+            (node_arg_set args 1 (alpha tbl (node_arg args 1)))
             (return args)
         )
-        (do
-            (= args (alpha_args_iter tbl chk rep args 0 check))
-            (var guard (setup_guard rep @C_NIL))
-            (if (== guard @C_NIL)
-                (return args)
-                (return (make_object2 When args guard))
-                )
-        ))
+        (return (alpha_args_iter tbl args 0 check))
+        )
     ))
 
 (fun alpha (tbl expr) (
@@ -338,7 +324,7 @@
     (if (== hd Lambda) (do
         (symtable_push tbl)
         (= expr (_copy expr))
-        (node_arg_set expr 0 (alpha_args tbl (node_arg expr 0) @FALSE))
+        (node_arg_set expr 0 (alpha_args tbl (node_arg expr 0) @TRUE))
         (node_arg_set expr 1 (alpha tbl (node_arg expr 1)))
         (symtable_pop tbl)
         (return expr)
@@ -432,8 +418,8 @@
     (return ret)
     ))
 
-(fun alloc_function (args keys code guard clos use_self nlocal) (
-    (return (variant @FunctionE 6 0 args keys code guard clos use_self nlocal))
+(fun alloc_function (args keys code guard clos use_self nlocal nocheck) (
+    (return (variant @FunctionE 6 0 args keys code guard clos use_self nlocal nocheck))
     ))
 
 (fun args_len (args) (
@@ -448,10 +434,10 @@
     (return (box len))
     ))
 
-(fun make_function (args keys code guard use_self nlocal) (
+(fun make_function (args keys code guard use_self nlocal nocheck) (
     (var arity (args_len args))
     (= args (cons arity args))
-    (return (alloc_function args keys code guard 0 use_self nlocal))
+    (return (alloc_function args keys code guard 0 use_self nlocal nocheck))
     ))
 
 (fun alloc_builtin_function (args func guard use_self) (
@@ -742,7 +728,7 @@
     (if (!= (node_size expr) size)
         (throw (type_error 
             (strcat "expression with "
-            (strcat (itos size) " arguments"))
+            (strcat (itos10 size) " arguments"))
             expr
             ))
         )
@@ -2175,6 +2161,34 @@
     (put_car asm)
     ))
 
+(fun compile_tryassign (asm expr) (
+    (var lhs (node_arg expr 0))
+    (var rhs (node_arg expr 1))
+    (var tup (unqualified_args lhs))
+    (var pattern (field_get tup 0))
+    (var tvars   (field_get tup 1))
+    (var rvars   (field_get tup 2))
+    (var failed (fresh_label asm))
+    (var exit   (fresh_label asm))
+
+    (compile asm (apply
+        (make_object3 Lambda (list1 pattern) tvars NoMatchingError) (list1 rhs)))
+    (put_dup asm)
+    (put_if_undef asm failed)
+    (while rvars (do
+        (compile asm (assign (car rvars) Decons))
+        (put_drop asm)
+        (= rvars (cdr rvars))
+        ))
+    (put_drop asm)
+    (put_true asm)
+    (put_goto asm exit)
+    (set_label asm failed)
+    (put_drop asm)
+    (put_false asm)
+    (set_label asm exit)
+    ))
+
 (fun compile_return (asm expr) (
     (compile asm (node_arg expr 0))
     (for i 0 try_nest (put_unwind_pop asm))
@@ -2246,7 +2260,7 @@
 	(compile asm (ifelse expr @C_TRUE @C_FALSE))
 	))
 
-(fun compile_lambda_main (asm args body guard cls) (
+(fun compile_lambda_main (asm args body guard cls nocheck) (
     (var save_compiling_lambda compiling_lambda)
     (= compiling_lambda @TRUE)
     (var save_use_self use_self)
@@ -2260,7 +2274,7 @@
             (var keys (tuple_at t 1))
             (var nlocal (unbox (tuple_at t 2)))
             (put_ireturn asm_body)
-            (put_push asm (make_function args keys (get_code asm_body) (get_code asm_guard) use_self nlocal))
+            (put_push asm (make_function args keys (get_code asm_body) (get_code asm_guard) use_self nlocal nocheck))
         )
         (do
             (var t (compile_function asm_body 0 args body noguard cls))
@@ -2268,7 +2282,7 @@
             (var keys (tuple_at t 1))
             (var nlocal (unbox (tuple_at t 2)))
             (put_ireturn asm_body)
-            (put_push asm (make_function args keys (get_code asm_body) 0 use_self nlocal))
+            (put_push asm (make_function args keys (get_code asm_body) 0 use_self nlocal nocheck))
         ))
     (= compiling_lambda save_compiling_lambda)
     (= use_self save_use_self)
@@ -2277,17 +2291,22 @@
 (fun compile_lambda_ (asm expr cls) (
     (var lhs (node_arg expr 0))
     (var body (node_arg expr 1))
+    (var nocheck @FALSE)
+    (if (&& (>= (node_size expr) 3)
+            (== (node_arg expr 2) NoMatchingError))
+        (= nocheck @TRUE)
+        )
     (var hd (node_head lhs))
     (if (== hd List)
-        (compile_lambda_main asm lhs body noguard cls)
+        (compile_lambda_main asm lhs body noguard cls nocheck)
     (if (== hd When)
         (do
             (var guard (node_arg lhs 1))
             (var args (node_arg lhs 0))
             (= hd (node_head lhs))
-            (compile_lambda_main asm args body guard cls)
+            (compile_lambda_main asm args body guard cls nocheck)
         )
-        (compile_lambda_main asm (list1 lhs) body noguard cls)
+        (compile_lambda_main asm (list1 lhs) body noguard cls nocheck)
         ))
     ))
 
@@ -2302,7 +2321,7 @@
     (var guard (field_get lam 5))
     (var use_self (field_get lam 7))
     (var nlocal (field_get lam 8))
-    (return (alloc_function args keys body guard clos use_self nlocal))
+    (return (alloc_function args keys body guard clos use_self nlocal @FALSE @FALSE))
     ))
 
 (fun compile_closure (asm expr) (
@@ -2430,7 +2449,7 @@
     (compile_simple_call asm 2 compile_matching)
     (put_jcall asm 1 0)
     (put_ireturn asm)
-    (return (make_function (list1 x) 0 (get_code asm) 0 @FALSE 0))
+    (return (make_function (list1 x) 0 (get_code asm) 0 @FALSE 0 @FALSE @FALSE))
     ))
 
 (export fun setup_builtin_compilers (mod) (
@@ -2484,10 +2503,12 @@
     (add_compiler mod (make_object1 Not DontCare) compile_logical)
 	(add_compiler mod (make_object2 SeqAnd DontCare DontCare) compile_logical)
 	(add_compiler mod (make_object2 SeqOr DontCare DontCare) compile_logical)
-    (add_compiler mod (make_object2 Lambda DontCare DontCare) compile_lambda)
+    (add_compiler mod (domainP Lambda) compile_lambda)
     (add_compiler mod (domainP Define) compile_define)
     (add_compiler mod (domainP Assign) compile_assign)
     (add_compiler mod (make_object3 ArithAssign DontCare DontCare DontCare) compile_arithmetic_assign)
+
+    (add_compiler mod (domainP (to_sym "TryAssign")) compile_tryassign)
 
     (add_compiler mod (make_object2 Slot DontCare symT) compile_slot)
     (add_compiler mod (make_object1 Reset DontCare) compile_reset)
