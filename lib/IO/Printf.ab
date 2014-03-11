@@ -1,9 +1,13 @@
 # Copyright (C) 2014 nineties
-# $Id: IO/Printf.ab 2014-03-10 12:18:54 nineties $
+# $Id: IO/Printf.ab 2014-03-11 09:59:35 nineties $
 
 import Numeric.Bit (lor, ltest)
 import String.Ascii (is_digit?)
 
+#= Formated output =
+# Output arguments according to a format string like C's printf().
+
+# flags.
 FMT_PLUS:  0x01
 FMT_MINUS: 0x02
 FMT_SHARP: 0x04
@@ -18,55 +22,88 @@ FLAG_MAP: Table.new([
     ("0",   FMT_ZERO)
 ])
 
-printf(oss, fmt @ String, args...): {
-    parse_flag(iss): {
-        flag: 0
-        while true {
-            f: FLAG_MAP[Prim.iss_lookahead(iss, false)]
-            if (f == nil) return flag
-            flag = lor(flag, f)
-            Prim.iss_read_char(iss, false)
-        }
-    }
-
-    parse_number(iss): {
-        if not is_digit?(Prim.iss_lookahead(iss, false))
-            return nil
-        w: 0
-        while true {
-            c: Prim.iss_lookahead(iss, false)
-            if not is_digit?(c)
-                return w
-            w = w*10 + c.to_i()
-            Prim.iss_read_char(iss, false)
-        }
-    }
-
-    parse_prec(iss): {
-        if (Prim.iss_lookahead(iss, false) != ".")
-            return nil
+# Read flags from input string stream `iss`.
+parse_flag(iss): {
+    flag: 0
+    while true {
+        f: FLAG_MAP[Prim.iss_lookahead(iss, false)]
+        if (f == nil) return flag
+        flag = lor(flag, f)
         Prim.iss_read_char(iss, false)
-        if not is_digit?(Prim.iss_lookahead(iss, false))
-            throw `InvalidFormatString{!fmt}
-        parse_number(iss)
     }
+}
 
-    print_element(oss,"s",f,w,p,args): {
-        if args == []
-            throw `MissingArgument{"argument for %s"}
-        str: first(args).to_s()
-        if p != nil and p > str.length
-            str = str[0,p]
-        if w == nil
-            oss.print(str)
-        else {
-            if ltest(f, FMT_MINUS)
-                oss.print(str.ljust(w))
-            else
-                oss.print(str.rjust(w))
-        }
-        rest(args)
+# Read decimal number from input string stream `iss`.
+# If `iss` doesn't begin with decimal character return `nil`.
+parse_number(iss): {
+    if not is_digit?(Prim.iss_lookahead(iss, false))
+        return nil
+    w: 0
+    while true {
+        c: Prim.iss_lookahead(iss, false)
+        if not is_digit?(c)
+            return w
+        w = w*10 + c.to_i()
+        Prim.iss_read_char(iss, false)
     }
+}
+
+# Read precision number from input string stream `iss`.
+# If `iss` doesn't begin with '.' return `nil`. If the format string
+# is invalid throw `InvalidFormatString` exception.
+parse_prec(fmt, iss): {
+    if (Prim.iss_lookahead(iss, false) != ".")
+        return nil
+    Prim.iss_read_char(iss, false)
+    if not is_digit?(Prim.iss_lookahead(iss, false))
+        throw `InvalidFormatString{!fmt}
+    parse_number(iss)
+}
+
+print_element(oss,t,...): throw `UnknownFormatType{!t}
+
+# Print string.
+print_element(oss,"s",f,w,p,arg): {
+    str: arg.to_s()
+    if p != nil and p < str.length
+        str = str[0,p]
+    if w == nil
+        oss.print(str)
+    else {
+        if ltest(f, FMT_MINUS)
+            oss.print(str.ljust(w))
+        else
+            oss.print(str.rjust(w))
+    }
+}
+
+print_element(oss,"d",f,w,p,arg): {
+    num: arg.to_i()
+    sign: num < 0
+    num = |num|
+    str: num.to_s(precision=p)
+    prefix: ""
+    if sign
+        prefix += "-"
+    else {
+        if ltest(f, FMT_PLUS)
+            prefix += "+"
+        else if ltest(f, FMT_SPACE)
+            prefix += " "
+    }
+    if w == nil
+        return oss.print(prefix + str)
+    else {
+        if ltest(f, FMT_MINUS)
+            oss.print(prefix + str.ljust(w - prefix.size))
+        else if ltest(f, FMT_ZERO)
+            oss.print(prefix + str.rjust(w - prefix.size, "0"))
+        else
+            oss.print((prefix + str).rjust(w))
+    }
+}
+
+printf(oss, fmt @ String, args...) when oss.OutputStream?: {
 
     # Create an input string stream.
     iss: Prim.iss_new(fmt, false)
@@ -78,30 +115,15 @@ printf(oss, fmt @ String, args...): {
         else {
             f: parse_flag(iss)
             w: parse_number(iss)
-            p: parse_prec(iss)
+            p: parse_prec(fmt, iss)
             t: Prim.iss_read_char(iss, false)
-            args = print_element(oss, t,f,w,p,args)
+            if args == []
+                throw `MissingArgument{"argument for %d is missing"}
+            print_element(oss, t,f,w,p,first(args))
+            args = rest(args)
         }
     }
+    if args != []
+        throw `InvalidArgument{"Number of arguments doesn't match", !args}
+    nil
 }
-#
-##OutputStreamTrait with {
-##
-##    printf(fmt @ String, args...) = {
-##        iss: InputStringStream.new(fmt)
-##        i: 0
-##        while true {
-##            c: iss.read_char()
-##            if (c == nil) break
-##            if (c == "%") {
-##                parse_format(iss)
-##            } else
-##                self.print_string(c)
-##        }
-##    }
-##
-##}
-##
-##printf(fmt, args...): stdout.printf(fmt, args...)
-##
-##export printf

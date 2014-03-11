@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-string.rlc 2014-02-26 16:39:51 nineties $
+; $Id: vm-prim-string.rlc 2014-03-11 08:56:50 nineties $
 ;
 
 (import "stdlib")
@@ -27,30 +27,41 @@
     ))
  
 (export prim_itos)
-(char[] 10 int_digits)
-(fun prim_itos (num) (
-    (void* ptr (allocate_pstruct @PLAIN_STRING 12))
-    (int idx 0)
+(string digits "0123456789abcdefghijklmnopqrstuvwxyz")
+(fun prim_itos (num base prec) (
+    (int sign 0)
     (if (< num 0) (
-        ([]=8 ptr idx '-')
-        (incr idx)
+        (= sign 1)
         (= num (neg num))
         ))
-    (set8 int_digits 0 (+ (% num 10) '0'))
-    (/= num 10)
-    (int i 0)
-    (while (!= num 0) (
-        (incr i)
-        (set8 int_digits i (+ (% num 10) '0'))
-        (/= num 10)
+    (int alloc 12)
+    (if (> prec alloc) ((= alloc prec)))
+    (if sign ((incr alloc)))
+    (void* ptr (prim_allocate_string alloc))
+    (int idx (- alloc 1))
+    (set8 ptr idx ([]8 digits (% num base)))
+    (decr idx)
+    (decr prec)
+    (= num (/ num base))
+    (while (> num 0) (
+        (set8 ptr idx ([]8 digits (% num base)))
+        (= num (/ num base))
+        (decr idx)
+        (decr prec)
         ))
-    (while (>= i 0) (
-        ([]=8 ptr idx (get8 int_digits i))
-        (incr idx)
-        (decr i)
+    (while (> prec 0) (
+        (set8 ptr idx '0')
+        (decr idx)
+        (decr prec)
         ))
-    ([]=8 ptr idx 0)
-    (return ptr)
+    (if sign ((set8 ptr idx '-') (decr idx)))
+    (if (>= idx 0) ((prim_memcpy ptr (+ ptr (+ idx 1)) (- alloc idx))))
+    (return (prim_strdup ptr))
+    ))
+
+(export prim_itos10)
+(fun prim_itos10 (num) (
+    (return (prim_itos num 10 0))
     ))
 
 (export prim_allocate_string)
