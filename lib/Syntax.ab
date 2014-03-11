@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-03-11 22:16:53 nineties $ "
+" $Id: Syntax.ab 2014-03-11 22:33:03 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -631,7 +631,8 @@ desugar_lambda(args, guard, body): {
             return `Lambda{When{!args, !guard}, !body}
     } else {
         inits: Prim.array_foldr(((a, _), b) -> Prim.list_append(a, b), checks, [])
-        checkexpr: Prim.array_foldl((b, (_, a)) -> `(!b and !a), true, checks)
+        checkexpr: Prim.array_foldl1((a, b) -> `(!a and !b),
+                Prim.array_map(((_, b)) -> b, checks))
         if guard != nil
             guard = `(!checkexpr and !guard)
         else
