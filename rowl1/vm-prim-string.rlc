@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-string.rlc 2014-03-11 08:56:50 nineties $
+; $Id: vm-prim-string.rlc 2014-03-12 09:45:57 nineties $
 ;
 
 (import "stdlib")
@@ -27,14 +27,23 @@
     ))
  
 (export prim_itos)
-(string digits "0123456789abcdefghijklmnopqrstuvwxyz")
-(fun prim_itos (num base prec) (
+(string ldigits "0123456789abcdefghijklmnopqrstuvwxyz")
+(string udigits "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+(fun prim_itos (num base prec upper unsigned) (
+    (if (&& unsigned (< num 0))
+        ((return (itos_unsigned num base prec upper)))
+        ((return (itos_signed num base prec upper)))
+        )
+    ))
+(fun itos_signed (num base prec upper) (
+    (void* digits ldigits)
+    (if upper ((= digits udigits)))
     (int sign 0)
     (if (< num 0) (
         (= sign 1)
         (= num (neg num))
         ))
-    (int alloc 12)
+    (int alloc 32)
     (if (> prec alloc) ((= alloc prec)))
     (if sign ((incr alloc)))
     (void* ptr (prim_allocate_string alloc))
@@ -59,9 +68,36 @@
     (return (prim_strdup ptr))
     ))
 
+(fun itos_unsigned (num base prec upper) (
+    (void* digits ldigits)
+    (if upper ((= digits udigits)))
+    (= num (neg num))
+    (int alloc 32)
+    (if (> prec alloc) ((= alloc prec)))
+    (void* ptr (prim_allocate_string alloc))
+    (int idx (- alloc 1))
+    (set8 ptr idx ([]8 digits (- base (% num base))))
+    (decr idx)
+    (decr prec)
+    (= num (/ num base))
+    (while (> num 0) (
+        (set8 ptr idx ([]8 digits (- (- base (% num base)) 1)))
+        (= num (/ num base))
+        (decr idx)
+        (decr prec)
+        ))
+    (while (> prec 0) (
+        (set8 ptr idx ([]8 digits (- base 1)))
+        (decr idx)
+        (decr prec)
+        ))
+    (if (>= idx 0) ((prim_memcpy ptr (+ ptr (+ idx 1)) (- alloc idx))))
+    (return (prim_strdup ptr))
+    ))
+
 (export prim_itos10)
 (fun prim_itos10 (num) (
-    (return (prim_itos num 10 0))
+    (return (prim_itos num 10 0 @FALSE @FALSE))
     ))
 
 (export prim_allocate_string)

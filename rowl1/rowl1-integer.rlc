@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-integer.rlc 2014-03-11 08:37:34 nineties $
+; $Id: rowl1-integer.rlc 2014-03-12 09:43:41 nineties $
 ;
 
 (import "rlvm-compile")
@@ -154,7 +154,7 @@
         )
     ))
 
-(export fun int_to_str (n base prec prefix) (
+(export fun int_to_str (n base prec prefix upper unsigned) (
     (= base (unbox base))
     (if (|| (< base 2) (> base 36))
         (throw (invalid_argument (string "Invalid radix") (box base)))
@@ -168,7 +168,9 @@
         )
         (= prec 0)
         )
-    (return (itos (unbox n) base prec (!= prefix @C_FALSE)))
+    (return (itos (unbox n) base prec
+        (!= prefix @C_FALSE) (!= upper @C_FALSE) (!= unsigned @C_FALSE)
+        ))
     ))
 
 (export fun int_hash (n) (
@@ -257,7 +259,7 @@
     (add_function2 mod (to_sym "int_shiftR") intT intT int_shiftR 0)
 
     (add_function1 mod (to_sym "int_abs") intT int_abs 0)
-    (add_function3 mod (to_sym "int_to_string") intT intT DontCare int_to_str 0)
+    (add_function5 mod (to_sym "int_to_string") intT intT DontCare DontCare DontCare int_to_str 0)
     (set_slot mod (to_sym "INTEGER_WIDTH") (box @FIXNUM_WIDTH))
     (set_slot mod (to_sym "INTEGER_MIN") (box @FIXNUM_MIN))
     (set_slot mod (to_sym "INTEGER_MAX") (box @FIXNUM_MAX))

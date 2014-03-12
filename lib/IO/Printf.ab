@@ -1,7 +1,7 @@
 # Copyright (C) 2014 nineties
-# $Id: IO/Printf.ab 2014-03-11 09:59:35 nineties $
+# $Id: IO/Printf.ab 2014-03-12 13:52:04 nineties $
 
-import Numeric.Bit (lor, ltest)
+import Numeric.Bit (lnot, lor, ltest)
 import String.Ascii (is_digit?)
 
 #= Formated output =
@@ -62,7 +62,7 @@ parse_prec(fmt, iss): {
 
 print_element(oss,t,...): throw `UnknownFormatType{!t}
 
-# Print string.
+# string.
 print_element(oss,"s",f,w,p,arg): {
     str: arg.to_s()
     if p != nil and p < str.length
@@ -77,19 +77,20 @@ print_element(oss,"s",f,w,p,arg): {
     }
 }
 
-print_element(oss,"d",f,w,p,arg): {
+# Decimal integer.
+print_element(oss,"d" or "i",f,w,p,arg): {
     num: arg.to_i()
     sign: num < 0
     num = |num|
     str: num.to_s(precision=p)
     prefix: ""
     if sign
-        prefix += "-"
+        prefix = "-"
     else {
         if ltest(f, FMT_PLUS)
-            prefix += "+"
+            prefix = "+"
         else if ltest(f, FMT_SPACE)
-            prefix += " "
+            prefix = " "
     }
     if w == nil
         return oss.print(prefix + str)
@@ -98,6 +99,53 @@ print_element(oss,"d",f,w,p,arg): {
             oss.print(prefix + str.ljust(w - prefix.size))
         else if ltest(f, FMT_ZERO)
             oss.print(prefix + str.rjust(w - prefix.size, "0"))
+        else
+            oss.print((prefix + str).rjust(w))
+    }
+}
+
+# Unsignd binary integer.
+print_element(oss,t@("b" or "B"),f,w,p,arg): {
+    num: arg.to_i()
+    sign: num < 0
+    str: num.to_s(base=2,precision=p,unsigned=true)
+    prefix: ""
+    if sign
+        prefix = "..1"
+    if ltest(f, FMT_SHARP)
+        prefix = "0" + t + prefix
+
+    if w == nil
+        return oss.print(prefix + str)
+    else {
+        if ltest(f, FMT_MINUS)
+            oss.print(prefix + str.ljust(w - prefix.size))
+        else if ltest(f, FMT_ZERO)
+            oss.print(prefix + str.rjust(w - prefix.size, sign ? "1" : "0"))
+        else
+            oss.print((prefix + str).rjust(w))
+    }
+}
+
+# Unsigned hexadecimal integer.
+print_element(oss,t@("x" or "X"),f,w,p,arg): {
+    num: arg.to_i()
+    sign: num < 0
+    str: num.to_s(base=16,precision=p,upper=(t=="X"),unsigned=true)
+    forF: ((t == "x") ? "f" : "F")
+    prefix: ""
+    if sign
+        prefix = ".." + forF
+    if ltest(f, FMT_SHARP)
+        prefix = "0" + t + prefix
+
+    if w == nil
+        return oss.print(prefix + str)
+    else {
+        if ltest(f, FMT_MINUS)
+            oss.print(prefix + str.ljust(w - prefix.size))
+        else if ltest(f, FMT_ZERO)
+            oss.print(prefix + str.rjust(w - prefix.size, sign ? forF : "0"))
         else
             oss.print((prefix + str).rjust(w))
     }
