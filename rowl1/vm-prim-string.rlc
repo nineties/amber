@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-string.rlc 2014-03-12 09:45:57 nineties $
+; $Id: vm-prim-string.rlc 2014-03-12 15:42:26 nineties $
 ;
 
 (import "stdlib")
@@ -76,15 +76,31 @@
     (if (> prec alloc) ((= alloc prec)))
     (void* ptr (prim_allocate_string alloc))
     (int idx (- alloc 1))
-    (set8 ptr idx ([]8 digits (- base (% num base))))
+    (int carry 0)
+    (int v (- base (% num base)))
+    (if (== v base) ((= carry 1) (= v 0)))
+    (set8 ptr idx ([]8 digits v))
     (decr idx)
     (decr prec)
     (= num (/ num base))
     (while (> num 0) (
-        (set8 ptr idx ([]8 digits (- (- base (% num base)) 1)))
+        (= v (+ (- (- base (% num base)) 1) carry))
+        (= carry 0)
+        (if (== v base) ((= carry 1) (= v 0)))
+        (set8 ptr idx ([]8 digits v))
         (= num (/ num base))
         (decr idx)
         (decr prec)
+        ))
+    (if carry (
+        (set8 ptr idx ([]8 digits 1))
+        (decr idx)
+        (decr prec)
+        ))
+    ; remove leading (base-1)s.
+    (while (== ([]8 ptr (+ idx 1)) ([]8 digits (- base 1))) (
+        (incr idx)
+        (incr prec)
         ))
     (while (> prec 0) (
         (set8 ptr idx ([]8 digits (- base 1)))
