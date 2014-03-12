@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-03-11 15:46:14 nineties $
+; $Id: rowl1-compile.rlc 2014-03-12 19:05:25 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1477,9 +1477,12 @@
         (set_label asm reverse)
         (compile_simple_call asm 1 list_reverse)
         (put_expand asm)    ; len;le0;le1;...
+        (var len (list_len args))
+        (if (> len 0) (do
+            (put_imm_int asm len)
+            (put_iadd asm)
+            ))
 
-        ; XXX: We should implement `rotate' instruction.
-        (var rot 1)
         (while args (do
             (if (|| (== (node_head (car args)) Rest)
                     (== (node_head (car args)) Keyword))
@@ -1488,10 +1491,9 @@
                     args_))
                     )
             (compile asm (car args))
-            (+= rot 1)
             (= args (cdr args))
             ))
-        (if (> rot 1) (put_rot asm rot 1))
+        (if (> len 1) (put_rot asm len 1))
         (return (tuple2 (box -1) keywords))
         ))
 
