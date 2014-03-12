@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-object.rlc 2014-03-07 23:14:25 nineties $
+; $Id: rowl1-object.rlc 2014-03-13 08:30:29 nineties $
 ;
 
 (import "rlvm-compile")
@@ -142,6 +142,7 @@
     ))
 
 (fun get_slot_ (obj sym rec alias check) (
+    (if (== sym parent) (return (get_parent obj)))
     (var ref (get_slot_ref obj sym rec))
     (if (== ref @C_UNDEF)
         (if (!= check @C_FALSE)
@@ -223,7 +224,7 @@
 (export fun setup_object_pre () (
     (= parent_special (allocate_array @NUM_NODE_TYPE))
     (for i 0 @NUM_NODE_TYPE
-        (array_set object parent_special i @C_NIL)
+        (array_set object parent_special i @C_UNDEF)
         )
     ))
 
