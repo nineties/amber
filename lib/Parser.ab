@@ -1,13 +1,15 @@
 # Copyright (C) 2014 nineties
-# $Id: Parser.ab 2014-02-10 15:07:53 nineties $
+# $Id: Parser.ab 2014-03-13 09:34:42 nineties $
 
-new(ichan): Prim.parser_new(ichan)
+#= Parser =
 
-ParserTrait: Prim.ParserTrait with {
-    parse_shell()    = Prim.parse_shell(self)
-    parse_toplevel() = Prim.parse_toplevel(self)
-    node             = alias(() -> Prim.parser_node(self))
-    error_string     = alias(() -> Prim.parser_error(self))
-    loc              = alias(() -> Prim.parser_loc(self))
-    flush()          = Prim.parser_flush(self)
+new(input) when input.InputFileStream? : Prim.parser_new(input)
+new(path @ String): Prim.parser_new(IO.File.open_in(path))
+
+trait Parser {
+    .tree: alias(() -> Prim.parser_tree(self))
+    .loc:  alias(() -> Prim.parser_loc(self))
+    .error_string: alias(() -> Prim.parser_error(self))
 }
+
+Prim.set_builtin_parent('Parser, Trait.Parser)
