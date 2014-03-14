@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-string.rlc 2014-03-10 10:50:01 nineties $
+; $Id: rowl1-string.rlc 2014-03-14 17:38:08 nineties $
 ;
 
 (import "rlvm-compile")
@@ -125,6 +125,19 @@
         (return ls)
         ))
     (return (str_split_ str d slen dlen))
+    ))
+
+(fun str_repeat (str n) (
+    (= n (unbox n))
+    (if (< n 0)
+        (throw (invalid_argument (string "Repeat count is negative") (box n)))
+        )
+    (var len (str_size str))
+    (var new (allocate_string (* len n)))
+    (for i 0 n (do
+        (memcpy (+ new (* i len)) str len)
+        ))
+    (return new)
     ))
 
 (fun str_ljust (str w punct) (
@@ -341,6 +354,8 @@
     (add_function1 mod (to_sym "string_unescape") stringT str_unescape 0)
     (add_function2 mod (to_sym "string_contain?") stringT stringT str_contain 0)
     (add_function2 mod (to_sym "string_split") stringT stringT str_split 0)
+
+    (add_function2 mod (to_sym "string_repeat") stringT intT str_repeat 0)
 
 
     (add_function3 mod (to_sym "string_ljust") stringT intT stringT str_ljust 0)
