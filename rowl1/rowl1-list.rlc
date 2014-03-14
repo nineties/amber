@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2014-03-11 16:18:18 nineties $
+; $Id: rowl1-list.rlc 2014-03-15 00:06:18 nineties $
 ;
 
 (import "rlvm-compile")
@@ -135,6 +135,15 @@
     (return (cons v ls))
     ))
 
+(fun ls_flatten (ls) (
+    (if (! ls) (return 0))
+    (var d (car ls))
+    (if (== (node_type d) @ListE)
+        (return (list_append (ls_flatten d) (ls_flatten (cdr ls))))
+        (return (cons d (ls_flatten (cdr ls))))
+        )
+    ))
+
 (fun ls_join (ls1 ls2) (
     (while ls1 (do
         (= ls2 (ls_insert_uniq (car ls1) ls2))
@@ -217,22 +226,6 @@
         (= ls (cdr ls))
         ))
     (return (tuple2 (list_reverse left) (list_reverse right)))
-    ))
-
-(fun ls_flatten (ls) (
-    (var original ls)
-    (var new_ls 0)
-    (while ls (do
-        (var t (car ls))
-        (if (!= (node_type t) @ListE)
-            (throw (invalid_argument (string "`flatten' requires list of lists") original)))
-        (while t (do
-            (= new_ls (cons (car t) new_ls))
-            (= t (cdr t))
-            ))
-        (= ls (cdr ls))
-        ))
-    (return (list_reverse new_ls))
     ))
 
 (fun ls_rem_ (ls a eql) (
@@ -345,6 +338,7 @@
     (add_function2 mod (to_sym "list_foreach") funT listT ls_foreach 0)
     (add_function2 mod (to_sym "list_include?") DontCare listT ls_include 0)
     (add_function2 mod (to_sym "list_insert_unique") DontCare listT ls_insert_uniq 0)
+    (add_function1 mod (to_sym "list_flatten") listT ls_flatten 0)
     (add_function2 mod (to_sym "list_join") listT listT ls_join 0)
     (add_function3 mod (to_sym "list_foldl") funT DontCare listT ls_foldl 0)
     (add_function2 mod (to_sym "list_foldl1") funT listT ls_foldl1 0)
