@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-03-12 19:22:13 nineties $
+; $Id: rowl1-compile.rlc 2014-03-14 11:59:11 nineties $
 ;
 
 (import "rlvm-compile")
@@ -969,7 +969,9 @@
             )
             (do
                 (= usual (cons arg usual))
-                (= alias (setup_arg tbl (make_arg idx) arg 0 alias))
+                (if (!= arg DontCare)
+                    (= alias (setup_arg tbl (make_arg idx) arg 0 alias))
+                    )
                 (+= idx 1)
             ))
         (= args (cdr args))
@@ -991,7 +993,9 @@
 (fun setup_arg (tbl obj arg level alias) (
     (if (is_special arg) (return alias))
     (if (is_symbol arg) (do
-        (if (== level 0) (= alias (add_arg tbl arg obj alias)))
+        (if (&& (!= arg DontCare) (== level 0))
+            (= alias (add_arg tbl arg obj alias))
+            )
         (return alias)
         ))
     (if (is_atom arg) (return alias))
