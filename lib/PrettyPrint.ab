@@ -1,0 +1,41 @@
+# Copyright (C) 2014 nineties
+# $Id: PrettyPrint.ab 2014-03-14 22:13:36 nineties $
+
+#= Pretty printing =
+# Implementation of pretty printing algorithm of the following paper.
+# * Philip Wadler. "A pretty printer."
+# * http://homepages.inf.ed.ac.uk/wadler/papers/prettier/prettier.pdf
+
+text(s @ String): `Text{!s}
+empty: text("")
+newline: `Newline{}
+
+nest(i, doc):          `Nest{!i, !doc}
+nest(i, doc @ Text):   doc
+nest(i, Nest{j, doc}): nest(i+j, doc)
+nest(i, docs @ List):  docs.map(d -> nest(i, d))
+nest(0, doc):          doc
+
+layout(out, docs @ List): {
+    for doc in docs
+        layout(out, doc)
+}
+layout(out, Text{s}): out.print(s)
+layout(out, Newline{}): out.print("\n")
+layout(out, Nest{i, Newline{}}): {
+    out.print("\n")
+    out.print(" " * i)
+}
+
+# ----
+# > doc: [text("bbbbb"), text("["), nest(2, [newline, text("ccc"),
+# ~       text(","), newline, text("dd")]), newline, text("]")]
+# > layout(stdout, doc)
+# bbbbb[
+#   ccc,
+#   dd
+# ]=> nil
+# ----
+
+
+
