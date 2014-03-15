@@ -1,5 +1,5 @@
 # Copyright (C) 2010 nineties
-# $Id: Module.ab 2014-03-09 21:59:58 nineties $
+# $Id: Module.ab 2014-03-15 10:09:27 nineties $
 
 #= Module system =
 #== Basics ==
@@ -93,16 +93,20 @@ exit_module()
 
 macro(e @ Import{mods, asname, option}): {
     mod: Prim.list_foldl1((l, r) -> `Slot{!l, !r}, mods)
-    case option of
+    import_stmt: case option of
           Some{option}
             -> `Seq{[
                     !Module.expand_import(mods, ""),
                     Module.copy_variables(!mod, '!option),
-                    nil
+                    !mod
                 ]}
         | nil
-            -> `Seq{[!Module.expand_import(mods, ""), nil]}
+            -> `Seq{[!Module.expand_import(mods, ""), !mod]}
         | _
             -> { throw `UnknownExpression{!e} }
+
+    case asname of
+        Some{name}  -> `Define{!name, !import_stmt}
+        | nil       -> import_stmt
 }
 
