@@ -1,5 +1,7 @@
 # Copyright (C) 2014 nineties
-# $Id: CAST/AST.ab 2014-03-15 18:10:34 nineties $
+# $Id: CAST/AST.ab 2014-03-16 08:44:55 nineties $
+
+import Numeric.Bit as Bit
 
 #= Abstract syntax tree for CAST =
 
@@ -26,7 +28,7 @@ PRIM_TYPES: [
     'ulong,     # unsigned 64-bit integer
     'float,     # 32-bit floating point number
     'double,    # 64-bit floating point number
-    'real,      # largest floating point number implemented in hardware
+    'real       # largest floating point number implemented in hardware
 ]
 
 #== Derived types ==
@@ -44,11 +46,13 @@ PRIM_TYPES: [
 # Where `params` is a list of `Param{type, name}`, `spec` contains
 # bit-flags `FUNC_SPEC.inline` and `FUNC_SPEC.const`.
 
-FUNC_SPEC: `Flags{} with {
-    .inline: 0x1
-    .const:  0x2
-}
+FUNC_SPEC: Bit.flags('inline, 'const)
 
+#== Aggregate types ==
 # * StructType{name}
-#
 # * UnionType{name}
+
+#== Qualifiers ==
+# * QualifiedType{base, qual}
+# Where `qual` contains bit-flags `QUALIFIER.const` and `QUALIFIER.volatile`.
+QUALIFIER: Bit.flags('const, 'volatile)
