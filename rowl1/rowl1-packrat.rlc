@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-03-15 00:12:58 nineties $
+; $Id: rowl1-packrat.rlc 2014-03-15 12:52:19 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1302,8 +1302,11 @@
             (apply (syntax_func "word") (list2 PVar (quote pat))) ws)))
         )
     (var hd (node_head pat))
-    (if (|| (== hd Symbol) (== hd Slot)) (do
+    (if (== hd Symbol) (do
         (return (parse_with_check (apply (slot Syntax pat) (list1 PVar)) ws))
+        ))
+    (if (== hd Slot) (do
+        (return (parse_with_check (apply pat (list1 PVar)) ws))
         ))
     (if (== hd String)
         (return (parse_with_check
@@ -1953,11 +1956,9 @@
     (var parser (apply_util "%call_parser"
             (list4 PVar (quote lhs) (quote key) parser_body)))
     (+= key_idx 1)
-    (if (== (node_head lhs) Slot)
-        (= lhs (slot (node_arg lhs 0) (slot Syntax (node_arg lhs 1))))
+    (if (!= (node_head lhs) Slot)
         (= lhs (slot Syntax lhs))
         )
-
     (return (make_object3 Define lhs (lambda (make_object2 When (list1 (make_object2 Domain PVar Parser)) parser) @C_TRUE) (to_sym "fusion")))
     ))
 
