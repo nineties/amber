@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: Numeric/Bit.ab 2014-03-10 12:18:46 nineties $
+# $Id: Numeric/Bit.ab 2014-03-16 08:25:35 nineties $
 
 lnot: Prim.int_lnot
 land: Prim.int_land
@@ -10,3 +10,23 @@ rshift: Prim.int_rshift
 logic_rshift: Prim.int_logic_rshift
 
 ltest(a, b): land(a, b) != 0
+
+# Create bit-flags.
+# ----
+# > Flag: Bit.flags('a, 'b, 'c)
+# > Flag.a      # => 0x1
+# > Flag.b      # => 0x2
+# > Flag.c      # => 0x4
+# ----
+flags(symbols...): {
+    if symbols.size > INTEGER_WIDTH
+        throw `InvalidArgument{"too many flags", !symbols}
+
+    f: `Flags{}
+    v: 1
+    for s in symbols {
+        f.set_slot(s, v)
+        v = v <lshift> 1
+    }
+    f
+}
