@@ -1,41 +1,117 @@
 # Copyright (C) 2014 nineties
-# $Id: PrettyPrint.ab 2014-03-14 22:13:36 nineties $
+# $Id: PrettyPrint.ab 2014-03-15 09:07:15 nineties $
 
 #= Pretty printing =
 # Implementation of pretty printing algorithm of the following paper.
 # * Philip Wadler. "A pretty printer."
 # * http://homepages.inf.ed.ac.uk/wadler/papers/prettier/prettier.pdf
+#
+# A 'document' is a one of following forms:
+# * A string
+# * A list of documents.
+# * nl_or_null : Output newline or empty string when the document is compressed into a single line.
+# * nl_or_space : Output newline or single space when the document is compressed into a single line.
+# * nest(indent, document): Output the document with indentation width = `indent`.
+# * group(document): Compress the document into a single line when there is enough area.
 
-text(s @ String): `Text{!s}
-empty: text("")
-newline: `Newline{}
+nl_or_null:  `Newline{""}
+nl_or_space: `Newline{" "}
 
-nest(i, doc):          `Nest{!i, !doc}
-nest(i, doc @ Text):   doc
+nest(i, doc): `Nest{!i, !doc}
+nest(i, Union{len, d1, d2}): `Union{!len, !nest(i, d1), !nest(i, d2)}
 nest(i, Nest{j, doc}): nest(i+j, doc)
 nest(i, docs @ List):  docs.map(d -> nest(i, d))
+nest(i, doc @ String): doc
 nest(0, doc):          doc
 
-layout(out, docs @ List): {
-    for doc in docs
-        layout(out, doc)
-}
-layout(out, Text{s}): out.print(s)
-layout(out, Newline{}): out.print("\n")
-layout(out, Nest{i, Newline{}}): {
-    out.print("\n")
-    out.print(" " * i)
+# Compress given document into one-line.
+compress(Newline{s}):          s
+compress(Nest{_, Newline{s}}): s
+compress(docs @ List):         docs.map(compress)
+compress(doc @ String):        doc
+
+# Compute the length of document to the next newline.
+assign_len([], follow): follow
+
+assign_len([Newline{_}, docs...], follow): {
+    assign_len(docs, follow)
+    0
 }
 
+assign_len([Nest{i, Newline{_}}, docs...], follow): {
+    assign_len(docs, follow)
+    0
+}
+
+assign_len([doc @ String, docs...], follow):
+    doc.size + assign_len(docs, follow)
+
+assign_len([u @ Union{_, d1, d2}, docs...], follow): {
+    follow = assign_len(docs, follow)
+    len1: assign_len(d1, follow)
+    len2: assign_len(d2, follow)
+    u[0] = len1
+    min(len1, len2)
+}
+
+assign_len([docs @ List, rest...], follow):
+    assign_len(docs, assign_len(rest, follow))
+
+group(doc): `Union{0, !compress(doc), !doc}
+
+layout(out, w, k, [Newline{_}, docs...]): {
+    out.print("\n")
+    layout(out, w, w, docs)
+}
+
+layout(out, w, k, [Nest{i, Newline{_}}, docs...]): {
+    out.print("\n")
+    out.print(" " * i)
+    layout(out, w, k - i, docs)
+}
+
+layout(out, w, k, [s @ String, docs...]): {
+    out.print(s)
+    layout(out, w, k - s.size, docs)
+}
+
+layout(out, w, k, [Union{len, d1, d2}, docs...]): {
+    if len < k
+        layout(out, w, k, d1 + docs)
+    else
+        layout(out, w, k, d2 + docs)
+}
+
+layout(out, w, k, [docs @ List, rest...]):
+    layout(out, w, k, docs + rest)
+layout(_, _, _, []): nil
+
+# Pretty printer.
+# Arguments:
+# * out: An output stream.
+# * doc: The document.
+# * width (optional): The maximum width of the text.
+#
 # ----
-# > doc: [text("bbbbb"), text("["), nest(2, [newline, text("ccc"),
-# ~       text(","), newline, text("dd")]), newline, text("]")]
-# > layout(stdout, doc)
+# > doc: ["bbbbb", "[", nest(2, [nl_or_null, "ccc",
+# ~       ",", nl_or_null, "dd"]), nl_or_null, "]"]
+# > pretty(stdout, doc)
+# bbbbb[
+#   ccc,
+#   dd
+# ]=> nil
+# > pretty(stdout, group(doc))
+# bbbbb[ccc,dd]=> nil
+# > pretty(stdout, group(doc), width=5)
 # bbbbb[
 #   ccc,
 #   dd
 # ]=> nil
 # ----
 
+pretty(out, doc, width=80): pretty(out, [doc], width=width)
 
-
+pretty(out, docs @ List, width=80): {
+    assign_len(docs, 0)
+    layout(out, width, width, docs)
+}
