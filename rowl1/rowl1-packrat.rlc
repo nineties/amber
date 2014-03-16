@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-03-16 18:39:56 nineties $
+; $Id: rowl1-packrat.rlc 2014-03-16 20:56:19 nineties $
 ;
 
 (import "rlvm-compile")
@@ -912,8 +912,10 @@
             (getc p)
             continue
             ))
-        (runcode comment p)
-        (if @(PARSED p) continue)
+        (if comment (do
+            (runcode comment p)
+            (if @(PARSED p) continue)
+            ))
         break
         ))
     (if (== (get_pos p) pos)
@@ -934,8 +936,10 @@
             (getc p)
             continue
             ))
-        (runcode comment p)
-        (if @(PARSED p) continue)
+        (if comment (do
+            (runcode comment p)
+            (if @(PARSED p) continue)
+            ))
         break
         ))
     (if (== (get_pos p) pos)
@@ -1949,7 +1953,7 @@
     ))
 
 (var key_idx 0)
-(fun compile_define_syntax (expr) (
+(export fun transl_define_syntax (expr) (
     (var lhs (node_arg expr 0))
     (var elems (node_arg expr 1))
     (var key (to_sym (strcat "%key" (itos10 key_idx))))
@@ -1957,8 +1961,7 @@
     (var parser (apply_util "%call_parser"
             (list4 PVar (quote lhs) (quote key) parser_body)))
     (+= key_idx 1)
-    (if (== (node_head lhs) Slot)
-        (= lhs (slot (slot (node_arg lhs 0) Syntax) (node_arg_symbol lhs 1)))
+    (if (!= (node_head lhs) Slot)
         (= lhs (slot Syntax lhs))
         )
     (return (make_object3 Define lhs (lambda (make_object2 When (list1 (make_object2 Domain PVar Parser)) parser) @C_TRUE) (to_sym "fusion")))
@@ -2025,8 +2028,6 @@
 
     (add_parser mod (to_sym "parse_shell_style_comment") parse_shell_style_comment)
     (add_parser mod (to_sym "parse_C_style_comment") parse_C_style_comment)
-
-    (add_function1 mod (to_sym "compile_define_syntax") (domainP DefSyntax) compile_define_syntax 0)
 
     (add_function1 mod (to_sym "parser_new") (domainP InputFileStream) make_parser_ 0)
     (add_function1 mod (to_sym "parse_shell") (domainP Parser) parse_shell 0)

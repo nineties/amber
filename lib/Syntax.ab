@@ -1,17 +1,9 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-03-16 18:33:34 nineties $ "
+" $Id: Syntax.ab 2014-03-16 19:15:22 nineties $ "
 
 " Syntax definition of the Amber language. "
 
-" Enable DefSyntax{...} expression. "
-Define{eval, Lambda{List{Domain{stmt, DefineSyntax}},
-    Apply{eval, List{
-        Apply{Slot{Prim, compile_define_syntax}, List{stmt}}
-    }}},
-    fusion
-}
-
-" Enable comment syntax. "
+" Enable comments. "
 Assign{Slot{Syntax, comment}, Slot{Prim, parse_shell_style_comment}}
 
 ### syntax definition
@@ -687,3 +679,16 @@ macro(WithSlots{obj, init}): `Apply{!obj, () -> { Seq{!init}; self }, []}
 ## Utilities
 add_reserved_word(syms...):
     Prim.list_foreach(sym -> Prim.array_push(Syntax.reserved_words, sym), syms)
+
+Syntax.new(case_sensitive=true): {
+    if not case_sensitive
+        throw `NotImplemented{"Sorry but we haven't implemented case-insensitive syntax"}
+    syn: `Syntax{}
+    syn.reserved_words: Prim.array_new_empty()
+    syn.case_sensitive: case_sensitive
+    syn.add_reserved_word(symbols...): {
+        for v in symbols
+            Prim.array_push(self.reserved_words, v)
+    }
+    syn
+}

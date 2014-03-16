@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-03-14 16:03:14 nineties $
+; $Id: rowl1-compile.rlc 2014-03-16 20:58:24 nineties $
 ;
 
 (import "rlvm-compile")
@@ -2406,6 +2406,11 @@
     (compile asm (assign func (lambda args rhs)))
     ))
 
+(extern fun transl_define_syntax)
+(fun compile_define_syntax (asm expr) (
+    (compile asm (transl_define_syntax expr))
+    ))
+
 (export fun add_function0 (mod sym func guard) (
     (append_function mod sym (make_builtin_function 0 func guard @FALSE))
     ))
@@ -2519,6 +2524,8 @@
     (add_compiler mod (make_object2 Slot DontCare symT) compile_slot)
     (add_compiler mod (make_object1 Reset DontCare) compile_reset)
     (add_compiler mod (make_object1 Shift DontCare) compile_shift)
+
+    (add_compiler mod (make_object2 DefSyntax DontCare DontCare) compile_define_syntax)
 
     ; internal expressions
     (add_compiler mod (make_object3 KeywordArg intT DontCare DontCare) compile_keyword_arg)
