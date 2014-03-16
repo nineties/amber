@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-03-16 20:58:24 nineties $
+; $Id: rowl1-compile.rlc 2014-03-16 21:46:49 nineties $
 ;
 
 (import "rlvm-compile")
@@ -2376,16 +2376,6 @@
     (put_fieldset asm (node_arg_int lhs 1))
     ))
 
-(export fun compile_simple_function (asm arity func) (
-    (var n arity)
-    (while (> n 0) (do
-        (decr n)
-        (put_arg asm n)
-        ))
-    (compile_simple_call asm arity func)
-    (put_ireturn asm)
-    ))
-
 (export fun compile_simple_call (asm arity func) (
     (put_imm_int32 asm func)
     (put_acall asm arity)
@@ -2397,13 +2387,6 @@
         )
     (if (is_symbol lhs) (return lhs))
     (throw (type_error (string "a symbol") lhs))
-    ))
-
-; f(x) = e is equivarent to f = f | (x -> e)
-(fun compile_function_assign (asm lhs rhs) (
-    (var func (node_arg lhs 0))
-    (var args (node_arg lhs 1))
-    (compile asm (assign func (lambda args rhs)))
     ))
 
 (extern fun transl_define_syntax)
