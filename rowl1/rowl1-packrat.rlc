@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-03-16 18:22:44 nineties $
+; $Id: rowl1-packrat.rlc 2014-03-16 18:39:56 nineties $
 ;
 
 (import "rlvm-compile")
@@ -209,6 +209,7 @@
 (var left_rec (string "Left Recursion Detected"))
 
 (extern fun load_global)
+(extern fun ary_include)
 
 (fun __cons (a b) (
     (return (cons a b))
@@ -1288,10 +1289,10 @@
     (if (!= (node_type sym) @SymbolE) (return @FALSE))
     (var reserved_words (get_slot_nocheck (load_global Syntax) (to_sym "reserved_words")))
     (if (!= reserved_words @C_NIL) (do
-        (if (!= (node_type reserved_words) @ListE)
-            (throw (logic_error (string "'reserved_words' must be a list of symbols")))
+        (if (!= (node_type reserved_words) @ArrayE)
+            (throw (logic_error (string "'reserved_words' must be an array of symbols")))
             )
-        (return (list_member sym reserved_words))
+        (return (!= (ary_include reserved_words sym) @C_FALSE))
         ))
     (return @FALSE)
     ))
