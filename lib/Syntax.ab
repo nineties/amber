@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-03-16 12:20:25 nineties $ "
+" $Id: Syntax.ab 2014-03-16 18:22:23 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -50,7 +50,7 @@ DefineSyntax{
         Tuple{List{"."}, Quote{any}},
         Tuple{List{string}, node0},
         Tuple{List{symbol_without_mark}, node0},
-        Tuple{List{reserved_symbol}, node0},
+        Tuple{List{reserved_word}, node0},
         Tuple{List{"(", syntax_element, ")"}, node1},
         Tuple{List{"(", Many1{syntax_element}, ")"}, node1, multiline},
         Tuple{List{"[", "^", character_set, "]"},
@@ -141,7 +141,7 @@ DefineSyntax{stmt, List{ Tuple{List{syntax_declaration}, node0}}}
 ### Reserved Symbols
 # The following symbols never been parsed as symbols.
 
-Define{Slot{Syntax, reserved_symbols}, List{
+Define{Slot{Syntax, reserved_words}, List{
     Quote{self}, Quote{not}, Quote{and}, Quote{or}, Quote{when},
     Quote{if}, Quote{else}, Quote{case}, Quote{of}, Quote{while},
     Quote{for}, Quote{in}, Quote{continue}, Quote{break}, Quote{return},
@@ -369,6 +369,11 @@ stmt
         { MakeObject{Quote{Apply}, List{node0, node2}} }
       | postfix_expr "." symbol ![+-] delimited1(argument, ",")
         { MakeObject{Quote{Send}, List{node0, node2, node4}} }
+
+# Add new syntax for syntax declaration usinged qualified symbol like
+# `Lang.expr ::= ...`.
+syntax_declaration ::= pattern "::=" delimited1(parser_entry, "|")
+    { `DefineSyntax{!node0, !node2} }
 
 # Entry point or parsers
 Syntax.toplevel = Prim.parse_toplevel
@@ -680,6 +685,6 @@ macro(Lambda{When{args, guard}, body}): desugar_lambda(args, guard, body)
 macro(WithSlots{obj, init}): `Apply{!obj, () -> { Seq{!init}; self }, []}
 
 ## Utilities
-Syntax.add_reserved_symbols(syms...):
-    Syntax.reserved_symbols = Prim.list_foldr(
-            Prim.list_insert_unique, syms, Syntax.reserved_symbols)
+Syntax.add_reserved_words(syms...):
+    Syntax.reserved_words = Prim.list_foldr(
+            Prim.list_insert_unique, syms, Syntax.reserved_words)

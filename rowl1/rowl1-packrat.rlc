@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-03-15 12:52:19 nineties $
+; $Id: rowl1-packrat.rlc 2014-03-16 18:22:44 nineties $
 ;
 
 (import "rlvm-compile")
@@ -990,7 +990,7 @@
     (var c (lookahead p))
     (if (|| (== c '!') (== c '?')) (getc p))
     (var s (to_sym (extract_string p begin (field_get p 6))))
-    (if (is_reserved_symbol s) (do
+    (if (is_reserved_word s) (do
         (noparse p (strcat "reserved symbol: " (symbol_name s)))
         (reset_parser_position p state)
         (return @C_FALSE)
@@ -999,7 +999,7 @@
     ))
 @(MEMOIZE symbol)
 
-(fun parse_reserved_symbol_ (p) (
+(fun parse_reserved_word_ (p) (
     (var state (copy_parser_state p))
     (var begin (field_get p 6))
     (parse_symbol_impl p)
@@ -1007,14 +1007,14 @@
     (var c (lookahead p))
     (if (|| (== c '!') (== c '?')) (getc p))
     (var s (to_sym (extract_string p begin (field_get p 6))))
-    (if (! (is_reserved_symbol s)) (do
+    (if (! (is_reserved_word s)) (do
         (noparse p (strcat "not reserved symbol: " (symbol_name s)))
         (reset_parser_position p state)
         (return @C_FALSE)
         ))
     (return (parsed p s))
     ))
-@(MEMOIZE reserved_symbol)
+@(MEMOIZE reserved_word)
 
 (fun parse_symbol_without_mark_ (p) (
     (var state (copy_parser_state p))
@@ -1023,7 +1023,7 @@
     @(CHECK p)
     (var c (lookahead p))
     (var s (to_sym (extract_string p begin (field_get p 6))))
-    (if (is_reserved_symbol s) (do
+    (if (is_reserved_word s) (do
         (noparse p (strcat "not reserved symbol: " (symbol_name s)))
         (reset_parser_position p state)
         (return @C_FALSE)
@@ -1284,20 +1284,20 @@
     (return p)
     ))
 
-(fun is_reserved_symbol (sym) (
+(fun is_reserved_word (sym) (
     (if (!= (node_type sym) @SymbolE) (return @FALSE))
-    (var reserved_symbols (get_slot_nocheck (load_global Syntax) (to_sym "reserved_symbols")))
-    (if (!= reserved_symbols @C_NIL) (do
-        (if (!= (node_type reserved_symbols) @ListE)
-            (throw (logic_error (string "'reserved_symbols' must be a list of symbols")))
+    (var reserved_words (get_slot_nocheck (load_global Syntax) (to_sym "reserved_words")))
+    (if (!= reserved_words @C_NIL) (do
+        (if (!= (node_type reserved_words) @ListE)
+            (throw (logic_error (string "'reserved_words' must be a list of symbols")))
             )
-        (return (list_member sym reserved_symbols))
+        (return (list_member sym reserved_words))
         ))
     (return @FALSE)
     ))
 
 (fun compile_parser_element (pat ws) (
-    (if (is_reserved_symbol pat) (do
+    (if (is_reserved_word pat) (do
         (return (parse_with_check
             (apply (syntax_func "word") (list2 PVar (quote pat))) ws)))
         )
@@ -1956,7 +1956,8 @@
     (var parser (apply_util "%call_parser"
             (list4 PVar (quote lhs) (quote key) parser_body)))
     (+= key_idx 1)
-    (if (!= (node_head lhs) Slot)
+    (if (== (node_head lhs) Slot)
+        (= lhs (slot (slot (node_arg lhs 0) Syntax) (node_arg_symbol lhs 1)))
         (= lhs (slot Syntax lhs))
         )
     (return (make_object3 Define lhs (lambda (make_object2 When (list1 (make_object2 Domain PVar Parser)) parser) @C_TRUE) (to_sym "fusion")))
@@ -2012,7 +2013,7 @@
     (add_parser mod (to_sym "parse_string") parse_string_d)
     (add_parser mod (to_sym "parse_symbol") parse_symbol)
     (add_parser mod (to_sym "parse_symbol_without_mark") parse_symbol_without_mark)
-    (add_parser mod (to_sym "parse_reserved_symbol") parse_reserved_symbol)
+    (add_parser mod (to_sym "parse_reserved_word") parse_reserved_word)
     (add_parser mod (to_sym "parse_atom") parse_atom)
     (add_parser mod (to_sym "parse_fullform") parse_fullform)
     (add_parser mod (to_sym "parse_expr") parse_expr)
