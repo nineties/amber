@@ -1,98 +1,106 @@
 # Copyright (C) 2014 nineties
-# $Id: Stack.ab 2014-02-16 18:13:22 nineties $
+# $Id: Stack.ab 2014-03-17 16:04:35 nineties $
 
-import Collection
+#= Stack =
 
 trait Stack {
-    extend Trait.Collection
+    require '.push, '.pop, '.top, '.size
 
-    require push pop top
-    export  push_values pop drop clear dup rotate
+    .empty?: alias(() -> .size == 0)
 
-    # Push values from given Iterable object.
-    push_values(seq) = {
-        it: seq.iterator()
-        while (it.next?) push(it.next())
+    # Push values from give iterable object.
+    .push_values(seq): {
+        for v in seq
+            self.push(v)
         self
     }
-    push_values(seq, n @ Int) = {
-        it: seq.iterator()
-        for (i in 1..n) push(it.next())
+    .push_values(seq, n @ Int): {
+        for v in seq.take(n)
+            self.push(v)
         self
     }
 
-    # Remove `n' elements and return them as a list.
-    pop(n @ Int) = {
-        v: pop()
-        cons(v, pop(n-1))
+    # Remove `n' elements and return them as an array.
+    .pop(n @ Int): {
+        values: Array.new()
+        for i in 0..n
+            values.push(.pop())
+        values
     }
-    pop(0): []
 
     # Drop elements.
-    drop() = {
-        pop()
+    .drop(): {
+        .pop()
         self
     }
-    drop(n @ Int) = {
-        for (i in 1..n) pop()
+    .drop(n @ Int): {
+        for i in 0..n
+            self.pop()
         self
     }
 
     # Remove all elements from the stack.
-    clear() = {
-        while (not empty?) pop()
+    .clear(): {
+        while (not .empty?)
+            self.drop()
         self
     }
 
     # Duplicate `top'.
-    dup() = push(top())
+    .dup(): .push(.top())
 
     # Duplicate `top' `n' times.
-    dup(n @ Int) = {
-        for (i in 1..n) dup()
+    .dup(n @ Int): {
+        for i in 0..n
+            self.dup()
         self
     }
 
     # Rotate `n` elements by sliding `m' elements.
-    rotate(n @ Int, m @Int) = {
+    .rotate(n @ Int, m @Int): {
         tmp: Array.new(n)
-        for (i in 0..n-1) tmp[(i + m) % n] = pop()
-        for (i in 1..n) push(tmp[n-i])
+        for i in 0..n-1
+            tmp[(i + m) % n] = .pop()
+        for i in 1..n
+            self.push(tmp[n-i])
         self
     }
 }
 
 ### Linked list implementation ###
+new('List):  `Stack{[]} with .parent = Trait.ListStack
+new('Array): `Stack{!Array.new()} with .parent = Trait.ArrayStack
+new(): new('Array)
+
 trait ListStack {
-    extend Trait.Stack
+    extend 'Stack
+    .list:   alias(0)
+    .size:   alias(() -> .list.size)
+    .empty? = alias(() -> .list.empty?)
 
-    list   = alias(0)
-    size   = alias(() -> list.size)
-    empty? = alias(() -> list.empty?)
+    .top(): {
+        if .empty?
+            throw `EmptyStack{}
+        first(.list)
+    }
 
-    push(v) = {
-        list = cons(v, list)
+    .push(v): {
+        .list = cons(v, .list)
         self
     }
-    pop() = {
-        v: car(list)
-        list = cdr(list)
-        v
+
+    .pop(): {
+        value: first(.list)
+        .list = rest(.list)
+        value
     }
 }
 
-new(\List): `Stack{[]} with parent = Trait.ListStack
-
 trait ArrayStack {
-    extend Trait.Stack
-
-    array   = alias(0)
-    size    = alias(() -> array.size)
-    empty?  = alias(() -> array.empty?)
-    push(v) = array.push_back(v)
-    pop()   = array.pop_back()
+    extend 'Stack
+    .array:   alias(0)
+    .size:    alias(() -> .array.size)
+    .empty? = alias(() -> .array.empty?)
+    .push(v): .array.push(v)
+    .pop():   .array.pop()
 }
-
-new(\Array): `Stack{!Array.new()} with parent = Trait.ArrayStack
-
-
