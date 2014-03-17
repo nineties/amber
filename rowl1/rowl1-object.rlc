@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-object.rlc 2014-03-17 06:20:36 nineties $
+; $Id: rowl1-object.rlc 2014-03-17 21:16:31 nineties $
 ;
 
 (import "rlvm-compile")
@@ -24,6 +24,9 @@
 
 (extern fun tuple_at)
 (extern fun tuple2)
+(extern fun table_new)
+(extern fun table_store)
+(extern fun table_at)
 
 (fun get_parent (obj) (
     (var p (wrtable_find parent_tbl obj))
@@ -177,16 +180,18 @@
 (fun each_slots (obj fun rec) (
     (var code (get_bytecode fun))
     (var ent_ (wrtable_entries slots))
+    (var dupcheck (table_new))
     (label loop)
     (var ent ent_)
     (while ent (do
         (var sym (field_get ent 2))
-        (if (!= sym parent) (do
+        (if (&& (!= sym parent) (!= (table_at dupcheck sym) @C_TRUE)) (do
             (var tbl (field_get ent 3))
             (var v (wrtable_find tbl obj))
-            (if (!= v @C_UNDEF)
+            (if (!= v @C_UNDEF) (do
                 (runcode code obj sym v)
-                )
+                (table_store dupcheck sym @C_TRUE)
+                ))
             ))
         (= ent (field_get ent 1))
         ))
