@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-03-17 22:39:10 nineties $
+; $Id: rowl1-packrat.rlc 2014-03-17 23:02:22 nineties $
 ;
 
 (import "rlvm-compile")
@@ -207,6 +207,8 @@
 (var shell_mode_p @FALSE)
 (var mayparse_p @FALSE)
 (var left_rec (string "Left Recursion Detected"))
+(var PVar (to_sym "parser")) ; internal use
+(var syntax (to_sym "syntax"))
 
 (extern fun load_global)
 (extern fun ary_include)
@@ -233,11 +235,11 @@
     ))
 
 (fun syntax_func (name) (
-    (return (slot Syntax (to_sym name)))
+    (return (slot (slot PVar syntax) (to_sym name)))
     ))
 
 (export fun parse (name p) (
-    (return (runcode (lookup_func (load_global Syntax) (to_sym name)) p))
+    (return (runcode (lookup_func (get_slot p syntax) (to_sym name)) p))
     ))
 
 (export fun parse_success (p) (
@@ -899,8 +901,7 @@
 
 (fun parse_spaces_oneline_ (p) (
     (var pos (get_pos p))
-    (var syntax (load_global Syntax))
-    (var comment (lookup_func_nocheck syntax (to_sym "comment")))
+    (var comment (lookup_func_nocheck (get_slot p syntax) (to_sym "comment")))
     (while @TRUE (do
         (var c (lookahead p))
         (if (< c 0) break)
@@ -923,8 +924,7 @@
 
 (fun parse_spaces_ (p) (
     (var pos (get_pos p))
-    (var syntax (load_global Syntax))
-    (var comment (lookup_func_nocheck syntax (to_sym "comment")))
+    (var comment (lookup_func_nocheck (get_slot p syntax) (to_sym "comment")))
     (while @TRUE (do
         (var c (lookahead p))
         (if (< c 0) break)
@@ -1212,7 +1212,6 @@
         ))
     ))
 
-(var PVar (to_sym "parser")) ; internal use
 (fun make_nodevar (idx) (
     (return (to_sym (strcat "node" (itos10 idx))))
     ))
@@ -1280,9 +1279,9 @@
     ))
 
 (fun is_reserved_word (p sym) (
-    (var syntax (get_slot_nocheck p (to_sym "syntax")))
-    (if (== syntax @C_NIL) (return @FALSE))
-    (var reserved_words (get_slot_nocheck syntax (to_sym "reserved_words")))
+    (var stx (get_slot_nocheck p syntax))
+    (if (== stx @C_NIL) (return @FALSE))
+    (var reserved_words (get_slot_nocheck stx (to_sym "reserved_words")))
     (if (== reserved_words @C_NIL) (return @FALSE))
     (if (!= (node_type reserved_words) @ArrayE)
         (throw (logic_error (string "'reserved_words' must be an array of symbols")))
@@ -1298,7 +1297,8 @@
                 (quote (node_arg_symbol pat 0)))) ws))
         ))
     (if (== hd Symbol) (do
-        (return (parse_with_check (apply (slot Syntax pat) (list1 PVar)) ws))
+        (return (parse_with_check
+            (apply (slot (slot PVar syntax) pat) (list1 PVar)) ws))
         ))
     (if (== hd Slot) (do
         (return (parse_with_check (apply pat (list1 PVar)) ws))
@@ -1757,11 +1757,11 @@
     (var v (to_unique_sym "v"))
     (var body 0)
     (= body (cons (defvar stx (apply Eval (list1 expr0))) body))
-    (= body (cons (defvar save_stx (slot PVar (to_sym "syntax"))) body))
-    (= body (cons (assign (slot PVar (to_sym "syntax")) stx) body))
+    (= body (cons (defvar save_stx (slot PVar syntax)) body))
+    (= body (cons (assign (slot PVar syntax) stx) body))
     (= body (cons (defvar v (apply
         (send stx (to_sym "get_slot") (list1 expr1)) (list1 PVar))) body))
-    (= body (cons (assign (slot PVar (to_sym "syntax")) save_stx) body))
+    (= body (cons (assign (slot PVar syntax) save_stx) body))
     (= body (cons v body))
     (return (parse_with_check (block (list_reverse body)) ws))
     ))
