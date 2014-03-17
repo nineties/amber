@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-03-16 21:57:47 nineties $ "
+" $Id: Syntax.ab 2014-03-17 19:58:41 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -18,6 +18,7 @@ Assign{Slot{Syntax, comment}, Slot{Prim, parse_shell_style_comment}}
 # P?    : option
 # &P    : and
 # !P    : not
+# 'sym  : a symbol
 # (...) : grouping
 # [...] : oneof
 # [^..] : noneof
@@ -42,7 +43,6 @@ DefineSyntax{
         Tuple{List{"."}, Quote{any}},
         Tuple{List{string}, node0},
         Tuple{List{symbol_without_mark}, node0},
-        Tuple{List{reserved_word}, node0},
         Tuple{List{"(", syntax_element, ")"}, node1},
         Tuple{List{"(", Many1{syntax_element}, ")"}, node1, multiline},
         Tuple{List{"[", "^", character_set, "]"},
@@ -63,6 +63,8 @@ DefineSyntax{
             QuasiQuote{Many1{Unquote{node0}}}},
         Tuple{List{Delimited2{primary_syntax_element, "/"}},
             MakeObject{Quote{Choice}, node0}},
+        Tuple{List{"'", any_symbol},
+            QuasiQuote{Word{Unquote{node1}}}},
         Tuple{List{"&", primary_syntax_element},
             QuasiQuote{And{Unquote{node1}}}},
         Tuple{List{"!", primary_syntax_element},
@@ -161,7 +163,7 @@ primary_expr
         { MakeObject{Quote{Tuple}, node1} }
       | "|" expr "|"
         { MakeObject{Quote{Abs}, List{node1}} }
-      | self            { Quote{GetSelf{}} }
+      | 'self           { Quote{GetSelf{}} }
       | atom
       | "..."           { Quote{Rest{}} }
 
@@ -214,7 +216,7 @@ Assign{Slot{Syntax, expr}, Slot{Syntax, quote_expr}}
 prefix_expr
     ::= "+"          quote_expr { `UnaryPlus{!node1} }
       | "-" !decimal quote_expr { `UnaryMinus{!node2} }
-      | not quote_expr          { `Not{!node1} }
+      | 'not quote_expr         { `Not{!node1} }
       | quote_expr
 
 infix_expr
@@ -249,11 +251,11 @@ rel_expr
       | range_expr
 
 seqand_expr
-    ::= rel_expr and seqand_expr { `SeqAnd{!node0, !node2} }
+    ::= rel_expr 'and seqand_expr { `SeqAnd{!node0, !node2} }
       | rel_expr
 
 seqor_expr
-    ::= seqand_expr or seqor_expr { `SeqOr{!node0, !node2} }
+    ::= seqand_expr 'or seqor_expr { `SeqOr{!node0, !node2} }
       | seqand_expr
 
 ternary_expr
@@ -261,7 +263,7 @@ ternary_expr
         { `IfElse{!node0, !node2, !node4} }
       | seqor_expr
 
-guard_clause ::= when ternary_expr { node1 }
+guard_clause ::= 'when ternary_expr { node1 }
 
 argument_list
     ::= "(" delimited(argument, ",") ")" guard_clause
@@ -290,8 +292,8 @@ slot_assign
       | slot_assign_stmt { List{node0} }
 
 continuation_expr
-    ::= reset multi_lambda_expr { `Reset{!node1} }
-      | shift multi_lambda_expr { `Shift{!node1} }
+    ::= 'reset multi_lambda_expr { `Reset{!node1} }
+      | 'shift multi_lambda_expr { `Shift{!node1} }
       | multi_lambda_expr
 
 assign_expr
@@ -304,7 +306,7 @@ assign_expr
       | pattern "//=" assign_expr { `QuotAssign{!node0, !node2} }
       | pattern "%=" assign_expr  { `RemAssign{!node0, !node2} }
       | pattern "|=" assign_expr  { `FusionAssign{!node0, !node2} }
-      | pattern with slot_assign
+      | pattern 'with slot_assign
         { MakeObject{Quote{WithSlots}, List{node0, node2}} }
       | continuation_expr
 
@@ -312,12 +314,12 @@ Assign{Syntax.expr, Syntax.assign_expr}
 
 ### Statements
 
-import_as ::= as symbol { node1 }
+import_as ::= 'as symbol { node1 }
 
 import_option
     ::= "(" "*" ")"                            { `All }
       | "(" delimited1(symbol, ",") ")"        { node1 }
-      | hiding "(" delimited1(symbol, ",") ")" { `Hiding{!node2} }
+      | 'hiding "(" delimited1(symbol, ",") ")" { `Hiding{!node2} }
 
 stmt
     ::= stmt ";" stmt
@@ -326,35 +328,35 @@ stmt
       | stmt ";"
         { `Seq{[!node0, nil]} }
 
-      | <<multiline>> if expr stmt else stmt
+      | <<multiline>> 'if expr stmt 'else stmt
         { `IfElse{!node1, !node2, !node4} }
-      | <<multiline>> if expr stmt
+      | <<multiline>> 'if expr stmt
         { `If{!node1, !node2} }
 
-      | <<multiline>> case expr of multi_lambda_expr
+      | <<multiline>> 'case expr 'of multi_lambda_expr
         { `Apply{!node3, [!node1]} }
 
-      | <<multiline>> while expr block
+      | <<multiline>> 'while expr block
         { `While{!node1, !node2} }
-      | <<multiline>> for pattern in expr block
+      | <<multiline>> 'for pattern 'in expr block
         { `For{!node1, !node3, !node4} }
-      | continue
+      | 'continue
         { `Continue{} }
-      | break
+      | 'break
         { `Break{} }
-      | return expr
+      | 'return expr
         { `Return{!node1} }
-      | return
+      | 'return
         { `Return{nil} }
-      | throw expr
+      | 'throw expr
         { `Throw{!node1} }
-      | <<multiline>> try block catch multi_lambda_expr
+      | <<multiline>> 'try block 'catch multi_lambda_expr
         { `Try{!node1, !node3} }
       | <<multiline>> pattern guard_clause ":" stmt
         { `Define{!node0, !node3, !node1} }
       | <<multiline>> pattern ":" stmt
         { `Define{!node0, !node2} }
-      | import delimited1(symbol, ".") import_as? import_option?
+      | 'import delimited1(symbol, ".") import_as? import_option?
         { `Import{!node1, !node2, !node3} }
 
       | postfix_expr ![+-.] delimited1(argument, ",")

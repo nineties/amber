@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-03-17 19:00:05 nineties $
+; $Id: rowl1-packrat.rlc 2014-03-17 20:01:39 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1000,7 +1000,7 @@
     ))
 @(MEMOIZE symbol)
 
-(fun parse_reserved_word_ (p) (
+(fun parse_any_symbol_ (p) (
     (var state (copy_parser_state p))
     (var begin (field_get p 6))
     (parse_symbol_impl p)
@@ -1008,14 +1008,9 @@
     (var c (lookahead p))
     (if (|| (== c '!') (== c '?')) (getc p))
     (var s (to_sym (extract_string p begin (field_get p 6))))
-    (if (! (is_reserved_word s)) (do
-        (noparse p (strcat "not reserved symbol: " (symbol_name s)))
-        (reset_parser_position p state)
-        (return @C_FALSE)
-        ))
     (return (parsed p s))
     ))
-@(MEMOIZE reserved_word)
+@(MEMOIZE any_symbol)
 
 (fun parse_symbol_without_mark_ (p) (
     (var state (copy_parser_state p))
@@ -1025,7 +1020,7 @@
     (var c (lookahead p))
     (var s (to_sym (extract_string p begin (field_get p 6))))
     (if (is_reserved_word s) (do
-        (noparse p (strcat "not reserved symbol: " (symbol_name s)))
+        (noparse p (strcat "reserved symbol: " (symbol_name s)))
         (reset_parser_position p state)
         (return @C_FALSE)
         ))
@@ -1297,11 +1292,12 @@
     ))
 
 (fun compile_parser_element (pat ws) (
-    (if (is_reserved_word pat) (do
-        (return (parse_with_check
-            (apply (syntax_func "word") (list2 PVar (quote pat))) ws)))
-        )
     (var hd (node_head pat))
+    (if (== hd (to_sym "Word")) (do
+        (return (parse_with_check
+            (apply (syntax_func "word") (list2 PVar
+                (quote (node_arg_symbol pat 0)))) ws))
+        ))
     (if (== hd Symbol) (do
         (return (parse_with_check (apply (slot Syntax pat) (list1 PVar)) ws))
         ))
@@ -2014,7 +2010,7 @@
     (add_parser mod (to_sym "parse_string") parse_string_d)
     (add_parser mod (to_sym "parse_symbol") parse_symbol)
     (add_parser mod (to_sym "parse_symbol_without_mark") parse_symbol_without_mark)
-    (add_parser mod (to_sym "parse_reserved_word") parse_reserved_word)
+    (add_parser mod (to_sym "parse_any_symbol") parse_any_symbol)
     (add_parser mod (to_sym "parse_atom") parse_atom)
     (add_parser mod (to_sym "parse_fullform") parse_fullform)
     (add_parser mod (to_sym "parse_expr") parse_expr)
