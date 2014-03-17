@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-object.rlc 2014-03-13 08:30:29 nineties $
+; $Id: rowl1-object.rlc 2014-03-17 06:20:36 nineties $
 ;
 
 (import "rlvm-compile")
@@ -104,10 +104,9 @@
         ))
     (if (&& (!= alias @C_FALSE) (== (node_type v) @AliasE)) (do
         (var f (field_get v 2))
-        (if (== f @C_NIL)
-            (throw (access_error (string "Readonly slot") obj sym))
+        (if (!= f @C_NIL)
+            (return (runcode_with_self obj (get_bytecode f) val))
             )
-        (return (runcode_with_self obj (get_bytecode f) val))
         ))
     (if (!= overwrite @C_FALSE)
         (field_set ref 3 val)
