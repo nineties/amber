@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-03-17 21:33:32 nineties $
+; $Id: rowl1-packrat.rlc 2014-03-17 22:39:10 nineties $
 ;
 
 (import "rlvm-compile")
@@ -227,8 +227,8 @@
 
 (fun trace (obj) (
     (return (block (list2
-        (apply (slot (to_sym "prim") (to_sym "print")) (list2 (slot (to_sym "prim") (to_sym "stderr")) obj))
-        (apply (slot (to_sym "prim") (to_sym "print")) (list2 (slot (to_sym "prim") (to_sym "stderr")) (string "\n")))
+        (apply (slot (to_sym "Prim") (to_sym "print")) (list2 (slot (to_sym "Prim") (to_sym "stderr")) obj))
+        (apply (slot (to_sym "Prim") (to_sym "print")) (list2 (slot (to_sym "Prim") (to_sym "stderr")) (string "\n")))
         )))
     ))
 
@@ -1326,8 +1326,8 @@
         (return (compile_delimited (node_arg pat 0) (node_arg pat 1) 2 ws))
         ))
     (if (== hd ParseWith) (do
-        (if (!= len 1) (goto compile_error))
-        (return (compile_parse_with (node_arg pat 0) ws))
+        (if (!= len 2) (goto compile_error))
+        (return (compile_parse_with (node_arg pat 0) (node_arg_symbol pat 1)ws))
         ))
     (if (!= len 1) (goto compile_error))
     (if (== hd OneOf)
@@ -1742,10 +1742,28 @@
     (return (breakable (list_reverse body)))
     ))
 
-; parsewith{ expr }
-(fun compile_parse_with (expr ws) (
-    (return (parse_with_check
-        (apply (apply Eval (list1 expr)) (list1 PVar)) ws))
+; parsewith{ stx, elem }
+;
+; save_stx: parser.stx
+; parser.stx = stx
+; v: stx.elem(parser)
+; parser.stx = save_stx
+; v
+;
+(fun compile_parse_with (expr0 expr1 ws) (
+    (var stx (to_unique_sym "stx"))
+    (var save_stx (to_unique_sym "save_stx"))
+    (var field (to_unique_sym "field"))
+    (var v (to_unique_sym "v"))
+    (var body 0)
+    (= body (cons (defvar stx (apply Eval (list1 expr0))) body))
+    (= body (cons (defvar save_stx (slot PVar (to_sym "syntax"))) body))
+    (= body (cons (assign (slot PVar (to_sym "syntax")) stx) body))
+    (= body (cons (defvar v (apply
+        (send stx (to_sym "get_slot") (list1 expr1)) (list1 PVar))) body))
+    (= body (cons (assign (slot PVar (to_sym "syntax")) save_stx) body))
+    (= body (cons v body))
+    (return (parse_with_check (block (list_reverse body)) ws))
     ))
 
 ; Option{ p } is translated to
