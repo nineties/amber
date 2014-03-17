@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-03-17 23:02:22 nineties $
+; $Id: rowl1-packrat.rlc 2014-03-18 03:47:33 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1746,21 +1746,33 @@
 ;
 ; save_stx: parser.stx
 ; parser.stx = stx
-; v: stx.elem(parser)
-; parser.stx = save_stx
+; v: nil
+; try
+;   v = stx.elem(parser)
+; catch e -> {
+;     parser.stx = save_stx
+;     throw e
+; }
 ; v
-;
+
 (fun compile_parse_with (expr0 expr1 ws) (
     (var stx (to_unique_sym "stx"))
     (var save_stx (to_unique_sym "save_stx"))
     (var field (to_unique_sym "field"))
     (var v (to_unique_sym "v"))
+    (var e (to_unique_sym "e"))
     (var body 0)
     (= body (cons (defvar stx (apply Eval (list1 expr0))) body))
     (= body (cons (defvar save_stx (slot PVar syntax)) body))
     (= body (cons (assign (slot PVar syntax) stx) body))
-    (= body (cons (defvar v (apply
-        (send stx (to_sym "get_slot") (list1 expr1)) (list1 PVar))) body))
+    (= body (cons (defvar v @C_NIL) body))
+    (= body (cons (make_object2 Try
+        (assign v (apply (send stx (to_sym "get_slot") (list1 expr1)) (list1 PVar)))
+        (lambda (list1 e) (block (list2
+            (assign (slot PVar syntax) save_stx)
+            (make_object1 Throw e)
+            )))
+        ) body))
     (= body (cons (assign (slot PVar syntax) save_stx) body))
     (= body (cons v body))
     (return (parse_with_check (block (list_reverse body)) ws))
