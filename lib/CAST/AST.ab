@@ -1,10 +1,10 @@
 # Copyright (C) 2014 nineties
-# $Id: CAST/AST.ab 2014-03-16 17:34:51 nineties $
+# $Id: CAST/AST.ab 2014-03-17 16:29:22 nineties $
 
+import PrettyPrint as PP
 import Numeric.Bit as Bit
 
 #= Abstract syntax tree for CAST =
-
 #== Types ==
 # A primitive type is just a symbol. We consulted primitive types of
 # D language (http://dlang.org/type).
@@ -166,3 +166,19 @@ DIRECVIRES: [
     `Define{name, value},
     `DirectCode{code}       # Insert any code into the current scope.
 ]
+
+#= Parsing =
+
+CAST.Syntax: Syntax.new() with {
+    .add_reserved_word(true, false)
+
+    .literal
+        ::= true                { `BoolL{true} }
+          | false               { `BoolL{false} }
+          | integer             { `IntL{!$0} }
+          | float               { `FloatL{!$0} }
+          | string              { `StringL{!$0} }
+          | "'" nospace(.) "'"  { `CharL{!$input} }
+}
+
+#= Pretty printing =

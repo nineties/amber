@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-03-17 20:01:39 nineties $
+; $Id: rowl1-packrat.rlc 2014-03-17 20:20:56 nineties $
 ;
 
 (import "rlvm-compile")
@@ -991,7 +991,7 @@
     (var c (lookahead p))
     (if (|| (== c '!') (== c '?')) (getc p))
     (var s (to_sym (extract_string p begin (field_get p 6))))
-    (if (is_reserved_word s) (do
+    (if (is_reserved_word p s) (do
         (noparse p (strcat "reserved symbol: " (symbol_name s)))
         (reset_parser_position p state)
         (return @C_FALSE)
@@ -1019,7 +1019,7 @@
     @(CHECK p)
     (var c (lookahead p))
     (var s (to_sym (extract_string p begin (field_get p 6))))
-    (if (is_reserved_word s) (do
+    (if (is_reserved_word p s) (do
         (noparse p (strcat "reserved symbol: " (symbol_name s)))
         (reset_parser_position p state)
         (return @C_FALSE)
@@ -1279,16 +1279,15 @@
     (return p)
     ))
 
-(fun is_reserved_word (sym) (
-    (if (!= (node_type sym) @SymbolE) (return @FALSE))
-    (var reserved_words (get_slot_nocheck (load_global Syntax) (to_sym "reserved_words")))
-    (if (!= reserved_words @C_NIL) (do
-        (if (!= (node_type reserved_words) @ArrayE)
-            (throw (logic_error (string "'reserved_words' must be an array of symbols")))
-            )
-        (return (!= (ary_include reserved_words sym) @C_FALSE))
-        ))
-    (return @FALSE)
+(fun is_reserved_word (p sym) (
+    (var syntax (get_slot_nocheck p (to_sym "syntax")))
+    (if (== syntax @C_NIL) (return @FALSE))
+    (var reserved_words (get_slot_nocheck syntax (to_sym "reserved_words")))
+    (if (== reserved_words @C_NIL) (return @FALSE))
+    (if (!= (node_type reserved_words) @ArrayE)
+        (throw (logic_error (string "'reserved_words' must be an array of symbols")))
+        )
+    (return (!= (ary_include reserved_words sym) @C_FALSE))
     ))
 
 (fun compile_parser_element (pat ws) (
