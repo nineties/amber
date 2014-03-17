@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-03-16 21:30:00 nineties $
+; $Id: rowl1-packrat.rlc 2014-03-17 17:32:35 nineties $
 ;
 
 (import "rlvm-compile")
@@ -446,24 +446,20 @@
     (field_set p 8 (+ (field_get p 8) 1))
     ))
 
+(fun reset_memotable (p) (
+    (var buf (field_get p 4))
+    (memotable_clear (field_get buf 2))
+    ))
+
 (export fun reset_parser (p) (
     (var buf (field_get p 4))
     (var cbuf (field_get buf 0))
-    (var bufsz (cvector_size cbuf))
-    (var pos (field_get p 6))
-
-    ; XXX: Not good implementation.
-    ; Ring buffer is better.
-    (if (|| (>= pos bufsz) (! @(PARSED p))) (do
-        (cvector_resize cbuf 0)
-        (field_set p 6 0)
-        ))
-
+    (cvector_resize cbuf 0)
+    (field_set p 6 0)
     ; reset error info
     (field_set p 3 0)
     (field_set p 11 0)
-
-    (memotable_clear (field_get buf 2))
+    (reset_memotable p)
     ))
 
 (fun get_nextchar (p) (
@@ -1182,7 +1178,7 @@
     (if (== (parse_char p '\n') @C_FALSE) (return @C_NIL))
 
     (parsed p stmt)
-    (reset_parser p)
+    (reset_memotable p)
     (return @C_NIL)
     ))
 
@@ -1751,10 +1747,9 @@
     (return (breakable (list_reverse body)))
     ))
 
-; parsewith{ sym }
-(fun compile_parse_with (sym ws) (
-    (= sym (slot Syntax sym))
-    (return (parse_with_check (apply sym (list1 PVar)) ws))
+; parsewith{ expr }
+(fun compile_parse_with (expr ws) (
+    (return (parse_with_check (apply expr (list1 PVar)) ws))
     ))
 
 ; Option{ p } is translated to
@@ -1963,7 +1958,11 @@
     (if (!= (node_head lhs) Slot)
         (= lhs (slot Syntax lhs))
         )
-    (return (make_object3 Define lhs (lambda (make_object2 When (list1 (make_object2 Domain PVar Parser)) parser) @C_TRUE) (to_sym "fusion")))
+    (var v (make_object3 Define lhs (lambda (make_object2 When (list1 (make_object2 Domain PVar Parser)) parser) @C_TRUE) (to_sym "fusion")))
+    (debugs "==== DEFINE SYNTAX ====\n")
+    (debugpf expr)
+    (debugpf v)
+    (return v)
     ))
 
 (export fun enable_shell_syntax () (
@@ -2004,6 +2003,8 @@
     (add_function2 mod (to_sym "parse_text") (domainP Parser) stringT parse_text 0)
     (add_function2 mod (to_sym "parse_word") (domainP Parser) symT parse_word 0)
 
+    (add_parser mod (to_sym "parse_char") parse_char)
+    (add_parser mod (to_sym "parse_char") parse_char)
     (add_parser mod (to_sym "parse_any") parse_any_char)
     (add_parser mod (to_sym "parse_comment") parse_fail)
     (add_parser mod (to_sym "parse_spaces") parse_spaces)
