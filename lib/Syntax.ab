@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-03-17 23:11:05 nineties $ "
+" $Id: Syntax.ab 2014-03-18 20:37:10 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -103,10 +103,10 @@ DefineSyntax{
 DefineSyntax{
     parser_entry,
     List{
-        Tuple{List{parser_option, Many1{syntax_element}, parser_action},
+        Tuple{List{parser_option, Many{syntax_element}, parser_action},
             QuasiQuote{Tuple{Unquote{node1}, Unquote{node2}, Unquote{node0}}}
         },
-        Tuple{List{Many1{syntax_element}, parser_action},
+        Tuple{List{Many{syntax_element}, parser_action},
             QuasiQuote{Tuple{Unquote{node0}, Unquote{node1}}}
         },
         Tuple{List{parser_option, syntax_element},
@@ -679,8 +679,10 @@ macro(Lambda{When{args, guard}, body}): desugar_lambda(args, guard, body)
 macro(WithSlots{obj, init}): `Apply{!obj, () -> { Seq{!init}; self }, []}
 
 ## Utilities
-add_reserved_word(syms...):
-    Prim.list_foreach(sym -> Prim.array_push(Syntax.reserved_words, sym), syms)
+add_reserved_word(strings...):
+    Prim.list_foreach(str ->
+        Prim.array_push(Syntax.reserved_words,
+            Prim.string_to_symbol(str)), strings)
 
 Syntax.new(case_sensitive=true): {
     if not case_sensitive
