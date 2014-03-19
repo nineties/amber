@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-03-18 03:47:33 nineties $
+; $Id: rowl1-packrat.rlc 2014-03-18 20:08:13 nineties $
 ;
 
 (import "rlvm-compile")
@@ -660,11 +660,15 @@
     (if (is_identchar (lookbehind p))
         (return (noparse p "not beggining of a word"))
         )
-    (var r (parse_text p (symbol_name sym)))
+    (parse_text p (symbol_name sym))
     (if (! (is_end_of_token p))
         (return (noparse p "not end of a word"))
         )
-    (return r)
+    (if @(PARSED p)
+        (return (parsed p sym))
+        (return (noparse p
+            (strcat "expect token: '" (strcat (symbol_name sym) "'"))))
+        )
     ))
 
 ; parse_integers
