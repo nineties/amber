@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-03-19 23:30:44 nineties $
+; $Id: rowl1-packrat.rlc 2014-03-20 00:15:04 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1023,7 +1023,7 @@
     ))
 @(MEMOIZE any_symbol)
 
-(fun parse_symbol_without_mark_ (p) (
+(fun parse_identifier_ (p) (
     (var state (copy_parser_state p))
     (var begin (field_get p 6))
     (parse_symbol_impl p)
@@ -1037,7 +1037,7 @@
         ))
     (return (parsed p s))
     ))
-@(MEMOIZE symbol_without_mark)
+@(MEMOIZE identifier)
 
 ; double-quoted string literal
 (fun parse_string_d_ (p) (
@@ -1337,7 +1337,7 @@
         ))
     (if (== hd ParseWith) (do
         (if (!= len 2) (goto compile_error))
-        (return (compile_parse_with (node_arg pat 0) (node_arg_symbol pat 1)ws))
+        (return (compile_parse_with (node_arg pat 0) (node_arg pat 1)ws))
         ))
     (if (!= len 1) (goto compile_error))
     (if (== hd OneOf)
@@ -1772,12 +1772,12 @@
     (var v (to_unique_sym "v"))
     (var e (to_unique_sym "e"))
     (var body 0)
-    (= body (cons (defvar stx (apply Eval (list1 expr0))) body))
+    (= body (cons (defvar stx expr0) body))
     (= body (cons (defvar save_stx (slot PVar syntax)) body))
     (= body (cons (assign (slot PVar syntax) stx) body))
     (= body (cons (defvar v @C_NIL) body))
     (= body (cons (make_object2 Try
-        (assign v (apply (send stx (to_sym "get_slot") (list1 expr1)) (list1 PVar)))
+        (assign v (apply (apply_util "%get_slot" (list2 stx expr1)) (list1 PVar)))
         (lambda (list1 e) (block (list2
             (assign (slot PVar syntax) save_stx)
             (make_object1 Throw e)
@@ -2034,6 +2034,7 @@
 
     (add_function2 utilities (to_sym "%parse_text") (domainP Parser) stringT parse_text 0)
     (add_function2 utilities (to_sym "%parse_word") (domainP Parser) symT parse_word 0)
+    (add_function2 utilities (to_sym "%get_slot") DontCare symT get_slot 0)
 
     (add_parser mod (to_sym "parse_char") parse_char)
     (add_parser mod (to_sym "parse_char") parse_char)
@@ -2048,7 +2049,7 @@
     (add_parser mod (to_sym "parse_float") parse_float)
     (add_parser mod (to_sym "parse_string") parse_string_d)
     (add_parser mod (to_sym "parse_symbol") parse_symbol)
-    (add_parser mod (to_sym "parse_symbol_without_mark") parse_symbol_without_mark)
+    (add_parser mod (to_sym "parse_identifier") parse_identifier)
     (add_parser mod (to_sym "parse_any_symbol") parse_any_symbol)
     (add_parser mod (to_sym "parse_atom") parse_atom)
     (add_parser mod (to_sym "parse_fullform") parse_fullform)

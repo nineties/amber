@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-03-19 23:28:12 nineties $ "
+" $Id: Syntax.ab 2014-03-20 00:10:47 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -28,7 +28,7 @@ Assign{Slot{Syntax, comment}, Slot{Prim, parse_shell_style_comment}}
 # delimited(p, d)  : sequence of p delimited by d
 # delimited1(p, d) : sequence of p delimited by d (one or many)
 # delimited2(p, d) : sequence of p delimited by d (two or many)
-# parsewith(p)     : do parse using p (p can refer previous tokens)
+# parsewith(expr,p): do parse using p (p can refer previous tokens)
 
 DefineSyntax{
     character_set,
@@ -42,7 +42,7 @@ DefineSyntax{
     List{
         Tuple{List{"."}, Quote{any}},
         Tuple{List{string}, node0},
-        Tuple{List{symbol_without_mark}, node0},
+        Tuple{List{identifier}, node0},
         Tuple{List{"(", syntax_element, ")"}, node1},
         Tuple{List{"(", Many1{syntax_element}, ")"}, node1, multiline},
         Tuple{List{"[", "^", character_set, "]"},
@@ -77,7 +77,7 @@ DefineSyntax{
             QuasiQuote{Delimited1{Unquote{node2}, Unquote{node4}}}, multiline},
         Tuple{List{"delimited2", "(", syntax_element, ",", syntax_element, ")"},
             QuasiQuote{Delimited2{Unquote{node2}, Unquote{node4}}}, multiline},
-        Tuple{List{"parsewith", "(", expr, ",", symbol, ")"},
+        Tuple{List{"parsewith", "(", expr, ",", expr, ")"},
             QuasiQuote{ParseWith{Unquote{node2}, Unquote{node4}}}, multiline},
         Tuple{List{"nospace", "(", syntax_element, ")"},
             QuasiQuote{NoSpace{Unquote{node2}}}, multiline},
@@ -153,7 +153,8 @@ block ::= primary_block
 
 primary_expr
     ::= primary_block
-      | <<multiline>> "<" postfix_expr "," symbol ">" "{" parsewith(node1, node3) "}"
+      | <<multiline>> "<" postfix_expr "," postfix_expr ">" "{"
+         parsewith(Apply{eval, List{node1}}, node3) "}"
         { node6 }
       | <<multiline>> "(" stmt ")"             { node1 }
       # List literal
@@ -698,7 +699,7 @@ Syntax.new(case_sensitive=true): {
     # Copy basic parsers
     basic_parsers: ['toplevel, 'shell, 'any, 'spaces, 'comment, 'decimal,
                     'binary, 'octal, 'hex, 'integer, 'float, 'string,
-                    'symbol, 'any_symbol, 'symbol_without_mark]
+                    'symbol, 'any_symbol, 'identifier]
 
     for p in basic_parsers
         syn.set_slot(p, Prim.get_slot(Amber.Syntax, p, false, false, true))
