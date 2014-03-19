@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-03-19 22:33:34 nineties $
+; $Id: rowl1-packrat.rlc 2014-03-19 22:48:44 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1161,11 +1161,15 @@
     (return @(PARSED_FLAG p))
     ))
 
+(fun parse_toplevel_stmt_ (p) (
+    (return (parse "stmt" p))
+    ))
+
 (fun parse_toplevel_stmt (p) (
     (parse_spaces p)
     (set_indent p (get_column p))
     (var loc (get_loc p))
-    (parse "stmt" p)
+    (parse "toplevel_stmt" p)
     (if (! @(PARSED p)) (return @C_NIL))
     (apply_located p loc)
     (var stmt @(TOKEN p))
@@ -2043,6 +2047,7 @@
     (add_parser mod (to_sym "parse_fullform") parse_fullform)
     (add_parser mod (to_sym "parse_expr") parse_expr)
     (add_parser mod (to_sym "parse_stmt") parse_stmt)
+    (add_parser mod (to_sym "parse_toplevel_stmt") parse_toplevel_stmt_)
 
     (add_function1 mod (to_sym "lookahead") (domainP Parser) get_nextchar 0)
     (add_function3 mod (to_sym "input_text") (domainP Parser) intT intT get_input_text 0)
