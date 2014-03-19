@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: CAST/AST.ab 2014-03-18 03:00:54 nineties $
+# $Id: CAST/AST.ab 2014-03-19 19:33:38 nineties $
 
 import PrettyPrint as PP
 import Numeric.Bit as Bit
@@ -41,7 +41,7 @@ DERIVED_TYPES: [
     # be a constant literal.
     `EnumT{name, fields},
 
-    # `params` is a list of `(type, name)`. `spec` contains
+    # `params` is a list of `type`. `spec` contains
     # bit-flags `FUNC_SPEC.inline` and `FUNC_SPEC.const`.
     `FunctionT{return_type, params, spec},
 
@@ -51,6 +51,9 @@ DERIVED_TYPES: [
 
 FUNC_SPEC: Bit.flags('inline, 'const)
 QUALIFIER: Bit.flags('const, 'volatile)
+
+set_type_qual(t, q): `QualifiedT{!t, !q}
+set_type_qual(QualifiedT{t, q1}, q2): `QualifiedT{!t, !Bit.lor(q1, q2)}
 
 # We do not support anonymous struct and union.
 AGGREGATE_TYPES: [
@@ -130,8 +133,7 @@ EXPRESSIONS: [
 #== Statements ==
 
 STATEMENTS: [
-    # `decls` is a list of declarations and `stmts` is a list of statements.
-    `Block{decls, stmts},
+    `Block{stmts},
 
     `If{test, ifthen, ifelse},
     `While{test, body},
@@ -148,9 +150,12 @@ STATEMENTS: [
     `Case{label, stmt},
     `Label{label, stmt},
 
-    `Null{},
+    `Goto{label},
     `Break{},
-    `Continue{}
+    `Continue{},
+
+    # `value == nil` when the return-value is ommitted.
+    `Return{value}
 ]
 
 #== Declarations ==
@@ -158,10 +163,19 @@ STATEMENTS: [
 DECLARATIONS: [
     # `storage` is a one of following symbols:
     # 'none, 'auto, 'static, 'exten and 'register.
-    `DefFunc{storage, type, body},
+    `DefFunc{storage, type, name, params, body},
     `DefVar{storage, type, name, value},
-    `DefAggregates{storage, type, name, subs},
-    `Typedef{name, type}
+
+    # `fields` is a list of `(type, identifier)` which represents a field
+    # for struct and union.
+    `DefAggregates{storage, type, name, fields},
+
+    # `fields` is a list of `(identifier, number)` which represents an
+    # entry of the enum type. Assign `nil` for the number when it is not
+    # specified.
+    `DefEnum{type, fields},
+
+    `DefType{type, name}
 ]
 
 #== Directives ==
@@ -175,7 +189,18 @@ DIRECVIRES: [
 #= Parsing =
 
 CAST.Syntax: Syntax.new() with {
-    .add_reserved_word(true, false)
+    .add_reserved_word "true", "false"
+    .add_reserved_word "void", "char", "wchar", "dchar", "bool", "byte",
+                       "ubyte", "short", "ushort", "int", "uint", "long",
+                       "ulong", "float", "double", "real", "function",
+                       "string", "auto"
+    .add_reserved_word "struct", "union", "enum"
+    .add_reserved_word "return", "if", "else", "while", "do", "upto",
+                       "downto", "switch", "case", "default", "goto",
+                       "break", "continue"
+    .add_reserved_word "typedef", "static", "extern", "const", "volatile"
+
+    # Expressions
 
     .identifier ::= symbol_without_mark
 
@@ -277,17 +302,17 @@ CAST.Syntax: Syntax.new() with {
           | logical_or_expr
 
     .assign_expr
-        ::= unary_expr "="  assign_expr { `Assign{!$0, !$2} }
-          | unary_expr "+=" assign_expr { `OpAssign{!$0, !$2, Add} }
-          | unary_expr "-=" assign_expr { `OpAssign{!$0, !$2, Sub} }
-          | unary_expr "*=" assign_expr { `OpAssign{!$0, !$2, Mul} }
-          | unary_expr "/=" assign_expr { `OpAssign{!$0, !$2, Div} }
-          | unary_expr "%=" assign_expr { `OpAssign{!$0, !$2, Mod} }
+        ::= unary_expr "="  assign_expr  { `Assign{!$0, !$2} }
+          | unary_expr "+=" assign_expr  { `OpAssign{!$0, !$2, Add} }
+          | unary_expr "-=" assign_expr  { `OpAssign{!$0, !$2, Sub} }
+          | unary_expr "*=" assign_expr  { `OpAssign{!$0, !$2, Mul} }
+          | unary_expr "/=" assign_expr  { `OpAssign{!$0, !$2, Div} }
+          | unary_expr "%=" assign_expr  { `OpAssign{!$0, !$2, Mod} }
           | unary_expr "<<=" assign_expr { `OpAssign{!$0, !$2, Shl} }
           | unary_expr ">>=" assign_expr { `OpAssign{!$0, !$2, Shr} }
-          | unary_expr "&=" assign_expr { `OpAssign{!$0, !$2, BAnd} }
-          | unary_expr "^=" assign_expr { `OpAssign{!$0, !$2, BXor} }
-          | unary_expr "|=" assign_expr { `OpAssign{!$0, !$2, BOr} }
+          | unary_expr "&=" assign_expr  { `OpAssign{!$0, !$2, BAnd} }
+          | unary_expr "^=" assign_expr  { `OpAssign{!$0, !$2, BXor} }
+          | unary_expr "|=" assign_expr  { `OpAssign{!$0, !$2, BOr} }
           | conditional_expr
 
     .expr
@@ -295,4 +320,90 @@ CAST.Syntax: Syntax.new() with {
           | assign_expr
 
     .constant_expr ::= conditional_expr
+
+    # Types
+    .base_type ::= 'void | 'char | 'wchar | 'dchar | 'bool | 'byte |
+                   'ubyte | 'short | 'ushort | 'int | 'uint | 'long |
+                   'ulong | 'float | 'double | 'real
+                 | 'auto
+                 | 'struct identifier   { `StructT{!$1} }
+                 | 'union identifier    { `UnionT{!$1} }
+                 | 'enum identifier     { `EnumT{!$1} }
+
+    .primary_type ::= "(" type ")"    { $1 }
+                    | base_type
+
+    .postfix_type ::= postfix_type  "[" constant_expr "]"
+                      { `ArrayT{!$0, !$2} }
+                    | postfix_type "*"
+                      { `PointerT{!$0} }
+                    | postfix_type "(" delimited(type, ",") ")"
+                      { `FunctionT{!$0, !$2, 0} }
+                    | primary_type
+
+    .type ::= 'const type       { set_type_qual($1, QUALIFIER.const) }
+            | 'volatile type    { set_type_qual($1, QUALIFIER.volatile) }
+            | postfix_type
+
+     # Statements
+    .storage ::= 'auto
+               | 'static
+               | 'extern
+               | 'register
+               |            { `none }
+
+    .initializer
+            ::= "{" delimited(initializer, ",") "}"
+                { `InitializerList{!$1} }
+              | assign_expr
+
+    .struct_union_field ::= type identifier ";" { ($0, $1) }
+    .enum_field ::= identifier "=" constant_expr { ($0, $2) }
+                  | identifier                   { ($0, nil) }
+
+    .decl ::= storage type identifier "=" initializer
+              { `DefVar{!$0, !$1, !$2, !$4} }
+            | 'typedef type identifier
+              { `DefType{!$1, !$2} }
+            | storage 'struct identifier "{" struct_union_field* "}"
+              { `DefAggregates{!$0, StructT{!$2}, !$2, !$4} }
+            | storage 'union identifier "{" struct_union_field* "}"
+              { `DefAggregates{!$0, Union{!$2}, !$2, !$4} }
+            | 'enum identifier "{" delimited(enum_field, ",") "}"
+              { `DefEnum{!$1, !$3} }
+
+    .stmt ::= identifier ":" stmt           { `Label{!$0, !$2} }
+            | 'case constant_expr ":" stmt  { `Case{!$1, !$3} }
+            | 'default ":" stmt             { `Case{default, !$2} }
+            | "{" block_item* "}"           { `Block{!$1} }
+            | expr ";"                      { $0 }
+            | 'if "(" expr ")" stmt 'else stmt
+              { `If{!$2, !$4, !$6} }
+            | 'if "(" expr ")" stmt
+              { `If{!$2, !$4, nil} }
+            | 'switch "(" expr ")" stmt
+              { `Switch{!$2, !$4} }
+            | 'while "(" expr ")" stmt
+              { `While{!$2, !$4} }
+            | 'do stmt 'while "(" expr ")" ";"
+              { `DoWhile{!$4, !$1} }
+            | 'upto "(" identifier "," expr "," expr ")" stmt
+              { `Upto{!$2, !$4, !$6, !$8} }
+            | 'downto "(" identifier "," expr "," expr ")" stmt
+              { `Downto{!$2, !$4, !$6, !$8} }
+            | 'goto identifier ";"
+              { `Goto{!$1} }
+            | 'continue ";"
+              { `Continue{} }
+            | 'break ";"
+              { `Break{} }
+            | 'return expr? ";"
+              { `Return{!$1} }
+
+    .function_decl
+        ::= storage type identifier "(" delimited(parameter, ",") ")"
+            "{" block_item* "}"
+            { `DefFunc{!$0, !$1, !$2, !$4, !$7} }
+
+    .program ::= (function_decl/decl)*  { `CASTProgram{!$0} }
 }
