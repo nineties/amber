@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: CAST/AST.ab 2014-03-19 19:33:38 nineties $
+# $Id: CAST/AST.ab 2014-03-19 20:10:42 nineties $
 
 import PrettyPrint as PP
 import Numeric.Bit as Bit
@@ -361,6 +361,8 @@ CAST.Syntax: Syntax.new() with {
     .enum_field ::= identifier "=" constant_expr { ($0, $2) }
                   | identifier                   { ($0, nil) }
 
+    .block_item ::= decl | stmt
+
     .decl ::= storage type identifier "=" initializer
               { `DefVar{!$0, !$1, !$2, !$4} }
             | 'typedef type identifier
@@ -400,10 +402,12 @@ CAST.Syntax: Syntax.new() with {
             | 'return expr? ";"
               { `Return{!$1} }
 
+    .parameter ::= type identifier  { ($0, $1) }
+
     .function_decl
         ::= storage type identifier "(" delimited(parameter, ",") ")"
             "{" block_item* "}"
-            { `DefFunc{!$0, !$1, !$2, !$4, !$7} }
+            { `DefFunc{!$0, !$1, !$2, !$4, Block{!$7}} }
 
     .program ::= (function_decl/decl)*  { `CASTProgram{!$0} }
 }
