@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-03-19 22:48:44 nineties $
+; $Id: rowl1-packrat.rlc 2014-03-19 23:30:44 nineties $
 ;
 
 (import "rlvm-compile")
@@ -408,6 +408,13 @@
 
 (export fun end_of_file (p) (
     (return (== (lookahead p) @EOF))
+    ))
+
+(fun end_of_file_ (p) (
+    (if (end_of_file p)
+        (return @C_TRUE)
+        (return @C_FALSE)
+        )
     ))
 
 (fun lookahead_text (p str) (
@@ -2062,6 +2069,7 @@
     (add_function1 mod (to_sym "parser_error") (domainP Parser) parser_error 0)
     (add_function1 mod (to_sym "parser_loc") (domainP Parser) get_loc 0)
     (add_function1 mod (to_sym "parser_reset") (domainP Parser) reset_parser 0)
+    (add_function1 mod (to_sym "parser_eof?") (domainP Parser) end_of_file_ 0)
     ))
 
 (export fun output_syntax_error (loc e) (

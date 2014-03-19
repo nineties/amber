@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-03-19 22:51:48 nineties $ "
+" $Id: Syntax.ab 2014-03-19 23:28:12 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -702,5 +702,15 @@ Syntax.new(case_sensitive=true): {
 
     for p in basic_parsers
         syn.set_slot(p, Prim.get_slot(Amber.Syntax, p, false, false, true))
+
+    syn.program(p): {
+        statements: []
+        while self.toplevel(p)
+            statements = cons(p.tree, statements)
+        if not p.eof?
+            return `SyntaxError{!p.error_string}
+        `Program{!statements.reverse()}
+    }
+
     syn
 }
