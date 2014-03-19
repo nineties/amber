@@ -2,15 +2,25 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: vm-prim-sys.rlc 2012-01-19 21:51:55 nineties $
+; $Id: vm-prim-sys.rlc 2014-03-19 20:43:28 nineties $
 ;
 
 (import "stdlib")
 (import "vm-compile")
 
 (var SYS_GETTIMEOFDAY 78)
+(var SYS_GETCWD 183)
 
 (var vm-prim-code `(
+
+(char[] @PATH_MAX cwd_str)
+(export prim_getcwd)
+(fun prim_getcwd () (
+    (if (< (syscall @SYS_GETCWD cwd_str @PATH_MAX) 0) (
+        (return 0)
+        ))
+    (return (prim_string cwd_str))
+    ))
 
 (export prim_gettimeofday)
 (fun prim_gettimeofday () (

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-03-17 21:32:48 nineties $
+; $Id: rowl1-interp.rlc 2014-03-19 20:51:18 nineties $
 ;
 
 (import "rlvm-compile")
@@ -83,6 +83,10 @@
 
     ; Boot Amber
     (set_loc no_loc)
+    (var cwd (getcwd))
+    (if (! cwd) (throw (io_error (string "Failed to get current working directory"))))
+    (set_slot amber (to_sym "INVOKE_PATH") cwd)
+
     (var load_path (ary_new)) 
     (set_slot amber (to_sym "AMBER_PATH") load_path)
     (set_slot amber (to_sym "ALREADY_LOADED") (ary_new))
@@ -360,6 +364,13 @@
     (return mod)
     ))
 
+(fun change_dir (path) (
+    (if (< (chdir path) 0)
+        (throw (io_error1 (string "Failed to change directory to") path))
+        )
+    (return @C_NIL)
+    ))
+
 (export fun load_global (sym) (
     (return (get_slot_nocheck amber sym))
     ))
@@ -419,6 +430,7 @@
     (add_function0 prim (to_sym "exit_module") exit_module 0)
     (add_function2 prim (to_sym "define_variable") symT DontCare define_variable 0)
     (add_function3 prim (to_sym "define_variable") symT DontCare (quote (to_sym "fusion")) define_variable_fusion 0)
+    (add_function1 prim (to_sym "chdir") stringT change_dir 0)
     (add_function1 prim (to_sym "debugpf") DontCare debugpf 0)
 
     ; important functions
