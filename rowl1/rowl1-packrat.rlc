@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-03-18 20:08:13 nineties $
+; $Id: rowl1-packrat.rlc 2014-03-19 22:33:34 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1156,11 +1156,8 @@
     ))
 @(MEMOIZE stmt)
 
-(extern fun set_matching_exception)
 (export fun parse_toplevel (p) (
-    (var save (set_matching_exception @C_TRUE))
     (parse_toplevel_stmt p)
-    (set_matching_exception save)
     (return @(PARSED_FLAG p))
     ))
 
@@ -1193,9 +1190,7 @@
 (export fun parse_shell (p) (
     (var save_shell_mode_p shell_mode_p)
     (= shell_mode_p @TRUE)
-    (var save (set_matching_exception @C_TRUE))
     (parse_shell_stmt p)
-    (set_matching_exception save)
     (= shell_mode_p save_shell_mode_p)
     (if @(PARSED p) (increment_line p))
     (return @(PARSED_FLAG p))
@@ -1988,7 +1983,7 @@
     (if (!= (node_head lhs) Slot)
         (= lhs (slot Syntax lhs))
         )
-    (return (make_object3 Define lhs (lambda (make_object2 When (list1 (make_object2 Domain PVar Parser)) parser) @C_TRUE) (to_sym "fusion")))
+    (return (make_object3 Define lhs (lambda_nocheck (make_object2 When (list1 (make_object2 Domain PVar Parser)) parser) @C_TRUE) (to_sym "fusion")))
     ))
 
 (export fun enable_shell_syntax () (
