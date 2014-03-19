@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-03-19 23:41:24 nineties $
+; $Id: rowl1-interp.rlc 2014-03-20 04:10:46 nineties $
 ;
 
 (import "rlvm-compile")
@@ -282,6 +282,30 @@
     (throw (logic_error1 (string "AMBER_PATH must be an array of strings") dirs))
     ))
 
+(fun exec_file (path) (
+    (var fd (open "."))
+    (if (< fd 0) (throw (io_error (string "Can not open '.'"))))
+
+    (var ichan (open_in path @FALSE))
+    (if (! ichan) (throw (io_error1 (string "Open failed") path)))
+    (var dir (get_directory path))
+    (if (< (chdir dir) 0)
+        (throw (io_error (string
+            (strcat "Failed to change directory to " dir)))))
+
+    (var p (make_parser path ichan))
+    (set_slot p (to_sym "syntax") (load_global Syntax))
+    (set_loc (get_loc p))
+    (interpret p)
+    (if (< (fchdir fd) 0)
+        (throw (io_error (string "Failed to change directory to '.'"))))
+    (if (< (close fd) 0)
+        (throw (io_error (string "Failed to close '.'")))
+        )
+    (close_in ichan)
+    (return @C_TRUE)
+    ))
+
 (fun loadable (path) (
     (var dirs (get_slot amber (to_sym "AMBER_PATH")))
     (var loaded (get_slot amber (to_sym "ALREADY_LOADED")))
@@ -425,6 +449,7 @@
     (add_function1 prim (to_sym "exit") intT exit_ 0)
     (add_function1 prim (to_sym "atexit") funT at_exit 0)
     (add_function1 prim (to_sym "load") stringT load_file 0)
+    (add_function1 prim (to_sym "execfile") stringT exec_file 0)
     (add_function1 prim (to_sym "loadable?") stringT loadable 0)
     (add_function1 prim (to_sym "create_module") symT create_module 0)
     (add_function1 prim (to_sym "enter_module") symT enter_module 0)
