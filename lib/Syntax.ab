@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-03-20 04:16:04 nineties $ "
+" $Id: Syntax.ab 2014-03-20 22:36:27 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -428,6 +428,31 @@ expand_macro: expr -> {
         if (Equal{level, 0} and Equal{head, 'QuoteSyntax})
             return Prim.get_arg(expr, 0)
         else if (Equal{head, 'QuasiQuoteSyntax}) {
+        #if (Equal{level, 0}) {
+        #    if Equal{head, 'QuoteSyntax}
+        #        return Prim.get_arg(expr, 0)
+        #    else if Equal{head, 'Define} {
+        #        Prim.set_arg(expr, 1,
+        #            expand_macro_iter(Prim.get_arg(expr, 1), level))
+        #        return expr
+        #    } else if Equal{head, 'Assign} {
+        #        Prim.set_arg(expr, 1,
+        #            expand_macro_iter(Prim.get_arg(expr, 1), level))
+        #        return expr
+        #    } else if Equal{head, 'Lambda} {
+        #        args: Prim.get_arg(expr, 0)
+        #        if Equal{Prim.head(args), 'When} {
+        #            Prim.set_arg(args, 1,
+        #               expand_macro_iter( Prim.get_arg(args, 1), level))
+        #            Prim.set_arg(expr, 0, args)
+        #        }
+        #        Prim.set_arg(expr, 1,
+        #            expand_macro_iter(Prim.get_arg(expr, 1), level))
+        #        return expr
+        #    }
+        #}
+
+        #if (Equal{head, 'QuasiQuoteSyntax}) {
             level = Prim.int_add(level, 1)
             expr = Prim.get_arg(expr, 0)
         } else if (Equal{head, 'UnquoteSyntax}) {

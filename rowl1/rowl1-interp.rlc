@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-03-20 04:10:46 nineties $
+; $Id: rowl1-interp.rlc 2014-03-20 22:54:57 nineties $
 ;
 
 (import "rlvm-compile")
@@ -415,6 +415,15 @@
     (return (set_slot_fusion global sym val))
     ))
 
+(fun gettimeofday_ () (
+    (return (gettimeofday))
+    ))
+
+(fun timeval_sub_ (t1 t2) (
+    (var t (timeval_sub t1 t2))
+    (return (tuple2 (box (field_get t 0)) (box (field_get t 1))))
+    ))
+
 (fun setup_minimal_interpreter (prim) (
     ; parser
     (var syntax (create_module Syntax))
@@ -456,6 +465,8 @@
     (add_function0 prim (to_sym "exit_module") exit_module 0)
     (add_function2 prim (to_sym "define_variable") symT DontCare define_variable 0)
     (add_function3 prim (to_sym "define_variable") symT DontCare (quote (to_sym "fusion")) define_variable_fusion 0)
+    (add_function0 prim (to_sym "gettimeofday") gettimeofday_ 0)
+    (add_function2 prim (to_sym "timeval_sub") DontCare DontCare timeval_sub_ 0)
     (add_function1 prim (to_sym "chdir") stringT change_dir 0)
     (add_function1 prim (to_sym "debugpf") DontCare debugpf 0)
 
