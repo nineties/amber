@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2014-03-07 18:16:50 nineties $
+; $Id: vm-gc.rlc 2014-03-21 21:44:03 nineties $
 ;
 
 (import "stdlib")
@@ -174,6 +174,10 @@
 (int num_allocated_pages 0) ; number of allocated pages
 (void* continuation_list 0)
 (int num_seq 0)
+
+(void*[] @MAX_LARGE_OBJECTS large_objects)
+(byte[]  @MAX_LARGE_OBJECTS large_objects_mark)
+(int num_large_objects 0)
 
 (void*[] @MAX_STATICS statics)
 (int num_static)
@@ -638,6 +642,14 @@
         (error "Every object must be bigger than 2 words.\n")
         ))
     (int npage (= npage (>> (- (+ words @PAGE_WORDS) 1) @PAGE_WORDS_SHIFT)))
+    (if (> npage @PAGES_PER_BLOCK) (
+        ; XXX: Mark-sweep based GC.
+        (void* p (mmap2 0 (* npage @PAGE_SIZE)))
+        ([]= large_objects num_large_objects p)
+        ([]= large_objects_mark num_large_objects 0)
+        (incr num_large_objects)
+        (return p)
+        ))
     (while (> words free_words) (
         (insert_padding)
         (allocate_page npage)
