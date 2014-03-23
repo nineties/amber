@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-03-20 22:36:27 nineties $ "
+" $Id: Syntax.ab 2014-03-23 21:11:44 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -7,7 +7,7 @@
 Assign{Slot{Syntax, comment}, Slot{Prim, parse_shell_style_comment}}
 
 ### syntax definition
-# Amber's parser uses Parsing Expression Grammer (PEG) 
+# Amber's parser uses Parsing Expression Grammer (PEG)
 
 ## syntax elements
 # .     : any character
@@ -413,71 +413,61 @@ Syntax.enable_shell_syntax: () -> {
 
 ### Macro
 macro: e -> e
-expand_macro: expr -> {
-    expand_macro_iter: (expr, level) -> {
-        if (Equal{level, 0}) {
-            new_expr: macro(expr)
-            while (NotEqual{new_expr, expr}) {
-                expr = new_expr
-                new_expr = macro(expr)
-            }
+Define{expand_macro_sub, (obj, lvl) -> {
+        head: Prim.head(obj)
+        args: Prim.arguments(obj)
+        MakeObject{
+            Prim.head(obj),
+            Prim.list_map(e -> expand_macro(e, lvl), args)
         }
-
-        head: Prim.head(expr)
-
-        if (Equal{level, 0} and Equal{head, 'QuoteSyntax})
-            return Prim.get_arg(expr, 0)
-        else if (Equal{head, 'QuasiQuoteSyntax}) {
-        #if (Equal{level, 0}) {
-        #    if Equal{head, 'QuoteSyntax}
-        #        return Prim.get_arg(expr, 0)
-        #    else if Equal{head, 'Define} {
-        #        Prim.set_arg(expr, 1,
-        #            expand_macro_iter(Prim.get_arg(expr, 1), level))
-        #        return expr
-        #    } else if Equal{head, 'Assign} {
-        #        Prim.set_arg(expr, 1,
-        #            expand_macro_iter(Prim.get_arg(expr, 1), level))
-        #        return expr
-        #    } else if Equal{head, 'Lambda} {
-        #        args: Prim.get_arg(expr, 0)
-        #        if Equal{Prim.head(args), 'When} {
-        #            Prim.set_arg(args, 1,
-        #               expand_macro_iter( Prim.get_arg(args, 1), level))
-        #            Prim.set_arg(expr, 0, args)
-        #        }
-        #        Prim.set_arg(expr, 1,
-        #            expand_macro_iter(Prim.get_arg(expr, 1), level))
-        #        return expr
-        #    }
-        #}
-
-        #if (Equal{head, 'QuasiQuoteSyntax}) {
-            level = Prim.int_add(level, 1)
-            expr = Prim.get_arg(expr, 0)
-        } else if (Equal{head, 'UnquoteSyntax}) {
-            level = Prim.int_sub(level, 1)
-            expr = Prim.get_arg(expr, 0)
-        } else if (Equal{level, 0} and Equal{head, 'Quote})
-            return expr
-        else if (Equal{head, 'QuasiQuote})
-            level = Prim.int_add(level, 1)
-        else if (Equal{head, 'Unquote})
-            level = Prim.int_sub(level, 1)
-
-        if Prim.int_less_than?(level, 0)
-            throw `LogicError{"Unquoation outside quasi-quoation"}
-
-        if Prim.atom?(expr)
-            return expr
-
-        head = Prim.head(expr)
-        args: Prim.arguments(expr)
-        args = Prim.list_map(e -> expand_macro_iter(e, level), args)
-        MakeObject{head, args}
-    }
-    expand_macro_iter(expr, 0)
-}
+    }, fusion}
+Define{expand_macro_sub, (obj, _) when Prim.atom?(obj) -> obj, fusion}
+Define{expand_macro_sub,
+    (obj, lvl) when Prim.int_less_than?(lvl, 0) ->
+    { throw `LogicError{"Unquotetation outside quasi-quotation"} },
+    fusion}
+Define{expand_macro_sub,
+    (obj, lvl) when Equal{Prim.head(obj), 'UnQuote} -> {
+        Prim.set_arg(obj, 0,
+            expand_macro(Prim.get_arg(obj, 0), Prim.int_sub(lvl, 1)))
+        obj
+    },
+    fusion}
+Define{expand_macro_sub,
+    (obj, lvl) when Equal{Prim.head(obj), 'QuasiQuote} -> {
+        Prim.set_arg(obj, 0,
+            expand_macro(Prim.get_arg(obj, 0), Prim.int_add(lvl, 1)))
+        obj
+    },
+    fusion}
+Define{expand_macro_sub,
+    (Lambda{args, body, options...}, 0) ->
+        `Lambda{!args, !expand_macro(body, 0), !options...},
+    fusion}
+Define{expand_macro_sub,
+    (Lambda{When{args, guard}, body, options...}, 0) ->
+        `Lambda{When{!args, !expand_macro(guard, 0)},
+            !expand_macro(body, 0), !options...},
+    fusion}
+Define{expand_macro_sub,
+    (Assign{lhs, rhs, options...}, 0) ->
+        `Assign{!lhs, !expand_macro(rhs, 0), !options...},
+    fusion}
+Define{expand_macro_sub,
+    (Define{lhs, rhs, options...}, 0) ->
+        `Define{!lhs, !expand_macro(rhs, 0), !options...},
+    fusion}
+Define{expand_macro, (obj, lvl) -> expand_macro_sub(obj, lvl), fusion}
+Define{expand_macro, (obj, 0) -> {
+        new_obj: macro(obj)
+        while (NotEqual{new_obj, obj}) {
+            obj = new_obj
+            new_obj = macro(obj)
+        }
+        expand_macro_sub(obj, 0)
+    },
+    fusion}
+Define{expand_macro, obj -> expand_macro(obj, 0), fusion}
 
 # Expand macros only once before eval.
 Amber.before_eval = expand_macro
@@ -520,9 +510,9 @@ macro(x |= y)  = `ArithAssign{!x, !y, fusion!}
 
 # Subscript syntax is not built-in. We need macros.
 macro(x[idxs...]) = `Send{!x, get, !idxs}
-macro(QuoteSyntax{x[idxs...]} = e)
+macro(x[idxs...] = e)
     = `Send{!x, set, !Prim.list_append(idxs, [e])}
-macro(ArithAssign{QuoteSyntax{x[idxs...]}, e, op}) = {
+macro(ArithAssign{x[idxs...], e, op}) = {
     # We have to consider that evaluation of `x' and `idxs' may have
     # side-effects. So, we translate x[a,b] op= e to
     # { y = x; t1 = a; t2 = b; y[t1, t2] = op(y[t1, t2], e) }
@@ -554,7 +544,7 @@ macro(For{i, container, body}) = {
 }
 
 # For-statement for ranges.
-macro(QuoteSyntax{For{i, Range{a, b}, body}}) = {
+macro(For{i, Range{a, b}, body}) = {
     j: Prim.unique_symbol('j)
     n: Prim.unique_symbol('n)
     `{
