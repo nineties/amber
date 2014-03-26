@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-03-27 03:01:24 nineties $
+; $Id: rowl1-packrat.rlc 2014-03-27 06:20:50 nineties $
 ;
 
 (import "rlvm-compile")
@@ -373,7 +373,7 @@
     (output_string stdout cmd)
     (flush stdout)
     ))
-(fun consume_char (p vec c) (
+(fun consume_char (p vec ichan c) (
     (if (! shell_mode_p) (return (cvector_pushback vec c)))
 
     (if (== c 0x7f) (do ; DEL
@@ -393,6 +393,26 @@
         return
         ))
 
+    (if (== c 033) (do ; ESC
+        (var c 0)
+        (input_char (address c) ichan) 
+        (if (!= c '[') return)
+        (input_char (address c) ichan)
+        (if (== c 'A') (do
+            ; Up
+            ))
+        (if (== c 'B') (do
+            ; Down
+            ))
+        (if (== c 'C') (do
+            ; Right
+            ))
+        (if (== c 'D') (do
+            ; Left
+            ))
+        return
+        ))
+
     (output_char stdout c)
     (flush stdout)
     (cvector_pushback vec c)
@@ -405,7 +425,7 @@
     (var line 0)
     (var c 0)
     (while (>= (input_char (address c) ichan) 0) (do
-        (consume_char p vec c)
+        (consume_char p vec ichan c)
         (if (|| (== c '\n') (== c '\0')) (return 0))
         ))
     (return -1)
