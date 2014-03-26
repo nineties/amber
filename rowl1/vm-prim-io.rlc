@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-io.rlc 2014-03-08 17:51:05 nineties $
+; $Id: vm-prim-io.rlc 2014-03-27 03:10:15 nineties $
 ;
 
 (import "stdlib")
@@ -13,6 +13,7 @@
 (var SYS_OPEN 5)
 (var SYS_CLOSE 6)
 (var SYS_CHDIR 12)
+(var SYS_IOCTL 54)
 (var SYS_LSTAT 107)
 (var SYS_FCHDIR 133)
 (var SYS_GETCWD 183)
@@ -29,6 +30,13 @@
 (var RDBUFSZ 512) ; read buffer size
 (var WRBUFSZ 512) ; write buffer size
 (var EOF -1)
+
+(var TCGETS 0x5401)
+(var TCSETS 0x5402)
+(var TERMIOS_SIZE 15)
+(var TERMIOS_LFLAG_OFFSET 3)
+(var TERMIOS_ICANON 0x2)
+(var TERMIOS_ECHO   0x8)
 
 (var vm-prim-code `(
 
@@ -584,6 +592,27 @@
 (export prim_error)
 (fun prim_error (msg) (
     (error msg)
+    ))
+
+(int[] @TERMIOS_SIZE termios)
+(export prim_unset_canon_mode)
+(fun prim_unset_canon_mode (ichan) (
+    (int fd ([] ichan 1))
+    (syscall @SYS_IOCTL fd @TCGETS termios)
+    (int f ([] termios @TERMIOS_LFLAG_OFFSET))
+    ([]= termios @TERMIOS_LFLAG_OFFSET
+        (& f (not (| @TERMIOS_ICANON @TERMIOS_ECHO))))
+    (syscall @SYS_IOCTL fd @TCSETS termios)
+    ))
+
+(export prim_set_canon_mode)
+(fun prim_set_canon_mode (ichan) (
+    (int fd ([] ichan 1))
+    (syscall @SYS_IOCTL fd @TCGETS termios)
+    (int f ([] termios @TERMIOS_LFLAG_OFFSET))
+    ([]= termios @TERMIOS_LFLAG_OFFSET
+        (& f (| @TERMIOS_ICANON @TERMIOS_ECHO)))
+    (syscall @SYS_IOCTL fd @TCSETS termios)
     ))
 
 (char[] @PATH_MAX resolved)
