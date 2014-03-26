@@ -1,0 +1,97 @@
+# Copyright (C) 2014 nineties
+# $Id: CAST/Cgen.ab 2014-03-26 21:11:54 nineties $
+
+import PrettyPrint as PP
+
+#= CAST to C converter =
+#
+
+pp_primary(e):  ["(", pp_expr(e), ")"]
+pp_primary(BoolL{true}):  "TRUE"
+pp_primary(BoolL{false}): "FALSE"
+pp_primary(IntL{n}):      n.to_s()
+pp_primary(FloatL{f}):    f.to_s()
+pp_primary(CharL{s}):     "'" + s + "'"   # FIXME: consider escape sequence
+pp_primary(StringL{s}):   "\"" + s + "\"" # FIXME: consider escape sequence
+pp_primary(Var{s}):       s.to_s()
+
+pp_postfix: pp_primary
+pp_postfix(Subscript{e,i}): [pp_postfix(e), "[", pp_expr(i), "]"]
+pp_postfix(Call{f, args}): [pp_postfix(f), "(", pp_arglist(args), ")"]
+pp_postfix(Select{f, id}): [pp_postfix(f), ".", id.to_s()]
+pp_postfix(Select{Deref{p}, id}): [pp_postfix(p), "->", id.to_s()]
+pp_postfix(PostInc{e}): [pp_postfix(e), "++"]
+pp_postfix(PostDec{e}): [pp_postfix(e), "--"]
+
+pp_unary: pp_postfix
+pp_unary(PreInc{e}):    ["++", pp_unary(e)]
+pp_unary(PreDec{e}):    ["--", pp_unary(e)]
+pp_unary(Addr{e}):      ["&", pp_cast(e)]
+pp_unary(Deref{e}):     ["*", pp_cast(e)]
+pp_unary(Uplus{e}):     ["+", pp_cast(e)]
+pp_unary(Uminus{e}):    ["-", pp_cast(e)]
+pp_unary(Sizeof{e}):    ["sizeof", pp_unary(e)]
+pp_unary(SizeofType{t}):["sizeof", "(", pp_type(t), ")"]
+
+pp_cast: pp_unary
+pp_cast(Case{t, e}):    ["(", pp_type(t), ")", pp_cast(e)]
+
+pp_multiplicative: pp_cast
+pp_multiplicative(Mul{a, b}): [pp_multiplicative(a), "*", pp_cast(b)]
+pp_multiplicative(Div{a, b}): [pp_multiplicative(a), "/", pp_cast(b)]
+pp_multiplicative(Mod{a, b}): [pp_multiplicative(a), "%", pp_cast(b)]
+
+pp_additive: pp_multiplicative
+pp_additive(Add{a, b}): [pp_additive(a), "+", pp_cast(b)]
+pp_additive(Sub{a, b}): [pp_additive(a), "-", pp_cast(b)]
+
+pp_shift: pp_additive
+pp_shift(Shl{a, b}):    [pp_shift(a), "<<", pp_additive(b)]
+pp_shift(Shr{a, b}):    [pp_shift(a), ">>", pp_additive(b)]
+
+pp_relational: pp_shift
+pp_relational(Lt{a, b}): [pp_relational(a), "<", pp_shift(b)]
+pp_relational(Gt{a, b}): [pp_relational(a), ">", pp_shift(b)]
+pp_relational(Le{a, b}): [pp_relational(a), "<=", pp_shift(b)]
+pp_relational(Ge{a, b}): [pp_relational(a), ">=", pp_shift(b)]
+
+pp_equality: pp_relational
+pp_equality(Eq{a, b}): [pp_equality(a), "==", pp_relational(b)]
+pp_equality(Ne{a, b}): [pp_equality(a), "!=", pp_relational(b)]
+
+pp_and: pp_equality
+pp_and(BAnd{a, b}): [pp_and(a), "&", pp_equality(b)]
+
+pp_xor: pp_and
+pp_xor(BXor{a, b}): [pp_xor(a), "^", pp_and(b)]
+
+pp_or: pp_xor
+pp_or(BOr{a, b}):   [pp_or(a), "|", pp_xor(b)]
+
+pp_logical_and: pp_or
+pp_logical_and(LAnd{a, b}): [pp_logical_and(a), "&&", pp_or(b)]
+
+pp_logical_or: pp_logical_and
+pp_logical_or(LOr{a, b}):   [pp_logical_or(a), "||", pp_logical_and(b)]
+
+pp_conditional: pp_logical_or
+pp_conditional(Cond{cond,a,b}):
+    [pp_logical_or(cond), "?", pp_expr(a), ":", pp_conditional(b)]
+
+pp_assign: pp_conditional
+pp_assign(Assign{a, b}): [pp_unary(a), "=", pp_assign(b)]
+pp_assign(OpAssign{a, b, 'Add}):  [pp_unary(a), "+=", pp_assign(b)]
+pp_assign(OpAssign{a, b, 'Sub}):  [pp_unary(a), "-=", pp_assign(b)]
+pp_assign(OpAssign{a, b, 'Mul}):  [pp_unary(a), "*=", pp_assign(b)]
+pp_assign(OpAssign{a, b, 'Div}):  [pp_unary(a), "/=", pp_assign(b)]
+pp_assign(OpAssign{a, b, 'Mod}):  [pp_unary(a), "%=", pp_assign(b)]
+pp_assign(OpAssign{a, b, 'Shl}):  [pp_unary(a), "<<=", pp_assign(b)]
+pp_assign(OpAssign{a, b, 'Shr}):  [pp_unary(a), ">>=", pp_assign(b)]
+pp_assign(OpAssign{a, b, 'BAnd}): [pp_unary(a), "&=", pp_assign(b)]
+pp_assign(OpAssign{a, b, 'BXor}): [pp_unary(a), "^=", pp_assign(b)]
+pp_assign(OpAssign{a, b, 'BOr}):  [pp_unary(a), "|=", pp_assign(b)]
+
+pp_expr: pp_assign
+pp_expr(Comma{a, b}): [pp_expr(a), ",", pp_assign(b)]
+
+
