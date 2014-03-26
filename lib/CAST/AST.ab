@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: CAST/AST.ab 2014-03-19 23:41:37 nineties $
+# $Id: CAST/AST.ab 2014-03-26 21:27:44 nineties $
 
 import PrettyPrint as PP
 import Numeric.Bit as Bit
@@ -203,7 +203,7 @@ CAST.Syntax: Syntax.new() with {
     # Expressions
 
     .constant
-        ::= 'true               { throw parser.syntax.reserved_words; `BoolL{true} }
+        ::= 'true               { `BoolL{true} }
           | 'false              { `BoolL{false} }
           | integer             { `IntL{!$0} }
           | float               { `FloatL{!$0} }
@@ -239,7 +239,7 @@ CAST.Syntax: Syntax.new() with {
           | "+"  cast_expr          { `Uplus{!$1} }
           | "-"  cast_expr          { `Uminus{!$1} }
           | 'sizeof unary_expr      { `Sizeof{!$1} }
-          | 'sizeof "(" type ")"    { `Sizeof{!$2} }
+          | 'sizeof "(" type ")"    { `SizeofType{!$2} }
           | postfix_expr
 
     .cast_expr
@@ -327,6 +327,7 @@ CAST.Syntax: Syntax.new() with {
                  | 'struct identifier   { `StructT{!$1} }
                  | 'union identifier    { `UnionT{!$1} }
                  | 'enum identifier     { `EnumT{!$1} }
+                 | identifier
 
     .primary_type ::= "(" type ")"    { $1 }
                     | base_type
