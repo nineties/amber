@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-io.rlc 2014-03-27 03:10:15 nineties $
+; $Id: vm-prim-io.rlc 2014-03-28 08:56:01 nineties $
 ;
 
 (import "stdlib")
@@ -595,24 +595,22 @@
     ))
 
 (int[] @TERMIOS_SIZE termios)
+(int[] @TERMIOS_SIZE save_termios)
 (export prim_unset_canon_mode)
 (fun prim_unset_canon_mode (ichan) (
     (int fd ([] ichan 1))
-    (syscall @SYS_IOCTL fd @TCGETS termios)
+    (syscall @SYS_IOCTL fd @TCGETS save_termios)
     (int f ([] termios @TERMIOS_LFLAG_OFFSET))
+    (prim_memcpy termios save_termios (* @TERMIOS_SIZE @WORD_SIZE))
     ([]= termios @TERMIOS_LFLAG_OFFSET
         (& f (not (| @TERMIOS_ICANON @TERMIOS_ECHO))))
     (syscall @SYS_IOCTL fd @TCSETS termios)
     ))
 
-(export prim_set_canon_mode)
-(fun prim_set_canon_mode (ichan) (
+(export prim_restore_termios)
+(fun prim_restore_termios (ichan) (
     (int fd ([] ichan 1))
-    (syscall @SYS_IOCTL fd @TCGETS termios)
-    (int f ([] termios @TERMIOS_LFLAG_OFFSET))
-    ([]= termios @TERMIOS_LFLAG_OFFSET
-        (& f (| @TERMIOS_ICANON @TERMIOS_ECHO)))
-    (syscall @SYS_IOCTL fd @TCSETS termios)
+    (syscall @SYS_IOCTL fd @TCSETS save_termios)
     ))
 
 (char[] @PATH_MAX resolved)
