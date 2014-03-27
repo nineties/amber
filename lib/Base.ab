@@ -1,5 +1,5 @@
 # Copyright (C) 2010 nineties
-# $Id: Base.ab 2014-03-28 05:24:52 nineties $
+# $Id: Base.ab 2014-03-28 08:41:18 nineties $
 
 #== The most basic functions and methods. ==
 
@@ -24,10 +24,6 @@ nil with {
     # For an object `h{a1, a2, ..., an}`, its `arguments` is
     # `[a1, a2, ..., an]`.
     .arguments: Prim.alias(() -> Prim.arguments(self), nil)
-
-    # `i`-th argument of the object.
-    .get(i @ Int):    Prim.get_arg(self, i)
-    .set(i @ Int, v): Prim.set_arg(self, i, v)
 
     # Get the value of the slot named `s`.
     #
@@ -98,6 +94,17 @@ nil with {
     #   recursive: Remove all slots named `s` of parents. (default=false)
     .remove_slot(s @ Symbol, recursive=false):
         Prim.remove_slot(self, s, recursive)
+
+    # `i`-th argument of the object.
+    .get(i @ Int):    Prim.get_arg(self, i)
+    .set(i @ Int, v): Prim.set_arg(self, i, v)
+
+    # Accessing slots with brackets.
+    .get(name @ Symbol): self.get_slot(name)
+    .get(name @ String): self.get_slot(name.to_sym())
+
+    .set(name @ Symbol, v): self.set_slot(name, v)
+    .set(name @ String, v): self.set_slot(name.to_sym(), v)
 
     # Return true if `self` has a slot named `s`.
     #
