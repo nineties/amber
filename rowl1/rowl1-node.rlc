@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2014-03-26 23:22:37 nineties $
+; $Id: rowl1-node.rlc 2014-03-28 08:24:47 nineties $
 ;
 
 (import "rlvm-compile")
@@ -169,26 +169,6 @@
     (var sym (variant @SymbolE 1 (strdup name) symbol_index_gen))
     (+= symbol_index_gen 1)
     (return sym)
-    ))
-
-(extern fun is_letter)
-(extern fun is_identchar)
-(extern fun invalid_argument)
-(export fun to_sym_user (name) (
-    (var len (strlen name))
-    (if (! len) (goto to_sym_error))
-    (if (! (is_letter (array_get char name 0))) (goto to_sym_error))
-    (for i 1 (- len 1) (do
-        (if (! (is_identchar (array_get char name i))) (goto to_sym_error))
-        ))
-    (var last (array_get char name (- len 1)))
-    (if (&& (! (is_identchar last)) (&& (!= last '!') (!= last '?')))
-        (goto to_sym_error)
-        )
-
-    (return (to_sym name))
-    (label to_sym_error)
-    (throw (invalid_argument (string "invalid identifier string") name))
     ))
 
 (export fun is_builtin_sym (sym) (
@@ -443,6 +423,7 @@
 (extern fun list_store_check)
 (extern fun tuple_store)
 (extern fun array_store)
+(extern fun invalid_argument)
 (export fun node_arg_set (expr idx val) (
     (if (is_atom expr)
         (throw (invalid_argument
