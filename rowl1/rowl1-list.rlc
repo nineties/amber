@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2014-03-15 00:06:18 nineties $
+; $Id: rowl1-list.rlc 2014-03-28 10:57:35 nineties $
 ;
 
 (import "rlvm-compile")
@@ -19,6 +19,8 @@
 (import "rowl1-table")
 
 (extern object global)
+(extern fun tuple2)
+(extern fun tuple_at)
 
 (fun index_out_of_range (list idx) (
     (throw (out_of_range list (box idx)))
@@ -130,6 +132,40 @@
     (return @C_FALSE)
     ))
 
+(fun ls_assoc (ls x) (
+    (var ls_ ls)
+    (var eql (lookup_func global (to_sym "equal?")))
+    (while ls (do
+        (var t (car ls))
+        (if (!= (node_type t) @TupleE)
+            (throw (invalid_argument (string "Not a list of pairs") ls_))
+            )
+        (if (!= (runcode eql (tuple_at t 0) x) @C_FALSE)
+            (return (tuple_at t 1))
+            )
+        (= ls (cdr ls))
+        ))
+    (return @C_NIL)
+    ))
+
+(fun assoc_set (eql ls x v) (
+    (if (! ls) (return (list1 (tuple2 x v))))
+    (var t (car ls))
+    (if (|| (!= (node_type t) @TupleE) (!= (node_size t) 2))
+        (throw (invalid_argument (string "Not a pair") t))
+        )
+    (if (!= (runcode eql (tuple_at t 0) x) @C_FALSE)
+        (return (cons (tuple2 x v) (cdr ls)))
+        (return (cons (car ls) (assoc_set eql (cdr ls) x v)))
+        )
+    ))
+
+(fun ls_assoc_set (ls x v) (
+    (var ls_ ls)
+    (var eql (lookup_func global (to_sym "equal?")))
+    (return (assoc_set eql ls x v))
+    ))
+
 (fun ls_insert_uniq (v ls) (
     (if (!= (ls_include v ls) @C_FALSE) (return ls))
     (return (cons v ls))
@@ -201,8 +237,6 @@
     (return v)
     ))
 
-(extern fun tuple2)
-(extern fun tuple_at)
 (fun ls_zip (a b) (
     (var new_ls 0)
     (while (&& a b) (do
@@ -337,6 +371,8 @@
     (add_function2 mod (to_sym "list_map") funT listT ls_map 0)
     (add_function2 mod (to_sym "list_foreach") funT listT ls_foreach 0)
     (add_function2 mod (to_sym "list_include?") DontCare listT ls_include 0)
+    (add_function2 mod (to_sym "list_assoc") listT DontCare ls_assoc 0)
+    (add_function3 mod (to_sym "list_assoc_set") listT DontCare DontCare ls_assoc_set 0)
     (add_function2 mod (to_sym "list_insert_unique") DontCare listT ls_insert_uniq 0)
     (add_function1 mod (to_sym "list_flatten") listT ls_flatten 0)
     (add_function2 mod (to_sym "list_join") listT listT ls_join 0)
