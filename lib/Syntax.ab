@@ -62,7 +62,7 @@ DefineSyntax{
         Tuple{List{primary_syntax_element, "+"},
             QuasiQuote{Many1{Unquote{node0}}}},
         Tuple{List{Delimited2{primary_syntax_element, "/"}},
-            MakeObject{Quote{Choice}, node0}},
+            Node{Quote{Choice}, node0}},
         Tuple{List{"'", any_symbol},
             QuasiQuote{Word{Unquote{node1}}}},
         Tuple{List{"&", primary_syntax_element},
@@ -161,9 +161,9 @@ primary_expr
       | <<multiline>> "[" delimited(expr, ",") "]"  { node1 }
       # Tuple literal
       | <<multiline>> "(" delimited2(expr, ",") ")"
-        { MakeObject{Quote{Tuple}, node1} }
+        { Node{Quote{Tuple}, node1} }
       | "|" expr "|"
-        { MakeObject{Quote{Abs}, List{node1}} }
+        { Node{Quote{Abs}, List{node1}} }
       | 'self           { Quote{GetSelf{}} }
       | atom
       | "..."           { Quote{Rest{}} }
@@ -175,24 +175,24 @@ argument ::= symbol "=" assign_expr
 postfix_expr
         # Function Application
     ::= postfix_expr nospace("(") delimited(argument, ",") ")"
-        { MakeObject{Quote{Apply}, List{node0, node2}} }
+        { Node{Quote{Apply}, List{node0, node2}} }
         # Subscription
       | postfix_expr nospace("[") delimited(argument, ",") "]"
-        { MakeObject{Quote{Subscript}, List{node0, node2}} }
+        { Node{Quote{Subscript}, List{node0, node2}} }
       | # RestOf Pattern
         postfix_expr "..."
-        { MakeObject{Quote{Rest}, List{node0}} }
+        { Node{Quote{Rest}, List{node0}} }
         # Domain Pattern
       | primary_expr "@" fullform_expr
-        { MakeObject{Quote{Domain}, List{node0, node2}} }
+        { Node{Quote{Domain}, List{node0, node2}} }
       | postfix_expr "." symbol nospace("(") delimited(argument, ",") ")"
-        { MakeObject{Quote{Send}, List{node0, node2, node4}} }
+        { Node{Quote{Send}, List{node0, node2, node4}} }
       | postfix_expr "." symbol
-        { MakeObject{Quote{Slot}, List{node0, node2}} }
+        { Node{Quote{Slot}, List{node0, node2}} }
       | "." symbol
-        { MakeObject{Quote{Slot}, List{Quote{GetSelf{}}, node1}} }
+        { Node{Quote{Slot}, List{Quote{GetSelf{}}, node1}} }
       | primary_expr "^" postfix_expr
-        { MakeObject{Quote{Power}, List{node0, node2}} }
+        { Node{Quote{Power}, List{node0, node2}} }
       | primary_expr
 
 fullform_expr
@@ -201,11 +201,11 @@ fullform_expr
 
 quote_expr
     ::= "'" quote_expr
-        { MakeObject{Quote{Quote}, List{node1}} }
+        { Node{Quote{Quote}, List{node1}} }
       | "`"  quote_expr
-        { MakeObject{Quote{QuasiQuote}, List{node1}} }
+        { Node{Quote{QuasiQuote}, List{node1}} }
       | "!"  quote_expr
-        { MakeObject{Quote{Unquote}, List{node1}} }
+        { Node{Quote{Unquote}, List{node1}} }
       | fullform_expr
 
 pattern ::= quote_expr
@@ -308,7 +308,7 @@ assign_expr
       | pattern "%=" assign_expr  { `RemAssign{!node0, !node2} }
       | pattern "|=" assign_expr  { `FusionAssign{!node0, !node2} }
       | pattern 'with slot_assign
-        { MakeObject{Quote{WithSlots}, List{node0, node2}} }
+        { Node{Quote{WithSlots}, List{node0, node2}} }
       | continuation_expr
 
 Assign{Syntax.expr, Syntax.assign_expr}
@@ -361,9 +361,9 @@ stmt
         { `Import{!node1, !node2, !node3} }
 
       | postfix_expr ![+-.{] delimited1(argument, ",")
-        { MakeObject{Quote{Apply}, List{node0, node2}} }
+        { Node{Quote{Apply}, List{node0, node2}} }
       | postfix_expr "." symbol ![+-.{] delimited1(argument, ",")
-        { MakeObject{Quote{Send}, List{node0, node2, node4}} }
+        { Node{Quote{Send}, List{node0, node2, node4}} }
 
 # Add new syntax for syntax declaration usinged qualified symbol like
 # `Lang.expr ::= ...`.
@@ -416,7 +416,7 @@ macro: e -> e
 Define{expand_macro_sub, (obj, lvl) -> {
         head: Prim.head(obj)
         args: Prim.arguments(obj)
-        MakeObject{
+        Node{
             Prim.head(obj),
             Prim.list_map(e -> expand_macro(e, lvl), args)
         }
@@ -592,7 +592,7 @@ desugar_args(a, vars, checks, 0): {
     if args == []
         return a
     args = desugar_args(args, vars, checks, 0)
-    MakeObject{Prim.head(a), args}
+    Node{Prim.head(a), args}
 }
 desugar_args([], _, _, 0): []
 desugar_args([a,rest...], vars, checks, 0): {

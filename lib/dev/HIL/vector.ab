@@ -5,14 +5,14 @@
 # Vector arithmetic for HIL
 module HIL {
     postfix_expr ::= <<multiline>> "Vector" "[" delimited(expr, ",") "]"
-           { MakeObject{\Vector, $2} }
+           { Node{\Vector, $2} }
 
     copyprop(sbst, Vector{values...}):
-        MakeObject{\Vector, map(values, v -> copyprop(sbst, v))}
+        Node{\Vector, map(values, v -> copyprop(sbst, v))}
 
     linearize(Vector{values...}): {
         t: newSymbol()
-        (`(!t : !MakeObject{\Vector, map(values, v -> linearize(v)[1])}), t)
+        (`(!t : !Node{\Vector, map(values, v -> linearize(v)[1])}), t)
     }
 
     typing_expr(tmap, Vector{values...}): {
@@ -21,9 +21,9 @@ module HIL {
         ts = ts.uniq
         if (ts.length > 1) throw `InvalidArg{!LOCATION, "fields of vector must have same types"}
         if (ts[0] == \Int)
-            return (`IVector{!dim}, MakeObject{\IVector, cons(dim, values)})
+            return (`IVector{!dim}, Node{\IVector, cons(dim, values)})
         else if (ts[0] == \Float)
-            return (`FVector{!dim}, MakeObject{\FVector, cons(dim, values)})
+            return (`FVector{!dim}, Node{\FVector, cons(dim, values)})
         throw `InvalidVectorType{!LOCATION, "field of vector must be integer of floating point"}
     }
 
@@ -45,9 +45,9 @@ module HIL {
         ]
 
     typing_assign(x, IVector{dim1}, e, IVector{dim2}, op) when dim1 == dim2 :
-        MakeObject{iasgnop[op], [dim1, x, e]}
+        Node{iasgnop[op], [dim1, x, e]}
     typing_assign(x, FVector{dim1}, e, FVector{dim2}, op) when dim1 == dim2 :
-        MakeObject{fasgnop[op], [dim1, x, e]}
+        Node{fasgnop[op], [dim1, x, e]}
 
     typing_unary(e, IVector{dim}, \UnaryMinus):
         (`IVector{!dim}, `IVneg{!dim, !e})

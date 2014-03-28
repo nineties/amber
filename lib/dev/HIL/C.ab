@@ -53,15 +53,15 @@ module HIL::C {
         List::create(dim, i -> format("%S[%d] += %S[%d];", x, i, y, i))
 
     emit_expr(FVector{dim, values...}):
-        MakeObject{\OneLine, ["{"] + map(values, emit_expr).delimit(",") + ["}"]}
+        Node{\OneLine, ["{"] + map(values, emit_expr).delimit(",") + ["}"]}
     emit_expr(FVneg{dim, x}):
-        MakeObject{\OneLine, ["{"] + List::create(dim, i -> format("-%S[%d]", x, i)).delimit(",") + ["}"]}
+        Node{\OneLine, ["{"] + List::create(dim, i -> format("-%S[%d]", x, i)).delimit(",") + ["}"]}
     emit_expr(FVmuls{dim, x, s}):
-        MakeObject{\OneLine, ["{"] + List::create(dim, i -> format("%S[%d]*%S", x, i, s)).delimit(",") + ["}"]}
+        Node{\OneLine, ["{"] + List::create(dim, i -> format("%S[%d]*%S", x, i, s)).delimit(",") + ["}"]}
     emit_expr(FVdivs{dim, x, s}):
-        MakeObject{\OneLine, ["{"] + List::create(dim, i -> format("%S[%d]/%S", x, i, s)).delimit(",") + ["}"]}
+        Node{\OneLine, ["{"] + List::create(dim, i -> format("%S[%d]/%S", x, i, s)).delimit(",") + ["}"]}
     emit_expr(FVabs{dim, x}):
-        MakeObject{\OneLine, [MakeObject{\NoSpace, ["sqrt("] +
+        Node{\OneLine, [Node{\NoSpace, ["sqrt("] +
             List::create(dim, i -> format("%S[%d]*%S[%d]", x, i, x, i)).delimit("+") + [")"]}]}
 
     emit_expr(FIpow{x, 2}): format("%S*%S", x, x)
