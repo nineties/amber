@@ -253,8 +253,8 @@
         (var v1 (field_get v 0))
         (var v2 (field_get v 1))
         (if (== guard @C_NIL)
-            (= guard (make_object2 Equal v1 v2))
-            (= guard (make_object2 SeqAnd guard (make_object2 Equal v1 v2)))
+            (= guard (make_node2 Equal v1 v2))
+            (= guard (make_node2 SeqAnd guard (make_node2 Equal v1 v2)))
             )
         ))
     (return guard)
@@ -291,7 +291,7 @@
         ))
     (var hd (node_head expr))
     (if (== hd Located)
-        (return (make_object2 Located
+        (return (make_node2 Located
             (node_arg expr 0)
             (alpha tbl (node_arg expr 1))))
         )
@@ -302,7 +302,7 @@
         (var rhs (node_arg expr 1))
         (if (&& (== (node_head rhs) Lambda) (== (node_head lhs) Symbol))
             (if (symtable_find_local tbl lhs)
-                (return (make_object Assign (node_args expr)))
+                (return (make_node Assign (node_args expr)))
                 )
             )
         (if (!= (node_head (node_arg expr 0)) Slot)
@@ -319,7 +319,7 @@
             (= exprs (cdr exprs))
             ))
         (symtable_pop tbl)
-        (return (make_object1 hd (list_reverse new_exprs)))
+        (return (make_node1 hd (list_reverse new_exprs)))
         ))
     (if (== hd Lambda) (do
         (symtable_push tbl)
@@ -331,7 +331,7 @@
         ))
     (if (== hd Quote) (return expr))
     (if (== hd QuasiQuote)
-        (return (make_object1 QuasiQuote
+        (return (make_node1 QuasiQuote
             (alpha_qquote tbl (node_arg expr 0) 0)))
         )
 
@@ -355,7 +355,7 @@
     (var hd (node_head expr))
     (if (== hd Unquote) (do
         (if (== level 0)
-            (return (make_object1 Unquote (alpha tbl (node_arg expr 0))))
+            (return (make_node1 Unquote (alpha tbl (node_arg expr 0))))
             )
         (-= level 1)
         )
@@ -426,7 +426,7 @@
     (var len 0)
     (while args (do
         (if (== (node_head (car args)) Rest) (do
-            (return (make_object1 VariableLength (box len)))
+            (return (make_node1 VariableLength (box len)))
             ))
         (+= len 1)
         (= args (cdr args))
@@ -506,7 +506,7 @@
             (= fv (cdr fv))
             ))
         (if (! mkcls) (return expr))
-        (return (make_object2 Closure @C_NIL expr))
+        (return (make_node2 Closure @C_NIL expr))
         ))
     ; Closure has no closure variables since it is already closed.
     (if (== hd Closure) (return expr))
@@ -615,7 +615,7 @@
         (return expr)
         ))
     (if (== hd Ref) (do
-        (return (make_object3 Ref
+        (return (make_node3 Ref
             (subst_clsvars tbl cls (node_arg expr 0))
             (node_arg expr 1)
             (node_arg expr 2)
@@ -793,10 +793,10 @@
     (put_push asm expr)
     ))
 
-(fun compile_make_object (asm expr) (
+(fun compile_make_node (asm expr) (
     (compile asm (node_arg expr 1))
     (compile asm (node_arg expr 0))
-    (compile_simple_call asm 2 make_object)
+    (compile_simple_call asm 2 make_node)
     ))
 
 (fun store_args (tbl args stmts) (
@@ -805,7 +805,7 @@
         (var s (symtable_find tbl (car vars)))
         (if (&& s (!= s maybe)) (do 
             ; this argument is a closure-variable.
-            (= stmts (cons (make_object2 Assign (copy s) (car vars)) stmts))
+            (= stmts (cons (make_node2 Assign (copy s) (car vars)) stmts))
             ))
         (= vars (cdr vars))
         ))
@@ -819,7 +819,7 @@
         (var entry (vector_at entries i))
         (if (!= (field_get entry 1) maybe) (do
             (field_set entry 1
-                (make_object3 Ref cls (box count) (field_get entry 0)))
+                (make_node3 Ref cls (box count) (field_get entry 0)))
             (+= count 1)
             ))
         ))
@@ -861,13 +861,13 @@
         ; allocate closures' environment.
         (var stmts 0)
         (= stmts (cons (defvar newcls
-            (make_object1 AllocClsEnv (box clssize))) stmts))
+            (make_node1 AllocClsEnv (box clssize))) stmts))
         (if (== cls @C_NIL)
             (= stmts (store_args tbl args stmts))
             (= stmts (store_args tbl (cons cls args) stmts))
             )
         (= stmts (cons body stmts))
-        (= body (make_object1 Block (list_reverse stmts)))
+        (= body (make_node1 Block (list_reverse stmts)))
         ))
 
     (symtable_push variables)
@@ -1053,7 +1053,7 @@
             (var v (node_arg_symbol a 0))
             (return (add_arg tbl v (make_restof obj i) alias))
             ))
-        (= alias (setup_arg tbl (make_object_at arg obj i)
+        (= alias (setup_arg tbl (make_node_at arg obj i)
                 (node_arg arg i) level alias))
         ))
     (return alias)
@@ -1098,7 +1098,7 @@
 ; if (k == undef)
 ;   k = e
 (fun keyword_init (v e tbl drop) (
-    (return (defvar v (make_object3 KeywordArg
+    (return (defvar v (make_node3 KeywordArg
         (box (keyword_index v tbl)) e drop))
         )
     ))
@@ -1131,41 +1131,41 @@
     ))
 
 (fun make_gvar (sym) (
-    (return (make_object1 GlobalVariable sym))
+    (return (make_node1 GlobalVariable sym))
     ))
 
 (fun make_lvar (idx) (
-    (return (make_object1 LocalVariable (box idx)))
+    (return (make_node1 LocalVariable (box idx)))
     ))
 
 (export fun get_arity () (
-    (return (make_object0 GetArity))
+    (return (make_node0 GetArity))
     ))
 
 (export fun make_arg (idx) (
-    (return (make_object1 Argument (box idx)))
+    (return (make_node1 Argument (box idx)))
     ))
 
 (export fun make_args_from (idx) (
-    (return (make_object1 ArgumentsFrom (box idx)))
+    (return (make_node1 ArgumentsFrom (box idx)))
     ))
 
 (export fun make_list_at (obj idx) (
-    (return (make_object2 ListAt obj (box idx)))
+    (return (make_node2 ListAt obj (box idx)))
     ))
 
 (export fun make_list_from (obj idx) (
-    (return (make_object2 ListFrom obj (box idx)))
+    (return (make_node2 ListFrom obj (box idx)))
     ))
 
-(export fun make_object_at (arg obj idx) (
-    (if (is_tuple arg) (return (make_object2 TupleAt obj (box idx))))
-    (if (is_array arg) (return (make_object2 ArrayAt obj (box idx))))
-    (return (make_object2 FieldRef obj (box idx)))
+(export fun make_node_at (arg obj idx) (
+    (if (is_tuple arg) (return (make_node2 TupleAt obj (box idx))))
+    (if (is_array arg) (return (make_node2 ArrayAt obj (box idx))))
+    (return (make_node2 FieldRef obj (box idx)))
     ))
 
 (export fun make_restof (obj idx) (
-    (return (make_object2 RestOf obj (box idx)))
+    (return (make_node2 RestOf obj (box idx)))
     ))
 
 (fun append_function (mod sym newfunc) (
@@ -1265,10 +1265,10 @@
     (var rvars   (field_get tup 2))
     (var t (to_unique_sym "t"))
     (compile asm (apply (lambda
-        (list1 (make_object2 Domain t pattern))
+        (list1 (make_node2 Domain t pattern))
         (list_append tvars (list1 t))) (list1 val)))
     (while rvars (do
-        (compile_define asm (make_object2 Define (car rvars) Decons))
+        (compile_define asm (make_node2 Define (car rvars) Decons))
         (put_drop asm)
         (= rvars (cdr rvars))
         ))
@@ -1333,7 +1333,7 @@
         ))
 
     (if (&& (!= ty Symbol) (!= ty Ref))
-        (throw (unknown_expression (make_object2 Define lhs lam))) 
+        (throw (unknown_expression (make_node2 Define lhs lam))) 
         )
 
     (if (symtable_find_local variables (variable_name lhs))
@@ -1720,7 +1720,7 @@
         (put_cons asm)
         ))
     (put_push asm (node_head expr))
-    (compile_simple_call asm 2 make_object)
+    (compile_simple_call asm 2 make_node)
     ))
 
 (fun compile_qquote (asm expr) (
@@ -1746,7 +1746,7 @@
         (put_cons asm)
         ))
     (put_push asm Tuple)
-    (compile_simple_call asm 2 make_object)
+    (compile_simple_call asm 2 make_node)
     ))
 
 (extern fun array_size)
@@ -1759,7 +1759,7 @@
         (put_cons asm)
         ))
     (put_push asm Array)
-    (compile_simple_call asm 2 make_object)
+    (compile_simple_call asm 2 make_node)
     ))
 
 (fun compile_range (asm expr) (
@@ -1769,7 +1769,7 @@
             (compile asm (node_arg expr 1))
             (compile asm (node_arg expr 0))
             (put_push asm Range)
-            (compile_simple_call asm 3 make_object2)
+            (compile_simple_call asm 3 make_node2)
         )
     (if (== size 3)
         (do
@@ -1777,7 +1777,7 @@
             (compile asm (node_arg expr 1))
             (compile asm (node_arg expr 0))
             (put_push asm Range)
-            (compile_simple_call asm 4 make_object3)
+            (compile_simple_call asm 4 make_node3)
         )
         (throw (unknown_expression expr))
         ))
@@ -2146,7 +2146,7 @@
 
     (var t (to_unique_sym "t"))
     (compile asm (apply (lambda
-        (list1 (make_object2 Domain t pattern))
+        (list1 (make_node2 Domain t pattern))
         (list_append tvars (list1 t))) (list1 rhs)))
     (while rvars (do
         (compile asm (assign (car rvars) Decons))
@@ -2167,7 +2167,7 @@
     (var exit   (fresh_label asm))
 
     (compile asm (apply
-        (make_object3 Lambda (list1 pattern) tvars NoMatchingError) (list1 rhs)))
+        (make_node3 Lambda (list1 pattern) tvars NoMatchingError) (list1 rhs)))
     (put_dup asm)
     (put_if_undef asm failed)
     (while rvars (do
@@ -2207,7 +2207,7 @@
     ))
 
 ; handler must be a lambda
-(var default_hdler (lambda (to_sym "x") (make_object1 Throw (to_sym "x"))))
+(var default_hdler (lambda (to_sym "x") (make_node1 Throw (to_sym "x"))))
 (fun compile_try (asm expr) (
     (var stmt (node_arg expr 0))
     (var hdlr (node_arg expr 1))
@@ -2236,7 +2236,7 @@
     ))
 
 (fun compile_eq (asm expr) (
-    (compile asm (make_object2 Apply (to_sym "equal?") (node_args expr)))
+    (compile asm (make_node2 Apply (to_sym "equal?") (node_args expr)))
     ))
 
 (fun compile_ne (asm expr) (
@@ -2435,11 +2435,11 @@
     (var locT (domainP Loc))
 
     (add_compiler mod DontCare compile_error)
-    (add_compiler mod (make_object2 Located locT DontCare) compile_located)
+    (add_compiler mod (make_node2 Located locT DontCare) compile_located)
 
     ; These commands have been evaluated in parsing phase.
-    (add_compiler mod (make_object2 Node DontCare DontCare) compile_make_object)
-    (add_compiler mod (make_object0 GetSelf) compile_getself)
+    (add_compiler mod (make_node2 Node DontCare DontCare) compile_make_node)
+    (add_compiler mod (make_node0 GetSelf) compile_getself)
     (add_compiler mod symT compile_var)
     (add_compiler mod (quote @C_TRUE) compile_special)
     (add_compiler mod (quote @C_FALSE) compile_special)
@@ -2449,9 +2449,9 @@
     (add_compiler mod bintT compile_const)
     (add_compiler mod (domainP Float) compile_const)
 
-    (add_compiler mod (make_object2 Apply DontCare listT) compile_apply)
-    (add_compiler mod (make_object3 Apply DontCare DontCare listT) compile_apply_with_self)
-    (add_compiler mod (make_object3 Send DontCare symT listT) compile_send)
+    (add_compiler mod (make_node2 Apply DontCare listT) compile_apply)
+    (add_compiler mod (make_node3 Apply DontCare DontCare listT) compile_apply_with_self)
+    (add_compiler mod (make_node3 Send DontCare symT listT) compile_send)
 
     (add_compiler mod (qquote (unquote (unquote DontCare))) compile_unquote)
     (add_compiler mod (qquote (quote (unquote DontCare))) compile_quote)
@@ -2462,43 +2462,43 @@
     (add_compiler mod (domainP Array) compile_array)
     (add_compiler mod (domainP Range) compile_range)
 
-    (add_compiler mod (make_object1 Block listT) compile_block)
-    (add_compiler mod (make_object1 Seq listT) compile_seq)
-    (add_compiler mod (make_object1 Breakable listT) compile_breakable)
+    (add_compiler mod (make_node1 Block listT) compile_block)
+    (add_compiler mod (make_node1 Seq listT) compile_seq)
+    (add_compiler mod (make_node1 Breakable listT) compile_breakable)
 
     (add_compiler mod (mkif DontCare DontCare) compile_if)
 	(add_compiler mod (ifelse DontCare DontCare DontCare) compile_ifelse)
-    (add_compiler mod (make_object2 While DontCare DontCare) compile_while)
-    (add_compiler mod (make_object3 While DontCare DontCare DontCare) compile_while)
-    (add_compiler mod (make_object0 Break) compile_break) 
-    (add_compiler mod (make_object0 Continue) compile_continue)
-    (add_compiler mod (make_object1 Return DontCare) compile_return)
-    (add_compiler mod (make_object2 Try DontCare DontCare) compile_try)
-    (add_compiler mod (make_object1 Throw DontCare) compile_throw)
-    (add_compiler mod (make_object2 Equal DontCare DontCare) compile_eq)
-    (add_compiler mod (make_object2 NotEqual DontCare DontCare) compile_ne)
-    (add_compiler mod (make_object1 Not DontCare) compile_logical)
-	(add_compiler mod (make_object2 SeqAnd DontCare DontCare) compile_logical)
-	(add_compiler mod (make_object2 SeqOr DontCare DontCare) compile_logical)
+    (add_compiler mod (make_node2 While DontCare DontCare) compile_while)
+    (add_compiler mod (make_node3 While DontCare DontCare DontCare) compile_while)
+    (add_compiler mod (make_node0 Break) compile_break) 
+    (add_compiler mod (make_node0 Continue) compile_continue)
+    (add_compiler mod (make_node1 Return DontCare) compile_return)
+    (add_compiler mod (make_node2 Try DontCare DontCare) compile_try)
+    (add_compiler mod (make_node1 Throw DontCare) compile_throw)
+    (add_compiler mod (make_node2 Equal DontCare DontCare) compile_eq)
+    (add_compiler mod (make_node2 NotEqual DontCare DontCare) compile_ne)
+    (add_compiler mod (make_node1 Not DontCare) compile_logical)
+	(add_compiler mod (make_node2 SeqAnd DontCare DontCare) compile_logical)
+	(add_compiler mod (make_node2 SeqOr DontCare DontCare) compile_logical)
     (add_compiler mod (domainP Lambda) compile_lambda)
     (add_compiler mod (domainP Define) compile_define)
     (add_compiler mod (domainP Assign) compile_assign)
-    (add_compiler mod (make_object3 ArithAssign DontCare DontCare DontCare) compile_arithmetic_assign)
+    (add_compiler mod (make_node3 ArithAssign DontCare DontCare DontCare) compile_arithmetic_assign)
 
     (add_compiler mod (domainP (to_sym "TryAssign")) compile_tryassign)
 
-    (add_compiler mod (make_object2 Slot DontCare symT) compile_slot)
-    (add_compiler mod (make_object1 Reset DontCare) compile_reset)
-    (add_compiler mod (make_object1 Shift DontCare) compile_shift)
+    (add_compiler mod (make_node2 Slot DontCare symT) compile_slot)
+    (add_compiler mod (make_node1 Reset DontCare) compile_reset)
+    (add_compiler mod (make_node1 Shift DontCare) compile_shift)
 
-    (add_compiler mod (make_object2 DefSyntax DontCare DontCare) compile_define_syntax)
+    (add_compiler mod (make_node2 DefSyntax DontCare DontCare) compile_define_syntax)
 
     ; internal expressions
-    (add_compiler mod (make_object3 KeywordArg intT DontCare DontCare) compile_keyword_arg)
-    (add_compiler mod (make_object2 FieldRef DontCare intT) compile_fieldref)
-    (add_compiler mod (make_object1 AllocClsEnv intT) compile_alloc_clsenv)
-    (add_compiler mod (make_object2 Closure DontCare DontCare) compile_closure)
-    (add_compiler mod (make_object3 Ref DontCare intT symT) compile_clsref)
+    (add_compiler mod (make_node3 KeywordArg intT DontCare DontCare) compile_keyword_arg)
+    (add_compiler mod (make_node2 FieldRef DontCare intT) compile_fieldref)
+    (add_compiler mod (make_node1 AllocClsEnv intT) compile_alloc_clsenv)
+    (add_compiler mod (make_node2 Closure DontCare DontCare) compile_closure)
+    (add_compiler mod (make_node3 Ref DontCare intT symT) compile_clsref)
     (add_compiler mod (quote Decons) compile_decons)
 
     ; vertical composition
