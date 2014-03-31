@@ -26,25 +26,25 @@ FLAG_MAP: Table.new([
 parse_flag(iss): {
     flag: 0
     while true {
-        f: FLAG_MAP[Prim.iss_lookahead(iss, false)]
+        f: FLAG_MAP[prim.iss_lookahead(iss, false)]
         if (f == nil) return flag
         flag = lor(flag, f)
-        Prim.iss_read_char(iss, false)
+        prim.iss_read_char(iss, false)
     }
 }
 
 # Read decimal number from input string stream `iss`.
 # If `iss` doesn't begin with decimal character return `nil`.
 parse_number(iss): {
-    if not is_digit?(Prim.iss_lookahead(iss, false))
+    if not is_digit?(prim.iss_lookahead(iss, false))
         return nil
     w: 0
     while true {
-        c: Prim.iss_lookahead(iss, false)
+        c: prim.iss_lookahead(iss, false)
         if not is_digit?(c)
             return w
         w = w*10 + c.to_i()
-        Prim.iss_read_char(iss, false)
+        prim.iss_read_char(iss, false)
     }
 }
 
@@ -52,10 +52,10 @@ parse_number(iss): {
 # If `iss` doesn't begin with '.' return `nil`. If the format string
 # is invalid throw `InvalidFormatString` exception.
 parse_prec(fmt, iss): {
-    if (Prim.iss_lookahead(iss, false) != ".")
+    if (prim.iss_lookahead(iss, false) != ".")
         return nil
-    Prim.iss_read_char(iss, false)
-    if not is_digit?(Prim.iss_lookahead(iss, false))
+    prim.iss_read_char(iss, false)
+    if not is_digit?(prim.iss_lookahead(iss, false))
         throw `InvalidFormatString{!fmt}
     parse_number(iss)
 }
@@ -63,7 +63,7 @@ parse_prec(fmt, iss): {
 print_element(oss,t,...): throw `UnknownFormatType{!t}
 
 # Pretty printing.
-print_element(oss,"p",f,w,p,arg): Prim.pretty_print(oss, arg)
+print_element(oss,"p",f,w,p,arg): prim.pretty_print(oss, arg)
 
 # string.
 print_element(oss,"s",f,w,p,arg): {
@@ -156,9 +156,9 @@ print_element(oss,t@("x" or "X"),f,w,p,arg): {
 
 printf(oss, fmt @ String, args...) when oss.OutputStream?: {
     # Create an input string stream.
-    iss: Prim.iss_new(fmt, false)
+    iss: prim.iss_new(fmt, false)
     while true {
-        c: Prim.iss_read_char(iss, false)
+        c: prim.iss_read_char(iss, false)
         if (c == nil) break
         if (c != "%")
             oss.write(c)
@@ -166,7 +166,7 @@ printf(oss, fmt @ String, args...) when oss.OutputStream?: {
             f: parse_flag(iss)
             w: parse_number(iss)
             p: parse_prec(fmt, iss)
-            t: Prim.iss_read_char(iss, false)
+            t: prim.iss_read_char(iss, false)
             if args == []
                 throw `MissingArgument{"argument for %d is missing"}
             print_element(oss, t,f,w,p,first(args))

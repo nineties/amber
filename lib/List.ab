@@ -8,13 +8,13 @@
 # of object into one list.
 
 # `cons(a, [b,c,d,...]) == [a,b,c,d,...]`. O(1)
-cons:  Prim.list_cons
+cons:  prim.list_cons
 
 # `first([a,b,c,...]) == a`. O(n)
-first: Prim.list_first
+first: prim.list_first
 
 # `rest([a,b,c,...]) == [b,c,...]`. O(n)
-rest:  Prim.list_rest
+rest:  prim.list_rest
 
 # Create a list of length `n` whose `i`-th element is `f(i)`.
 # Example:
@@ -25,7 +25,7 @@ new(f @ Function, n @ Int): {
     list: []
     for i in 0..n
         list = cons(f(i), list)
-    Prim.list_reverse(list)
+    prim.list_reverse(list)
 }
 
 # Create a list of length `n` by first element `f0` and recurrence
@@ -40,7 +40,7 @@ new(f @ Function, f0, n @ Int): {
         list = cons(f0, list)
         f0 = f(f0)
     }
-    Prim.list_reverse(list)
+    prim.list_reverse(list)
 }
 
 # Create a list whose elements are obtained from an iterable object
@@ -49,59 +49,59 @@ new(container) when container.Iterable? : {
     list: []
     for v in container
         list = cons(v, list)
-    Prim.list_reverse(list)
+    prim.list_reverse(list)
 }
 
 # Concatenation of two lists.
 # ----
 # > [1,2,3] + [4,5]     # => [1,2,3,4,5]
 # ----
-add = Prim.list_append | add
+add = prim.list_append | add
 
 # Difference of two arrays.
 # ----
 # > [1,2,3,4,5] - [2,3,6]   # => [1,4,5]
 # ----
-sub = Prim.list_diff | sub
+sub = prim.list_diff | sub
 
 trait List {
     # The number of elements.
-    .length: alias(() -> Prim.list_length(self))
-    .size:   alias(() -> Prim.list_length(self))
+    .length: alias(() -> prim.list_length(self))
+    .size:   alias(() -> prim.list_length(self))
 
     # Return true when `self` is an empty list.
     .empty?: alias(() -> self == [])
 
     # `i`-th element.
-    .get(i @ Int): Prim.list_at(self, i)
+    .get(i @ Int): prim.list_at(self, i)
 
     # Do nothing. For consistency with other containers.
     .to_list(): self
 
     # Create a new array that include all elements of `self` in the same
     # order.
-    .to_array(): Prim.list_to_array(self)
+    .to_array(): prim.list_to_array(self)
 
     # Create a list that include all elements of `self` in the
     # reverse order.
-    .reverse(): Prim.list_reverse(self)
+    .reverse(): prim.list_reverse(self)
 
     # Create a list by applying `f` to each element of `self`.
-    .map(f): Prim.list_map(f, self)
+    .map(f): prim.list_map(f, self)
 
     # Return true when `self` include `v`.
-    .include?(v): Prim.list_include?(v, self)
+    .include?(v): prim.list_include?(v, self)
 
     # Lookup from association list.
     # `self` must be a list of pairs.
-    .assoc(x): Prim.list_assoc(self, x)
-    .assoc_set(x, v): Prim.list_assoc_set(self, x, v)
+    .assoc(x): prim.list_assoc(self, x)
+    .assoc_set(x, v): prim.list_assoc_set(self, x, v)
 
     # Convert nested list to flat list.
     # ----
     # > [1,[2,3],[4,[5],6]].flatten()   # => [1,2,3,4,5,6]
     # ----
-    .flatten(): Prim.list_flatten(self)
+    .flatten(): prim.list_flatten(self)
 
     # Fold elements of `self` by the binary function `f` from left to right.
     # Example:
@@ -109,8 +109,8 @@ trait List {
     # > [1,2,3,4].foldl((x,y)->x+y, 1)  # => (((1+1)+2)+3)+4
     # > [1,2,3,4].foldl((x,y)->x+y)     # => ((1+2)+3)+4
     # ----
-    .foldl(f, v): Prim.list_foldl(f, v, self)
-    .foldl(f):    Prim.list_fold1(f, self)
+    .foldl(f, v): prim.list_foldl(f, v, self)
+    .foldl(f):    prim.list_fold1(f, self)
 
     # Fold elements of `self` by the binary function `f` from right to left.
     # Example:
@@ -118,19 +118,19 @@ trait List {
     # > [1,2,3,4].foldr((x,y)->x+y, 1)  # => 1+(2+(3+(4+1)))
     # > [1,2,3,4].foldr((x,y)->x+y)     # => 1+(2+(3+4))
     # ----
-    .foldr(f, v): Prim.list_foldr(f, self, v)
-    .foldr(f):    Prim.list_foldr1(f, self)
+    .foldr(f, v): prim.list_foldr(f, self, v)
+    .foldr(f):    prim.list_foldr1(f, self)
 
     # Create new list that contains all elements of `self` but they are sorted.
-    .sort(cmp @ Function): Prim.list_sort(self, cmp)
-    .sort(): Prim.list_sort(self, compare)
+    .sort(cmp @ Function): prim.list_sort(self, cmp)
+    .sort(): prim.list_sort(self, compare)
 
     # Create new list where `v` is inserted between each element.
     # Example:
     # ----
     # > [1,2,3,4].intersperse(0)    # => [1,0,2,0,3,0,4]
     # ----
-    .intersperse(v): Prim.list_intersperse(v, self)
+    .intersperse(v): prim.list_intersperse(v, self)
 
     extend 'Iterable
 
@@ -147,4 +147,4 @@ trait List {
     }
 }
 
-Prim.set_builtin_parent('List, Trait.List)
+prim.set_builtin_parent('List, Trait.List)

@@ -4,7 +4,7 @@
 " Syntax definition of the Amber language. "
 
 " Enable comments. "
-Assign{Slot{Syntax, comment}, Slot{Prim, parse_shell_style_comment}}
+Assign{Slot{Syntax, comment}, Slot{prim, parse_shell_style_comment}}
 
 ### syntax definition
 # Amber's parser uses Parsing Expression Grammer (PEG)
@@ -33,7 +33,7 @@ Assign{Slot{Syntax, comment}, Slot{Prim, parse_shell_style_comment}}
 DefineSyntax{
     character_set,
     List{Tuple{List{Many1{Choice{List{"\\", any}, List{Not{"]"}, any}}}},
-        Send{Prim, input_text, List{parser,begin,end}}}
+        Send{prim, input_text, List{parser,begin,end}}}
     }
 }
 
@@ -371,18 +371,18 @@ syntax_declaration ::= pattern "::=" delimited1(parser_entry, "|")
     { `DefineSyntax{!node0, !node2} }
 
 # Entry point of parsers
-Syntax.toplevel = Prim.parse_toplevel
-Syntax.shell    = Prim.parse_shell
+Syntax.toplevel = prim.parse_toplevel
+Syntax.shell    = prim.parse_shell
 
 # Extend primary_expr to enable dollar sign ($) in parser action.
 primary_expr_act
     ::= "$" decimal
         {
-            Prim.string_to_symbol(
-                Prim.string_add("node",
-                Prim.int_to_string(node1,10,0,false,false)))
+            prim.string_to_symbol(
+                prim.string_add("node",
+                prim.int_to_string(node1,10,0,false,false)))
         }
-      | "$input"    { 'Prim.input_text(parser, begin, end) }
+      | "$input"    { 'prim.input_text(parser, begin, end) }
 
 Syntax.primary_expr_act = fusion(Syntax.primary_expr_act, Syntax.primary_expr)
 
@@ -399,13 +399,13 @@ Syntax.parser_action = parser -> {
 primary_expr_shell
     ::= "%" decimal
         {
-            if (Prim.equal?(node1, 0) or
-                Prim.int_greater_than?(node1, Prim.array_size(shell_outputs))) {
+            if (prim.equal?(node1, 0) or
+                prim.int_greater_than?(node1, prim.array_size(shell_outputs))) {
                     throw `SyntaxError{"The argument of % must be a line number"}
             }
-            `Prim.array_at(shell_outputs, !node1)
+            `prim.array_at(shell_outputs, !node1)
         }
-      | "%" { `Prim.array_at(shell_outputs, 0) }
+      | "%" { `prim.array_at(shell_outputs, 0) }
 
 Syntax.enable_shell_syntax: () -> {
     Syntax.primary_expr = fusion(Syntax.primary_expr, Syntax.primary_expr_shell)
@@ -414,34 +414,34 @@ Syntax.enable_shell_syntax: () -> {
 ### Macro
 macro: e -> e
 Define{expand_macro_sub, (obj, lvl) -> {
-        head: Prim.head(obj)
-        args: Prim.arguments(obj)
+        head: prim.head(obj)
+        args: prim.arguments(obj)
         Node{
-            Prim.head(obj),
-            Prim.list_map(e -> expand_macro(e, lvl), args)
+            prim.head(obj),
+            prim.list_map(e -> expand_macro(e, lvl), args)
         }
     }, fusion}
-Define{expand_macro_sub, (obj, _) when Prim.atom?(obj) -> obj, fusion}
+Define{expand_macro_sub, (obj, _) when prim.atom?(obj) -> obj, fusion}
 Define{expand_macro_sub,
-    (obj, lvl) when Prim.int_less_than?(lvl, 0) ->
+    (obj, lvl) when prim.int_less_than?(lvl, 0) ->
     { throw `LogicError{"Unquotetation outside quasi-quotation"} },
     fusion}
 Define{expand_macro_sub,
-    (obj, lvl) when Equal{Prim.head(obj), 'UnQuote} -> {
-        Prim.set_arg(obj, 0,
-            expand_macro(Prim.get_arg(obj, 0), Prim.int_sub(lvl, 1)))
+    (obj, lvl) when Equal{prim.head(obj), 'UnQuote} -> {
+        prim.set_arg(obj, 0,
+            expand_macro(prim.get_arg(obj, 0), prim.int_sub(lvl, 1)))
         obj
     },
     fusion}
 Define{expand_macro_sub,
-    (obj, lvl) when Equal{Prim.head(obj), 'QuasiQuote} -> {
-        Prim.set_arg(obj, 0,
-            expand_macro(Prim.get_arg(obj, 0), Prim.int_add(lvl, 1)))
+    (obj, lvl) when Equal{prim.head(obj), 'QuasiQuote} -> {
+        prim.set_arg(obj, 0,
+            expand_macro(prim.get_arg(obj, 0), prim.int_add(lvl, 1)))
         obj
     },
     fusion}
 Define{expand_macro_sub,
-    (obj, 0) when Equal{Prim.head(obj), 'Quote} -> obj,
+    (obj, 0) when Equal{prim.head(obj), 'Quote} -> obj,
     fusion}
 Define{expand_macro_sub,
     (Lambda{args, body, options...}, 0) ->
@@ -514,19 +514,19 @@ macro(x |= y)  = `ArithAssign{!x, !y, fusion!}
 # Subscript syntax is not built-in. We need macros.
 macro(x[idxs...]) = `Send{!x, get, !idxs}
 macro(x[idxs...] = e)
-    = `Send{!x, set, !Prim.list_append(idxs, [e])}
+    = `Send{!x, set, !prim.list_append(idxs, [e])}
 macro(ArithAssign{x[idxs...], e, op}) = {
     # We have to consider that evaluation of `x' and `idxs' may have
     # side-effects. So, we translate x[a,b] op= e to
     # { y = x; t1 = a; t2 = b; y[t1, t2] = op(y[t1, t2], e) }
     stmt1: `Define{!unique_symbol('x), !x}
-    stmt2: Prim.list_map(i -> `Define{!unique_symbol('t), !i}, idxs)
-    y: Prim.get_arg(stmt1, 0)
-    ts: Prim.list_map(e -> Prim.get_arg(e, 0), stmt2)
+    stmt2: prim.list_map(i -> `Define{!unique_symbol('t), !i}, idxs)
+    y: prim.get_arg(stmt1, 0)
+    ts: prim.list_map(e -> prim.get_arg(e, 0), stmt2)
 
     `Block{
-        !Prim.list_append(
-            Prim.list_cons(stmt1, stmt2),
+        !prim.list_append(
+            prim.list_cons(stmt1, stmt2),
             [`Assign{Subscript{!y, !ts}, Send{Subscript{!y, !ts}, !op, [!e]}}]
         )
     }
@@ -534,8 +534,8 @@ macro(ArithAssign{x[idxs...], e, op}) = {
 
 # For-statement for containers.
 macro(For{i, container, body}) = {
-    iter:  Prim.unique_symbol('iter)
-    value: Prim.unique_symbol('value)
+    iter:  prim.unique_symbol('iter)
+    value: prim.unique_symbol('value)
     `{
         !iter : (!container).each()
         !value: nil
@@ -548,8 +548,8 @@ macro(For{i, container, body}) = {
 
 # For-statement for ranges.
 macro(For{i, Range{a, b}, body}) = {
-    j: Prim.unique_symbol('j)
-    n: Prim.unique_symbol('n)
+    j: prim.unique_symbol('j)
+    n: prim.unique_symbol('n)
     `{
         !j: !a
         !n: !b
@@ -588,25 +588,25 @@ macro(For{i, Range{a, b}, body}) = {
 
 desugar_args(a, _, _, _): a
 desugar_args(a, vars, checks, 0): {
-    args: Prim.arguments(a)
+    args: prim.arguments(a)
     if args == []
         return a
     args = desugar_args(args, vars, checks, 0)
-    Node{Prim.head(a), args}
+    Node{prim.head(a), args}
 }
 desugar_args([], _, _, 0): []
 desugar_args([a,rest...], vars, checks, 0): {
     a    = desugar_args(a, vars, checks, 0)
     rest = desugar_args(rest, vars, checks, 0)
-    Prim.list_cons(a, rest)
+    prim.list_cons(a, rest)
 }
 desugar_args(a @ Symbol, vars, checks, 0): {
-    if not Prim.array_include?(vars, a) {
-        Prim.array_push(vars, a)
+    if not prim.array_include?(vars, a) {
+        prim.array_push(vars, a)
         return a
     }
-    t: Prim.unique_symbol(a)
-    Prim.array_push(checks, ([], `Equal{!t, !a}))
+    t: prim.unique_symbol(a)
+    prim.array_push(checks, ([], `Equal{!t, !a}))
     t
 }
 desugar_args('_, _, _, 0): '_
@@ -615,23 +615,23 @@ desugar_args(true, _, _, 0): true
 desugar_args(false, _, _, 0): false
 desugar_args(a @ Quote, _, _, 0): a
 desugar_args(a @ QuasiQuote, vars, checks, level): {
-    arg: desugar_args(Prim.get_arg(a, 0), vars, checks, level + 1)
+    arg: desugar_args(prim.get_arg(a, 0), vars, checks, level + 1)
     'QuasiQuote{!arg}
 }
 desugar_args(a @ Unquote, vars, checks, level): {
-    arg: desugar_args(Prim.get_arg(a, 0), vars, checks, level - 1)
+    arg: desugar_args(prim.get_arg(a, 0), vars, checks, level - 1)
     'Unquote{!arg}
 }
 desugar_args(a @ Domain, vars, checks, 0): {
-    v: Prim.get_arg(a, 0)
-    pat: Prim.get_arg(a, 1)
-    if not Prim.array_include?(vars, v)
-        Prim.array_push(vars, v)
-    if Prim.head(pat) == 'Symbol
+    v: prim.get_arg(a, 0)
+    pat: prim.get_arg(a, 1)
+    if not prim.array_include?(vars, v)
+        prim.array_push(vars, v)
+    if prim.head(pat) == 'Symbol
         return a
     pat = desugar_args(pat, vars, checks, 0)
-    if Prim.head(pat) == 'Symbol {
-        Prim.array_push(checks, ([`Define{!pat, !v}], true))
+    if prim.head(pat) == 'Symbol {
+        prim.array_push(checks, ([`Define{!pat, !v}], true))
         v
     } else
         `Domain{!v, !pat}
@@ -639,47 +639,47 @@ desugar_args(a @ Domain, vars, checks, 0): {
 
 desugar_args(orpat @ SeqOr, vars, checks, 0): {
     # Translate `a or b or ..` to [a,b,..]
-    t: Prim.unique_symbol('t)
+    t: prim.unique_symbol('t)
     to_list(pat): [pat]
-    to_list(SeqOr{a, b}): Prim.list_append(to_list(a), to_list(b))
+    to_list(SeqOr{a, b}): prim.list_append(to_list(a), to_list(b))
     pats: to_list(orpat)
-    n: Prim.array_size(vars)
-    orp_vars: Prim.array_new_empty()
-    pats = Prim.list_map(p -> {
-                Prim.array_resize(vars, n)
+    n: prim.array_size(vars)
+    orp_vars: prim.array_new_empty()
+    pats = prim.list_map(p -> {
+                prim.array_resize(vars, n)
                 p: desugar_args(p, vars, checks, 0)
-                for i in n..Prim.array_size(vars) {
-                    if not Prim.array_include?(orp_vars, vars[i])
-                        Prim.array_push(orp_vars, vars[i])
+                for i in n..prim.array_size(vars) {
+                    if not prim.array_include?(orp_vars, vars[i])
+                        prim.array_push(orp_vars, vars[i])
                 }
                 p
             }, pats)
-    init: Prim.array_to_list(Prim.array_map(x -> `Define{!x, nil}, orp_vars))
-    asgn: Prim.list_foldl1((a,b) -> `(!a or !b),
-            Prim.list_map(p -> `TryAssign{!p, !t}, pats))
-    Prim.array_push(checks, (init, asgn))
+    init: prim.array_to_list(prim.array_map(x -> `Define{!x, nil}, orp_vars))
+    asgn: prim.list_foldl1((a,b) -> `(!a or !b),
+            prim.list_map(p -> `TryAssign{!p, !t}, pats))
+    prim.array_push(checks, (init, asgn))
     t
 }
 
 desugar_lambda(args, guard, body): {
-    vars: Prim.array_new_empty()   # Parameter-variables
-    checks: Prim.array_new_empty() # Expresions that is needed to be checked.
+    vars: prim.array_new_empty()   # Parameter-variables
+    checks: prim.array_new_empty() # Expresions that is needed to be checked.
     args = desugar_args(args, vars, checks, 0)
-    if Prim.array_size(checks) == 0 {
+    if prim.array_size(checks) == 0 {
         if guard == nil
             return `Lambda{!args, !body}
         else
             return `Lambda{When{!args, !guard}, !body}
     } else {
-        inits: Prim.array_foldr(((a, _), b) -> Prim.list_append(a, b), checks, [])
-        checkexpr: Prim.array_foldl1((a, b) -> `(!a and !b),
-                Prim.array_map(((_, b)) -> b, checks))
+        inits: prim.array_foldr(((a, _), b) -> prim.list_append(a, b), checks, [])
+        checkexpr: prim.array_foldl1((a, b) -> `(!a and !b),
+                prim.array_map(((_, b)) -> b, checks))
         if guard != nil
             guard = `(!checkexpr and !guard)
         else
             guard = checkexpr
         if inits != []
-            guard = `Seq{!Prim.list_append(inits, [guard])}
+            guard = `Seq{!prim.list_append(inits, [guard])}
         return `Lambda{When{!args, !guard}, !body}
     }
 }
@@ -699,19 +699,19 @@ macro(WithSlots{obj, init}): `Apply{!obj, () -> { Seq{!init}; self }, []}
 
 ## Utilities
 add_reserved_word(strings...):
-    Prim.list_foreach(str ->
-        Prim.array_push(Syntax.reserved_words,
-            Prim.string_to_symbol(str)), strings)
+    prim.list_foreach(str ->
+        prim.array_push(Syntax.reserved_words,
+            prim.string_to_symbol(str)), strings)
 
 Syntax.new(case_sensitive=true): {
     if not case_sensitive
         throw `NotImplemented{"Sorry but we haven't implemented case-insensitive syntax"}
     syn: `Syntax{}
-    syn.reserved_words: Prim.array_new_empty()
+    syn.reserved_words: prim.array_new_empty()
     syn.case_sensitive: case_sensitive
     syn.add_reserved_word(symbols...): {
         for v in symbols
-            Prim.array_push(self.reserved_words, v)
+            prim.array_push(self.reserved_words, v)
     }
 
     # Copy basic parsers
@@ -720,7 +720,7 @@ Syntax.new(case_sensitive=true): {
                     'symbol, 'any_symbol, 'identifier]
 
     for p in basic_parsers
-        syn.set_slot(p, Prim.get_slot(Amber.Syntax, p, false, false, true))
+        syn.set_slot(p, prim.get_slot(Amber.Syntax, p, false, false, true))
 
     syn.program(p): {
         statements: []

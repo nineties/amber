@@ -14,10 +14,10 @@
 #
 # The representation of floating-point numbers is IEEE754 double.
 
-INTEGER_WIDTH: Prim.INTEGER_WIDTH
-INTEGER_MIN:   Prim.INTEGER_MIN
-INTEGER_MAX:   Prim.INTEGER_MAX
-infinity: Prim.infinity
+INTEGER_WIDTH: prim.INTEGER_WIDTH
+INTEGER_MIN:   prim.INTEGER_MIN
+INTEGER_MAX:   prim.INTEGER_MAX
+infinity: prim.infinity
 
 #== Implicit type conversion ==
 # Type conversions between objects and integers or floating-point numbers
@@ -34,12 +34,12 @@ typejoin('Float, 'Int) = 'Float
 #== Addition, Subtraction and Multiplication ==
 # These are very usual ones. We probably need no explanation.
 
-uplus  = Prim.int_uplus | Prim.float_uplus | uplus
-uminus = Prim.int_uminus | Prim.float_uminus | uminus
-abs    = Prim.int_abs | Prim.float_abs | abs
-add    = Prim.int_add | Prim.float_add | add
-sub    = Prim.int_sub | Prim.float_sub | sub
-mul    = Prim.int_mul | Prim.float_mul | mul
+uplus  = prim.int_uplus | prim.float_uplus | uplus
+uminus = prim.int_uminus | prim.float_uminus | uminus
+abs    = prim.int_abs | prim.float_abs | abs
+add    = prim.int_add | prim.float_add | add
+sub    = prim.int_sub | prim.float_sub | sub
+mul    = prim.int_mul | prim.float_mul | mul
 
 #== Division ==
 # Amber distinguishes two kinds of arithmetic division.
@@ -94,13 +94,13 @@ mul    = Prim.int_mul | Prim.float_mul | mul
 # > -1.0/-0.0       # => infinity
 # ----
 
-div    = Prim.int_div | div
-mod    = Prim.int_mod | mod
+div    = prim.int_div | div
+mod    = prim.int_mod | mod
 
 divmod(a, b): perform_binary_operation(a, b, divmod, 'divmod)
 divmod(a, b) when a.head == b.head: (div(a, b), mod(a, b))
 
-quo    = Prim.int_quo | Prim.float_quo | quo
+quo    = prim.int_quo | prim.float_quo | quo
 
 #== Power operation ==
 # `pow(a, b)` (operator = '^') is equal to `a` to the power of `b`.
@@ -111,7 +111,7 @@ quo    = Prim.int_quo | Prim.float_quo | quo
 # > 2^(-3)      # => 0.125
 # ----
 
-pow    = Prim.int_pow | Prim.float_pow | pow
+pow    = prim.int_pow | prim.float_pow | pow
 
 # `powmod(a, b, c)` for integer `a` and natural numbers `b` and `c`,
 # is basically equal to `(a ^ b) % c`. The difference is that
@@ -130,15 +130,15 @@ pow    = Prim.int_pow | Prim.float_pow | pow
 # ----
 
 powmod(a, b, c): perform_ternary_operation(a, b, c, powmod, 'powmod)
-powmod = Prim.int_powmod | powmod
+powmod = prim.int_powmod | powmod
 
 # We use specialized comparison methods for integers for speed,
 # and use `compare` for floating-point numbers.
-less_than?     = Prim.int_less_than?     | less_than?
-greater_than?  = Prim.int_greater_than?  | greater_than?
-less_equal?    = Prim.int_less_equal?    | less_equal?
-greater_equal? = Prim.int_greater_equal? | greater_equal?
-compare = Prim.int_compare | Prim.float_compare | compare
+less_than?     = prim.int_less_than?     | less_than?
+greater_than?  = prim.int_greater_than?  | greater_than?
+less_equal?    = prim.int_less_equal?    | less_equal?
+greater_equal? = prim.int_greater_equal? | greater_equal?
+compare = prim.int_compare | prim.float_compare | compare
 
 # Several other functions.
 abs(a) = a >= 0 ? a : -a
@@ -150,16 +150,16 @@ minmax(a, b): a < b ? (a, b) : (b, a)
 # Traits.
 trait Int {
     .to_i(): self
-    .to_f(): Prim.int_to_float(self)
+    .to_f(): prim.int_to_float(self)
     .to_s(base=10, precision=nil, upper=false, unsigned=false):
-        Prim.int_to_string(self, base, precision, upper, unsigned)
+        prim.int_to_string(self, base, precision, upper, unsigned)
 }
 
 trait Float {
-    .to_i(): Prim.float_to_int(self)
+    .to_i(): prim.float_to_int(self)
     .to_f(): self
-    .to_s(): Prim.float_to_string(self)
+    .to_s(): prim.float_to_string(self)
 }
 
-Prim.set_builtin_parent('Int, Trait.Int)
-Prim.set_builtin_parent('Float, Trait.Float)
+prim.set_builtin_parent('Int, Trait.Int)
+prim.set_builtin_parent('Float, Trait.Float)
