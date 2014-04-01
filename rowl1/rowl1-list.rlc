@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2014-03-28 10:57:35 nineties $
+; $Id: rowl1-list.rlc 2014-04-01 00:57:45 nineties $
 ;
 
 (import "rlvm-compile")
@@ -91,6 +91,18 @@
     (var code (get_bytecode f))
     (while ls (do
         (= new_ls (cons (runcode code (car ls)) new_ls))
+        (= ls (cdr ls))
+        ))
+    (return (list_reverse new_ls))
+    ))
+
+(fun ls_map_wi (f ls) (
+    (var new_ls 0)
+    (var idx 0)
+    (var code (get_bytecode f))
+    (while ls (do
+        (= new_ls (cons (runcode code (car ls) (box idx)) new_ls))
+        (+= idx 1)
         (= ls (cdr ls))
         ))
     (return (list_reverse new_ls))
@@ -369,6 +381,7 @@
     (add_function2 mod (to_sym "list_append") listT listT list_append 0)
     (add_function2 mod (to_sym "list_diff") listT listT ls_diff 0)
     (add_function2 mod (to_sym "list_map") funT listT ls_map 0)
+    (add_function2 mod (to_sym "list_map_with_index") funT listT ls_map_wi 0)
     (add_function2 mod (to_sym "list_foreach") funT listT ls_foreach 0)
     (add_function2 mod (to_sym "list_include?") DontCare listT ls_include 0)
     (add_function2 mod (to_sym "list_assoc") listT DontCare ls_assoc 0)
