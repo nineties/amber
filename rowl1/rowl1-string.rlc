@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-string.rlc 2014-03-26 23:34:44 nineties $
+; $Id: rowl1-string.rlc 2014-04-03 04:19:14 nineties $
 ;
 
 (import "rlvm-compile")
@@ -128,6 +128,9 @@
     ))
 
 (fun str_repeat (str n) (
+    (if (! @(UFIX n))
+        (throw (invalid_argument (string "invalid repeat count") n))
+        )
     (= n (unbox n))
     (if (< n 0)
         (throw (invalid_argument (string "Repeat count is negative") (box n)))
@@ -141,6 +144,9 @@
     ))
 
 (fun str_ljust (str w punct) (
+    (if (! @(UFIX w))
+        (throw (invalid_argument (string "invalid string width") w))
+        )
     (= w (unbox w))
     (var sz (str_size str))
     (var psz (str_size punct))
@@ -155,6 +161,9 @@
     )) 
 
 (fun str_rjust (str w punct) (
+    (if (! @(UFIX w))
+        (throw (invalid_argument (string "invalid string width") w))
+        )
     (= w (unbox w))
     (var sz (str_size str))
     (var psz (str_size punct))
@@ -169,6 +178,9 @@
     ))
 
 (fun str_center (str w punct) (
+    (if (! @(UFIX w))
+        (throw (invalid_argument (string "invalid string width") w))
+        )
     (= w (unbox w))
     (var sz (str_size str))
     (var psz (str_size punct))
@@ -190,25 +202,28 @@
 (fun str_code (s) (
     (var len (str_size s))
     (if (!= len 1) (throw (invalid_argument
-        (string "`to_code' requires a string of length 1")
+        (string "invalid character")
         s)))
     (return (box (array_get char s 0)))
     ))
 
 (fun str_char (i) (
-    (= i (unbox i))
-    (if (& i 0xffffff00) (throw (invalid_argument
-        (string "`char' requires number between 0 and 255")
-        (box i))))
-    (return (ctos i))
+    (if (&& @(UFIX i) (< i (box 256)))
+        (return (ctos (unbox i)))
+        )
+    (throw (invalid_argument (string "invalid ascii code") i))
     ))
 
 (fun str_at (s i) (
+    (if (! @(FIX i))
+        (throw (invalid_argument (string "invalid index") i))
+        )
+    (var i_ i)
     (= i (unbox i))
     (var len (str_size s))
     (if (< i 0) (+= i len))
     (if (|| (>= i len) (< i 0))
-        (throw (out_of_range s (box i))))
+        (throw (out_of_range s i_)))
     (return (ctos (array_get char s i)))
     ))
 
@@ -247,6 +262,10 @@
     ))
 
 (fun str_substr (s i len) (
+    (if (! @(FIX i))
+        (throw (invalid_argument (string "invalid index") i)))
+    (if (! @(UFIX len))
+        (throw (invalid_argument (string "invalid length") len)))
     (= i (unbox i))
     (= len (unbox len))
     (var size (str_size s))
@@ -323,12 +342,10 @@
     ))
 
 (fun iss_read_bytes (io size eoserr) (
+    (if (! @(UFIX size))
+        (throw (invalid_argument (string "invalid read size") size))
+        )
     (= size (unbox size))
-    (if (<= size 0)
-        (throw (invalid_argument
-            (string "Read size must be positive.")
-            (box size)
-            )))
     (var s (allocate_string size))
     (var r (input_bytes (field_get io 1) s size))
     (if (== r size) (return s))
