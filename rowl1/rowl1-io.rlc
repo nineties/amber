@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-io.rlc 2014-03-19 20:56:30 nineties $
+; $Id: rowl1-io.rlc 2014-04-03 03:10:55 nineties $
 ;
 
 (import "rlvm-compile")
@@ -104,6 +104,9 @@
     ))
 
 (fun io_read_bytes (io size eoserr) (
+    (if (! @(UFIX size))
+        (throw (invalid_argument (string "invalid byte size") size))
+        )
     (= size (unbox size))
     (if (<= size 0)
         (throw (invalid_argument
@@ -287,46 +290,149 @@
     (return f)
     ))
 
-(fun io_write_byte8 (io n) (
+(fun io_write_int8 (io n) (
+    (var n_ n)
+    (if (! (& n 1)) (goto invalid_arg))
     (= n (unbox n))
+    (if (|| (< n -128) (> n 127)) (goto invalid_arg))
     (output_bytes (field_get io 2) (address n) 1)
     (return @C_NIL)
+
+    (label invalid_arg)
+    (throw (invalid_argument
+        (string "8-bit integer is required") n_))
     ))
 
-(fun io_write_byte16 (io n) (
+(fun io_write_uint8 (io n) (
+    (var n_ n)
+    (if (! (& n 1)) (goto invalid_arg))
     (= n (unbox n))
+    (if (|| (< n 0) (> n 255)) (goto invalid_arg))
+    (output_bytes (field_get io 2) (address n) 1)
+    (return @C_NIL)
+
+    (label invalid_arg)
+    (throw (invalid_argument
+        (string "8-bit non-negative integer is required") n_))
+    ))
+
+(fun io_write_int16 (io n) (
+    (var n_ n)
+    (if (! (& n 1)) (goto invalid_arg))
+    (= n (unbox n))
+    (if (|| (< n -32768) (> n 32767)) (goto invalid_arg))
     (output_bytes (field_get io 2) (address n) 2)
     (return @C_NIL)
+
+    (label invalid_arg)
+    (throw (invalid_argument
+        (string "16-bit integer is required") n_))
     ))
 
-(fun io_write_byte32 (io n) (
+(fun io_write_uint16 (io n) (
+    (var n_ n)
+    (if (! (& n 1)) (goto invalid_arg))
+    (= n (unbox n))
+    (if (|| (< n 0) (> n 65535)) (goto invalid_arg))
+    (output_bytes (field_get io 2) (address n) 2)
+    (return @C_NIL)
+
+    (label invalid_arg)
+    (throw (invalid_argument
+        (string "8-bit non-negative integer is required") n_))
+    ))
+
+(fun io_write_int32 (io n) (
+    (var n_ n)
     (if (& n 1)
         (do
             (= n (unbox n))
             (output_bytes (field_get io 2) (address n) 4)
             (return @C_NIL)
         ))
-    (if (!= (node_head n) BigInt)
-        (throw (invalid_argument (string "32-bit integer is required") n)))
+    (if (bint_is_negative n) (= n (abs_twoscomplement (copy_bint n))))
+    (if (!= (bint_ndigit n) 1) (goto invalid_arg))
+
     (= n (bint_digit n 0))
     (output_bytes (field_get io 2) (address n) 4)
     (return @C_NIL)
+
+    (label invalid_arg)
+    (throw (invalid_argument
+        (string "32-bit integer is required") n_))
     ))
 
-(fun io_write_byte64 (io n) (
+(fun io_write_uint32 (io n) (
+    (var n_ n)
     (if (& n 1)
         (do
+            (if (< n 0) (goto invalid_arg))
+            (= n (unbox n))
+            (output_bytes (field_get io 2) (address n) 4)
+            (return @C_NIL)
+        ))
+    (if (|| (!= (bint_ndigit n) 1) (bint_is_negative n))
+        (goto invalid_arg))
+
+    (= n (bint_digit n 0))
+    (output_bytes (field_get io 2) (address n) 4)
+    (return @C_NIL)
+
+    (label invalid_arg)
+    (throw (invalid_argument
+        (string "32-bit non-negative integer is required") n_))
+    ))
+
+(fun io_write_int64 (io n) (
+    (var n_ n)
+    (if (& n 1)
+        (do
+            (= n (unbox n))
+            (output_bytes (field_get io 2) (address n) 4)
+            (if (>= n 0)
+                (= n 0)
+                (= n 0xffffffff)
+                )
+            (output_bytes (field_get io 2) (address n) 4)
+            (return @C_NIL)
+        ))
+    (if (bint_is_negative n) (= n (abs_twoscomplement (copy_bint n))))
+    (if (!= (bint_ndigit n) 2) (goto invalid_arg))
+
+    (= n (bint_digit n 0))
+    (output_bytes (field_get io 2) (address n) 4)
+    (= n (bint_digit n 1))
+    (output_bytes (field_get io 2) (address n) 4)
+    (return @C_NIL)
+
+    (label invalid_arg)
+    (throw (invalid_argument
+        (string "64-bit integer is required") n_))
+    ))
+
+(fun io_write_uint64 (io n) (
+    (var n_ n)
+    (if (& n 1)
+        (do
+            (if (< n 0) (goto invalid_arg))
             (= n (unbox n))
             (output_bytes (field_get io 2) (address n) 4)
             (= n 0)
             (output_bytes (field_get io 2) (address n) 4)
             (return @C_NIL)
         ))
-    (if (!= (node_head n) BigInt)
-        (throw (invalid_argument (string "64-bit integer is required") n)))
+    (if (|| (!= (bint_ndigit n) 2) (bint_is_negative n))
+        (goto invalid_arg))
+
     (= n (bint_digit n 0))
-    (output_bytes (field_get io 2) (address n) 8)
+    (output_bytes (field_get io 2) (address n) 4)
+    (= n (bint_digit n 1))
+    (output_bytes (field_get io 2) (address n) 4)
     (return @C_NIL)
+
+    (label invalid_arg)
+    (throw (invalid_argument
+        (string "64-bit non-negative integer is required") n_))
     ))
 
 (fun io_write_float (io f) (
@@ -371,14 +477,14 @@
     (add_function2 mod (to_sym "read_uint64") ifT DontCare io_read_uint64 0)
     (add_function2 mod (to_sym "read_float") ifT DontCare io_read_float 0)
 
-    (add_function2 mod (to_sym "write_int8") ofT intT io_write_byte8 0)
-    (add_function2 mod (to_sym "write_uint8") ofT intT io_write_byte8 0)
-    (add_function2 mod (to_sym "write_int16") ofT intT io_write_byte16 0)
-    (add_function2 mod (to_sym "write_uint16") ofT intT io_write_byte16 0)
-    (add_function2 mod (to_sym "write_int32") ofT DontCare io_write_byte32 0)
-    (add_function2 mod (to_sym "write_uint32") ofT DontCare io_write_byte32 0)
-    (add_function2 mod (to_sym "write_int64") ofT DontCare io_write_byte64 0)
-    (add_function2 mod (to_sym "write_uint64") ofT DontCare io_write_byte64 0)
+    (add_function2 mod (to_sym "write_int8") ofT intT io_write_int8 0)
+    (add_function2 mod (to_sym "write_uint8") ofT intT io_write_uint8 0)
+    (add_function2 mod (to_sym "write_int16") ofT intT io_write_int16 0)
+    (add_function2 mod (to_sym "write_uint16") ofT intT io_write_uint16 0)
+    (add_function2 mod (to_sym "write_int32") ofT intT io_write_int32 0)
+    (add_function2 mod (to_sym "write_uint32") ofT intT io_write_uint32 0)
+    (add_function2 mod (to_sym "write_int64") ofT intT io_write_int64 0)
+    (add_function2 mod (to_sym "write_uint64") ofT intT io_write_uint64 0)
     (add_function2 mod (to_sym "write_float") ofT floatT io_write_float 0)
     ))
 

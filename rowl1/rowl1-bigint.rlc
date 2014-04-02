@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-bigint.rlc 2014-03-09 16:37:26 nineties $
+; $Id: rowl1-bigint.rlc 2014-04-03 02:02:43 nineties $
 ;
 
 (import "rlvm-compile")
@@ -26,7 +26,8 @@
     ))
 
 (export fun pp_bint (ochan n) (
-    (output_string ochan (bint_to_s n))
+    (output_string ochan
+        (bint_to_s n (box 10) (box 0) @C_FALSE @C_FALSE @C_FALSE))
     (return @C_NIL)
     ))
 
@@ -71,17 +72,6 @@
             (field_set b 3 1)
         ))
     (return b)
-    ))
-
-(fun int_to_bint_ (v) (
-    (return (int_to_bint (unbox v)))
-    ))
-
-(fun bint_to_int (v) (
-    (var f (norm v))
-    (if (! (& v 1))
-        (throw (value_error (string "Bigint overflows the range of fixed-length integer") v)))
-    (return f)
     ))
 
 (export fun uint_to_bint (v) (
@@ -277,15 +267,45 @@
         )
     ))
 
-(export fun bint_to_s (u) (
-    (= u (to_bint_copy u))
+(fun int_to_s (n base prec prefix upper unsigned) (
+    (if (|| (< base 2) (> base 36))
+        (throw (invalid_argument (string "Invalid radix") (box base)))
+        )
+    (if (< prec 0)
+        (throw (invalid_argument (string "Invalid precision") prec))
+        )
+    (return (itos n base prec
+        (!= prefix @C_FALSE) (!= upper @C_FALSE) (!= unsigned @C_FALSE)
+        ))
+    ))
 
-    (if (bint_is_zero u) (return (string "0")))
+(export fun bint_to_s (n base prec prefix upper unsigned) (
+    (if (! (& base 1))
+        (throw (invalid_argument (string "Invalid radix") base))
+        )
+    (if (! (& prec 1))
+        (throw (invalid_argument (string "Invalid precision") base))
+        )
+    (= base (unbox base))
+    (= prec (unbox prec))
+    (if (& n 1) (return (int_to_s (unbox n) base prec prefix upper unsigned)))
 
-    (var udigit (field_get u 0))
-    (var ulen (field_get u 1))
-    (var usign (field_get u 3))
-    (field_set u 3 0)
+    (if (|| (!= base 10)
+        (|| (!= prec 0)
+        (|| (!= prefix @C_FALSE)
+        (|| (!= upper @C_FALSE)
+            (!= unsigned @C_FALSE)))))
+        (throw (exception (string "bin_to_s: not implemented")))
+        )
+
+    (= n (to_bint_copy n))
+
+    (if (bint_is_zero n) (return (string "0")))
+
+    (var udigit (field_get n 0))
+    (var ulen (field_get n 1))
+    (var usign (field_get n 3))
+    (field_set n 3 0)
     ; convert base 2^32 to 10^9
     ; number of digits in base 10^9 is
     ;    ( ulen * log(2^32)/log(10^9) ).ceil
@@ -295,8 +315,8 @@
     (var ary  (allocate_iarray (+ ulen (>> (+ (* 3 ulen) 31) 5))))
     (var base (uint_to_bint 1000000000))
     (var i 0)
-    (while (! (bint_is_zero u)) (do
-        (var r (bigdiv u base))
+    (while (! (bint_is_zero n)) (do
+        (var r (bigdiv n base))
         (array_set int ary i (bint_digit r 0))
         (+= i 1)
         ))
@@ -347,8 +367,8 @@
     ; fill '\0'
     (array_set char str p 0)
 
-    ; recover sign of u
-    (field_set u 3 usign)
+    ; recover sign of n
+    (field_set n 3 usign)
     (return str)
     ))
 
@@ -500,7 +520,7 @@
     (return (box h))
     ))
 
-(fun abs_twoscomplement (n) (
+(export fun abs_twoscomplement (n) (
     (var ds (bint_digits n))
     (var len (bint_ndigit n))
     (for i 0 len
@@ -515,11 +535,12 @@
     ))
 
 (fun bint_to_f (b) (
+    (if (& b 1) (return (itof (unbox b))))
     (= b (copy_bint b))
     (var f (allocate_float))
     (var n (bint_ndigits2 b))
     (var e (- n 1))
-    (= b (bint_shiftR b (box (- n 53))))
+    (= b (bint_rshift b (box (- n 53))))
     (field_set f 0 (bint_digit b 0))
     (var s (field_get b 3))
     (field_set f 1
@@ -565,23 +586,32 @@
     (return n)
     ))
 (export fun bint_uminus (n) (
+    (if (& n 1) (return (+ (- n) 2)))
     (return (bigneg (to_bint_copy n)))
     ))
 (fun bint_abs (n) (
+    (if (& n 1) 
+        (if (> n 0)
+            (return n)
+            (return (+ (- n) 2))
+        )
     (if (field_get n 3)
         (return (bint_uminus n))
         (return n)
-        )
+        ))
     ))
 (export fun bint_add (a b) (
+    (if (& (& a b) 1) (return (int_add2 a b)))
     (= a (to_bint_copy a))
     (return (norm (bigadd a (to_bint b))))
     ))
 (export fun bint_sub (a b) (
+    (if (& (& a b) 1) (return (int_sub2 a b)))
     (= a (to_bint_copy a))
     (return (norm (bigsub a (to_bint b))))
     ))
 (export fun bint_mul (a b) (
+    (if (& (& a b) 1) (return (int_mul2 a b)))
     (= a (to_bint_copy a))
     (return (norm (bigmul a (to_bint b))))
     ))
@@ -605,7 +635,8 @@
     ))
 
 ; ~a = -n - 1
-(fun bint_bnot (a) (
+(fun bint_lnot (a) (
+    (if (& a 1) (return (| 1 (~ a))))
     (= a (to_bint_copy a))
     (bigadd a (int_to_bint 1))
     (bigneg a)
@@ -613,7 +644,8 @@
     ))
 
 ; a & b
-(fun bint_band (a b) (
+(fun bint_land (a b) (
+    (if (& (& a b) 1) (return (& a b)))
     (= a (to_bint a))
     (= b (to_bint b))
     (var alen (bint_ndigit a))
@@ -684,7 +716,14 @@
         ))
     ))
 
-(export fun bint_shiftL (a b) (
+(fun bint_lor (a b) (
+    (throw (exception (string "bint_lor: not implemented")))
+    ))
+(fun bint_lxor (a b) (
+    (throw (exception (string "bint_lxor: not implemented")))
+    ))
+
+(export fun bint_lshift (a b) (
     (= a (to_bint_copy a))
     (= b (norm b))
     (if (== (node_type b) @BigIntE)
@@ -698,7 +737,7 @@
         (return (norm (bigshr a (- b))))
         ))
     ))
-(export fun bint_shiftR (a b) (
+(export fun bint_rshift (a b) (
     (= a (to_bint_copy a))
     (= b (norm b))
     (if (== (node_type b) @BigIntE)
@@ -712,6 +751,10 @@
         (return (norm (bigshl a (- b))))
         ))
     ))
+(fun bint_logic_rshift (a b) (
+    (throw (exception (string "bint_logic_rshift: not implemented")))
+    ))
+
 (export fun bint_lt (a b) (
     (= a (to_bint a))
     (= b (to_bint b))
@@ -733,11 +776,20 @@
     (if (>= (bigcmp a b) 0) (return @C_TRUE) (return @C_FALSE))
     ))
 (export fun bint_equal (a b) (
+    (if (& (& a b) 1)
+        (if (== a b) (return @C_TRUE) (return @C_FALSE))
+        )
     (= a (to_bint a))
     (= b (to_bint b))
     (if (== (bigcmp a b) 0) (return @C_TRUE) (return @C_FALSE))
     ))
 (export fun bint_compare (a b) (
+    (if (& (& a b) 1) (do
+        (if (< a b) (return (box -1))
+        (if (== a b) (return (box 0))
+            (return (box 1))
+            ))
+        ))
     (= a (to_bint a))
     (= b (to_bint b))
     (var r (bigcmp a b))
@@ -805,7 +857,7 @@
     (return (norm v))
     ))
 
-(export fun int_mul2 (a b) (
+(fun int_mul2 (a b) (
     (if (== b 1) (return b))    ; 1 == box(0)
     (if (== a 1) (return a))    ; 1 == box(0)
 
@@ -820,14 +872,14 @@
         )
     (return (bigmul (int_to_bint a) (int_to_bint b)))
     ))
-(export fun int_add2 (a b) (
+(fun int_add2 (a b) (
     (var c (+ (unbox a) (unbox b)))
     (if (&& (<= c @FIXNUM_MAX) (>= c @FIXNUM_MIN))
         (return (box c))
         (return (int_to_bint c))
         )
     ))
-(export fun int_sub2 (a b) (
+(fun int_sub2 (a b) (
     (var c (- (unbox a) (unbox b)))
     (if (&& (<= c @FIXNUM_MAX) (>= c @FIXNUM_MIN))
         (return (box c))
@@ -853,38 +905,35 @@
 (extern fun float_uminus)
 
 (export fun setup_bigint (mod) (
-    (add_function1 mod (to_sym "int_to_bint") intT int_to_bint_ 0)
-    (add_function1 mod (to_sym "bint_to_int") bintT bint_to_int 0)
-    (add_function1 mod (to_sym "bint_to_string") bintT bint_to_s 0)
-    (add_function1 mod (to_sym "string_to_bint") stringT string_to_bint 0)
-    (add_function1 mod (to_sym "bint_to_float") bintT bint_to_f 0)
+    (add_function6 mod (to_sym "int_to_string") intT intT DontCare DontCare DontCare DontCare bint_to_s 0)
+    (add_function1 mod (to_sym "string_to_int") stringT string_to_bint 0)
+    (add_function1 mod (to_sym "int_to_float") intT bint_to_f 0)
 
-    (add_function1 mod (to_sym "bint_uplus") bintT bint_uplus 0)
-    (add_function1 mod (to_sym "bint_uminus") bintT bint_uminus 0)
-    (add_function1 mod (to_sym "bint_abs") bintT bint_abs 0)
-    (add_function2 mod (to_sym "bint_add") bintT bintT bint_add 0)
-    (add_function2 mod (to_sym "bint_sub") bintT bintT bint_sub 0)
-    (add_function2 mod (to_sym "bint_mul") bintT bintT bint_mul 0)
-    (add_function2 mod (to_sym "bint_div") bintT bintT bint_div 0)
-    (add_function2 mod (to_sym "bint_mod") bintT bintT bint_mod 0)
-    (add_function2 mod (to_sym "bint_quo") bintT bintT bint_quo 0)
-    (add_function2 mod (to_sym "bint_divmod") bintT bintT bint_divmod 0)
-    (add_function2 mod (to_sym "bint_pow") bintT bintT bint_pow 0)
-    (add_function3 mod (to_sym "bint_powmod") bintT bintT bintT bint_powmod 0)
-    (add_function2 mod (to_sym "bint_compare") bintT bintT bint_compare 0)
-    (add_function2 mod (to_sym "bint_equalual?") bintT bintT bint_equal 0)
-    (add_function1 mod (to_sym "bint_bnot") bintT bint_bnot 0)
-    (add_function2 mod (to_sym "bint_band") bintT bintT bint_band 0)
-    (add_function2 mod (to_sym "bint_shiftL") bintT intT bint_shiftL 0)
-    (add_function2 mod (to_sym "bint_shiftR") bintT intT bint_shiftR 0)
-
-    ; overwrite operations between int and int
-    (add_function2 mod (to_sym "bint_add") intT intT int_add2 0)
-    (add_function2 mod (to_sym "bint_sub") intT intT int_sub2 0)
-    (add_function2 mod (to_sym "bint_mul") intT intT int_mul2 0)
-    (add_function2 mod (to_sym "bint_pow") intT intT bint_pow 0)
-    (add_function2 mod (to_sym "bint_shiftL") intT intT bint_shiftL 0)
-    (add_function2 mod (to_sym "bint_shiftR") intT intT bint_shiftR 0)
+    (add_function1 mod (to_sym "int_uplus") intT bint_uplus 0)
+    (add_function1 mod (to_sym "int_uminus") intT bint_uminus 0)
+    (add_function1 mod (to_sym "int_abs") intT bint_abs 0)
+    (add_function2 mod (to_sym "int_add") intT intT bint_add 0)
+    (add_function2 mod (to_sym "int_sub") intT intT bint_sub 0)
+    (add_function2 mod (to_sym "int_mul") intT intT bint_mul 0)
+    (add_function2 mod (to_sym "int_div") intT intT bint_div 0)
+    (add_function2 mod (to_sym "int_mod") intT intT bint_mod 0)
+    (add_function2 mod (to_sym "int_quo") intT intT bint_quo 0)
+    (add_function2 mod (to_sym "int_divmod") intT intT bint_divmod 0)
+    (add_function2 mod (to_sym "int_pow") intT intT bint_pow 0)
+    (add_function3 mod (to_sym "int_powmod") intT intT intT bint_powmod 0)
+    (add_function2 mod (to_sym "int_compare") intT intT bint_compare 0)
+    (add_function2 mod (to_sym "int_less_than?") intT intT bint_lt 0)
+    (add_function2 mod (to_sym "int_greater_than?") intT intT bint_gt 0)
+    (add_function2 mod (to_sym "int_less_equal?") intT intT bint_le 0)
+    (add_function2 mod (to_sym "int_greater_equal?") intT intT bint_ge 0)
+    (add_function2 mod (to_sym "int_equal?") intT intT bint_equal 0)
+    (add_function1 mod (to_sym "int_lnot") intT bint_lnot 0)
+    (add_function2 mod (to_sym "int_land") intT intT bint_land 0)
+    (add_function2 mod (to_sym "int_lor") intT intT bint_lor 0)
+    (add_function2 mod (to_sym "int_lxor") intT intT bint_lxor 0)
+    (add_function2 mod (to_sym "int_lshift") intT intT bint_lshift 0)
+    (add_function2 mod (to_sym "int_rshift") intT intT bint_rshift 0)
+    (add_function2 mod (to_sym "int_logic_rshift") intT intT bint_logic_rshift 0)
     ))
 
     ))

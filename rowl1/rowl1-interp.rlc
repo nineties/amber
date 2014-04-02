@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-03-31 22:35:09 nineties $
+; $Id: rowl1-interp.rlc 2014-04-03 03:05:52 nineties $
 ;
 
 (import "rlvm-compile")
@@ -180,6 +180,9 @@
     ))
 
 (fun exit_ (status) (
+    (if (! (&& (& status 1) (> status 0)))
+        (throw (invalid_argument (string "invalid exit status code") status))
+        )
     (= atexit_list (list_reverse atexit_list))
     (while atexit_list (do
         (runcode (get_bytecode (car atexit_list)))
@@ -500,9 +503,8 @@
     (setup_encoding mod)
     (setup_symbol mod)
     (setup_math mod)
-    (setup_numeric mod)
-    (setup_string mod)
     (setup_bigint mod)
+    (setup_string mod)
     (setup_float mod)
     (setup_random mod)
     (setup_io mod)

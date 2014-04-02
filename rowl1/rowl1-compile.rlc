@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-04-02 17:07:34 nineties $
+; $Id: rowl1-compile.rlc 2014-04-02 20:46:59 nineties $
 ;
 
 (import "rlvm-compile")
@@ -786,7 +786,10 @@
     ))
 
 (fun compile_const_int (asm expr) (
-    (put_imm_int asm expr)
+    (if (& expr 1)
+        (put_imm_int asm expr)
+        (put_push asm expr)
+        )
     ))
 
 (fun compile_const (asm expr) (
@@ -2447,7 +2450,6 @@
     (add_compiler mod (quote @C_NIL) compile_special)
     (add_compiler mod intT compile_const_int)
     (add_compiler mod stringT compile_const)
-    (add_compiler mod bintT compile_const)
     (add_compiler mod (domainP Float) compile_const)
 
     (add_compiler mod (make_node2 Apply DontCare listT) compile_apply)

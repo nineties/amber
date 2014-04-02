@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-03-31 08:53:37 nineties $
+; $Id: rowl1-packrat.rlc 2014-04-03 03:21:15 nineties $
 ;
 
 (import "rlvm-compile")
@@ -212,6 +212,7 @@
 
 (extern fun load_global)
 (extern fun ary_include)
+(extern fun tuple2)
 
 (fun __cons (a b) (
     (return (cons a b))
@@ -568,6 +569,9 @@
 
 ; boxed version
 (fun get_input_text (p begin end) (
+    (if (|| (! @(UFIX begin)) (! @(UFIX end)))
+        (throw (invalid_argument (string "invalid offsets") (tuple2 begin end)))
+        )
     (return (extract_string p (unbox begin) (unbox end)))
     ))
 

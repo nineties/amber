@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-array.rlc 2014-03-20 22:39:37 nineties $
+; $Id: rowl1-array.rlc 2014-04-03 03:50:13 nineties $
 ;
 
 (import "rlvm-compile")
@@ -34,6 +34,8 @@
     ))
 
 (export fun ary_new2 (f len) (
+    (if (! @(UFIX len))
+        (throw (invalid_argument (string "invalid length") len)))
     (= len (unbox len))
     (var buf (allocate_array len))
     (var code (get_bytecode f))
@@ -70,6 +72,8 @@
     ))
 
 (fun ary_resize (ary new_size) (
+    (if (! @(UFIX new_size))
+        (throw (invalid_argument (string "invalid length") new_size)))
     (return (array_resize ary (unbox new_size)))
     ))
 
@@ -100,16 +104,24 @@
 
 (export fun array_at (ary i) (
     (var size (array_size ary))
+    (var i_ i)
+    (if (< i 0) (+= i size))
     (if (&& (>= i 0) (< i size))
         (return (array_get object (array_buf ary) i)))
-    (return @C_NIL)
+    (index_out_of_range ary i_)
     ))
 
 (export fun ary_at (ary i) (
+    (if (! @(FIX i))
+        (throw (invalid_argument (string "invalid index") i)))
     (return (array_at ary (unbox i)))
     ))
 
 (fun ary_sub (ary i len) (
+    (if (! @(FIX i))
+        (throw (invalid_argument (string "invalid index") i)))
+    (if (! @(UFIX len))
+        (throw (invalid_argument (string "invalid length") len)))
     (= i (unbox i))
     (= len (unbox len))
     (var size (array_size ary))
@@ -125,16 +137,23 @@
 
 (export fun array_store (ary i v) (
     (var size (array_size ary))
-    (if (< i size) (do
+    (var i_ i)
+    (if (< i 0) (+= i size))
+    (if (&& (>= i 0) (< i size)) (do
         (array_set object (array_buf ary) i v)
         (return v)
         ))
+    (if (< i 0)
+        (throw (invalid_argument (string "invalid index") (box i_)))
+        )
     (array_resize ary (+ i 1))
     (array_set object (array_buf ary) i v)
     (return v)
     ))
 
 (export fun ary_store (ary i v) (
+    (if (! @(FIX i))
+        (throw (invalid_argument (string "invalid index") i)))
     (return (array_store ary (unbox i) v))
     ))
 
@@ -359,9 +378,6 @@
 (fun ary_sort_bang (ary cmp) (
     (= cmp (get_bytecode cmp))
     (var limit (* 2 (bsr (array_size ary))))
-    (debugs "==== START sort ====\n")
-    (debugi (array_size ary))
-    (debugs "\n")
     (intro_sort (array_buf ary) 0 (- (array_size ary) 1) cmp limit)
     (return @C_NIL)
     ))
