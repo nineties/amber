@@ -1,45 +1,37 @@
 # Copyright (C) 2014 nineties
-# $Id: array.ab 2014-04-02 00:18:04 nineties $
+# $Id: array.ab 2014-04-02 18:12:39 nineties $
 
 #= Array =
 # Dynamic and mutable array.
 # Amber's objects are basically heterogeneous, i.e. you can put any kind
 # of object into one array.
 
-# Create an empty array.
-Array(): prim.array_new_empty()
+Array: object_system.builtin_class('Array) with {
+    # Create an empty array.
+    .new(): prim.array_new_empty()
 
-# Create an array of length `n` whose `i`-th element is `f(i)`
-Array(f @ Function, n @ Int): prim.array_new(f, n)
+    # Create an array of length `n` whose `i`-th element is `f(i)`
+    .new(f @ Function, n @ Int): prim.array_new(f, n)
 
-# Create an array of length `n` by first element `f0` and recurrence
-# formula `f`.
-Array(f @ Function, f0, n @ Int): {
-    ary: Array()
-    for i in 0..n {
-        ary.push(f0)
-        f0 = f(f0)
+    # Create an array of length `n` by first element `f0` and recurrence
+    # formula `f`.
+    .new(f @ Function, f0, n @ Int): {
+        ary: Array.new()
+        for i in 0..n {
+            ary.push(f0)
+            f0 = f(f0)
+        }
+        ary
     }
-    ary
-}
 
-# Create an array whose elements are obtained from an iterable object
-# `container`.
-Array(container) when container.Iterable? : {
-    ary: Array()
-    for v in container
-        ary.push(v)
-    ary
-}
-
-# Concatenation of two arrays.
-add = prim.array_append | add
-
-# Difference of two arrays.
-sub = prim.array_diff | sub
-
-Array with {
-    .parent: Trait
+    # Create an array whose elements are obtained from an iterable object
+    # `container`.
+    .new(container) when container.Iterable? : {
+        ary: Array.new()
+        for v in container
+            ary.push(v)
+        ary
+    }
 
     # The number of elements.
     .length: alias(() -> prim.array_length(self))
@@ -112,3 +104,10 @@ Array with {
 }
 
 prim.set_builtin_parent('Array, Array)
+
+# Concatenation of two arrays.
+add = prim.array_append | add
+
+# Difference of two arrays.
+sub = prim.array_diff | sub
+

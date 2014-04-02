@@ -1,9 +1,9 @@
 # Copyright (C) 2014 nineties
-# $Id: stack.ab 2014-04-02 02:35:05 nineties $
+# $Id: stack.ab 2014-04-02 18:13:50 nineties $
 
 #= Stack =
 
-trait Stack {
+trait Stack with {
     require '.push, '.pop, '.top, '.size
 
     .empty?: alias(() -> .size == 0)
@@ -68,8 +68,9 @@ trait Stack {
 }
 
 ### Linked list implementation ###
-class ListStack{list} {
+class ListStack{list} with {
     extend Stack
+    .new(): .new([])
     .size:   alias(() -> .list.size)
     .empty? = alias(() -> .list.empty?)
 
@@ -91,13 +92,11 @@ class ListStack{list} {
     }
 }
 
-ArrayStack(...) => ArrayStack.new().init(...)
-
-class ArrayStack{array} {
+class ArrayStack{array} with {
     extend Stack
-
+    .new(): .new(Array{})
     .size:    alias(() -> .array.size)
     .empty? = alias(() -> .array.empty?)
-    .push(v): .array.push(v)
-    .pop():   .array.pop()
+    .push(v): { .array.push(v); self }
+    .pop():   { .array.pop(); self }
 }

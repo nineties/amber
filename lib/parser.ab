@@ -1,14 +1,13 @@
 # Copyright (C) 2014 nineties
-# $Id: Parser.ab 2014-04-02 01:45:19 nineties $
+# $Id: Parser.ab 2014-04-02 18:11:08 nineties $
 
 #= Parser =
-
-Parser(input, syntax) when input.InputFileStream? :
-    prim.parser_new(input) with .syntax = syntax
-Parser(path @ String, syntax):
-    prim.parser_new(io.file.open_in(path)) with .syntax = syntax
-
+Parser: object_system.builtin_class('Parser)
 Parser with {
+    .new(input, syntax) when input.InputFileStream? :
+        prim.parser_new(input) with .syntax = syntax
+    .new(path @ String, syntax):
+        prim.parser_new(io.file.open_in(path)) with .syntax = syntax
     .tree: alias(() -> prim.parser_tree(self))
     .loc:  alias(() -> prim.parser_loc(self))
     .reset!():prim.parser_reset(self)
@@ -16,6 +15,7 @@ Parser with {
     .eof?: alias(() -> prim.parser_eof?(self))
 }
 
+prim.set_builtin_parent('Parser, Parser)
+
 parse(syntax, input): syntax.program(Parser(input, syntax))
 
-prim.set_builtin_parent('Parser, Parser)

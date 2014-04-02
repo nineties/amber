@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: object_system.ab 2014-04-02 00:18:22 nineties $
+# $Id: object_system.ab 2014-04-02 18:10:18 nineties $
 
 #= Object System =
 # This library introduces prototype-based object-oriented programming
@@ -70,13 +70,16 @@ postfix_expr ::= 'class symbol "{" delimited(pattern, ",") "}"
                   { `DefTrait{!$1} }
 
 macro(DefClass{head, fields}) = `Seq{[
-        Define{!head, Lambda{!fields,
+        Define{!head, 'Class{!head} with .parent = Trait},
+
+        Define{Slot{!head, make}, Lambda{!fields,
             Node{'!head, !fields} with .parent = !head}},
 
-        Define{!head, Lambda{!prim.list_map(f -> `Keyword{!f, nil}, fields),
+        Define{Slot{!head, make}, Lambda{!prim.list_map(f -> `Keyword{!f, nil}, fields),
             Node{'!head, !fields} with .parent = !head}, fusion},
 
-        ( (!head).parent = Trait ),
+        Define{Slot{!head, new}, Slot{!head, make}},
+
         WithSlots{!head, !prim.list_map_with_index((f, i) ->
             `(Slot{Self{}, !f} = alias(!i)), fields)}
     ]}
@@ -129,3 +132,5 @@ require(attrs...): {
     prim.list_foreach((s) -> to.add_required_slot(s), attrs)
     self
 }
+
+builtin_class(head @ Symbol): `Class{!head} with .parent = Trait
