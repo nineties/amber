@@ -1,0 +1,82 @@
+" Copyright (C) 2014 nineties "
+" $Id: boot.ab 2014-04-02 01:50:32 nineties $ "
+
+" NB: We write comments as string literals until we define comment syntax. "
+
+" Copy important functions from the module `prim' to the global-module. "
+Define{load,          Slot{prim, load}}
+Define{execfile,      Slot{prim, execfile}}
+Define{exit,          Slot{prim, exit}}
+Define{create_module, Slot{prim, create_module}}
+Define{enter_module,  Slot{prim, enter_module}}
+Define{exit_module,   Slot{prim, exit_module}}
+Define{fusion,        Slot{prim, fusion_function}}
+Define{equal?,        Slot{prim, equal?}}
+Define{identical?,    Slot{prim, identical?}}
+
+" Load parser and macros. "
+Apply{load, List{"syntax.ab"}}
+
+# Load important functions
+load "base.ab"
+
+# Setup module system.
+load "module.ab"
+
+# Setup trait system and standard traits.
+import object_system (Trait, extend, require)
+
+# Import standard libraries.
+import numeric hiding (INTEGER_WIDTH, INTEGER_MIN, INTEGER_MAX)
+import symbol (Symbol)
+import iterable (Iterable, iterator)
+import string (String)
+import tuple (Tuple)
+import list (List,cons,first,rest)
+import array (Array)
+import table (Table)
+import io
+import io.file as file (stdin, stdout, stderr, print, puts, printf)
+import parser (Parser, parse)
+
+if (ARGV.empty?) {
+    # Start shell
+
+    # Change directory to the ditectory where amber is invoked.
+    prim.chdir(amber.INVOKE_PATH)
+
+    # Add `exit` command.
+    amber.eval('exit): exit(0)
+
+    # Enable syntax for shell.
+    syntax.enable_shell_syntax()
+    amber.shell_outputs: Array()
+    amber.shell_outputs.push(nil)
+
+    PROMPT = "amber"
+    p: Parser(stdin, amber.syntax)
+    while true {
+        try {
+            if (syntax.shell(p)) {
+                tree: p.tree
+                if (prim.has_slot?(amber, 'before_eval, true))
+                    tree = amber.before_eval(tree)
+                v: amber.eval(tree)
+                if (prim.has_slot?(amber, 'after_eval, true))
+                    v = amber.after_eval(tree, v)
+                printf("=> %p\n", v)
+                amber.shell_outputs[0] = v
+                amber.shell_outputs.push(v)
+            } else {
+                stderr.printf("Syntax error: %s\n", p.error_string)
+                p.reset!()
+            }
+        } catch e -> {
+            stderr.printf("Error: %s\n", prim.fullform(e))
+            p.reset!()
+        }
+    }
+} else {
+    load(ARGV[0])
+    exit(0)
+}

@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: List.ab 2014-03-28 10:54:42 nineties $
+# $Id: list.ab 2014-04-02 00:17:40 nineties $
 
 #= List =
 # A list is a finite sequence of objects. The internal representation of
@@ -19,9 +19,9 @@ rest:  prim.list_rest
 # Create a list of length `n` whose `i`-th element is `f(i)`.
 # Example:
 # ----
-# > List.new(x -> x^2, 5)       # => [0, 1, 4, 9, 16]
+# > List(x -> x^2, 5)       # => [0, 1, 4, 9, 16]
 # ----
-new(f @ Function, n @ Int): {
+List(f @ Function, n @ Int): {
     list: []
     for i in 0..n
         list = cons(f(i), list)
@@ -32,9 +32,9 @@ new(f @ Function, n @ Int): {
 # formula `f`.
 # Example:
 # ----
-# > List.new(x -> x + 1, 0, 5)      # => [0,1,2,3,4]
+# > List(x -> x + 1, 0, 5)      # => [0,1,2,3,4]
 # ----
-new(f @ Function, f0, n @ Int): {
+List(f @ Function, f0, n @ Int): {
     list: []
     for i in 0..n {
         list = cons(f0, list)
@@ -45,7 +45,7 @@ new(f @ Function, f0, n @ Int): {
 
 # Create a list whose elements are obtained from an iterable object
 # `container`.
-new(container) when container.Iterable? : {
+List(container) when container.Iterable? : {
     list: []
     for v in container
         list = cons(v, list)
@@ -64,7 +64,9 @@ add = prim.list_append | add
 # ----
 sub = prim.list_diff | sub
 
-trait List {
+List with {
+    .parent: Trait
+
     # The number of elements.
     .length: alias(() -> prim.list_length(self))
     .size:   alias(() -> prim.list_length(self))
@@ -132,7 +134,7 @@ trait List {
     # ----
     .intersperse(v): prim.list_intersperse(v, self)
 
-    extend 'Iterable
+    extend Iterable
 
     .each(): {
         list: self
@@ -147,4 +149,4 @@ trait List {
     }
 }
 
-prim.set_builtin_parent('List, Trait.List)
+prim.set_builtin_parent('List, List)

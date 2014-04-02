@@ -1,10 +1,10 @@
 " Copyright (C) 2010 nineties "
-" $Id: Syntax.ab 2014-04-01 01:58:01 nineties $ "
+" $Id: syntax.ab 2014-04-02 01:51:57 nineties $ "
 
 " Syntax definition of the Amber language. "
 
 " Enable comments. "
-Assign{Slot{Syntax, comment}, Slot{prim, parse_shell_style_comment}}
+Assign{Slot{syntax, comment}, Slot{prim, parse_shell_style_comment}}
 
 ### syntax definition
 # Amber's parser uses Parsing Expression Grammer (PEG)
@@ -135,7 +135,7 @@ DefineSyntax{stmt, List{ Tuple{List{syntax_declaration}, node0}}}
 ### Reserved Symbols
 # The following symbols never been parsed as symbols.
 
-Define{Slot{Syntax, reserved_words}, Array{
+Define{Slot{syntax, reserved_words}, Array{
     Quote{self}, Quote{not}, Quote{and}, Quote{or}, Quote{when},
     Quote{if}, Quote{else}, Quote{case}, Quote{of}, Quote{while},
     Quote{for}, Quote{in}, Quote{continue}, Quote{break}, Quote{return},
@@ -212,7 +212,7 @@ pattern ::= quote_expr
 term    ::= postfix_expr
 
 ## enable use of quoation expressions for following definitions.
-Assign{Slot{Syntax, expr}, Slot{Syntax, quote_expr}}
+Assign{Slot{syntax, expr}, Slot{syntax, quote_expr}}
 
 prefix_expr
     ::= "+"          quote_expr { `UnaryPlus{!node1} }
@@ -311,7 +311,7 @@ assign_expr
         { Node{Quote{WithSlots}, List{node0, node2}} }
       | continuation_expr
 
-Assign{Syntax.expr, Syntax.assign_expr}
+Assign{syntax.expr, syntax.assign_expr}
 
 ### Statements
 
@@ -371,8 +371,8 @@ syntax_declaration ::= pattern "::=" delimited1(parser_entry, "|")
     { `DefineSyntax{!node0, !node2} }
 
 # Entry point of parsers
-Syntax.toplevel = prim.parse_toplevel
-Syntax.shell    = prim.parse_shell
+syntax.toplevel = prim.parse_toplevel
+syntax.shell    = prim.parse_shell
 
 # Extend primary_expr to enable dollar sign ($) in parser action.
 primary_expr_act
@@ -384,14 +384,14 @@ primary_expr_act
         }
       | "$input"    { 'prim.input_text(parser, begin, end) }
 
-Syntax.primary_expr_act = fusion(Syntax.primary_expr_act, Syntax.primary_expr)
+syntax.primary_expr_act = fusion(syntax.primary_expr_act, syntax.primary_expr)
 
-Syntax.parser_action_old: Syntax.parser_action
-Syntax.parser_action = parser -> {
-    save_primary_expr: Syntax.primary_expr
-    Syntax.primary_expr = Syntax.primary_expr_act
-    r: Syntax.parser_action_old(parser)
-    Syntax.primary_expr = save_primary_expr
+syntax.parser_action_old: syntax.parser_action
+syntax.parser_action = parser -> {
+    save_primary_expr: syntax.primary_expr
+    syntax.primary_expr = syntax.primary_expr_act
+    r: syntax.parser_action_old(parser)
+    syntax.primary_expr = save_primary_expr
     r
 }
 
@@ -407,8 +407,8 @@ primary_expr_shell
         }
       | "%" { `prim.array_at(shell_outputs, 0) }
 
-Syntax.enable_shell_syntax: () -> {
-    Syntax.primary_expr = fusion(Syntax.primary_expr, Syntax.primary_expr_shell)
+syntax.enable_shell_syntax: () -> {
+    syntax.primary_expr = fusion(syntax.primary_expr, syntax.primary_expr_shell)
 }
 
 ### Macro
@@ -473,7 +473,7 @@ Define{expand_macro, (obj, 0) -> {
 Define{expand_macro, obj -> expand_macro(obj, 0), fusion}
 
 # Expand macros only once before eval.
-Amber.before_eval = expand_macro
+amber.before_eval = expand_macro
 
 macro = fusion((Assign{Apply{f, args}, e}) -> `Assign{!f, Lambda{!args, !e}, fusion}, macro)
 macro(Define{Apply{f, args}, e})     = `Define{!f, Lambda{!args, !e}, fusion}
@@ -700,10 +700,10 @@ macro(WithSlots{obj, init}): `Apply{!obj, () -> { Seq{!init}; self }, []}
 ## Utilities
 add_reserved_word(strings...):
     prim.list_foreach(str ->
-        prim.array_push(Syntax.reserved_words,
+        prim.array_push(syntax.reserved_words,
             prim.string_to_symbol(str)), strings)
 
-Syntax.new(case_sensitive=true): {
+Syntax(case_sensitive=true): {
     if not case_sensitive
         throw `NotImplemented{"Sorry but we haven't implemented case-insensitive syntax"}
     syn: `Syntax{}
@@ -720,7 +720,7 @@ Syntax.new(case_sensitive=true): {
                     'symbol, 'any_symbol, 'identifier]
 
     for p in basic_parsers
-        syn.set_slot(p, prim.get_slot(Amber.Syntax, p, false, false, true))
+        syn.set_slot(p, prim.get_slot(amber.syntax, p, false, false, true))
 
     syn.program(p): {
         statements: []

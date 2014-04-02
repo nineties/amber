@@ -1,13 +1,12 @@
 # Copyright (C) 2014 nineties
-# $Id: object_system.ab 2014-04-01 16:04:21 nineties $
+# $Id: object_system.ab 2014-04-02 00:18:22 nineties $
 
 #= Object System =
 # This library introduces prototype-based object-oriented programming
 # functionalities to Amber.
 #
-#== Definition of a class ==
-#
-# Define a class `A` with arguments `a,b,c` can be written as
+#== Definition of classes and trait ==
+# Definition of a class `A` with arguments `a,b,c` can be written as
 # `class A{a,b,c}`. For example, following code defines a class named
 # `Point2D` with two arguments `x` and `y`.
 #
@@ -42,22 +41,7 @@
 # > p: Point2D(1, 2)
 # > p.norm()            # => 2.23606797749979
 # ---
-
-add_reserved_word "class"
-postfix_expr ::= 'class symbol "{" delimited(pattern, ",") "}"
-                  { `DefClass{!$1, !$3} }
-
-macro(DefClass{head, fields}) = `Seq{[
-        Define{!head, Lambda{!fields,
-            Node{'!head, !fields} with .parent = !head}},
-
-        Define{!head, Lambda{!prim.list_map(f -> `Keyword{!f, nil}, fields),
-            Node{'!head, !fields} with .parent = !head}, fusion},
-
-        WithSlots{!head, !prim.list_map_with_index((f, i) ->
-            `Assign{Slot{Self{}, !f}, alias(!i)}, fields)}
-    ]}
-
+#
 #== Inheritence ==
 # Inheritance can be emulated by assigning `parent` slot.
 #
@@ -74,3 +58,74 @@ macro(DefClass{head, fields}) = `Seq{[
 # > obj: B()
 # > obj.hello()     # => "This is B"
 # ---
+#
+#== Trait ==
+# A trait is similar to a class but it has no data constructor.
+# A trait with name 'A' can be defined by `trait A`.
+
+add_reserved_word "class", "trait"
+postfix_expr ::= 'class symbol "{" delimited(pattern, ",") "}"
+                  { `DefClass{!$1, !$3} }
+               | 'trait symbol
+                  { `DefTrait{!$1} }
+
+macro(DefClass{head, fields}) = `Seq{[
+        Define{!head, Lambda{!fields,
+            Node{'!head, !fields} with .parent = !head}},
+
+        Define{!head, Lambda{!prim.list_map(f -> `Keyword{!f, nil}, fields),
+            Node{'!head, !fields} with .parent = !head}, fusion},
+
+        ( (!head).parent = Trait ),
+        WithSlots{!head, !prim.list_map_with_index((f, i) ->
+            `(Slot{Self{}, !f} = alias(!i)), fields)}
+    ]}
+
+macro(DefTrait{head}) = `Define{!head, Trait('!head)}
+
+Trait(name @ Symbol): {
+    # When create trait `A`, an attribute `A?` is defined.
+    name?: prim.string_to_symbol(
+            prim.string_add(prim.symbol_to_string(name), "?"))
+
+    nil.set_slot(name?, false)
+    `Trait{!name} with {
+        .parent: Trait
+        .set_slot(name?, true)
+    }
+}
+
+Trait with {
+    .Trait?: true
+
+    .extend_trait(...):
+         throw `LogicError{"Traits can extend Trait{...} objects"}
+    .extend_trait(from @ Trait{name}): {
+        to: self
+
+        if (from.has_slot?('before_extend))
+            from.before_extend(to)
+        from.each_slots((_, x, v) -> to.set_slot(x, v, fusion=true))
+        if (from.has_slot?('after_extend))
+            from.after_extend(to)
+        self
+    }
+
+    .add_required_slot(attr): {
+        # XXX: What should we do here?
+    }
+}
+
+nil.Trait?: false
+
+extend(traits...): {
+    to: self
+    prim.list_foreach((t) -> to.extend_trait(t), traits)
+    self
+}
+
+require(attrs...): {
+    to: self
+    prim.list_foreach((s) -> to.add_required_slot(s), attrs)
+    self
+}

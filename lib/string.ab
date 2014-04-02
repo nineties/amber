@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: String.ab 2014-03-14 17:40:38 nineties $
+# $Id: string.ab 2014-04-01 23:24:32 nineties $
 
 #= Strings. =
 # The representation of strings are internally null-terminated sequence
@@ -26,7 +26,10 @@ add = prim.string_add | add
 mul(s @ String, n @ Int) = prim.string_repeat(s, n)
 mul(n @ Int, s @ String) = prim.string_repeat(s, n)
 
-trait String {
+trait String with {
+    # Convert to a symbol.
+    .to_sym(): prim.string_to_symbol(self)
+
     # Number of characters.
     # ----
     # > "Hello World".length    # => 21
@@ -91,7 +94,7 @@ trait String {
     .to_f(): prim.string_to_float(self)
 
     #== Iteration ==
-    extend 'Iterable
+    extend Iterable
     .each(): {
         str: self
         len: self.size
@@ -106,11 +109,9 @@ trait String {
     }
 }
 
-trait Int {
-    # Convert ascii code to a character.
-    # Exception:
-    #   * InvalidArgument
-    .to_char(): prim.code_to_char(self)
-}
+# Convert ascii code to a character.
+# Exception:
+#   * InvalidArgument
+Int.to_char(): prim.code_to_char(self)
 
-prim.set_builtin_parent('String, Trait.String)
+prim.set_builtin_parent('String, String)
