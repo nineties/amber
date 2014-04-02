@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-04-01 11:20:38 nineties $
+; $Id: rowl1-compile.rlc 2014-04-02 17:07:34 nineties $
 ;
 
 (import "rlvm-compile")
@@ -962,31 +962,33 @@
     ; Setup usual arguments and keyword arguments
     (while args (do
         (var arg (car args))
-        (if (== (node_head arg) Rest) break)
-        (if (== (node_head arg) Keyword)
-            (do
-                (= keyargs (cons arg keyargs))
+        (var hd (node_head arg))
+        (if (|| (== hd Rest) (== hd Keyword)) break)
+        (= usual (cons arg usual))
+        (if (!= arg DontCare)
+            (= alias (setup_arg tbl (make_arg idx) arg 0 alias))
             )
-            (do
-                (= usual (cons arg usual))
-                (if (!= arg DontCare)
-                    (= alias (setup_arg tbl (make_arg idx) arg 0 alias))
-                    )
-                (+= idx 1)
+        (+= idx 1)
+        (= args (cdr args))
+        ))
+    (if (! args) (goto setup_args_finish))
+    (if (== (node_head (car args)) Rest) (do
+        (= usual (cons (car args) usual))
+        (if (> (node_size (car args)) 0) (do
+            (var v (node_arg_symbol (car args) 0))
+            (= alias (add_arg tbl v (make_args_from idx) alias))
             ))
         (= args (cdr args))
         ))
-    (if (! args) (return (tuple3 alias (list_reverse usual) (list_reverse keyargs))))
-
-    ; Setup variable arguments 
-    (= usual (cons (car args) usual))
-    (if (> (node_size (car args)) 0) (do
-        (var v (node_arg_symbol (car args) 0))
-        (= alias (add_arg tbl v (make_args_from idx) alias))
+    (if (! args) (goto setup_args_finish))
+    (while (&& args (== (node_head (car args)) Keyword)) (do
+        (= keyargs (cons (car args) keyargs))
+        (= args (cdr args))
         ))
-    (if (cdr args) (throw (logic_error1
+    (if args (throw (logic_error1
             (string "The order of arguments is invalid")
             args_)))
+    (label setup_args_finish)
     (return (tuple3 alias (list_reverse usual) (list_reverse keyargs)))
     ))
 
