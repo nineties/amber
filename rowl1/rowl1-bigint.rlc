@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-bigint.rlc 2014-04-03 02:02:43 nineties $
+; $Id: rowl1-bigint.rlc 2014-04-03 05:10:14 nineties $
 ;
 
 (import "rlvm-compile")
@@ -50,6 +50,10 @@
     (field_set u 1 len)
     ))
 
+(fun bint_sign (n) (
+    (return (field_get n 3))
+    ))
+
 (fun bint_set_sign (n s) (
     (field_set n 3 s)
     ))
@@ -69,7 +73,7 @@
         (array_set int (field_get b 0) 0 v)
         (do
             (array_set int (field_get b 0) 0 (- v))
-            (field_set b 3 1)
+            (bint_set_sign b 1)
         ))
     (return b)
     ))
@@ -87,7 +91,7 @@
     ))
 
 (export fun bigneg (u) (
-    (field_set u 3 (- 1 (field_get u 3)))
+    (bint_set_sign u (- 1 (bint_sign u)))
     (return u)
     ))
 
@@ -199,8 +203,8 @@
 
 ; u = u/v and returns u%v
 (export fun bigdiv (u v) (
-    (var usign (field_get u 3))
-    (var vsign (field_get v 3))
+    (var usign (bint_sign u))
+    (var vsign (bint_sign v))
     (if (&& (== usign 0) (== vsign 0)) (return (bigdiv_nat u v)))
     (if (&& (== usign 1) (== vsign 0)) (do
         ; let q, r are numbers such that
@@ -304,8 +308,8 @@
 
     (var udigit (field_get n 0))
     (var ulen (field_get n 1))
-    (var usign (field_get n 3))
-    (field_set n 3 0)
+    (var usign (bint_sign n))
+    (bint_set_sign n 0)
     ; convert base 2^32 to 10^9
     ; number of digits in base 10^9 is
     ;    ( ulen * log(2^32)/log(10^9) ).ceil
@@ -368,7 +372,7 @@
     (array_set char str p 0)
 
     ; recover sign of n
-    (field_set n 3 usign)
+    (bint_set_sign n usign)
     (return str)
     ))
 
@@ -411,7 +415,7 @@
         (bigadd u d)
         (= r 9)
         ))
-    (field_set u 3 sign)
+    (bint_set_sign u sign)
     (return (remove_leading_zeros u))
     ))
 
@@ -542,7 +546,7 @@
     (var e (- n 1))
     (= b (bint_rshift b (box (- n 53))))
     (field_set f 0 (bint_digit b 0))
-    (var s (field_get b 3))
+    (var s (bint_sign b))
     (field_set f 1
         (| (<< s 31)
         (| (<< (& (+ e 1023) 0x7ff) 20)
@@ -563,7 +567,7 @@
     (if (!= (field_get n 1) 1) (return n))
     (var d (bint_digit n 0))
     (if (u> d @FIXNUM_MAX) (return n))
-    (if (field_get n 3)
+    (if (bint_sign n)
         (return (box (- d)))
         (return (box d))
         )
@@ -595,7 +599,7 @@
             (return n)
             (return (+ (- n) 2))
         )
-    (if (field_get n 3)
+    (if (bint_sign n)
         (return (bint_uminus n))
         (return n)
         ))
@@ -648,79 +652,134 @@
     (if (& (& a b) 1) (return (& a b)))
     (= a (to_bint a))
     (= b (to_bint b))
+    (var asign (bint_sign a))
+    (var bsign (bint_sign b))
+    (if asign (do
+        (= a (abs_twoscomplement (copy_bint a)))
+        ))
+    (if bsign (do
+        (= b (abs_twoscomplement (copy_bint b)))
+        ))
     (var alen (bint_ndigit a))
     (var blen (bint_ndigit b))
-    (var asign (field_get a 3))
-    (var bsign (field_get b 3))
-    (if (&& (! asign) (! bsign))
-        (do
-            ; a > 0 && b > 0
-            (var clen (min alen blen))
-            (var c (allocate_bint clen))
-            (bint_set_ndigit c clen)
-            (var adigits (bint_digits a))
-            (var bdigits (bint_digits b))
-            (var cdigits (bint_digits c))
-            (for i 0 clen
-                (array_set int cdigits i
-                    (& (array_get int adigits i)
-                       (array_get int bdigits i)))
-                )
-            (return (norm c))
+    (var adigits (bint_digits a))
+    (var bdigits (bint_digits b))
+
+    ; c = a&b
+    (var clen 0)
+    (if asign
+        (if bsign (= clen (max alen blen)) (= clen blen))
+        (if bsign (= clen alen) (= clen (min alen blen)))
         )
-    (if (&& asign bsign)
-        (do
-            ; a < 0 && b < 0
-            ; (-a) & (-b) = (~a+1) & (~b+1)
-            (= a (abs_twoscomplement (copy_bint a)))
-            (= b (abs_twoscomplement (copy_bint b)))
-            (var clen (max alen blen))
-            (var c (allocate_bint clen))
-            (bint_set_ndigit c clen)
-            (var adigits (bint_digits a))
-            (var bdigits (bint_digits b))
-            (var cdigits (bint_digits c))
-            (for i 0 clen (do
-                (var x 0xffffffff)
-                (var y 0xffffffff)
-                (if (< i alen) (= x (array_get int adigits i)))
-                (if (< i blen) (= y (array_get int bdigits i)))
-                (array_set int cdigits i (& x y))
-                ))
-            (= c (abs_twoscomplement c))
-            (bint_set_sign c @TRUE)
-            (return (norm c))
-        )
-        (do
-            (if asign (do
-                (var t b)
-                (= b a)
-                (= a t)
-                ))
-            ; a > 0 && b < 0
-            (= b (abs_twoscomplement (copy_bint b)))
-            (var clen alen)
-            (var c (allocate_bint clen))
-            (bint_set_ndigit c clen)
-            (var adigits (bint_digits a))
-            (var bdigits (bint_digits b))
-            (var cdigits (bint_digits c))
-            (for i 0 clen (do
-                (var x (array_get int adigits i))
-                (var y 0xffffffff)
-                (if (< i blen) (= y (array_get int bdigits i)))
-                (array_set int cdigits i (& x y))
-                ))
-            (return (norm c))
-        )
+    (var c (allocate_bint clen))
+    (bint_set_ndigit c clen)
+    (var cdigits (bint_digits c))
+
+    (for i 0 clen (do
+        (var x 0)
+        (var y 0)
+        (if (< i alen)
+            (= x (array_get int adigits i))
+            (= x (* asign 0xffffffff))
+            )
+        (if (< i blen)
+            (= y (array_get int bdigits i))
+            (= y (* bsign 0xffffffff))
+            )
+        (array_set int cdigits i (& x y))
         ))
+    (if (&& asign bsign) (do
+        (= c (abs_twoscomplement c))
+        (bint_set_sign c @TRUE)
+        ))
+    (return (norm c))
     ))
 
 (fun bint_lor (a b) (
-    (throw (exception (string "bint_lor: not implemented")))
+    (if (& (& a b) 1) (return (| a b)))
+    (= a (to_bint a))
+    (= b (to_bint b))
+    (var asign (bint_sign a))
+    (var bsign (bint_sign b))
+    (if asign (do
+        (= a (abs_twoscomplement (copy_bint a)))
+        ))
+    (if bsign (do
+        (= b (abs_twoscomplement (copy_bint b)))
+        ))
+    (var alen (bint_ndigit a))
+    (var blen (bint_ndigit b))
+    (var adigits (bint_digits a))
+    (var bdigits (bint_digits b))
+
+    ; c = a|b
+    (var clen (max alen blen))
+    (var c (allocate_bint clen))
+    (bint_set_ndigit c clen)
+    (var cdigits (bint_digits c))
+
+    (for i 0 clen (do
+        (var x 0)
+        (var y 0)
+        (if (< i alen)
+            (= x (array_get int adigits i))
+            (= x (* asign 0xffffffff))
+            )
+        (if (< i blen)
+            (= y (array_get int bdigits i))
+            (= y (* bsign 0xffffffff))
+            )
+        (array_set int cdigits i (| x y))
+        ))
+    (if (|| asign bsign) (do
+        (= c (abs_twoscomplement c))
+        (bint_set_sign c @TRUE)
+        ))
+    (return (norm c))
     ))
+
+; a^b
 (fun bint_lxor (a b) (
-    (throw (exception (string "bint_lxor: not implemented")))
+    (if (& (& a b) 1) (return (^ a b)))
+    (= a (to_bint a))
+    (= b (to_bint b))
+    (var asign (bint_sign a))
+    (var bsign (bint_sign b))
+    (if asign (do
+        (= a (abs_twoscomplement (copy_bint a)))
+        ))
+    (if bsign (do
+        (= b (abs_twoscomplement (copy_bint b)))
+        ))
+    (var alen (bint_ndigit a))
+    (var blen (bint_ndigit b))
+    (var adigits (bint_digits a))
+    (var bdigits (bint_digits b))
+
+    ; c = a^b
+    (var clen (max alen blen))
+    (var c (allocate_bint clen))
+    (bint_set_ndigit c clen)
+    (var cdigits (bint_digits c))
+
+    (for i 0 clen (do
+        (var x 0)
+        (var y 0)
+        (if (< i alen)
+            (= x (array_get int adigits i))
+            (= x (* asign 0xffffffff))
+            )
+        (if (< i blen)
+            (= y (array_get int bdigits i))
+            (= y (* bsign 0xffffffff))
+            )
+        (array_set int cdigits i (^ x y))
+        ))
+    (if (!= asign bsign) (do
+        (= c (abs_twoscomplement c))
+        (bint_set_sign c @TRUE)
+        ))
+    (return (norm c))
     ))
 
 (export fun bint_lshift (a b) (
