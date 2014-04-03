@@ -1,21 +1,60 @@
 # Copyright (C) 2014 nineties
-# $Id: Parser.ab 2014-04-02 18:11:08 nineties $
+# $Id: Parser.ab 2014-04-04 03:07:21 nineties $
 
 #= Parser =
 Parser: object_system.builtin_class('Parser)
 Parser with {
-    .new(input, syntax) when input.InputFileStream? :
-        prim.parser_new(input) with .syntax = syntax
-    .new(path @ String, syntax):
-        prim.parser_new(io.file.open_in(path)) with .syntax = syntax
+    .new(input, lang) when input.InputFileStream? :
+        prim.parser_new(input) with .syntax = lang.syntax
+    .new(path @ String, lang):
+        prim.parser_new(io.file.open_in(path)) with .syntax = lang.syntax
     .tree: alias(() -> prim.parser_tree(self))
     .loc:  alias(() -> prim.parser_loc(self))
     .reset!():prim.parser_reset(self)
     .error_string: alias(() -> prim.parser_error(self))
     .eof?: alias(() -> prim.parser_eof?(self))
+
+    .parse(sym): {
+        f: get_slot(self.syntax, sym)
+        f(self)
+    }
 }
 
 prim.set_builtin_parent('Parser, Parser)
 
-parse(syntax, input): syntax.program(Parser(input, syntax))
+parse(lang, input): lang.syntax.program(Parser(input, lang.syntax))
 
+#= Syntax object =
+class Syntax{name} with {
+    .new(case_sensitive=true): {
+        if not case_sensitive
+            throw `NotImplemented{"Sorry but we haven't implemented case-insensitive syntax"}
+        syn: `Syntax{!name}
+        syn.reserved_words: prim.array_new_empty()
+        syn.case_sensitive: case_sensitive
+
+        # Copy basic parsers
+        basic_parsers: ['toplevel, 'shell, 'any, 'spaces, 'comment,
+                        'decimal, 'binary, 'octal, 'hex, 'integer,
+                        'float, 'string, 'symbol, 'any_symbol, 'identifier]
+
+        for p in basic_parsers
+            syn.set_slot(p,
+                prim.get_slot(amber.syntax, p, false, false, true))
+        syn
+    }
+
+    .add_reserved_word(words...): {
+        for v in words
+            prim.array_push(self.reserved_words, v.to_sym())
+    }
+
+    .program(p): {
+        statements: []
+        while self.toplevel(p)
+            statements = cons(p.tree, statements)
+        if not p.eof?
+            return `SyntaxError{!p.error_string}
+        statements.reverse()
+    }
+}

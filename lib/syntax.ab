@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: syntax.ab 2014-04-04 02:34:09 nineties $ "
+" $Id: syntax.ab 2014-04-04 03:02:11 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -154,7 +154,7 @@ block ::= primary_block
 primary_expr
     ::= primary_block
       | <<multiline>> "<" postfix_expr "," postfix_expr ">" "{"
-         parsewith(Apply{eval, List{node1}}, node3) "}"
+         parsewith(Apply{eval, List{Slot{node1, syntax}}}, node3) "}"
         { node6 }
       | <<multiline>> "(" stmt ")"             { node1 }
       # List literal
@@ -698,38 +698,7 @@ macro(Lambda{When{args, guard}, body}): desugar_lambda(args, guard, body)
 macro(WithSlots{obj, init}): `Apply{!obj, () -> { Seq{!init}; self }, []}
 
 ## Utilities
-add_reserved_word(strings...):
+add_reserved_word(words...):
     prim.list_foreach(str ->
         prim.array_push(syntax.reserved_words,
-            prim.string_to_symbol(str)), strings)
-
-syntax.new(case_sensitive=true): {
-    if not case_sensitive
-        throw `NotImplemented{"Sorry but we haven't implemented case-insensitive syntax"}
-    syn: `Syntax{}
-    syn.reserved_words: prim.array_new_empty()
-    syn.case_sensitive: case_sensitive
-    syn.add_reserved_word(symbols...): {
-        for v in symbols
-            prim.array_push(self.reserved_words, v)
-    }
-
-    # Copy basic parsers
-    basic_parsers: ['toplevel, 'shell, 'any, 'spaces, 'comment, 'decimal,
-                    'binary, 'octal, 'hex, 'integer, 'float, 'string,
-                    'symbol, 'any_symbol, 'identifier]
-
-    for p in basic_parsers
-        syn.set_slot(p, prim.get_slot(amber.syntax, p, false, false, true))
-
-    syn.program(p): {
-        statements: []
-        while self.toplevel(p)
-            statements = cons(p.tree, statements)
-        if not p.eof?
-            return `SyntaxError{!p.error_string}
-        statements.reverse()
-    }
-
-    syn
-}
+            prim.string_to_symbol(str)), words)
