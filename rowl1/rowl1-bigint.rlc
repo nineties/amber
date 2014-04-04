@@ -1,8 +1,8 @@
 ;
 ; rowl - 1st generation
-; Copyright (C) 2012 nineties
+; Copyright (C) 2012_bang nineties
 ;
-; $Id: rowl1-bigint.rlc 2014-04-05 00:04:42 nineties $
+; $Id: rowl1-bigint.rlc 2014-04-05 05:05:37 nineties $
 ;
 
 (import "rlvm-compile")
@@ -609,14 +609,26 @@
     (= a (to_bint_copy a))
     (return (norm (bigadd a (to_bint b))))
     ))
+(fun bint_add_bang (a b) (
+    (if (& (& a b) 1) (return (int_add2 a b)))
+    (return (norm (bigadd a (to_bint b))))
+    ))
 (export fun bint_sub (a b) (
     (if (& (& a b) 1) (return (int_sub2 a b)))
     (= a (to_bint_copy a))
     (return (norm (bigsub a (to_bint b))))
     ))
+(fun bint_sub_bang (a b) (
+    (if (& (& a b) 1) (return (int_sub2 a b)))
+    (return (norm (bigsub a (to_bint b))))
+    ))
 (export fun bint_mul (a b) (
     (if (& (& a b) 1) (return (int_mul2 a b)))
     (= a (to_bint_copy a))
+    (return (norm (bigmul a (to_bint b))))
+    ))
+(export fun bint_mul_bang (a b) (
+    (if (& (& a b) 1) (return (int_mul2 a b)))
     (return (norm (bigmul a (to_bint b))))
     ))
 (export fun bint_quo (a b) (
@@ -625,9 +637,18 @@
     (bigdiv a (to_bint b))
     (return (norm a))
     ))
+(fun bint_quo_bang (a b) (
+    (if (& (& a b) 1) (return (box (/ (unbox a) (unbox b)))))
+    (bigdiv a (to_bint b))
+    (return (norm a))
+    ))
 (export fun bint_rem (a b) (
     (if (& (& a b) 1) (return (box (% (unbox a) (unbox b)))))
     (= a (to_bint_copy a))
+    (return (norm (bigdiv a (to_bint b))))
+    ))
+(fun bint_rem_bang (a b) (
+    (if (& (& a b) 1) (return (box (% (unbox a) (unbox b)))))
     (return (norm (bigdiv a (to_bint b))))
     ))
 (fun bint_quorem (a b) (
@@ -652,6 +673,12 @@
 (fun bint_lnot (a) (
     (if (& a 1) (return (| 1 (~ a))))
     (= a (to_bint_copy a))
+    (bigadd a (int_to_bint 1))
+    (bigneg a)
+    (return (norm a))
+    ))
+(fun bint_lnot_bang (a) (
+    (if (& a 1) (return (| 1 (~ a))))
     (bigadd a (int_to_bint 1))
     (bigneg a)
     (return (norm a))
@@ -704,6 +731,51 @@
         ))
     (return (norm c))
     ))
+(fun bint_land_bang (a b) (
+    (if (& (& a b) 1) (return (& a b)))
+    (= a (to_bint a))
+    (= b (to_bint b))
+    (var asign (bint_sign a))
+    (var bsign (bint_sign b))
+    (if asign (do
+        (= a (abs_twoscomplement (copy_bint a)))
+        ))
+    (if bsign (do
+        (= b (abs_twoscomplement (copy_bint b)))
+        ))
+    (var alen (bint_ndigit a))
+    (var blen (bint_ndigit b))
+    (var adigits (bint_digits a))
+    (var bdigits (bint_digits b))
+
+    ; c = a&b
+    (var clen 0)
+    (if asign
+        (if bsign (= clen (max alen blen)) (= clen blen))
+        (if bsign (= clen alen) (= clen (min alen blen)))
+        )
+    (resize_bint a clen)
+    (bint_set_ndigit a clen)
+
+    (for i 0 clen (do
+        (var x 0)
+        (var y 0)
+        (if (< i alen)
+            (= x (array_get int adigits i))
+            (= x (* asign 0xffffffff))
+            )
+        (if (< i blen)
+            (= y (array_get int bdigits i))
+            (= y (* bsign 0xffffffff))
+            )
+        (array_set int adigits i (& x y))
+        ))
+    (if (&& asign bsign) (do
+        (= a (abs_twoscomplement a))
+        (bint_set_sign a @TRUE)
+        ))
+    (return (norm a))
+    ))
 
 (fun bint_lor (a b) (
     (if (& (& a b) 1) (return (| a b)))
@@ -746,6 +818,47 @@
         (bint_set_sign c @TRUE)
         ))
     (return (norm c))
+    ))
+(fun bint_lor_bang (a b) (
+    (if (& (& a b) 1) (return (| a b)))
+    (= a (to_bint a))
+    (= b (to_bint b))
+    (var asign (bint_sign a))
+    (var bsign (bint_sign b))
+    (if asign (do
+        (= a (abs_twoscomplement (copy_bint a)))
+        ))
+    (if bsign (do
+        (= b (abs_twoscomplement (copy_bint b)))
+        ))
+    (var alen (bint_ndigit a))
+    (var blen (bint_ndigit b))
+    (var adigits (bint_digits a))
+    (var bdigits (bint_digits b))
+
+    ; c = a|b
+    (var clen (max alen blen))
+    (resize_bint a clen)
+    (bint_set_ndigit clen)
+
+    (for i 0 clen (do
+        (var x 0)
+        (var y 0)
+        (if (< i alen)
+            (= x (array_get int adigits i))
+            (= x (* asign 0xffffffff))
+            )
+        (if (< i blen)
+            (= y (array_get int bdigits i))
+            (= y (* bsign 0xffffffff))
+            )
+        (array_set int adigits i (| x y))
+        ))
+    (if (|| asign bsign) (do
+        (= a (abs_twoscomplement a))
+        (bint_set_sign a @TRUE)
+        ))
+    (return (norm a))
     ))
 
 ; a^b
@@ -791,6 +904,47 @@
         ))
     (return (norm c))
     ))
+(fun bint_lxor_bang (a b) (
+    (if (& (& a b) 1) (return (^ a b)))
+    (= a (to_bint a))
+    (= b (to_bint b))
+    (var asign (bint_sign a))
+    (var bsign (bint_sign b))
+    (if asign (do
+        (= a (abs_twoscomplement (copy_bint a)))
+        ))
+    (if bsign (do
+        (= b (abs_twoscomplement (copy_bint b)))
+        ))
+    (var alen (bint_ndigit a))
+    (var blen (bint_ndigit b))
+    (var adigits (bint_digits a))
+    (var bdigits (bint_digits b))
+
+    ; c = a^b
+    (var clen (max alen blen))
+    (resize_bint a clen)
+    (bint_set_ndigit a clen)
+
+    (for i 0 clen (do
+        (var x 0)
+        (var y 0)
+        (if (< i alen)
+            (= x (array_get int adigits i))
+            (= x (* asign 0xffffffff))
+            )
+        (if (< i blen)
+            (= y (array_get int bdigits i))
+            (= y (* bsign 0xffffffff))
+            )
+        (array_set int adigits i (^ x y))
+        ))
+    (if (!= asign bsign) (do
+        (= a (abs_twoscomplement a))
+        (bint_set_sign a @TRUE)
+        ))
+    (return (norm a))
+    ))
 
 (export fun bint_lshift (a b) (
     (= a (to_bint_copy a))
@@ -806,8 +960,36 @@
         (return (norm (bigshr a (- b))))
         ))
     ))
+(fun bint_lshift_bang (a b) (
+    (= a (to_bint a))
+    (= b (norm b))
+    (if (== (node_type b) @BigIntE)
+        (throw (invalid_argument (string "shift length is too long") b))
+        )
+    (= b (unbox b))
+    (if (> b 0)
+        (return (norm (bigshl a b)))
+    (if (== b 0)
+        (return (norm a))
+        (return (norm (bigshr a (- b))))
+        ))
+    ))
 (export fun bint_rshift (a b) (
     (= a (to_bint_copy a))
+    (= b (norm b))
+    (if (== (node_type b) @BigIntE)
+        (throw (invalid_argument (string "shift length is too long") b))
+        )
+    (= b (unbox b))
+    (if (> b 0)
+        (return (norm (bigshr a b)))
+    (if (== b 0)
+        (return (norm a))
+        (return (norm (bigshl a (- b))))
+        ))
+    ))
+(fun bint_rshift_bang (a b) (
+    (= a (to_bint a))
     (= b (norm b))
     (if (== (node_type b) @BigIntE)
         (throw (invalid_argument (string "shift length is too long") b))
@@ -981,11 +1163,11 @@
     (add_function2 mod (to_sym "int_add") intT intT bint_add 0)
     (add_function2 mod (to_sym "int_sub") intT intT bint_sub 0)
     (add_function2 mod (to_sym "int_mul") intT intT bint_mul 0)
+    (add_function2 mod (to_sym "int_pow") intT intT bint_pow 0)
     (add_function2 mod (to_sym "int_quo") intT intT bint_quo 0)
     (add_function2 mod (to_sym "int_rem") intT intT bint_rem 0)
     (add_function2 mod (to_sym "int_div") intT intT bint_div 0)
     (add_function2 mod (to_sym "int_quorem") intT intT bint_quorem 0)
-    (add_function2 mod (to_sym "int_pow") intT intT bint_pow 0)
     (add_function3 mod (to_sym "int_powmod") intT intT intT bint_powmod 0)
     (add_function2 mod (to_sym "int_compare") intT intT bint_compare 0)
     (add_function2 mod (to_sym "int_less_than?") intT intT bint_lt 0)
@@ -999,6 +1181,18 @@
     (add_function2 mod (to_sym "int_lxor") intT intT bint_lxor 0)
     (add_function2 mod (to_sym "int_lshift") intT intT bint_lshift 0)
     (add_function2 mod (to_sym "int_rshift") intT intT bint_rshift 0)
+
+    (add_function2 mod (to_sym "int_add!") intT intT bint_add_bang 0)
+    (add_function2 mod (to_sym "int_sub!") intT intT bint_sub_bang 0)
+    (add_function2 mod (to_sym "int_mul!") intT intT bint_mul_bang 0)
+    (add_function2 mod (to_sym "int_quo!") intT intT bint_quo_bang 0)
+    (add_function2 mod (to_sym "int_rem!") intT intT bint_rem_bang 0)
+    (add_function1 mod (to_sym "int_lnot!") intT bint_lnot_bang 0)
+    (add_function2 mod (to_sym "int_land!") intT intT bint_land_bang 0)
+    (add_function2 mod (to_sym "int_lor!") intT intT bint_lor_bang 0)
+    (add_function2 mod (to_sym "int_lxor!") intT intT bint_lxor_bang 0)
+    (add_function2 mod (to_sym "int_lshift!") intT intT bint_lshift_bang 0)
+    (add_function2 mod (to_sym "int_rshift!") intT intT bint_rshift_bang 0)
     ))
 
     ))
