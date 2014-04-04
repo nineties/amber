@@ -1,0 +1,709 @@
+" Copyright (C) 2010 nineties "
+" $Id: syntax/parse.ab 2014-04-05 08:41:42 nineties $ "
+
+" Syntax definition of the Amber language. "
+
+" Enable comments. "
+Assign{Slot{syntax, comment}, Slot{prim, parse_shell_style_comment}}
+
+### syntax definition
+# Amber's parser uses Parsing Expression Grammer (PEG)
+
+## syntax elements
+# .     : any character
+# P*    : zero or many
+# P+    : one or many
+# P..   : sequence
+# P / P : choice
+# P?    : option
+# &P    : and
+# !P    : not
+# 'sym  : a symbol
+# (...) : grouping
+# [...] : oneof
+# [^..] : noneof
+
+## Amber's unique syntax elements
+# aligned(p)       : sequence of p when every p has same indentation
+# delimited(p, d)  : sequence of p delimited by d
+# delimited1(p, d) : sequence of p delimited by d (one or many)
+# delimited2(p, d) : sequence of p delimited by d (two or many)
+# parsewith(expr,p): do parse using p (p can refer previous tokens)
+
+DefineSyntax{
+    character_set,
+    List{Tuple{List{Many1{Choice{List{"\\", any}, List{Not{"]"}, any}}}},
+        Send{prim, input_text, List{parser,begin,end}}}
+    }
+}
+
+DefineSyntax{
+    primary_syntax_element,
+    List{
+        Tuple{List{"."}, Quote{any}},
+        Tuple{List{string}, node0},
+        Tuple{List{identifier}, node0},
+        Tuple{List{"(", syntax_element, ")"}, node1},
+        Tuple{List{"(", Many1{syntax_element}, ")"}, node1, multiline},
+        Tuple{List{"[", "^", character_set, "]"},
+            QuasiQuote{NoneOf{Unquote{node2}}}},
+        Tuple{List{"[", character_set, "]"},
+            QuasiQuote{OneOf{Unquote{node1}}}}
+    }
+}
+
+DefineSyntax{
+    syntax_element,
+    List{
+        Tuple{List{primary_syntax_element, "?"},
+            QuasiQuote{Option{Unquote{node0}}}},
+        Tuple{List{primary_syntax_element, "*"},
+            QuasiQuote{Many{Unquote{node0}}}},
+        Tuple{List{primary_syntax_element, "+"},
+            QuasiQuote{Many1{Unquote{node0}}}},
+        Tuple{List{Delimited2{primary_syntax_element, "/"}},
+            Node{Quote{Choice}, node0}},
+        Tuple{List{"'", any_symbol},
+            QuasiQuote{Word{Unquote{node1}}}},
+        Tuple{List{"&", primary_syntax_element},
+            QuasiQuote{And{Unquote{node1}}}},
+        Tuple{List{"!", primary_syntax_element},
+            QuasiQuote{Not{Unquote{node1}}}},
+        Tuple{List{"aligned", "(", syntax_element, ")"},
+            QuasiQuote{Aligned{Unquote{node2}}}, multiline},
+        Tuple{List{"delimited", "(", syntax_element, ",", syntax_element, ")"},
+            QuasiQuote{Delimited{Unquote{node2}, Unquote{node4}}}, multiline},
+        Tuple{List{"delimited1", "(", syntax_element, ",", syntax_element, ")"},
+            QuasiQuote{Delimited1{Unquote{node2}, Unquote{node4}}}, multiline},
+        Tuple{List{"delimited2", "(", syntax_element, ",", syntax_element, ")"},
+            QuasiQuote{Delimited2{Unquote{node2}, Unquote{node4}}}, multiline},
+        Tuple{List{"parsewith", "(", expr, ",", expr, ")"},
+            QuasiQuote{ParseWith{Unquote{node2}, Unquote{node4}}}, multiline},
+        Tuple{List{"nospace", "(", syntax_element, ")"},
+            QuasiQuote{NoSpace{Unquote{node2}}}, multiline},
+        Tuple{List{primary_syntax_element}, node0}
+    }
+}
+
+DefineSyntax{
+    parser_option,
+    List{
+        Tuple{List{"<<", Delimited1{symbol, ","}, ">>"},
+            node1, multiline}
+    }
+}
+
+DefineSyntax{
+    parser_action,
+    List{Tuple{List{"{", Aligned{stmt}, "}"},
+        QuasiQuote{Block{Unquote{node1}}}, multiline}
+        }
+}
+
+DefineSyntax{
+    parser_entry,
+    List{
+        Tuple{List{parser_option, Many{syntax_element}, parser_action},
+            QuasiQuote{Tuple{Unquote{node1}, Unquote{node2}, Unquote{node0}}}
+        },
+        Tuple{List{Many{syntax_element}, parser_action},
+            QuasiQuote{Tuple{Unquote{node0}, Unquote{node1}}}
+        },
+        Tuple{List{parser_option, syntax_element},
+            QuasiQuote{Tuple{Unquote{List{node1}}, node1, Unquote{node0}}}
+        },
+        Tuple{List{syntax_element},
+            QuasiQuote{Tuple{Unquote{List{node0}}, node0}}
+        }
+    }
+}
+
+DefineSyntax{
+    syntax_declaration,
+    List{
+        Tuple{List{symbol, "::=", Delimited1{parser_entry, "|"}},
+            QuasiQuote{DefineSyntax{
+                Unquote{node0},
+                Unquote{node2}
+            }}}
+    }
+}
+
+### enable the syntax_declaration statement.
+DefineSyntax{stmt, List{ Tuple{List{syntax_declaration}, node0}}}
+
+### Reserved Symbols
+# The following symbols never been parsed as symbols.
+
+Define{Slot{syntax, reserved_words}, Array{
+    Quote{self}, Quote{not}, Quote{and}, Quote{or}, Quote{when},
+    Quote{if}, Quote{else}, Quote{case}, Quote{of}, Quote{while},
+    Quote{for}, Quote{in}, Quote{continue}, Quote{break}, Quote{return},
+    Quote{throw}, Quote{try}, Quote{catch}, Quote{import}, Quote{hiding},
+    Quote{as}, Quote{with}, Quote{reset}, Quote{shift}
+}}
+
+### Expressions
+block_body ::= aligned(stmt) { QuasiQuote{Block{Unquote{node0}}} }
+
+primary_block ::= <<multiline>> "{" block_body "}" { node1 }
+
+block ::= primary_block
+        | block_body
+
+primary_expr
+    ::= primary_block
+      | <<multiline>> "<" postfix_expr "," postfix_expr ">" "{"
+         parsewith(Slot{Apply{eval, List{node1}}, syntax}, node3) "}"
+        { node6 }
+      | <<multiline>> "(" stmt ")"             { node1 }
+      # List literal
+      | <<multiline>> "[" delimited(expr, ",") "]"  { node1 }
+      # Tuple literal
+      | <<multiline>> "(" delimited2(expr, ",") ")"
+        { Node{Quote{Tuple}, node1} }
+      | "|" expr "|"
+        { Node{Quote{Abs}, List{node1}} }
+      | 'self           { Quote{Self{}} }
+      | "." symbol
+        { Node{Quote{Slot}, List{Quote{Self{}}, node1}} }
+      | atom
+      | "..."           { Quote{Rest{}} }
+
+argument ::= symbol "=" assign_expr
+             { QuasiQuote{Keyword{Unquote{node0}, Unquote{node2}}} }
+           | expr
+
+postfix_expr
+        # Function Application
+    ::= postfix_expr nospace("(") delimited(argument, ",") ")"
+        { Node{Quote{Apply}, List{node0, node2}} }
+        # Subscription
+      | postfix_expr nospace("[") delimited(argument, ",") "]"
+        { Node{Quote{Subscript}, List{node0, node2}} }
+      | # RestOf Pattern
+        postfix_expr "..."
+        { Node{Quote{Rest}, List{node0}} }
+        # Domain Pattern
+      | primary_expr "@" fullform_expr
+        { Node{Quote{Domain}, List{node0, node2}} }
+      | postfix_expr "." symbol nospace("(") delimited(argument, ",") ")"
+        { Node{Quote{Send}, List{node0, node2, node4}} }
+      | postfix_expr "." symbol
+        { Node{Quote{Slot}, List{node0, node2}} }
+      | primary_expr "^" postfix_expr
+        { Node{Quote{Pow}, List{node0, node2}} }
+      | primary_expr
+
+fullform_expr
+    ::= fullform
+      | postfix_expr
+
+quote_expr
+    ::= "'" quote_expr
+        { Node{Quote{Quote}, List{node1}} }
+      | "`"  quote_expr
+        { Node{Quote{QuasiQuote}, List{node1}} }
+      | "!"  quote_expr
+        { Node{Quote{Unquote}, List{node1}} }
+      | fullform_expr
+
+pattern ::= quote_expr
+term    ::= postfix_expr
+
+## enable use of quoation expressions for following definitions.
+Assign{Slot{syntax, expr}, Slot{syntax, quote_expr}}
+
+prefix_expr
+    ::= "+"          quote_expr { `UPlus{!node1} }
+      | "-" !decimal quote_expr { `UMinus{!node2} }
+      | 'not quote_expr         { `Not{!node1} }
+      | quote_expr
+
+infix_expr
+    ::= infix_expr "<" nospace(symbol) nospace(">") prefix_expr
+        { `Apply{!node2, List{!node0, !node4}} }
+      | prefix_expr
+
+multiplicative_expr
+    ::= multiplicative_expr "*" infix_expr  { `Mul{!node0, !node2} }
+      | multiplicative_expr "/" infix_expr  { `Div{!node0, !node2} }
+      | multiplicative_expr "//" infix_expr { `Quo{!node0, !node2} }
+      | multiplicative_expr "%" infix_expr  { `Rem{!node0, !node2} }
+      | infix_expr
+
+additive_expr
+    ::= additive_expr "+" multiplicative_expr { `Add{!node0, !node2} }
+      | additive_expr "-" multiplicative_expr { `Sub{!node0, !node2} }
+      | multiplicative_expr
+
+range_expr
+    ::= additive_expr ".." additive_expr { `Range{!node0, !node2} }
+      | additive_expr
+
+rel_expr
+    ::= range_expr "<"  range_expr  { `LessThan{!node0, !node2} }
+      | range_expr "<=" range_expr  { `LessEqual{!node0, !node2} }
+      | range_expr ">"  range_expr  { `GreaterThan{!node0, !node2} }
+      | range_expr ">=" range_expr  { `GreaterEqual{!node0, !node2} }
+      | range_expr "==" range_expr  { `Equal{!node0, !node2} }
+      | range_expr "!=" range_expr  { `NotEqual{!node0, !node2} }
+      | range_expr "<=>" range_expr { `Compare{!node0, !node2} }
+      | range_expr
+
+seqand_expr
+    ::= rel_expr 'and seqand_expr { `SeqAnd{!node0, !node2} }
+      | rel_expr
+
+seqor_expr
+    ::= seqand_expr 'or seqor_expr { `SeqOr{!node0, !node2} }
+      | seqand_expr
+
+ternary_expr
+    ::= seqor_expr "?" seqor_expr ":" ternary_expr
+        { `IfElse{!node0, !node2, !node4} }
+      | seqor_expr
+
+guard_clause ::= 'when ternary_expr { node1 }
+
+argument_list
+    ::= "(" delimited(argument, ",") ")" guard_clause
+        { `When{!node1, !node3} }
+      | "(" delimited(argument, ",") ")"
+        { node1 }
+      | !"{" pattern guard_clause
+        { `When{List{!node1}, !node2} }
+      | !"{" pattern
+        { List{node1} }
+
+lambda_expr
+    ::= argument_list "->" ternary_expr
+        { `Lambda{!node0, !node2} }
+      | ternary_expr
+
+multi_lambda_expr
+    ::= lambda_expr "|" multi_lambda_expr
+        { `Fusion{!node0, !node2} }
+      | lambda_expr
+
+slot_assign_stmt ::= stmt
+
+slot_assign
+    ::= <<multiline>> "{" aligned(slot_assign_stmt) "}" { node1 }
+      | slot_assign_stmt { List{node0} }
+
+continuation_expr
+    ::= 'reset multi_lambda_expr { `Reset{!node1} }
+      | 'shift multi_lambda_expr { `Shift{!node1} }
+      | multi_lambda_expr
+
+assign_expr
+    ::= pattern "=" assign_expr   { `Assign{!node0, !node2} }
+      | pattern "+=" assign_expr  { `AddAssign{!node0, !node2} }
+      | pattern "-=" assign_expr  { `SubAssign{!node0, !node2} }
+      | pattern "*=" assign_expr  { `MulAssign{!node0, !node2} }
+      | pattern "^=" assign_expr  { `PowAssign{!node0, !node2} }
+      | pattern "/=" assign_expr  { `DivAssign{!node0, !node2} }
+      | pattern "//=" assign_expr { `QuotAssign{!node0, !node2} }
+      | pattern "%=" assign_expr  { `RemAssign{!node0, !node2} }
+      | pattern "|=" assign_expr  { `FusionAssign{!node0, !node2} }
+      | pattern 'with slot_assign
+        { Node{Quote{WithSlots}, List{node0, node2}} }
+      | continuation_expr
+
+Assign{syntax.expr, syntax.assign_expr}
+
+### Statements
+
+# parenthleses-less tuple pattern and expression
+tuple_pattern ::= delimited2(pattern, ",")  { Node{'Tuple, node0} }
+                | pattern
+tuple_expr ::= delimited2(expr, ",")  { Node{'Tuple, node0} }
+             | expr
+
+import_as ::= 'as symbol { node1 }
+
+import_option
+    ::= "(" "*" ")"                            { `All }
+      | "(" delimited1(symbol, ",") ")"        { node1 }
+      | 'hiding "(" delimited1(symbol, ",") ")" { `Hiding{!node2} }
+
+stmt
+    ::= stmt ";" stmt
+        { `Seq{[!node0, !node2]} }
+      | stmt ";"
+        { `Seq{[!node0, nil]} }
+      | <<multiline>> 'if expr stmt 'else stmt
+        { `IfElse{!node1, !node2, !node4} }
+      | <<multiline>> 'if expr stmt
+        { `If{!node1, !node2} }
+      | <<multiline>> 'case tuple_expr 'of multi_lambda_expr
+        { `Apply{!node3, [!node1]} }
+      | <<multiline>> 'while expr block
+        { `While{!node1, !node2} }
+      | <<multiline>> 'for pattern 'in expr block
+        { `For{!node1, !node3, !node4} }
+      | 'continue
+        { `Continue{} }
+      | 'break
+        { `Break{} }
+      | 'return tuple_expr
+        { `Return{!node1} }
+      | 'return
+        { `Return{nil} }
+      | 'throw tuple_expr
+        { `Throw{!node1} }
+      | <<multiline>> 'try block 'catch multi_lambda_expr
+        { `Try{!node1, !node3} }
+      | <<multiline>> pattern guard_clause ":" stmt
+        { `Define{!node0, !node3, !node1} }
+      | <<multiline>> pattern ":" stmt
+        { `Define{!node0, !node2} }
+      | tuple_pattern ":" tuple_expr
+        { `Define{!node0, !node2} }
+      | tuple_pattern "=" tuple_expr
+        { `Assign{!node0, !node2} }
+      | 'import delimited1(symbol, ".") import_as? import_option?
+        { `Import{!node1, !node2, !node3} }
+      | postfix_expr ![+-.{] delimited1(argument, ",")
+        { Node{Quote{Apply}, List{node0, node2}} }
+      | postfix_expr "." symbol ![+-.{] delimited1(argument, ",")
+        { Node{Quote{Send}, List{node0, node2, node4}} }
+
+# Add new syntax for syntax declaration usinged qualified symbol like
+# `Lang.expr ::= ...`.
+syntax_declaration ::= pattern "::=" delimited1(parser_entry, "|")
+    { `DefineSyntax{!node0, !node2} }
+
+# Entry point of parsers
+syntax.toplevel = prim.parse_toplevel
+syntax.shell    = prim.parse_shell
+
+# Extend primary_expr to enable dollar sign ($) in parser action.
+primary_expr_act
+    ::= "$" decimal
+        {
+            prim.string_to_symbol(
+                prim.string_add("node",
+                prim.int_to_string(node1,10,0,false,false,false)))
+        }
+      | "$input"    { 'prim.input_text(parser, begin, end) }
+
+syntax.primary_expr_act = fusion(syntax.primary_expr_act, syntax.primary_expr)
+
+syntax.parser_action_old: syntax.parser_action
+syntax.parser_action = parser -> {
+    save_primary_expr: syntax.primary_expr
+    syntax.primary_expr = syntax.primary_expr_act
+    r: syntax.parser_action_old(parser)
+    syntax.primary_expr = save_primary_expr
+    r
+}
+
+# Extension of primary_expr to enable percent sign ($) in shell mode.
+primary_expr_shell
+    ::= "$" nospace(decimal)
+        {
+            if (prim.equal?(node1, 0) or
+                prim.int_greater_than?(node1, prim.array_size(shell_outputs))) {
+                    throw `Error{"Invalid line number", !node1}
+            }
+            `prim.array_at(shell_outputs, !node1)
+        }
+      | "$" { `prim.array_at(shell_outputs, 0) }
+
+syntax.enable_shell_syntax: () -> {
+    syntax.primary_expr = fusion(syntax.primary_expr, syntax.primary_expr_shell)
+}
+
+### Macro
+macro: e -> e
+Define{expand_macro_sub, (obj, lvl) -> {
+        head: prim.head(obj)
+        args: prim.arguments(obj)
+        Node{
+            prim.head(obj),
+            prim.list_map(e -> expand_macro(e, lvl), args)
+        }
+    }, fusion}
+Define{expand_macro_sub, (obj, _) when prim.atom?(obj) -> obj, fusion}
+Define{expand_macro_sub,
+    (obj, lvl) when prim.int_less_than?(lvl, 0) ->
+    { throw `LogicError{"Unquotetation outside quasi-quotation"} },
+    fusion}
+Define{expand_macro_sub,
+    (obj, lvl) when Equal{prim.head(obj), 'UnQuote} -> {
+        prim.set_arg(obj, 0,
+            expand_macro(prim.get_arg(obj, 0), prim.int_sub(lvl, 1)))
+        obj
+    },
+    fusion}
+Define{expand_macro_sub,
+    (obj, lvl) when Equal{prim.head(obj), 'QuasiQuote} -> {
+        prim.set_arg(obj, 0,
+            expand_macro(prim.get_arg(obj, 0), prim.int_add(lvl, 1)))
+        obj
+    },
+    fusion}
+Define{expand_macro_sub,
+    (obj, 0) when Equal{prim.head(obj), 'Quote} -> obj,
+    fusion}
+Define{expand_macro_sub,
+    (Lambda{args, body, options...}, 0) ->
+        `Lambda{!args, !expand_macro(body, 0), !options...},
+    fusion}
+Define{expand_macro_sub,
+    (Lambda{When{args, guard}, body, options...}, 0) ->
+        `Lambda{When{!args, !expand_macro(guard, 0)},
+            !expand_macro(body, 0), !options...},
+    fusion}
+Define{expand_macro_sub,
+    (Assign{lhs, rhs, options...}, 0) ->
+        `Assign{!lhs, !expand_macro(rhs, 0), !options...},
+    fusion}
+Define{expand_macro_sub,
+    (Define{lhs, rhs, options...}, 0) ->
+        `Define{!lhs, !expand_macro(rhs, 0), !options...},
+    fusion}
+Define{expand_macro, (obj, lvl) -> expand_macro_sub(obj, lvl), fusion}
+Define{expand_macro, (obj, 0) -> {
+        new_obj: macro(obj)
+        while (NotEqual{new_obj, obj}) {
+            obj = new_obj
+            new_obj = macro(obj)
+        }
+        expand_macro_sub(obj, 0)
+    },
+    fusion}
+Define{expand_macro, obj -> expand_macro(obj, 0), fusion}
+
+# Expand macros only once before eval.
+amber.before_eval = expand_macro
+
+macro = fusion((Assign{Apply{f, args}, e}) -> `Assign{!f, Lambda{!args, !e}, fusion}, macro)
+macro(Define{Apply{f, args}, e})     = `Define{!f, Lambda{!args, !e}, fusion}
+macro(Define{Send{obj, f, args}, e}) = `Define{Slot{!obj, !f}, Lambda{!args, !e}, fusion}
+macro(Assign{Send{obj, f, args}, e}) = `Assign{Slot{!obj, !f}, Lambda{!args, !e}, fusion}
+macro(Define{Apply{f, args}, e, g})     = `Define{!f, Lambda{When{!args, !g}, !e}, fusion}
+macro(Assign{Apply{f, args}, e, g})     = `Assign{!f, Lambda{When{!args, !g}, !e}, fusion}
+macro(Define{Send{obj, f, args}, e, g}) = `Define{Slot{!obj, !f}, Lambda{When{!args, !g}, !e}, fusion}
+macro(Assign{Send{obj, f, args}, e, g}) = `Assign{Slot{!obj, !f}, Lambda{When{!args, !g}, !e}, fusion}
+
+macro(|x|)     = `abs(!x)
+macro(+x)      = `uplus(!x)
+macro(-x)      = `uminus(!x)
+macro(x + y)   = `add(!x, !y)
+macro(x - y)   = `sub(!x, !y)
+macro(x * y)   = `mul(!x, !y)
+macro(x ^ y)   = `pow(!x, !y)
+macro(x / y)   = `div(!x, !y)
+macro(x // y)  = `quo(!x, !y)
+macro(x % y)   = `rem(!x, !y)
+macro(x | y)   = `fusion(!x, !y)
+macro(x < y)   = `less_than?(!x, !y)
+macro(x > y)   = `greater_than?(!x, !y)
+macro(x <= y)  = `less_equal?(!x, !y)
+macro(x >= y)  = `greater_equal?(!x, !y)
+macro(x == y)  = `equal?(!x, !y)
+macro(x != y)  = `(not equal?(!x, !y))
+macro(x <=> y) = `compare(!x, !y)
+macro(x += y)  = `ArithAssign{!x, !y, add!}
+macro(x -= y)  = `ArithAssign{!x, !y, sub!}
+macro(x *= y)  = `ArithAssign{!x, !y, mul!}
+macro(x ^= y)  = `ArithAssign{!x, !y, pow!}
+macro(x /= y)  = `ArithAssign{!x, !y, div!}
+macro(x //= y) = `ArithAssign{!x, !y, quo!}
+macro(x %= y)  = `ArithAssign{!x, !y, rem!}
+macro(x |= y)  = `ArithAssign{!x, !y, fusion!}
+
+# Subscript syntax is not built-in. We need macros.
+macro(x[idxs...]) = `Send{!x, get, !idxs}
+macro(x[idxs...] = e)
+    = `Send{!x, set, !prim.list_append(idxs, [e])}
+macro(ArithAssign{x[idxs...], e, op}) = {
+    # We have to consider that evaluation of `x' and `idxs' may have
+    # side-effects. So, we translate x[a,b] op= e to
+    # { y = x; t1 = a; t2 = b; y[t1, t2] = op(y[t1, t2], e) }
+    stmt1: `Define{!unique_symbol('x), !x}
+    stmt2: prim.list_map(i -> `Define{!unique_symbol('t), !i}, idxs)
+    y: prim.get_arg(stmt1, 0)
+    ts: prim.list_map(e -> prim.get_arg(e, 0), stmt2)
+
+    `Block{
+        !prim.list_append(
+            prim.list_cons(stmt1, stmt2),
+            [`Assign{Subscript{!y, !ts}, Send{Subscript{!y, !ts}, !op, [!e]}}]
+        )
+    }
+}
+
+# For-statement for containers.
+macro(For{i, container, body}) = {
+    iter:  prim.unique_symbol('iter)
+    value: prim.unique_symbol('value)
+    `{
+        !iter : (!container).each()
+        !value: nil
+        while ((!value = (!iter)()) != nil) {
+            !i: !value
+            !body
+        }
+    }
+}
+
+# For-statement for ranges.
+macro(For{i, Range{a, b}, body}) = {
+    j: prim.unique_symbol('j)
+    n: prim.unique_symbol('n)
+    `{
+        !j: !a
+        !n: !b
+        if (!j < !n) {
+            while (!j < !n) {
+                !i: !j
+                !body
+                !j += 1
+            }
+        } else {
+            !j -= 1
+            while (!j >= !n) {
+                !i: !j
+                !body
+                !j -= 1
+            }
+        }
+    }
+}
+
+# Syntax sugers for pattern-matching
+#
+# 1: equal-pattern
+# f(...,a,...,a,...): body
+# is equivalent to
+# f(...,a,...,b,...) when a == b: body
+#
+#NB: Exceptions are Dont-care pattern '_' and special symbols.
+#
+# 2: or-pattern
+# f(..,pat1 or pat2,...): body
+# is equivalent to
+# f(...,t,...) when Seq{init; TryAssign{pat1, t} or TryAssign{pat2, t}}:...
+#
+# pat1 and pat2 must have exactly same set of symbol.
+
+desugar_args(a, _, _, _): a
+desugar_args(a, vars, checks, 0): {
+    args: prim.arguments(a)
+    if args == []
+        return a
+    args = desugar_args(args, vars, checks, 0)
+    Node{prim.head(a), args}
+}
+desugar_args([], _, _, 0): []
+desugar_args([a,rest...], vars, checks, 0): {
+    a    = desugar_args(a, vars, checks, 0)
+    rest = desugar_args(rest, vars, checks, 0)
+    prim.list_cons(a, rest)
+}
+desugar_args(a @ Symbol, vars, checks, 0): {
+    if not prim.array_include?(vars, a) {
+        prim.array_push(vars, a)
+        return a
+    }
+    t: prim.unique_symbol(a)
+    prim.array_push(checks, ([], `Equal{!t, !a}))
+    t
+}
+desugar_args('_, _, _, 0): '_
+desugar_args(nil, _, _, 0): nil
+desugar_args(true, _, _, 0): true
+desugar_args(false, _, _, 0): false
+desugar_args(a @ Quote, _, _, 0): a
+desugar_args(a @ QuasiQuote, vars, checks, level): {
+    arg: desugar_args(prim.get_arg(a, 0), vars, checks, level + 1)
+    'QuasiQuote{!arg}
+}
+desugar_args(a @ Unquote, vars, checks, level): {
+    arg: desugar_args(prim.get_arg(a, 0), vars, checks, level - 1)
+    'Unquote{!arg}
+}
+desugar_args(a @ Domain, vars, checks, 0): {
+    v: prim.get_arg(a, 0)
+    pat: prim.get_arg(a, 1)
+    if not prim.array_include?(vars, v)
+        prim.array_push(vars, v)
+    if prim.head(pat) == 'Symbol
+        return a
+    pat = desugar_args(pat, vars, checks, 0)
+    if prim.head(pat) == 'Symbol {
+        prim.array_push(checks, ([`Define{!pat, !v}], true))
+        v
+    } else
+        `Domain{!v, !pat}
+}
+
+desugar_args(orpat @ SeqOr, vars, checks, 0): {
+    # Translate `a or b or ..` to [a,b,..]
+    t: prim.unique_symbol('t)
+    to_list(pat): [pat]
+    to_list(SeqOr{a, b}): prim.list_append(to_list(a), to_list(b))
+    pats: to_list(orpat)
+    n: prim.array_size(vars)
+    orp_vars: prim.array_new_empty()
+    pats = prim.list_map(p -> {
+                prim.array_resize(vars, n)
+                p: desugar_args(p, vars, checks, 0)
+                for i in n..prim.array_size(vars) {
+                    if not prim.array_include?(orp_vars, vars[i])
+                        prim.array_push(orp_vars, vars[i])
+                }
+                p
+            }, pats)
+    init: prim.array_to_list(prim.array_map(x -> `Define{!x, nil}, orp_vars))
+    asgn: prim.list_foldl1((a,b) -> `(!a or !b),
+            prim.list_map(p -> `TryAssign{!p, !t}, pats))
+    prim.array_push(checks, (init, asgn))
+    t
+}
+
+desugar_lambda(args, guard, body): {
+    vars: prim.array_new_empty()   # Parameter-variables
+    checks: prim.array_new_empty() # Expresions that is needed to be checked.
+    args = desugar_args(args, vars, checks, 0)
+    if prim.array_size(checks) == 0 {
+        if guard == nil
+            return `Lambda{!args, !body}
+        else
+            return `Lambda{When{!args, !guard}, !body}
+    } else {
+        inits: prim.array_foldr(((a, _), b) -> prim.list_append(a, b), checks, [])
+        checkexpr: prim.array_foldl1((a, b) -> `(!a and !b),
+                prim.array_map(((_, b)) -> b, checks))
+        if guard != nil
+            guard = `(!checkexpr and !guard)
+        else
+            guard = checkexpr
+        if inits != []
+            guard = `Seq{!prim.list_append(inits, [guard])}
+        return `Lambda{When{!args, !guard}, !body}
+    }
+}
+
+macro(Lambda{args @ List, body}): desugar_lambda(args, nil, body)
+macro(Lambda{When{args, guard}, body}): desugar_lambda(args, guard, body)
+
+# 'with' exprssion
+#
+# obj with { a = p, b = q, c = r }
+#
+# is expaned to
+#
+# { t: obj; t.a = p; t.b = q; t.c = r; t }
+#
+macro(WithSlots{obj, init}): `Apply{!obj, () -> { Seq{!init}; self }, []}
+
+## Utilities
+add_reserved_word(words...):
+    prim.list_foreach(str ->
+        prim.array_push(syntax.reserved_words,
+            prim.string_to_symbol(str)), words)
