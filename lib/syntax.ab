@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: syntax.ab 2014-04-05 00:21:10 nineties $ "
+" $Id: syntax.ab 2014-04-05 04:31:54 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -315,6 +315,12 @@ Assign{syntax.expr, syntax.assign_expr}
 
 ### Statements
 
+# parenthleses-less tuple pattern and expression
+tuple_pattern ::= delimited2(pattern, ",")  { Node{'Tuple, node0} }
+                | pattern
+tuple_expr ::= delimited2(expr, ",")  { Node{'Tuple, node0} }
+             | expr
+
 import_as ::= 'as symbol { node1 }
 
 import_option
@@ -325,18 +331,14 @@ import_option
 stmt
     ::= stmt ";" stmt
         { `Seq{[!node0, !node2]} }
-
       | stmt ";"
         { `Seq{[!node0, nil]} }
-
       | <<multiline>> 'if expr stmt 'else stmt
         { `IfElse{!node1, !node2, !node4} }
       | <<multiline>> 'if expr stmt
         { `If{!node1, !node2} }
-
-      | <<multiline>> 'case expr 'of multi_lambda_expr
+      | <<multiline>> 'case tuple_expr 'of multi_lambda_expr
         { `Apply{!node3, [!node1]} }
-
       | <<multiline>> 'while expr block
         { `While{!node1, !node2} }
       | <<multiline>> 'for pattern 'in expr block
@@ -345,11 +347,11 @@ stmt
         { `Continue{} }
       | 'break
         { `Break{} }
-      | 'return expr
+      | 'return tuple_expr
         { `Return{!node1} }
       | 'return
         { `Return{nil} }
-      | 'throw expr
+      | 'throw tuple_expr
         { `Throw{!node1} }
       | <<multiline>> 'try block 'catch multi_lambda_expr
         { `Try{!node1, !node3} }
@@ -357,9 +359,12 @@ stmt
         { `Define{!node0, !node3, !node1} }
       | <<multiline>> pattern ":" stmt
         { `Define{!node0, !node2} }
+      | tuple_pattern ":" tuple_expr
+        { `Define{!node0, !node2} }
+      | tuple_pattern "=" tuple_expr
+        { `Assign{!node0, !node2} }
       | 'import delimited1(symbol, ".") import_as? import_option?
         { `Import{!node1, !node2, !node3} }
-
       | postfix_expr ![+-.{] delimited1(argument, ",")
         { Node{Quote{Apply}, List{node0, node2}} }
       | postfix_expr "." symbol ![+-.{] delimited1(argument, ",")

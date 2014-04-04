@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-04-02 20:46:59 nineties $
+; $Id: rowl1-compile.rlc 2014-04-05 04:06:08 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1264,6 +1264,18 @@
 ; z: decons(tmp)
 ; car(tmp)
 (fun compile_define_multi_variable (asm vars val) (
+    (if (&& (== (node_type vars) @TupleE) (== (node_type val) @TupleE)) (do
+        (if (!= (node_size vars) (node_size val))
+            (throw (exception2
+                (string "numbers of variables and values are different")
+                 vars val)))
+        (for i 0 (node_size vars) (do
+            (compile_define asm (defvar (node_arg vars i) (node_arg val i)))
+            (put_drop asm)
+            ))
+        (compile asm vars)
+        return
+        ))
     (var tup (unqualified_args vars))
     (var pattern (field_get tup 0))
     (var tvars   (field_get tup 1))
@@ -2143,6 +2155,26 @@
 ; z = decons(tmp)
 ; car(tmp)
 (fun compile_multi_assign (asm lhs rhs) (
+    (if (&& (== (node_type lhs) @TupleE) (== (node_type rhs) @TupleE)) (do
+        (if (!= (node_size lhs) (node_size rhs))
+            (throw (exception2
+                (string "numbers of variables and values are different")
+                 lhs rhs)))
+        (var n (node_size lhs))
+        (var tmp (allocate_tuple n))
+        (for i 0 n (do
+            (var t (to_unique_sym "t"))
+            (compile_define asm (defvar t (node_arg rhs i)))
+            (put_drop asm)
+            (node_arg_set tmp i t)
+            ))
+        (for i 0 n (do
+            (compile_assign asm (assign (node_arg lhs i) (node_arg tmp i)))
+            (put_drop asm)
+            ))
+        (compile asm lhs)
+        return
+        ))
     (var tup (unqualified_args lhs))
     (var pattern (field_get tup 0))
     (var tvars   (field_get tup 1))
@@ -2153,7 +2185,7 @@
         (list1 (make_node2 Domain t pattern))
         (list_append tvars (list1 t))) (list1 rhs)))
     (while rvars (do
-        (compile asm (assign (car rvars) Decons))
+        (compile_assign asm (assign (car rvars) Decons))
         (put_drop asm)
         (= rvars (cdr rvars))
         ))
