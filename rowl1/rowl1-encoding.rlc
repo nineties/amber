@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-string.rlc 2014-02-17 21:27:05 nineties $
+; $Id: rowl1-string.rlc 2014-04-04 13:41:14 nineties $
 ;
 
 (import "rlvm-compile")
@@ -72,15 +72,32 @@
 
 (array ushort ascii_ctype_mask @CTYPE_MASK_TABLE)
 
-(fun is_ctype (s mask) (
-    (if (!= (strlen s) 1)
-        (throw (invalid_argument (string "Not a character") s))
-        )
-    (var c (array_get char s 0))
+(fun is_ctype_c (c mask) (
     (if (& (array_get ushort ascii_ctype_mask c) mask)
         (return @C_TRUE)
         (return @C_FALSE)
         )
+    ))
+
+(export fun lowercase (c) (
+    (if (!= (is_ctype_c c @CTYPE_UPPER) @C_FALSE)
+        (return (+ c 0x20))
+        (return c)
+        )
+    ))
+
+(export fun upcase (c) (
+    (if (!= (is_ctype_c c @CTYPE_LOWER) @C_FALSE)
+        (return (- c 0x20))
+        (return c)
+        )
+    ))
+
+(fun is_ctype (s mask) (
+    (if (!= (strlen s) 1)
+        (throw (invalid_argument (string "Not a character") s))
+        )
+    (return (is_ctype_c (array_get char s 0) mask))
     ))
 
 (export fun is_alpha (s)   ((return (is_ctype s @CTYPE_ALPHA))))

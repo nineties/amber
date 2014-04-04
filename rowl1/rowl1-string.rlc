@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-string.rlc 2014-04-03 04:19:14 nineties $
+; $Id: rowl1-string.rlc 2014-04-04 13:44:23 nineties $
 ;
 
 (import "rlvm-compile")
@@ -125,6 +125,39 @@
         (return ls)
         ))
     (return (str_split_ str d slen dlen))
+    ))
+
+(extern fun lowercase)
+(extern fun upcase)
+(fun str_downcase (str) (
+    (var len (str_size str))
+    (if (== len 0) (return str))
+    (var new (allocate_string len))
+    (for i 0 len
+        (array_set char new i (lowercase (array_get char str i)))
+        )
+    (return new)
+    ))
+
+(fun str_upcase (str) (
+    (var len (str_size str))
+    (if (== len 0) (return str))
+    (var new (allocate_string len))
+    (for i 0 len
+        (array_set char new i (upcase (array_get char str i)))
+        )
+    (return new)
+    ))
+
+(fun str_capitalize (str) (
+    (var len (str_size str))
+    (if (== len 0) (return str))
+    (var new (allocate_string len))
+    (array_set char new 0 (upcase (array_get char str 0)))
+    (for i 1 len
+        (array_set char new i (lowercase (array_get char str i)))
+        )
+    (return new)
     ))
 
 (fun str_repeat (str n) (
@@ -372,9 +405,11 @@
     (add_function2 mod (to_sym "string_contain?") stringT stringT str_contain 0)
     (add_function2 mod (to_sym "string_split") stringT stringT str_split 0)
 
+    (add_function1 mod (to_sym "string_downcase") stringT str_downcase 0)
+    (add_function1 mod (to_sym "string_upcase") stringT str_upcase 0)
+    (add_function1 mod (to_sym "string_capitalize") stringT str_capitalize 0)
+
     (add_function2 mod (to_sym "string_repeat") stringT intT str_repeat 0)
-
-
     (add_function3 mod (to_sym "string_ljust") stringT intT stringT str_ljust 0)
     (add_function3 mod (to_sym "string_rjust") stringT intT stringT str_rjust 0)
     (add_function3 mod (to_sym "string_center") stringT intT stringT str_center 0)
