@@ -1,26 +1,28 @@
 # Copyright (C) 2014 nineties
-# $Id: algebra/euclid.ab 2014-04-04 23:05:09 nineties $
+# $Id: algebra/euclid.ab 2014-04-05 03:11:32 nineties $
 
 #= Euclidean algorithm =
 
 # Compute Greatest Common Divisor (G.C.D.) of arguments.
-# The arguments must be elements of some Euclidean domain with operators
+# The arguments must be elements of an Euclidean domain with operators
 # `/` (quotient) and `%` (remainder).
 
 gcd(values...): values.foldr(gcd)
 gcd(a, b): {
-    while (b != 0) {
-        t: b
-        b = a % b
-        a = t
-    }
+    while (b != 0)
+        (a, b) = (b, a % b)
     a
 }
 
+# Return `(g, s, t)` where `g == gcd(a, b)` and `s*a+t*b == g` holds.
 extended_euclid(a, b): {
-    r0: a; s0: 1; t0: 0     # a = 1*a + 0*b
-    r1: b; s1: 0; t1: 1     # b = 0*a + 1*b
+    (r0, s0, t0): (a, 1, 0)
+    (r1, s1, t1): (b, 0, 1)
     while r1 != 0 {
-        q = r0 
+        q: r0 // r1
+        (r0, r1) = (r1, r0 - q*r1)
+        (s0, s1) = (s1, s0 - q*s1)
+        (t0, t1) = (t1, t0 - q*t1)
     }
+    (r0, s0, t0)
 }
