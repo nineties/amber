@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2014-04-03 03:44:32 nineties $
+; $Id: rowl1-list.rlc 2014-04-04 22:40:24 nineties $
 ;
 
 (import "rlvm-compile")
@@ -214,7 +214,7 @@
 
 (fun ls_foldl1 (f ls) (
     (if (! ls)
-        (throw (invalid_argument (string "foldl1 requires non-empty list") ls))
+        (throw (invalid_argument (string "empty list") ls))
         )
     (var v (car ls))
     (= ls (cdr ls))
@@ -244,7 +244,7 @@
 
 (fun ls_foldr1 (f ls) (
     (if (! ls)
-        (throw (invalid_argument (string "foldr1 requires non-empty list") ls))
+        (throw (invalid_argument (string "empty list") ls))
         )
     (var code (get_bytecode f))
     (var v (foldr1 ls code))
@@ -264,11 +264,10 @@
 (fun ls_unzip (ls) (
     (var left 0)
     (var right 0)
-    (var orig ls)
     (while ls (do
         (var t (car ls))
         (if (!= (node_type t) @TupleE)
-            (throw (invalid_argument (string "List of tuples is required") orig)))
+            (throw (invalid_argument (string "not a pair") t)))
         (= left (cons (tuple_at t 0) left))
         (= right (cons (tuple_at t 1) right))
         (= ls (cdr ls))
