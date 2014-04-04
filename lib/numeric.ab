@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: numeric.ab 2014-04-03 02:01:08 nineties $
+# $Id: numeric.ab 2014-04-04 23:57:52 nineties $
 
 #= Fixed-length integers and floating-point numbers. =
 # This module defines numerical operations for fixed-length integers and
@@ -41,37 +41,34 @@ mul    = prim.int_mul | prim.float_mul | mul
 #== Division ==
 # Amber distinguishes two kinds of arithmetic division.
 # A division with remainder (Euclidean division) and a division with
-# no remainder.
+# no remainder (division for fields).
 #
-# The functions `div` (operator = `//`) and `mod` (operator = `%`) are for
+# The functions `quo` (operator = `//`) and `rem` (operator = `%`) are for
 # the former and defined as follows:
 # * For any integer a and b (b != 0), there exist unique integers q and r
-#   such that a = bq + r (0 <= r < |b|).
-# * Then `div(a, b) == q` and `mod(a, b) == r`.
+#   such that a = bq + r (|r| < |b| and sign(r)==sign(b)).
+#   Then, `quo(a, b) == q` and `rem(a, b) == r`.
 # Examples:
 # ----
 # > 7 // 3      # => 2
-# > 7 // -3     # => -2
+# > 7 // -3     # => -3
 # > -7 // 3     # => -3
-# > -7 // -3    # => 3
+# > -7 // -3    # => 2
 # > 7 % 3       # => 1
-# > 7 % -3      # => 1
+# > 7 % -3      # => -2
 # > -7 % 3      # => 2
-# > -7 % -3     # => 2
+# > -7 % -3     # => -1
 # ----
-# Note that `mod(a, b)` is always positive. It follows usual definition of
-# Euclidian division in mathematics. But this behavior is differ from many
-# other programming languages.
 #
-# The function `divmod` computes both.
+# The function `quorem` computes both.
 # ----
-# > divmod(7, 3)    # => (2, 1)
+# > quorem(7, 3)    # => (2, 1)
 # ----
 #
 # Exceptions:
 #   DivisionByZero: When the divisor is 0.
 #
-# The function `quo` is for the latter.
+# The function `div` is for the latter.
 # Examples:
 # ----
 # > 3 / 2       # => 1.5
@@ -81,8 +78,7 @@ mul    = prim.int_mul | prim.float_mul | mul
 # Exceptions:
 #   DivisionByZero: When the divisor is 0.
 # Note that when the divisor is `0.0` or `-0.0` the result is `infinity`
-# with appropriate sign and no exceptions are thrown. This is because we
-# should think that `0.0` means approximately zero.
+# with appropriate sign and no exceptions are thrown.
 # ----
 # > 1.0/0           # => Error DivisionByZero
 # > 1.0/0.0         # => infinity
@@ -91,13 +87,13 @@ mul    = prim.int_mul | prim.float_mul | mul
 # > -1.0/-0.0       # => infinity
 # ----
 
-div    = prim.int_div | div
-mod    = prim.int_mod | mod
+quo    = prim.int_quo | quo
+rem    = prim.int_rem | rem
 
-divmod(a, b): perform_binary_operation(a, b, divmod, 'divmod)
-divmod(a, b) when a.head == b.head: (div(a, b), mod(a, b))
+quorem(a, b): perform_binary_operation(a, b, quorem, 'quorem)
+quorem(a, b) when a.head == b.head: (quo(a, b), rem(a, b))
 
-quo = prim.int_quo | prim.float_quo | quo
+div = prim.int_div | prim.float_div | div
 
 #== Power operation ==
 # `pow(a, b)` (operator = '^') is equal to `a` to the power of `b`.

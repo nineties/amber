@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-bigint.rlc 2014-04-03 05:17:22 nineties $
+; $Id: rowl1-bigint.rlc 2014-04-05 00:04:42 nineties $
 ;
 
 (import "rlvm-compile")
@@ -619,22 +619,32 @@
     (= a (to_bint_copy a))
     (return (norm (bigmul a (to_bint b))))
     ))
-(export fun bint_div (a b) (
+(export fun bint_quo (a b) (
+    (if (& (& a b) 1) (return (box (/ (unbox a) (unbox b)))))
     (= a (to_bint_copy a))
     (bigdiv a (to_bint b))
     (return (norm a))
     ))
-(export fun bint_mod (a b) (
+(export fun bint_rem (a b) (
+    (if (& (& a b) 1) (return (box (% (unbox a) (unbox b)))))
     (= a (to_bint_copy a))
     (return (norm (bigdiv a (to_bint b))))
     ))
-(fun bint_divmod (a b) (
+(fun bint_quorem (a b) (
+    (if (& (& a b) 1) (do
+        (= a (unbox a))
+        (= b (unbox b))
+        (return (tuple2 (box (/ a b)) (box (% a b))))
+        ))
     (= a (to_bint_copy a))
     (var r (bigdiv a (to_bint b)))
     (return (tuple2 (norm a) (norm r)))
     ))
-(fun bint_quo (a b) (
+(fun bint_div (a b) (
     (nonzero_check b)
+    (if (& (& a b) 1)
+        (return (fdiv (itof (unbox a)) (itof (unbox b))))
+        )
     (return (fdiv (bint_to_f a) (bint_to_f b)))
     ))
 
@@ -971,10 +981,10 @@
     (add_function2 mod (to_sym "int_add") intT intT bint_add 0)
     (add_function2 mod (to_sym "int_sub") intT intT bint_sub 0)
     (add_function2 mod (to_sym "int_mul") intT intT bint_mul 0)
-    (add_function2 mod (to_sym "int_div") intT intT bint_div 0)
-    (add_function2 mod (to_sym "int_mod") intT intT bint_mod 0)
     (add_function2 mod (to_sym "int_quo") intT intT bint_quo 0)
-    (add_function2 mod (to_sym "int_divmod") intT intT bint_divmod 0)
+    (add_function2 mod (to_sym "int_rem") intT intT bint_rem 0)
+    (add_function2 mod (to_sym "int_div") intT intT bint_div 0)
+    (add_function2 mod (to_sym "int_quorem") intT intT bint_quorem 0)
     (add_function2 mod (to_sym "int_pow") intT intT bint_pow 0)
     (add_function3 mod (to_sym "int_powmod") intT intT intT bint_powmod 0)
     (add_function2 mod (to_sym "int_compare") intT intT bint_compare 0)
