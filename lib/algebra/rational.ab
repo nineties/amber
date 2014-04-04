@@ -1,15 +1,46 @@
 # Copyright (C) 2014 nineties
-# $Id: algebra/rational.ab 2014-04-04 17:29:45 nineties $
+# $Id: algebra/rational.ab 2014-04-05 07:03:10 nineties $
 
-import numeric 
+import algebra.euclid (gcd)
 
 #= Arithmetic of rational numbers =
-
-class Rat{num, denom} with {
-    .new(num, denom): {
+# The rational number class.
+class Rat{numerator, denominator} with {
+    .new = (num @ Int, denom @ Int) -> {
+        if denom == 0 throw `DivisionByZero{}
+        g: gcd(num, denom)
+        Rat.make(denom.sign * num//g, denom.sign * denom//g)
     }
+
+    # Numerator.
+    .num: alias () -> {
+        n: .numerator
+        d: .denominator
+        n//gcd(n,d)
+    }
+
+    # Denominator.
+    .denom: alias () -> {
+        n: .numerator
+        d: .denominator
+        d//gcd(n,d)
+    }
+
+    .to_f(): .numerator.to_f() / .denominator.to_f()
 }
 
-Int.to_rat(): Rat.new(self, 1)
+add(Rat{a, b}, Rat{c, d}) = Rat.make(a*d+b*c, b*d)
+sub(Rat{a, b}, Rat{c, d}) = Rat.make(a*d-b*c, b*d)
+mul(Rat{a, b}, Rat{c, d}) = Rat.make(a*c, b*d)
+div(Rat{a, b}, Rat{c, d}) = Rat.make(a*d, b*c)
+pow(Rat{a, b}, e) = Rat.make(a^e, b^e)
 
-aadd(Rat{
+# Redefine division of integers.
+div(a @ Int, b @ Int) = Rat.new(a, b)
+
+typecast(a @ Int,   'Rat) = Rat.make(a, 1)
+typecast(a @ Rat, 'Float) = a.to_f()
+typejoin('Int, 'Rat) = 'Rat
+typejoin('Rat, 'Int) = 'Rat
+typejoin('Rat, 'Float) = 'Float
+typejoin('Float, 'Rat) = 'Float
