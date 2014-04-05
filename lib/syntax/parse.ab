@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: syntax/parse.ab 2014-04-05 17:02:38 nineties $ "
+" $Id: syntax/parse.ab 2014-04-06 06:18:34 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -587,7 +587,7 @@ macro(For{i, Range{a, b}, body}) = {
 # 2: or-pattern
 # f(..,pat1 or pat2,...): body
 # is equivalent to
-# f(...,t,...) when Seq{init; TryAssign{pat1, t} or TryAssign{pat2, t}}:...
+# f(...,t,...) when Seq{init; Assign{pat1, t, noerror} or Assign{pat2, t, noerro}}:...
 #
 # pat1 and pat2 must have exactly same set of symbol.
 
@@ -661,7 +661,7 @@ desugar_args(orpat @ SeqOr, vars, checks, 0): {
             }, pats)
     init: prim.array_to_list(prim.array_map(x -> `Define{!x, nil}, orp_vars))
     asgn: prim.list_foldl1((a,b) -> `(!a or !b),
-            prim.list_map(p -> `TryAssign{!p, !t}, pats))
+            prim.list_map(p -> `Assign{!p, !t, noerror}, pats))
     prim.array_push(checks, (init, asgn))
     t
 }
