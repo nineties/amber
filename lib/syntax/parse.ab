@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: syntax/parse.ab 2014-04-05 08:41:42 nineties $ "
+" $Id: syntax/parse.ab 2014-04-05 17:02:38 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -46,9 +46,9 @@ DefineSyntax{
         Tuple{List{"(", syntax_element, ")"}, node1},
         Tuple{List{"(", Many1{syntax_element}, ")"}, node1, multiline},
         Tuple{List{"[", "^", character_set, "]"},
-            QuasiQuote{NoneOf{Unquote{node2}}}},
+            Quasiquote{NoneOf{Unquote{node2}}}},
         Tuple{List{"[", character_set, "]"},
-            QuasiQuote{OneOf{Unquote{node1}}}}
+            Quasiquote{OneOf{Unquote{node1}}}}
     }
 }
 
@@ -56,31 +56,31 @@ DefineSyntax{
     syntax_element,
     List{
         Tuple{List{primary_syntax_element, "?"},
-            QuasiQuote{Option{Unquote{node0}}}},
+            Quasiquote{Option{Unquote{node0}}}},
         Tuple{List{primary_syntax_element, "*"},
-            QuasiQuote{Many{Unquote{node0}}}},
+            Quasiquote{Many{Unquote{node0}}}},
         Tuple{List{primary_syntax_element, "+"},
-            QuasiQuote{Many1{Unquote{node0}}}},
+            Quasiquote{Many1{Unquote{node0}}}},
         Tuple{List{Delimited2{primary_syntax_element, "/"}},
             Node{Quote{Choice}, node0}},
         Tuple{List{"'", any_symbol},
-            QuasiQuote{Word{Unquote{node1}}}},
+            Quasiquote{Word{Unquote{node1}}}},
         Tuple{List{"&", primary_syntax_element},
-            QuasiQuote{And{Unquote{node1}}}},
+            Quasiquote{And{Unquote{node1}}}},
         Tuple{List{"!", primary_syntax_element},
-            QuasiQuote{Not{Unquote{node1}}}},
+            Quasiquote{Not{Unquote{node1}}}},
         Tuple{List{"aligned", "(", syntax_element, ")"},
-            QuasiQuote{Aligned{Unquote{node2}}}, multiline},
+            Quasiquote{Aligned{Unquote{node2}}}, multiline},
         Tuple{List{"delimited", "(", syntax_element, ",", syntax_element, ")"},
-            QuasiQuote{Delimited{Unquote{node2}, Unquote{node4}}}, multiline},
+            Quasiquote{Delimited{Unquote{node2}, Unquote{node4}}}, multiline},
         Tuple{List{"delimited1", "(", syntax_element, ",", syntax_element, ")"},
-            QuasiQuote{Delimited1{Unquote{node2}, Unquote{node4}}}, multiline},
+            Quasiquote{Delimited1{Unquote{node2}, Unquote{node4}}}, multiline},
         Tuple{List{"delimited2", "(", syntax_element, ",", syntax_element, ")"},
-            QuasiQuote{Delimited2{Unquote{node2}, Unquote{node4}}}, multiline},
+            Quasiquote{Delimited2{Unquote{node2}, Unquote{node4}}}, multiline},
         Tuple{List{"parsewith", "(", expr, ",", expr, ")"},
-            QuasiQuote{ParseWith{Unquote{node2}, Unquote{node4}}}, multiline},
+            Quasiquote{ParseWith{Unquote{node2}, Unquote{node4}}}, multiline},
         Tuple{List{"nospace", "(", syntax_element, ")"},
-            QuasiQuote{NoSpace{Unquote{node2}}}, multiline},
+            Quasiquote{NoSpace{Unquote{node2}}}, multiline},
         Tuple{List{primary_syntax_element}, node0}
     }
 }
@@ -96,7 +96,7 @@ DefineSyntax{
 DefineSyntax{
     parser_action,
     List{Tuple{List{"{", Aligned{stmt}, "}"},
-        QuasiQuote{Block{Unquote{node1}}}, multiline}
+        Quasiquote{Block{Unquote{node1}}}, multiline}
         }
 }
 
@@ -104,16 +104,16 @@ DefineSyntax{
     parser_entry,
     List{
         Tuple{List{parser_option, Many{syntax_element}, parser_action},
-            QuasiQuote{Tuple{Unquote{node1}, Unquote{node2}, Unquote{node0}}}
+            Quasiquote{Tuple{Unquote{node1}, Unquote{node2}, Unquote{node0}}}
         },
         Tuple{List{Many{syntax_element}, parser_action},
-            QuasiQuote{Tuple{Unquote{node0}, Unquote{node1}}}
+            Quasiquote{Tuple{Unquote{node0}, Unquote{node1}}}
         },
         Tuple{List{parser_option, syntax_element},
-            QuasiQuote{Tuple{Unquote{List{node1}}, node1, Unquote{node0}}}
+            Quasiquote{Tuple{Unquote{List{node1}}, node1, Unquote{node0}}}
         },
         Tuple{List{syntax_element},
-            QuasiQuote{Tuple{Unquote{List{node0}}, node0}}
+            Quasiquote{Tuple{Unquote{List{node0}}, node0}}
         }
     }
 }
@@ -122,7 +122,7 @@ DefineSyntax{
     syntax_declaration,
     List{
         Tuple{List{symbol, "::=", Delimited1{parser_entry, "|"}},
-            QuasiQuote{DefineSyntax{
+            Quasiquote{DefineSyntax{
                 Unquote{node0},
                 Unquote{node2}
             }}}
@@ -144,7 +144,7 @@ Define{Slot{syntax, reserved_words}, Array{
 }}
 
 ### Expressions
-block_body ::= aligned(stmt) { QuasiQuote{Block{Unquote{node0}}} }
+block_body ::= aligned(stmt) { Quasiquote{Block{Unquote{node0}}} }
 
 primary_block ::= <<multiline>> "{" block_body "}" { node1 }
 
@@ -171,7 +171,7 @@ primary_expr
       | "..."           { Quote{Rest{}} }
 
 argument ::= symbol "=" assign_expr
-             { QuasiQuote{Keyword{Unquote{node0}, Unquote{node2}}} }
+             { Quasiquote{Keyword{Unquote{node0}, Unquote{node2}}} }
            | expr
 
 postfix_expr
@@ -203,7 +203,7 @@ quote_expr
     ::= "'" quote_expr
         { Node{Quote{Quote}, List{node1}} }
       | "`"  quote_expr
-        { Node{Quote{QuasiQuote}, List{node1}} }
+        { Node{Quote{Quasiquote}, List{node1}} }
       | "!"  quote_expr
         { Node{Quote{Unquote}, List{node1}} }
       | fullform_expr
@@ -304,7 +304,7 @@ assign_expr
       | pattern "*=" assign_expr  { `MulAssign{!node0, !node2} }
       | pattern "^=" assign_expr  { `PowAssign{!node0, !node2} }
       | pattern "/=" assign_expr  { `DivAssign{!node0, !node2} }
-      | pattern "//=" assign_expr { `QuotAssign{!node0, !node2} }
+      | pattern "//=" assign_expr { `QuoAssign{!node0, !node2} }
       | pattern "%=" assign_expr  { `RemAssign{!node0, !node2} }
       | pattern "|=" assign_expr  { `FusionAssign{!node0, !node2} }
       | pattern 'with slot_assign
@@ -439,7 +439,7 @@ Define{expand_macro_sub,
     },
     fusion}
 Define{expand_macro_sub,
-    (obj, lvl) when Equal{prim.head(obj), 'QuasiQuote} -> {
+    (obj, lvl) when Equal{prim.head(obj), 'Quasiquote} -> {
         prim.set_arg(obj, 0,
             expand_macro(prim.get_arg(obj, 0), prim.int_add(lvl, 1)))
         obj
@@ -619,9 +619,9 @@ desugar_args(nil, _, _, 0): nil
 desugar_args(true, _, _, 0): true
 desugar_args(false, _, _, 0): false
 desugar_args(a @ Quote, _, _, 0): a
-desugar_args(a @ QuasiQuote, vars, checks, level): {
+desugar_args(a @ Quasiquote, vars, checks, level): {
     arg: desugar_args(prim.get_arg(a, 0), vars, checks, level + 1)
-    'QuasiQuote{!arg}
+    'Quasiquote{!arg}
 }
 desugar_args(a @ Unquote, vars, checks, level): {
     arg: desugar_args(prim.get_arg(a, 0), vars, checks, level - 1)

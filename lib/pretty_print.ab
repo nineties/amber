@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: pretty_print.ab 2014-04-02 01:54:52 nineties $
+# $Id: pretty_print.ab 2014-04-05 16:07:02 nineties $
 
 #= Pretty printing =
 # Implementation of pretty printing algorithm of the following paper.
@@ -9,13 +9,13 @@
 # A 'document' is a one of following forms:
 # * A string
 # * A list of documents.
-# * nl_or_null : Output newline or empty string when the document is compressed into a single line.
-# * nl_or_space : Output newline or single space when the document is compressed into a single line.
+# * nl() : Output newline or empty string when the document is compressed into a single line.
+# * nl(sep) : Output newline or `sep` when the document is compressed into a single line.
 # * nest(indent, document): Output the document with indentation width = `indent`.
 # * group(document): Compress the document into a single line when there is enough area.
 
-nl_or_null:  `Newline{""}
-nl_or_space: `Newline{" "}
+nl():    `Newline{""}
+nl(sep): `Newline{!sep}
 
 nest(i, doc): `Nest{!i, !doc}
 nest(i, Union{len, d1, d2}): `Union{!len, !nest(i, d1), !nest(i, d2)}
@@ -94,8 +94,8 @@ layout(_, _, _, []): nil
 # * width (optional): The maximum width of the text.
 #
 # ----
-# > doc: ["bbbbb", "[", nest(2, [nl_or_null, "ccc",
-# ~       ",", nl_or_null, "dd"]), nl_or_null, "]"]
+# > doc: ["bbbbb", "[", nest(2, [nl(), "ccc",
+# ~       ",", nl(), "dd"]), nl(), "]"]
 # > pretty(stdout, doc)
 # bbbbb[
 #   ccc,
