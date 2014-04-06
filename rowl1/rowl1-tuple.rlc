@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2014-03-04 16:02:26 nineties $
+; $Id: rowl1-list.rlc 2014-04-07 05:24:16 nineties $
 ;
 
 (import "rlvm-compile")
@@ -64,26 +64,10 @@
     (return t)
     ))
 
-(fun tp_equal (t1 t2) (
-    (var n (seq_size t1))
-    (if (!= (seq_size t2) n) (return @C_FALSE))
-    (var f (lookup_func global (to_sym "equal")))
-    (for i 0 n (do
-        (if (== (runcode f
-            (array_get object t1 i) (array_get object t2 i)) @C_FALSE)
-            (return @C_FALSE))
-        ))
-    (return @C_TRUE)
-    ))
-
 (export fun tuple_at (t i) (
     (var n (seq_size t))
     (if (>= i n) (throw (out_of_range t (box i))))
     (return (array_get object t i))
-    ))
-
-(fun tp_at (t i) (
-    (return (tuple_at t (unbox i)))
     ))
 
 (export fun tuple_store (t i v) (
@@ -91,10 +75,6 @@
     (if (>= i n) (throw (out_of_range t (box i))))
     (array_set object t i v)
     (return v)
-    ))
-
-(fun tp_store (t i v) (
-    (return (tuple_store t (unbox i) v))
     ))
 
 (export fun tuple_restof (tup i) (

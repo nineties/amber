@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-04-03 03:21:15 nineties $
+; $Id: rowl1-packrat.rlc 2014-04-07 05:32:34 nineties $
 ;
 
 (import "rlvm-compile")
@@ -289,12 +289,8 @@
     (return (noparse_sub p msg @FALSE @TRUE))
     ))
 
-(fun noparse_quite (p) (
+(fun noparse_quiet (p) (
     (return (noparse_sub p 0 @TRUE @FALSE))
-    ))
-
-(fun mayparse_quiet (p) (
-    (return (noparse_sub p 0 @TRUE @TRUE))
     ))
 
 (fun negate (p) (
@@ -316,10 +312,6 @@
         (field_set p 2 (located loc (field_get p 2)))
         )
     (return @(PARSED_FLAG p))
-    ))
-
-(fun integer_overflow (p) (
-    (return (noparse p "integer literal is too large"))
     ))
 
 (fun junk_letter (p) (
@@ -986,7 +978,7 @@
         break
         ))
     (if (== (get_pos p) pos)
-        (return (noparse_quite p))
+        (return (noparse_quiet p))
         (return (parsed p @C_NIL))
         )
     ))
@@ -1009,7 +1001,7 @@
         break
         ))
     (if (== (get_pos p) pos)
-        (return (noparse_quite p))
+        (return (noparse_quiet p))
         (return (parsed p @C_NIL))
         )
     ))
@@ -1017,7 +1009,7 @@
 
 (fun parse_shell_style_comment_ (p) (
     (var v (lookahead p))
-    (if (!= v '#') (return (noparse_quite p)))
+    (if (!= v '#') (return (noparse_quiet p)))
     (while @TRUE (do
         (var c (lookahead p))
         (if (|| (== c '\n') (< c 0)) break)
@@ -1311,10 +1303,6 @@
 
 (fun gen_get_token () (
     (return (make_node2 FieldRef PVar (box 2)))
-    ))
-
-(fun gen_get_error () (
-    (return (make_node2 FieldRef PVar (box 3)))
     ))
 
 (fun gen_test_parsed () (

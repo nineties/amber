@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-04-06 06:19:20 nineties $
+; $Id: rowl1-compile.rlc 2014-04-07 05:28:30 nineties $
 ;
 
 (import "rlvm-compile")
@@ -63,17 +63,6 @@
     (var v (symtable_find variables sym))
     (if v (return v))
     (return (make_gvar sym))
-    ))
-
-(fun lookup_symbol_current_scope (sym) (
-    (if (== (symtable_depth variables) 0)
-        (do
-            (var v (get_slot_nocheck global sym))
-            (if (== v @C_NIL) (return 0))
-            (return v)
-        )
-        (return (symtable_find_local variables sym))
-        )
     ))
 
 (fun iter_args (f node arg level) (
@@ -246,18 +235,6 @@
             (alpha_args_iter tbl (node_arg expr i) level check))
         )
     (return expr)
-    ))
-
-(fun setup_guard (rep guard) (
-    (lfor v (field_get rep 0) (do
-        (var v1 (field_get v 0))
-        (var v2 (field_get v 1))
-        (if (== guard @C_NIL)
-            (= guard (make_node2 Equal v1 v2))
-            (= guard (make_node2 SeqAnd guard (make_node2 Equal v1 v2)))
-            )
-        ))
-    (return guard)
     ))
 
 (fun alpha_args (tbl args check) (
@@ -694,44 +671,6 @@
 
 (export fun call1 (sym arg0) (
     (return (runcode (lookup_func global sym) arg0))
-    ))
-
-(export fun call2 (sym arg0 arg1) (
-    (return (runcode (lookup_func global sym) arg0 arg1))
-    ))
-
-(export fun call3 (sym arg0 arg1 arg2) (
-    (return (runcode (lookup_func global sym) arg0 arg1 arg2))
-    ))
-
-(export fun send0 (self sym) (
-    (return (runcode_with_self self (get_bytecode (get_slot self sym))))
-    ))
-
-(export fun send1 (self sym arg0) (
-    (return (runcode_with_self self (get_bytecode (get_slot self sym)) arg0))
-    ))
-
-(export fun send2 (self sym arg0 arg1) (
-    (return (runcode_with_self self (get_bytecode (get_slot self sym)) arg0 arg1))
-    ))
-
-(export fun send3 (self sym arg0 arg1 arg2) (
-    (return (runcode_with_self self (get_bytecode (get_slot self sym)) arg0 arg1 arg2))
-    ))
-
-(fun topscope_only (asm expr) (
-    (throw (unexpected_error (string "Allowed only in top-level scope") expr))
-    ))
-
-(fun check_arg_size (name size expr) (
-    (if (!= (node_size expr) size)
-        (throw (type_error 
-            (strcat "expression with "
-            (strcat (itos10 size) " arguments"))
-            expr
-            ))
-        )
     ))
 
 (fun compile_error (asm expr) (
@@ -1364,13 +1303,6 @@
     (put_decons asm)
     ))
 
-(fun compile_define_clsref (asm clsref rhs overwrite) (
-    (if (== overwrite @C_FALSE) (do
-        (symtable_add variables (node_arg_symbol clsref 2) clsref)
-        ))
-    (compile asm (assign clsref rhs))
-    ))
-
 (fun check_variable (sym) (
     (if (|| (!= (node_type sym) @SymbolE) (is_special sym))
         (throw (invalid_varname sym))
@@ -1380,14 +1312,6 @@
         (if (! (symtable_find_local variables sym)) return)
         )
     (throw (redefined_var sym))
-    ))
-
-(fun check_init (sym info) (
-    (if (!= (node_head info) GlobalVariable) (do
-        (throw (unexpected_error (string "module variable is required") sym))
-        ))
-    (var box (node_arg info 0))
-    (if (! box) (throw (undefined_var sym)))
     ))
 
 (export fun compile_operand (asm opd sym) (

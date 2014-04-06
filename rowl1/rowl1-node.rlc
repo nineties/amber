@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2014-04-07 01:46:56 nineties $
+; $Id: rowl1-node.rlc 2014-04-07 05:25:52 nineties $
 ;
 
 (import "rlvm-compile")
@@ -351,6 +351,7 @@
 
 (extern fun tuple_restof)
 (extern fun array_restof)
+(extern fun table_restof)
 (export fun node_restof (expr i) (
     (if (is_atom expr)
         (throw (out_of_range expr (box i)))
@@ -361,6 +362,7 @@
         ))
     (if (is_tuple expr) (return (tuple_restof expr i)))
     (if (is_array expr) (return (array_restof expr i)))
+    (if (is_table expr) (return (table_restof expr i)))
     (var args 0)
     (rfor j i (node_size expr)
         (= args (cons (node_arg expr j) args))
@@ -471,17 +473,6 @@
     (return obj)
     ))
 
-(export fun make_node5 (head a b c d e) (
-    (var obj (allocate_expr 5))
-    (field_set obj 0 head)
-    (field_set obj 1 a)
-    (field_set obj 2 b)
-    (field_set obj 3 c)
-    (field_set obj 4 d)
-    (field_set obj 5 e)
-    (return obj)
-    ))
-
 (extern fun list_to_tuple)
 (extern fun list_to_ary)
 (export fun make_node (head args) (
@@ -533,10 +524,6 @@
     (return (make_node1 Unquote expr))
     ))
 
-(export fun mknot (e) (
-    (return (make_node1 Not e))
-    ))
-
 (export fun ifelse (cnd then else) (
     (return (make_node3 IfElse cnd then else))
 	))
@@ -577,10 +564,6 @@
     (return (make_node2 Assign v arg))
     ))
 
-(export fun mkreturn (v) (
-    (return (make_node1 Return v))
-    ))
-
 (export fun defvar (v arg) (
     (return (make_node2 Define v arg))
     ))
@@ -614,16 +597,6 @@
 (export var irangeT    (make_node2 Range intT intT))
 
 ; printing functions
-(fun output_ordinal (ochan idx) (
-    (output_int ochan idx)
-    (if (== (/ idx 10) 1) (return (output_string ochan "th")))
-    (var r (umod idx 10))
-    (if (== r 1) (return (output_string ochan "st")))
-    (if (== r 2) (return (output_string ochan "nd")))
-    (if (== r 3) (return (output_string ochan "rd")))
-    (output_string ochan "th")
-    ))
-
 (fun type_string (type) (
     (tswitch type (
         (@SymbolE             . (return (string "Symbol")))

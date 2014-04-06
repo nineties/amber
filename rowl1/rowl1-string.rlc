@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-string.rlc 2014-04-04 13:44:23 nineties $
+; $Id: rowl1-string.rlc 2014-04-07 05:24:41 nineties $
 ;
 
 (import "rlvm-compile")
@@ -260,38 +260,10 @@
     (return (ctos (array_get char s i)))
     ))
 
-(fun str_store (s i c) (
-    (if (!= (str_size c) 1)
-        (throw (invalid_argument (string "2nd argument of store for String must be one character") c))
-        )
-    (= i (unbox i))
-    (var len (str_size s))
-    (if (< i 0) (+= i len))
-    (if (|| (>= i len) (< i 0))
-        (throw (out_of_range s (box i))))
-    (array_set char s i (array_get char c 0))
-    (return c)
-    ))
-
 (fun substr (s i j) (
     (var str (allocate_string (+ (- j i) 1)))
     (memcpy str (+ s i) (+ (- j i) 1))
     (return str)
-    ))
-
-(fun str_at_range (s r) (
-    (var b (node_arg_int r 0))
-    (var e (node_arg_int r 1))
-    (var len (str_size s))
-    (if (< b 0) (+= b len))
-    (if (< e 0) (+= e len))
-    (if (> b e)
-        (throw (invalid_argument (string "Not valid range") r))
-        )
-    (if (|| (>= e len) (< b 0))
-        (throw (out_of_range s r))
-        )
-    (return (substr s b e))
     ))
 
 (fun str_substr (s i len) (

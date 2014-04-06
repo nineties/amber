@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-util.rlc 2014-04-03 03:18:03 nineties $
+; $Id: rowl1-util.rlc 2014-04-07 05:23:22 nineties $
 ;
 
 (import "rlvm-compile")
@@ -201,14 +201,6 @@
     (return @FALSE)
     ))
 
-(export fun list_drop (ls n) (
-    (while (> n 0) (do
-        (= ls (cdr ls))
-        (decr n)
-        ))
-    (return ls)
-    ))
-
 (export fun list_copy (ls) (
     (if (! ls) (return 0))
     (return (cons (car ls) (list_copy (cdr ls))))
@@ -224,43 +216,6 @@
     (var tl (cdr ls))
     (setcdr ls 0)
     (return (cons hd tl))
-    ))
-
-(fun is_prefix (pre str) (
-    (var i 0)
-    (while 1 (do
-        (var a (array_get char pre i))
-        (if (! a) (return @TRUE))
-        (var b (array_get char str i))
-        (if (!= a b) (return @FALSE))
-        (incr i)
-        ))
-    ))
-
-(fun is_suffix (post str) (
-    (var post_len (strlen post))
-    (var str_len (strlen str))
-    (return (streq (+ str (- str_len post_len)) post))
-    ))
-
-(export fun get_env (name) (
-    (var envp (environ))
-    (var i 0)
-    (while 1 (do
-        (var ent (array_get string envp i))
-        (if (! ent) (return 0))
-        (if (is_prefix name ent) (do
-            (return (strdup (+ ent (+ (strlen name) 1))))
-            ))
-        (incr i)
-        ))
-    ))
-
-(export fun add_extension (post path) (
-    (if (! (is_suffix post path))
-        (return (strcat path post))
-        (return path)
-        )
     ))
 
 (export fun get_directory (path) (
