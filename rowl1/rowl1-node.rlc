@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2014-04-07 05:25:52 nineties $
+; $Id: rowl1-node.rlc 2014-04-07 05:46:59 nineties $
 ;
 
 (import "rlvm-compile")
@@ -254,40 +254,22 @@
     (return (is_atom_type (node_type obj)))
     ))
 
-(export var no_loc (make_loc (string "<internal>") 0 0 0 0))
+(export var no_loc (make_loc (string "<internal>") 0 0))
 
-(export fun make_loc (file bl bc el ec) (
-    (return (variant @LocE 1 file bl bc el ec))
+(export fun make_loc (file line column) (
+    (return (variant @LocE 1 file line column))
     ))
 
 (export fun loc_file   (loc) ((return (field_get loc 1))))
-(export fun loc_beginL (loc) ((return (field_get loc 2))))
-(export fun loc_beginC (loc) ((return (field_get loc 3))))
-(export fun loc_endL   (loc) ((return (field_get loc 4))))
-(export fun loc_endC   (loc) ((return (field_get loc 5))))
-(export fun loc_line (loc) ((return (box (loc_beginL loc)))))
-
-(export fun merge_loc (loc1 loc2) (
-    (var el (loc_endL loc2))
-    (var ec (loc_endC loc2))
-    (field_set loc1 4 el)
-    (field_set loc1 5 ec)
-    (return loc1)
-    ))
+(export fun loc_line   (loc) ((return (field_get loc 2))))
+(export fun loc_column (loc) ((return (field_get loc 3))))
+(export fun loc_line_  (loc) ((return (box (loc_line loc)))))
 
 (export fun pp_loc (ochan loc) (
     (output_char ochan '[')
     (output_string ochan (loc_file loc))
     (output_char ochan ':')
-    (var begin (loc_beginL loc))
-    (var end   (loc_endL loc))
-    (if (== begin end)
-        (output_int ochan begin)
-        (do
-            (output_int ochan begin)
-            (output_char ochan '-')
-            (output_int ochan end)
-        ))
+    (output_int ochan (loc_line loc))
     (output_char ochan ']')
     ))
 
