@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: syntax/parse.ab 2014-04-07 04:02:35 nineties $ "
+" $Id: syntax/parse.ab 2014-04-07 05:53:49 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -167,6 +167,7 @@ primary_expr
       | 'self           { Quote{Self{}} }
       | "." symbol
         { Node{Quote{Slot}, List{Quote{Self{}}, node1}} }
+      | fullform
       | atom
       | "..."           { Quote{Rest{}} }
 
@@ -185,7 +186,7 @@ postfix_expr
         postfix_expr "..."
         { Node{Quote{Rest}, List{node0}} }
         # Domain Pattern
-      | primary_expr "@" fullform_expr
+      | primary_expr "@" primary_expr
         { Node{Quote{Domain}, List{node0, node2}} }
       | postfix_expr "." symbol nospace("(") delimited(argument, ",") ")"
         { Node{Quote{Send}, List{node0, node2, node4}} }
@@ -195,10 +196,6 @@ postfix_expr
         { Node{Quote{Pow}, List{node0, node2}} }
       | primary_expr
 
-fullform_expr
-    ::= fullform
-      | postfix_expr
-
 quote_expr
     ::= "'" quote_expr
         { Node{Quote{Quote}, List{node1}} }
@@ -206,7 +203,7 @@ quote_expr
         { Node{Quote{Quasiquote}, List{node1}} }
       | "!"  quote_expr
         { Node{Quote{Unquote}, List{node1}} }
-      | fullform_expr
+      | postfix_expr
 
 pattern ::= quote_expr
 term    ::= postfix_expr
