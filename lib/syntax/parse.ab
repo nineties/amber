@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: syntax/parse.ab 2014-04-06 06:18:34 nineties $ "
+" $Id: syntax/parse.ab 2014-04-07 04:02:35 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -606,6 +606,8 @@ desugar_args([a,rest...], vars, checks, 0): {
     prim.list_cons(a, rest)
 }
 desugar_args(a @ Symbol, vars, checks, 0): {
+    if a == '_
+        return '_
     if not prim.array_include?(vars, a) {
         prim.array_push(vars, a)
         return a
@@ -614,7 +616,6 @@ desugar_args(a @ Symbol, vars, checks, 0): {
     prim.array_push(checks, ([], `Equal{!t, !a}))
     t
 }
-desugar_args('_, _, _, 0): '_
 desugar_args(nil, _, _, 0): nil
 desugar_args(true, _, _, 0): true
 desugar_args(false, _, _, 0): false
@@ -630,7 +631,7 @@ desugar_args(a @ Unquote, vars, checks, level): {
 desugar_args(a @ Domain, vars, checks, 0): {
     v: prim.get_arg(a, 0)
     pat: prim.get_arg(a, 1)
-    if not prim.array_include?(vars, v)
+    if v != '_ and not prim.array_include?(vars, v)
         prim.array_push(vars, v)
     if prim.head(pat) == 'Symbol
         return a
@@ -660,7 +661,7 @@ desugar_args(orpat @ SeqOr, vars, checks, 0): {
                 p
             }, pats)
     init: prim.array_to_list(prim.array_map(x -> `Define{!x, nil}, orp_vars))
-    asgn: prim.list_foldl1((a,b) -> `(!a or !b),
+    asgn: prim.list_foldr1((a,b) -> `(!a or !b),
             prim.list_map(p -> `Assign{!p, !t, noerror}, pats))
     prim.array_push(checks, (init, asgn))
     t
