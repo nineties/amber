@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2014-04-07 05:26:41 nineties $
+; $Id: rowl1-matching.rlc 2014-04-07 23:00:43 nineties $
 ;
 
 (import "rlvm-compile")
@@ -218,22 +218,18 @@
     (var hd (node_head pat))
     (if (|| (== hd Symbol) (|| (== hd Int) (== hd String)))
         (return pat)
-        )
     (if (== hd List)
         (return (qquote_pattern_list pat level))
-        )
     (if (== hd Tuple)
         (return (qquote_pattern_tuple pat level))
-        )
-    (if (== hd Unquote) (do
+    (if (== hd Unquote)
         (if (== level 0)
             (return (setup_pattern (node_arg pat 0)))
             (return (qquote_pattern (node_arg pat 0) (- level 1)))
             )
-        )
     (if (== hd Quasiquote)
         (+= level 1)
-        ))
+        )))))
     (= pat (copy pat))
     (for i 0 (node_size pat)
         (node_arg_set pat i (qquote_pattern (node_arg pat i) level))

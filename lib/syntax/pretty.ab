@@ -1,10 +1,12 @@
 # Copyright (C) 2014 nineties
-# $Id: syntax/prettify.ab 2014-04-07 20:39:19 nineties $
+# $Id: syntax/prettify.ab 2014-04-07 23:08:09 nineties $
 
 import pretty_print as P
 
 #= Pretty-printing of standard nodes=
 # Following definitions correspond to the definitions in syntax/parse.ab.
+
+INDENT_WIDTH: 4
 
 #== Detection of standard expressions and statements ==
 
@@ -13,7 +15,6 @@ expression?(_): false
 
 # We need special treatment of following nodes because these nods have
 # special semantics in pattern matching.
-expression?(p) when p.head == 'Rest and p.arity <= 1: true
 expression?(p) when p.head == 'Domain and p.arity == 2: true
 expression?(p) when p.head == 'SeqOr and p.arity == 2: true
 expression?(p) when p.head == 'Quote and p.arity == 1: true
@@ -21,8 +22,8 @@ expression?(p) when p.head == 'Quasiquote and p.arity == 1: true
 expression?(p) when p.head == 'Unquote and p.arity == 1: true
 
 expression?(_ @ Int or _ @ Float or _ @ String or _ @ Symbol or _ @ List or
-            _ @ Tuple or Abs{_} or Slot{_, _ @ Symbol} or
-            Apply{_, _ @ List} or Subscript{_, _ @ List} or
+            _ @ Tuple or Abs{_} or Slot{_, _ @ Symbol} or 'Rest{} or
+            'Rest{e} or Apply{_, _ @ List} or Subscript{_, _ @ List} or
             Send{_, _ @ Symbol, _ @ List} or Pow{_, _} or UPlus{_} or
             UMinus{_} or Not{_} or Mul{_} or Div{_} or Quo{_} or Rem{_} or
             Add{_, _} or Sub{_, _} or Range{_, _} or LessThan{_, _} or
@@ -57,14 +58,14 @@ sequence(list, f, left, delim, right): {
 }
 
 block(stmt, cont=false): {
-    doc: nest(INDENT_WIDTH, [P.nl(), stmt(stmt)])
+    doc: P.nest(INDENT_WIDTH, [P.nl(), stmt(stmt)])
     if cont
         [doc, P.nl()]
     else
         doc
 }
 block(Block{stmts}, cont=false): {
-    doc: ["{", nest(INDENT_WIDTH, stmts.map(s -> [P.nl(), stmt(s)])),
+    doc: ["{", P.nest(INDENT_WIDTH, stmts.map(s -> [P.nl(), stmt(s)])),
            P.nl(), "}"]
     if cont
         [doc, " "]
@@ -72,7 +73,7 @@ block(Block{stmts}, cont=false): {
         doc
 }
 block(stmt @ Seq, cont=false): {
-    doc: nest(INDENT_WIDTH, [P.nl(), P.compress(stmt(stmt))])
+    doc: P.nest(INDENT_WIDTH, [P.nl(), P.compress(stmt(stmt))])
     if cont
         [doc, P.nl()]
     else
@@ -81,8 +82,8 @@ block(stmt @ Seq, cont=false): {
 
 #== Formatters ==
 fullform(obj):
-   P.group([ nest(INDENT_WIDTH, [obj.head.to_s(), "{", P.nl(),
-    arguments.map(expr).weave([",", P.nl(" ")])]), P.nl(), "}"])
+   P.group([ P.nest(INDENT_WIDTH, [obj.head.to_s(), "{", P.nl(),
+    obj.arguments.map(expr).weave([",", P.nl(" ")])]), P.nl(), "}"])
 
 primary(e): fullform(e)
 primary(s) when statement?(s):  ["(", stmt(s), ")"]
@@ -99,7 +100,7 @@ primary(Slot{Self{}, m @ Symbol}): "." + m.to_s()
 primary('Rest{}): "..."
 
 argument(e): expr(e)
-argument(Keyword{x @ Symbol, e}): [x.to_s(), "=", assign_expr(e)]
+argument(`Keyword{!(x @ Symbol), !e}): [x.to_s(), " = ", assign_expr(e)]
 
 postfix: primary
 postfix(Apply{f, args}):
@@ -114,9 +115,9 @@ postfix(Slot{obj, m @ Symbol}): [postfix(obj), ".", m.to_s()]
 postfix(Pow{x, e}): [primary(x), "^", postfix(e)]
 
 quote: postfix
-quote(Quote{e}): ["'", quote(e)]
+quote(`Quote{!e}): ["'", quote(e)]
 quote(Quasiquote{e}): ["`", quote(e)]
-quote(Unquote(e)): ["!", quote(e)]
+quote(Unquote{e}): ["!", quote(e)]
 
 pattern: quote
 term: postfix
@@ -152,7 +153,7 @@ seqand: rel
 seqand(SeqAnd{a, b}): [rel(a), " and ", seqand(b)]
 
 seqor: seqand
-seqor(SeqOr{a, b}): [seqand(a), " or ", seqor(b)]
+seqor(`SeqOr{!a, !b}): [seqand(a), " or ", seqor(b)]
 
 ternary: seqor
 ternary(IfElse{cond, ifthen, ifelse}):
@@ -216,6 +217,7 @@ stmt(Import{mods, name, option}):
     (option == nil) ? [] :
     (option == 'All) ? " (*)" :
     (option.head == 'List) ? [" (", option.map(s -> s.to_s()).weave(","), ")"] :
-    ["hiding", "(", option[0].map(s -> s.to_s()).weave(","), ")"]
+    ["hiding", "(", option[0].map(s -> s.to_s()).weave(","), ")"]]
 
-pretty(out, s, width=80): P.pretty(out, s, width=width)
+print(out, s, width=80):
+    P.pretty(out, stmt(s), width=width)
