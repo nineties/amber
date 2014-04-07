@@ -1,0 +1,221 @@
+# Copyright (C) 2014 nineties
+# $Id: syntax/prettify.ab 2014-04-07 20:39:19 nineties $
+
+import pretty_print as P
+
+#= Pretty-printing of standard nodes=
+# Following definitions correspond to the definitions in syntax/parse.ab.
+
+#== Detection of standard expressions and statements ==
+
+# Return `true` when given node is a standard expression.
+expression?(_): false
+
+# We need special treatment of following nodes because these nods have
+# special semantics in pattern matching.
+expression?(p) when p.head == 'Rest and p.arity <= 1: true
+expression?(p) when p.head == 'Domain and p.arity == 2: true
+expression?(p) when p.head == 'SeqOr and p.arity == 2: true
+expression?(p) when p.head == 'Quote and p.arity == 1: true
+expression?(p) when p.head == 'Quasiquote and p.arity == 1: true
+expression?(p) when p.head == 'Unquote and p.arity == 1: true
+
+expression?(_ @ Int or _ @ Float or _ @ String or _ @ Symbol or _ @ List or
+            _ @ Tuple or Abs{_} or Slot{_, _ @ Symbol} or
+            Apply{_, _ @ List} or Subscript{_, _ @ List} or
+            Send{_, _ @ Symbol, _ @ List} or Pow{_, _} or UPlus{_} or
+            UMinus{_} or Not{_} or Mul{_} or Div{_} or Quo{_} or Rem{_} or
+            Add{_, _} or Sub{_, _} or Range{_, _} or LessThan{_, _} or
+            LessEqual{_, _} or GreaterThan{_, _} or GreaterEqual{_, _} or
+            Equal{_, _} or NotEqual{_, _} or Compare{_, _} or
+            SeqAnd{_, _} or IfElse{_, _, _} or Lambda{_ @ List, _} or
+            Lambda{When{_, _}, _} or Fusion{_, _} or
+            Reset{_} or Shift{_} or Assign{_, _} or AddAssign{_, _} or
+            SubAssign{_, _} or MulAssign{_, _} or PowAssign{_, _} or
+            DivAssign{_, _} or QuoAssign{_, _} or RemAssign{_, _} or
+            FusionAssign{_, _} or WithSlots{_, _ @ List} or Block{_ @ List}
+        ): true
+
+# Return `true` when given node is a standard statement.
+statement?: expression?
+statement?(Seq{_ @ List} or If{_, _} or While{_, _} or For{_, _, _} or
+           Continue{} or Break{} or Return{_} or Throw{_} or Try{_, _} or
+           Define{_, _} or Assign{_, _} or Import{_ @ List, _, _}): true
+
+#== Utility formatters ==
+# Sequences with parentheses are printed as the following rule.
+# When a sequence `(a, b, c)` can be printed in single line the output
+# is `(a, b, c)` otherwise the output is
+#
+#     (a,
+#      b,
+#      c)
+#
+sequence(list, f, left, delim, right): {
+    indent: left.size
+    P.group(P.nest(indent, [left, list.map(f).weave([delim, P.nl(" ")]), right]))
+}
+
+block(stmt, cont=false): {
+    doc: nest(INDENT_WIDTH, [P.nl(), stmt(stmt)])
+    if cont
+        [doc, P.nl()]
+    else
+        doc
+}
+block(Block{stmts}, cont=false): {
+    doc: ["{", nest(INDENT_WIDTH, stmts.map(s -> [P.nl(), stmt(s)])),
+           P.nl(), "}"]
+    if cont
+        [doc, " "]
+    else
+        doc
+}
+block(stmt @ Seq, cont=false): {
+    doc: nest(INDENT_WIDTH, [P.nl(), P.compress(stmt(stmt))])
+    if cont
+        [doc, P.nl()]
+    else
+        doc
+}
+
+#== Formatters ==
+fullform(obj):
+   P.group([ nest(INDENT_WIDTH, [obj.head.to_s(), "{", P.nl(),
+    arguments.map(expr).weave([",", P.nl(" ")])]), P.nl(), "}"])
+
+primary(e): fullform(e)
+primary(s) when statement?(s):  ["(", stmt(s), ")"]
+primary(e) when expression?(e): ["(", expr(e), ")"]
+primary(n @ Int):       n.to_s()
+primary(f @ Float):     f.to_s()
+primary(s @ String):    "\"" + s.escape() + "\""
+primary(var @ Symbol):  var.to_s()
+primary(list @ List):   sequence(list, expr, "[", ",", "]")
+primary(tuple @ Tuple): sequence(tuple, expr, "(", ",", ")")
+primary(Block{stmts}):  P.group(block(stmts))
+primary(Abs{e}):        ["|", epxr(e), "|"]
+primary(Slot{Self{}, m @ Symbol}): "." + m.to_s()
+primary('Rest{}): "..."
+
+argument(e): expr(e)
+argument(Keyword{x @ Symbol, e}): [x.to_s(), "=", assign_expr(e)]
+
+postfix: primary
+postfix(Apply{f, args}):
+    [postfix(f), sequence(args, argument, "(", ",", ")")]
+postfix(Subscript{obj, args}):
+    [postfix(obj), sequence(args, argument, "[", ",", "]")]
+postfix(`Rest{!e}): [postfix(e), "..."]
+postfix(`Domain{!arg, !dom}): [primary(arg), " @ ", primary(dom)]
+postfix(Send{obj, f @ Symbol, args}):
+    [postfix(obj), ".", f.to_s(), sequence(args, argument, "(", ",", ")")]
+postfix(Slot{obj, m @ Symbol}): [postfix(obj), ".", m.to_s()]
+postfix(Pow{x, e}): [primary(x), "^", postfix(e)]
+
+quote: postfix
+quote(Quote{e}): ["'", quote(e)]
+quote(Quasiquote{e}): ["`", quote(e)]
+quote(Unquote(e)): ["!", quote(e)]
+
+pattern: quote
+term: postfix
+
+prefix: quote
+prefix(UPlus{e}):  ["+", quote(e)]
+prefix(UMinus{e}): ["-", quote(e)]
+prefix(Not{e}):    ["not", quote(e)]
+
+multiplicative: prefix
+multiplicative(Mul{a, b}): [multiplicative(a), " * ", prefix(b)]
+multiplicative(Div{a, b}): [multiplicative(a), " / ", prefix(b)]
+multiplicative(Quo{a, b}): [multiplicative(a), " // ", prefix(b)]
+multiplicative(Rem{a, b}): [multiplicative(a), " % ", prefix(b)]
+
+additive: multiplicative
+additive(Add{a, b}): [additive(a), " + ", multiplicative(b)]
+additive(Sub{a, b}): [additive(a), " - ", multiplicative(b)]
+
+range: additive
+range(Range{a, b}): [additive(a), "..", additive(b)]
+
+rel: range
+rel(LessThan{a, b}):     [range(a), " < ", range(b)]
+rel(LessEqual{a, b}):    [range(a), " <= ", range(b)]
+rel(GreaterThan{a, b}):  [range(a), " > ", range(b)]
+rel(GreaterEqual{a, b}): [range(a), " >= ", range(b)]
+rel(Equal{a, b}):        [range(a), " == ", range(b)]
+rel(NotEqual{a, b}):     [range(a), " != ", range(b)]
+rel(Compare{a, b}):      [range(a), " <=> ", range(b)]
+
+seqand: rel
+seqand(SeqAnd{a, b}): [rel(a), " and ", seqand(b)]
+
+seqor: seqand
+seqor(SeqOr{a, b}): [seqand(a), " or ", seqor(b)]
+
+ternary: seqor
+ternary(IfElse{cond, ifthen, ifelse}):
+    [seqor(cond), " ? ", seqor(ifthen), " : ", ternary(ifelse)]
+
+lambda_arg(args @ List): sequence(args, argument, "(", ",", ")")
+lambda_arg(When{args, guard}):
+    [sequence(args, argument, "(", ",", ")"), " when ", ternary(guard)]
+
+lambda: ternary
+lambda(Lambda{args, body}): [lambda_arg(args), " -> ", ternary(body)]
+
+multi_lambda: lambda
+multi_lambda(Fusion{f, g}):
+    [lambda(f), P.nl(" "), "| ", multi_lambda(g)]
+
+continuation: multi_lambda
+continuation(Reset{e}): ["reset ", multi_lambda(e)]
+continuation(Shift{e}): ["shift ", multi_lambda(e)]
+
+assign: continuation
+assign(Assign{x, v}): [pattern(x), " = ", assign(v)]
+assign(AddAssign{x, v}): [pattern(x), " += ", assign(v)]
+assign(SubAssign{x, v}): [pattern(x), " -= ", assign(v)]
+assign(MulAssign{x, v}): [pattern(x), " *= ", assign(v)]
+assign(PowAssign{x, v}): [pattern(x), " ^" , assign(v)]
+assign(DivAssign{x, v}): [pattern(x), " /= ", assign(v)]
+assign(QuoAssign{x, v}): [pattern(x), " //= ", assign(v)]
+assign(RemAssign{x, v}): [pattern(x), " %= ", assign(v)]
+assign(FusionAssign{x, v}): [pattern(x), " |= ", assign(v)]
+assign(WithSlots{x, stmts}): [pattern(x), " with ", block(`Block{!stmts})]
+
+expr: assign
+
+stmt: expr
+stmt(Seq{stmts}): [stmts.map(stmt).weave(P.nl())]
+stmt(If{cond, body}): ["if ", expr(cond), " ", block(body)]
+stmt(IfElse{cond, ifthen, ifelse}):
+    ["if ", expr(cond), " ", block(ifthen, cont=true),
+    "else ", block(ifelse)]
+stmt(While{cond, body}):
+    ["while ", expr(cond), block(body)]
+stmt(For{x, v, body}):
+    ["for ", pattern(x), " in ", expr(v), block(body)]
+stmt(Continue{}): "continue"
+stmt(Break{}): "break"
+stmt(Return{nil}): "return"
+stmt(Return{e}): ["return ", expr(e)]
+stmt(Throw{e}): ["throw ", expr(e)]
+stmt(Try{body, hdlr}):
+    ["try ", block(body, cont=true), "catch ", multi_lambda(hdlr)]
+stmt(Define{x, s}): [pattern(x), ": ", stmt(s)]
+smtt(Define{f, Lambda{args, body}}):
+    [pattern(f), lambda_arg(args), ": ", stmt(body)]
+stmt(Assign{x, e}): [pattern(x), " = ", expr(e)]
+stmt(Assign{f, Lambda{args, body}}):
+    [pattern(f), lambda_arg(args), " = ", stmt(body)]
+stmt(Import{mods, name, option}):
+    ["import ", mods.map(s -> s.to_s()).weave("."),
+    (name == nil) ? [] : [" as ", name.to_s()],
+    (option == nil) ? [] :
+    (option == 'All) ? " (*)" :
+    (option.head == 'List) ? [" (", option.map(s -> s.to_s()).weave(","), ")"] :
+    ["hiding", "(", option[0].map(s -> s.to_s()).weave(","), ")"]
+
+pretty(out, s, width=80): P.pretty(out, s, width=width)
