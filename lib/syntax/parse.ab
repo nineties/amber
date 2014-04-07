@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: syntax/parse.ab 2014-04-07 05:53:49 nineties $ "
+" $Id: syntax/parse.ab 2014-04-07 15:45:40 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -462,6 +462,9 @@ Define{expand_macro_sub,
     (Define{lhs, rhs, options...}, 0) ->
         `Define{!lhs, !expand_macro(rhs, 0), !options...},
     fusion}
+Define{expand_macro_sub,
+    (Match{pat, expr}, 0) -> `Match{!pat, !expand_macro(expr, 0)},
+    fusion}
 Define{expand_macro, (obj, lvl) -> expand_macro_sub(obj, lvl), fusion}
 Define{expand_macro, (obj, 0) -> {
         new_obj: macro(obj)
@@ -584,7 +587,7 @@ macro(For{i, Range{a, b}, body}) = {
 # 2: or-pattern
 # f(..,pat1 or pat2,...): body
 # is equivalent to
-# f(...,t,...) when Seq{init; Assign{pat1, t, noerror} or Assign{pat2, t, noerro}}:...
+# f(...,t,...) when Seq{init; Match{pat1, t} or Match{pat2, t}}:...
 #
 # pat1 and pat2 must have exactly same set of symbol.
 
@@ -619,11 +622,11 @@ desugar_args(false, _, _, 0): false
 desugar_args(a @ Quote, _, _, 0): a
 desugar_args(a @ Quasiquote, vars, checks, level): {
     arg: desugar_args(prim.get_arg(a, 0), vars, checks, level + 1)
-    'Quasiquote{!arg}
+    node('Quasiquote, arg)
 }
 desugar_args(a @ Unquote, vars, checks, level): {
     arg: desugar_args(prim.get_arg(a, 0), vars, checks, level - 1)
-    'Unquote{!arg}
+    node('Unquote, arg)
 }
 desugar_args(a @ Domain, vars, checks, 0): {
     v: prim.get_arg(a, 0)
@@ -659,7 +662,7 @@ desugar_args(orpat @ SeqOr, vars, checks, 0): {
             }, pats)
     init: prim.array_to_list(prim.array_map(x -> `Define{!x, nil}, orp_vars))
     asgn: prim.list_foldr1((a,b) -> `(!a or !b),
-            prim.list_map(p -> `Assign{!p, !t, noerror}, pats))
+            prim.list_map(p -> `Match{!p, !t}, pats))
     prim.array_push(checks, (init, asgn))
     t
 }
