@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: syntax/prettify.ab 2014-04-07 23:11:46 nineties $
+# $Id: syntax/prettify.ab 2014-04-08 00:02:23 nineties $
 
 import pretty_print as P
 
@@ -220,5 +220,10 @@ stmt(Import{mods, name, option}):
     (option.head == 'List) ? [" (", option.map(s -> s.to_s()).weave(","), ")"] :
     ["hiding", "(", option[0].map(s -> s.to_s()).weave(","), ")"]]
 
-print(out, s):
-    P.pretty(out, stmt(s), width=TEXT_WIDTH)
+# Replace `.to_s` to prettified version.
+nil.to_s(): {
+    oss: prim.oss_new(true)
+    s: stmt(self)
+    P.pretty(oss, s, width=TEXT_WIDTH)
+    prim.oss_to_string(oss)
+}
