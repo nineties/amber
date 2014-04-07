@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2014-04-07 06:09:23 nineties $
+; $Id: rowl1-node.rlc 2014-04-07 09:35:07 nineties $
 ;
 
 (import "rlvm-compile")
@@ -112,6 +112,9 @@
 (export var Syntax (to_sym "syntax"))
 
 ; BuiltinType headers
+(export var Bool   (to_builtin_sym "Bool"))
+(export var Nil    (to_builtin_sym "Nil"))
+(export var Undef  (to_builtin_sym "Undef"))
 (export var Symbol (to_builtin_sym "Symbol"))
 (export var Int    (to_builtin_sym "Int"))
 (export var String (to_builtin_sym "String"))
@@ -167,7 +170,6 @@
     ))
 
 (export fun is_builtin_sym (sym) (
-    (if (is_special sym) (return @FALSE))
     (if (< (field_get sym 2) 0)
         (return @TRUE)
         (return @FALSE)
@@ -177,28 +179,29 @@
 (export fun symbol_name (sym) (
     (if (is_special sym) (do
         (if (== sym @C_NIL) (return (string "nil")))
-        (if (== sym @C_TRUE) (return (string "true")))
-        (if (== sym @C_FALSE) (return (string "false")))
         (return (string "undef"))
         ))
     (return (field_get sym @SymbolName))
     ))
 
 (export fun node_type (obj) (
-    (if (! obj) (return @ListE))
-    (if (& obj 1) (return @IntE))
-    (if (is_special obj) (return @SymbolE))
+    (if (! obj) (return @ListE)
+    (if (& obj 1) (return @IntE)
+    (if (|| (== obj @C_TRUE) (== obj @C_FALSE)) (return @BoolE)
+    (if (== obj @C_NIL) (return @NilE)
+    (if (== obj @C_UNDEF) (return @UndefE)
+    (if (is_special obj) (return @SymbolE)))))))
     (var tag (get_tag obj))
-    (if (== tag @TAG_PSTRUCT) (return (+ (get_pstruct_tag obj) @PLAIN_TYPE_OFFSET)))
-    (if (== tag @TAG_VARIANT) (return (field_get obj 0)))
-    (if (== tag @TAG_CONS) (return @ListE))
-    (if (== tag @TAG_EXPR) (return @ExprE))
-    (if (== tag @TAG_BYTECODE) (return @BytecodeE))
-    (if (== tag @TAG_CONT) (return @ContinuationE))
-    (if (== tag @TAG_BIGINT) (return @BigIntE))
+    (if (== tag @TAG_PSTRUCT) (return (+ (get_pstruct_tag obj) @PLAIN_TYPE_OFFSET))
+    (if (== tag @TAG_VARIANT) (return (field_get obj 0))
+    (if (== tag @TAG_CONS) (return @ListE)
+    (if (== tag @TAG_EXPR) (return @ExprE)
+    (if (== tag @TAG_BYTECODE) (return @BytecodeE)
+    (if (== tag @TAG_CONT) (return @ContinuationE)
+    (if (== tag @TAG_BIGINT) (return @BigIntE)
     (if (== tag @TAG_SEQUENCE) (do
         (if (== (get_sequence_tag obj) @SEQ_TUPLE) (return @TupleE))
-        ))
+        )))))))))
     (return @BuiltinTypeE)
     ))
 
@@ -274,6 +277,9 @@
 
 (export fun node_head (node) (
     (tswitch (node_type node) (
+        (@NilE                . (return Nil))
+        (@UndefE              . (return Undef))
+        (@BoolE               . (return Bool))
         (@SymbolE             . (return Symbol))
         (@ExprE               . (return (field_get node 0)))
         (@ListE               . (return List))
@@ -556,8 +562,6 @@
 
 (export fun output_symbol (ochan sym) (
     (if (is_special sym) (do
-        (if (== sym @C_NIL) (return (output_string ochan "nil")))
-        (if (== sym @C_TRUE) (return (output_string ochan "true")))
         (if (== sym @C_FALSE) (return (output_string ochan "false")))
         (return (output_string ochan "undef"))
         ))
@@ -580,6 +584,9 @@
 ; printing functions
 (fun type_string (type) (
     (tswitch type (
+        (@NilE                . (return (string "Nil")))
+        (@UndefE              . (return (string "Undef")))
+        (@BoolE               . (return (string "Bool")))
         (@SymbolE             . (return (string "Symbol")))
         (@ExprE               . (return (string "composite expression")))
         (@ListE               . (return (string "List")))
