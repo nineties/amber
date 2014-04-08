@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: syntax/prettify.ab 2014-04-08 00:02:23 nineties $
+# $Id: syntax/prettify.ab 2014-04-08 13:58:53 nineties $
 
 import pretty_print as P
 
@@ -55,7 +55,7 @@ statement?(Seq{_ @ List} or If{_, _} or While{_, _} or For{_, _, _} or
 #
 sequence(list, f, left, delim, right): {
     indent: left.size
-    P.group(P.nest(indent, [left, list.map(f).weave([delim, P.nl(" ")]), right]))
+    P.breakable(P.nest(indent, [left, list.map(f).weave([delim, P.nl(" ")]), right]))
 }
 
 block(stmt, cont=false): {
@@ -66,7 +66,7 @@ block(stmt, cont=false): {
         doc
 }
 block(Block{stmts}, cont=false): {
-    doc: ["{", P.nest(INDENT_WIDTH, stmts.map(s -> [P.nl(), stmt(s)])),
+    doc: [" {", P.nest(INDENT_WIDTH, stmts.map(s -> [P.nl(), stmt(s)])),
            P.nl(), "}"]
     if cont
         [doc, " "]
@@ -83,12 +83,15 @@ block(stmt @ Seq, cont=false): {
 
 #== Formatters ==
 fullform(obj):
-   P.group([ P.nest(INDENT_WIDTH, [obj.head.to_s(), "{", P.nl(),
-    obj.arguments.map(expr).weave([",", P.nl(" ")])]), P.nl(), "}"])
+    P.breakable([ P.nest(INDENT_WIDTH, [obj.head.to_s(), "{", P.nl(),
+        obj.arguments.map(expr).weave([",", P.nl(" ")])]), P.nl(), "}"])
 
 primary(e): fullform(e)
 primary(s) when statement?(s):  ["(", stmt(s), ")"]
 primary(e) when expression?(e): ["(", expr(e), ")"]
+primary(nil):           "nil"
+primary(true):          "true"
+primary(false):         "false"
 primary(n @ Int):       n.to_s()
 primary(f @ Float):     f.to_s()
 primary(s @ String):    "\"" + s.escape() + "\""
@@ -221,7 +224,7 @@ stmt(Import{mods, name, option}):
     ["hiding", "(", option[0].map(s -> s.to_s()).weave(","), ")"]]
 
 # Replace `.to_s` to prettified version.
-nil.to_s(): {
+nil.to_s = () -> {
     oss: prim.oss_new(true)
     s: stmt(self)
     P.pretty(oss, s, width=TEXT_WIDTH)
