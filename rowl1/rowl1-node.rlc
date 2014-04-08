@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2014-04-08 17:50:05 nineties $
+; $Id: rowl1-node.rlc 2014-04-09 01:41:02 nineties $
 ;
 
 (import "rlvm-compile")
@@ -24,6 +24,7 @@
 (export var List       (to_sym "List"))
 (export var Array      (to_sym "Array"))
 (export var Tuple      (to_sym "Tuple"))
+(export var Table      (to_sym "Table"))
 (export var Range      (to_sym "Range"))
 (export var Module     (to_sym "Module"))
 (export var Slot       (to_sym "Slot"))
@@ -120,7 +121,6 @@
 (export var Int    (to_builtin_sym "Int"))
 (export var String (to_builtin_sym "String"))
 (export var Float  (to_builtin_sym "Float"))
-(export var Table  (to_builtin_sym "Table"))
 (export var Assembler        (to_builtin_sym "Assembler"))
 (export var BuiltinType      (to_builtin_sym "BuiltinType"))
 (export var Bytecode         (to_builtin_sym "Bytecode"))
@@ -249,7 +249,11 @@
     ))
 
 (fun is_atom_type (ty) (
-    (if (|| (== ty @ExprE) (|| (== ty @ListE) (|| (== ty @TupleE) (== ty @ArrayE))))
+    (if (|| (== ty @ExprE) 
+        (|| (== ty @ListE) 
+        (|| (== ty @TupleE) 
+        (|| (== ty @TableE)
+            (== ty @ArrayE)))))
         (return @FALSE)
         (return @TRUE)
         )
@@ -468,6 +472,7 @@
 
 (extern fun list_to_tuple)
 (extern fun list_to_ary)
+(extern fun list_to_table)
 (export fun make_node (head args) (
     (if (!= (node_type head) @SymbolE)
         (throw (exception (string "the 1st argument of Node must be a Symbol")))
@@ -487,6 +492,7 @@
     (if (== head List)  (return args))
     (if (== head Tuple) (return (list_to_tuple args)))
     (if (== head Array) (return (list_to_ary args)))
+    (if (== head Table) (return (list_to_table args)))
 
     (var size (list_len args))
     (var expr (allocate_expr size))

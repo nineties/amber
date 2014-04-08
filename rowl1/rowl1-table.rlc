@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-table.rlc 2014-03-04 23:27:24 nineties $
+; $Id: rowl1-table.rlc 2014-04-09 01:58:18 nineties $
 ;
 
 (import "rlvm-compile")
@@ -49,6 +49,19 @@
     (var hash (lookup_func global (to_sym "hash")))
     (var eql  (lookup_func global (to_sym "equal?")))
     (return (table_new_with_hint 10 hash eql))
+    ))
+
+(export fun table_copy (tbl) (
+    (var hash (field_get tbl 2))
+    (var eql  (field_get tbl 3))
+    (var num  (field_get tbl 5))
+    (var new_tbl (table_new_with_hint num hash eql))
+    (var entry (field_get tbl 4))
+    (while entry (do
+        (table_store new_tbl (field_get entry 0) (field_get entry 1))
+        (= entry (field_get entry 3))
+        ))
+    (return new_tbl)
     ))
 
 (export fun table_size (tbl) (
@@ -176,7 +189,7 @@
     (output_string ochan "}")
     ))
 
-(export fun iter_to_table (it) (
+(fun iter_to_table (it) (
     (var tbl (table_new))
     (= it (get_bytecode it))
     (while @TRUE (do
@@ -186,6 +199,19 @@
             (throw (invalid_argument (string "Given iterator returns non key-value pair.") v))
             )
         (table_store tbl (node_arg v 0) (node_arg v 1))
+        ))
+    (return tbl)
+    ))
+
+(export fun list_to_table (ls) (
+    (var tbl (table_new))
+    (while ls (do
+        (var v (car ls))
+        (if (|| (!= (node_head v) Tuple) (!= (node_size v) 2))
+            (throw (invalid_argument (string "Given iterator returns non key-value pair.") v))
+            )
+        (table_store tbl (node_arg v 0) (node_arg v 1))
+        (= ls (cdr ls))
         ))
     (return tbl)
     ))

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-04-07 23:00:59 nineties $
+; $Id: rowl1-compile.rlc 2014-04-09 02:30:39 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1521,6 +1521,20 @@
     (compile_simple_call asm 2 make_node)
     ))
 
+(extern fun table_to_list)
+(fun compile_table (asm expr) (
+    (var list (table_to_list expr))
+    (put_zero asm)
+    (while list (do
+        (var t (car list))
+        (compile_tuple asm t)
+        (put_cons asm)
+        (= list (cdr list))
+        ))
+    (put_push asm Table)
+    (compile_simple_call asm 2 make_node)
+    ))
+
 (fun compile_range (asm expr) (
     (var size (node_size expr))
     (if (== size 2)
@@ -2266,6 +2280,7 @@
     (add_compiler mod (domainP List)  compile_list)
     (add_compiler mod (domainP Tuple) compile_tuple)
     (add_compiler mod (domainP Array) compile_array)
+    (add_compiler mod (domainP Table) compile_table)
     (add_compiler mod (domainP Range) compile_range)
 
     (add_compiler mod (make_node1 Block listT) compile_block)
