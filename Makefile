@@ -3,7 +3,7 @@
 # Copyright (C) 2009 nineties
 #
 
-# $Id: Makefile 2014-04-08 22:30:30 nineties $
+# $Id: Makefile 2014-04-08 22:35:19 nineties $
 
 LIBDIR = /usr/lib/amber
 
@@ -14,8 +14,8 @@ all:
 install:
 	cd rowl1; $(MAKE) install_binaries install_libraries
 	mkdir -p $(LIBDIR)
-	cp -r lib/* $(LIBDIR)/
-	cp -r demo $(LIBDIR)/
+	cp -ur lib/* $(LIBDIR)/
+	cp -ur demo $(LIBDIR)/
 	echo "exit" | amber --preparse
 
 clean:
