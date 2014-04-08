@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-wrtable.rlc 2014-02-19 22:54:11 nineties $
+; $Id: vm-prim-wrtable.rlc 2014-04-08 10:58:31 nineties $
 ;
 
 ; Weak reference table from object to object
@@ -39,7 +39,7 @@
 (export prim_make_wrtable)
 (fun prim_make_wrtable () (
     (= stop_GC @TRUE)
-    (int size (get prime_numbers 1))
+    (int size (get prime_numbers 0))
     (void* bucket (prim_allocate_array size))
     (void* tbl (prim_make_struct4 2 bucket 0 size 0))
     (= wrtable_list (cons tbl wrtable_list))
@@ -62,6 +62,7 @@
         (while entry (
             (void* key (get entry 2))
             (void* value (get entry 3))
+            (void* prev 0)
             (int alive (is_alive key))
             (if (&& alive (|| (require_move key) (require_move value)))
                 (
@@ -88,19 +89,29 @@
             ))
         (void* bucket (prim_allocate_array size))
         (void* entry (get table 1))
-        (= n_entry 0)
+        (void* prev 0)
+        (int n_entry2 0)
         (while entry (
-            (if (get entry 4) (
-                (int h (% (get entry 2) size))
-                (set entry 0 (get bucket h))
-                (set bucket h entry)
-                (incr n_entry)
+            (if (get entry 4)
+                (
+                    (int h (% (get entry 2) size))
+                    (set entry 0 (get bucket h))
+                    (set bucket h entry)
+                    (incr n_entry2)
+                    (= prev entry)
+                )
+                (
+                    (if prev
+                        ((set prev 1 (get entry 1)))
+                        ((set table 1 (get entry 1)))
+                        )
                 ))
             (= entry (get entry 1))
+            (decr n_entry)
             ))
         (set table 0 bucket)
         (set table 2 size)
-        (set table 3 n_entry)
+        (set table 3 n_entry2)
         ))
     ))
 
@@ -166,6 +177,7 @@
                 ((set prev 0 (get entry 0)))
                 ((set bucket h (get entry 0)))
                 )
+            (set table 3 (- (get table 3) 1))
             (= stop_GC @FALSE)
             (return)
             ))
