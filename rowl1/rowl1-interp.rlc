@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-04-08 18:58:00 nineties $
+; $Id: rowl1-interp.rlc 2014-04-08 23:22:32 nineties $
 ;
 
 (import "rlvm-compile")
@@ -132,19 +132,23 @@
     (return (runcode_with_self self (lookup_func global Eval) expr))
     ))
 
+(fun preparse_ochan (path) (
+    (if (|| (! preparse_p) (! path)) (return 0))
+    ; change .ab to .abc
+    (var abc_path (strcat path "c"))
+    (if (<= (mtime path) (mtime abc_path)) (return 0))
+    (output_string stdout path)
+    (output_string stdout " => ")
+    (output_string stdout abc_path)
+    (output_string stdout "\n")
+    (var ochan (open_out abc_path @(| O_WRONLY O_CREAT O_TRUNC)))
+    (if (! ochan) (throw (io_error1 (string "Open failed") abc_path)))
+    (return ochan)
+    ))
+
 (extern fun fullform)
 (fun interpret (p path) (
-    (var ochan 0)
-    (if (&& preparse_p path) (do
-        ; change .ab to .abc
-        (output_string stdout path)
-        (= path (strcat path "c"))
-        (output_string stdout " => ")
-        (output_string stdout path)
-        (output_string stdout "\n")
-        (= ochan (open_out path @(| O_WRONLY O_CREAT O_TRUNC)))
-        (if (! ochan) (throw (io_error1 (string "Open failed") path)))
-        ))
+    (var ochan (preparse_ochan path))
 
     (while 1 (do
         (set_loc (get_loc p))
@@ -282,10 +286,10 @@
 
             ; Check whether there is pre-parsed lib.
             (var pcpath (strcat rpath "c"))
-            (var preparsed @FALSE)
-            (if (file_exists pcpath) (do
+            (var pre @FALSE)
+            (if (&& (! preparse_p) (file_exists pcpath)) (do
                 (= rpath pcpath)
-                (= preparsed @TRUE)
+                (= pre @TRUE)
                 ))
             (var ichan (open_in rpath @FALSE))
             (if (! ichan) (throw (io_error1 (string "Open failed") fullpath)))
@@ -301,7 +305,7 @@
             (var p (make_parser fullpath ichan))
             (set_slot p (to_sym "syntax") (load_global Syntax))
             (set_loc (get_loc p))
-            (if preparsed
+            (if pre
                 (interpret_preparsed p)
                 (interpret p fullpath)
                 )

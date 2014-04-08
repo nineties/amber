@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-io.rlc 2014-04-07 05:27:05 nineties $
+; $Id: vm-prim-io.rlc 2014-04-08 23:17:17 nineties $
 ;
 
 (import "stdlib")
@@ -30,6 +30,10 @@
 (var RDBUFSZ 512) ; read buffer size
 (var WRBUFSZ 512) ; write buffer size
 (var EOF -1)
+
+(var STAT_SIZE 144)
+(var MTIME_SEC 10)
+(var MTIME_NSEC 11)
 
 (var TCGETS 0x5401)
 (var TCSETS 0x5402)
@@ -606,11 +610,12 @@
     (syscall @SYS_IOCTL fd @TCSETS save_termios)
     ))
 
+(char[] @STAT_SIZE stat) ; sizeof(struct stat) XXX it should not be hardcoded.
+
 (char[] @PATH_MAX resolved)
 (char[] @PATH_MAX left)
 (char[] @PATH_MAX next_token)
 (char[] @PATH_MAX symlink)
-(char[] 144 stat) ; sizeof(struct stat) XXX it should not be hardcoded.
 
 (export prim_realpath)
 (fun prim_realpath (path) (
@@ -688,6 +693,14 @@
         ([]=8 resolved (- resolved_len 1) 0)
         ))
     (return (prim_string resolved))
+    ))
+
+(export prim_mtime)
+(fun prim_mtime (path) (
+    (if (syscall @SYS_LSTAT path stat) (
+        (return 0)
+        ))
+    (return ([] stat @MTIME_SEC))
     ))
 
 (export init_prim_io)
