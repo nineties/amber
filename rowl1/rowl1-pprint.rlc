@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-array.rlc 2014-04-08 14:56:59 nineties $
+; $Id: rowl1-array.rlc 2014-04-08 15:37:48 nineties $
 ;
 
 (import "rlvm-compile")
@@ -190,14 +190,14 @@
 (extern fun oss_new)
 (extern fun oss_raw)
 (extern fun oss_to_s)
-(fun _fullform (obj) (
+(export fun fullform (obj) (
     (var io (oss_new))
     (var ochan (oss_raw io))
-    (_fullform_iter ochan obj)
+    (fullform_iter ochan obj)
     (return (oss_to_s io))
     ))
 
-(fun _fullform_iter (ochan obj) (
+(fun fullform_iter (ochan obj) (
     (if (is_atom obj) (do
         (pprint_main ochan obj)
         return
@@ -216,7 +216,7 @@
     (output_symbol ochan h)
     (output_char ochan '{')
     (while args (do
-        (_fullform_iter ochan (car args))
+        (fullform_iter ochan (car args))
         (= args (cdr args))
         (if args (output_string ochan ", "))
         ))
@@ -226,7 +226,7 @@
 (export fun setup_pprint (mod) (
     (add_function2 mod (to_sym "pretty_print") (domainP OutputFileStream) DontCare pprint_ 0)
     (add_function2 mod (to_sym "pretty_print") (domainP OutputStringStream) DontCare pprint_ 0)
-    (add_function1 mod (to_sym "fullform") DontCare _fullform 0)
+    (add_function1 mod (to_sym "fullform") DontCare fullform 0)
     ))
 
     ))
