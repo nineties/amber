@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: syntax/prettify.ab 2014-04-09 01:39:18 nineties $
+# $Id: syntax/prettify.ab 2014-04-09 03:29:02 nineties $
 
 import pretty_print as P
 
@@ -94,14 +94,15 @@ primary(e) when expression?(e): ["(", expr(e), ")"]
 primary(nil):           "nil"
 primary(true):          "true"
 primary(false):         "false"
-primary(n @ Int):       n.to_s()
-primary(f @ Float):     f.to_s()
-primary(s @ String):    "\"" + s.escape() + "\""
-primary(var @ Symbol):  var.to_s()
-primary(list @ List):   sequence(list, expr, "[", ",", "]")
-primary(tuple @ Tuple): sequence(tuple.to_list(), expr, "(", ",", ")")
-primary(Block{stmts}):  P.group(block(stmts))
-primary(Abs{e}):        ["|", epxr(e), "|"]
+primary(e) when e.atom?: prim.fullform(e)
+primary(n @ Int):        n.to_s()
+primary(f @ Float):      f.to_s()
+primary(s @ String):     "\"" + s.escape() + "\""
+primary(var @ Symbol):   var.to_s()
+primary(list @ List):    sequence(list, expr, "[", ",", "]")
+primary(tuple @ Tuple):  sequence(tuple.to_list(), expr, "(", ",", ")")
+primary(Block{stmts}):   P.group(block(stmts))
+primary(Abs{e}):         ["|", epxr(e), "|"]
 primary(Slot{Self{}, m @ Symbol}): "." + m.to_s()
 primary('Rest{}): "..."
 
