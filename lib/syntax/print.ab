@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: syntax/prettify.ab 2014-04-08 14:40:43 nineties $
+# $Id: syntax/prettify.ab 2014-04-08 15:14:44 nineties $
 
 import pretty_print as P
 
@@ -55,7 +55,9 @@ statement?(Seq{_ @ List} or If{_, _} or While{_, _} or For{_, _, _} or
 #
 sequence(list, f, left, delim, right): {
     indent: left.size
-    P.breakable(P.nest(indent, [left, list.map(f).weave([delim, P.nl(" ")]), right]))
+    P.breakable(P.nest(indent,
+        [left, list.map(f).weave([delim, P.nl(" ")]), right].flatten()
+        ))
 }
 
 block(stmt, cont=false): {
@@ -132,10 +134,10 @@ prefix(UMinus{e}): ["-", quote(e)]
 prefix(Not{e}):    ["not", quote(e)]
 
 multiplicative(e): prefix(e)
-multiplicative(Mul{a, b}): [multiplicative(a), "*", prefix(b)]
-multiplicative(Div{a, b}): [multiplicative(a), "/", prefix(b)]
-multiplicative(Quo{a, b}): [multiplicative(a), "//", prefix(b)]
-multiplicative(Rem{a, b}): [multiplicative(a), "%", prefix(b)]
+multiplicative(Mul{a, b}): [multiplicative(a), " * ", prefix(b)]
+multiplicative(Div{a, b}): [multiplicative(a), " / ", prefix(b)]
+multiplicative(Quo{a, b}): [multiplicative(a), " // ", prefix(b)]
+multiplicative(Rem{a, b}): [multiplicative(a), " % ", prefix(b)]
 
 additive(e): multiplicative(e)
 additive(Add{a, b}): [additive(a), " + ", multiplicative(b)]
@@ -223,10 +225,8 @@ stmt(Import{mods, name, option}):
     (option.head == 'List) ? [" (", option.map(s -> s.to_s()).weave(","), ")"] :
     ["hiding", "(", option[0].map(s -> s.to_s()).weave(","), ")"]]
 
-# Replace `.to_s` to prettified version.
-nil.to_s = () -> {
+pretty(s): {
     oss: OutputStringStream.new()
-    s: stmt(self)
-    P.pretty(oss, s, width=TEXT_WIDTH)
+    P.pretty(oss, stmt(s), width=TEXT_WIDTH)
     oss.to_s()
 }
