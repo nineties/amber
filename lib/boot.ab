@@ -1,5 +1,5 @@
 " Copyright (C) 2014 nineties "
-" $Id: boot.ab 2014-04-08 23:34:30 nineties $ "
+" $Id: boot.ab 2014-04-08 23:56:27 nineties $ "
 
 " NB: We write comments as string literals until we define comment syntax. "
 
@@ -58,6 +58,10 @@ if (ARGV.empty?) {
 
     PROMPT = "amber"
     p: Parser.new(stdin, amber)
+
+    to_s(obj): fullform(obj)
+    to_s(obj) when has_slot?(obj, 'to_s): obj.to_s()
+
     while true {
         try {
             if (p.parse('shell)) {
@@ -67,11 +71,7 @@ if (ARGV.empty?) {
                 v: amber.eval(tree)
                 if (has_slot?(amber, 'after_eval))
                     v = amber.after_eval(tree, v)
-
-                if has_slot?(v, 'to_s)
-                    printf("=> %s\n", v.to_s())
-                else
-                    printf("=> %s\n", prim.fullform(v))
+                printf("=> %s\n", to_s(v))
                 amber.shell_outputs[0] = v
                 amber.shell_outputs.push(v)
             } else {
@@ -79,7 +79,7 @@ if (ARGV.empty?) {
                 p.reset!()
             }
         } catch e -> {
-            stderr.printf("Error: %s\n", prim.fullform(e))
+            stderr.printf("Error: %s\n", to_s(e))
             p.reset!()
         }
     }
