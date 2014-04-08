@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: syntax/prettify.ab 2014-04-08 13:58:53 nineties $
+# $Id: syntax/prettify.ab 2014-04-08 14:40:43 nineties $
 
 import pretty_print as P
 
@@ -106,7 +106,7 @@ primary('Rest{}): "..."
 argument(e): expr(e)
 argument(`Keyword{!(x @ Symbol), !e}): [x.to_s(), " = ", assign_expr(e)]
 
-postfix: primary
+postfix(e): primary(e)
 postfix(Apply{f, args}):
     [postfix(f), sequence(args, argument, "(", ",", ")")]
 postfix(Subscript{obj, args}):
@@ -118,33 +118,33 @@ postfix(Send{obj, f @ Symbol, args}):
 postfix(Slot{obj, m @ Symbol}): [postfix(obj), ".", m.to_s()]
 postfix(Pow{x, e}): [primary(x), "^", postfix(e)]
 
-quote: postfix
+quote(e): postfix(e)
 quote(`Quote{!e}): ["'", quote(e)]
 quote(Quasiquote{e}): ["`", quote(e)]
 quote(Unquote{e}): ["!", quote(e)]
 
-pattern: quote
-term: postfix
+pattern(e): quote(e)
+term(e): postfix(e)
 
-prefix: quote
+prefix(e): quote(e)
 prefix(UPlus{e}):  ["+", quote(e)]
 prefix(UMinus{e}): ["-", quote(e)]
 prefix(Not{e}):    ["not", quote(e)]
 
-multiplicative: prefix
-multiplicative(Mul{a, b}): [multiplicative(a), " * ", prefix(b)]
-multiplicative(Div{a, b}): [multiplicative(a), " / ", prefix(b)]
-multiplicative(Quo{a, b}): [multiplicative(a), " // ", prefix(b)]
-multiplicative(Rem{a, b}): [multiplicative(a), " % ", prefix(b)]
+multiplicative(e): prefix(e)
+multiplicative(Mul{a, b}): [multiplicative(a), "*", prefix(b)]
+multiplicative(Div{a, b}): [multiplicative(a), "/", prefix(b)]
+multiplicative(Quo{a, b}): [multiplicative(a), "//", prefix(b)]
+multiplicative(Rem{a, b}): [multiplicative(a), "%", prefix(b)]
 
-additive: multiplicative
+additive(e): multiplicative(e)
 additive(Add{a, b}): [additive(a), " + ", multiplicative(b)]
 additive(Sub{a, b}): [additive(a), " - ", multiplicative(b)]
 
-range: additive
+range(e): additive(e)
 range(Range{a, b}): [additive(a), "..", additive(b)]
 
-rel: range
+rel(e): range(e)
 rel(LessThan{a, b}):     [range(a), " < ", range(b)]
 rel(LessEqual{a, b}):    [range(a), " <= ", range(b)]
 rel(GreaterThan{a, b}):  [range(a), " > ", range(b)]
@@ -153,13 +153,13 @@ rel(Equal{a, b}):        [range(a), " == ", range(b)]
 rel(NotEqual{a, b}):     [range(a), " != ", range(b)]
 rel(Compare{a, b}):      [range(a), " <=> ", range(b)]
 
-seqand: rel
+seqand(e): rel(e)
 seqand(SeqAnd{a, b}): [rel(a), " and ", seqand(b)]
 
-seqor: seqand
+seqor(e): seqand(e)
 seqor(`SeqOr{!a, !b}): [seqand(a), " or ", seqor(b)]
 
-ternary: seqor
+ternary(e): seqor(e)
 ternary(IfElse{cond, ifthen, ifelse}):
     [seqor(cond), " ? ", seqor(ifthen), " : ", ternary(ifelse)]
 
@@ -167,18 +167,18 @@ lambda_arg(args @ List): sequence(args, argument, "(", ",", ")")
 lambda_arg(When{args, guard}):
     [sequence(args, argument, "(", ",", ")"), " when ", ternary(guard)]
 
-lambda: ternary
+lambda(e): ternary(e)
 lambda(Lambda{args, body}): [lambda_arg(args), " -> ", ternary(body)]
 
-multi_lambda: lambda
+multi_lambda(e): lambda(e)
 multi_lambda(Fusion{f, g}):
     [lambda(f), P.nl(" "), "| ", multi_lambda(g)]
 
-continuation: multi_lambda
+continuation(e): multi_lambda(e)
 continuation(Reset{e}): ["reset ", multi_lambda(e)]
 continuation(Shift{e}): ["shift ", multi_lambda(e)]
 
-assign: continuation
+assign(e): continuation(e)
 assign(Assign{x, v}): [pattern(x), " = ", assign(v)]
 assign(AddAssign{x, v}): [pattern(x), " += ", assign(v)]
 assign(SubAssign{x, v}): [pattern(x), " -= ", assign(v)]
@@ -190,9 +190,9 @@ assign(RemAssign{x, v}): [pattern(x), " %= ", assign(v)]
 assign(FusionAssign{x, v}): [pattern(x), " |= ", assign(v)]
 assign(WithSlots{x, stmts}): [pattern(x), " with ", block(`Block{!stmts})]
 
-expr: assign
+expr(e): assign(e)
 
-stmt: expr
+stmt(e): expr(e)
 stmt(Seq{stmts}): [stmts.map(stmt).weave(P.nl())]
 stmt(If{cond, body}): ["if ", expr(cond), " ", block(body)]
 stmt(IfElse{cond, ifthen, ifelse}):
@@ -225,8 +225,8 @@ stmt(Import{mods, name, option}):
 
 # Replace `.to_s` to prettified version.
 nil.to_s = () -> {
-    oss: prim.oss_new(true)
+    oss: OutputStringStream.new()
     s: stmt(self)
     P.pretty(oss, s, width=TEXT_WIDTH)
-    prim.oss_to_string(oss)
+    oss.to_s()
 }
