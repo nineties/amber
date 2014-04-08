@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-04-08 16:01:01 nineties $
+; $Id: rowl1-interp.rlc 2014-04-08 16:22:37 nineties $
 ;
 
 (import "rlvm-compile")
@@ -21,7 +21,7 @@
 (import "rowl1-tuple")
 (import "rowl1-array")
 
-(extern object cacheparse_p)
+(extern object preparse_p)
 
 (export var amber null)
 (export var global null)
@@ -55,6 +55,10 @@
     ))
 
 (fun eval_main_ (argc argv) (
+    (if preparse_p
+        (output_string stdout "Generating pre-parsed libs...\n")
+        )
+
     (= current_loc no_loc)
 
     ; Local variable table
@@ -128,7 +132,20 @@
     (return (runcode_with_self self (lookup_func global Eval) expr))
     ))
 
-(fun interpret (p) (
+(extern fun fullform)
+(fun interpret (p path) (
+    (var ochan 0)
+    (if (&& preparse_p path) (do
+        ; change .ab to .abc
+        (output_string stdout path)
+        (= path (strcat path "c"))
+        (output_string stdout " => ")
+        (output_string stdout path)
+        (output_string stdout "\n")
+        (= ochan (open_out path @(| O_WRONLY O_CREAT O_TRUNC)))
+        (if (! ochan) (throw (io_error1 (string "Open failed") path)))
+        ))
+
     (while 1 (do
         (set_loc (get_loc p))
         (parse_toplevel p)
@@ -137,8 +154,15 @@
             (output_syntax_error (get_loc p) (parser_error p))
             (exit 1)
             ))
+
+        (if ochan (do
+            (output_string ochan (fullform (parsed_token p)))
+            (output_string ochan "\n")
+            ))
+
         (evalfull (parsed_token p))
         ))
+    (if ochan (close_out ochan))
     ))
 
 (fun builtin_eval (expr) (
@@ -257,7 +281,7 @@
             (var p (make_parser fullpath ichan))
             (set_slot p (to_sym "syntax") (load_global Syntax))
             (set_loc (get_loc p))
-            (interpret p)
+            (interpret p fullpath)
             (if new_dir_p (ary_pop dirs))
             (if (< (fchdir fd) 0)
                 (throw (io_error (string "Failed to change directory to '.'"))))
@@ -287,7 +311,7 @@
     (var p (make_parser path ichan))
     (set_slot p (to_sym "syntax") (load_global Syntax))
     (set_loc (get_loc p))
-    (interpret p)
+    (interpret p 0)
     (if (< (fchdir fd) 0)
         (throw (io_error (string "Failed to change directory to '.'"))))
     (if (< (close fd) 0)
