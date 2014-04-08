@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-array.rlc 2014-04-08 17:37:17 nineties $
+; $Id: rowl1-array.rlc 2014-04-09 03:13:01 nineties $
 ;
 
 (import "rlvm-compile")
@@ -39,6 +39,11 @@
 (fun pprint_main (ochan obj) (
     (= obj (unwrap_internal obj))
     (tswitch (node_type obj) (
+        (@ExprE               . (return (pp_expr ochan obj)))
+        (@ListE               . (return (pp_list ochan obj)))
+        (@TupleE              . (return (pp_tuple ochan obj)))
+        (@ArrayE              . (return (pp_array ochan obj)))
+        (@TableE              . (return (pp_table ochan obj)))
         (@NilE                . (return (output_string ochan "nil")))
         (@UndefE              . (return (output_string ochan "undef")))
         (@BoolE               . (do
@@ -49,16 +54,12 @@
             return
             ))
         (@SymbolE             . (return (output_symbol ochan obj)))
-        (@ExprE               . (return (pp_expr ochan obj)))
-        (@ListE               . (return (pp_list ochan obj)))
-        (@ArrayE              . (return (pp_array ochan obj)))
-        (@TableE              . (return (pp_table ochan obj)))
         (@AssemblerE          . (return (pp_node ochan "Assembler" obj)))
         (@BytecodeE           . (return (pp_node ochan "Bytecode" obj)))
-        (@FunctionE           . (return (pp_function ochan obj)))
-        (@BuiltinFunctionE    . (return (pp_function ochan obj)))
-        (@BoundFunctionE      . (return (pp_function ochan obj)))
-        (@ContinuationE       . (return (pp_function ochan obj)))
+        (@FunctionE           . (return (pp_node ochan "Function" obj)))
+        (@BuiltinFunctionE    . (return (pp_node ochan "Function" obj)))
+        (@BoundFunctionE      . (return (pp_node ochan "Function" obj)))
+        (@ContinuationE       . (return (pp_node ochan "Function" obj)))
         (@AliasE              . (return (pp_node ochan "Alias" obj)))
         (@InputFileStreamE    . (return (pp_node ochan "InputFileStream" obj)))
         (@OutputFileStreamE   . (return (pp_node ochan "OutputFileStream" obj)))
@@ -66,13 +67,11 @@
         (@OutputStringStreamE . (return (pp_node ochan "OutputStringStream" obj)))
         (@ParserE             . (return (pp_node ochan "Parser" obj)))
         (@BigIntE             . (return (pp_bint ochan obj)))
-        (@LocE                . (return (pp_loc ochan obj)))
-        (@TupleE              . (return (pp_tuple ochan obj)))
         (@IntE                . (return (pp_int ochan obj)))
         (@StringE             . (return (pp_string ochan obj)))
         (@FloatE              . (return (pp_float ochan obj)))
         (@BuiltinTypeE        . (return (pp_node ochan "BuiltinType" obj)))
-        (default              . (return (not_reachable "prettify")))
+        (default              . (return (not_reachable "fullform")))
         ))
     ))
 
@@ -99,14 +98,6 @@
     (return @C_NIL)
     ))
 
-(export fun pp_loc (ochan loc) (
-    (output_string ochan "Loc{\"")
-    (output_string ochan (loc_file loc))
-    (output_string ochan "\", ")
-    (output_int ochan (loc_line loc))
-    (output_char ochan '}')
-    ))
-
 (fun pp_tuple (ochan obj) (
     (var size (seq_size obj))
     (output_char ochan '(')
@@ -115,48 +106,6 @@
         (if (!= i (- size 1)) (output_string ochan ", "))
         ))
     (output_char ochan ')')
-    (return @C_NIL)
-    ))
-
-(fun pp_function_body (ochan func) (
-    (if (|| (== (node_type func) @FunctionE)
-            (== (node_type func) @BuiltinFunctionE))
-        (do
-            (output_string ochan "(")
-            (var args (field_get func 2))
-            (var keys (field_get func 3))
-            (= args (cdr args)) ; skip arity
-            (while args (do
-                (pprint ochan (car args))
-                (= args (cdr args))
-                (if args (output_string ochan ", "))
-                ))
-            (output_char ochan ')')
-            (if keys (do
-                (var n (seq_size keys))
-                (output_string ochan "{")
-                (for i 0 n (do
-                    (pprint ochan (array_get object keys i))
-                    (if (!= i (- n 1)) (output_string ochan ", "))
-                    ))
-                (output_string ochan "}")
-                ))
-        )
-    (if (== (node_type func) @ContinuationE)
-        (do
-            (output_string ochan "{continuation}")
-        )
-        (do
-            (pp_function_body ochan (field_get func 2))
-            (output_string ochan ", ")
-            (pp_function_body ochan (field_get func 3))
-        )))
-    ))
-
-(fun pp_function (ochan func) (
-    (output_string ochan "<#Function:")
-    (pp_function_body ochan func)
-    (output_char ochan '>')
     (return @C_NIL)
     ))
 

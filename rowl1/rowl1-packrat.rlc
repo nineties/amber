@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-04-09 01:01:56 nineties $
+; $Id: rowl1-packrat.rlc 2014-04-09 03:19:14 nineties $
 ;
 
 (import "rlvm-compile")
@@ -213,6 +213,7 @@
 (extern fun load_global)
 (extern fun ary_include)
 (extern fun tuple2)
+(extern fun tuple_at)
 
 (fun __cons (a b) (
     (return (cons a b))
@@ -572,6 +573,12 @@
         )
     (return v)
     ))
+
+(fun make_loc (file line) (
+    (return (tuple2 file (box line)))
+    ))
+
+(export var no_loc (make_loc (string "<internal>") 0))
 
 (export fun get_loc (p) (
     (var line (field_get p 8))
@@ -2188,9 +2195,9 @@
     (add_function1 mod (to_sym "parser_eof?") (domainP Parser) end_of_file_ 0)
     ))
 
-(extern fun pp_loc)
+(extern fun pprint)
 (export fun output_syntax_error (loc e) (
-    (pp_loc stderr loc)
+    (pprint stderr loc)
     (output_string stderr " Syntax error: ")
     (output_string stderr e)
     (output_char stderr '\n')

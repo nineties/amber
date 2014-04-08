@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-base.rlc 2014-04-09 02:24:13 nineties $
+; $Id: rowl1-base.rlc 2014-04-09 03:12:38 nineties $
 ;
 
 (import "rlvm-compile")
@@ -79,14 +79,15 @@
 (fun _hash (obj) (
     ; We can't use addresses of objects because amber uses copy GC.
     (tswitch (node_type obj) (
+        (@ExprE               . (return (builtin_hash obj)))
+        (@ListE               . (return (ls_hash obj)))
+        (@TupleE              . (return (tuple_hash obj)))
+        (@ArrayE              . (return (ary_hash obj)))
+        (@TableE              . (return (table_hash obj)))
         (@NilE                . (return (box (hashnext 0 obj))))
         (@UndefE              . (return (box (hashnext 0 obj))))
         (@BoolE               . (return (box (hashnext 0 obj))))
         (@SymbolE             . (return (sym_hash obj)))
-        (@ExprE               . (return (builtin_hash obj)))
-        (@ListE               . (return (ls_hash obj)))
-        (@ArrayE              . (return (ary_hash obj)))
-        (@TableE              . (return (table_hash obj)))
         (@AssemblerE          . (return (builtin_hash obj)))
         (@BytecodeE           . (return (builtin_hash obj)))
         (@FunctionE           . (return (builtin_hash obj)))
@@ -100,8 +101,6 @@
         (@OutputStringStreamE . (return (builtin_hash obj)))
         (@ParserE             . (return (builtin_hash obj)))
         (@BigIntE             . (return (bint_hash obj)))
-        (@LocE                . (return (builtin_hash obj)))
-        (@TupleE              . (return (tuple_hash obj)))
         (@IntE                . (return (box (hashnext 0 obj))))
         (@StringE             . (return (str_hash obj)))
         (@FloatE              . (return (float_hash obj)))

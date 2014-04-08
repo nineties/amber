@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2014-04-09 01:41:02 nineties $
+; $Id: rowl1-node.rlc 2014-04-09 03:11:59 nineties $
 ;
 
 (import "rlvm-compile")
@@ -20,7 +20,6 @@
 ; builtin expression headers and types
 (export var DontCare    (to_sym "_"))
 
-(export var Loc        (to_sym "Loc"))
 (export var List       (to_sym "List"))
 (export var Array      (to_sym "Array"))
 (export var Tuple      (to_sym "Tuple"))
@@ -249,13 +248,9 @@
     ))
 
 (fun is_atom_type (ty) (
-    (if (|| (== ty @ExprE) 
-        (|| (== ty @ListE) 
-        (|| (== ty @TupleE) 
-        (|| (== ty @TableE)
-            (== ty @ArrayE)))))
-        (return @FALSE)
+    (if (>= ty @ATOM_TYPE_OFFSET)
         (return @TRUE)
+        (return @FALSE)
         )
     ))
 
@@ -263,38 +258,17 @@
     (return (is_atom_type (node_type obj)))
     ))
 
-(export var no_loc (make_loc (string "<internal>") 0))
-
-(export fun make_loc (file line) (
-    (return (variant @LocE 1 file line))
-    ))
-
-(fun make_loc_ (args) (
-    (if (!= (list_len args) 2)
-        (throw (exception1 (string "invalid Loc object") args))
-        )
-    (var file (car args))
-    (var line (cadr args))
-    (if (|| (!= (node_type file) @StringE) (!= (node_type line) @IntE))
-        (throw (exception1 (string "invalid Loc object") args))
-        )
-    (return (make_loc file (unbox line)))
-    ))
-
-(export fun loc_file   (loc) ((return (field_get loc 1))))
-(export fun loc_line   (loc) ((return (field_get loc 2))))
-(export fun loc_line_  (loc) ((return (box (loc_line loc)))))
-
 (export fun node_head (node) (
     (tswitch (node_type node) (
+        (@ExprE               . (return (field_get node 0)))
+        (@ListE               . (return List))
+        (@TupleE              . (return Tuple))
+        (@ArrayE              . (return Array))
+        (@TableE              . (return Table))
         (@NilE                . (return Nil))
         (@UndefE              . (return Undef))
         (@BoolE               . (return Bool))
         (@SymbolE             . (return Symbol))
-        (@ExprE               . (return (field_get node 0)))
-        (@ListE               . (return List))
-        (@ArrayE              . (return Array))
-        (@TableE              . (return Table))
         (@AssemblerE          . (return Assembler))
         (@BytecodeE           . (return Bytecode))
         (@FunctionE           . (return Function))
@@ -308,8 +282,6 @@
         (@OutputStringStreamE . (return OutputStringStream))
         (@ParserE             . (return Parser))
         (@BigIntE             . (return Int))
-        (@LocE                . (return Loc))
-        (@TupleE              . (return Tuple))
         (@IntE                . (return Int))
         (@StringE             . (return String))
         (@FloatE              . (return Float))
@@ -488,7 +460,6 @@
         )
 
     ; following three objects uses special data structure
-    (if (== head Loc)   (return (make_loc_ args)))
     (if (== head List)  (return args))
     (if (== head Tuple) (return (list_to_tuple args)))
     (if (== head Array) (return (list_to_ary args)))
@@ -597,14 +568,15 @@
 ; printing functions
 (fun type_string (type) (
     (tswitch type (
+        (@ExprE               . (return (string "composite expression")))
+        (@ListE               . (return (string "List")))
+        (@TupleE              . (return (string "Tuple")))
+        (@ArrayE              . (return (string "Array")))
+        (@TableE              . (return (string "Table")))
         (@NilE                . (return (string "Nil")))
         (@UndefE              . (return (string "Undef")))
         (@BoolE               . (return (string "Bool")))
         (@SymbolE             . (return (string "Symbol")))
-        (@ExprE               . (return (string "composite expression")))
-        (@ListE               . (return (string "List")))
-        (@ArrayE              . (return (string "Array")))
-        (@TableE              . (return (string "Table")))
         (@AssemblerE          . (return (string "Assembler")))
         (@BytecodeE           . (return (string "Bytecode")))
         (@FunctionE           . (return (string "Function")))
@@ -618,8 +590,6 @@
         (@OutputStringStreamE . (return (string "OutputStringStream")))
         (@ParserE             . (return (string "Parser")))
         (@BigIntE             . (return (string "Int")))
-        (@LocE                . (return (string "Loc")))
-        (@TupleE              . (return (string "Tuple")))
         (@IntE                . (return (string "Int")))
         (@StringE             . (return (string "String")))
         (@FloatE              . (return (string "Float")))
