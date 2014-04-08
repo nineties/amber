@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-04-07 06:08:28 nineties $
+; $Id: rowl1-packrat.rlc 2014-04-08 18:44:29 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1274,6 +1274,79 @@
         ))
     ))
 
+;== Parsers for pre-parsed libs ==
+(fun parse_spaces_preparse (p) (
+    (var pos (get_pos p))
+    (while @TRUE (do
+        (var c (lookahead p))
+        (if (< c 0) break)
+        (if (is_spaces c) (do
+            (getc p)
+            continue
+            ))
+        break
+        ))
+    (if (== (get_pos p) pos)
+        (return (noparse_quiet p))
+        (return (parsed p @C_NIL))
+        )
+    ))
+
+(fun parse_fullform_preparse (p) (
+    (var c (lookahead p))
+    (if (< c 0) (return (mayparse p "expect token: a symbol")))
+    (if (! (is_letter c)) (return (noparse p "expect token: a symbol")))
+
+    (var state (copy_parser_state p))
+
+    (if (== (parse_any_symbol p) @C_FALSE) (return @C_FALSE))
+
+    (var hd @(TOKEN p))
+    (parse_char p '{')
+    @(CHECK p)
+    (parse_spaces_preparse p)
+
+    (var args 0)
+    (if (!= (lookahead p) '}') (do
+        (while (> (lookahead p) 0) (do
+            (parse_preparse p)
+            @(CHECK p)
+            (= args (cons @(TOKEN p) args))
+            (parse_spaces_preparse p)
+            (if (== (lookahead p) '}') break)
+            (parse_char p ',')
+            @(CHECK p)
+            (parse_spaces_preparse p)
+            ))
+        ))
+    (parse_char p '}')
+    @(CHECK p)
+    (parsed p (make_node hd (list_reverse args)))
+    (return @C_TRUE)
+    ))
+
+(fun parse_preparse (p) (
+    @(OR p `(
+        fullform_preparse
+        any_symbol
+        string
+        decimal
+        hex
+        octal
+        binary
+        ))
+    ))
+
+(export fun parse_toplevel_preparse (p) (
+    (parse_preparse p)
+    (if (! @(PARSED p)) (return @C_NIL))
+    (var stmt @(TOKEN p))
+    (parse_char p '\n')
+    (parsed p stmt)
+    (reset_memotable p)
+    (return @C_NIL)
+    ))
+
 (fun make_nodevar (idx) (
     (return (to_sym (strcat "node" (itos10 idx))))
     ))
@@ -2101,6 +2174,7 @@
     (add_parser mod (to_sym "parse_any_symbol") parse_any_symbol)
     (add_parser mod (to_sym "parse_atom") parse_atom)
     (add_parser mod (to_sym "parse_fullform") parse_fullform)
+    (add_parser mod (to_sym "parse_fullform_preparse") parse_fullform_preparse)
     (add_parser mod (to_sym "parse_expr") parse_expr)
     (add_parser mod (to_sym "parse_stmt") parse_stmt)
     (add_parser mod (to_sym "parse_toplevel_stmt") parse_toplevel_stmt_)
@@ -2121,6 +2195,7 @@
     (add_function1 mod (to_sym "parser_eof?") (domainP Parser) end_of_file_ 0)
     ))
 
+(extern fun pp_loc)
 (export fun output_syntax_error (loc e) (
     (pp_loc stderr loc)
     (output_string stderr " Syntax Error: ")

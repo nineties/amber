@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-04-08 16:22:37 nineties $
+; $Id: rowl1-interp.rlc 2014-04-08 18:58:00 nineties $
 ;
 
 (import "rlvm-compile")
@@ -165,6 +165,19 @@
     (if ochan (close_out ochan))
     ))
 
+(fun interpret_preparsed (p) (
+    (while 1 (do
+        (set_loc (get_loc p))
+        (parse_toplevel_preparse p)
+        (if (! (parse_success p)) (do
+            (if (end_of_file p) break)
+            (output_syntax_error (get_loc p) (parser_error p))
+            (exit 1)
+            ))
+        (evalfull (parsed_token p))
+        ))
+    ))
+
 (fun builtin_eval (expr) (
     (var hd (node_head expr))
     (if (== hd Located) (do
@@ -267,6 +280,13 @@
 
             (ary_push loaded rpath)
 
+            ; Check whether there is pre-parsed lib.
+            (var pcpath (strcat rpath "c"))
+            (var preparsed @FALSE)
+            (if (file_exists pcpath) (do
+                (= rpath pcpath)
+                (= preparsed @TRUE)
+                ))
             (var ichan (open_in rpath @FALSE))
             (if (! ichan) (throw (io_error1 (string "Open failed") fullpath)))
             (var dir (get_directory rpath))
@@ -281,7 +301,10 @@
             (var p (make_parser fullpath ichan))
             (set_slot p (to_sym "syntax") (load_global Syntax))
             (set_loc (get_loc p))
-            (interpret p fullpath)
+            (if preparsed
+                (interpret_preparsed p)
+                (interpret p fullpath)
+                )
             (if new_dir_p (ary_pop dirs))
             (if (< (fchdir fd) 0)
                 (throw (io_error (string "Failed to change directory to '.'"))))
@@ -460,6 +483,7 @@
     (copy_variable syntax "identifier" prim "parse_identifier")
     (copy_variable syntax "atom" prim "parse_atom")
     (copy_variable syntax "fullform" prim "parse_fullform")
+    (copy_variable syntax "fullform_preparse" prim "parse_fullform_preparse")
     (copy_variable syntax "expr" prim "parse_expr")
     (copy_variable syntax "stmt" prim "parse_stmt")
     (copy_variable syntax "toplevel_stmt" prim "parse_toplevel_stmt")

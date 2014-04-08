@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2014-04-07 15:32:38 nineties $
+; $Id: rowl1-node.rlc 2014-04-08 17:50:05 nineties $
 ;
 
 (import "rlvm-compile")
@@ -134,6 +134,7 @@
 (export var Parser (to_builtin_sym "Parser"))
 
 (extern fun exception)
+(extern fun exception1)
 (extern fun out_of_range)
 (extern fun type_error)
 
@@ -264,17 +265,21 @@
     (return (variant @LocE 1 file line))
     ))
 
+(fun make_loc_ (args) (
+    (if (!= (list_len args) 2)
+        (throw (exception1 (string "invalid Loc object") args))
+        )
+    (var file (car args))
+    (var line (cadr args))
+    (if (|| (!= (node_type file) @StringE) (!= (node_type line) @IntE))
+        (throw (exception1 (string "invalid Loc object") args))
+        )
+    (return (make_loc file (unbox line)))
+    ))
+
 (export fun loc_file   (loc) ((return (field_get loc 1))))
 (export fun loc_line   (loc) ((return (field_get loc 2))))
 (export fun loc_line_  (loc) ((return (box (loc_line loc)))))
-
-(export fun pp_loc (ochan loc) (
-    (output_char ochan '[')
-    (output_string ochan (loc_file loc))
-    (output_char ochan ':')
-    (output_int ochan (loc_line loc))
-    (output_char ochan ']')
-    ))
 
 (export fun node_head (node) (
     (tswitch (node_type node) (
@@ -478,6 +483,7 @@
         )
 
     ; following three objects uses special data structure
+    (if (== head Loc)   (return (make_loc_ args)))
     (if (== head List)  (return args))
     (if (== head Tuple) (return (list_to_tuple args)))
     (if (== head Array) (return (list_to_ary args)))
