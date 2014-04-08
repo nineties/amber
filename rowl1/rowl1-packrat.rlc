@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-04-08 18:44:29 nineties $
+; $Id: rowl1-packrat.rlc 2014-04-09 01:01:56 nineties $
 ;
 
 (import "rlvm-compile")
@@ -266,31 +266,25 @@
     (return @C_TRUE)
     ))
 
-(fun noparse_sub (p msg quiet may) (
+(fun noparse_sub (p msg may) (
     (field_set p 1 @C_FALSE)
 
-    ; if current position > error position, update error message
-    (if (> (field_get p 6) (field_get p 11)) (do
+    ; if current position >= error position, update error message
+    (if (>= (field_get p 6) (field_get p 11)) (do
         (= mayparse_p may)
-        (if (! quiet) (do
-            (field_set p 3 (string msg))
-            ; update the error position
-            (field_set p 11 (field_get p 6))
-            ))
+        (field_set p 3 (string msg))
+        ; update the error position
+        (field_set p 11 (field_get p 6))
         ))
     (return @C_FALSE)
     ))
 
 (fun noparse (p msg) (
-    (return (noparse_sub p msg @FALSE @FALSE))
+    (return (noparse_sub p msg @FALSE))
     ))
 
 (fun mayparse (p msg) (
-    (return (noparse_sub p msg @FALSE @TRUE))
-    ))
-
-(fun noparse_quiet (p) (
-    (return (noparse_sub p 0 @TRUE @FALSE))
+    (return (noparse_sub p msg @TRUE))
     ))
 
 (fun negate (p) (
@@ -977,7 +971,7 @@
         break
         ))
     (if (== (get_pos p) pos)
-        (return (noparse_quiet p))
+        (return (noparse p "no space"))
         (return (parsed p @C_NIL))
         )
     ))
@@ -1000,7 +994,7 @@
         break
         ))
     (if (== (get_pos p) pos)
-        (return (noparse_quiet p))
+        (return (noparse p "no space"))
         (return (parsed p @C_NIL))
         )
     ))
@@ -1008,7 +1002,7 @@
 
 (fun parse_shell_style_comment_ (p) (
     (var v (lookahead p))
-    (if (!= v '#') (return (noparse_quiet p)))
+    (if (!= v '#') (return (noparse p "no space")))
     (while @TRUE (do
         (var c (lookahead p))
         (if (|| (== c '\n') (< c 0)) break)
@@ -1214,6 +1208,7 @@
 @(MEMOIZE stmt)
 
 (export fun parse_toplevel (p) (
+    (= shell_mode_p @FALSE)
     (parse_toplevel_stmt p)
     (return @(PARSED_FLAG p))
     ))
@@ -1249,12 +1244,12 @@
     ))
 
 (export fun parse_shell (p) (
-    (var save_shell_mode_p shell_mode_p)
+    ;(var save_shell_mode_p shell_mode_p)
     (= shell_mode_p @TRUE)
     (var buf (field_get p 4))
     (var ichan (field_get buf 1))
     (parse_shell_stmt p)
-    (= shell_mode_p save_shell_mode_p)
+    ;(= shell_mode_p save_shell_mode_p)
     (if @(PARSED p) (increment_line p))
     (return @(PARSED_FLAG p))
     ))
@@ -1287,7 +1282,7 @@
         break
         ))
     (if (== (get_pos p) pos)
-        (return (noparse_quiet p))
+        (return (noparse p "no space"))
         (return (parsed p @C_NIL))
         )
     ))
@@ -2023,12 +2018,10 @@
     (= multiline_p @FALSE)
     ))
 
-(var idx 0)
 (fun compile_parser (elems) (
     (if (!= (node_head elems) List)
         (= elems (list1 elems))
         )
-    (+= idx 1)
 
     (var body 0)
     (var state (to_unique_sym "state"))
@@ -2198,7 +2191,7 @@
 (extern fun pp_loc)
 (export fun output_syntax_error (loc e) (
     (pp_loc stderr loc)
-    (output_string stderr " Syntax Error: ")
+    (output_string stderr " Syntax error: ")
     (output_string stderr e)
     (output_char stderr '\n')
     ))
