@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: tuple.ab 2014-04-08 15:24:15 nineties $
+# $Id: tuple.ab 2014-04-09 18:50:36 nineties $
 
 #= Tuple =
 # An n-tuple is an ordered collection of n objects. Tuples do not have
@@ -18,12 +18,13 @@
 # > z              # => 3
 # ----
 
-Tuple(v, size @ Int): prim.tuple_new(v, size)
-Tuple(container) when container.Iterable? :
-    prim.list_to_tuple(container.to_list())
+Tuple: object_system.builtin_class('Tuple) with {
+    # Create n-ary tuple. Its fields are initialized by v.
+    .new(v, n @ Int): prim.tuple_new(v, n)
 
-Tuple with {
-    .parent: Trait
+    # Create a tuple from iterable sequence.
+    .new(container) when container.Iterable? :
+        prim.list_to_tuple(container.to_list())
 
     # The number of elements.
     .size:   alias(() -> prim.arity(self))
@@ -32,21 +33,6 @@ Tuple with {
     # Apply `f` to each element of `self`.
     .map(f):  prim.tuple_map(f, self)
     .map!(f): prim.tuple_map(f, self)
-
-    # Convert to string.
-    .to_s(): {
-        os: OutputStringStream.new()
-        os.print("(")
-        list: self
-        while list != [] {
-            os.print(first(list))
-            list = rest(list)
-            if list != []
-                os.print(", ")
-        }
-        os.print(")")
-        os.to_s()
-    }
 
     extend Iterable
     .each(): {
@@ -62,5 +48,4 @@ Tuple with {
         }
     }
 }
-
 prim.set_builtin_parent('Tuple, Tuple)
