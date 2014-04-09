@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: object_system.ab 2014-04-02 18:10:18 nineties $
+# $Id: object_system.ab 2014-04-09 09:43:52 nineties $
 
 #= Object System =
 # This library introduces prototype-based object-oriented programming
@@ -84,22 +84,22 @@ macro(DefClass{head, fields}) = `Seq{[
             `(Slot{Self{}, !f} = alias(!i)), fields)}
     ]}
 
-macro(DefTrait{head}) = `Define{!head, Trait('!head)}
+macro(DefTrait{head}) = `Define{!head, Trait.new('!head)}
 
-Trait(name @ Symbol): {
-    # When create trait `A`, an attribute `A?` is defined.
-    name?: prim.string_to_symbol(
-            prim.string_add(prim.symbol_to_string(name), "?"))
-
-    nil.set_slot(name?, false)
-    `Trait{!name} with {
-        .parent: Trait
-        .set_slot(name?, true)
-    }
-}
-
-Trait with {
+Trait: `Class{Trait} with {
     .Trait?: true
+
+    .new(name @ Symbol): {
+        # When create trait `A`, an attribute `A?` is defined.
+        name?: prim.string_to_symbol(
+                prim.string_add(prim.symbol_to_string(name), "?"))
+
+        nil.set_slot(name?, false)
+        `Trait{!name} with {
+            .parent: Trait
+            .set_slot(name?, true)
+        }
+    }
 
     .extend_trait(...):
          throw `LogicError{"Traits can extend Trait{...} objects"}
