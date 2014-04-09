@@ -1,5 +1,5 @@
 # Copyright (C) 2010 nineties
-# $Id: base.ab 2014-04-09 03:27:21 nineties $
+# $Id: base.ab 2014-04-09 13:53:14 nineties $
 
 #== The most basic functions and methods. ==
 
@@ -208,15 +208,17 @@ hash: prim.hash
 
 #== Operators ==
 #=== Mathematical operators ===
-# * `+ a`   : Unary plus. Equivalent to `uplus(a)`.
-# * `- a`   : Unary minus. Equivalent to `uminus(a)`.
-# * `|a|`   : Absolute value. Equivalent to `abs(a)`.
-# * `a + b` : Addition. Equivalent to `add(a, b)`.
-# * `a - b` : Subtraction. Equivalent to `sub(a, b)`.
-# * `a * b` : Multiplication. Equivalent to `mul(a, b)`.
-# * `a ^ b` : Exponential. Equivalent to `pow(a, b)`.
-# * `a / b` : Division. Equivalent to `div(a, b)`.
-# * `a // b`: Quotient of Euclidean division (division with remainder).
+# * `+ a`    : Unary plus. Equivalent to `uplus(a)`.
+# * `- a`    : Unary minus. Equivalent to `uminus(a)`.
+# * `|a|`    : Absolute value. Equivalent to `abs(a)`.
+# * `a + b`  : Addition. Equivalent to `add(a, b)`.
+# * `a ++ b` : Non-commutative addition. equivalent to `ncadd(a, b)`.
+# * `a - b`  : Subtraction. Equivalent to `sub(a, b)`.
+# * `a * b`  : Multiplication. Equivalent to `mul(a, b)`.
+# * `a ** b` * Non-commutative multiplication. Equivalent to `ncmul(a, b)`.
+# * `a ^ b`  : Exponential. Equivalent to `pow(a, b)`.
+# * `a / b`  : Division. Equivalent to `div(a, b)`.
+# * `a // b` : Quotient of Euclidean division (division with remainder).
 #   Equivalent to `quo(a, b)`.
 # * `a % b` : Remainder of Euclidean division. Equivalent to `rem(a, b)`.
 #
@@ -235,14 +237,16 @@ hash: prim.hash
 # * 'f | g': Equivalent to `fusion(f, g)`.
 #
 #=== Assignment operators ===
-# * 'a += b' : Equivalent to `a = a.add!(b)`
-# * 'a -= b' : Equivalent to `a = a.sub!(b)`
-# * 'a *= b' : Equivalent to `a = a.mul!(b)`
-# * 'a ^= b' : Equivalent to `a = a.pow!(b)`
-# * 'a /= b' : Equivalent to `a = a.div!(b)`
-# * 'a //= b': Equivalent to `a = a.quo!(b)`
-# * 'a %= b' : Equivalent to `a = a.rem!(b)`
-# * 'a |= b' : Equivalent to `a = a.fusion!(b)`
+# * 'a += b'  : Equivalent to `a = a.add!(b)`
+# * 'a ++= b' : Equivalent to `a = a.ncadd!(b)`
+# * 'a -= b'  : Equivalent to `a = a.sub!(b)`
+# * 'a *= b'  : Equivalent to `a = a.mul!(b)`
+# * 'a **= b' : Equivalent to `a = a.ncmul!(b)`
+# * 'a ^= b'  : Equivalent to `a = a.pow!(b)`
+# * 'a /= b'  : Equivalent to `a = a.div!(b)`
+# * 'a //= b' : Equivalent to `a = a.quo!(b)`
+# * 'a %= b'  : Equivalent to `a = a.rem!(b)`
+# * 'a |= b'  : Equivalent to `a = a.fusion!(b)`
 #
 # Amber uses different functions for `a op b` and `a op= b`.
 # Our intention is to enable giving efficient implementations to assignment
@@ -299,22 +303,26 @@ uplus(a):  throw `LogicError{"No default implementation", uplus}
 uminus(a): throw `LogicError{"No default implementation", uminus}
 abs(a):    throw `LogicError{"No default implementation", abs}
 add(a, b): perform_binary_operation(a, b, add, 'add)
+ncadd(a, b): perform_binary_operation(a, b, ncadd, 'ncadd)
 sub(a, b): perform_binary_operation(a, b, sub, 'sub)
 mul(a, b): perform_binary_operation(a, b, mul, 'mul)
+ncmul(a, b): perform_binary_operation(a, b, ncmul, 'ncmul)
 pow(a, b): perform_binary_operation(a, b, pow, 'pow)
 quo(a, b): perform_binary_operation(a, b, quo, 'quo)
 div(a, b): perform_binary_operation(a, b, div, 'div)
 rem(a, b): perform_binary_operation(a, b, rem, 'rem)
 
 nil with {
-    .add!(b):    add(self,b)
-    .sub!(b):    sub(self,b)
-    .mul!(b):    mul(self,b)
-    .pow!(b):    pow(self,b)
-    .quo!(b):    quo(self,b)
-    .rem!(b):    rem(self,b)
-    .div!(b):    div(self,b)
-    .fusion!(b): fusion(self,b)
+    .add!(b):    add(self, b)
+    .ncadd!(b):  ncadd(self, b)
+    .sub!(b):    sub(self, b)
+    .mul!(b):    mul(self, b)
+    .ncmul!(b):  ncmul(self, b)
+    .pow!(b):    pow(self, b)
+    .quo!(b):    quo(self, b)
+    .rem!(b):    rem(self, b)
+    .div!(b):    div(self, b)
+    .fusion!(b): fusion(self, b)
 }
 
 compare(a, b)        : perform_binary_operation(a, b, compare, 'compare)

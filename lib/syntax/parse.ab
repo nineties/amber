@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: syntax/parse.ab 2014-04-09 11:48:06 nineties $ "
+" $Id: syntax/parse.ab 2014-04-09 13:35:26 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -223,15 +223,17 @@ infix_expr
       | prefix_expr
 
 multiplicative_expr
-    ::= multiplicative_expr "*" infix_expr  { `Mul{!node0, !node2} }
+    ::= multiplicative_expr "**" infix_expr { `NcMul{!node0, !node2} }
+      | multiplicative_expr "*" infix_expr  { `Mul{!node0, !node2} }
       | multiplicative_expr "/" infix_expr  { `Div{!node0, !node2} }
       | multiplicative_expr "//" infix_expr { `Quo{!node0, !node2} }
       | multiplicative_expr "%" infix_expr  { `Rem{!node0, !node2} }
       | infix_expr
 
 additive_expr
-    ::= additive_expr "+" multiplicative_expr { `Add{!node0, !node2} }
-      | additive_expr "-" multiplicative_expr { `Sub{!node0, !node2} }
+    ::= additive_expr "++" multiplicative_expr { `NcAdd{!node0, !node2} }
+      | additive_expr "+" multiplicative_expr  { `Add{!node0, !node2} }
+      | additive_expr "-" multiplicative_expr  { `Sub{!node0, !node2} }
       | multiplicative_expr
 
 range_expr
@@ -297,8 +299,10 @@ continuation_expr
 assign_expr
     ::= pattern "=" assign_expr   { `Assign{!node0, !node2} }
       | pattern "+=" assign_expr  { `AddAssign{!node0, !node2} }
+      | pattern "++=" assign_expr { `NcAddAssign{!node0, !node2} }
       | pattern "-=" assign_expr  { `SubAssign{!node0, !node2} }
       | pattern "*=" assign_expr  { `MulAssign{!node0, !node2} }
+      | pattern "**=" assign_expr { `NcMulAssign{!node0, !node2} }
       | pattern "^=" assign_expr  { `PowAssign{!node0, !node2} }
       | pattern "/=" assign_expr  { `DivAssign{!node0, !node2} }
       | pattern "//=" assign_expr { `QuoAssign{!node0, !node2} }
@@ -497,7 +501,9 @@ macro(+x)      = `uplus(!x)
 macro(-x)      = `uminus(!x)
 macro(x + y)   = `add(!x, !y)
 macro(x - y)   = `sub(!x, !y)
+macro(x ++ y)  = `ncadd(!x, !y)
 macro(x * y)   = `mul(!x, !y)
+macro(x ** y)  = `ncmul(!x, !y)
 macro(x ^ y)   = `pow(!x, !y)
 macro(x / y)   = `div(!x, !y)
 macro(x // y)  = `quo(!x, !y)
@@ -511,8 +517,10 @@ macro(x == y)  = `equal?(!x, !y)
 macro(x != y)  = `(not equal?(!x, !y))
 macro(x <=> y) = `compare(!x, !y)
 macro(x += y)  = `ArithAssign{!x, !y, add!}
+macro(x ++= y) = `ArithAssign{!x, !y, ncadd!}
 macro(x -= y)  = `ArithAssign{!x, !y, sub!}
 macro(x *= y)  = `ArithAssign{!x, !y, mul!}
+macro(x **= y) = `ArithAssign{!x, !y, ncmul!}
 macro(x ^= y)  = `ArithAssign{!x, !y, pow!}
 macro(x /= y)  = `ArithAssign{!x, !y, div!}
 macro(x //= y) = `ArithAssign{!x, !y, quo!}
