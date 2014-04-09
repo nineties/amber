@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: syntax/print.ab 2014-04-09 10:40:07 nineties $
+# $Id: syntax/print.ab 2014-04-09 11:28:30 nineties $
 
 import pretty_print as P
 
@@ -84,13 +84,9 @@ block(stmt @ Seq, cont=false): {
 }
 
 #== Formatters ==
-fullform(obj): {
-    prim.debugpf obj
-    v: P.breakable([ P.nest(INDENT_WIDTH, [obj.head.to_s(), "{", P.nl(),
+fullform(obj):
+    P.breakable([ P.nest(INDENT_WIDTH, [obj.head.to_s(), "{", P.nl(),
         obj.arguments.map(expr).weave([",", P.nl(" ")])]), P.nl(), "}"])
-    prim.debugpf v
-    v
-}
 
 primary(e): fullform(e)
 primary(s) when statement?(s):  ["(", stmt(s), ")"]
@@ -111,7 +107,8 @@ primary(Slot{Self{}, m @ Symbol}): "." + m.to_s()
 primary('Rest{}): "..."
 
 argument(e): P.compress(expr(e))
-argument(`Keyword{!(x @ Symbol), !e}): [x.to_s(), " = ", assign(e)]
+argument(`Keyword{!(x @ Symbol), !e}):
+    [x.to_s(), " = ", P.compress(assign(e))]
 
 postfix(e): primary(e)
 postfix(Apply{f, args @ List}):
@@ -170,10 +167,11 @@ ternary(e): seqor(e)
 ternary(IfElse{cond, ifthen, ifelse}):
     [seqor(cond), " ? ", seqor(ifthen), " : ", ternary(ifelse)]
 
-lambda_arg(e): fullform(e)
+lambda_arg(e): P.compress(fullform(e))
 lambda_arg(args @ List): sequence(args, argument, "(", ",", ")")
 lambda_arg(When{args @ List, guard}):
-    [sequence(args, argument, "(", ",", ")"), " when ", ternary(guard)]
+    [sequence(args, argument, "(", ",", ")"),
+     " when ", P.compress(ternary(guard))]
 
 lambda(e): ternary(e)
 lambda(Lambda{args, body}): [lambda_arg(args), " -> ", ternary(body)]
@@ -201,7 +199,7 @@ assign(WithSlots{x, stmts @ List}): [pattern(x), " with ", block(`Block{!stmts})
 expr(e): assign(e)
 
 stmt(e): expr(e)
-stmt(Seq{stmts}): [stmts.map(stmt).weave(P.nl())]
+stmt(Seq{stmts}): [stmts.map(stmt).weave(P.nl("; "))]
 stmt(If{cond, body}): ["if ", expr(cond), block(body)]
 stmt(IfElse{cond, ifthen, ifelse}):
     ["if ", expr(cond), " ", block(ifthen, cont=true),

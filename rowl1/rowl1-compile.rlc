@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-04-09 09:43:13 nineties $
+; $Id: rowl1-compile.rlc 2014-04-09 12:02:40 nineties $
 ;
 
 (import "rlvm-compile")
@@ -218,8 +218,8 @@
     (return ret)
     ))
 
-(fun alloc_function (args keys guard code guard_code clos use_self nlocal nocheck) (
-    (return (variant @FunctionE 7 0 args keys guard code guard_code clos use_self nlocal nocheck))
+(fun alloc_function (args keys guard code guard_code clos use_self nlocal nocheck orig) (
+    (return (variant @FunctionE 8 0 args keys guard code guard_code clos orig use_self nlocal nocheck))
     ))
 
 (fun args_len (args) (
@@ -234,10 +234,10 @@
     (return (box len))
     ))
 
-(fun make_function (args keys guard code guard_code use_self nlocal nocheck) (
+(fun make_function (args keys guard code guard_code use_self nlocal nocheck orig) (
     (var arity (args_len args))
     (= args (cons arity args))
-    (return (alloc_function args keys guard code guard_code 0 use_self nlocal nocheck))
+    (return (alloc_function args keys guard code guard_code 0 use_self nlocal nocheck orig))
     ))
 
 (fun alloc_builtin_function (args func guard use_self) (
@@ -2077,7 +2077,7 @@
 	(compile asm (ifelse expr @C_TRUE @C_FALSE))
 	))
 
-(fun compile_lambda_main (asm args body guard cls nocheck) (
+(fun compile_lambda_main (asm args body guard cls nocheck orig) (
     (var save_compiling_lambda compiling_lambda)
     (= compiling_lambda @TRUE)
     (var save_use_self use_self)
@@ -2091,7 +2091,7 @@
             (var keys (tuple_at t 1))
             (var nlocal (unbox (tuple_at t 2)))
             (put_ireturn asm_body)
-            (put_push asm (make_function args keys guard (get_code asm_body) (get_code asm_guard) use_self nlocal nocheck))
+            (put_push asm (make_function args keys guard (get_code asm_body) (get_code asm_guard) use_self nlocal nocheck orig))
         )
         (do
             (var t (compile_function asm_body 0 args body noguard cls))
@@ -2099,13 +2099,13 @@
             (var keys (tuple_at t 1))
             (var nlocal (unbox (tuple_at t 2)))
             (put_ireturn asm_body)
-            (put_push asm (make_function args keys @C_UNDEF (get_code asm_body) 0 use_self nlocal nocheck))
+            (put_push asm (make_function args keys @C_UNDEF (get_code asm_body) 0 use_self nlocal nocheck orig))
         ))
     (= compiling_lambda save_compiling_lambda)
     (= use_self save_use_self)
     ))
 
-(fun compile_lambda_ (asm expr cls) (
+(fun compile_lambda_ (asm expr cls orig) (
     (var lhs (node_arg expr 0))
     (var body (node_arg expr 1))
     (var nocheck @FALSE)
@@ -2115,20 +2115,30 @@
         )
     (var hd (node_head lhs))
     (if (== hd List)
-        (compile_lambda_main asm lhs body noguard cls nocheck)
+        (compile_lambda_main asm lhs body noguard cls nocheck orig)
     (if (== hd When)
         (do
             (var guard (node_arg lhs 1))
             (var args (node_arg lhs 0))
             (= hd (node_head lhs))
-            (compile_lambda_main asm args body guard cls nocheck)
+            (compile_lambda_main asm args body guard cls nocheck orig)
         )
-        (compile_lambda_main asm (list1 lhs) body noguard cls nocheck)
+        (compile_lambda_main asm (list1 lhs) body noguard cls nocheck orig)
         ))
     ))
 
 (fun compile_lambda (asm expr) (
-    (return (compile_lambda_ asm expr @C_NIL))
+    (var original_arg @C_NIL)
+    (var orig (get_slot_nocheck expr (to_sym "_original_")))
+    (if (!= orig @C_NIL) (do
+        (= original_arg (node_arg orig 0))
+        (if (== (node_head original_arg) When)
+            (= original_arg (tuple2
+                (node_arg original_arg 0)
+                (node_arg original_arg 1)
+                )))
+        ))
+    (return (compile_lambda_ asm expr @C_NIL original_arg))
     ))
 
 (fun build_closure (lam clos) (
@@ -2137,9 +2147,10 @@
     (var guard (field_get lam 4))
     (var body (field_get lam 5))
     (var guard_code (field_get lam 6))
-    (var use_self (field_get lam 8))
-    (var nlocal (field_get lam 9))
-    (return (alloc_function args keys guard body guard_code clos use_self nlocal @FALSE @FALSE))
+    (var orig (field_get lam 8))
+    (var use_self (field_get lam 9))
+    (var nlocal (field_get lam 10))
+    (return (alloc_function args keys guard body guard_code clos use_self nlocal @FALSE @FALSE orig))
     ))
 
 (fun compile_closure (asm expr) (
@@ -2148,7 +2159,7 @@
     (var save_closure_frame closure_frame)
     (= closure_frame (node_arg expr 0))
 
-    (compile_lambda_ asm (node_arg expr 1) (node_arg expr 0))
+    (compile_lambda_ asm (node_arg expr 1) (node_arg expr 0) @C_NIL)
     (compile_simple_call asm 2 build_closure)
 
     (= closure_frame save_closure_frame)
@@ -2251,7 +2262,7 @@
     (compile_simple_call asm 2 compile_matching)
     (put_jcall asm 1 0)
     (put_ireturn asm)
-    (return (make_function (list1 x) 0 @C_UNDEF (get_code asm) 0 @FALSE 0 @FALSE @FALSE))
+    (return (make_function (list1 x) 0 @C_UNDEF (get_code asm) 0 @FALSE 0 @FALSE @FALSE @C_NIL))
     ))
 
 (export fun setup_builtin_compilers (mod) (

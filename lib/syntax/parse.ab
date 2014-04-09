@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: syntax/parse.ab 2014-04-09 01:05:40 nineties $ "
+" $Id: syntax/parse.ab 2014-04-09 11:48:06 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -467,12 +467,15 @@ Define{expand_macro_sub,
     fusion}
 Define{expand_macro, (obj, lvl) -> expand_macro_sub(obj, lvl), fusion}
 Define{expand_macro, (obj, 0) -> {
+        original: obj
         new_obj: macro(obj)
         while (NotEqual{new_obj, obj}) {
             obj = new_obj
             new_obj = macro(obj)
         }
-        expand_macro_sub(obj, 0)
+        new_obj = expand_macro_sub(obj, 0)
+        new_obj._original_ = original   # Preserve original node.
+        new_obj
     },
     fusion}
 Define{expand_macro, obj -> expand_macro(obj, 0), fusion}
