@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-04-09 14:28:27 nineties $
+; $Id: rowl1-compile.rlc 2014-04-09 15:26:11 nineties $
 ;
 
 (import "rlvm-compile")
@@ -477,8 +477,16 @@
 
 (export fun compile_main (expr) (
     (var asm (make_assembler))
-    (compile asm expr)
-    (put_ireturn asm)
+    (try (do
+        (compile asm expr)
+        (put_ireturn asm)
+        )
+    (catch e (do
+        (while (> (symtable_depth variables) 0)
+            (symtable_pop variables)
+            )
+        (throw e)
+        )))
     (return (get_code asm))
     ))
 
