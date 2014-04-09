@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-04-09 15:29:56 nineties $
+; $Id: rowl1-compile.rlc 2014-04-09 16:07:06 nineties $
 ;
 
 (import "rlvm-compile")
@@ -477,16 +477,8 @@
 
 (export fun compile_main (expr) (
     (var asm (make_assembler))
-    (try (do
-        (compile asm expr)
-        (put_ireturn asm)
-        )
-    (catch e (do
-        (while (> (symtable_depth variables) 0)
-            (symtable_pop variables)
-            )
-        (throw e)
-        )))
+    (compile asm expr)
+    (put_ireturn asm)
     (return (get_code asm))
     ))
 
@@ -642,74 +634,86 @@
         ))
 
     (symtable_push variables)
-
     (var save_max_lvar_idx max_lvar_idx)
     (var save_lvar_idx_offset lvar_idx_offset)
     (var save_break_labels break_labels)
     (var save_continue_labels continue_labels)
     (var save_try_nest try_nest)
-    (= lvar_idx_offset (symtable_count variables))
-    (= max_lvar_idx 0)
-    (= break_labels 0)
-    (= continue_labels 0)
-    (= try_nest 0)
 
-    (var cnt_addr 0)
-    (var t (setup_args variables args 0))
-    (var alias    (tuple_at t 0))
-    (= args       (tuple_at t 1))
-    (var keywords (tuple_at t 2))
-    (var keyarray (setup_keyword_array keywords))
+    (try (do
+        (= lvar_idx_offset (symtable_count variables))
+        (= max_lvar_idx 0)
+        (= break_labels 0)
+        (= continue_labels 0)
+        (= try_nest 0)
 
-    (if alias (do
-        (var list 0)
-        (if (== guard noguard)
-            (= list (cons body list))
-            (= list (cons guard list))
-            )
-        (while alias (do
-            (var e (car alias))
-            (= list (cons (defvar (field_get e 0) (field_get e 1)) list))
-            (= alias (cdr alias))
+        (var cnt_addr 0)
+        (var t (setup_args variables args 0))
+        (var alias    (tuple_at t 0))
+        (= args       (tuple_at t 1))
+        (var keywords (tuple_at t 2))
+        (var keyarray (setup_keyword_array keywords))
+
+        (if alias (do
+            (var list 0)
+            (if (== guard noguard)
+                (= list (cons body list))
+                (= list (cons guard list))
+                )
+            (while alias (do
+                (var e (car alias))
+                (= list (cons (defvar (field_get e 0) (field_get e 1)) list))
+                (= alias (cdr alias))
+                ))
+            (if (== guard noguard)
+                (= body (seq list))
+                (= guard (seq list))
+                )
             ))
-        (if (== guard noguard)
-            (= body (seq list))
-            (= guard (seq list))
-            )
-        ))
 
-    (if keywords (do
-        (var list 0)
-        (if (== guard noguard)
-            (= list (cons body list))
-            (= list (cons guard list))
-            )
-        (var drop @C_TRUE)
-        (while keywords (do
-            (var v (node_arg_symbol (car keywords) 0))
-            (var e (node_arg (car keywords) 1))
-            (= list (cons (keyword_init v e keyarray drop) list))
-            (= drop @C_FALSE)
-            (= keywords (cdr keywords))
+        (if keywords (do
+            (var list 0)
+            (if (== guard noguard)
+                (= list (cons body list))
+                (= list (cons guard list))
+                )
+            (var drop @C_TRUE)
+            (while keywords (do
+                (var v (node_arg_symbol (car keywords) 0))
+                (var e (node_arg (car keywords) 1))
+                (= list (cons (keyword_init v e keyarray drop) list))
+                (= drop @C_FALSE)
+                (= keywords (cdr keywords))
+                ))
+            (if (== guard noguard)
+                (= body (seq list))
+                (= guard (seq list))
+                )
             ))
-        (if (== guard noguard)
-            (= body (seq list))
-            (= guard (seq list))
-            )
-        ))
 
-    (if (!= guard noguard) (compile asm_guard guard))
-    (compile asm_body body)
+        (if (!= guard noguard) (compile asm_guard guard))
+        (compile asm_body body)
 
-    (symtable_pop variables)
+        (var num_lvar max_lvar_idx)
+        (= lvar_idx_offset save_lvar_idx_offset)
+        (= max_lvar_idx save_max_lvar_idx)
+        (= break_labels save_break_labels)
+        (= continue_labels save_continue_labels)
+        (= try_nest save_try_nest)
+        (symtable_pop variables)
 
-    (var num_lvar max_lvar_idx)
-    (= lvar_idx_offset save_lvar_idx_offset)
-    (= max_lvar_idx save_max_lvar_idx)
-    (= break_labels save_break_labels)
-    (= continue_labels save_continue_labels)
-    (= try_nest save_try_nest)
-    (return (tuple3 args keyarray (box num_lvar)))
+        (return (tuple3 args keyarray (box num_lvar)))
+        )
+    (catch e (do
+        (= lvar_idx_offset save_lvar_idx_offset)
+        (= max_lvar_idx save_max_lvar_idx)
+        (= break_labels save_break_labels)
+        (= continue_labels save_continue_labels)
+        (= try_nest save_try_nest)
+        (symtable_pop variables)
+        (throw e)
+
+        )))
     ))
 
 (fun add_arg (tbl sym obj alias) (
@@ -1594,7 +1598,12 @@
         )
     (var exprs (node_arg expr 0))
     (symtable_push variables)
-    (compile_block_body asm exprs)
+    (try
+        (compile_block_body asm exprs)
+    (catch e (do
+        (symtable_pop variables)
+        (throw e)
+        )))
     (symtable_pop variables)
     ))
 
@@ -2068,30 +2077,37 @@
 
 (fun compile_lambda_main (asm args body guard cls nocheck orig) (
     (var save_compiling_lambda compiling_lambda)
-    (= compiling_lambda @TRUE)
     (var save_use_self use_self)
-    (= use_self @FALSE)
-    (var asm_body (make_assembler))
-    (if (!= guard noguard)
-        (do
-            (var asm_guard (make_assembler))
-            (var t (compile_function asm_body asm_guard args body guard cls))
-            (= args (tuple_at t 0))
-            (var keys (tuple_at t 1))
-            (var nlocal (unbox (tuple_at t 2)))
-            (put_ireturn asm_body)
-            (put_push asm (make_function args keys guard (get_code asm_body) (get_code asm_guard) use_self nlocal nocheck orig))
+    (try (do
+        (= compiling_lambda @TRUE)
+        (= use_self @FALSE)
+        (var asm_body (make_assembler))
+        (if (!= guard noguard)
+            (do
+                (var asm_guard (make_assembler))
+                (var t (compile_function asm_body asm_guard args body guard cls))
+                (= args (tuple_at t 0))
+                (var keys (tuple_at t 1))
+                (var nlocal (unbox (tuple_at t 2)))
+                (put_ireturn asm_body)
+                (put_push asm (make_function args keys guard (get_code asm_body) (get_code asm_guard) use_self nlocal nocheck orig))
+            )
+            (do
+                (var t (compile_function asm_body 0 args body noguard cls))
+                (= args (tuple_at t 0))
+                (var keys (tuple_at t 1))
+                (var nlocal (unbox (tuple_at t 2)))
+                (put_ireturn asm_body)
+                (put_push asm (make_function args keys @C_UNDEF (get_code asm_body) 0 use_self nlocal nocheck orig))
+            ))
+        (= compiling_lambda save_compiling_lambda)
+        (= use_self save_use_self)
         )
-        (do
-            (var t (compile_function asm_body 0 args body noguard cls))
-            (= args (tuple_at t 0))
-            (var keys (tuple_at t 1))
-            (var nlocal (unbox (tuple_at t 2)))
-            (put_ireturn asm_body)
-            (put_push asm (make_function args keys @C_UNDEF (get_code asm_body) 0 use_self nlocal nocheck orig))
-        ))
-    (= compiling_lambda save_compiling_lambda)
-    (= use_self save_use_self)
+    (catch e (do
+        (= compiling_lambda save_compiling_lambda)
+        (= use_self save_use_self)
+        (throw e)
+        )))
     ))
 
 (fun compile_lambda_ (asm expr cls orig) (
@@ -2146,12 +2162,16 @@
     (compile asm (node_arg expr 0))
 
     (var save_closure_frame closure_frame)
-    (= closure_frame (node_arg expr 0))
-
-    (compile_lambda_ asm (node_arg expr 1) (node_arg expr 0) @C_NIL)
-    (compile_simple_call asm 2 build_closure)
-
-    (= closure_frame save_closure_frame)
+    (try (do
+        (= closure_frame (node_arg expr 0))
+        (compile_lambda_ asm (node_arg expr 1) (node_arg expr 0) @C_NIL)
+        (compile_simple_call asm 2 build_closure)
+        (= closure_frame save_closure_frame)
+        )
+    (catch e (do
+        (= closure_frame save_closure_frame)
+        (throw e)
+        )))
     ))
 
 (fun compile_alloc_clsenv (asm expr) (
