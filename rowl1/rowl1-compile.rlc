@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-04-09 12:02:40 nineties $
+; $Id: rowl1-compile.rlc 2014-04-09 14:28:27 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1041,9 +1041,13 @@
     (var tvars   (field_get tup 1))
     (var rvars   (field_get tup 2))
     (var t (to_unique_sym "t"))
-    (compile asm (apply (lambda
-        (list1 (make_node2 Domain t pattern))
-        (list_append tvars (list1 t))) (list1 val)))
+    (var lam (lambda (list1 (make_node2 Domain t pattern))
+        (list_append tvars (list1 t))))
+
+    ; for error message.
+    (set_slot lam (to_sym "_original_") (lambda (list1 vars) @C_NIL))
+
+    (compile asm (apply lam (list1 val)))
     (while rvars (do
         (compile_define asm (make_node2 Define (car rvars) Decons))
         (put_drop asm)
@@ -1967,9 +1971,14 @@
     (var rvars   (field_get tup 2))
 
     (var t (to_unique_sym "t"))
-    (compile asm (apply (lambda
-        (list1 (make_node2 Domain t pattern))
-        (list_append tvars (list1 t))) (list1 rhs)))
+
+    (var lam (lambda (list1 (make_node2 Domain t pattern))
+        (list_append tvars (list1 t)))) 
+
+    ; for error message.
+    (set_slot lam (to_sym "_original_") (lambda (list1 lhs) @C_NIL))
+
+    (compile asm (apply lam (list1 rhs)))
     (while rvars (do
         (compile_assign asm (assign (car rvars) Decons))
         (put_drop asm)

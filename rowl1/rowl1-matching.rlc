@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2014-04-09 11:20:03 nineties $
+; $Id: rowl1-matching.rlc 2014-04-09 14:04:02 nineties $
 ;
 
 (import "rlvm-compile")
@@ -37,8 +37,9 @@
     (compile_simple_call asm 2 trace_func)
     ))
 
-(fun matching_failed_error (obj def self args) (
-    (throw (matching_failed obj def self args))
+(extern fun fun_domain)
+(fun matching_failed_error (def args) (
+    (throw (matching_failed (fun_domain def) args))
     ))
 
 (export fun compile_matching (obj def) (
@@ -62,10 +63,8 @@
         )
         (do
             (put_args asm 0)
-            (put_self asm)
             (put_push asm def)
-            (put_push asm obj)
-            (compile_simple_call asm 4 matching_failed_error)
+            (compile_simple_call asm 2 matching_failed_error)
             (put_ireturn asm)
         ))
 
