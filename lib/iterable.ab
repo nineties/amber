@@ -1,11 +1,11 @@
 # Copyright (C) 2014 nineties
-# $Id: iterable.ab 2014-04-01 22:23:53 nineties $
+# $Id: iterable.ab 2014-04-09 19:33:14 nineties $
 
 #= Trait for iteration of containers. =
 # An `Iterable` object must implements method `.each()` which returns a new# iterator for the object.
 #
 # An iterator of a container is just a closure which returns elements of
-# the container one by one and returns `nil` when it reached the end of
+# the container one by one and returns `undef` when it reached the end of
 # the container.
 #
 # Tha trait `Iterable` provides useful functions using the method `.each()`.
@@ -17,7 +17,7 @@ trait Iterable with {
     .each(callback @ Function): {
         it: self.each()
         value: nil
-        while ((value = it()) != nil)
+        while ((value = it()) != undef)
             callback(value)
         self
     }
@@ -47,8 +47,8 @@ trait Iterable with {
         iterator () -> {
             v: it()
             idx += 1
-            if (v == nil)
-                return nil
+            if (v == undef)
+                return undef
             (idx-1, v)
         }
     }
@@ -59,7 +59,7 @@ trait Iterable with {
 
         iterator () -> {
             if n == 0
-                return nil
+                return undef
             n -= 1
             it()
         }
@@ -71,8 +71,8 @@ trait Iterable with {
 
         iterator () -> {
             v: it()
-            if v == nil or not p(v)
-                return nil
+            if v == undef or not p(v)
+                return undef
             v
         }
     }
@@ -89,7 +89,7 @@ trait Iterable with {
     .dropWhile(p @ Function): {
         it: self.each()
         value: nil
-        while ((value = it()) != nil) and p(value)
+        while ((value = it()) != undef) and p(value)
             ;
         iterator () -> {
             t: value
@@ -131,7 +131,7 @@ trait Iterable with {
         len: ary.size
 
         if len == 0
-            return (iterator () -> nil)
+            return (iterator () -> undef)
 
         iterator () -> {
             v: ary[idx]
@@ -147,11 +147,11 @@ trait Iterable with {
 
         iterator () -> {
             value: nil
-            while ((value = it()) != nil) {
+            while ((value = it()) != undef) {
                 if p(value)
                     return value
             }
-            nil
+            undef
         }
     }
 }
@@ -170,7 +170,7 @@ repeat(v, size=nil): {
     cnt: 0
     iterator () -> {
         if (size != nil and cnt >= size)
-            return nil
+            return undef
         cnt += 1
         return v
     }
@@ -190,7 +190,7 @@ counter(begin = 0, step=1, end = nil): {
     cnt: begin
     iterator () -> {
         if (end != nil and cnt >= end)
-            return nil
+            return undef
         v: cnt
         cnt += step
         v
@@ -209,8 +209,8 @@ zip(iterables...)
     iterator () -> {
         values: iterators.map(x -> x())
         for i in 0..values.size {
-            if values[i] == nil
-                return nil
+            if values[i] == undef
+                return undef
         }
         return values
     }
@@ -222,8 +222,8 @@ zip(it1, it2) when it1.Iterable? and it2.Iterable? : {
     iterator () -> {
         v1: it1()
         v2: it2()
-        if (v1 == nil or v2 == nil)
-            return nil
+        if (v1 == undef or v2 == undef)
+            return undef
         return (v1, v2)
     }
 }
@@ -236,8 +236,8 @@ zip(it1, it2, it3) when it1.Iterable? and it2.Iterable? and it3.Iterable? : {
         v1: it1()
         v2: it2()
         v3: it3()
-        if (v1 == nil or v2 == nil or v3 == nil)
-            return nil
+        if (v1 == undef or v2 == undef or v3 == undef)
+            return undef
         return (v1, v2)
     }
 }
@@ -254,7 +254,7 @@ product(iterables...) when iterables.all?(x -> x.Iterable?) : {
     i: 0
     iterator () -> {
         if (i == n)
-            return nil
+            return undef
         value: Tuple.new(0, len)
         j: i
         for k in len..0 {
@@ -275,7 +275,7 @@ product(it1, it2) when it1.Iterable? and it2.Iterable? : {
     i:  0
     iterator () -> {
         if (i == n)
-            return nil
+            return undef
         value: (ary1[i//n2], ary2[i%n2])
         i += 1
         value
@@ -293,7 +293,7 @@ product(it1, it2, it3) when it1.Iterable? and it2.Iterable? and it3.Iterable? : 
     i:  0
     iterator () -> {
         if (i == n)
-            return nil
+            return undef
         value: (ary1[i//(n2*n3)], ary2[(i//n3)%n2], ary3[i%n3])
         i += 1
         value
