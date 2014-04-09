@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-04-09 16:07:06 nineties $
+; $Id: rowl1-compile.rlc 2014-04-09 18:30:45 nineties $
 ;
 
 (import "rlvm-compile")
@@ -639,6 +639,7 @@
     (var save_break_labels break_labels)
     (var save_continue_labels continue_labels)
     (var save_try_nest try_nest)
+    (var ret 0)
 
     (try (do
         (= lvar_idx_offset (symtable_count variables))
@@ -701,8 +702,7 @@
         (= continue_labels save_continue_labels)
         (= try_nest save_try_nest)
         (symtable_pop variables)
-
-        (return (tuple3 args keyarray (box num_lvar)))
+        (= ret (tuple3 args keyarray (box num_lvar)))
         )
     (catch e (do
         (= lvar_idx_offset save_lvar_idx_offset)
@@ -712,8 +712,8 @@
         (= try_nest save_try_nest)
         (symtable_pop variables)
         (throw e)
-
         )))
+    (return ret)
     ))
 
 (fun add_arg (tbl sym obj alias) (
@@ -1598,13 +1598,14 @@
         )
     (var exprs (node_arg expr 0))
     (symtable_push variables)
-    (try
+    (try (do
         (compile_block_body asm exprs)
+        (symtable_pop variables)
+        )
     (catch e (do
         (symtable_pop variables)
         (throw e)
         )))
-    (symtable_pop variables)
     ))
 
 (fun compile_breakable (asm expr) (

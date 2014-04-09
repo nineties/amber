@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-04-09 03:34:20 nineties $
+; $Id: rowl1-interp.rlc 2014-04-09 18:33:12 nineties $
 ;
 
 (import "rlvm-compile")
@@ -42,8 +42,9 @@
     ))
 
 (export fun eval_main (argc argv) (
+    (var ret 0)
     (try
-        (return (eval_main_ argc argv))
+        (= ret (eval_main_ argc argv))
         (catch e (do
             (= global amber)
             (pprint stderr current_loc)
@@ -52,6 +53,7 @@
             (output_string stderr "\n")
             (return 1)
         )))
+    (return ret)
     ))
 
 (fun eval_main_ (argc argv) (
@@ -163,7 +165,6 @@
             (output_string ochan (fullform (parsed_token p)))
             (output_string ochan "\n")
             ))
-
         (evalfull (parsed_token p))
         ))
     (if ochan (close_out ochan))
