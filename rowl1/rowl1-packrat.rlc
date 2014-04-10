@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-04-09 03:19:14 nineties $
+; $Id: rowl1-packrat.rlc 2014-04-10 10:47:23 nineties $
 ;
 
 (import "rlvm-compile")
@@ -494,8 +494,18 @@
     (return c)
     ))
 
-(fun increment_line (p) (
-    (field_set p 8 (+ (field_get p 8) 1))
+(fun set_file (p file) (
+    (field_set p 5 file)
+    (return p)
+    ))
+
+(fun set_line (p line) (
+    (= line (unbox line))
+    (if (< line 0)
+        (throw (invalid_argument (string "invalid line number") (box line)))
+        )
+    (field_set p 8 line)
+    (return p)
     ))
 
 (fun reset_memotable (p) (
@@ -1251,13 +1261,8 @@
     ))
 
 (export fun parse_shell (p) (
-    ;(var save_shell_mode_p shell_mode_p)
     (= shell_mode_p @TRUE)
-    (var buf (field_get p 4))
-    (var ichan (field_get buf 1))
     (parse_shell_stmt p)
-    ;(= shell_mode_p save_shell_mode_p)
-    (if @(PARSED p) (increment_line p))
     (return @(PARSED_FLAG p))
     ))
 
@@ -2190,6 +2195,8 @@
     (add_function1 mod (to_sym "parse_toplevel") (domainP Parser) parse_toplevel 0)
     (add_function1 mod (to_sym "parser_tree") (domainP Parser) parsed_token 0)
     (add_function1 mod (to_sym "parser_error") (domainP Parser) parser_error 0)
+    (add_function2 mod (to_sym "parser_setfile") (domainP Parser) stringT set_file 0)
+    (add_function2 mod (to_sym "parser_setline") (domainP Parser) intT set_line 0)
     (add_function1 mod (to_sym "parser_loc") (domainP Parser) get_loc 0)
     (add_function1 mod (to_sym "parser_reset") (domainP Parser) reset_parser 0)
     (add_function1 mod (to_sym "parser_eof?") (domainP Parser) end_of_file_ 0)
