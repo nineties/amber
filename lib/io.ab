@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: io.ab 2014-04-09 01:21:46 nineties $
+# $Id: io.ab 2014-04-10 11:09:55 nineties $
 
 #= IO =
 # Input and output stream.
@@ -9,14 +9,14 @@ trait InputStream with {
     require '.eos?
 
     # Read one byte.
-    .read_char(eoserror): .read(eoserror)
+    .read_char(eoserror=false): .read(eoserror)
 
     # Read characters until reach "\n", "\0" or EOS. The newline character
     # will be truncated.
-    .read_line(eoserror): {
+    .read_line(eoserror=false): {
         oss: prim.oss_new(true)
         while true {
-            if self.eof? {
+            if self.eos? {
                 if eoserror
                     throw `IOError{"End of stream"}
                 else
@@ -34,7 +34,7 @@ trait InputStream with {
     .read(n @ Int, eoserror=false): {
         oss: prim.oss_new(true)
         for i in 1..n {
-            if self.eof? {
+            if self.eos? {
                 if eoserror
                     throw `IOError{"End of stream"}
                 else
@@ -80,13 +80,18 @@ print(v): stdout.print(v)
 puts(v): stdout.puts(v)
 printf(fmt @ String, args...): stdout.printf(fmt, args...)
 
+# Reading function for `stdin`.
+read_char(eoserror=false): stdin.read_char(eoserror = eoserror)
+read_line(eoserror=false): stdin.read_line(eoserror = eoserror)
+read_all(): stdin.read_all()
+
 # Open file `path` and create an input stream.
 # Option:
 #   * binary: Binary mode.
 open_in(path @ String, binary=false): {
     io: prim.open_in(path, binary)
     if binary
-        io.parent = Trait.BinaryInputFileStream
+        io.parent = BinaryInputFileStream
     io
 }
 
@@ -98,7 +103,7 @@ open_in(path @ String, binary=false): {
 open_out(path @ String, append=false, binary=false): {
     io: prim.open_out(path, append, binary)
     if binary
-        io.parent = Trait.BinaryOutputFileStream
+        io.parent = BinaryOutputFileStream
     io
 }
 
