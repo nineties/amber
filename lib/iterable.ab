@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: iterable.ab 2014-04-09 19:33:14 nineties $
+# $Id: iterable.ab 2014-04-12 01:31:11 nineties $
 
 #= Trait for iteration of containers. =
 # An `Iterable` object must implements method `.each()` which returns a new# iterator for the object.
@@ -297,5 +297,19 @@ product(it1, it2, it3) when it1.Iterable? and it2.Iterable? and it3.Iterable? : 
         value: (ary1[i//(n2*n3)], ary2[(i//n3)%n2], ary3[i%n3])
         i += 1
         value
+    }
+}
+
+intersection(it1, it2) when it1.Iterable? and it2.Iterable?: {
+    set: Table.new(zip(it2, iterator(() -> true)))
+    it1:  it1.each()
+    iterator () -> {
+        while true {
+            v: it1()
+            if v == undef
+                return undef
+            if set[v] == true
+                return v
+        }
     }
 }

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012_bang nineties
 ;
-; $Id: rowl1-bigint.rlc 2014-04-07 05:16:08 nineties $
+; $Id: rowl1-bigint.rlc 2014-04-12 03:15:57 nineties $
 ;
 
 (import "rlvm-compile")
@@ -264,28 +264,24 @@
         ))
     ))
 
-(fun int_to_s (n base prec prefix upper unsigned) (
-    (if (|| (< base 2) (> base 36))
-        (throw (invalid_argument (string "Invalid radix") (box base)))
-        )
-    (if (< prec 0)
-        (throw (invalid_argument (string "Invalid precision") prec))
-        )
-    (return (itos n base prec
-        (!= prefix @C_FALSE) (!= upper @C_FALSE) (!= unsigned @C_FALSE)
-        ))
-    ))
-
 (export fun bint_to_s (n base prec prefix upper unsigned) (
     (if (! (& base 1))
         (throw (invalid_argument (string "Invalid radix") base))
         )
-    (if (! (& prec 1))
+    (= base (unbox base))
+    (if (|| (< base 2) (> base 36))
+        (throw (invalid_argument (string "Invalid radix") (box base)))
+        )
+    (if (&& (!= prec @C_NIL) (|| (! (& prec 1)) (< prec 0)))
+
         (throw (invalid_argument (string "Invalid precision") base))
         )
-    (= base (unbox base))
-    (= prec (unbox prec))
-    (if (& n 1) (return (int_to_s (unbox n) base prec prefix upper unsigned)))
+    (if (& prec 1)
+        (= prec (unbox prec))
+        (= prec -1)
+        )
+    (if (& n 1) (return (itos (unbox n) base prec
+        (!= prec @C_FALSE) (!= upper @C_FALSE) (!= unsigned @C_FALSE))))
 
     (if (|| (!= base 10)
         (|| (!= prec 0)

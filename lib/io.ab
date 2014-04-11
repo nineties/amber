@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: io.ab 2014-04-11 10:05:18 nineties $
+# $Id: io.ab 2014-04-12 03:01:56 nineties $
 
 #= IO =
 # Input and output stream.
@@ -261,7 +261,7 @@ parse_number(iss): {
         c: prim.iss_lookahead(iss, false)
         if not is_digit?(c)
             return w
-        w = w*10 + c.to_i()
+        w = w*10 ++ c.to_i()
         prim.iss_read_char(iss, false)
     }
 }
@@ -314,14 +314,14 @@ print_element(oss,"d" or "i",f,w,p,arg): {
             prefix = " "
     }
     if w == nil
-        return oss.print(prefix + str)
+        return oss.print(prefix ++ str)
     else {
         if ltest(f, FMT_MINUS)
-            oss.print(prefix + str.ljust(w - prefix.size))
+            oss.print(prefix ++ str.ljust(w - prefix.size))
         else if ltest(f, FMT_ZERO)
-            oss.print(prefix + str.rjust(w - prefix.size, "0"))
+            oss.print(prefix ++ str.rjust(w - prefix.size, "0"))
         else
-            oss.print((prefix + str).rjust(w))
+            oss.print((prefix ++ str).rjust(w))
     }
 }
 
@@ -334,17 +334,17 @@ print_element(oss,t@("b" or "B"),f,w,p,arg): {
     if sign
         prefix = "..1"
     if ltest(f, FMT_SHARP)
-        prefix = "0" + t + prefix
+        prefix = "0" ++ t ++ prefix
 
     if w == nil
-        return oss.print(prefix + str)
+        return oss.print(prefix ++ str)
     else {
         if ltest(f, FMT_MINUS)
-            oss.print(prefix + str.ljust(w - prefix.size))
+            oss.print(prefix ++ str.ljust(w - prefix.size))
         else if ltest(f, FMT_ZERO)
-            oss.print(prefix + str.rjust(w - prefix.size, sign ? "1" : "0"))
+            oss.print(prefix ++ str.rjust(w - prefix.size, sign ? "1" : "0"))
         else
-            oss.print((prefix + str).rjust(w))
+            oss.print((prefix ++ str).rjust(w))
     }
 }
 
@@ -356,19 +356,19 @@ print_element(oss,t@("x" or "X"),f,w,p,arg): {
     forF: ((t == "x") ? "f" : "F")
     prefix: ""
     if sign
-        prefix = ".." + forF
+        prefix = ".." ++ forF
     if ltest(f, FMT_SHARP)
-        prefix = "0" + t + prefix
+        prefix = "0" ++ t ++ prefix
 
     if w == nil
-        return oss.print(prefix + str)
+        return oss.print(prefix ++ str)
     else {
         if ltest(f, FMT_MINUS)
-            oss.print(prefix + str.ljust(w - prefix.size))
+            oss.print(prefix ++ str.ljust(w - prefix.size))
         else if ltest(f, FMT_ZERO)
-            oss.print(prefix + str.rjust(w - prefix.size, sign ? forF : "0"))
+            oss.print(prefix ++ str.rjust(w - prefix.size, sign ? forF : "0"))
         else
-            oss.print((prefix + str).rjust(w))
+            oss.print((prefix ++ str).rjust(w))
     }
 }
 
@@ -386,7 +386,8 @@ printf(oss, fmt @ String, args...) when oss.OutputStream?: {
             p: parse_prec(fmt, iss)
             t: prim.iss_read_char(iss, false)
             if args == []
-                throw `MissingArgument{"argument for %d is missing"}
+                throw `MissingArgument{
+                    !("argument for %" ++ t ++ " is missing")}
             print_element(oss, t,f,w,p,first(args))
             args = rest(args)
         }

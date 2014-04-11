@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: syntax/parse.ab 2014-04-09 19:28:52 nineties $ "
+" $Id: syntax/parse.ab 2014-04-12 02:54:12 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -296,6 +296,11 @@ continuation_expr
       | 'shift multi_lambda_expr { `Shift{!node1} }
       | multi_lambda_expr
 
+case_expr
+    ::= <<multiline>> 'case tuple_expr 'of multi_lambda_expr
+        { `Apply{!node3, [!node1]} }
+      | continuation_expr
+
 assign_expr
     ::= pattern "=" assign_expr   { `Assign{!node0, !node2} }
       | pattern "+=" assign_expr  { `AddAssign{!node0, !node2} }
@@ -310,7 +315,7 @@ assign_expr
       | pattern "|=" assign_expr  { `FusionAssign{!node0, !node2} }
       | pattern 'with slot_assign
         { Node{Quote{WithSlots}, List{node0, node2}} }
-      | continuation_expr
+      | case_expr
 
 Assign{syntax.expr, syntax.assign_expr}
 
@@ -338,8 +343,6 @@ stmt
         { `IfElse{!node1, !node2, !node4} }
       | <<multiline>> 'if expr stmt
         { `If{!node1, !node2} }
-      | <<multiline>> 'case tuple_expr 'of multi_lambda_expr
-        { `Apply{!node3, [!node1]} }
       | <<multiline>> 'while expr block
         { `While{!node1, !node2} }
       | <<multiline>> 'for pattern 'in expr block
@@ -433,7 +436,7 @@ Define{expand_macro_sub,
     { throw `LogicError{"Unquotetation outside quasi-quotation"} },
     fusion}
 Define{expand_macro_sub,
-    (obj, lvl) when Equal{prim.head(obj), 'UnQuote} -> {
+    (obj, lvl) when Equal{prim.head(obj), 'Unquote} -> {
         prim.set_arg(obj, 0,
             expand_macro(prim.get_arg(obj, 0), prim.int_sub(lvl, 1)))
         obj
