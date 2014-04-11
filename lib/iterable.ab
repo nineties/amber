@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: iterable.ab 2014-04-12 01:31:11 nineties $
+# $Id: iterable.ab 2014-04-12 08:46:56 nineties $
 
 #= Trait for iteration of containers. =
 # An `Iterable` object must implements method `.each()` which returns a new# iterator for the object.
@@ -80,7 +80,7 @@ trait Iterable with {
     # Drop first `n` elements of the iterator.
     .drop(n @ Int): {
         it: self.each()
-        for i in 0..n
+        for i in 1..n
             it()
         it
     }
@@ -208,7 +208,7 @@ zip(iterables...)
     iterators: Tuple.new(iterables.map(x -> x.each()))
     iterator () -> {
         values: iterators.map(x -> x())
-        for i in 0..values.size {
+        for i in 0..values.size-1 {
             if values[i] == undef
                 return undef
         }
@@ -257,7 +257,8 @@ product(iterables...) when iterables.all?(x -> x.Iterable?) : {
             return undef
         value: Tuple.new(0, len)
         j: i
-        for k in len..0 {
+        for k in 1..len {
+            k = len-k
             value[k] = arrays[k][i % sizes[k]]
             j //= sizes[k]
         }

@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: syntax/parse.ab 2014-04-12 02:54:12 nineties $ "
+" $Id: syntax/parse.ab 2014-04-12 08:42:29 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -572,19 +572,10 @@ macro(For{i, Range{a, b}, body}) = {
     `{
         !j: !a
         !n: !b
-        if (!j < !n) {
-            while (!j < !n) {
-                !i: !j
-                !body
-                !j += 1
-            }
-        } else {
-            !j -= 1
-            while (!j >= !n) {
-                !i: !j
-                !body
-                !j -= 1
-            }
+        while (!j <= !n) {
+            !i: !j
+            !body
+            !j += 1
         }
     }
 }
@@ -668,7 +659,8 @@ desugar_args(orpat @ SeqOr, vars, checks, 0): {
     pats = prim.list_map(p -> {
                 prim.array_resize(vars, n)
                 p: desugar_args(p, vars, checks, 0)
-                for i in n..prim.array_size(vars) {
+                for i in n..prim.array_size(vars)-1 {
+                    prim.debugpf i
                     if not prim.array_include?(orp_vars, vars[i])
                         prim.array_push(orp_vars, vars[i])
                 }
