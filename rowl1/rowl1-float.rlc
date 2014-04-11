@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-float.rlc 2014-04-05 06:45:17 nineties $
+; $Id: rowl1-float.rlc 2014-04-12 04:20:04 nineties $
 ;
 
 ; Since Amber has no 64-bit integer, this source code uses bignums instead.
@@ -25,7 +25,7 @@
 (import "rowl1-bigint")
 
 (export fun pp_float (ochan f) (
-    (output_string ochan (float_to_s f))
+    (output_string ochan (float_to_s f (box 0)))
     ))
 
 (export fun float_sign (f) (
@@ -265,7 +265,13 @@
 
 ; ==== translate floating-point number to ascii-string ====
 
-(fun float_to_s (v) (
+(fun float_to_s (v prec) (
+    (if (|| (! (& prec 1)) (< prec 0))
+
+        (throw (invalid_argument (string "Invalid precision") prec))
+        )
+    (= prec (unbox prec))
+
     (var s 0)
     (var f0 (field_get v 0))
     (var f1 (field_get v 1))
@@ -302,14 +308,14 @@
         )
         (bint_set_digit f 1 (| f1 (<< 1 20)))
         )
-    (return (decode_float s f e))
+    (return (decode_float s f e prec))
     ))
 
 ; v: abs of input floating-point number.
 ; f: mantissa (bigint)
 ; e: exponent
 (var ten (int_to_bint 10))
-(fun decode_float (sign f e) (
+(fun decode_float (sign f e prec) (
     (-= e 52)
 
     ; find k s.t. 10^k <= f*2^e < 10^(k+1) by linear search.
@@ -389,7 +395,16 @@
             )
         ))
     (var n (strlen digits))
-    (return (format_float sign (+ exp n) digits n))
+    (= k (+ exp n))
+
+    (if (> prec 0) (do
+        (var p (+ k prec))
+        (if (&& (>= p 0) (< p n)) (do
+            (array_set char digits p 0)
+            (= n p)
+            ))
+        ))
+    (return (format_float sign k digits n prec))
     ))
 
 ; Format  0.d1 d2 ... dn 10^k to
@@ -643,7 +658,7 @@
 
     (add_function1 mod (to_sym "float_uplus") floatT float_uplus 0)
     (add_function1 mod (to_sym "float_uminus") floatT float_uminus 0)
-    (add_function1 mod (to_sym "float_to_string") floatT float_to_s 0)
+    (add_function2 mod (to_sym "float_to_string") floatT intT float_to_s 0)
     (add_function1 mod (to_sym "float_to_int") stringT float_to_i 0)
     (add_function1 mod (to_sym "float_to_bint") stringT float_to_bi 0)
     (add_function1 mod (to_sym "string_to_float") stringT str_to_f 0)

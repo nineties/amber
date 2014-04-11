@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012_bang nineties
 ;
-; $Id: rowl1-bigint.rlc 2014-04-12 03:15:57 nineties $
+; $Id: rowl1-bigint.rlc 2014-04-12 04:17:23 nineties $
 ;
 
 (import "rlvm-compile")
@@ -265,21 +265,15 @@
     ))
 
 (export fun bint_to_s (n base prec prefix upper unsigned) (
-    (if (! (& base 1))
+    (if (|| (! (& base 1)) (|| (< base (box 2)) (> base (box 36))))
         (throw (invalid_argument (string "Invalid radix") base))
         )
     (= base (unbox base))
-    (if (|| (< base 2) (> base 36))
-        (throw (invalid_argument (string "Invalid radix") (box base)))
-        )
-    (if (&& (!= prec @C_NIL) (|| (! (& prec 1)) (< prec 0)))
+    (if (|| (! (& prec 1)) (< prec 0))
 
-        (throw (invalid_argument (string "Invalid precision") base))
+        (throw (invalid_argument (string "Invalid precision") prec))
         )
-    (if (& prec 1)
-        (= prec (unbox prec))
-        (= prec -1)
-        )
+    (= prec (unbox prec))
     (if (& n 1) (return (itos (unbox n) base prec
         (!= prec @C_FALSE) (!= upper @C_FALSE) (!= unsigned @C_FALSE))))
 
@@ -1142,7 +1136,7 @@
 (extern fun float_uminus)
 
 (export fun setup_bigint (mod) (
-    (add_function6 mod (to_sym "int_to_string") intT intT DontCare DontCare DontCare DontCare bint_to_s 0)
+    (add_function6 mod (to_sym "int_to_string") intT intT intT DontCare DontCare DontCare bint_to_s 0)
     (add_function1 mod (to_sym "string_to_int") stringT string_to_bint 0)
     (add_function1 mod (to_sym "int_to_float") intT bint_to_f 0)
 

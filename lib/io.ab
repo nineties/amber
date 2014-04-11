@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: io.ab 2014-04-12 03:01:56 nineties $
+# $Id: io.ab 2014-04-12 04:07:28 nineties $
 
 #= IO =
 # Input and output stream.
@@ -261,7 +261,7 @@ parse_number(iss): {
         c: prim.iss_lookahead(iss, false)
         if not is_digit?(c)
             return w
-        w = w*10 ++ c.to_i()
+        w = w*10 + c.to_i()
         prim.iss_read_char(iss, false)
     }
 }
@@ -303,7 +303,7 @@ print_element(oss,"d" or "i",f,w,p,arg): {
     num: arg.to_i()
     sign: num < 0
     num = |num|
-    str: num.to_s(precision=p)
+    str: num.to_s(precision=(p==nil)?0:p)
     prefix: ""
     if sign
         prefix = "-"
@@ -329,7 +329,7 @@ print_element(oss,"d" or "i",f,w,p,arg): {
 print_element(oss,t@("b" or "B"),f,w,p,arg): {
     num: arg.to_i()
     sign: num < 0
-    str: num.to_s(base=2,precision=p,unsigned=true)
+    str: num.to_s(base=2,precision=(p==nil)?0:p,unsigned=true)
     prefix: ""
     if sign
         prefix = "..1"
@@ -352,7 +352,7 @@ print_element(oss,t@("b" or "B"),f,w,p,arg): {
 print_element(oss,t@("x" or "X"),f,w,p,arg): {
     num: arg.to_i()
     sign: num < 0
-    str: num.to_s(base=16,precision=p,upper=(t=="X"),unsigned=true)
+    str: num.to_s(base=16,precision=(p==nil)?0:p,upper=(t=="X"),unsigned=true)
     forF: ((t == "x") ? "f" : "F")
     prefix: ""
     if sign
@@ -367,6 +367,32 @@ print_element(oss,t@("x" or "X"),f,w,p,arg): {
             oss.print(prefix ++ str.ljust(w - prefix.size))
         else if ltest(f, FMT_ZERO)
             oss.print(prefix ++ str.rjust(w - prefix.size, sign ? forF : "0"))
+        else
+            oss.print((prefix ++ str).rjust(w))
+    }
+}
+
+# Floating-point
+print_element(oss,"f",f,w,p,arg): {
+    num: arg.to_f()
+    sign: num < 0
+    num = |num|
+    str: num.to_s(precision=(p==nil)?0:p)
+    prefix: ""
+    if sign
+        prefix = "-"
+    else {
+        if ltest(f, FMT_PLUS)
+            prefix = "+"
+        else if ltest(f, FMT_SPACE)
+            prefix = " "
+    }
+    if w == nil
+        return oss.print(prefix ++ str)
+    else {
+        # FMT_ZERO is ignored
+        if ltest(f, FMT_MINUS)
+            oss.print(prefix ++ str.ljust(w - prefix.size))
         else
             oss.print((prefix ++ str).rjust(w))
     }
