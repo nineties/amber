@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-float.rlc 2014-04-12 06:05:06 nineties $
+; $Id: rowl1-float.rlc 2014-04-12 07:14:23 nineties $
 ;
 
 ; Since Amber has no 64-bit integer, this source code uses bignums instead.
@@ -575,7 +575,7 @@
     (return (box (hashnext (hashnext 0 w0) w1)))
     ))
 
-(fun float_to_bi (f) (
+(fun float_to_i (f) (
     (var w0 (field_get f 0))
     (var w1 (field_get f 1))
     (var sign 0)
@@ -589,15 +589,7 @@
     (bint_set_digit b 1 w1)
     (field_set b 1 2)
     (if sign (bigneg b))
-    (return (bint_rshift b (box shift)))
-    ))
-
-(fun float_to_i (f) (
-    (var v (norm (float_to_bi f)))
-    (if (! (& v 1))
-        (throw (value_error (string "Floating point number overflows the range of fixed-length integer")))
-        )
-    (return v)
+    (return (norm (bint_rshift b (box shift))))
     ))
 
 (export fun uitof (n) (
@@ -674,8 +666,7 @@
     (add_function1 mod (to_sym "float_uplus") floatT float_uplus 0)
     (add_function1 mod (to_sym "float_uminus") floatT float_uminus 0)
     (add_function2 mod (to_sym "float_to_string") floatT intT float_to_s 0)
-    (add_function1 mod (to_sym "float_to_int") stringT float_to_i 0)
-    (add_function1 mod (to_sym "float_to_bint") stringT float_to_bi 0)
+    (add_function1 mod (to_sym "float_to_int") floatT float_to_i 0)
     (add_function1 mod (to_sym "string_to_float") stringT str_to_f 0)
     
     (add_function2 mod (to_sym "float_add") floatT floatT float_add 0)
