@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-float.rlc 2014-04-12 04:20:04 nineties $
+; $Id: rowl1-float.rlc 2014-04-12 06:05:06 nineties $
 ;
 
 ; Since Amber has no 64-bit integer, this source code uses bignums instead.
@@ -352,59 +352,74 @@
         ))
     (= f f_save)
 
-    ; find integer m (10^15 <= m < 10^16) s.t. by binary search
-    ; m * 10^(k-15) <= f*2^e < (m+1) * 10^(k-15)
-    (var left  (parse_bint "1000000000000000"))
-    (var right (parse_bint "10000000000000000"))
+    ; modify precision
+    (var p 0)
+    (if (== prec 0) (= p 15)
+    (if (>= k 0)    (= p (+ k prec))
+                    (= p (- prec 1))
+                    ))
+
+    ; find integer m (10^p <= m < 10^(p+1)) s.t. 
+    ; m * 10^(k-p) <= f*2^e < (m+1) * 10^(k-p)
+    ; by binary search
+    ; I want to find the closest 
+
+    (var left (uint_to_bint 1))
+    (var right (uint_to_bint 10))
+    (for i 0 p (do
+        (bigmul left ten)
+        (bigmul right ten)
+        ))
     (var b (int_to_bint 1))
-    (var kk (- k 15))
+    (var kk (- k p))
     (if (< kk 0) (= kk (- kk)))
     (while (> kk 0) (do (bigmul b ten) (-= kk 1)))
-    (while (!= (bint_sub right left) (box 1)) (do
-        (var m (bint_rshift (bint_add left right) (box 1)))
-        (var m2 (copy_bint m))
-        (var f2 (copy_bint f))
-        (if (>= e 0)
-            (bigshl f2 e)
-            (bigshl m2 (- e))
-            )
-        (if (>= k 15)
-            (bigmul m2 b)
-            (bigmul f2 b)
-            )
+    (var m 0)
+    (var m2 0)
+    (var f2 (copy_bint f))
+    (if (>= e 0) (bigshl f2 e))
+    (if (< k p) (bigmul f2 b))
+    (while @TRUE (do
+        (= m (copy_bint left))
+        (bigadd m right)
+        (= m2 (copy_bint m))
+        (if (< e 0) (bigshl m2 (- e)))
+        (if (>= k p) (bigmul m2 b))
+        (bigshr m 1)
+        (bigshr m2 1)
         (if (<= (bigcmp m2 f2) 0)
-            (= left m)
-            (= right m)
+            (do
+                (if (== (bigcmp left m) 0) (do
+                    (= m right)
+                    break
+                    ))
+                (= left m)
+            )
+            (do
+                (if (== (bigcmp right m) 0) (do
+                    (= m left)
+                    break
+                    ))
+                (= right m)
+            )
             )
         ))
-
-    ; select left or right
-    (var r (bint_rem left (box 10)))
-    (var m left)
-    (if (== r (box 9)) (= m right))
-
     (var digits (bint_to_s m (box 10) (box 0) @C_FALSE @C_FALSE @C_FALSE))
-    (var exp (- k 15))
-    (rfor i 0 (strlen digits) (do
-        (if (== (array_get char digits i) '0')
-            (do
-                (array_set char digits i '\0')
-                (+= exp 1)
-            )
-            break
-            )
+    (var exp (- k p))
+    (if (== prec 0) (do
+        (rfor i 0 (strlen digits) (do
+            (if (== (array_get char digits i) '0')
+                (do
+                    (array_set char digits i '\0')
+                    (+= exp 1)
+                )
+                break
+                )
+            ))
         ))
     (var n (strlen digits))
     (= k (+ exp n))
-
-    (if (> prec 0) (do
-        (var p (+ k prec))
-        (if (&& (>= p 0) (< p n)) (do
-            (array_set char digits p 0)
-            (= n p)
-            ))
-        ))
-    (return (format_float sign k digits n prec))
+    (return (format_float sign k digits n))
     ))
 
 ; Format  0.d1 d2 ... dn 10^k to
