@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-04-11 23:30:59 nineties $
+; $Id: rowl1-compile.rlc 2014-04-12 08:13:32 nineties $
 ;
 
 (import "rlvm-compile")
@@ -24,8 +24,8 @@
 (var expand        (to_unique_sym "%expand"))
 
 (export fun unwrap_internal (node) (
-    (if (== (node_head node) Ref)
-        (return (unwrap_internal (node_arg node 2))))
+    ;(if (== (node_head node) Ref)
+    ;    (return (unwrap_internal (node_arg node 2))))
     (return node)
     ))
 
@@ -180,6 +180,12 @@
         (field_set ret 1 (cons expr (field_get ret 1)))
         (field_set ret 2 (cons expr (field_get ret 2)))
         (return expr)
+        ))
+    (if (== (node_head expr) Ref) (do
+        (var t (to_unique_sym (symbol_name (variable_name expr))))
+        (field_set ret 1 (cons t (field_get ret 1)))
+        (field_set ret 2 (cons expr (field_get ret 2)))
+        (return t)
         ))
     (if (is_atom expr) (return expr))
     (if (is_list expr) (do
