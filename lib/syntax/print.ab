@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: syntax/print.ab 2014-04-09 13:50:12 nineties $
+# $Id: syntax/print.ab 2014-04-11 12:23:21 nineties $
 
 import pretty_print as P
 
@@ -8,6 +8,10 @@ import pretty_print as P
 
 INDENT_WIDTH: 4
 TEXT_WIDTH:  80
+
+# When a sequence is longer than SEQUENCE_ABBREV_LEN, the following
+# elements are abbreviated.
+SEQUENCE_ABBREV_LEN: 1000
 
 #== Detection of standard expressions and statements ==
 
@@ -53,10 +57,14 @@ statement?(Seq{_ @ List} or If{_, _} or While{_, _} or For{_, _, _} or
 #      b,
 #      c)
 #
-sequence(list, f, left, delim, right): {
+sequence(seq, f, left, delim, right): {
+    values: seq.take(SEQUENCE_ABBREV_LEN).to_list()
+    if values.size == SEQUENCE_ABBREV_LEN
+        values[values.size-1] = '...
+
     indent: left.size
     P.breakable(P.nest(indent,
-        [left, list.map(f).weave([delim, P.nl(" ")]), right].flatten()
+        [left, values.map(f).weave([delim, P.nl(" ")]), right].flatten()
         ))
 }
 
@@ -100,7 +108,8 @@ primary(f @ Float):      f.to_s()
 primary(s @ String):     "\"" ++ s.escape() ++ "\""
 primary(var @ Symbol):   var.to_s()
 primary(list @ List):    sequence(list, expr, "[", ",", "]")
-primary(tuple @ Tuple):  sequence(tuple.to_list(), expr, "(", ",", ")")
+primary(tuple @ Tuple):  sequence(tuple, expr, "(", ",", ")")
+primary(ary @ Array):    sequence(ary, expr, "Array{", ",", "}")
 primary(Block{stmts}):   P.group(block(stmts))
 primary(Abs{e}):         ["|", expr(e), "|"]
 primary(Slot{Self{}, m @ Symbol}): "." ++ m.to_s()
@@ -229,8 +238,8 @@ stmt(Import{mods, name, option}):
     (option.head == 'List) ? [" (", option.map(s -> s.to_s()).weave(","), ")"] :
     ["hiding", "(", option[0].map(s -> s.to_s()).weave(","), ")"]]
 
-nil.to_s = () -> {
+pretty(obj): {
     oss: OutputStringStream.new()
-    P.pretty(oss, stmt(self), width=TEXT_WIDTH)
+    P.pretty(oss, stmt(obj), width=TEXT_WIDTH)
     oss.to_s()
 }
