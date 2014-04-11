@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: io.ab 2014-04-12 04:07:28 nineties $
+# $Id: io.ab 2014-04-12 06:42:25 nineties $
 
 #= IO =
 # Input and output stream.
@@ -25,6 +25,19 @@ trait InputStream with {
             prim.oss_print_string(oss, c)
         }
         prim.oss_to_string(oss)
+    }
+
+    # Read an *iterator* which returns lines of the stream.
+    .read_lines(count=nil): {
+        list: []
+        i: 0
+        while (not self.eos?) {
+            list = cons(.read_line(), list)
+            i += 1
+            if i == count
+                break
+        }
+        list.reverse()
     }
 
     # Read `n` bytes or until reach EOS and return them as a string.
@@ -80,6 +93,7 @@ printf(fmt @ String, args...): stdout.printf(fmt, args...)
 # Reading function for `stdin`.
 read_char(eoserror=false): stdin.read_char(eoserror = eoserror)
 read_line(eoserror=false): stdin.read_line(eoserror = eoserror)
+read_lines(count=nil): stdin.read_lines(count=count)
 read(): stdin.read()
 
 # Open file `path` and create an input stream.
