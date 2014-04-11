@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-04-09 19:35:41 nineties $
+; $Id: rowl1-compile.rlc 2014-04-11 13:35:06 nineties $
 ;
 
 (import "rlvm-compile")
@@ -498,10 +498,16 @@
     (throw (unknown_expression expr))
     ))
 
+(var SET_SLOT (to_sym "set_slot"))
 (fun define_slot (obj sym val) (
     (if (!= (get_slot_norec_nocheck obj sym) @C_NIL)
         (throw (redefined_slot obj sym))
         )
+    (var f (get_slot_nocheck obj SET_SLOT))
+    (if (!= f @C_NIL) (do
+        (debugpf (list3 obj sym val))
+        (return (runcode_with_self obj (get_bytecode f) sym val))
+        ))
     (return (set_slot obj sym val))
     ))
 
