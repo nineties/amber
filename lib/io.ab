@@ -1,16 +1,16 @@
 # Copyright (C) 2014 nineties
-# $Id: io.ab 2014-04-10 11:39:46 nineties $
+# $Id: io.ab 2014-04-11 10:05:18 nineties $
 
 #= IO =
 # Input and output stream.
 
 trait InputStream with {
-    require '.readchar(eoserror=false)
+    require '.read_char(eoserror=false)
     require '.eos?
 
     # Read characters until reach "\n", "\0" or EOS. The newline character
     # will be truncated.
-    .readline(eoserror=false): {
+    .read_line(eoserror=false): {
         oss: prim.oss_new(true)
         while true {
             if self.eos? {
@@ -19,7 +19,7 @@ trait InputStream with {
                 else
                     break
             }
-            c: self.readchar()
+            c: self.read_char()
             if (c == "\n")
                 break
             prim.oss_print_string(oss, c)
@@ -28,7 +28,7 @@ trait InputStream with {
     }
 
     # Read `n` bytes or until reach EOS and return them as a string.
-    .readchar(n @ Int, eoserror=false): {
+    .read_char(n @ Int, eoserror=false): {
         oss: prim.oss_new(true)
         for i in 1..n {
             if self.eos? {
@@ -37,17 +37,17 @@ trait InputStream with {
                 else
                     break
             }
-            prim.oss_print_string(oss, self.readchar())
+            prim.oss_print_string(oss, self.read_char())
         }
         prim.oss_to_string(oss)
     }
 
     # Skip next one byte in the stream.
-    .skip(eoserror=false): { self.readchar(eoserror); self }
+    .skip(eoserror=false): { self.read_char(eoserror); self }
 
     # Skip `n` bytes or until reach EOS.
     .skip(n @ Int, eoserror=false): {
-        self.readchar(n, eoserror)
+        self.read_char(n, eoserror)
         self
     }
 }
@@ -78,8 +78,8 @@ puts(v): stdout.puts(v)
 printf(fmt @ String, args...): stdout.printf(fmt, args...)
 
 # Reading function for `stdin`.
-readchar(eoserror=false): stdin.readchar(eoserror = eoserror)
-readline(eoserror=false): stdin.readline(eoserror = eoserror)
+read_char(eoserror=false): stdin.read_char(eoserror = eoserror)
+read_line(eoserror=false): stdin.read_line(eoserror = eoserror)
 read(): stdin.read()
 
 # Open file `path` and create an input stream.
@@ -114,14 +114,14 @@ trait InputFileStream with {
     .eos?: alias(() -> prim.eos?(self))
 
     # Read one byte from the stream.
-    .readchar(eoserror=false): prim.readchar(self, eoserror)
+    .read_char(eoserror=false): prim.read_char(self, eoserror)
 
     # Read `n` bytes or until reach EOS and return them as a string.
-    .readchar(n @ Int, eoserror=false): prim.readbytes(self, n, eoserror)
+    .read_char(n @ Int, eoserror=false): prim.read_bytes(self, n, eoserror)
 
     # Read characters until reach "\n", "\0" or EOS. The newline character
     # will be truncated.
-    .readline(eoserror): prim.readline(self, eoserror)
+    .read_line(eoserror): prim.read_line(self, eoserror)
 
     # Read characters until reach EOS.
     .read(): prim.read(self)
@@ -194,10 +194,10 @@ trait InputStringStream with {
     .eos?: alias(() -> prim.iss_eos?(self))
 
     # Read one byte from the stream.
-    .readchar(eoserror=false): prim.iss_readchar(self, eoserror)
+    .read_char(eoserror=false): prim.iss_read_char(self, eoserror)
 
     # Read `n` bytes or until reach EOS and return them as a string.
-    .readchar(n @ Int, eoserror=false): prim.readbytes(self, n, eoserror)
+    .read_char(n @ Int, eoserror=false): prim.read_bytes(self, n, eoserror)
 
     # Return the next character if any.
     .lookahead(eoserror=false): prim.iss_lookahead(self, eoserror)
@@ -247,7 +247,7 @@ parse_flag(iss): {
         f: FLAG_MAP[prim.iss_lookahead(iss, false)]
         if (f == nil) return flag
         flag = lor(flag, f)
-        prim.iss_readchar(iss, false)
+        prim.iss_read_char(iss, false)
     }
 }
 
@@ -262,7 +262,7 @@ parse_number(iss): {
         if not is_digit?(c)
             return w
         w = w*10 + c.to_i()
-        prim.iss_readchar(iss, false)
+        prim.iss_read_char(iss, false)
     }
 }
 
@@ -272,7 +272,7 @@ parse_number(iss): {
 parse_prec(fmt, iss): {
     if (prim.iss_lookahead(iss, false) != ".")
         return nil
-    prim.iss_readchar(iss, false)
+    prim.iss_read_char(iss, false)
     if not is_digit?(prim.iss_lookahead(iss, false))
         throw `InvalidFormatString{!fmt}
     parse_number(iss)
@@ -376,7 +376,7 @@ printf(oss, fmt @ String, args...) when oss.OutputStream?: {
     # Create an input string stream.
     iss: prim.iss_new(fmt, false)
     while true {
-        c: prim.iss_readchar(iss, false)
+        c: prim.iss_read_char(iss, false)
         if (c == nil) break
         if (c != "%")
             oss.write(c)
@@ -384,7 +384,7 @@ printf(oss, fmt @ String, args...) when oss.OutputStream?: {
             f: parse_flag(iss)
             w: parse_number(iss)
             p: parse_prec(fmt, iss)
-            t: prim.iss_readchar(iss, false)
+            t: prim.iss_read_char(iss, false)
             if args == []
                 throw `MissingArgument{"argument for %d is missing"}
             print_element(oss, t,f,w,p,first(args))
