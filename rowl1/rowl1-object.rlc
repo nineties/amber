@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-object.rlc 2014-04-09 09:39:31 nineties $
+; $Id: rowl1-object.rlc 2014-04-12 20:10:29 nineties $
 ;
 
 (import "rlvm-compile")
@@ -16,9 +16,8 @@
 (import "rowl1-error")
 
 (var slots (make_wrtable))
-(var parent (to_sym "parent"))
 (var parent_tbl (make_wrtable))
-(var dummy (wrtable_add slots parent parent_tbl))
+(var dummy (wrtable_add slots Parent parent_tbl))
 (var parent_special null)
 (var noparent (to_unique_sym "noparent"))
 
@@ -83,7 +82,7 @@
     ))
 
 (fun set_slot_ (obj sym val overwrite fusion alias) (
-    (if (== sym parent) (return (set_parent obj val)))
+    (if (== sym Parent) (return (set_parent obj val)))
     (var ref (get_slot_ref obj sym @C_TRUE))
     (if (&& (!= overwrite @C_FALSE) (== ref @C_UNDEF))
         (if (== (node_head obj) Module)
@@ -144,7 +143,7 @@
     ))
 
 (fun get_slot_ (obj sym rec alias check) (
-    (if (== sym parent) (return (get_parent obj)))
+    (if (== sym Parent) (return (get_parent obj)))
     (var ref (get_slot_ref obj sym rec))
     (if (== ref @C_UNDEF)
         (if (!= check @C_FALSE)
@@ -185,7 +184,7 @@
     (var ent ent_)
     (while ent (do
         (var sym (field_get ent 2))
-        (if (&& (!= sym parent) (!= (table_at dupcheck sym) @C_TRUE)) (do
+        (if (&& (!= sym Parent) (!= (table_at dupcheck sym) @C_TRUE)) (do
             (var tbl (field_get ent 3))
             (var v (wrtable_find tbl obj))
             (if (!= v @C_UNDEF) (do
@@ -197,7 +196,7 @@
         ))
     (if (== obj @C_NIL) (return @C_NIL))
     (var p (get_parent obj))
-    (if (!= p @C_UNDEF) (runcode code obj parent p))
+    (if (!= p @C_UNDEF) (runcode code obj Parent p))
     (if (&& (!= rec @C_FALSE) (!= p @C_UNDEF)) (do
         (= obj p)
         (goto loop)
