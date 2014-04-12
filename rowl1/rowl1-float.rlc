@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-float.rlc 2014-04-12 07:14:23 nineties $
+; $Id: rowl1-float.rlc 2014-04-12 10:23:20 nineties $
 ;
 
 ; Since Amber has no 64-bit integer, this source code uses bignums instead.
@@ -582,7 +582,7 @@
     (if (& w1 0x80000000) (= sign 1))
     (var e (- (& (>> w1 20) 0x7ff) 1023))
     (= w1 (| (& w1 0xfffff) 0x100000))
-    (if (< e 0) (return (int_to_bint 0)))
+    (if (< e 0) (return (box 0)))
     (var shift (- 52 e))
     (var b (allocate_bint 2))
     (bint_set_digit b 0 w0)
@@ -660,6 +660,50 @@
     (return (fpow f g))
     ))
 
+(fun float_ceil (f) (
+    (var w0 (field_get f 0))
+    (var w1 (field_get f 1))
+    (var sign 0)
+    (if (& w1 0x80000000) (= sign 1))
+    (var e (- (& (>> w1 20) 0x7ff) 1023))
+    (= w1 (| (& w1 0xfffff) 0x100000))
+    (if (< e 0)
+        (if sign (return (box 0)) (return (box 1)))
+        )
+    (var shift (- 52 e))
+    (var b (allocate_bint 2))
+    (bint_set_digit b 0 w0)
+    (bint_set_digit b 1 w1)
+    (field_set b 1 2)
+    (= b (norm (bint_rshift b (box shift))))
+    (if sign 
+        (return (bigneg b))
+        (return (bigadd b (uint_to_bint 1)))
+        )
+    ))
+
+(fun float_floor (f) (
+    (var w0 (field_get f 0))
+    (var w1 (field_get f 1))
+    (var sign 0)
+    (if (& w1 0x80000000) (= sign 1))
+    (var e (- (& (>> w1 20) 0x7ff) 1023))
+    (= w1 (| (& w1 0xfffff) 0x100000))
+    (if (< e 0)
+        (if sign (return (box -1)) (return (box 0)))
+        )
+    (var shift (- 52 e))
+    (var b (allocate_bint 2))
+    (bint_set_digit b 0 w0)
+    (bint_set_digit b 1 w1)
+    (field_set b 1 2)
+    (= b (norm (bint_rshift b (box shift))))
+    (if sign 
+        (return (bigneg (bigadd b (uint_to_bint 1))))
+        (return b)
+        )
+    ))
+
 (export fun setup_float (mod) (
     (set_slot mod (to_sym "infinity") (float_infinity))
 
@@ -677,6 +721,8 @@
     (add_function2 mod (to_sym "float_pow") floatT floatT float_fpow 0)
     (add_function2 mod (to_sym "float_compare") floatT floatT float_compare 0)
     (add_function2 mod (to_sym "float_equalual?") floatT floatT float_equal 0)
+    (add_function1 mod (to_sym "float_floor") floatT float_floor 0)
+    (add_function1 mod (to_sym "float_ceil") floatT float_ceil 0)
 
     (add_function1 mod (to_sym "float_abs") floatT float_abs 0)
     ))
