@@ -1,5 +1,5 @@
 # Copyright (C) 2010 nineties
-# $Id: module.ab 2014-04-13 05:05:27 nineties $
+# $Id: module.ab 2014-04-13 05:23:02 nineties $
 
 #= Module system =
 #== Basics ==
@@ -79,7 +79,7 @@ expand_import([M,rest...], path) := {
         | _  -> `( if prim.loadable?(!file) load(!file) )
 
     `Seq{[
-        enter_module('!M),
+        enter_module('!M) with .parent = Module,
         !loadstmt,
         !expand_import(rest, path),
         exit_module()
@@ -91,6 +91,16 @@ buildpath(mods) := prim.string_add(
     ".ab")
 
 exit_module()
+
+class Module{name} with {
+    .defined?(x @ Symbol) := self.variables.has_slot?(x, recursive=true)
+}
+
+# Set parents of already created modules manually.
+amber.parent         = Module
+syntax.parent        = Module
+object_system.parent = Module
+module.parent        = Module
 
 macro(e @ Import{mods, asname, option}) := {
     mod := prim.list_foldl1((l, r) -> `Var{!l, !r}, mods)
