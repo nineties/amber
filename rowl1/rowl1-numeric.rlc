@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012_bang nineties
 ;
-; $Id: rowl1-numeric.rlc 2014-04-12 09:59:29 nineties $
+; $Id: rowl1-numeric.rlc 2014-04-12 10:31:15 nineties $
 ;
 
 (import "rlvm-compile")
@@ -18,6 +18,7 @@
 (import "rowl1-error")
 
 (extern fun tuple2)
+(extern fun tuple_at)
 
 (fun nonzero_check (x) (
     (if (bint_is_zero x)
@@ -646,8 +647,15 @@
     ))
 (fun bint_div (a b) (
     (nonzero_check b)
-    (if (& (& a b) 1)
-        (return (fdiv (itof (unbox a)) (itof (unbox b))))
+    (if (& (& a b) 1) (do
+        (= a (unbox a))
+        (= b (unbox b))
+        (if (== (% a b) 0) (return (box (/ a b))))
+        (return (fdiv (itof a) (itof b)))
+        ))
+    (var t (bint_quorem a b))
+    (if (== (tuple_at t 1) (box 0))
+        (return (tuple_at t 0))
         )
     (return (fdiv (bint_to_f a) (bint_to_f b)))
     ))
