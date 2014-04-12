@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: io.ab 2014-04-12 13:50:23 nineties $
+# $Id: io.ab 2014-04-13 00:48:26 nineties $
 
 #= IO =
 # Input and output stream.
@@ -10,8 +10,8 @@ trait InputStream with {
 
     # Read characters until reach "\n", "\0" or EOS. The newline character
     # will be truncated.
-    .read_line(eoserror=false): {
-        oss: prim.oss_new(true)
+    .read_line(eoserror=false) := {
+        oss := prim.oss_new(true)
         while true {
             if self.eos? {
                 if eoserror
@@ -19,7 +19,7 @@ trait InputStream with {
                 else
                     break
             }
-            c: self.read_char()
+            c := self.read_char()
             if (c == "\n")
                 break
             prim.oss_print_string(oss, c)
@@ -29,9 +29,9 @@ trait InputStream with {
 
     # Read at most `count` lines from the stream and return
     # them as a list. Read all lines when `count==nil`.
-    .read_lines(count=nil): {
-        list: []
-        i: 0
+    .read_lines(count=nil) := {
+        i    := 0
+        list := []
         while (not self.eos?) {
             list = cons(.read_line(), list)
             i += 1
@@ -42,8 +42,8 @@ trait InputStream with {
     }
 
     # Read `n` bytes or until reach EOS and return them as a string.
-    .read_char(n @ Int, eoserror=false): {
-        oss: prim.oss_new(true)
+    .read_char(n @ Int, eoserror=false) := {
+        oss := prim.oss_new(true)
         for i in 1..n {
             if self.eos? {
                 if eoserror
@@ -57,10 +57,10 @@ trait InputStream with {
     }
 
     # Skip next one byte in the stream.
-    .skip(eoserror=false): { self.read_char(eoserror); self }
+    .skip(eoserror=false) := { self.read_char(eoserror); self }
 
     # Skip `n` bytes or until reach EOS.
-    .skip(n @ Int, eoserror=false): {
+    .skip(n @ Int, eoserror=false) := {
         self.read_char(n, eoserror)
         self
     }
@@ -70,40 +70,37 @@ trait OutputStream with {
     require '.write(s @ String)
 
     # Convert an object `o` to a string by `str` and output it.
-    .print(o): {
-        self.write(str(o))
-    }
+    .print(o) := self.write(str(o))
 
     # Ouptut an object `o` and newline.
-    .puts(o): { self.print(o); self.write("\n") }
+    .puts(o) := { self.print(o); self.write("\n") }
 
     # Formatted output
-    .printf(fmt @ String, args...):
-        io.printf(self, fmt, args...)
+    .printf(fmt @ String, args...) := io.printf(self, fmt, args...)
 }
 
 #== File  IO ==
 # Standard input, standard output and standard error.
-stdin:  prim.stdin
-stdout: prim.stdout
-stderr: prim.stderr
+stdin  := prim.stdin
+stdout := prim.stdout
+stderr := prim.stderr
 
 # Printing functions for `stdout`.
-print(v): stdout.print(v)
-puts(v): stdout.puts(v)
-printf(fmt @ String, args...): stdout.printf(fmt, args...)
+print(v) := stdout.print(v)
+puts(v)  := stdout.puts(v)
+printf(fmt @ String, args...) := stdout.printf(fmt, args...)
 
 # Reading function for `stdin`.
-read_char(eoserror=false): stdin.read_char(eoserror = eoserror)
-read_line(eoserror=false): stdin.read_line(eoserror = eoserror)
-read_lines(count=nil): stdin.read_lines(count=count)
-read(): stdin.read()
+read_char(eoserror=false) := stdin.read_char(eoserror = eoserror)
+read_line(eoserror=false) := stdin.read_line(eoserror = eoserror)
+read_lines(count=nil)     := stdin.read_lines(count=count)
+read() := stdin.read()
 
 # Open file `path` and create an input stream.
 # Option:
 #   * binary: Binary mode.
-open_in(path @ String, binary=false): {
-    io: prim.open_in(path, binary)
+open_in(path @ String, binary=false) := {
+    io := prim.open_in(path, binary)
     if binary
         io.parent = BinaryInputFileStream
     io
@@ -114,8 +111,8 @@ open_in(path @ String, binary=false): {
 #   * append: Do not truncate existing content of the file and
 #     write new data to the end of the file.
 #   * binary: Binary mode.
-open_out(path @ String, append=false, binary=false): {
-    io: prim.open_out(path, append, binary)
+open_out(path @ String, append=false, binary=false) := {
+    io := prim.open_out(path, append, binary)
     if binary
         io.parent = BinaryOutputFileStream
     io
@@ -125,26 +122,27 @@ trait InputFileStream with {
     extend InputStream
 
     # Close the stream.
-    .close(): prim.close_in(self)
+    .close() := prim.close_in(self)
 
     # True when the stream is at end of stream.
-    .eos?: alias(() -> prim.eos?(self))
+    .eos? := alias(() -> prim.eos?(self))
 
     # Read one byte from the stream.
-    .read_char(eoserror=false): prim.read_char(self, eoserror)
+    .read_char(eoserror=false) := prim.read_char(self, eoserror)
 
     # Read `n` bytes or until reach EOS and return them as a string.
-    .read_char(n @ Int, eoserror=false): prim.read_bytes(self, n, eoserror)
+    .read_char(n @ Int, eoserror=false)
+        := prim.read_bytes(self, n, eoserror)
 
     # Read characters until reach "\n", "\0" or EOS. The newline character
     # will be truncated.
-    .read_line(eoserror): prim.read_line(self, eoserror)
+    .read_line(eoserror) := prim.read_line(self, eoserror)
 
     # Read characters until reach EOS.
-    .read(): prim.read(self)
+    .read() := prim.read(self)
 
     # Return the next character if any.
-    .lookahead(eoserror=false): prim.lookahead(self, eoserror)
+    .lookahead(eoserror=false) := prim.lookahead(self, eoserror)
 }
 
 
@@ -152,10 +150,10 @@ trait OutputFileStream with {
     extend OutputStream
 
     # Close the stream.
-    .close(): prim.close_out(self)
+    .close() := prim.close_out(self)
 
     # Output string `s` to the stream.
-    .write(s @ String): prim.print_string(self, s)
+    .write(s @ String) := prim.print_string(self, s)
 }
 
 prim.set_builtin_parent('InputFileStream, InputFileStream)
@@ -165,38 +163,38 @@ trait BinaryInputFileStream with {
     extend InputFileStream
 
     # Read characters until reach "\0" or EOS.
-    .read_string(): prim.read_string(self)
+    .read_string() := prim.read_string(self)
 
     # Read signed or unsigned integer with specified precision and
     # return a fixed-length integer or a multi-precision integer.
-    .read_int8():   prim.read_int8(self)
-    .read_uint8():  prim.read_uint8(self)
-    .read_int16():  prim.read_int16(self)
-    .read_uint16(): prim.read_uint16(self)
-    .read_int32():  prim.read_int32(self)
-    .read_uint32(): prim.read_uint32(self)
-    .read_int64():  prim.read_int64(self)
-    .read_uint64(): prim.read_uint64(self)
+    .read_int8()   := prim.read_int8(self)
+    .read_uint8()  := prim.read_uint8(self)
+    .read_int16()  := prim.read_int16(self)
+    .read_uint16() := prim.read_uint16(self)
+    .read_int32()  := prim.read_int32(self)
+    .read_uint32() := prim.read_uint32(self)
+    .read_int64()  := prim.read_int64(self)
+    .read_uint64() := prim.read_uint64(self)
 
     # Read IEEE754 double-precision floating point number.
-    .read_float():  prim.read_float(self)
+    .read_float() := prim.read_float(self)
 }
 
 trait BinaryOutputFileStream with {
     extend OutputFileStream
 
     # Write signed or unsigned integer with specified precision.
-    .write_int8(n):   prim.write_int8(self, n)
-    .write_uint8(n):  prim.write_uint8(self, n)
-    .write_int16(n):  prim.write_int16(self, n)
-    .write_uint16(n): prim.write_uint16(self, n)
-    .write_int32(n):  prim.write_int32(self, n)
-    .write_uint32(n): prim.write_uint32(self, n)
-    .write_int64(n):  prim.write_int64(self, n)
-    .write_uint64(n): prim.write_uint64(self, n)
+    .write_int8(n)   := prim.write_int8(self, n)
+    .write_uint8(n)  := prim.write_uint8(self, n)
+    .write_int16(n)  := prim.write_int16(self, n)
+    .write_uint16(n) := prim.write_uint16(self, n)
+    .write_int32(n)  := prim.write_int32(self, n)
+    .write_uint32(n) := prim.write_uint32(self, n)
+    .write_int64(n)  := prim.write_int64(self, n)
+    .write_uint64(n) := prim.write_uint64(self, n)
 
     # Write IEEE754 double-precision floating point number.
-    .write_float(n):  prim.write_float(self, n)
+    .write_float(n) := prim.write_float(self, n)
 }
 
 #== String Stream ==
@@ -205,51 +203,52 @@ trait InputStringStream with {
     extend InputStream
 
     # Create an input string stream from `text`.
-    .new(text @ String, binary=false): prim.iss_new(text, binary)
+    .new(text @ String, binary=false) := prim.iss_new(text, binary)
 
     # True when the stream is at end of stream.
-    .eos?: alias(() -> prim.iss_eos?(self))
+    .eos? := alias(() -> prim.iss_eos?(self))
 
     # Read one byte from the stream.
-    .read_char(eoserror=false): prim.iss_read_char(self, eoserror)
+    .read_char(eoserror=false) := prim.iss_read_char(self, eoserror)
 
     # Read `n` bytes or until reach EOS and return them as a string.
-    .read_char(n @ Int, eoserror=false): prim.read_bytes(self, n, eoserror)
+    .read_char(n @ Int, eoserror=false)
+        := prim.read_bytes(self, n, eoserror)
 
     # Return the next character if any.
-    .lookahead(eoserror=false): prim.iss_lookahead(self, eoserror)
+    .lookahead(eoserror=false) := prim.iss_lookahead(self, eoserror)
 }
 
 trait OutputStringStream with {
     extend OutputStream
 
     # Create an output string stream.
-    .new(binary=false): prim.oss_new(binary)
+    .new(binary=false) := prim.oss_new(binary)
 
     # Output string `s` to the stream.
-    .write(s @ String): prim.oss_print_string(self, s)
+    .write(s @ String) := prim.oss_print_string(self, s)
 }
 
 prim.set_builtin_parent('InputStringStream, InputStringStream)
 prim.set_builtin_parent('OutputStringStream, OutputStringStream)
 
 # Convert the stream to a string.
-str(o @ OutputStringStream): prim.oss_to_string(o)
+str(o @ OutputStringStream) := prim.oss_to_string(o)
 
 #== Formatted print ==
 # Output arguments according to a format string like C's printf().
 
-import numeric.bit (lnot, lor, ltest)
-import string.ascii (is_digit?)
+import numeric::bit (lnot, lor, ltest)
+import string::ascii (is_digit?)
 
 # flags.
-FMT_PLUS:  0x01
-FMT_MINUS: 0x02
-FMT_SHARP: 0x04
-FMT_SPACE: 0x08
-FMT_ZERO:  0x10
+FMT_PLUS  := 0x01
+FMT_MINUS := 0x02
+FMT_SHARP := 0x04
+FMT_SPACE := 0x08
+FMT_ZERO  := 0x10
 
-FLAG_MAP: Table.new([
+FLAG_MAP := Table.new([
     ("+",   FMT_PLUS),
     ("-",   FMT_MINUS),
     ("#",   FMT_SHARP),
@@ -258,10 +257,10 @@ FLAG_MAP: Table.new([
 ])
 
 # Read flags from input string stream `iss`.
-parse_flag(iss): {
-    flag: 0
+parse_flag(iss) := {
+    flag := 0
     while true {
-        f: FLAG_MAP[prim.iss_lookahead(iss, false)]
+        f := FLAG_MAP[prim.iss_lookahead(iss, false)]
         if (f == nil) return flag
         flag = lor(flag, f)
         prim.iss_read_char(iss, false)
@@ -270,12 +269,12 @@ parse_flag(iss): {
 
 # Read decimal number from input string stream `iss`.
 # If `iss` doesn't begin with decimal character return `nil`.
-parse_number(iss): {
+parse_number(iss) := {
     if not is_digit?(prim.iss_lookahead(iss, false))
         return nil
-    w: 0
+    w := 0
     while true {
-        c: prim.iss_lookahead(iss, false)
+        c := prim.iss_lookahead(iss, false)
         if not is_digit?(c)
             return w
         w = w*10 + int(c)
@@ -286,7 +285,7 @@ parse_number(iss): {
 # Read precision number from input string stream `iss`.
 # If `iss` doesn't begin with '.' return `nil`. If the format string
 # is invalid throw `InvalidFormatString` exception.
-parse_prec(fmt, iss): {
+parse_prec(fmt, iss) := {
     if (prim.iss_lookahead(iss, false) != ".")
         return nil
     prim.iss_read_char(iss, false)
@@ -295,14 +294,14 @@ parse_prec(fmt, iss): {
     parse_number(iss)
 }
 
-print_element(oss,t,...): throw `UnknownFormatType{!t}
+print_element(oss,t,...) := throw `UnknownFormatType{!t}
 
 # Pretty printing.
-print_element(oss,"p",f,w,p,arg): prim.pretty_print(oss, arg)
+print_element(oss,"p",f,w,p,arg) := prim.pretty_print(oss, arg)
 
 # string.
-print_element(oss,"s",f,w,p,arg): {
-    s: str(arg)
+print_element(oss,"s",f,w,p,arg) := {
+    s := str(arg)
     if p != nil and p < s.length
         s = s[0,p]
     if w == nil
@@ -316,12 +315,11 @@ print_element(oss,"s",f,w,p,arg): {
 }
 
 # Decimal integer.
-print_element(oss,"d" or "i",f,w,p,arg): {
-    num: int(arg)
-    sign: num < 0
-    num = |num|
-    s: str(num,precision=(p==nil)?0:p)
-    prefix: ""
+print_element(oss,"d" or "i",f,w,p,arg) := {
+    num    := int(arg)
+    sign   := num < 0
+    s      := str(|num|,precision=(p==nil)?0:p)
+    prefix := ""
     if sign
         prefix = "-"
     else {
@@ -343,11 +341,11 @@ print_element(oss,"d" or "i",f,w,p,arg): {
 }
 
 # Unsignd binary integer.
-print_element(oss,t@("b" or "B"),f,w,p,arg): {
-    num: int(arg)
-    sign: num < 0
-    s: str(num,base=2,precision=(p==nil)?0:p,unsigned=true)
-    prefix: ""
+print_element(oss,t@("b" or "B"),f,w,p,arg) := {
+    num    := int(arg)
+    sign   := num < 0
+    s      := str(num,base=2,precision=(p==nil)?0:p,unsigned=true)
+    prefix := ""
     if sign
         prefix = "..1"
     if ltest(f, FMT_SHARP)
@@ -366,12 +364,13 @@ print_element(oss,t@("b" or "B"),f,w,p,arg): {
 }
 
 # Unsigned hexadecimal integer.
-print_element(oss,t@("x" or "X"),f,w,p,arg): {
-    num: int(arg)
-    sign: num < 0
-    s: str(num,base=16,precision=(p==nil)?0:p,upper=(t=="X"),unsigned=true)
-    forF: ((t == "x") ? "f" : "F")
-    prefix: ""
+print_element(oss,t@("x" or "X"),f,w,p,arg) := {
+    num    := int(arg)
+    sign   := num < 0
+    s      := str(num,base=16,precision=(p==nil)?0:p,upper=(t=="X"),
+                  unsigned=true)
+    forF   := ((t == "x") ? "f" : "F")
+    prefix := ""
     if sign
         prefix = ".." ++ forF
     if ltest(f, FMT_SHARP)
@@ -390,12 +389,11 @@ print_element(oss,t@("x" or "X"),f,w,p,arg): {
 }
 
 # Floating-point
-print_element(oss,"f",f,w,p,arg): {
-    num: float(arg)
-    sign: num < 0
-    num = |num|
-    s: str(num,precision=(p==nil)?0:p)
-    prefix: ""
+print_element(oss,"f",f,w,p,arg) := {
+    num    := float(arg)
+    sign   := num < 0
+    s      := str(|num|,precision=(p==nil)?0:p)
+    prefix := ""
     if sign
         prefix = "-"
     else {
@@ -415,19 +413,19 @@ print_element(oss,"f",f,w,p,arg): {
     }
 }
 
-printf(oss, fmt @ String, args...) when oss.OutputStream?: {
+printf(oss, fmt @ String, args...) when oss.OutputStream? := {
     # Create an input string stream.
-    iss: prim.iss_new(fmt, false)
+    iss := prim.iss_new(fmt, false)
     while true {
-        c: prim.iss_read_char(iss, false)
+        c := prim.iss_read_char(iss, false)
         if (c == nil) break
         if (c != "%")
             oss.write(c)
         else {
-            f: parse_flag(iss)
-            w: parse_number(iss)
-            p: parse_prec(fmt, iss)
-            t: prim.iss_read_char(iss, false)
+            f := parse_flag(iss)
+            w := parse_number(iss)
+            p := parse_prec(fmt, iss)
+            t := prim.iss_read_char(iss, false)
             if args == []
                 throw `MissingArgument{
                     !("argument for %" ++ t ++ " is missing")}

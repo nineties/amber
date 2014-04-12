@@ -1,22 +1,22 @@
 # Copyright (C) 2014 nineties
-# $Id: array.ab 2014-04-12 13:53:37 nineties $
+# $Id: array.ab 2014-04-13 00:37:23 nineties $
 
 #= Array =
 # Dynamic and mutable array.
 # Amber's objects are basically heterogeneous, i.e. you can put any kind
 # of object into one array.
 
-Array: object_system.builtin_class('Array) with {
+Array := object_system::builtin_class('Array) with {
     # Create an empty array.
-    .new(): prim.array_new_empty()
+    .new() := prim.array_new_empty()
 
     # Create an array of length `n` whose `i`-th element is `f(i)`
-    .new(f @ Function, n @ Int): prim.array_new(f, n)
+    .new(f @ Function, n @ Int) := prim.array_new(f, n)
 
     # Create an array of length `n` by first element `f0` and recurrence
     # formula `f`.
-    .new(f @ Function, f0, n @ Int): {
-        ary: Array.new()
+    .new(f @ Function, f0, n @ Int) := {
+        ary := Array.new()
         for i in 1..n {
             ary.push(f0)
             f0 = f(f0)
@@ -26,73 +26,73 @@ Array: object_system.builtin_class('Array) with {
 
     # Create an array whose elements are obtained from an iterable object
     # `container`.
-    .new(container) when container.Iterable? : {
-        ary: Array.new()
+    .new(container) when container.Iterable? := {
+        ary := Array.new()
         for v in container
             ary.push(v)
         ary
     }
 
     # The number of elements.
-    .length: alias(() -> prim.array_length(self))
-    .size:   alias(() -> prim.array_length(self))
+    .length := alias(() -> prim.array_length(self))
+    .size   := alias(() -> prim.array_length(self))
 
     # Return true when `self` is an empty array.
-    .empty?: alias(() -> prim.array_length(self) == 0)
+    .empty? := alias(() -> prim.array_length(self) == 0)
 
     # `i`-th element.
-    .get(i @ Int): prim.array_at(self, i)
+    .get(i @ Int) := prim.array_at(self, i)
 
     # Store `v` to the `i`-th position. When the length of array is
     # insufficient, it will be resized by length `i+1`. Newly allocated
     # positions are initialized by `nil`.
-    .set(i @ Int, v): prim.array_store(self, i, v)
+    .set(i @ Int, v) := prim.array_store(self, i, v)
 
     # Add new element `v` to the last of the array.
-    .push(v): prim.array_push(self, v)
+    .push(v) := prim.array_push(self, v)
 
     # Pop the last element. When `self` is empty, throw `LogicError` exception.
-    .pop(): prim.array_pop(self)
+    .pop() := prim.array_pop(self)
 
     # Do nothing. For consistency with other containers.
-    .to_array(): self
+    .to_array() := self
 
     # Create a new list that contains all elements of `self` in the same order.
-    .to_list(): prim.array_to_list(self)
+    .to_list() := prim.array_to_list(self)
 
     # Return `true` when the array includes the value `v`.
-    .include?(v): prim.array_include?(self, v)
+    .include?(v) := prim.array_include?(self, v)
 
     # Reverse the order of `self`.
-    .reverse():  prim.array_reverse(self)
-    .reverse!(): prim.array_reverse!(self)
+    .reverse()  := prim.array_reverse(self)
+    .reverse!() := prim.array_reverse!(self)
 
     # Apply `f` to each element of `self`.
-    .map(f):  prim.array_map(f, self)
-    .map!(f): prim.array_map!(f, self)
+    .map(f)  := prim.array_map(f, self)
+    .map!(f) := prim.array_map!(f, self)
 
     # Append `other` to the last of `self` destructively.
-    .ncadd!(other)   = prim.array_append!(self, other)
+    .ncadd!(other) := prim.array_append!(self, other)
 
     # Remove elements in `other` from `self` destructively.
-    .sub!(other)   = prim.array_diff!(self, other)
+    .sub!(other) := prim.array_diff!(self, other)
 
     # Fold elements of `self` by the binary function `f` from left to right.
-    .foldl(f, v): prim.array_foldl(f, v, self)
-    .foldl(f):    prim.array_foldl1(f, self)
+    .foldl(f, v) := prim.array_foldl(f, v, self)
+    .foldl(f)    := prim.array_foldl1(f, self)
 
     # Fold elements of `self` by the binary function `f` from right to left.
-    .foldr(f, v): prim.array_foldr(f, self, v)
-    .foldr(f):    prim.array_foldr1(f, self)
+    .foldr(f, v) := prim.array_foldr(f, self, v)
+    .foldr(f)    := prim.array_foldr1(f, self)
 
     # Inplace sort.
-    .sort!(cmp @ Function): prim.array_sort!(self, cmp)
-    .sort!(): prim.array_sort!(self, compare)
+    .sort!(cmp @ Function) := prim.array_sort!(self, cmp)
+    .sort!()               := prim.array_sort!(self, compare)
 
     extend Iterable
-    .each(): {
-        ary: self
-        idx: 0
+    .each() := {
+        ary := self
+        idx := 0
 
         iterator () -> {
             if (idx >= ary.size)
@@ -113,7 +113,7 @@ sub = prim.array_diff | sub
 
 # Convert to string.
 str(ary @ Array) = {
-    os: OutputStringStream.new()
+    os := OutputStringStream.new()
     os.print("Array{")
     for i in 0..ary.size-1 {
         os.print(ary[i])
@@ -123,4 +123,3 @@ str(ary @ Array) = {
     os.print("}")
     str(os)
 }
-

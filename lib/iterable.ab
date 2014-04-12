@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: iterable.ab 2014-04-12 08:46:56 nineties $
+# $Id: iterable.ab 2014-04-13 00:28:49 nineties $
 
 #= Trait for iteration of containers. =
 # An `Iterable` object must implements method `.each()` which returns a new# iterator for the object.
@@ -14,25 +14,25 @@ trait Iterable with {
     require '.each()
 
     # Internal iteration. Call `callback` for each element of `self`.
-    .each(callback @ Function): {
-        it: self.each()
-        value: nil
+    .each(callback @ Function) := {
+        it := self.each()
+        value := nil
         while ((value = it()) != undef)
             callback(value)
         self
     }
 
     # Create a new list by collecting values obtained from the iterator.
-    .to_list(): {
-        list: []
+    .to_list() := {
+        list := []
         for v in self
             list = cons(v, list)
         list.reverse()
     }
 
     # Create a new array by collecting values obtained from the iterator.
-    .to_array(): {
-        ary: Array.new()
+    .to_array() := {
+        ary := Array.new()
         for v in self
             ary.push(v)
         ary
@@ -40,12 +40,12 @@ trait Iterable with {
 
     # Create a new iterator that returns elements of `self` and their
     # index as a tuple `(index, value)`.
-    .with_index(): {
-        it: self.each()
-        idx: 0
+    .with_index() := {
+        it := self.each()
+        idx := 0
 
         iterator () -> {
-            v: it()
+            v := it()
             idx += 1
             if (v == undef)
                 return undef
@@ -54,8 +54,8 @@ trait Iterable with {
     }
 
     # Return new iterator that returns at most `n` elements.
-    .take(n @ Int): {
-        it: self.each()
+    .take(n @ Int) := {
+        it := self.each()
 
         iterator () -> {
             if n == 0
@@ -66,11 +66,11 @@ trait Iterable with {
     }
 
     # Return new iterator that returns elements while `p` is satisfied.
-    .takeWhile(p @ Function): {
-        it: self.each()
+    .takeWhile(p @ Function) := {
+        it := self.each()
 
         iterator () -> {
-            v: it()
+            v := it()
             if v == undef or not p(v)
                 return undef
             v
@@ -78,28 +78,28 @@ trait Iterable with {
     }
 
     # Drop first `n` elements of the iterator.
-    .drop(n @ Int): {
-        it: self.each()
+    .drop(n @ Int) := {
+        it := self.each()
         for i in 1..n
             it()
         it
     }
 
     # Drop elements from the iterator while `p` is satisfied.
-    .dropWhile(p @ Function): {
-        it: self.each()
-        value: nil
+    .dropWhile(p @ Function) := {
+        it := self.each()
+        value := nil
         while ((value = it()) != undef) and p(value)
             ;
         iterator () -> {
-            t: value
+            t := value
             value = it()
             t
         }
     }
 
     # Return `true` when all elements of `self` satisfy the predicate `p`.
-    .all?(p @ Function): {
+    .all?(p @ Function) := {
         for v in self {
             if not p(v)
                 return false
@@ -109,7 +109,7 @@ trait Iterable with {
 
     # Return `true` when `self` contains some element which satisfies the
     # predicate `p`.
-    .any?(p @ Function): {
+    .any?(p @ Function) := {
         for v in self {
             if p(v)
                 return true
@@ -118,23 +118,23 @@ trait Iterable with {
     }
 
     # Return `true` when `self` includes `v`.
-    .include?(v): self.any?(x -> x == v)
+    .include?(v) := self.any?(x -> x == v)
 
     # Create new iterator that returns elements of `self` repeatedly.
     # Example
     # ----
     # > [1,2,3].cycle().take(10).to_list()      # => [1,2,3,1,2,3,1,2,3,1]
     # ----
-    .cycle(): {
-        ary: self.to_array()
-        idx: 0
-        len: ary.size
+    .cycle() := {
+        ary := self.to_array()
+        idx := 0
+        len := ary.size
 
         if len == 0
             return (iterator () -> undef)
 
         iterator () -> {
-            v: ary[idx]
+            v := ary[idx]
             idx = (idx + 1) % len
             v
         }
@@ -142,11 +142,11 @@ trait Iterable with {
 
     # Create a new iterator from `self` that returns values which satisfy
     # the predicate `p`.
-    .filter(p @ Function): {
-        it: self.each()
+    .filter(p @ Function) := {
+        it := self.each()
 
         iterator () -> {
-            value: nil
+            value := nil
             while ((value = it()) != undef) {
                 if p(value)
                     return value
@@ -157,7 +157,7 @@ trait Iterable with {
 }
 
 # Convert given nullary function `f` to an iterable object.
-iterator(f @ Function): {
+iterator(f @ Function) := {
     f.parent = Iterable
     f.each() = self
     f
@@ -166,8 +166,8 @@ iterator(f @ Function): {
 # Create an iterator that returns `v` repeatedly.
 # When `size` option is specified, the iterator returns
 # `size` values.
-repeat(v, size=nil): {
-    cnt: 0
+repeat(v, size=nil) := {
+    cnt := 0
     iterator () -> {
         if (size != nil and cnt >= size)
             return undef
@@ -186,12 +186,12 @@ repeat(v, size=nil): {
 # ----
 # > counter(begin=10, step=2, end=20).to_list()    # => [10,12,14,16,18]
 # ----
-counter(begin = 0, step=1, end = nil): {
-    cnt: begin
+counter(begin = 0, step=1, end = nil) := {
+    cnt := begin
     iterator () -> {
         if (end != nil and cnt >= end)
             return undef
-        v: cnt
+        v := cnt
         cnt += step
         v
     }
@@ -204,10 +204,10 @@ counter(begin = 0, step=1, end = nil): {
 # > zip([1,2,3,4], [4,5,6]).to_list()       # => [(1,4),(2,5),(3,6)]
 # ----
 zip(iterables...)
-    when iterables.size >= 2 and iterables.all?(x -> x.Iterable?) : {
-    iterators: Tuple.new(iterables.map(x -> x.each()))
+    when iterables.size >= 2 and iterables.all?(x -> x.Iterable?) := {
+    iterators := Tuple.new(iterables.map(x -> x.each()))
     iterator () -> {
-        values: iterators.map(x -> x())
+        values := iterators.map(x -> x())
         for i in 0..values.size-1 {
             if values[i] == undef
                 return undef
@@ -216,26 +216,27 @@ zip(iterables...)
     }
 }
 
-zip(it1, it2) when it1.Iterable? and it2.Iterable? : {
+zip(it1, it2) when it1.Iterable? and it2.Iterable? := {
     it1 = it1.each()
     it2 = it2.each()
     iterator () -> {
-        v1: it1()
-        v2: it2()
+        v1 := it1()
+        v2 := it2()
         if (v1 == undef or v2 == undef)
             return undef
         return (v1, v2)
     }
 }
 
-zip(it1, it2, it3) when it1.Iterable? and it2.Iterable? and it3.Iterable? : {
+zip(it1, it2, it3)
+    when it1.Iterable? and it2.Iterable? and it3.Iterable? := {
     it1 = it1.each()
     it2 = it2.each()
     it3 = it3.each()
     iterator () -> {
-        v1: it1()
-        v2: it2()
-        v3: it3()
+        v1 := it1()
+        v2 := it2()
+        v3 := it3()
         if (v1 == undef or v2 == undef or v3 == undef)
             return undef
         return (v1, v2)
@@ -246,17 +247,17 @@ zip(it1, it2, it3) when it1.Iterable? and it2.Iterable? and it3.Iterable? : {
 # ----
 # > product([1,2,3],[4,5]).to_list()        # => [(1,4),(1,5),(2,4),(2,5),(3,4),(3,5)]
 # ---
-product(iterables...) when iterables.all?(x -> x.Iterable?) : {
-    arrays: iterables.map(x -> x.to_array())
-    sizes:  arrays.map(x -> x.size)
-    len: arrays.size
-    n: sizes.foldl(mul, 1)
-    i: 0
+product(iterables...) when iterables.all?(x -> x.Iterable?) := {
+    arrays := iterables.map(x -> x.to_array())
+    sizes  := arrays.map(x -> x.size)
+    len    := arrays.size
+    n      := sizes.foldl(mul, 1)
+    i      := 0
     iterator () -> {
         if (i == n)
             return undef
-        value: Tuple.new(0, len)
-        j: i
+        value := Tuple.new(0, len)
+        j := i
         for k in 1..len {
             k = len-k
             value[k] = arrays[k][i % sizes[k]]
@@ -267,46 +268,47 @@ product(iterables...) when iterables.all?(x -> x.Iterable?) : {
     }
 }
 
-product(it1, it2) when it1.Iterable? and it2.Iterable? : {
-    ary1: it1.to_array()
-    ary2: it2.to_array()
-    n1: ary1.size
-    n2: ary2.size
-    n:  n1*n2
-    i:  0
+product(it1, it2) when it1.Iterable? and it2.Iterable? := {
+    ary1 := it1.to_array()
+    ary2 := it2.to_array()
+    n1   := ary1.size
+    n2   := ary2.size
+    n    := n1*n2
+    i    := 0
     iterator () -> {
         if (i == n)
             return undef
-        value: (ary1[i//n2], ary2[i%n2])
+        value := (ary1[i//n2], ary2[i%n2])
         i += 1
         value
     }
 }
 
-product(it1, it2, it3) when it1.Iterable? and it2.Iterable? and it3.Iterable? : {
-    ary1: it1.to_array()
-    ary2: it2.to_array()
-    ary3: it3.to_array()
-    n1: ary1.size
-    n2: ary2.size
-    n3: ary3.size
-    n:  n1*n2*n3
-    i:  0
+product(it1, it2, it3)
+    when it1.Iterable? and it2.Iterable? and it3.Iterable? := {
+    ary1 := it1.to_array()
+    ary2 := it2.to_array()
+    ary3 := it3.to_array()
+    n1   := ary1.size
+    n2   := ary2.size
+    n3   := ary3.size
+    n    := n1*n2*n3
+    i    := 0
     iterator () -> {
         if (i == n)
             return undef
-        value: (ary1[i//(n2*n3)], ary2[(i//n3)%n2], ary3[i%n3])
+        value := (ary1[i//(n2*n3)], ary2[(i//n3)%n2], ary3[i%n3])
         i += 1
         value
     }
 }
 
-intersection(it1, it2) when it1.Iterable? and it2.Iterable?: {
-    set: Table.new(zip(it2, iterator(() -> true)))
-    it1:  it1.each()
+intersection(it1, it2) when it1.Iterable? and it2.Iterable? := {
+    set := Table.new(zip(it2, iterator(() -> true)))
+    it1 :=  it1.each()
     iterator () -> {
         while true {
-            v: it1()
+            v := it1()
             if v == undef
                 return undef
             if set[v] == true

@@ -1,64 +1,66 @@
 # Copyright (C) 2014 nineties
-# $Id: Parser.ab 2014-04-11 23:25:06 nineties $
+# $Id: Parser.ab 2014-04-13 03:56:06 nineties $
 
 #= Parser =
-Parser: object_system.builtin_class('Parser)
+Parser := object_system::builtin_class('Parser)
 Parser with {
-    .new(input, lang) when input.InputFileStream? :
-        prim.parser_new(input) with .syntax = lang.syntax
-    .new(path @ String, lang):
-        prim.parser_new(io.file.open_in(path)) with .syntax = lang.syntax
-    .tree: alias(() -> prim.parser_tree(self))
-    .loc:  alias(() -> prim.parser_loc(self))
+    .new(input, lang) when input.InputFileStream?
+        := prim.parser_new(input) with .syntax = lang::syntax
+    .new(path @ String, lang)
+        := prim.parser_new(io.file.open_in(path))
+            with .syntax = lang::syntax
+    .tree := alias(() -> prim.parser_tree(self))
+    .loc  := alias(() -> prim.parser_loc(self))
 
-    .file: alias(
+    .file := alias(
         get = () -> prim.parser_loc[0],
         set = file -> prim.parser_setfile(self, file))
-    .line: alias(
+    .line := alias(
         get = () -> prim.parser_loc[1],
         set = line -> prim.parser_setline(self, line))
 
-    .reset!():prim.parser_reset(self)
-    .error_string: alias(() -> prim.parser_error(self))
-    .eof?: alias(() -> prim.parser_eof?(self))
+    .reset!()     := prim.parser_reset(self)
+    .error_string := alias(() -> prim.parser_error(self))
+    .eof?         := alias(() -> prim.parser_eof?(self))
 
-    .parse(sym): {
-        f: prim.get_slot(self.syntax, sym, true, true, true)
+    .parse(sym) := {
+        f := prim.get_slot(self.syntax, sym, true, true, true)
         f(self)
     }
 }
 
 prim.set_builtin_parent('Parser, Parser)
 
-parse(lang, input): lang.syntax.program(Parser(input, lang.syntax))
+parse(lang, input) := lang::syntax.program(Parser(input, lang::syntax))
 
 #= Syntax object =
 class Syntax{name} with {
-    .new(name, case_sensitive=true): {
+    .new(name, case_sensitive=true) := {
         if not case_sensitive
             throw `NotImplemented{"Sorry but we haven't implemented case-insensitive syntax"}
-        syn: Syntax.make(name)
-        syn.reserved_words: prim.array_new_empty()
-        syn.case_sensitive: case_sensitive
+        syn := Syntax.make(name)
+        syn.reserved_words := prim.array_new_empty()
+        syn.case_sensitive := case_sensitive
 
         # Copy basic parsers
-        basic_parsers: ['toplevel, 'shell, 'any, 'spaces, 'comment,
-                        'decimal, 'binary, 'octal, 'hex, 'integer,
-                        'float, 'string, 'symbol, 'any_symbol, 'identifier]
+        basic_parsers := [
+            'toplevel, 'shell, 'any, 'spaces, 'comment, 'decimal, 'binary,
+            'octal, 'hex, 'integer, 'float, 'string, 'symbol, 'any_symbol,
+            'identifier]
 
         for p in basic_parsers
             syn.set_slot(p,
-                prim.get_slot(amber.syntax, p, false, false, true))
+                prim.get_slot(amber::syntax, p, false, false, true))
         syn
     }
 
-    .add_reserved_word(words...): {
+    .add_reserved_word(words...) := {
         for v in words
             prim.array_push(self.reserved_words, v.to_sym())
     }
 
-    .program(p): {
-        statements: []
+    .program(p) := {
+        statements := []
         while self.toplevel(p)
             statements = cons(p.tree, statements)
         if not p.eof?

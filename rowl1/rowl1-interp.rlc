@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-04-12 20:27:43 nineties $
+; $Id: rowl1-interp.rlc 2014-04-13 03:19:28 nineties $
 ;
 
 (import "rlvm-compile")
@@ -32,7 +32,7 @@
 
 (export fun set_loc (loc) (
     (= current_loc loc)
-    (set_slot global (to_sym "LOCATION") loc)
+    (set_var global (to_sym "LOCATION") loc)
     ))
 
 (fun version_string () (
@@ -71,14 +71,14 @@
 
     ; Global Module
     (= amber (create_module @C_NIL Amber))
-    (set_slot amber Amber amber)
+    (set_var amber Amber amber)
     (= global amber)
 
     (remove_parent @C_NIL)
 
-    ; prim Module
-    (var prim (create_module amber Prim)) ; prim functions
-    (set_slot global Prim prim)
+    ; Collection of primitive functions
+    (var prim (make_node0 VarTable))
+    (set_var global Prim prim)
 
     ; Setup built-in objects and functions.
     (setup_argv argc argv)
@@ -90,12 +90,12 @@
     (set_loc no_loc)
     (var cwd (getcwd))
     (if (! cwd) (throw (io_error (string "Failed to get current working directory"))))
-    (set_slot amber (to_sym "INVOKE_PATH") cwd)
+    (set_var amber (to_sym "INVOKE_PATH") cwd)
 
     (var load_path (ary_new)) 
-    (set_slot amber (to_sym "AMBER_PATH") load_path)
-    (set_slot amber (to_sym "ALREADY_LOADED") (ary_new))
-    (set_slot amber (to_sym "VERSION") (version_string))
+    (set_var amber (to_sym "AMBER_PATH") load_path)
+    (set_var amber (to_sym "ALREADY_LOADED") (ary_new))
+    (set_var amber (to_sym "VERSION") (version_string))
     (ary_push load_path (tuple2 (string "/usr/lib/amber") amber))
     (var cwdir (realpath (string ".")))
     (if (! cwdir) (throw (io_error (string "Failed to get absolute path of current working directory"))))
@@ -149,7 +149,6 @@
 (extern fun fullform)
 (fun interpret (p path) (
     (var ochan (preparse_ochan path))
-
     (while 1 (do
         (set_loc (get_loc p))
         (parse_toplevel p)
@@ -158,7 +157,6 @@
             (output_syntax_error (get_loc p) (parser_error p))
             (exit 1)
             ))
-
         (if ochan (do
             (output_string ochan (fullform (parsed_token p)))
             (output_string ochan "\n")
@@ -240,7 +238,7 @@
 
 (fun setup_argv (argc argv) (
     (var ARGV (ary_new))
-    (set_slot amber (to_sym "ARGV") ARGV)
+    (set_var amber (to_sym "ARGV") ARGV)
     (if (== argc 0) return)
     (for i 0 argc (do
         (ary_push ARGV (string (array_get string argv i)))
@@ -257,8 +255,8 @@
     ))
 
 (fun load_file (path) (
-    (var dirs (get_slot amber (to_sym "AMBER_PATH")))
-    (var loaded (get_slot amber (to_sym "ALREADY_LOADED")))
+    (var dirs (get_var amber (to_sym "AMBER_PATH")))
+    (var loaded (get_var amber (to_sym "ALREADY_LOADED")))
     (if (!= (node_type dirs) @ArrayE) (goto load_error))
     (if (!= (node_type loaded) @ArrayE) (goto load_error))
     (rfor i 0 (array_size dirs) (do
@@ -302,7 +300,7 @@
                     (strcat "Failed to change directory to " dir)))))
 
             (var p (make_parser fullpath ichan))
-            (set_slot p (to_sym "syntax") (load_global Syntax))
+            (set_slot p Syntax (get_var amber Syntax))
             (set_loc (get_loc p))
             (if pre
                 (interpret_preparsed p)
@@ -335,7 +333,7 @@
             (strcat "Failed to change directory to " dir)))))
 
     (var p (make_parser path ichan))
-    (set_slot p (to_sym "syntax") (load_global Syntax))
+    (set_slot p Syntax (get_var amber Syntax))
     (set_loc (get_loc p))
     (interpret p 0)
     (if (< (fchdir fd) 0)
@@ -348,8 +346,8 @@
     ))
 
 (fun loadable (path) (
-    (var dirs (get_slot amber (to_sym "AMBER_PATH")))
-    (var loaded (get_slot amber (to_sym "ALREADY_LOADED")))
+    (var dirs (get_var amber (to_sym "AMBER_PATH")))
+    (var loaded (get_var amber (to_sym "ALREADY_LOADED")))
     (if (!= (node_type dirs) @ArrayE) (goto load_error))
     (if (!= (node_type loaded) @ArrayE) (goto load_error))
     (rfor i 0 (array_size dirs) (do
@@ -366,7 +364,7 @@
     ))
 
 (fun find_parent (sym) (
-    (var dirs (get_slot amber (to_sym "AMBER_PATH")))
+    (var dirs (get_var amber (to_sym "AMBER_PATH")))
     (if (!= (node_type dirs) @ArrayE) (goto load_error))
     (rfor i 0 (array_size dirs) (do
         (var t (ary_at dirs (box i)))
@@ -388,18 +386,23 @@
         )
     (var mod (make_node1 Module sym))
     (set_slot mod Parent parent)
+    (var vtbl (make_node0 VarTable))
+    (if (!= parent @C_NIL)
+        (set_slot vtbl Parent (get_slot parent Variables))
+        )
+    (set_slot mod Variables vtbl)
     (return mod)
     ))
 
 (fun enter_module (sym) (
     (if (!= (symtable_depth variables) 0)
         (throw (logic_error (string "enter_module() can be called only in top-scope"))))
-    (var mod (get_slot_nocheck global sym))
+    (var mod (get_var_nocheck global sym))
     (if (|| (== mod @C_NIL) (!= (node_head mod) Module)) (do
         (var p (find_parent sym))
         (if (! p) (= p global))
         (= mod (create_module p sym))
-        (set_slot p sym mod)
+        (set_var p sym mod)
         ))
     (= module_stack (cons global module_stack))
     (= global mod)
@@ -409,8 +412,7 @@
 (fun enter_block () (
     (if (!= (symtable_depth variables) 0)
         (throw (logic_error (string "enter_module() can be called only in top-scope"))))
-    (var mod (make_node1 Module (to_unique_sym "Block")))
-    (set_slot mod Parent global)
+    (var mod (create_module global (to_unique_sym "block")))
     (= module_stack (cons global module_stack))
     (= global mod)
     (return mod)
@@ -433,23 +435,23 @@
     ))
 
 (export fun load_global (sym) (
-    (return (get_slot_nocheck amber sym))
+    (return (get_slot_nocheck (get_slot amber Variables) sym))
     ))
 
-(fun copy_variable (to sym1 from sym2) (
-    (var f (get_slot_nocheck from (to_sym sym2)))
-    (if (== f @C_NIL)
-        (throw (not_found (to_sym sym2)))
-        )
-    (set_slot to (to_sym sym1) f)
+(export fun set_var (mod sym val) (
+    (return (set_slot (get_slot mod Variables) sym val))
+    ))
+
+(export fun get_var (mod sym) (
+    (return (get_slot (get_slot mod Variables) sym))
+    ))
+
+(export fun get_var_nocheck (mod sym) (
+    (return (get_slot_nocheck (get_slot mod Variables) sym))
     ))
 
 (fun define_variable (sym val) (
-    (return (set_slot global sym val))
-    ))
-
-(fun define_variable_fusion (sym val _) (
-    (return (set_slot_fusion global sym val))
+    (return (set_var global sym val))
     ))
 
 (fun gettimeofday_ () (
@@ -463,34 +465,33 @@
 
 (fun setup_minimal_interpreter (prim) (
     ; parser
-    (var syntax (create_module amber Syntax))
-    (set_slot global Syntax syntax)
-    (set_slot syntax Parent global)
+    (var syntax (create_module amber (to_sym "Syntax")))
+    (set_var amber Syntax syntax)
     
-    (copy_variable syntax "any" prim "parse_any")
-    (copy_variable syntax "spaces" prim "parse_spaces")
-    (copy_variable syntax "comment" prim "parse_comment")
-    (copy_variable syntax "decimal" prim "parse_decimal")
-    (copy_variable syntax "binary" prim "parse_binary")
-    (copy_variable syntax "octal" prim "parse_octal")
-    (copy_variable syntax "hex" prim "parse_hex")
-    (copy_variable syntax "integer" prim "parse_integer")
-    (copy_variable syntax "float" prim "parse_float")
-    (copy_variable syntax "string" prim "parse_string")
-    (copy_variable syntax "symbol" prim "parse_symbol")
-    (copy_variable syntax "any_symbol" prim "parse_any_symbol")
-    (copy_variable syntax "identifier" prim "parse_identifier")
-    (copy_variable syntax "atom" prim "parse_atom")
-    (copy_variable syntax "fullform" prim "parse_fullform")
-    (copy_variable syntax "fullform_preparse" prim "parse_fullform_preparse")
-    (copy_variable syntax "expr" prim "parse_expr")
-    (copy_variable syntax "stmt" prim "parse_stmt")
-    (copy_variable syntax "toplevel_stmt" prim "parse_toplevel_stmt")
+    (set_slot syntax (to_sym "any") (get_slot prim (to_sym "parse_any")))
+    (set_slot syntax (to_sym "spaces") (get_slot prim (to_sym "parse_spaces")))
+    (set_slot syntax (to_sym "comment") (get_slot prim (to_sym "parse_comment")))
+    (set_slot syntax (to_sym "decimal") (get_slot prim (to_sym "parse_decimal")))
+    (set_slot syntax (to_sym "binary") (get_slot prim (to_sym "parse_binary")))
+    (set_slot syntax (to_sym "octal") (get_slot prim (to_sym "parse_octal")))
+    (set_slot syntax (to_sym "hex") (get_slot prim (to_sym "parse_hex")))
+    (set_slot syntax (to_sym "integer") (get_slot prim (to_sym "parse_integer")))
+    (set_slot syntax (to_sym "float") (get_slot prim (to_sym "parse_float")))
+    (set_slot syntax (to_sym "string") (get_slot prim (to_sym "parse_string")))
+    (set_slot syntax (to_sym "symbol") (get_slot prim (to_sym "parse_symbol")))
+    (set_slot syntax (to_sym "any_symbol") (get_slot prim (to_sym "parse_any_symbol")))
+    (set_slot syntax (to_sym "identifier") (get_slot prim (to_sym "parse_identifier")))
+    (set_slot syntax (to_sym "atom") (get_slot prim (to_sym "parse_atom")))
+    (set_slot syntax (to_sym "fullform") (get_slot prim (to_sym "parse_fullform")))
+    (set_slot syntax (to_sym "fullform_preparse") (get_slot prim (to_sym "parse_fullform_preparse")))
+    (set_slot syntax (to_sym "expr") (get_slot prim (to_sym "parse_expr")))
+    (set_slot syntax (to_sym "stmt") (get_slot prim (to_sym "parse_stmt")))
+    (set_slot syntax (to_sym "toplevel_stmt") (get_slot prim (to_sym "parse_toplevel_stmt")))
 
     ; evaluator
     (add_function1 prim Eval DontCare builtin_eval 0)
     (add_function2 prim (to_sym "eval_with_self") DontCare DontCare eval_with_self 0)
-    (add_function1 prim (to_sym "eval_full") DontCare evalfull 0)
+    (add_function1 prim (to_sym "evalfull") DontCare evalfull 0)
     (add_function2 prim (to_sym "eval_with_self_full") DontCare DontCare evalfull_with_self 0)
 
     (add_function1 prim (to_sym "exit") intT exit_ 0)
@@ -502,16 +503,14 @@
     (add_function1 prim (to_sym "enter_module") symT enter_module 0)
     (add_function0 prim (to_sym "exit_module") exit_module 0)
     (add_function2 prim (to_sym "define_variable") symT DontCare define_variable 0)
-    (add_function3 prim (to_sym "define_variable") symT DontCare (quote (to_sym "fusion")) define_variable_fusion 0)
     (add_function0 prim (to_sym "gettimeofday") gettimeofday_ 0)
     (add_function2 prim (to_sym "timeval_sub") DontCare DontCare timeval_sub_ 0)
     (add_function1 prim (to_sym "chdir") stringT change_dir 0)
     (add_function1 prim (to_sym "debugpf") DontCare debugpf 0)
 
     ; important functions
-    (copy_variable global "compile" prim "compile")
-    (copy_variable global "eval" prim "eval")
-
+    (define_variable (to_sym "compile") (get_slot prim (to_sym "compile")))
+    (define_variable (to_sym "eval")    (get_slot prim (to_sym "eval")))
     (define_variable (to_sym "PROMPT") (string "amber"))
     ))
 

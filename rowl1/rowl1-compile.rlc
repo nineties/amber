@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-04-12 08:13:32 nineties $
+; $Id: rowl1-compile.rlc 2014-04-13 03:52:58 nineties $
 ;
 
 (import "rlvm-compile")
@@ -458,9 +458,21 @@
     (return expr)
     ))
 
+(fun get_global_variable (mod sym) (
+    (return (get_slot_unalias (get_slot mod Variables) sym))
+    ))
+
+(fun define_global_variable (mod sym val) (
+    (return (set_slot (get_slot mod Variables) sym val))
+    ))
+
+(fun assign_global_variable (mod sym val) (
+    (return (set_slot_overwrite (get_slot mod Variables) sym val))
+    ))
+
 (extern fun compile_matching)
 (export fun lookup_func (mod sym) (
-    (var func (get_slot_nocheck mod sym))
+    (var func (get_slot_nocheck (get_slot mod Variables) sym))
     (if (== func @C_NIL) (do
         (throw (undefined_fun sym))
         ))
@@ -468,7 +480,7 @@
     ))
 
 (export fun lookup_func_nocheck (mod sym) (
-    (var func (get_slot_nocheck mod sym))
+    (var func (get_slot_nocheck (get_slot mod Variables) sym))
     (if (== func @C_NIL) (return 0))
     (return (compile_matching sym func))
     ))
@@ -957,13 +969,14 @@
     ))
 
 (fun append_function (mod sym newfunc) (
-    (var func (get_slot_nocheck mod sym))
+    (var vtbl (get_slot mod Variables))
+    (var func (get_slot_nocheck vtbl sym))
     (if (!= func @C_NIL)
         (if (&& (is_function func) (is_function newfunc))
-            (return (set_slot mod sym (fusion_function newfunc func)))
+            (return (set_slot vtbl sym (fusion_function newfunc func)))
             (throw (redefined_slot mod sym))
             )
-        (return (set_slot mod sym newfunc))
+        (return (set_slot vtbl sym newfunc))
         )
     ))
 
@@ -1001,8 +1014,12 @@
         (return (compile_define_global_variable asm lhs rhs))
     (if (== ty Slot)
         (return (compile_define_slot asm lhs rhs))
+    (if (== ty Var)
+        (return (compile_define_slot asm
+            (slot (slot (node_arg lhs 0) Variables) (node_arg lhs 1))
+            rhs))
         (return (compile_define_multi_variable asm lhs rhs))
-        )))
+        ))))
     ))
 
 ; v: e              (in local scope)
@@ -1024,15 +1041,19 @@
         (return (compile_define_local_variable asm lhs rhs))
     (if (== ty Slot)
         (return (compile_define_slot asm lhs rhs))
+    (if (== ty Var)
+        (return (compile_define_slot asm
+            (slot (slot (node_arg lhs 0) Variables) (node_arg lhs 1))
+            rhs))
         (return (compile_define_multi_variable asm lhs rhs))
-        )))
+        ))))
     ))
 
 (fun compile_define_global_variable (asm sym val) (
     (compile asm val)
     (put_push asm sym)
     (put_push asm global)
-    (compile_simple_call asm 3 set_slot)
+    (compile_simple_call asm 3 define_global_variable)
     ))
 
 ; translate
@@ -1091,6 +1112,16 @@
         return
         ))
 
+    (if (== ty Var) (do
+        (var obj (node_arg lhs 0))
+        (var sym (node_arg_symbol lhs 1))
+        (compile asm lam)
+        (put_push asm sym)
+        (compile asm (slot obj Variables))
+        (compile_simple_call asm 3 set_slot_fusion)
+        return
+        ))
+
     (compile asm lam)
     (put_push asm lhs)
     (put_push asm global)
@@ -1138,6 +1169,16 @@
         return
         ))
 
+    (if (== ty Var) (do
+        (var obj (node_arg lhs 0))
+        (var sym (node_arg_symbol lhs 1))
+        (compile asm lam)
+        (put_push asm sym)
+        (compile asm (slot obj Variables))
+        (compile_simple_call asm 3 set_slot_fusion)
+        return
+        ))
+
     (if (&& (!= ty Symbol) (!= ty Ref))
         (throw (unknown_expression (make_node2 Define lhs lam))) 
         )
@@ -1174,7 +1215,7 @@
     (if (== ty GlobalVariable) (do
         (put_push asm sym)
         (put_push asm global)
-        (compile_simple_call asm 2 get_slot_unalias)
+        (compile_simple_call asm 2 get_global_variable)
         return
         ))
     (if (== ty LocalVariable) (do
@@ -1240,6 +1281,12 @@
 
 (fun compile_var (asm sym) (
     (compile_operand asm (lookup_symbol sym) sym)
+    ))
+
+(fun compile_qualvar (asm expr) (
+    (var mod (node_arg expr 0))
+    (var sym (node_arg_symbol expr 1))
+    (compile asm (slot (slot mod Variables) sym))
     ))
 
 (fun variable_length_args_error (args) (
@@ -1878,7 +1925,7 @@
         (compile asm rhs)
         (put_push asm (node_arg_symbol v 0))
         (put_push asm global)
-        (compile_simple_call asm 3 set_slot_overwrite)
+        (compile_simple_call asm 3 assign_global_variable)
         return
         ))
 
@@ -2238,32 +2285,32 @@
     (compile asm (transl_define_syntax expr))
     ))
 
-(export fun add_function0 (mod sym func guard) (
-    (append_function mod sym (make_builtin_function 0 func guard @FALSE))
+(export fun add_function0 (obj sym func guard) (
+    (set_slot_fusion obj sym (make_builtin_function 0 func guard @FALSE))
     ))
 
-(export fun add_function1 (mod sym pat func guard) (
-    (append_function mod sym (make_builtin_function (list1 pat) func guard @FALSE))
+(export fun add_function1 (obj sym pat func guard) (
+    (set_slot_fusion obj sym (make_builtin_function (list1 pat) func guard @FALSE))
     ))
 
-(export fun add_function2 (mod sym pat1 pat2 func guard) (
-    (append_function mod sym (make_builtin_function (list2 pat1 pat2) func guard @FALSE))
+(export fun add_function2 (obj sym pat1 pat2 func guard) (
+    (set_slot_fusion obj sym (make_builtin_function (list2 pat1 pat2) func guard @FALSE))
     ))
 
-(export fun add_function3 (mod sym pat1 pat2 pat3 func guard) (
-    (append_function mod sym (make_builtin_function (list3 pat1 pat2 pat3) func guard @FALSE))
+(export fun add_function3 (obj sym pat1 pat2 pat3 func guard) (
+    (set_slot_fusion obj sym (make_builtin_function (list3 pat1 pat2 pat3) func guard @FALSE))
     ))
 
-(export fun add_function4 (mod sym pat1 pat2 pat3 pat4 func guard) (
-    (append_function mod sym (make_builtin_function (list4 pat1 pat2 pat3 pat4) func guard @FALSE))
+(export fun add_function4 (obj sym pat1 pat2 pat3 pat4 func guard) (
+    (set_slot_fusion obj sym (make_builtin_function (list4 pat1 pat2 pat3 pat4) func guard @FALSE))
     ))
 
-(export fun add_function5 (mod sym pat1 pat2 pat3 pat4 pat5 func guard) (
-    (append_function mod sym (make_builtin_function (list5 pat1 pat2 pat3 pat4 pat5) func guard @FALSE))
+(export fun add_function5 (obj sym pat1 pat2 pat3 pat4 pat5 func guard) (
+    (set_slot_fusion obj sym (make_builtin_function (list5 pat1 pat2 pat3 pat4 pat5) func guard @FALSE))
     ))
 
-(export fun add_function6 (mod sym pat1 pat2 pat3 pat4 pat5 pat6 func guard) (
-    (append_function mod sym (make_builtin_function (list6 pat1 pat2 pat3 pat4 pat5 pat6) func guard @FALSE))
+(export fun add_function6 (obj sym pat1 pat2 pat3 pat4 pat5 pat6 func guard) (
+    (set_slot_fusion obj sym (make_builtin_function (list6 pat1 pat2 pat3 pat4 pat5 pat6) func guard @FALSE))
     ))
 
 ; g * f == (x -> g(f(x)))
@@ -2340,6 +2387,7 @@
     (add_compiler mod (make_node3 ArithAssign DontCare DontCare DontCare) compile_arithmetic_assign)
 
     (add_compiler mod (make_node2 Slot DontCare symT) compile_slot)
+    (add_compiler mod (make_node2 Var DontCare symT) compile_qualvar)
     (add_compiler mod (make_node1 Reset DontCare) compile_reset)
     (add_compiler mod (make_node1 Shift DontCare) compile_shift)
 

@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: object_system.ab 2014-04-09 09:43:52 nineties $
+# $Id: object_system.ab 2014-04-13 00:11:01 nineties $
 
 #= Object System =
 # This library introduces prototype-based object-oriented programming
@@ -20,14 +20,14 @@
 #
 # ---
 # > class Point2D{x, y}
-# > p: Point2D(1, 2)          # => `Point2D{1, 2}
-# > p.x                       # => 1
-# > p.y                       # => 2
-# > q: Point2D(x = 3, y = 4)  # => `Point2D{3, 4}
-# > q.x                       # => 3
-# > q.y                       # => 4
+# > p := Point2D(1, 2)          # => `Point2D{1, 2}
+# > p.x                         # => 1
+# > p.y                         # => 2
+# > q := Point2D(x = 3, y = 4)  # => `Point2D{3, 4}
+# > q.x                         # => 3
+# > q.y                         # => 4
 # > q.x = 5
-# > q                         # => `Point2D{5, 4}
+# > q                           # => `Point2D{5, 4}
 # ---
 #
 # To define additional fields to the class, you can use `with` expression
@@ -35,10 +35,10 @@
 # ---
 # > import math
 # > class Point2D{x, y} with {
-# >     .norm(): math.sqrt(.x^2 + .y^2)
+# >     .norm() := math.sqrt(.x^2 + .y^2)
 # > }
 # >
-# > p: Point2D(1, 2)
+# > p := Point2D(1, 2)
 # > p.norm()            # => 2.23606797749979
 # ---
 #
@@ -48,14 +48,14 @@
 # ---
 # > class A{} with {
 # >     .name = "A"
-# >     .hello(): "This is " + .name
+# >     .hello() := "This is " + .name
 # > }
 # > class B{} with {
 # >     .parent = A
 # >     .name = "B"
 # > }
 # >
-# > obj: B()
+# > obj := B()
 # > obj.hello()     # => "This is B"
 # ---
 #
@@ -86,25 +86,25 @@ macro(DefClass{head, fields}) = `Seq{[
 
 macro(DefTrait{head}) = `Define{!head, Trait.new('!head)}
 
-Trait: `Class{Trait} with {
-    .Trait?: true
+Trait := `Class{Trait} with {
+    .Trait? := true
 
-    .new(name @ Symbol): {
+    .new(name @ Symbol) := {
         # When create trait `A`, an attribute `A?` is defined.
-        name?: prim.string_to_symbol(
+        name? := prim.string_to_symbol(
                 prim.string_add(prim.symbol_to_string(name), "?"))
 
         nil.set_slot(name?, false)
         `Trait{!name} with {
-            .parent: Trait
+            .parent := Trait
             .set_slot(name?, true)
         }
     }
 
-    .extend_trait(...):
-         throw `LogicError{"Traits can extend Trait{...} objects"}
-    .extend_trait(from @ Trait{name}): {
-        to: self
+    .extend_trait(...)
+        := throw `LogicError{"Traits can extend Trait{...} objects"}
+    .extend_trait(from @ Trait{name}) := {
+        to := self
 
         if (from.has_slot?('before_extend))
             from.before_extend(to)
@@ -114,23 +114,23 @@ Trait: `Class{Trait} with {
         self
     }
 
-    .add_required_slot(attr): {
+    .add_required_slot(attr) := {
         # XXX: What should we do here?
     }
 }
 
-nil.Trait?: false
+nil.Trait? := false
 
-extend(traits...): {
-    to: self
+extend(traits...) := {
+    to := self
     prim.list_foreach((t) -> to.extend_trait(t), traits)
     self
 }
 
-require(attrs...): {
-    to: self
+require(attrs...) := {
+    to := self
     prim.list_foreach((s) -> to.add_required_slot(s), attrs)
     self
 }
 
-builtin_class(head @ Symbol): `Class{!head} with .parent = Trait
+builtin_class(head @ Symbol) := `Class{!head} with .parent = Trait

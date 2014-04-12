@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-04-12 20:22:32 nineties $
+; $Id: rowl1-packrat.rlc 2014-04-13 02:41:36 nineties $
 ;
 
 (import "rlvm-compile")
@@ -198,23 +198,23 @@
     ))
 
 (var utilities null)
-(fun apply_util (name args) (do
-    (return (apply (quote (get_slot utilities (to_sym name))) args))
-    ))
-
 (var nospace_p @FALSE)
 (var multiline_p @FALSE)
 (var shell_mode_p @FALSE)
 (var mayparse_p @FALSE)
 (var left_rec (string "Left Recursion Detected"))
 (var PVar (to_sym "parser")) ; internal use
-(var syntax (to_sym "syntax"))
 
 (extern object global)
 (extern fun load_global)
 (extern fun ary_include)
 (extern fun tuple2)
 (extern fun tuple_at)
+(extern fun compile_matching)
+
+(fun apply_util (name args) (do
+    (return (apply (quote (get_slot utilities (to_sym name))) args))
+    ))
 
 (fun __cons (a b) (
     (return (cons a b))
@@ -238,11 +238,23 @@
     ))
 
 (fun syntax_func (name) (
-    (return (slot (slot PVar syntax) (to_sym name)))
+    (return (slot (slot PVar Syntax) (to_sym name)))
+    ))
+
+(fun lookup_parser (name p) (
+    (var sym (to_sym name))
+    (var func (get_slot_nocheck (get_slot p Syntax) sym))
+    (if (== func @C_NIL) (return 0))
+    (return (compile_matching sym func))
     ))
 
 (export fun parse (name p) (
-    (return (runcode (lookup_func (get_slot p syntax) (to_sym name)) p))
+    (var sym (to_sym name))
+    (var func (get_slot_nocheck (get_slot p Syntax) sym))
+    (if (== func @C_NIL) (do
+        (throw (undefined_fun sym))
+        ))
+    (return (runcode (compile_matching sym func) p))
     ))
 
 (export fun parse_success (p) (
@@ -974,7 +986,7 @@
 
 (fun parse_spaces_oneline_ (p) (
     (var pos (get_pos p))
-    (var comment (lookup_func_nocheck (get_slot p syntax) (to_sym "comment")))
+    (var comment (lookup_parser "comment" p))
     (while @TRUE (do
         (var c (lookahead p))
         (if (< c 0) break)
@@ -997,7 +1009,7 @@
 
 (fun parse_spaces_ (p) (
     (var pos (get_pos p))
-    (var comment (lookup_func_nocheck (get_slot p syntax) (to_sym "comment")))
+    (var comment (lookup_parser "comment" p))
     (while @TRUE (do
         (var c (lookahead p))
         (if (< c 0) break)
@@ -1418,7 +1430,7 @@
     ))
 
 (fun is_reserved_word (p sym) (
-    (var stx (get_slot_nocheck p syntax))
+    (var stx (get_slot_nocheck p Syntax))
     (if (== stx @C_NIL) (return @FALSE))
     (var reserved_words (get_slot_nocheck stx (to_sym "reserved_words")))
     (if (== reserved_words @C_NIL) (return @FALSE))
@@ -1437,7 +1449,7 @@
         ))
     (if (== hd Symbol) (do
         (return (parse_with_check
-            (apply (slot (slot PVar syntax) pat) (list1 PVar)) ws))
+            (apply (slot (slot PVar Syntax) pat) (list1 PVar)) ws))
         ))
     (if (== hd Slot) (do
         (return (parse_with_check (apply pat (list1 PVar)) ws))
@@ -1902,17 +1914,17 @@
     (var e (to_unique_sym "e"))
     (var body 0)
     (= body (cons (defvar stx expr0) body))
-    (= body (cons (defvar save_stx (slot PVar syntax)) body))
-    (= body (cons (assign (slot PVar syntax) stx) body))
+    (= body (cons (defvar save_stx (slot PVar Syntax)) body))
+    (= body (cons (assign (slot PVar Syntax) stx) body))
     (= body (cons (defvar v @C_NIL) body))
     (= body (cons (make_node2 Try
         (assign v (apply (apply_util "%get_slot" (list2 stx expr1)) (list1 PVar)))
         (lambda (list1 e) (block (list2
-            (assign (slot PVar syntax) save_stx)
+            (assign (slot PVar Syntax) save_stx)
             (make_node1 Throw e)
             )))
         ) body))
-    (= body (cons (assign (slot PVar syntax) save_stx) body))
+    (= body (cons (assign (slot PVar Syntax) save_stx) body))
     (= body (cons v body))
     (return (parse_with_check (block (list_reverse body)) ws))
     ))
@@ -2138,7 +2150,7 @@
 
 (extern fun create_module)
 (export fun init_parser_funcs (mod) (
-    (= utilities (create_module global (to_unique_sym "%ParserUtilities")))
+    (= utilities (make_node0 VarTable))
     (add_function1 utilities (to_sym "%get_column") DontCare get_column 0)
     (add_function2 utilities (to_sym "%set_indent") DontCare DontCare set_indent 0)
     (add_function1 utilities (to_sym "%check_indent") DontCare check_indent 0)

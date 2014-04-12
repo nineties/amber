@@ -1,5 +1,5 @@
 # Copyright (C) 2010 nineties
-# $Id: module.ab 2014-03-31 09:51:28 nineties $
+# $Id: module.ab 2014-04-13 02:04:42 nineties $
 
 #= Module system =
 #== Basics ==
@@ -43,18 +43,19 @@
 #   * `import A hiding (x,y,z)`: Copy every variables but `x`, `y` and `z`.
 #   * `import A (*)`: Copy every variables which is visible in `A`.
 
-module: enter_module('module)
+module := enter_module('module)
 
-copy_variables(mod, 'All):
-    prim.each_slots(mod,
+copy_variables(mod, 'All)
+    := prim.each_slots(mod.variables,
         (_, x, v) -> {
             if (x != 'parent)
                 prim.define_variable(x, v)
         },
         true
         )
-copy_variables(mod, Hiding{vars}):
-    prim.each_slots(mod,
+
+copy_variables(mod, Hiding{vars})
+    := prim.each_slots(mod.variables,
         (_, x, v) -> {
             if (x != 'parent and not prim.list_include?(x, vars))
                 prim.define_variable(x, v)
@@ -62,18 +63,18 @@ copy_variables(mod, Hiding{vars}):
         true
         )
 
-copy_variables(mod, vars @ List):
-    prim.list_foreach(x -> prim.define_variable(x,
-                prim.get_slot(mod, x, true, false, true)), vars)
+copy_variables(mod, vars @ List)
+    := prim.list_foreach(x -> prim.define_variable(x,
+        prim.get_slot(mod.variables, x, true, false, true)), vars)
 
-expand_import([], _): nil
-expand_import([M,rest...], path): {
+expand_import([], _) := nil
+expand_import([M,rest...], path) := {
     if (not prim.equal?(path, ""))
         path = prim.string_add(path, "/")
     path = prim.string_add(path, prim.symbol_to_string(M))
-    file: prim.string_add(path, ".ab")
+    file := prim.string_add(path, ".ab")
 
-    loadstmt: case rest of
+    loadstmt := case rest of
           [] -> `load(!file)
         | _  -> `( if prim.loadable?(!file) load(!file) )
 
@@ -85,23 +86,23 @@ expand_import([M,rest...], path): {
     ]}
 }
 
-buildpath(mods): prim.string_add(prim.string_join(
-        prim.list_map(prim.symbol_to_string, mods), "/")
-        , ".ab")
+buildpath(mods):= prim.string_add(
+    prim.string_join(prim.list_map(prim.symbol_to_string, mods), "/"),
+    ".ab")
 
-exit_module()
+exit_module() # Exit from `module`.
 
-macro(e @ Import{mods, asname, option}): {
-    mod: prim.list_foldl1((l, r) -> `Slot{!l, !r}, mods)
-    import_stmt: case option of
+macro(e @ Import{mods, asname, option}) := {
+    mod := prim.list_foldl1((l, r) -> `Var{!l, !r}, mods)
+    import_stmt := case option of
           Some{option}
             -> `Seq{[
-                    !module.expand_import(mods, ""),
-                    module.copy_variables(!mod, '!option),
+                    !module::expand_import(mods, ""),
+                    module::copy_variables(!mod, '!option),
                     !mod
                 ]}
         | nil
-            -> `Seq{[!module.expand_import(mods, ""), !mod]}
+            -> `Seq{[!module::expand_import(mods, ""), !mod]}
         | _
             -> { throw `UnknownExpression{!e} }
 

@@ -1,30 +1,30 @@
 # Copyright (C) 2014 nineties
-# $Id: syntax/print.ab 2014-04-12 11:47:23 nineties $
+# $Id := syntax/print.ab 2014-04-12 11:47:23 nineties $
 
 import pretty_print as P
 
 #= Pretty-printing of standard nodes=
 # Following definitions correspond to the definitions in syntax/parse.ab.
 
-INDENT_WIDTH: 4
-TEXT_WIDTH:  80
+INDENT_WIDTH := 4
+TEXT_WIDTH   := 80
 
 # When a sequence is longer than SEQUENCE_ABBREV_LEN, the following
 # elements are abbreviated.
-SEQUENCE_ABBREV_LEN: 1000
+SEQUENCE_ABBREV_LEN := 1000
 
 #== Detection of standard expressions and statements ==
 
 # Return `true` when given node is a standard expression.
-expression?(_): false
+expression?(_) := false
 
 # We need special treatment of following nodes because these nods have
 # special semantics in pattern matching.
-expression?(p) when p.head == 'Domain and p.arity == 2: true
-expression?(p) when p.head == 'SeqOr and p.arity == 2: true
-expression?(p) when p.head == 'Quote and p.arity == 1: true
-expression?(p) when p.head == 'Quasiquote and p.arity == 1: true
-expression?(p) when p.head == 'Unquote and p.arity == 1: true
+expression?(p) when p.head == 'Domain and p.arity == 2     := true
+expression?(p) when p.head == 'SeqOr and p.arity == 2      := true
+expression?(p) when p.head == 'Quote and p.arity == 1      := true
+expression?(p) when p.head == 'Quasiquote and p.arity == 1 := true
+expression?(p) when p.head == 'Unquote and p.arity == 1    := true
 
 expression?(_ @ Int or _ @ Float or _ @ String or _ @ Symbol or _ @ List or
             _ @ Tuple or Abs{_} or Slot{_, _ @ Symbol} or 'Rest{} or
@@ -40,13 +40,13 @@ expression?(_ @ Int or _ @ Float or _ @ String or _ @ Symbol or _ @ List or
             SubAssign{_, _} or MulAssign{_, _} or PowAssign{_, _} or
             DivAssign{_, _} or QuoAssign{_, _} or RemAssign{_, _} or
             FusionAssign{_, _} or WithSlots{_, _ @ List} or Block{_ @ List}
-        ): true
+        ) := true
 
 # Return `true` when given node is a standard statement.
-statement?: expression?
+statement? := expression?
 statement?(Seq{_ @ List} or If{_, _} or While{_, _} or For{_, _, _} or
            Continue{} or Break{} or Return{_} or Throw{_} or Try{_, _} or
-           Define{_, _} or Assign{_, _} or Import{_ @ List, _, _}): true
+           Define{_, _} or Assign{_, _} or Import{_ @ List, _, _}) := true
 
 #== Utility formatters ==
 # Sequences with parentheses are printed as the following rule.
@@ -57,194 +57,186 @@ statement?(Seq{_ @ List} or If{_, _} or While{_, _} or For{_, _, _} or
 #      b,
 #      c)
 #
-sequence(seq, f, left, delim, right): {
-    values: seq.take(SEQUENCE_ABBREV_LEN).to_list()
+sequence(seq, f, left, delim, right) := {
+    values := seq.take(SEQUENCE_ABBREV_LEN).to_list()
     if values.size == SEQUENCE_ABBREV_LEN
         values[values.size-1] = '...
 
-    indent: left.size
-    P.breakable(P.nest(indent,
-        [left, values.map(f).weave([delim, P.nl(" ")]), right].flatten()
+    indent := left.size
+    P::breakable(P::nest(indent,
+        [left, values.map(f).weave([delim, P::nl(" ")]), right].flatten()
         ))
 }
 
-block(s, cont=false): {
-    doc: P.nest(INDENT_WIDTH, [P.nl(" "), stmt(s)])
-    if cont
-        [doc, P.nl()]
-    else
-        doc
+block(s, cont=false) := {
+    doc := P::nest(INDENT_WIDTH, [P::nl(" "), stmt(s)])
+    cont ? [doc, P::nl()] : doc
 }
-block(Block{stmts @ List}, cont=false): {
-    doc: [" {", P.nest(INDENT_WIDTH, stmts.map(s -> [P.nl(), stmt(s)])),
-           P.nl(), "}"]
-    if cont
-        [doc, " "]
-    else
-        doc
+
+block(Block{stmts @ List}, cont=false) := {
+    doc := [" {", P::nest(INDENT_WIDTH, stmts.map(s -> [P::nl(), stmt(s)])),
+           P::nl(), "}"]
+    cont ? [doc, " "] : doc
 }
-block(stmt @ Seq, cont=false): {
-    doc: P.nest(INDENT_WIDTH, [P.nl(" "), P.compress(stmt(stmt))])
-    if cont
-        [doc, P.nl()]
-    else
-        doc
+
+block(stmt @ Seq, cont=false) := {
+    doc := P::nest(INDENT_WIDTH, [P::nl(" "), P::compress(stmt(stmt))])
+    cont ? [doc, P::nl()] : doc
 }
 
 #== Formatters ==
-fullform(obj):
-    P.breakable([ P.nest(INDENT_WIDTH, [str(obj.head), "{", P.nl(),
-        obj.arguments.map(expr).weave([",", P.nl(" ")])]), P.nl(), "}"])
+fullform(obj) := P::breakable([
+    P::nest(INDENT_WIDTH, [str(obj.head), "{", P::nl(),
+    obj.arguments.map(expr).weave([",", P::nl(" ")])]),
+    P::nl(), "}"])
 
-primary(e): fullform(e)
-primary(s) when statement?(s):  ["(", stmt(s), ")"]
-primary(e) when expression?(e): ["(", expr(e), ")"]
-primary(nil):           "nil"
-primary(true):          "true"
-primary(false):         "false"
-primary(e) when e.atom?: prim.fullform(e)
-primary(n @ Int):        str(n)
-primary(f @ Float):      str(f)
-primary(s @ String):     "\"" ++ s.escape() ++ "\""
-primary(var @ Symbol):   str(var)
-primary(list @ List):    sequence(list, expr, "[", ",", "]")
-primary(tuple @ Tuple):  sequence(tuple, expr, "(", ",", ")")
-primary(ary @ Array):    sequence(ary, expr, "Array{", ",", "}")
-primary(Block{stmts}):   P.group(block(stmts))
-primary(Abs{e}):         ["|", expr(e), "|"]
-primary(Slot{Self{}, m @ Symbol}): "." ++ str(m)
-primary('Rest{}): "..."
+primary(e) := fullform(e)
+primary(s) when statement?(s)  := ["(", stmt(s), ")"]
+primary(e) when expression?(e) := ["(", expr(e), ")"]
+primary(nil)   := "nil"
+primary(true)  := "true"
+primary(false) := "false"
+primary(e) when e.atom? := prim.fullform(e)
+primary(n @ Int)       := str(n)
+primary(f @ Float)     := str(f)
+primary(s @ String)    := "\"" ++ s.escape() ++ "\""
+primary(var @ Symbol)  := str(var)
+primary(list @ List)   := sequence(list, expr, "[", ",", "]")
+primary(tuple @ Tuple) := sequence(tuple, expr, "(", ",", ")")
+primary(ary @ Array)   := sequence(ary, expr, "Array{", ",", "}")
+primary(Block{stmts})  := P::group(block(stmts))
+primary(Abs{e})        := ["|", expr(e), "|"]
+primary(Slot{Self{}, m @ Symbol}) := "." ++ str(m)
+primary('Rest{}) := "..."
 
-argument(e): P.compress(expr(e))
-argument(`Keyword{!(x @ Symbol), !e}):
-    [str(x), " = ", P.compress(assign(e))]
+argument(e) := P::compress(expr(e))
+argument(`Keyword{!(x @ Symbol), !e})
+    := [str(x), " = ", P::compress(assign(e))]
 
-postfix(e): primary(e)
-postfix(Apply{f, args @ List}):
-    [postfix(f), sequence(args, argument, "(", ",", ")")]
-postfix(Subscript{obj, args @ List}):
-    [postfix(obj), sequence(args, argument, "[", ",", "]")]
-postfix(`Rest{!e}): [postfix(e), "..."]
-postfix(`Domain{!arg, !dom}): [primary(arg), " @ ", primary(dom)]
-postfix(Send{obj, f @ Symbol, args @ List}):
-    [postfix(obj), ".", str(f), sequence(args, argument, "(", ",", ")")]
-postfix(Slot{obj, m @ Symbol}): [postfix(obj), ".", str(m)]
-postfix(Pow{x, e}): [primary(x), "^", postfix(e)]
+postfix(e) := primary(e)
+postfix(Apply{f, args @ List})
+    := [postfix(f), sequence(args, argument, "(", ",", ")")]
+postfix(Subscript{obj, args @ List})
+    := [postfix(obj), sequence(args, argument, "[", ",", "]")]
+postfix(`Rest{!e}) := [postfix(e), "..."]
+postfix(`Domain{!arg, !dom}) := [primary(arg), " @ ", primary(dom)]
+postfix(Send{obj, f @ Symbol, args @ List})
+    := [postfix(obj), ".", str(f), sequence(args, argument, "(", ",", ")")]
+postfix(Slot{obj, m @ Symbol}) := [postfix(obj), ".", str(m)]
+postfix(Pow{x, e}) := [primary(x), "^", postfix(e)]
 
-quote(e): postfix(e)
-quote(e) when e.head == 'Quote and e.arity == 1:      ["'", quote(e[0])]
-quote(e) when e.head == 'Quasiquote and e.arity == 1: ["`", quote(e[0])]
-quote(e) when e.head == 'Unquote and e.arity == 1:    ["!", quote(e[0])]
+quote(e) := postfix(e)
+quote(e) when e.head == 'Quote and e.arity == 1      := ["'", quote(e[0])]
+quote(e) when e.head == 'Quasiquote and e.arity == 1 := ["`", quote(e[0])]
+quote(e) when e.head == 'Unquote and e.arity == 1    := ["!", quote(e[0])]
 
-pattern(e): quote(e)
-term(e): postfix(e)
+pattern(e) := quote(e)
+term(e) := postfix(e)
 
-prefix(e): quote(e)
-prefix(UPlus{e}):  ["+", quote(e)]
-prefix(UMinus{e}): ["-", quote(e)]
-prefix(Not{e}):    ["not", quote(e)]
+prefix(e)         := quote(e)
+prefix(UPlus{e})  := ["+", quote(e)]
+prefix(UMinus{e}) := ["-", quote(e)]
+prefix(Not{e})    := ["not", quote(e)]
 
-multiplicative(e): prefix(e)
-multiplicative(Mul{a, b}): [multiplicative(a), " * ", prefix(b)]
-multiplicative(Div{a, b}): [multiplicative(a), " / ", prefix(b)]
-multiplicative(Quo{a, b}): [multiplicative(a), " // ", prefix(b)]
-multiplicative(Rem{a, b}): [multiplicative(a), " % ", prefix(b)]
+multiplicative(e)         := prefix(e)
+multiplicative(Mul{a, b}) := [multiplicative(a), " * ", prefix(b)]
+multiplicative(Div{a, b}) := [multiplicative(a), " / ", prefix(b)]
+multiplicative(Quo{a, b}) := [multiplicative(a), " // ", prefix(b)]
+multiplicative(Rem{a, b}) := [multiplicative(a), " % ", prefix(b)]
 
-additive(e): multiplicative(e)
-additive(Add{a, b}): [additive(a), " + ", multiplicative(b)]
-additive(Sub{a, b}): [additive(a), " - ", multiplicative(b)]
+additive(e)         := multiplicative(e)
+additive(Add{a, b}) := [additive(a), " + ", multiplicative(b)]
+additive(Sub{a, b}) := [additive(a), " - ", multiplicative(b)]
 
-range(e): additive(e)
-range(Range{a, b}): [additive(a), "..", additive(b)]
+range(e)           := additive(e)
+range(Range{a, b}) := [additive(a), "..", additive(b)]
 
-rel(e): range(e)
-rel(LessThan{a, b}):     [range(a), " < ", range(b)]
-rel(LessEqual{a, b}):    [range(a), " <= ", range(b)]
-rel(GreaterThan{a, b}):  [range(a), " > ", range(b)]
-rel(GreaterEqual{a, b}): [range(a), " >= ", range(b)]
-rel(Equal{a, b}):        [range(a), " == ", range(b)]
-rel(NotEqual{a, b}):     [range(a), " != ", range(b)]
-rel(Compare{a, b}):      [range(a), " <=> ", range(b)]
+rel(e)                  := range(e)
+rel(LessThan{a, b})     := [range(a), " < ", range(b)]
+rel(LessEqual{a, b})    := [range(a), " <= ", range(b)]
+rel(GreaterThan{a, b})  := [range(a), " > ", range(b)]
+rel(GreaterEqual{a, b}) := [range(a), " >= ", range(b)]
+rel(Equal{a, b})        := [range(a), " == ", range(b)]
+rel(NotEqual{a, b})     := [range(a), " != ", range(b)]
+rel(Compare{a, b})      := [range(a), " <=> ", range(b)]
 
-seqand(e): rel(e)
-seqand(SeqAnd{a, b}): [rel(a), " and ", seqand(b)]
+seqand(e)            := rel(e)
+seqand(SeqAnd{a, b}) := [rel(a), " and ", seqand(b)]
 
-seqor(e): seqand(e)
-seqor(`SeqOr{!a, !b}): [seqand(a), " or ", seqor(b)]
+seqor(e)              := seqand(e)
+seqor(`SeqOr{!a, !b}) := [seqand(a), " or ", seqor(b)]
 
-ternary(e): seqor(e)
-ternary(IfElse{cond, ifthen, ifelse}):
-    [seqor(cond), " ? ", seqor(ifthen), " : ", ternary(ifelse)]
+ternary(e) := seqor(e)
+ternary(IfElse{cond, ifthen, ifelse})
+    := [seqor(cond), " ? ", seqor(ifthen), "  := ", ternary(ifelse)]
 
-lambda_arg(e): P.compress(fullform(e))
-lambda_arg(args @ List): sequence(args, argument, "(", ",", ")")
-lambda_arg(When{args @ List, guard}):
-    [sequence(args, argument, "(", ",", ")"),
-     " when ", P.compress(ternary(guard))]
+lambda_arg(e) := P::compress(fullform(e))
+lambda_arg(args @ List) := sequence(args, argument, "(", ",", ")")
+lambda_arg(When{args @ List, guard})
+    := [sequence(args, argument, "(", ",", ")"),
+        " when ", P::compress(ternary(guard))]
 
-lambda(e): ternary(e)
-lambda(Lambda{args, body}): [lambda_arg(args), " -> ", ternary(body)]
+lambda(e)                  := ternary(e)
+lambda(Lambda{args, body}) := [lambda_arg(args), " -> ", ternary(body)]
 
-multi_lambda(e): lambda(e)
-multi_lambda(Fusion{f, g}):
-    [lambda(f), P.nl(" "), "| ", multi_lambda(g)]
+multi_lambda(e)            := lambda(e)
+multi_lambda(Fusion{f, g}) := [lambda(f), P::nl(" "), "| ", multi_lambda(g)]
 
-continuation(e): multi_lambda(e)
-continuation(Reset{e}): ["reset ", multi_lambda(e)]
-continuation(Shift{e}): ["shift ", multi_lambda(e)]
+continuation(e)        := multi_lambda(e)
+continuation(Reset{e}) := ["reset ", multi_lambda(e)]
+continuation(Shift{e}) := ["shift ", multi_lambda(e)]
 
-assign(e): continuation(e)
-assign(Assign{x, v}): [pattern(x), " = ", assign(v)]
-assign(AddAssign{x, v}): [pattern(x), " += ", assign(v)]
-assign(SubAssign{x, v}): [pattern(x), " -= ", assign(v)]
-assign(MulAssign{x, v}): [pattern(x), " *= ", assign(v)]
-assign(PowAssign{x, v}): [pattern(x), " ^" , assign(v)]
-assign(DivAssign{x, v}): [pattern(x), " /= ", assign(v)]
-assign(QuoAssign{x, v}): [pattern(x), " //= ", assign(v)]
-assign(RemAssign{x, v}): [pattern(x), " %= ", assign(v)]
-assign(FusionAssign{x, v}): [pattern(x), " |= ", assign(v)]
-assign(WithSlots{x, stmts @ List}): [pattern(x), " with ", block(`Block{!stmts})]
+assign(e)                  := continuation(e)
+assign(Assign{x, v})       := [pattern(x), " = ", assign(v)]
+assign(AddAssign{x, v})    := [pattern(x), " += ", assign(v)]
+assign(SubAssign{x, v})    := [pattern(x), " -= ", assign(v)]
+assign(MulAssign{x, v})    := [pattern(x), " *= ", assign(v)]
+assign(PowAssign{x, v})    := [pattern(x), " ^" , assign(v)]
+assign(DivAssign{x, v})    := [pattern(x), " /= ", assign(v)]
+assign(QuoAssign{x, v})    := [pattern(x), " //= ", assign(v)]
+assign(RemAssign{x, v})    := [pattern(x), " %= ", assign(v)]
+assign(FusionAssign{x, v}) := [pattern(x), " |= ", assign(v)]
+assign(WithSlots{x, stmts @ List})
+    := [pattern(x), " with ", block(`Block{!stmts})]
 
-expr(e): assign(e)
+expr(e) := assign(e)
 
-stmt(e): expr(e)
-stmt(Seq{stmts}): [stmts.map(stmt).weave(P.nl("; "))]
-stmt(If{cond, body}): ["if ", expr(cond), block(body)]
-stmt(IfElse{cond, ifthen, ifelse}):
-    ["if ", expr(cond), " ", block(ifthen, cont=true),
-    "else ", block(ifelse)]
-stmt(While{cond, body}):
-    ["while ", expr(cond), block(body)]
-stmt(For{x, v, body}):
-    ["for ", pattern(x), " in ", expr(v), block(body)]
-stmt(Continue{}): "continue"
-stmt(Break{}): "break"
-stmt(Return{nil}): "return"
-stmt(Return{e}): ["return ", expr(e)]
-stmt(Throw{e}): ["throw ", expr(e)]
-stmt(Try{body, hdlr}):
-    ["try ", block(body, cont=true), "catch ", multi_lambda(hdlr)]
-stmt(Define{x, s}): [pattern(x), ": ", stmt(s)]
-smtt(Define{f, Lambda{args, body}}):
-    [pattern(f), lambda_arg(args), ": ", stmt(body)]
-stmt(Assign{x, e}): [pattern(x), " = ", expr(e)]
-stmt(Assign{f, Lambda{args, body}}):
-    [pattern(f), lambda_arg(args), " = ", stmt(body)]
-stmt(Import{mods, name, option}):
-    ["import ", mods.map(str).weave("."),
-    (name == nil) ? [] : [" as ", str(name)],
-    (option == nil) ? [] :
-    (option == 'All) ? " (*)" :
-    (option.head == 'List) ? [" (", option.map(str).weave(","), ")"] :
-    ["hiding", "(", option[0].map(str).weave(","), ")"]]
+stmt(e) := expr(e)
+stmt(Seq{stmts}) := [stmts.map(stmt).weave(P::nl("; "))]
+stmt(If{cond, body}) := ["if ", expr(cond), block(body)]
+stmt(IfElse{cond, ifthen, ifelse})
+    := ["if ", expr(cond), " ", block(ifthen, cont=true),
+        "else ", block(ifelse)]
+stmt(While{cond, body}) := ["while ", expr(cond), block(body)]
+stmt(For{x, v, body}) := ["for ", pattern(x), " in ", expr(v), block(body)]
+stmt(Continue{})  := "continue"
+stmt(Break{})     := "break"
+stmt(Return{nil}) := "return"
+stmt(Return{e})   := ["return ", expr(e)]
+stmt(Throw{e})    := ["throw ", expr(e)]
+stmt(Try{body, hdlr})
+    := ["try ", block(body, cont=true), "catch ", multi_lambda(hdlr)]
+stmt(Define{x, s}) := [pattern(x), " := ", stmt(s)]
+smtt(Define{f, Lambda{args, body}})
+    := [pattern(f), lambda_arg(args), " := ", stmt(body)]
+stmt(Assign{x, e}) := [pattern(x), " = ", expr(e)]
+stmt(Assign{f, Lambda{args, body}})
+    := [pattern(f), lambda_arg(args), " = ", stmt(body)]
+stmt(Import{mods, name, option})
+    := ["import ", mods.map(str).weave("."),
+        (name == nil) ? [] : [" as ", str(name)],
+        (option == nil) ? [] :
+        (option == 'All) ? " (*)" :
+        (option.head == 'List) ? [" (", option.map(str).weave(","), ")"] :
+        ["hiding", "(", option[0].map(str).weave(","), ")"]]
 
 # Convert `obj` to prettified string.
-pretty(obj): {
-    oss: OutputStringStream.new()
-    P.pretty(oss, stmt(obj), width=TEXT_WIDTH)
+pretty(obj) := {
+    oss := OutputStringStream.new()
+    P::pretty(oss, stmt(obj), width=TEXT_WIDTH)
     str(oss)
 }
 
 # Pretty-printting to the stream.
-OutputStream.pp(o): self.puts(pretty(o))
-pp(o): stdout.pp(o)
+OutputStream.pp(o) := self.puts(pretty(o))
+pp(o) := stdout.pp(o)
