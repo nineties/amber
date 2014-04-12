@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012_bang nineties
 ;
-; $Id: rowl1-numeric.rlc 2014-04-12 04:17:23 nineties $
+; $Id: rowl1-numeric.rlc 2014-04-12 09:59:29 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1135,6 +1135,28 @@
 (extern fun float_infinity)
 (extern fun float_uminus)
 
+; ==== numeric algorithms ===
+(fun check_range (beg end) (
+    (if (&& (& beg 1) (& end 1))
+        return
+        )
+    (throw (invalid_argument (string "invalid range") (tuple2 beg end)))
+    ))
+
+(fun num_reduce (op init f beg end) (
+    (check_range beg end)
+    (= beg (unbox beg))
+    (= end (unbox end))
+    (var v init)
+    (= op (get_bytecode op))
+    (= f  (get_bytecode f))
+    (while (<= beg end) (do
+        (= v (runcode op v (runcode f (box beg))))
+        (+= beg 1)
+        ))
+    (return v)
+    ))
+
 (export fun setup_bigint (mod) (
     (add_function6 mod (to_sym "int_to_string") intT intT intT DontCare DontCare DontCare bint_to_s 0)
     (add_function1 mod (to_sym "string_to_int") stringT string_to_bint 0)
@@ -1176,6 +1198,8 @@
     (add_function2 mod (to_sym "int_lxor!") intT intT bint_lxor_bang 0)
     (add_function2 mod (to_sym "int_lshift!") intT intT bint_lshift_bang 0)
     (add_function2 mod (to_sym "int_rshift!") intT intT bint_rshift_bang 0)
+
+    (add_function5 mod (to_sym "numeric_reduce") funT DontCare funT intT intT num_reduce 0)
     ))
 
     ))
