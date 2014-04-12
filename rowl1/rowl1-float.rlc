@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-float.rlc 2014-04-12 12:02:02 nineties $
+; $Id: rowl1-float.rlc 2014-04-12 12:18:53 nineties $
 ;
 
 ; Since Amber has no 64-bit integer, this source code uses bignums instead.
@@ -675,33 +675,32 @@
     (bint_set_digit b 0 w0)
     (bint_set_digit b 1 w1)
     (field_set b 1 2)
-    (bigshr b shift)
-    (if sign 
+    (if (<= shift 0)
+        ; The result is an integer.
+        (return (norm (bigshr b shift)))
+        )
+    (if sign (do
+        (bigshr b shift)
         (return (norm (bigneg b)))
+        ))
+    (var round @FALSE)
+    (var x (bint_sub_bang (bint_lshift (box 1) (box shift)) (box 1)))
+    (debugpf x)
+    (debugpf b)
+    (var u (bint_land_bang x b))
+    (debugpf u)
+    (if (!= u (box 0))
+        (= round @TRUE)
+        )
+    (bigshr b shift)
+    (if round
         (return (norm (bigadd b (uint_to_bint 1))))
+        (return (norm b))
         )
     ))
 
 (fun float_floor (f) (
-    (var w0 (field_get f 0))
-    (var w1 (field_get f 1))
-    (var sign 0)
-    (if (& w1 0x80000000) (= sign 1))
-    (var e (- (& (>> w1 20) 0x7ff) 1023))
-    (= w1 (| (& w1 0xfffff) 0x100000))
-    (if (< e 0)
-        (if sign (return (box -1)) (return (box 0)))
-        )
-    (var shift (- 52 e))
-    (var b (allocate_bint 2))
-    (bint_set_digit b 0 w0)
-    (bint_set_digit b 1 w1)
-    (field_set b 1 2)
-    (bigshr b shift)
-    (if sign 
-        (return (norm (bigneg (bigadd b (uint_to_bint 1)))))
-        (return (norm b))
-        )
+    (return (bint_uminus (float_ceil (float_uminus f))))
     ))
 
 (export fun setup_float (mod) (

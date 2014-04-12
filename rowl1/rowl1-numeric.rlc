@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012_bang nineties
 ;
-; $Id: rowl1-numeric.rlc 2014-04-12 10:31:15 nineties $
+; $Id: rowl1-numeric.rlc 2014-04-12 12:46:03 nineties $
 ;
 
 (import "rlvm-compile")
@@ -602,7 +602,7 @@
     (= a (to_bint_copy a))
     (return (norm (bigsub a (to_bint b))))
     ))
-(fun bint_sub_bang (a b) (
+(export fun bint_sub_bang (a b) (
     (if (& (& a b) 1) (return (int_sub2 a b)))
     (return (norm (bigsub a (to_bint b))))
     ))
@@ -690,8 +690,6 @@
         ))
     (var alen (bint_ndigit a))
     (var blen (bint_ndigit b))
-    (var adigits (bint_digits a))
-    (var bdigits (bint_digits b))
 
     ; c = a&b
     (var clen 0)
@@ -701,6 +699,8 @@
         )
     (var c (allocate_bint clen))
     (bint_set_ndigit c clen)
+    (var adigits (bint_digits a))
+    (var bdigits (bint_digits b))
     (var cdigits (bint_digits c))
 
     (for i 0 clen (do
@@ -720,9 +720,9 @@
         (= c (abs_twoscomplement c))
         (bint_set_sign c @TRUE)
         ))
-    (return (norm c))
+    (return (norm (remove_leading_zeros c)))
     ))
-(fun bint_land_bang (a b) (
+(export fun bint_land_bang (a b) (
     (if (& (& a b) 1) (return (& a b)))
     (= a (to_bint a))
     (= b (to_bint b))
@@ -736,8 +736,6 @@
         ))
     (var alen (bint_ndigit a))
     (var blen (bint_ndigit b))
-    (var adigits (bint_digits a))
-    (var bdigits (bint_digits b))
 
     ; c = a&b
     (var clen 0)
@@ -747,6 +745,8 @@
         )
     (resize_bint a clen)
     (bint_set_ndigit a clen)
+    (var adigits (bint_digits a))
+    (var bdigits (bint_digits b))
 
     (for i 0 clen (do
         (var x 0)
@@ -765,7 +765,7 @@
         (= a (abs_twoscomplement a))
         (bint_set_sign a @TRUE)
         ))
-    (return (norm a))
+    (return (norm (remove_leading_zeros a)))
     ))
 
 (fun bint_lor (a b) (
@@ -782,13 +782,13 @@
         ))
     (var alen (bint_ndigit a))
     (var blen (bint_ndigit b))
-    (var adigits (bint_digits a))
-    (var bdigits (bint_digits b))
 
     ; c = a|b
     (var clen (max alen blen))
     (var c (allocate_bint clen))
     (bint_set_ndigit c clen)
+    (var adigits (bint_digits a))
+    (var bdigits (bint_digits b))
     (var cdigits (bint_digits c))
 
     (for i 0 clen (do
@@ -824,13 +824,13 @@
         ))
     (var alen (bint_ndigit a))
     (var blen (bint_ndigit b))
-    (var adigits (bint_digits a))
-    (var bdigits (bint_digits b))
 
     ; c = a|b
     (var clen (max alen blen))
     (resize_bint a clen)
     (bint_set_ndigit clen)
+    (var adigits (bint_digits a))
+    (var bdigits (bint_digits b))
 
     (for i 0 clen (do
         (var x 0)
@@ -867,13 +867,13 @@
         ))
     (var alen (bint_ndigit a))
     (var blen (bint_ndigit b))
-    (var adigits (bint_digits a))
-    (var bdigits (bint_digits b))
 
     ; c = a^b
     (var clen (max alen blen))
     (var c (allocate_bint clen))
     (bint_set_ndigit c clen)
+    (var adigits (bint_digits a))
+    (var bdigits (bint_digits b))
     (var cdigits (bint_digits c))
 
     (for i 0 clen (do
@@ -893,7 +893,7 @@
         (= c (abs_twoscomplement c))
         (bint_set_sign c @TRUE)
         ))
-    (return (norm c))
+    (return (norm (remove_leading_zeros c)))
     ))
 (fun bint_lxor_bang (a b) (
     (if (& (& a b) 1) (return (^ a b)))
@@ -909,13 +909,13 @@
         ))
     (var alen (bint_ndigit a))
     (var blen (bint_ndigit b))
-    (var adigits (bint_digits a))
-    (var bdigits (bint_digits b))
 
     ; c = a^b
     (var clen (max alen blen))
     (resize_bint a clen)
     (bint_set_ndigit a clen)
+    (var adigits (bint_digits a))
+    (var bdigits (bint_digits b))
 
     (for i 0 clen (do
         (var x 0)
@@ -934,7 +934,7 @@
         (= a (abs_twoscomplement a))
         (bint_set_sign a @TRUE)
         ))
-    (return (norm a))
+    (return (norm (remove_leading_zeros a)))
     ))
 
 (export fun bint_lshift (a b) (
