@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-04-12 20:02:39 nineties $
+; $Id: rowl1-interp.rlc 2014-04-12 20:24:32 nineties $
 ;
 
 (import "rlvm-compile")
@@ -70,15 +70,14 @@
     (setup_object_pre)
 
     ; Global Module
-    (= global @C_NIL)
-    (= amber (create_module Amber))
+    (= amber (create_module @C_NIL Amber))
     (set_slot amber Amber amber)
     (= global amber)
 
     (remove_parent @C_NIL)
 
     ; prim Module
-    (var prim (create_module Prim)) ; prim functions
+    (var prim (create_module amber Prim)) ; prim functions
     (set_slot global Prim prim)
 
     ; Setup built-in objects and functions.
@@ -383,15 +382,12 @@
     (throw (logic_error1 (string "AMBER_PATH must be an array of strings") dirs))
     ))
 
-(export fun create_module (sym) (
-    (if (&& (!= (node_head global) Module) (!= global @C_NIL))
-        (throw (invalid_argument
-            "1st argument of create_module(sym@Symbol)"
-            sym
-            ))
+(export fun create_module (parent sym) (
+    (if (&& (!= (node_head parent) Module) (!= parent @C_NIL))
+        (throw (invalid_argument (string "not a module") sym))
         )
     (var mod (make_node1 Module sym))
-    (set_slot mod Parent global)
+    (set_slot mod Parent parent)
     (return mod)
     ))
 
@@ -468,7 +464,7 @@
 
 (fun setup_minimal_interpreter (prim) (
     ; parser
-    (var syntax (create_module Syntax))
+    (var syntax (create_module amber Syntax))
     (set_slot global Syntax syntax)
     (set_slot syntax Parent global)
     
@@ -503,7 +499,7 @@
     (add_function1 prim (to_sym "load") stringT load_file 0)
     (add_function1 prim (to_sym "execfile") stringT exec_file 0)
     (add_function1 prim (to_sym "loadable?") stringT loadable 0)
-    (add_function1 prim (to_sym "create_module") symT create_module 0)
+    (add_function2 prim (to_sym "create_module") DontCare symT create_module 0)
     (add_function1 prim (to_sym "enter_module") symT enter_module 0)
     (add_function0 prim (to_sym "exit_module") exit_module 0)
     (add_function2 prim (to_sym "define_variable") symT DontCare define_variable 0)
