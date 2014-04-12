@@ -96,7 +96,7 @@ RLC1OBJECTS = rowl1-main.rlo\
 			  rowl1-base.rlo\
 			  rowl1-function.rlo\
 			  rowl1-symbol.rlo\
-			  rowl1-bigint.rlo\
+			  rowl1-numeric.rlo\
 			  rowl1-float.rlo\
 			  rowl1-math.rlo\
 			  rowl1-random.rlo\
@@ -132,16 +132,16 @@ rowl1-packrat.rlo	: $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rl
 rowl1-base.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-object.rlo rowl1-compile.rlo rowl1-error.rlo
 rowl1-function.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-object.rlo rowl1-compile.rlo rowl1-error.rlo
 rowl1-symbol.rlo: $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-object.rlo rowl1-compile.rlo
-rowl1-bigint.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-compile.rlo
-rowl1-float.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-object.rlo rowl1-compile.rlo rowl1-assemble.rlo rowl1-error.rlo rowl1-base.rlo rowl1-bigint.rlo
+rowl1-numeric.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-compile.rlo
+rowl1-float.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-object.rlo rowl1-compile.rlo rowl1-assemble.rlo rowl1-error.rlo rowl1-base.rlo rowl1-numeric.rlo
 rowl1-string.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-object.rlo rowl1-compile.rlo rowl1-error.rlo
 rowl1-list.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-object.rlo rowl1-compile.rlo rowl1-assemble.rlo rowl1-error.rlo rowl1-table.rlo
 rowl1-tuple.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-object.rlo rowl1-compile.rlo rowl1-assemble.rlo rowl1-error.rlo
 rowl1-array.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-object.rlo rowl1-compile.rlo rowl1-assemble.rlo rowl1-error.rlo rowl1-table.rlo
 rowl1-table.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-object.rlo rowl1-compile.rlo rowl1-error.rlo rowl1-pprint.rlo
-rowl1-io.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-object.rlo rowl1-compile.rlo rowl1-error.rlo rowl1-pprint.rlo rowl1-bigint.rlo rowl1-string.rlo
+rowl1-io.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-object.rlo rowl1-compile.rlo rowl1-error.rlo rowl1-pprint.rlo rowl1-numeric.rlo rowl1-string.rlo
 rowl1-pprint.rlo : $(RLVMCOMPILER) rowl1-types.rlo rowl1-util.rlo rowl1-node.rlo rowl1-compile.rlo rowl1-string.rlo
-rowl1-random.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-object.rlo rowl1-compile.rlo rowl1-assemble.rlo rowl1-error.rlo rowl1-bigint.rlo rowl1-float.rlo
+rowl1-random.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-object.rlo rowl1-compile.rlo rowl1-assemble.rlo rowl1-error.rlo rowl1-numeric.rlo rowl1-float.rlo
 rowl1-math.rlo : $(RLVMCOMPILER) rowl1-types.rlc rowl1-util.rlo rowl1-node.rlo rowl1-object.rlo rowl1-float.rlo rowl1-compile.rlo rowl1-assemble.rlo rowl1-error.rlo
 rowl1-gc.rlo : $(RLVMCOMPILER) rowl1-types.rlo rowl1-util.rlo rowl1-node.rlo rowl1-compile.rlo rowl1-symbol.rlo
 rowl1-encoding.rlo : $(RLVMCOMPILER) rowl1-types.rlo rowl1-util.rlo rowl1-node.rlo rowl1-error.rlo rowl1-compile.rlo
