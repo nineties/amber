@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: list.ab 2014-04-12 08:25:00 nineties $
+# $Id: list.ab 2014-04-12 11:23:09 nineties $
 
 #= List =
 # A list is a finite sequence of objects. The internal representation of
@@ -112,21 +112,6 @@ List with {
     # ----
     .weave(v): prim.list_weave(v, self)
 
-    # Convert to string.
-    .to_s(): {
-        os: OutputStringStream.new()
-        os.print("[")
-        list: self
-        while list != [] {
-            os.print(first(list))
-            list = rest(list)
-            if list != []
-                os.print(", ")
-        }
-        os.print("]")
-        os.to_s()
-    }
-
     extend Iterable
 
     .each(): {
@@ -165,5 +150,20 @@ ncadd = prim.list_append | ncadd
 # ----
 sub = prim.list_diff | sub
 
+# Convert to string.
+str(list @ List): {
+    os: OutputStringStream.new()
+    os.print("[")
+    while list != [] {
+        os.print(first(list))
+        list = rest(list)
+        if list != []
+            os.print(", ")
+    }
+    os.print("]")
+    str(os)
+}
+
+# Return a list consists of elements that are included in both `a` and `b`.
 intersection(a @ List, b @ List): iterable.intersection(a, b).to_list()
 

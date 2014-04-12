@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: array.ab 2014-04-12 08:25:40 nineties $
+# $Id: array.ab 2014-04-12 11:46:03 nineties $
 
 #= Array =
 # Dynamic and mutable array.
@@ -89,19 +89,6 @@ Array: object_system.builtin_class('Array) with {
     .sort!(cmp @ Function): prim.array_sort!(self, cmp)
     .sort!(): prim.array_sort!(self, compare)
 
-    # Convert to string.
-    .to_s(): {
-        os: OutputStringStream.new()
-        os.print("Array{")
-        for i in 0..self.size-1 {
-            os.print(self[i])
-            if i != self.size-1
-                os.print(", ")
-        }
-        os.print("}")
-        os.to_s()
-    }
-
     extend Iterable
     .each(): {
         ary: self
@@ -123,4 +110,17 @@ ncadd = prim.array_append | ncadd
 
 # Difference of two arrays.
 sub = prim.array_diff | sub
+
+# Convert to string.
+str(ary @ Array): {
+    os: OutputStringStream.new()
+    os.print("Array{")
+    for i in 0..ary.size-1 {
+        os.print(ary[i])
+        if i != ary.size-1
+            os.print(", ")
+    }
+    os.print("}")
+    str(os)
+}
 

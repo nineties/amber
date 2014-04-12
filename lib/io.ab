@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: io.ab 2014-04-12 08:24:11 nineties $
+# $Id: io.ab 2014-04-12 11:49:44 nineties $
 
 #= IO =
 # Input and output stream.
@@ -69,8 +69,8 @@ trait InputStream with {
 trait OutputStream with {
     require '.write(s @ String)
 
-    # Convert an object `o` to a string by `to_s` and output it.
-    .print(o): self.write(o.to_s())
+    # Convert an object `o` to a string by `str` and output it.
+    .print(o): self.write(str(o))
 
     # Ouptut an object `o` and newline.
     .puts(o): { self.print(o); self.write("\n") }
@@ -226,13 +226,13 @@ trait OutputStringStream with {
 
     # Output string `s` to the stream.
     .write(s @ String): prim.oss_print_string(self, s)
-
-    # Convert the stream to a string.
-    .to_s(): prim.oss_to_string(self)
 }
 
 prim.set_builtin_parent('InputStringStream, InputStringStream)
 prim.set_builtin_parent('OutputStringStream, OutputStringStream)
+
+# Convert the stream to a string.
+str(o @ OutputStringStream): prim.oss_to_string(o)
 
 #== Formatted print ==
 # Output arguments according to a format string like C's printf().
@@ -276,7 +276,7 @@ parse_number(iss): {
         c: prim.iss_lookahead(iss, false)
         if not is_digit?(c)
             return w
-        w = w*10 + c.to_i()
+        w = w*10 + int(c)
         prim.iss_read_char(iss, false)
     }
 }
@@ -300,25 +300,25 @@ print_element(oss,"p",f,w,p,arg): prim.pretty_print(oss, arg)
 
 # string.
 print_element(oss,"s",f,w,p,arg): {
-    str: arg.to_s()
-    if p != nil and p < str.length
-        str = str[0,p]
+    s: str(arg)
+    if p != nil and p < s.length
+        s = s[0,p]
     if w == nil
-        oss.print(str)
+        oss.print(s)
     else {
         if ltest(f, FMT_MINUS)
-            oss.print(str.ljust(w))
+            oss.print(s.ljust(w))
         else
-            oss.print(str.rjust(w))
+            oss.print(s.rjust(w))
     }
 }
 
 # Decimal integer.
 print_element(oss,"d" or "i",f,w,p,arg): {
-    num: arg.to_i()
+    num: int(arg)
     sign: num < 0
     num = |num|
-    str: num.to_s(precision=(p==nil)?0:p)
+    s: str(num,precision=(p==nil)?0:p)
     prefix: ""
     if sign
         prefix = "-"
@@ -329,22 +329,22 @@ print_element(oss,"d" or "i",f,w,p,arg): {
             prefix = " "
     }
     if w == nil
-        return oss.print(prefix ++ str)
+        return oss.print(prefix ++ s)
     else {
         if ltest(f, FMT_MINUS)
-            oss.print(prefix ++ str.ljust(w - prefix.size))
+            oss.print(prefix ++ s.ljust(w - prefix.size))
         else if ltest(f, FMT_ZERO)
-            oss.print(prefix ++ str.rjust(w - prefix.size, "0"))
+            oss.print(prefix ++ s.rjust(w - prefix.size, "0"))
         else
-            oss.print((prefix ++ str).rjust(w))
+            oss.print((prefix ++ s).rjust(w))
     }
 }
 
 # Unsignd binary integer.
 print_element(oss,t@("b" or "B"),f,w,p,arg): {
-    num: arg.to_i()
+    num: int(arg)
     sign: num < 0
-    str: num.to_s(base=2,precision=(p==nil)?0:p,unsigned=true)
+    s: str(num,base=2,precision=(p==nil)?0:p,unsigned=true)
     prefix: ""
     if sign
         prefix = "..1"
@@ -352,22 +352,22 @@ print_element(oss,t@("b" or "B"),f,w,p,arg): {
         prefix = "0" ++ t ++ prefix
 
     if w == nil
-        return oss.print(prefix ++ str)
+        return oss.print(prefix ++ s)
     else {
         if ltest(f, FMT_MINUS)
-            oss.print(prefix ++ str.ljust(w - prefix.size))
+            oss.print(prefix ++ s.ljust(w - prefix.size))
         else if ltest(f, FMT_ZERO)
-            oss.print(prefix ++ str.rjust(w - prefix.size, sign ? "1" : "0"))
+            oss.print(prefix ++ s.rjust(w - prefix.size, sign ? "1" : "0"))
         else
-            oss.print((prefix ++ str).rjust(w))
+            oss.print((prefix ++ s).rjust(w))
     }
 }
 
 # Unsigned hexadecimal integer.
 print_element(oss,t@("x" or "X"),f,w,p,arg): {
-    num: arg.to_i()
+    num: int(arg)
     sign: num < 0
-    str: num.to_s(base=16,precision=(p==nil)?0:p,upper=(t=="X"),unsigned=true)
+    s: str(num,base=16,precision=(p==nil)?0:p,upper=(t=="X"),unsigned=true)
     forF: ((t == "x") ? "f" : "F")
     prefix: ""
     if sign
@@ -376,23 +376,23 @@ print_element(oss,t@("x" or "X"),f,w,p,arg): {
         prefix = "0" ++ t ++ prefix
 
     if w == nil
-        return oss.print(prefix ++ str)
+        return oss.print(prefix ++ s)
     else {
         if ltest(f, FMT_MINUS)
-            oss.print(prefix ++ str.ljust(w - prefix.size))
+            oss.print(prefix ++ s.ljust(w - prefix.size))
         else if ltest(f, FMT_ZERO)
-            oss.print(prefix ++ str.rjust(w - prefix.size, sign ? forF : "0"))
+            oss.print(prefix ++ s.rjust(w - prefix.size, sign ? forF : "0"))
         else
-            oss.print((prefix ++ str).rjust(w))
+            oss.print((prefix ++ s).rjust(w))
     }
 }
 
 # Floating-point
 print_element(oss,"f",f,w,p,arg): {
-    num: arg.to_f()
+    num: float(arg)
     sign: num < 0
     num = |num|
-    str: num.to_s(precision=(p==nil)?0:p)
+    s: str(num,precision=(p==nil)?0:p)
     prefix: ""
     if sign
         prefix = "-"
@@ -403,13 +403,13 @@ print_element(oss,"f",f,w,p,arg): {
             prefix = " "
     }
     if w == nil
-        return oss.print(prefix ++ str)
+        return oss.print(prefix ++ s)
     else {
         # FMT_ZERO is ignored
         if ltest(f, FMT_MINUS)
-            oss.print(prefix ++ str.ljust(w - prefix.size))
+            oss.print(prefix ++ s.ljust(w - prefix.size))
         else
-            oss.print((prefix ++ str).rjust(w))
+            oss.print((prefix ++ s).rjust(w))
     }
 }
 

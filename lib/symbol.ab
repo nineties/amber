@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: symbol.ab 2014-04-08 13:55:28 nineties $
+# $Id: symbol.ab 2014-04-12 11:25:10 nineties $
 
 import numeric (compare)
 
@@ -18,18 +18,17 @@ trait Symbol with {
     # The unique identification number.
     .id: alias(() -> prim.symbol_id(self))
 
-    # Convert to a string.
-    .to_s(): prim.symbol_to_string(self)
-
     # Convert lower characters to upper ones.
-    .upcase(): .to_s().upcase().to_sym()
+    .upcase(): str(self).upcase().to_sym()
 
     # Convert upper characters to lower ones.
-    .downcase(): .to_s().downcase().to_sym()
+    .downcase(): str(self).downcase().to_sym()
 
     # Convert first character to uppercase and others to lowercase.
-    .capitalize(): .to_s().capitalize().to_sym()
+    .capitalize(): str(self).capitalize().to_sym()
 }
+
+prim.set_builtin_parent('Symbol, Symbol)
 
 # Extend the comparison operator.
 # NB: This function compares id-numbers of symbols, not lexicographic.
@@ -38,4 +37,6 @@ compare = prim.symbol_compare | compare
 # Create a symbol, which is not internalized, with given name.
 unique: prim.unique_symbol
 
-prim.set_builtin_parent('Symbol, Symbol)
+# Convert to a string.
+str(s @ Symbol): prim.symbol_to_string(s)
+

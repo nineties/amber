@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: algebra/rational.ab 2014-04-09 19:55:41 nineties $
+# $Id: algebra/rational.ab 2014-04-12 11:20:58 nineties $
 
 import algebra.euclid (gcd)
 
@@ -25,22 +25,12 @@ class Rat{numerator, denominator} with {
         d: .denominator
         d//gcd(n,d)
     }
-
     # Return pair of numerator and denominator.
     .to_pair(): {
         n: .numerator
         d: .denominator
         g: gcd(n, d)
         (n//g, d//g)
-    }
-
-    # Convert to a floatig-point number.
-    .to_f(): .numerator.to_f() / .denominator.to_f()
-
-    # Convert to a string.
-    .to_s(): {
-        n, d: self.to_pair()
-        n.to_s() ++ "/" ++ d.to_s()
     }
 }
 
@@ -58,7 +48,7 @@ pow(Rat{a, b}, e) = Rat.make(a^e, b^e)
 div(a @ Int, b @ Int) = Rat.new(a, b)
 
 typecast(a @ Int,   'Rat) = Rat.make(a, 1)
-typecast(a @ Rat, 'Float) = a.to_f()
+typecast(a @ Rat, 'Float) = float(a)
 typejoin('Int, 'Rat) = 'Rat
 typejoin('Rat, 'Int) = 'Rat
 typejoin('Rat, 'Float) = 'Float
@@ -67,5 +57,12 @@ typejoin('Float, 'Rat) = 'Float
 # Pretty-printing.
 syntax.print.primary(r @ Rat) = {
     n, d: r.to_pair()
-    [n.to_s(), "/", d.to_s()]
+    [str(n), "/", str(d)]
 }
+
+# Convert to a floatig-point number.
+float(Rat{n, d}): float(n)/float(d)
+
+# Convert to a string.
+str(Rat{n, d}): str(n) ++ "/" ++ str(d)
+

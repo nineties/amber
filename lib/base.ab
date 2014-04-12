@@ -1,5 +1,5 @@
 # Copyright (C) 2010 nineties
-# $Id: base.ab 2014-04-11 23:29:45 nineties $
+# $Id: base.ab 2014-04-12 11:52:05 nineties $
 
 #== The most basic functions and methods. ==
 
@@ -126,10 +126,6 @@ nil with {
         self.each_slots((_,x,v) -> { list = cons((x,v), list) }, recursive=recursive)
         list
     }
-
-    # Convert objects to fullform-string, i.e. the form of
-    # `h{a1, a2, .., an}`.
-    .to_s(): prim.fullform(self)
 
     # Evaluate `expression`.
     .eval(expression, full=true):
@@ -323,3 +319,21 @@ less_than?(a, b)     : compare(a, b) < 0
 greater_than?(a, b)  : compare(a, b) > 0
 less_equal?(a, b)    : compare(a, b) <= 0
 greater_equal?(a, b) : compare(a, b) >= 0
+
+# Data converters
+int(n @ Int):    n
+int(f @ Float):  prim.float_to_int(f)
+int(s @ String): prim.string_to_int(s)
+
+float(n @ Int):    prim.int_to_float(n)
+float(f @ Float):  f
+float(s @ String): prim.string_to_float(s)
+
+# Convert objects to fullform-string, i.e. the form of
+# `h{a1, a2, .., an}`.
+str(obj): prim.fullform(obj)
+
+str(n @ Int, base=10, precision=0, prefix=false, upper=false, unsigned=false):
+ prim.int_to_string(n, base, precision, prefix, upper, unsigned)
+str(f @ Float, precision=0): prim.float_to_string(f, precision)
+str(s @ String): s

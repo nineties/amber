@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: numeric.ab 2014-04-12 10:45:44 nineties $
+# $Id: numeric.ab 2014-04-12 11:11:28 nineties $
 
 #= Fixed-length integers and floating-point numbers. =
 # This module defines numerical operations for fixed-length integers and
@@ -18,12 +18,12 @@ infinity: prim.infinity
 
 #== Implicit type conversion ==
 # Type conversions between objects and integers or floating-point numbers
-# are done by methods `to_i` and `to_f`. When you implement these methods,
-# `to_i` must returns `Int` type values and `to_f` must returns `Float` types.
+# are done by methods `int` and `float`. When you implement these methods,
+# `int` must returns `Int` type values and `float` must returns `Float` types.
 # We extend `typejoin` by `typejoin('Int, 'Float) == 'Float` and
 # `typejoin('Float, 'Int) == 'Int`.
 
-typecast(a @ Int, 'Float) = a.to_f()
+typecast(a @ Int, 'Float) = float(a)
 typejoin('Int, 'Float) = 'Float
 typejoin('Float, 'Int) = 'Float
 
@@ -139,19 +139,17 @@ min(a, b): a < b ? a : b
 max(a, b): a < b ? b : a
 minmax(a, b): a < b ? (a, b) : (b, a)
 
+ceil(f @ Float): prim.float_ceil(f)
+ceil(n @ Int): n
+
+floor(f @ Float): prim.float_floor(f)
+floor(n @ Int): n
+
+sign(n): self >= 0 ? 1 : -1
+
 # Traits.
 
 Int: object_system.builtin_class('Int) with {
-    .sign: alias(() -> self >= 0 ? 1 : -1)
-
-    .to_i(): self
-    .to_f(): prim.int_to_float(self)
-    .to_s(base=10, precision=0, prefix=false, upper=false, unsigned=false):
-        prim.int_to_string(self, base, precision, prefix, upper, unsigned)
-
-    .ceil(): self
-    .floor(): self
-
     .add!(b @ Int): prim.int_add!(self,b)
     .sub!(b @ Int): prim.int_sub!(self,b)
     .mul!(b @ Int): prim.int_mul!(self,b)
@@ -159,15 +157,7 @@ Int: object_system.builtin_class('Int) with {
     .rem!(b @ Int): prim.int_rem!(self,b)
 }
 
-Float: object_system.builtin_class('Float) with {
-    .to_i(): prim.float_to_int(self)
-    .to_f(): self
-    .to_s(precision=0): prim.float_to_string(self, precision)
-
-    # Rounding functions.
-    .ceil(): prim.float_ceil(self)
-    .floor(): prim.float_floor(self)
-}
+Float: object_system.builtin_class('Float)
 
 prim.set_builtin_parent('Int, Int)
 prim.set_builtin_parent('Float, Float)

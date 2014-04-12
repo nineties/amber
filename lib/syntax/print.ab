@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: syntax/print.ab 2014-04-11 12:39:55 nineties $
+# $Id: syntax/print.ab 2014-04-12 11:47:23 nineties $
 
 import pretty_print as P
 
@@ -93,7 +93,7 @@ block(stmt @ Seq, cont=false): {
 
 #== Formatters ==
 fullform(obj):
-    P.breakable([ P.nest(INDENT_WIDTH, [obj.head.to_s(), "{", P.nl(),
+    P.breakable([ P.nest(INDENT_WIDTH, [str(obj.head), "{", P.nl(),
         obj.arguments.map(expr).weave([",", P.nl(" ")])]), P.nl(), "}"])
 
 primary(e): fullform(e)
@@ -103,21 +103,21 @@ primary(nil):           "nil"
 primary(true):          "true"
 primary(false):         "false"
 primary(e) when e.atom?: prim.fullform(e)
-primary(n @ Int):        n.to_s()
-primary(f @ Float):      f.to_s()
+primary(n @ Int):        str(n)
+primary(f @ Float):      str(f)
 primary(s @ String):     "\"" ++ s.escape() ++ "\""
-primary(var @ Symbol):   var.to_s()
+primary(var @ Symbol):   str(var)
 primary(list @ List):    sequence(list, expr, "[", ",", "]")
 primary(tuple @ Tuple):  sequence(tuple, expr, "(", ",", ")")
 primary(ary @ Array):    sequence(ary, expr, "Array{", ",", "}")
 primary(Block{stmts}):   P.group(block(stmts))
 primary(Abs{e}):         ["|", expr(e), "|"]
-primary(Slot{Self{}, m @ Symbol}): "." ++ m.to_s()
+primary(Slot{Self{}, m @ Symbol}): "." ++ str(m)
 primary('Rest{}): "..."
 
 argument(e): P.compress(expr(e))
 argument(`Keyword{!(x @ Symbol), !e}):
-    [x.to_s(), " = ", P.compress(assign(e))]
+    [str(x), " = ", P.compress(assign(e))]
 
 postfix(e): primary(e)
 postfix(Apply{f, args @ List}):
@@ -127,8 +127,8 @@ postfix(Subscript{obj, args @ List}):
 postfix(`Rest{!e}): [postfix(e), "..."]
 postfix(`Domain{!arg, !dom}): [primary(arg), " @ ", primary(dom)]
 postfix(Send{obj, f @ Symbol, args @ List}):
-    [postfix(obj), ".", f.to_s(), sequence(args, argument, "(", ",", ")")]
-postfix(Slot{obj, m @ Symbol}): [postfix(obj), ".", m.to_s()]
+    [postfix(obj), ".", str(f), sequence(args, argument, "(", ",", ")")]
+postfix(Slot{obj, m @ Symbol}): [postfix(obj), ".", str(m)]
 postfix(Pow{x, e}): [primary(x), "^", postfix(e)]
 
 quote(e): postfix(e)
@@ -231,18 +231,18 @@ stmt(Assign{x, e}): [pattern(x), " = ", expr(e)]
 stmt(Assign{f, Lambda{args, body}}):
     [pattern(f), lambda_arg(args), " = ", stmt(body)]
 stmt(Import{mods, name, option}):
-    ["import ", mods.map(s -> s.to_s()).weave("."),
-    (name == nil) ? [] : [" as ", name.to_s()],
+    ["import ", mods.map(str).weave("."),
+    (name == nil) ? [] : [" as ", str(name)],
     (option == nil) ? [] :
     (option == 'All) ? " (*)" :
-    (option.head == 'List) ? [" (", option.map(s -> s.to_s()).weave(","), ")"] :
-    ["hiding", "(", option[0].map(s -> s.to_s()).weave(","), ")"]]
+    (option.head == 'List) ? [" (", option.map(str).weave(","), ")"] :
+    ["hiding", "(", option[0].map(str).weave(","), ")"]]
 
 # Convert `obj` to prettified string.
 pretty(obj): {
     oss: OutputStringStream.new()
     P.pretty(oss, stmt(obj), width=TEXT_WIDTH)
-    oss.to_s()
+    str(oss)
 }
 
 # Pretty-printting to the stream.
