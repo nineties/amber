@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-matching.rlc 2014-04-09 14:04:02 nineties $
+; $Id: rowl1-matching.rlc 2014-04-13 14:44:05 nineties $
 ;
 
 (import "rlvm-compile")
@@ -102,7 +102,7 @@
     (while mat (do
         (var fun (field_get (car mat) 1))
         (if (== (node_type fun) @FunctionE)
-            (&= nocheck (field_get fun 11))
+            (&= nocheck (field_get fun 10))
             (= nocheck 0)
             )
         (var m (list_len (field_get (car mat) 0)))
@@ -288,7 +288,6 @@
         (var code 0)
         (var guard 0)
         (var clos 0)
-        (var use_self @FALSE)
         (var nlocal 0)
         (if (== ty @FunctionE)
             (do
@@ -296,20 +295,14 @@
                 (= code (field_get func 5))
                 (= guard (field_get func 6))
                 (= clos (field_get func 7))
-                (= use_self (field_get func 9))
-                (= nlocal (field_get func 10))
+                (= nlocal (field_get func 9))
             )
         (if (== ty @BuiltinFunctionE)
             (do 
                 (= guard (field_get func 3))
-                (= use_self (field_get func 5))
             )))
 
         (var check_failed (fresh_label asm))
-        (if use_self (do
-            (put_self asm)
-            (put_if_undef asm check_failed)
-            ))
         (if clos (do
             (put_push asm clos)
             (put_store_closure asm)
@@ -338,7 +331,7 @@
                 (put_push asm func)
                 (put_callc asm)
             )))
-        (if (|| guard (|| use_self keys)) (do
+        (if (|| guard keys) (do
             (set_label asm check_failed)
             (put_deallocate asm)
             (if (cdr pats) (do

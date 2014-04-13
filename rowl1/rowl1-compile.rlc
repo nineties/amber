@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-04-13 03:52:58 nineties $
+; $Id: rowl1-compile.rlc 2014-04-13 14:43:10 nineties $
 ;
 
 (import "rlvm-compile")
@@ -224,8 +224,8 @@
     (return ret)
     ))
 
-(fun alloc_function (args keys guard code guard_code clos use_self nlocal nocheck orig) (
-    (return (variant @FunctionE 8 0 args keys guard code guard_code clos orig use_self nlocal nocheck))
+(fun alloc_function (args keys guard code guard_code clos nlocal nocheck orig) (
+    (return (variant @FunctionE 8 0 args keys guard code guard_code clos orig nlocal nocheck))
     ))
 
 (fun args_len (args) (
@@ -240,20 +240,20 @@
     (return (box len))
     ))
 
-(fun make_function (args keys guard code guard_code use_self nlocal nocheck orig) (
+(fun make_function (args keys guard code guard_code nlocal nocheck orig) (
     (var arity (args_len args))
     (= args (cons arity args))
-    (return (alloc_function args keys guard code guard_code 0 use_self nlocal nocheck orig))
+    (return (alloc_function args keys guard code guard_code 0 nlocal nocheck orig))
     ))
 
-(fun alloc_builtin_function (args func guard use_self) (
-    (return (variant @BuiltinFunctionE 3 0 args guard func use_self))
+(fun alloc_builtin_function (args func guard) (
+    (return (variant @BuiltinFunctionE 3 0 args guard func))
     ))
 
-(fun make_builtin_function (args func guard use_self) (
+(fun make_builtin_function (args func guard) (
     (var arity (args_len args))
     (= args (cons arity args))
-    (return (alloc_builtin_function args func guard use_self))
+    (return (alloc_builtin_function args func guard))
     ))
 
 (export fun fusion_function (fun1 fun2) (
@@ -491,7 +491,6 @@
 
 (var closure_frame null)
 (var compiling_lambda @FALSE)
-(var use_self @FALSE)
 
 (export fun compile_main (expr) (
     (var asm (make_assembler))
@@ -1275,7 +1274,6 @@
     ))
 
 (fun compile_self (asm expr) (
-    (= use_self @TRUE)
     (put_self asm)
     ))
 
@@ -2136,10 +2134,8 @@
 
 (fun compile_lambda_main (asm args body guard cls nocheck orig) (
     (var save_compiling_lambda compiling_lambda)
-    (var save_use_self use_self)
     (try (do
         (= compiling_lambda @TRUE)
-        (= use_self @FALSE)
         (var asm_body (make_assembler))
         (if (!= guard noguard)
             (do
@@ -2149,7 +2145,7 @@
                 (var keys (tuple_at t 1))
                 (var nlocal (unbox (tuple_at t 2)))
                 (put_ireturn asm_body)
-                (put_push asm (make_function args keys guard (get_code asm_body) (get_code asm_guard) use_self nlocal nocheck orig))
+                (put_push asm (make_function args keys guard (get_code asm_body) (get_code asm_guard) nlocal nocheck orig))
             )
             (do
                 (var t (compile_function asm_body 0 args body noguard cls))
@@ -2157,14 +2153,12 @@
                 (var keys (tuple_at t 1))
                 (var nlocal (unbox (tuple_at t 2)))
                 (put_ireturn asm_body)
-                (put_push asm (make_function args keys @C_UNDEF (get_code asm_body) 0 use_self nlocal nocheck orig))
+                (put_push asm (make_function args keys @C_UNDEF (get_code asm_body) 0 nlocal nocheck orig))
             ))
         (= compiling_lambda save_compiling_lambda)
-        (= use_self save_use_self)
         )
     (catch e (do
         (= compiling_lambda save_compiling_lambda)
-        (= use_self save_use_self)
         (throw e)
         )))
     ))
@@ -2212,9 +2206,8 @@
     (var body (field_get lam 5))
     (var guard_code (field_get lam 6))
     (var orig (field_get lam 8))
-    (var use_self (field_get lam 9))
-    (var nlocal (field_get lam 10))
-    (return (alloc_function args keys guard body guard_code clos use_self nlocal @FALSE @FALSE orig))
+    (var nlocal (field_get lam 9))
+    (return (alloc_function args keys guard body guard_code clos nlocal @FALSE @FALSE orig))
     ))
 
 (fun compile_closure (asm expr) (
