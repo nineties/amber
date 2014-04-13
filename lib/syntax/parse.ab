@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: syntax/parse.ab 2014-04-13 15:59:10 nineties $ "
+" $Id: syntax/parse.ab 2014-04-13 17:25:46 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -135,12 +135,10 @@ DefineSyntax{stmt, List{ Tuple{List{syntax_declaration}, node0}}}
 ### Reserved Symbols
 # The following symbols never been parsed as symbols.
 
-Define{Slot{syntax, reserved_words}, Array{
-    Quote{self}, Quote{not}, Quote{and}, Quote{or}, Quote{when},
-    Quote{if}, Quote{else}, Quote{case}, Quote{of}, Quote{while},
-    Quote{for}, Quote{in}, Quote{continue}, Quote{break}, Quote{return},
-    Quote{throw}, Quote{try}, Quote{catch}, Quote{import}, Quote{hiding},
-    Quote{as}, Quote{with}, Quote{reset}, Quote{shift}
+Define{Var{syntax, reserved_words}, Array{
+    "self", "not", "and", "or", "when", "if", "else", "case", "of",
+    "while", "for", "in", "continue", "break", "return", "throw", "try",
+    "catch", "import", "hiding", "as", "with", "reset", "shift"
 }}
 
 ### Expressions
@@ -711,9 +709,3 @@ macro(Lambda{When{args, guard}, body}) := desugar_lambda(args, guard, body)
 # { t := obj; t.a = p; t.b = q; t.c = r; t }
 #
 macro(WithSlots{obj, init}) := `Apply{!obj, () -> { Seq{!init}; self }, []}
-
-## Utilities
-add_reserved_word(words...) :=
-    prim.list_foreach(str ->
-        prim.array_push(syntax.reserved_words,
-            prim.string_to_symbol(str)), words)

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-04-13 02:41:36 nineties $
+; $Id: rowl1-packrat.rlc 2014-04-13 17:27:18 nineties $
 ;
 
 (import "rlvm-compile")
@@ -211,6 +211,7 @@
 (extern fun tuple2)
 (extern fun tuple_at)
 (extern fun compile_matching)
+(extern fun get_var_nocheck)
 
 (fun apply_util (name args) (do
     (return (apply (quote (get_slot utilities (to_sym name))) args))
@@ -1075,13 +1076,13 @@
     @(CHECK p)
     (var c (lookahead p))
     (if (|| (== c '!') (== c '?')) (getc p))
-    (var s (to_sym (extract_string p begin (field_get p 6))))
+    (var s (extract_string p begin (field_get p 6)))
     (if (is_reserved_word p s) (do
-        (noparse p (strcat "reserved symbol: " (symbol_name s)))
+        (noparse p (strcat "reserved symbol: " s))
         (reset_parser_position p state)
         (return @C_FALSE)
         ))
-    (return (parsed p s))
+    (return (parsed p (to_sym s)))
     ))
 @(MEMOIZE symbol)
 
@@ -1103,13 +1104,13 @@
     (parse_symbol_impl p)
     @(CHECK p)
     (var c (lookahead p))
-    (var s (to_sym (extract_string p begin (field_get p 6))))
+    (var s (extract_string p begin (field_get p 6)))
     (if (is_reserved_word p s) (do
-        (noparse p (strcat "reserved symbol: " (symbol_name s)))
+        (noparse p (strcat "reserved symbol: " s))
         (reset_parser_position p state)
         (return @C_FALSE)
         ))
-    (return (parsed p s))
+    (return (parsed p (to_sym s)))
     ))
 @(MEMOIZE identifier)
 
@@ -1429,15 +1430,15 @@
     (return p)
     ))
 
-(fun is_reserved_word (p sym) (
+(fun is_reserved_word (p str) (
     (var stx (get_slot_nocheck p Syntax))
     (if (== stx @C_NIL) (return @FALSE))
-    (var reserved_words (get_slot_nocheck stx (to_sym "reserved_words")))
+    (var reserved_words (get_var_nocheck stx (to_sym "reserved_words")))
     (if (== reserved_words @C_NIL) (return @FALSE))
     (if (!= (node_type reserved_words) @ArrayE)
         (throw (logic_error (string "'reserved_words' must be an array of symbols")))
         )
-    (return (!= (ary_include reserved_words sym) @C_FALSE))
+    (return (!= (ary_include reserved_words str) @C_FALSE))
     ))
 
 (fun compile_parser_element (pat ws) (
