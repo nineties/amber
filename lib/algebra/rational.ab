@@ -1,68 +1,68 @@
 # Copyright (C) 2014 nineties
-# $Id: algebra/rational.ab 2014-04-12 11:20:58 nineties $
+# $Id: algebra/rational.ab 2014-04-13 08:04:21 nineties $
 
-import algebra.euclid (gcd)
+import algebra::euclid (gcd)
 
 #= Arithmetic of rational numbers =
 # The rational number class.
 class Rat{numerator, denominator} with {
-    .new = (num @ Int, denom @ Int) -> {
+    .new := (num @ Int, denom @ Int) -> {
         if denom == 0 throw `DivisionByZero{}
-        g: gcd(num, denom)
+        g := gcd(num, denom)
         Rat.make(denom.sign * num//g, denom.sign * denom//g)
     }
 
     # Numerator.
-    .num: alias () -> {
-        n: .numerator
-        d: .denominator
+    .num := alias () -> {
+        n := .numerator
+        d := .denominator
         n//gcd(n,d)
     }
 
     # Denominator.
-    .denom: alias () -> {
-        n: .numerator
-        d: .denominator
+    .denom := alias () -> {
+        n := .numerator
+        d := .denominator
         d//gcd(n,d)
     }
     # Return pair of numerator and denominator.
-    .to_pair(): {
-        n: .numerator
-        d: .denominator
-        g: gcd(n, d)
+    .to_pair() := {
+        n := .numerator
+        d := .denominator
+        g := gcd(n, d)
         (n//g, d//g)
     }
 }
 
 # Basic arithmetic operations.
-uplus(a @ Rat) = a
-uminus(Rat{a, b}) = Rat.make(-a, b)
-abs(Rat{a, b}) = Rat.make(|a|, |b|)
-add(Rat{a, b}, Rat{c, d}) = Rat.make(a*d+b*c, b*d)
-sub(Rat{a, b}, Rat{c, d}) = Rat.make(a*d-b*c, b*d)
-mul(Rat{a, b}, Rat{c, d}) = Rat.make(a*c, b*d)
-div(Rat{a, b}, Rat{c, d}) = Rat.make(a*d, b*c)
-pow(Rat{a, b}, e) = Rat.make(a^e, b^e)
+uplus(a @ Rat)            := a
+uminus(Rat{a, b})         := Rat.make(-a, b)
+abs(Rat{a, b})            := Rat.make(|a|, |b|)
+add(Rat{a, b}, Rat{c, d}) := Rat.make(a*d+b*c, b*d)
+sub(Rat{a, b}, Rat{c, d}) := Rat.make(a*d-b*c, b*d)
+mul(Rat{a, b}, Rat{c, d}) := Rat.make(a*c, b*d)
+div(Rat{a, b}, Rat{c, d}) := Rat.make(a*d, b*c)
+pow(Rat{a, b}, e)         := Rat.make(a^e, b^e)
 
 # Redefine division of integers.
-div(a @ Int, b @ Int) = Rat.new(a, b)
+div(a @ Int, b @ Int) := Rat.new(a, b)
 
-typecast(a @ Int,   'Rat) = Rat.make(a, 1)
-typecast(a @ Rat, 'Float) = float(a)
-typejoin('Int, 'Rat) = 'Rat
-typejoin('Rat, 'Int) = 'Rat
-typejoin('Rat, 'Float) = 'Float
-typejoin('Float, 'Rat) = 'Float
+typecast(a @ Int,   'Rat) := Rat.make(a, 1)
+typecast(a @ Rat, 'Float) := float(a)
+typejoin('Int, 'Rat)      := 'Rat
+typejoin('Rat, 'Int)      := 'Rat
+typejoin('Rat, 'Float)    := 'Float
+typejoin('Float, 'Rat)    := 'Float
 
 # Pretty-printing.
-syntax.print.primary(r @ Rat) = {
-    n, d: r.to_pair()
+syntax::print::primary(r @ Rat) := {
+    n, d := r.to_pair()
     [str(n), "/", str(d)]
 }
 
 # Convert to a floatig-point number.
-float(Rat{n, d}): float(n)/float(d)
+float(Rat{n, d}) := float(n)/float(d)
 
 # Convert to a string.
-str(Rat{n, d}): str(n) ++ "/" ++ str(d)
+str(Rat{n, d}) := str(n) ++ "/" ++ str(d)
 
