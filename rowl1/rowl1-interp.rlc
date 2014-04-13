@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-04-14 07:33:53 nineties $
+; $Id: rowl1-interp.rlc 2014-04-14 08:47:13 nineties $
 ;
 
 (import "rlvm-compile")
@@ -162,6 +162,7 @@
             (output_string ochan (fullform (parsed_token p)))
             (output_string ochan "\n")
             ))
+        (debugpf (parsed_token p))
         (evalfull (parsed_token p))
         ))
     (if ochan (close_out ochan))
@@ -395,10 +396,14 @@
     (return mod)
     ))
 
-(fun enter_module (sym) (
+(fun enter_module (sym rec) (
     (if (!= (symtable_depth variables) 0)
         (throw (logic_error (string "enter_module() can be called only in top-scope"))))
-    (var mod (get_var_nocheck global sym))
+    (var mod @C_NIL)
+    (if (!= rec @C_FALSE)
+        (= mod (get_var_nocheck global sym))
+        (= mod (get_var_norec_nocheck global sym))
+        )
     (if (|| (== mod @C_NIL) (!= (node_head mod) Module)) (do
         (var p (find_parent sym))
         (if (! p) (= p global))
@@ -451,6 +456,10 @@
     (return (get_slot_nocheck (get_slot mod Variables) sym))
     ))
 
+(export fun get_var_norec_nocheck (mod sym) (
+    (return (get_slot_norec_nocheck (get_slot mod Variables) sym))
+    ))
+
 (fun define_variable (sym val) (
     (return (set_var global sym val))
     ))
@@ -501,7 +510,7 @@
     (add_function1 prim (to_sym "execfile") stringT exec_file 0)
     (add_function1 prim (to_sym "loadable?") stringT loadable 0)
     (add_function2 prim (to_sym "create_module") DontCare symT create_module 0)
-    (add_function1 prim (to_sym "enter_module") symT enter_module 0)
+    (add_function2 prim (to_sym "enter_module") symT boolT enter_module 0)
     (add_function0 prim (to_sym "exit_module") exit_module 0)
     (add_function2 prim (to_sym "define_variable") symT DontCare define_variable 0)
     (add_function0 prim (to_sym "gettimeofday") gettimeofday_ 0)

@@ -1,5 +1,5 @@
 # Copyright (C) 2010 nineties
-# $Id: module.ab 2014-04-13 16:40:53 nineties $
+# $Id: module.ab 2014-04-14 08:40:56 nineties $
 
 #= Module system =
 #== Basics ==
@@ -43,7 +43,7 @@
 #   * `import A hiding (x,y,z)`: Copy every variables but `x`, `y` and `z`.
 #   * `import A (*)`: Copy every variables which is visible in `A`.
 
-module := enter_module('module)
+module := enter_module('module, true)
 
 copy_variables(mod, 'All)
     := prim.each_slots(mod.variables,
@@ -67,8 +67,8 @@ copy_variables(mod, vars @ List)
     := prim.list_foreach(x -> prim.define_variable(x,
         prim.get_slot(mod.variables, x, true, false, true)), vars)
 
-expand_import([], _) := nil
-expand_import([M,rest...], path) := {
+expand_import([], _, _) := nil
+expand_import([M,rest...], path, rec) := {
     if (not prim.equal?(path, ""))
         path = prim.string_add(path, "/")
     path = prim.string_add(path, prim.symbol_to_string(M))
@@ -79,9 +79,9 @@ expand_import([M,rest...], path) := {
         | _  -> `( if prim.loadable?(!file) load(!file) )
 
     `Seq{[
-        enter_module('!M),
+        enter_module('!M, !rec),
         !loadstmt,
-        !expand_import(rest, path),
+        !expand_import(rest, path, false),
         exit_module()
     ]}
 }
@@ -123,12 +123,12 @@ macro(e @ Import{mods, asname, option}) := {
     import_stmt := case option of
           Some{option}
             -> `Seq{[
-                    !module::expand_import(mods, ""),
+                    !module::expand_import(mods, "", true),
                     module::copy_variables(!mod, '!option),
                     !mod
                 ]}
         | nil
-            -> `Seq{[!module::expand_import(mods, ""), !mod]}
+            -> `Seq{[!module::expand_import(mods, "", true), !mod]}
         | _
             -> { throw `UnknownExpression{!e} }
 
