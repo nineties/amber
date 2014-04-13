@@ -1,15 +1,49 @@
 # Copyright (C) 2014 nineties
-# $Id: numeric/algorithm.ab 2014-04-12 09:24:41 nineties $
+# $Id: numeric/algorithm.ab 2014-04-13 15:56:06 nineties $
 
 #= Numerical algorithm =
 
-reduce: prim.numeric_reduce
+#== Reduction ==
+# "Reduction" of a sequence `a1, a2, ..., an` by a binary
+# operation `o` and its unit value `v` is defined as
+# - `v` (when n == 0)
+# - `a1 o a2 o a3 o ... o an` (when n >= 1).
+#
+# The order of operations is not undefined.
+# That is reduction of a sequence `a,b,c` by `o` and `v` could be
+# computed as `(a o b) o c` or `a o (b o c)` or (v o a) o (b o c)`
+# and so on. Therefore the operations must satisfy *associativity law*,
+# `(a o b) o c == a o (b o c)`, and the unit must satisfy *unit law*,
+# `v o a == a o v == a`. In other words, they must struct a monoid.
+#
+# Note that numerical operations on floating-point numbers is basically
+# not associative. But this library treats them associative by default.
+# XXX: We will add optional prameters to each methods to specify
+# the order of operations it is necessary.
 
-sum(f @ Function, begin @ Int, end @ Int):
-   prim.numeric_reduce(add, 0, f, begin, end)
-product(f @ Function, begin @ Int, end @ Int):
-   prim.numeric_reduce(mul, 1, f, begin, end)
-max(f @ Function, begin @ Int, end @ Int):
-    prim.numeric_reduce(max, -infinity, f, begin, end)
-min(f @ Function, begin @ Int, end @ Int):
-    prim.numeric_reduce(min, infinity, f, begin, end)
+# Reduction of a sequence `f(a), f(a+1), ..., f(b)`.
+reduce(f @ Function, a @ Int, b @ Int, o @ Function, v)
+   := prim.numeric_reduce(f, a, b, o, v)
+
+# Reduction of an iterable object.
+reduce(f, o @ Function, v) when f.Iterable? := {
+    for x in f
+        v = o(v, x)
+    v
+}
+
+# Generate specialized reduction functions from following table.
+REDUCTION_OPERATIONS := [
+    ('sum, 'amber::add, 0),
+    ('product, 'amber::mul, 1),
+    ('max, 'amber::max, -infinity),
+    ('min, 'amber::min, infinity)
+]
+
+for (fname, o, v) in REDUCTION_OPERATIONS {
+    amber::evalfull `(
+        Var{algorithm, !fname}(f @ Function, a @ Int, b @ Int)
+        := prim.numeric_reduce(f, a, b, !o, !v)
+        )
+}
+
