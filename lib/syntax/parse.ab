@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: syntax/parse.ab 2014-04-13 17:25:46 nineties $ "
+" $Id: syntax/parse.ab 2014-04-14 01:25:14 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -296,9 +296,22 @@ continuation_expr
       | 'shift multi_lambda_expr { `Shift{!node1} }
       | multi_lambda_expr
 
-case_expr
-    ::= <<multiline>> 'case tuple_expr 'of multi_lambda_expr
-        { `Apply{!node3, [!node1]} }
+argument_list
+    ::= "(" delimited(argument, ",") ")" guard_clause
+        { `When{!node1, !node3} }
+      | "(" delimited(argument, ",") ")"
+        { node1 }
+      | !"{" pattern guard_clause
+        { `When{List{!node1}, !node2} }
+      | !"{" pattern
+        { List{node1} }
+
+case_expr ::= argument_list "->" ternary_expr { `Case{!node0, !node2} }
+
+caseof_expr
+    ::= <<multiline>> 'case delimited1(tuple_expr, ",")
+                      'of delimited1(case_expr, "|")
+        { `CaseOf{!node1, !node3} }
       | continuation_expr
 
 assign_expr
@@ -315,7 +328,7 @@ assign_expr
       | pattern "|=" assign_expr  { `FusionAssign{!node0, !node2} }
       | pattern 'with slot_assign
         { Node{Quote{WithSlots}, List{node0, node2}} }
-      | case_expr
+      | caseof_expr
 
 Assign{syntax.expr, syntax.assign_expr}
 
@@ -456,23 +469,81 @@ Define{expand_macro_sub,
     fusion}
 Define{expand_macro_sub,
     (Lambda{args, body, options...}, 0) ->
-        `Lambda{!args, !expand_macro(body, 0), !options...},
+        `Lambda{!args, !expand_macro(body), !options...},
     fusion}
 Define{expand_macro_sub,
     (Lambda{When{args, guard}, body, options...}, 0) ->
-        `Lambda{When{!args, !expand_macro(guard, 0)},
-            !expand_macro(body, 0), !options...},
+        `Lambda{When{!args, !expand_macro(guard)},
+            !expand_macro(body), !options...},
     fusion}
 Define{expand_macro_sub,
     (Assign{lhs, rhs, options...}, 0) ->
-        `Assign{!lhs, !expand_macro(rhs, 0), !options...},
+        `Assign{!lhs, !expand_macro(rhs), !options...},
     fusion}
 Define{expand_macro_sub,
     (Define{lhs, rhs, options...}, 0) ->
-        `Define{!lhs, !expand_macro(rhs, 0), !options...},
+        `Define{!lhs, !expand_macro(rhs), !options...},
     fusion}
 Define{expand_macro_sub,
-    (Match{pat, expr}, 0) -> `Match{!pat, !expand_macro(expr, 0)},
+    (Match{pat, expr}, 0) -> `Match{!pat, !expand_macro(expr)},
+    fusion}
+
+# Translate
+#
+# case e of p1 -> s1 | p2 -> s2 | ... | pn -> sn
+#
+# to
+#
+# t: e
+# if Match{p1, t}
+#     s1
+# else if Match{p2, t}
+#     s2
+# else
+#     ...
+# else if Match{pn, t}
+#     ...
+# else
+#     throw `MatchingFailed{p1 or p2 or ... or pn, e}
+
+Define{expand_macro_sub, (CaseOf{es, pats}, 0) -> {
+        ts   := prim.list_map(_ -> prim.unique_symbol('t), es)
+        vars := []
+        f := (Case{When{args, guard}, e}, cont) -> {
+            t := desugar_pattern(args, guard)
+            prim.array_map(x -> { vars = prim.list_insert_unique(x, vars) },
+                    prim.get_arg(t, 1))
+            `IfElse{Match{!prim.get_arg(t, 0), !ts}, !e, !cont}
+        }
+        g := (Case{args, e}, cont) -> {
+            t := desugar_pattern(args, nil)
+            prim.array_map(x -> { vars = prim.list_insert_unique(x, vars) },
+                    prim.get_arg(t, 1))
+            `IfElse{Match{!prim.get_arg(t, 0), !ts}, !e, !cont}
+        }
+
+        p  := prim.list_foldr1((p, q) -> `(!p or !q),
+                prim.list_map(Case{p, _} -> p, pats))
+        ex := `Throw{'MatchingFailed{DomainList{!p}, !es}}
+        body := prim.list_foldr(fusion(f, g), pats, ex)
+
+        defs1 := prim.list_map_with_index(
+            (v, i) -> `Define{!v, !expand_macro(prim.list_at(es, i))},
+            ts)
+
+        defs2 := prim.list_map(x -> `Define{!x, nil}, vars)
+        `Seq{[
+            Seq{!defs1},
+            Seq{!defs2},
+            !body
+            ]}
+    }, fusion}
+Define{expand_macro_sub,
+    (Case{args, body}, 0) -> `Case{!args, !expand_macro(body)},
+    fusion}
+Define{expand_macro_sub,
+    (Case{When{args, guard}, body}, 0) ->
+        `Case{When{!args, !expand_macro(guard)}, !expand_macro(body)},
     fusion}
 Define{expand_macro, (obj, lvl) -> expand_macro_sub(obj, lvl), fusion}
 Define{expand_macro, (obj, 0) -> {
@@ -598,21 +669,21 @@ macro(For{i, Range{a, b}, body}) = {
 #
 # pat1 and pat2 must have exactly same set of symbol.
 
-desugar_args(a, _, _, _) := a
-desugar_args(a, vars, checks, 0) := {
+desugar_iter(a, _, _, _) := a
+desugar_iter(a, vars, checks, 0) := {
     args := prim.arguments(a)
     if args == []
         return a
-    args = desugar_args(args, vars, checks, 0)
+    args = desugar_iter(args, vars, checks, 0)
     Node{prim.head(a), args}
 }
-desugar_args([], _, _, 0) := []
-desugar_args([a,rest...], vars, checks, 0) := {
-    a    = desugar_args(a, vars, checks, 0)
-    rest = desugar_args(rest, vars, checks, 0)
+desugar_iter([], _, _, 0) := []
+desugar_iter([a,rest...], vars, checks, 0) := {
+    a    = desugar_iter(a, vars, checks, 0)
+    rest = desugar_iter(rest, vars, checks, 0)
     prim.list_cons(a, rest)
 }
-desugar_args(a @ Symbol, vars, checks, 0) := {
+desugar_iter(a @ Symbol, vars, checks, 0) := {
     if a == '_
         return '_
     if not prim.array_include?(vars, a) {
@@ -623,26 +694,26 @@ desugar_args(a @ Symbol, vars, checks, 0) := {
     prim.array_push(checks, ([], `Equal{!t, !a}))
     t
 }
-desugar_args(nil, _, _, 0) := nil
-desugar_args(true, _, _, 0) := true
-desugar_args(false, _, _, 0) := false
-desugar_args(a @ Quote, _, _, 0) := a
-desugar_args(a @ Quasiquote, vars, checks, level) := {
-    arg := desugar_args(prim.get_arg(a, 0), vars, checks, level + 1)
+desugar_iter(nil, _, _, 0) := nil
+desugar_iter(true, _, _, 0) := true
+desugar_iter(false, _, _, 0) := false
+desugar_iter(a @ Quote, _, _, 0) := a
+desugar_iter(a @ Quasiquote, vars, checks, level) := {
+    arg := desugar_iter(prim.get_arg(a, 0), vars, checks, level + 1)
     node('Quasiquote, arg)
 }
-desugar_args(a @ Unquote, vars, checks, level) := {
-    arg := desugar_args(prim.get_arg(a, 0), vars, checks, level - 1)
+desugar_iter(a @ Unquote, vars, checks, level) := {
+    arg := desugar_iter(prim.get_arg(a, 0), vars, checks, level - 1)
     node('Unquote, arg)
 }
-desugar_args(a @ Domain, vars, checks, 0) := {
+desugar_iter(a @ Domain, vars, checks, 0) := {
     v   := prim.get_arg(a, 0)
     pat := prim.get_arg(a, 1)
     if v != '_ and not prim.array_include?(vars, v)
         prim.array_push(vars, v)
     if prim.head(pat) == 'Symbol
         return a
-    pat = desugar_args(pat, vars, checks, 0)
+    pat = desugar_iter(pat, vars, checks, 0)
     if prim.head(pat) == 'Symbol {
         prim.array_push(checks, ([`Define{!pat, !v}], true))
         v
@@ -650,7 +721,7 @@ desugar_args(a @ Domain, vars, checks, 0) := {
         `Domain{!v, !pat}
 }
 
-desugar_args(orpat @ SeqOr, vars, checks, 0) := {
+desugar_iter(orpat @ SeqOr, vars, checks, 0) := {
     # Translate `a or b or ..` to [a,b,..]
     to_list(pat)         := [pat]
     to_list(SeqOr{a, b}) := prim.list_append(to_list(a), to_list(b))
@@ -660,7 +731,7 @@ desugar_args(orpat @ SeqOr, vars, checks, 0) := {
     orp_vars := prim.array_new_empty()
     pats = prim.list_map(p -> {
                 prim.array_resize(vars, n)
-                p := desugar_args(p, vars, checks, 0)
+                p := desugar_iter(p, vars, checks, 0)
                 for i in n..prim.array_size(vars)-1 {
                     if not prim.array_include?(orp_vars, vars[i])
                         prim.array_push(orp_vars, vars[i])
@@ -669,20 +740,20 @@ desugar_args(orpat @ SeqOr, vars, checks, 0) := {
             }, pats)
     init := prim.array_to_list(prim.array_map(x -> `Define{!x, nil}, orp_vars))
     asgn := prim.list_foldr1((a,b) -> `(!a or !b),
-            prim.list_map(p -> `Match{!p, !t}, pats))
+            prim.list_map(p -> `Match{[!p], [!t]}, pats))
     prim.array_push(checks, (init, asgn))
     t
 }
 
-desugar_lambda(args, guard, body) := {
-    vars := prim.array_new_empty()   # Parameter-variables
-    checks := prim.array_new_empty() # Expresions that is needed to be checked.
-    args = desugar_args(args, vars, checks, 0)
+desugar_pattern(args, guard) := {
+    vars   := prim.array_new_empty() # Parameter-variables
+    checks := prim.array_new_empty() # Expressoins needs checked.
+    args = desugar_iter(args, vars, checks, 0)
     if prim.array_size(checks) == 0 {
         if guard == nil
-            return `Lambda{!args, !body}
+            return (args, vars)
         else
-            return `Lambda{When{!args, !guard}, !body}
+            return (`When{!args, !guard}, vars)
     } else {
         inits := prim.array_foldr(((a, _), b) -> prim.list_append(a, b), checks, [])
         checkexpr := prim.array_foldl1((a, b) -> `(!a and !b),
@@ -693,12 +764,18 @@ desugar_lambda(args, guard, body) := {
             guard = checkexpr
         if inits != []
             guard = `Seq{!prim.list_append(inits, [guard])}
-        return `Lambda{When{!args, !guard}, !body}
+        return (`When{!args, !guard}, vars)
     }
 }
 
-macro(Lambda{args @ List, body})       := desugar_lambda(args, nil, body)
-macro(Lambda{When{args, guard}, body}) := desugar_lambda(args, guard, body)
+macro(Lambda{args @ List, body}) := {
+    t := desugar_pattern(args, nil)
+    `Lambda{!prim.get_arg(t, 0), !body}
+}
+macro(Lambda{When{args, guard}, body}) := {
+    t := desugar_pattern(args, guard)
+    `Lambda{!prim.get_arg(t, 0), !body}
+}
 
 # 'with' exprssion
 #

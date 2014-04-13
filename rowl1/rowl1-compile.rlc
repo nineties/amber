@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-04-13 14:43:10 nineties $
+; $Id: rowl1-compile.rlc 2014-04-13 21:17:11 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1960,8 +1960,8 @@
     ))
 
 (fun compile_match (asm expr) (
-    (var lhs (node_arg expr 0))
-    (var rhs (node_arg expr 1))
+    (var lhs (node_arg_list expr 0))
+    (var rhs (node_arg_list expr 1))
     (var tup (unqualified_args lhs))
     (var pattern (field_get tup 0))
     (var tvars   (field_get tup 1))
@@ -1970,7 +1970,7 @@
     (var exit   (fresh_label asm))
 
     (compile asm (apply
-        (make_node3 Lambda (list1 pattern) tvars NoMatchingError) (list1 rhs)))
+        (make_node3 Lambda pattern tvars NoMatchingError) rhs))
     (put_dup asm)
     (put_if_undef asm failed)
     (while rvars (do
