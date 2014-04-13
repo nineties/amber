@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: syntax/parse.ab 2014-04-14 01:25:14 nineties $ "
+" $Id: syntax/parse.ab 2014-04-14 04:15:02 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -136,9 +136,10 @@ DefineSyntax{stmt, List{ Tuple{List{syntax_declaration}, node0}}}
 # The following symbols never been parsed as symbols.
 
 Define{Var{syntax, reserved_words}, Array{
-    "self", "not", "and", "or", "when", "if", "else", "case", "of",
-    "while", "for", "in", "continue", "break", "return", "throw", "try",
-    "catch", "import", "hiding", "as", "with", "reset", "shift"
+    "self", "not", "and", "or", "when", "if", "unless", "else", "case",
+    "of", "while", "until", "for", "in", "continue", "break", "return",
+    "throw", "try", "catch", "import", "hiding", "as", "with", "reset",
+    "shift"
 }}
 
 ### Expressions
@@ -352,12 +353,22 @@ stmt
         { `Seq{[!node0, !node2]} }
       | stmt ";"
         { `Seq{[!node0, nil]} }
+      | stmt 'if expr
+        { `If{!node2, !node0} }
+      | stmt 'unless expr
+        { `If{Not{!node2}, !node0} }
       | <<multiline>> 'if expr stmt 'else stmt
         { `IfElse{!node1, !node2, !node4} }
       | <<multiline>> 'if expr stmt
         { `If{!node1, !node2} }
+      | <<multiline>> 'unless expr stmt 'else stmt
+        { `IfElse{Not{!node1}, !node2, !node4} }
+      | <<multiline>> 'unless expr stmt
+        { `If{Not{!node1}, !node2} }
       | <<multiline>> 'while expr block
         { `While{!node1, !node2} }
+      | <<multiline>> 'until expr block
+        { `While{Not{!node1}, !node2} }
       | <<multiline>> 'for pattern 'in expr block
         { `For{!node1, !node3, !node4} }
       | 'continue
@@ -672,8 +683,7 @@ macro(For{i, Range{a, b}, body}) = {
 desugar_iter(a, _, _, _) := a
 desugar_iter(a, vars, checks, 0) := {
     args := prim.arguments(a)
-    if args == []
-        return a
+    return a if args == []
     args = desugar_iter(args, vars, checks, 0)
     Node{prim.head(a), args}
 }
@@ -684,9 +694,8 @@ desugar_iter([a,rest...], vars, checks, 0) := {
     prim.list_cons(a, rest)
 }
 desugar_iter(a @ Symbol, vars, checks, 0) := {
-    if a == '_
-        return '_
-    if not prim.array_include?(vars, a) {
+    return '_ if a == '_
+    unless prim.array_include?(vars, a) {
         prim.array_push(vars, a)
         return a
     }
@@ -709,7 +718,7 @@ desugar_iter(a @ Unquote, vars, checks, level) := {
 desugar_iter(a @ Domain, vars, checks, 0) := {
     v   := prim.get_arg(a, 0)
     pat := prim.get_arg(a, 1)
-    if v != '_ and not prim.array_include?(vars, v)
+    unless v == '_ and not prim.array_include?(vars, v)
         prim.array_push(vars, v)
     if prim.head(pat) == 'Symbol
         return a
@@ -733,7 +742,7 @@ desugar_iter(orpat @ SeqOr, vars, checks, 0) := {
                 prim.array_resize(vars, n)
                 p := desugar_iter(p, vars, checks, 0)
                 for i in n..prim.array_size(vars)-1 {
-                    if not prim.array_include?(orp_vars, vars[i])
+                    unless prim.array_include?(orp_vars, vars[i])
                         prim.array_push(orp_vars, vars[i])
                 }
                 p
