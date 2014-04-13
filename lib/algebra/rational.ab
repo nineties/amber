@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: algebra/rational.ab 2014-04-13 13:04:39 nineties $
+# $Id: algebra/rational.ab 2014-04-13 16:13:48 nineties $
 
 import algebra::euclid (gcd)
 
@@ -9,7 +9,12 @@ class Rat{numerator, denominator} with {
     .new = (num @ Int, denom @ Int) -> {
         if denom == 0 throw `DivisionByZero{}
         g := gcd(num, denom)
-        Rat.make(sign(denom) * num//g, sign(denom) * denom//g)
+        denom = sign(denom) * denom//g
+        num   = sign(num) * num//g
+        if denom == 1
+            return num
+        else
+            Rat.make(num, denom)
     }
 
     # Numerator.
@@ -32,6 +37,14 @@ class Rat{numerator, denominator} with {
         g := gcd(n, d)
         (n//g, d//g)
     }
+}
+
+# An integers is also a rational number.
+Int with {
+    .Rat?  := true
+    .num   := alias () -> self
+    .denom := alias () -> 1
+    .to_pair() := (self, 1)
 }
 
 # Basic arithmetic operations.
