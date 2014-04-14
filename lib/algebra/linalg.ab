@@ -1,11 +1,15 @@
 # Copyright (C) 2014 nineties
-# $Id: algebra/linalg.ab 2014-04-14 12:15:20 nineties $
+# $Id: algebra/linalg.ab 2014-04-14 12:45:06 nineties $
 
 import math
 
 #= Linear algebra =
+#== Vector ==
 # Creation of a vector
 vector(values...) := node('Vector, values...)
+
+# The dimention of the vector.
+dim(v @ Vector) := v.arity
 
 # We use the notation `|v|` for L2-norm.
 abs(v @ Vector) := {
@@ -90,7 +94,8 @@ for op in VECTOR_VECTOR_ARITHMETIC {
 normalize(v @ Vector) := v/|v|
 
 # Inner product.
-dot(a @ Vector, b @ Vector) := throw `DomainError{"dimension mismatch", !a, !b}
+dot(a @ Vector, b @ Vector)
+    := throw `DomainError{"dimension mismatch", !a, !b}
 dot(a @ Vector, b @ Vector) when a.arity == b.arity := {
     n := a.arity
     v := 0
@@ -113,3 +118,43 @@ zeros(1) := 'Vector{0}
 zeros(2) := 'Vector{0, 0}
 zeros(3) := 'Vector{0, 0, 0}
 zeros(4) := 'Vector{0, 0, 0, 0}
+
+#== Matrix ==
+# An (n,m) matrix is represented by `Matrix{v1, v2, ..., vm}` where
+# `v1, v1, ..., vm` are n-dimentional vector.
+
+# Construct a matrix from column vectors.
+matrix(vectors...) := node('Matrix, vectors...)
+
+# The number of rows and columns.
+nrow(m @ Matrix) := dim(m[0])
+ncol(m @ Matrix) := m.arity
+
+zeros(m @ Int, n @ Int) when m > 0 and n > 0
+    := matrix(List.new(_ -> zeros(n))...
+
+# Multiplication of a matrix and a column-vector.
+dot(m @ Matrix, v @ Vector) when ncol(m) == dim(v) := {
+    n := nrow(m)
+    l := ncol(m)
+    a := zeros(n)
+    for i in 0..n-1 {
+        a[i] = 0
+        for j in 0..l-1
+            a[i] += m[i][j] * v[j]
+    }
+    a
+}
+
+# Multiplication of a row-vector and a matrix.
+dot(v @ Vector, m @ Matrix) when nrow(m) == dim(v) := {
+    n := ncol(m)
+    l := nrow(m)
+    a := zeros(n)
+    for i in 0..n-1 {
+        a[i] = 0
+        for j in 0..l-1
+            a[i] += v[j] * m[j][i]
+    }
+    a
+}
