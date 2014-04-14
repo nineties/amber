@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: syntax/parse.ab 2014-04-14 08:58:57 nineties $ "
+" $Id: syntax/parse.ab 2014-04-14 09:06:29 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -136,10 +136,10 @@ DefineSyntax{stmt, List{ Tuple{List{syntax_declaration}, node0}}}
 # The following symbols never been parsed as symbols.
 
 Define{Var{syntax, reserved_words}, Array{
-    "self", "not", "and", "or", "when", "if", "unless", "else", "case",
-    "of", "while", "until", "for", "in", "continue", "break", "return",
-    "throw", "try", "catch", "import", "hiding", "as", "with", "reset",
-    "shift"
+    "self", "seq", "not", "and", "or", "when", "if", "unless", "else",
+    "case", "of", "while", "until", "for", "in", "continue", "break",
+    "return", "throw", "try", "catch", "import", "hiding", "as", "with",
+    "reset", "shift"
 }}
 
 ### Expressions
@@ -181,6 +181,9 @@ postfix_expr
         # Subscription
       | postfix_expr nospace("[") delimited(argument, ",") "]"
         { Node{Quote{Subscript}, List{node0, node2}} }
+        # sequence of statements
+      | <<multiline>> 'seq "{" aligned(stmt) "}"
+        { Node{Quote{Seq}, List{node2}} }
       | # RestOf Pattern
         postfix_expr "..."
         { Node{Quote{Rest}, List{node0}} }
