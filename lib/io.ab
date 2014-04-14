@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: io.ab 2014-04-13 04:12:31 nineties $
+# $Id: io.ab 2014-04-14 12:26:56 nineties $
 
 #= IO =
 # Input and output stream.
@@ -294,16 +294,8 @@ parse_prec(fmt, iss) := {
     parse_number(iss)
 }
 
-print_element(oss,t,...) := throw `UnknownFormatType{!t}
-
-# Pretty printing.
-print_element(oss,"p",f,w,p,arg) := prim.pretty_print(oss, arg)
-
-# string.
-print_element(oss,"s",f,w,p,arg) := {
-    s := str(arg)
-    if p != nil and p < s.length
-        s = s[0,p]
+# Justify given string by given flags `f` and width `w`.
+justify(oss, s, f, w) := {
     if w == nil
         oss.print(s)
     else {
@@ -312,6 +304,25 @@ print_element(oss,"s",f,w,p,arg) := {
         else
             oss.print(s.rjust(w))
     }
+}
+
+print_element(oss,t,...) := throw `UnknownFormatType{!t}
+
+# Pretty printing.
+print_element(oss,"p",f,w,p,arg) := prim.pretty_print(oss, arg)
+
+# character.
+print_element(oss,"c",f,w,p,arg) := {
+    c := arg.to_char()
+    justify(oss, c, f, w)
+}
+
+# string.
+print_element(oss,"s",f,w,p,arg) := {
+    s := str(arg)
+    if p != nil and p < s.length
+        s = s[0,p]
+    justify(oss, s, f, w)
 }
 
 # Decimal integer.
