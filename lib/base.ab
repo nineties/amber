@@ -1,5 +1,5 @@
 # Copyright (C) 2010 nineties
-# $Id: base.ab 2014-04-13 16:40:45 nineties $
+# $Id: base.ab 2014-04-14 09:26:03 nineties $
 
 #== The most basic functions and methods. ==
 
@@ -330,3 +330,23 @@ str(n @ Int, base=10, precision=0, prefix=false, upper=false, unsigned=false) :=
  prim.int_to_string(n, base, precision, prefix, upper, unsigned)
 str(f @ Float, precision=0) := prim.float_to_string(f, precision)
 str(s @ String) := s
+
+#== Pattern-substitution ==
+subst(obj, f) := {
+    f := f | id
+    iter(obj) := {
+        new_obj := f(obj)
+        while (NotEqual{new_obj, obj}) {
+            obj = new_obj
+            new_obj = macro(obj)
+        }
+        return new_obj if new_obj.atom?
+        head := obj.head
+        args := obj.arguments
+        node(head, args.map(iter)...)
+    }
+    iter(obj)
+}
+
+# Enable pattern-substitution of `obj` by `f` using syntax `obj[f]`.
+nil.get(f @ Function) := subst(self, f)
