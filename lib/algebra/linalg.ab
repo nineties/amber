@@ -1,82 +1,83 @@
 # Copyright (C) 2014 nineties
-# $Id: algebra/linalg.ab 2014-04-14 08:07:38 nineties $
+# $Id: algebra/linalg.ab 2014-04-14 08:56:32 nineties $
 
 import math
 
 #= Linear algebra =
 
-# We use the notation `|v|` L2-norm.
+# We use the notation `|v|` for L2-norm.
 abs(v @ Vec) := {
     n := 0
-    for i in 0..v.arity-1
+    for i in 0..v.arity-1 {
         n += v[i]^2
+    }
     math::sqrt(n)
 }
-
-# Specialized version for low dimentional vectors.
-abs(Vec{a})          := |a|
-abs(Vec{a, b})       := math::sqrt(a^2 + b^2)
-abs(Vec{a, b, c})    := math::sqrt(a^2 + b^2 + c^2)
-abs(Vec{a, b, c, d}) := math::sqrt(a^2 + b^2 + c^2)
-
-# Vector arithmetic
-VECTOR_VECTOR_ARITHMETIC := ['add, 'sub, 'mul, 'div]
-for op in VECTOR_VECTOR_ARITHMETIC {
-    template := 'seq {
-        op(a @ Vec, b @ Vec) when a.arity == b.arity := {
-            n := a.arity
-            c := zeros(n)
-            for i in 0..n-1
-                c[i] = op(a[i], b[i])
-            c
-        }
-        op(Vec{a0}, Vec{b0})         := `Vec{!op(a0, b0)}
-        op(Vec{a0, a1}, Vec{b0, b1}) := `Vec{!op(a0, b0), !op(a1, b1)}
-        op(Vec{a0, a1, a2}, Vec{b0, b1, b2})
-            := `Vec{!op(a0, b0), !op(a1, b1), !op(a2, b2)}
-        op(Vec{a0, a1, a2, a3}, Vec{b0, b1, b2, b3})
-            := `Vec{!op(a0, b0), !op(a1, b1), !op(a2, b2), !op(a3, b3)}
-    }
-    linalg.eval(template['op -> op])
-}
-
-SCALER_VECTOR_ARITHMETIC := ['mul]
-for op in VECTOR_VECTOR_ARITHMETIC {
-    template := 'seq {
-        op(s, v @ Vec) := {
-            n := v.arity
-            c := zeros(n)
-            for i in 0..n-1
-                c[i] = op(s, v[i])
-            c
-        }
-        op(s, Vec{v0})         := `Vec{!op(s, v0)}
-        op(s, Vec{v0, v1})     := `Vec{!op(s, v0), !op(s, v1)}
-        op(s, Vec{v0, v1, v2}) := `Vec{!op(s, v0), !op(s, v1), !op(s, v2)}
-        op(s, Vec{v0, v1, v2, v3})
-            := `Vec{!op(s, v0), !op(s, v1), !op(s, v2), !op(s, v3)}
-    }
-    linalg.eval(template['op -> op])
-}
-
-VECTOR_SCALAR_ARITHMETIC := ['mul, 'div, 'pow]
-for op in VECTOR_VECTOR_ARITHMETIC {
-    template := 'seq {
-        op(v @ Vec, s) := {
-            n := v.arity
-            c := zeros(n)
-            for i in 0..n-1
-                c[i] = op(v[i], s)
-            c
-        }
-        op(Vec{v0}, s)         := `Vec{!op(v0, s)}
-        op(Vec{v0, v1}, s)     := `Vec{!op(v0, s), !op(v1, s)}
-        op(Vec{v0, v1, v2}, s) := `Vec{!op(v0, s), !op(v1, s), !op(v2, s)}
-        op(Vec{v0, v1, v2, v3}, s)
-            := `Vec{!op(v0, s), !op(v1, s), !op(v2, s), !op(v3, s)}
-    }
-    linalg.eval(template['op -> op])
-}
-
-# Return normalized vector.
-normalize(v @ Vec) := v/|v|
+#
+## Specialized version for low dimentional vectors.
+#abs(Vec{a})          := |a|
+#abs(Vec{a, b})       := math::sqrt(a^2 + b^2)
+#abs(Vec{a, b, c})    := math::sqrt(a^2 + b^2 + c^2)
+#abs(Vec{a, b, c, d}) := math::sqrt(a^2 + b^2 + c^2)
+#
+## Vector arithmetic
+#VECTOR_VECTOR_ARITHMETIC := ['add, 'sub, 'mul, 'div]
+#for op in VECTOR_VECTOR_ARITHMETIC {
+#    template := 'seq {
+#        op(a @ Vec, b @ Vec) when a.arity == b.arity := {
+#            n := a.arity
+#            c := zeros(n)
+#            for i in 0..n-1
+#                c[i] = op(a[i], b[i])
+#            c
+#        }
+#        op(Vec{a0}, Vec{b0})         := `Vec{!op(a0, b0)}
+#        op(Vec{a0, a1}, Vec{b0, b1}) := `Vec{!op(a0, b0), !op(a1, b1)}
+#        op(Vec{a0, a1, a2}, Vec{b0, b1, b2})
+#            := `Vec{!op(a0, b0), !op(a1, b1), !op(a2, b2)}
+#        op(Vec{a0, a1, a2, a3}, Vec{b0, b1, b2, b3})
+#            := `Vec{!op(a0, b0), !op(a1, b1), !op(a2, b2), !op(a3, b3)}
+#    }
+#    linalg.eval(template['op -> op])
+#}
+#
+#SCALER_VECTOR_ARITHMETIC := ['mul]
+#for op in VECTOR_VECTOR_ARITHMETIC {
+#    template := 'seq {
+#        op(s, v @ Vec) := {
+#            n := v.arity
+#            c := zeros(n)
+#            for i in 0..n-1
+#                c[i] = op(s, v[i])
+#            c
+#        }
+#        op(s, Vec{v0})         := `Vec{!op(s, v0)}
+#        op(s, Vec{v0, v1})     := `Vec{!op(s, v0), !op(s, v1)}
+#        op(s, Vec{v0, v1, v2}) := `Vec{!op(s, v0), !op(s, v1), !op(s, v2)}
+#        op(s, Vec{v0, v1, v2, v3})
+#            := `Vec{!op(s, v0), !op(s, v1), !op(s, v2), !op(s, v3)}
+#    }
+#    linalg.eval(template['op -> op])
+#}
+#
+#VECTOR_SCALAR_ARITHMETIC := ['mul, 'div, 'pow]
+#for op in VECTOR_VECTOR_ARITHMETIC {
+#    template := 'seq {
+#        op(v @ Vec, s) := {
+#            n := v.arity
+#            c := zeros(n)
+#            for i in 0..n-1
+#                c[i] = op(v[i], s)
+#            c
+#        }
+#        op(Vec{v0}, s)         := `Vec{!op(v0, s)}
+#        op(Vec{v0, v1}, s)     := `Vec{!op(v0, s), !op(v1, s)}
+#        op(Vec{v0, v1, v2}, s) := `Vec{!op(v0, s), !op(v1, s), !op(v2, s)}
+#        op(Vec{v0, v1, v2, v3}, s)
+#            := `Vec{!op(v0, s), !op(v1, s), !op(v2, s), !op(v3, s)}
+#    }
+#    linalg.eval(template['op -> op])
+#}
+#
+## Return normalized vector.
+#normalize(v @ Vec) := v/|v|

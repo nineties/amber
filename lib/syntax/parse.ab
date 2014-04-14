@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: syntax/parse.ab 2014-04-14 04:15:02 nineties $ "
+" $Id: syntax/parse.ab 2014-04-14 08:58:57 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -193,9 +193,12 @@ postfix_expr
         { Node{Quote{Var}, List{node0, node2}} }
       | postfix_expr "." symbol
         { Node{Quote{Slot}, List{node0, node2}} }
-      | primary_expr "^" postfix_expr
-        { Node{Quote{Pow}, List{node0, node2}} }
       | primary_expr
+
+power_expr
+    ::= postfix_expr "^" power_expr
+        { Node{Quote{Pow}, List{node0, node2}} }
+      | postfix_expr
 
 quote_expr
     ::= "'" quote_expr
@@ -204,7 +207,7 @@ quote_expr
         { Node{Quote{Quasiquote}, List{node1}} }
       | "!"  quote_expr
         { Node{Quote{Unquote}, List{node1}} }
-      | postfix_expr
+      | power_expr
 
 pattern ::= quote_expr
 term    ::= postfix_expr
