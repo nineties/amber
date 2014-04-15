@@ -1,0 +1,146 @@
+# AO rebder benchmark
+# Amber version by Koichi Nakamura
+
+import algebra::linalg (*)
+import math (sqrt, sin, cos)
+import numeric::random (rand)
+
+IMAGE_WIDTH  := 256
+IMAGE_HEIGHT := 256
+NSUBSAMPLES  := 2
+NAO_SAMPLES  := 8
+
+# Intersection of a sphere (center = C, radious = r) and a ray (origin = O,
+# normalized direction vector = d).
+#
+# Return nil when these two don't intersect.
+# Otherwise, return (t, n) where O + t*d is the point of intersection and
+# n is the normal vector.
+intersect(Sphere{C, r}, Ray{O, d}, isect) := {
+    CO := O - C
+
+    # distance between C and the ray.
+    s  := r^2 - |CO|^2 + (CO <dot> d)^2
+    return unless s > 0
+
+    t := -(CO <dot> d) - sqrt(s)
+    P := O + t*d
+    isect.update(t, normalize(P-C))
+}
+
+# Intersection of a plane (point = P, normal vector = n) and
+# a ray (origin = O, normalized direction vector = d).
+# Return values are same as previous function.
+intersect(Plane{P, n}, Ray{O, d}, isect) := {
+    v := d <dot> n
+    return nil if |v| < 1.0e-17 # plane and ray are parallel
+    t := ((P - O) <dot> n) / (d <dot> n)
+    isect.update(t, n)
+}
+
+class Isect{hit, t, P, n} with {
+    .new() := .make(false, 10000000.0, zeros(3), zeros(3))
+
+    .update(t, n) := {
+        if t > 0 and t < .t {
+            .hit = true
+            .t   = t
+            .n   = n
+        }
+    }
+}
+
+
+clamp(f) := {
+    v := int(f * 255.5)
+    min(max(0, v), 255)
+}
+
+# From given normalized vector n, compute normalized vectors u, v,
+# and w that are perpendicular to each other. Then return change of basis
+# matrix from (e1, e2, e3) to (u, v, w).
+ortho_basis(n) := {
+    w := n
+    v := (|n[0]| < 0.6) ? vector(1.0, 0.0, 0.0) :
+         (|n[1]| < 0.6) ? vector(0.0, 1.0, 0.0) :
+         (|n[2]| < 0.6) ? vector(0.0, 0.0, 1.0) :
+         vector(1.0, 0.0, 0.0)
+    u := normalize(v <cross> w)
+    v  = normalize(w <cross> u)
+    matrix(u, v, w)
+}
+
+# Compute ambient occlusion at the point P on a surface.
+# n is the normal vector of the surface at P.
+ambient_occlusion(objects, P, n) := {
+    Q := ortho_basis(n)
+
+    ntheta := NAO_SAMPLES
+    nphi   := NAO_SAMPLES
+    eps    := 0.0001
+    occlusion := 0.0
+    p0 := P + eps*n
+
+    for j in 0..nphi-1 {
+        for i in 0..ntheta-1 {
+            theta := sqrt(rand())
+            phi   := 2.0 * 3.14159265 * rand()
+            x := cos(phi) * theta
+            y := sin(phi) * theta
+            z := sqrt(1 - theta^2)
+
+            dir := Q <dot> vector(x, y, z)
+            ray := `Ray{!p0, !dir}
+            isect := Isect.new()
+            for o in objects
+                intersect(o, ray, isect)
+            if isect.hit
+                occlusion += 1.0
+        }
+    }
+    return (ntheta * nphi - occlusion) / (ntheta * nphi)
+}
+
+render(objects, fp, w, h) := {
+    fp.printf("P6\n")
+    fp.printf("%d %d\n", w, h)
+    fp.printf("255\n")
+    ns := NSUBSAMPLES
+    for y in 0..h-1 {
+        for x in 0..w-1 {
+            rad := 0.0
+
+            # Subsampling
+            for v in 0..ns-1 {
+                for u in 0..ns-1 {
+                    px  :=  (x + u / ns - w / 2) / (w / 2)
+                    py  := -(y + v / ns - h / 2) / (h / 2)
+                    eye := normalize(vector(px, py, -1))
+                    ray := `Ray{!zeros(3), !eye}
+                    isect := Isect.new()
+                    for o in objects
+                        intersect(o, ray, isect)
+                    if isect.hit {
+                        rad += ambient_occlusion(objects,
+                                isect.t * eye, isect.n)
+                    }
+                }
+            }
+
+            color := clamp(rad / ns^2)
+            fp.write_uint8(color)
+            fp.write_uint8(color)
+            fp.write_uint8(color)
+        }
+    }
+}
+
+objects := Array{
+    'Sphere{Vector{-2.0, 0.0, -3.5}, 0.5},
+    'Sphere{Vector{-0.5, 0.0, -3.0}, 0.5},
+    'Sphere{Vector{ 1.0, 0.0, -2.2}, 0.5},
+    'Plane{Vector{0.0, -0.5, 0.0}, Vector{0.0, 1.0, 0.0}}
+}
+
+fp := io::open_out("ao.ppm", binary=true)
+render(objects, fp, IMAGE_WIDTH, IMAGE_HEIGHT)
