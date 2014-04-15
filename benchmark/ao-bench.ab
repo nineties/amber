@@ -1,4 +1,5 @@
 # AO rebder benchmark
+# This code is based on C version https://code.google.com/p/aobench/
 # Amber version by Koichi Nakamura
 
 import algebra::linalg (*)
@@ -57,17 +58,16 @@ clamp(f) := {
 }
 
 # From given normalized vector n, compute normalized vectors u, v,
-# and w that are perpendicular to each other. Then return change of basis
-# matrix from (e1, e2, e3) to (u, v, w).
+# and n that are perpendicular to each other. Then return change of basis
+# matrix from (u, v, n) to (e1, e2, e3).
 ortho_basis(n) := {
-    w := n
     v := (|n[0]| < 0.6) ? vector(1.0, 0.0, 0.0) :
          (|n[1]| < 0.6) ? vector(0.0, 1.0, 0.0) :
          (|n[2]| < 0.6) ? vector(0.0, 0.0, 1.0) :
          vector(1.0, 0.0, 0.0)
-    u := normalize(v <cross> w)
-    v  = normalize(w <cross> u)
-    matrix(u, v, w)
+    u := normalize(v <cross> n)
+    v  = normalize(n <cross> u)
+    matrix(u, v, n)
 }
 
 # Compute ambient occlusion at the point P on a surface.
