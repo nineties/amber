@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: Parser.ab 2014-04-16 17:55:17 nineties $
+# $Id: Parser.ab 2014-04-16 18:21:04 nineties $
 
 #= Parser =
 Parser := object_system::builtin_class('Parser)
@@ -29,39 +29,3 @@ Parser with {
 prim.set_builtin_parent('Parser, Parser)
 
 parse(lang, input) := lang::syntax.program(Parser.new(input, lang::syntax))
-
-#= Syntax object =
-class Syntax{name} with {
-    .new(name, case_sensitive=true) := {
-        if not case_sensitive
-            throw `NotImplemented{"Sorry but we haven't implemented case-insensitive syntax"}
-        syn := Syntax.make(name)
-        syn.reserved_words := prim.array_new_empty()
-        syn.case_sensitive := case_sensitive
-
-        # Copy basic parsers
-        basic_parsers := [
-            'toplevel, 'shell, 'any, 'spaces, 'comment, 'decimal, 'binary,
-            'octal, 'hex, 'integer, 'float, 'string, 'symbol, 'any_symbol,
-            'identifier]
-
-        for p in basic_parsers
-            syn.set_slot(p,
-                prim.get_slot(amber::syntax, p, false, false, true))
-        syn
-    }
-
-    .add_reserved_word(words...) := {
-        for v in words
-            prim.array_push(self.reserved_words, v)
-    }
-
-    .program(p) := {
-        statements := []
-        while self.toplevel(p)
-            statements = cons(p.tree, statements)
-        if not p.eof?
-            return `SyntaxError{!p.error_string}
-        statements.reverse()
-    }
-}

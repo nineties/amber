@@ -30,16 +30,18 @@ expression?(_ @ Int or _ @ Float or _ @ String or _ @ Symbol or _ @ List or
             _ @ Tuple or Abs{_} or Slot{_, _ @ Symbol} or 'Rest{} or
             'Rest{_} or Apply{_, _ @ List} or Subscript{_, _ @ List} or
             Send{_, _ @ Symbol, _ @ List} or Pow{_, _} or UPlus{_} or
-            UMinus{_} or Not{_} or Mul{_} or Div{_} or Quo{_} or Rem{_} or
-            Add{_, _} or Sub{_, _} or Range{_, _} or LessThan{_, _} or
-            LessEqual{_, _} or GreaterThan{_, _} or GreaterEqual{_, _} or
-            Equal{_, _} or NotEqual{_, _} or Compare{_, _} or
-            SeqAnd{_, _} or IfElse{_, _, _} or Lambda{_ @ List, _} or
-            Lambda{When{_, _}, _} or Fusion{_, _} or
-            Reset{_} or Shift{_} or Assign{_, _} or AddAssign{_, _} or
-            SubAssign{_, _} or MulAssign{_, _} or PowAssign{_, _} or
-            DivAssign{_, _} or QuoAssign{_, _} or RemAssign{_, _} or
-            FusionAssign{_, _} or WithSlots{_, _ @ List} or Block{_ @ List}
+            UMinus{_} or Not{_} or Mul{_} or NcMul{_} or Div{_} or
+            Quo{_} or Rem{_} or Add{_, _} or NcAdd{_, _} or Sub{_, _} or
+            Range{_, _} or LessThan{_, _} or LessEqual{_, _} or
+            GreaterThan{_, _} or GreaterEqual{_, _} or Equal{_, _} or
+            NotEqual{_, _} or Compare{_, _} or SeqAnd{_, _} or
+            IfElse{_, _, _} or Lambda{_ @ List, _} or
+            Lambda{When{_, _}, _} or Fusion{_, _} or Reset{_} or Shift{_}
+            or Assign{_, _} or AddAssign{_, _} or NcAddAssign{_, _} or
+            SubAssign{_, _} or MulAssign{_, _} or NcMulAssign{_, _} or
+            PowAssign{_, _} or DivAssign{_, _} or QuoAssign{_, _} or
+            RemAssign{_, _} or FusionAssign{_, _} or
+            WithSlots{_, _ @ List} or Block{_ @ List}
         ) := true
 
 # Return `true` when given node is a standard statement.
@@ -138,15 +140,17 @@ prefix(UPlus{e})  := ["+", quote(e)]
 prefix(UMinus{e}) := ["-", quote(e)]
 prefix(Not{e})    := ["not", quote(e)]
 
-multiplicative(e)         := prefix(e)
-multiplicative(Mul{a, b}) := [multiplicative(a), " * ", prefix(b)]
-multiplicative(Div{a, b}) := [multiplicative(a), " / ", prefix(b)]
-multiplicative(Quo{a, b}) := [multiplicative(a), " // ", prefix(b)]
-multiplicative(Rem{a, b}) := [multiplicative(a), " % ", prefix(b)]
+multiplicative(e)           := prefix(e)
+multiplicative(Mul{a, b})   := [multiplicative(a), " * ", prefix(b)]
+multiplicative(NcMul{a, b}) := [multiplicative(a), " ** ", prefix(b)]
+multiplicative(Div{a, b})   := [multiplicative(a), " / ", prefix(b)]
+multiplicative(Quo{a, b})   := [multiplicative(a), " // ", prefix(b)]
+multiplicative(Rem{a, b})   := [multiplicative(a), " % ", prefix(b)]
 
-additive(e)         := multiplicative(e)
-additive(Add{a, b}) := [additive(a), " + ", multiplicative(b)]
-additive(Sub{a, b}) := [additive(a), " - ", multiplicative(b)]
+additive(e)           := multiplicative(e)
+additive(Add{a, b})   := [additive(a), " + ", multiplicative(b)]
+additive(NcAdd{a, b}) := [additive(a), " ++ ", multiplicative(b)]
+additive(Sub{a, b})   := [additive(a), " - ", multiplicative(b)]
 
 range(e)           := additive(e)
 range(Range{a, b}) := [additive(a), "..", additive(b)]
@@ -189,8 +193,10 @@ continuation(Shift{e}) := ["shift ", multi_lambda(e)]
 assign(e)                  := continuation(e)
 assign(Assign{x, v})       := [pattern(x), " = ", assign(v)]
 assign(AddAssign{x, v})    := [pattern(x), " += ", assign(v)]
+assign(NcAddAssign{x, v})  := [pattern(x), " ++= ", assign(v)]
 assign(SubAssign{x, v})    := [pattern(x), " -= ", assign(v)]
 assign(MulAssign{x, v})    := [pattern(x), " *= ", assign(v)]
+assign(NcMulAssign{x, v})  := [pattern(x), " **= ", assign(v)]
 assign(PowAssign{x, v})    := [pattern(x), " ^" , assign(v)]
 assign(DivAssign{x, v})    := [pattern(x), " /= ", assign(v)]
 assign(QuoAssign{x, v})    := [pattern(x), " //= ", assign(v)]
@@ -201,9 +207,11 @@ assign(WithSlots{x, stmts @ List})
 
 expr(e) := assign(e)
 
-stmt(e)              := expr(e)
-stmt(Seq{stmts})     := [stmts.map(stmt).weave(P::nl("; "))]
-stmt(s @ Block)      := block(s)
+stmt(e) := expr(e)
+stmt(Seq{stmts @ List}) := [stmts.map(stmt).weave(P::nl("; "))]
+stmt(Block{stmts @ List})
+    := ["{", P::nest(INDENT_WIDTH, stmts.map(s -> [P::nl(), stmt(s)])),
+        P::nl(), "}"]
 stmt(If{cond, body}) := ["if ", expr(cond), block(body)]
 stmt(IfElse{cond, ifthen, ifelse})
     := ["if ", expr(cond), " ", block(ifthen, cont=true),
@@ -232,9 +240,11 @@ stmt(Import{mods, name, option})
         ["hiding", "(", option[0].map(str).weave(","), ")"]]
 
 # Convert `obj` to prettified string.
-pretty(obj) := {
+pretty(obj, indent=0, compress=false) := {
     oss := OutputStringStream.new()
-    P::pretty(oss, stmt(obj), width=TEXT_WIDTH)
+    doc := P::nest(indent, stmt(obj))
+    doc  = P::compress(doc) if compress
+    P::pretty(oss, doc, width=TEXT_WIDTH)
     str(oss)
 }
 
