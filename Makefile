@@ -3,7 +3,7 @@
 # Copyright (C) 2009 nineties
 #
 
-# $Id: Makefile 2014-04-09 02:25:37 nineties $
+# $Id: Makefile 2014-04-17 01:54:48 nineties $
 
 LIBDIR = /usr/lib/amber
 
@@ -16,7 +16,9 @@ install:
 	mkdir -p $(LIBDIR)
 	cp -ur lib/* $(LIBDIR)/
 	cp -ur demo $(LIBDIR)/
-	echo "exit" | amber --preparse > /dev/null
+	@echo "Generating pre-parsed libs..."
+	@echo exit | amber --preparse > /dev/null
+	@echo "Installation finished."
 
 clean:
 	cd rowl0; $(MAKE) clean
