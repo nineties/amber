@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-table.rlc 2014-04-09 19:38:48 nineties $
+; $Id: rowl1-table.rlc 2014-04-16 16:49:55 nineties $
 ;
 
 (import "rlvm-compile")
@@ -126,6 +126,11 @@
     ))
 
 (export fun table_at_by_idx (tbl idx) (
+    (var num (field_get tbl 5))
+    (if (|| (< idx 0) (>= idx num))
+        (throw (out_of_range tbl (box idx)))
+        )
+    (= idx (- (- num idx) 1))
     (var entry (field_get tbl 4))
     (while entry (do
         (if (== idx 0)
@@ -134,7 +139,7 @@
         (-= idx 1)
         (= entry (field_get entry 3))
         ))
-    (throw (out_of_range tbl (box idx)))
+    (not_reachable "table_at_by_idx")
     ))
 
 (export fun table_at (tbl key) (
