@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-prim-util.rlc 2014-03-05 16:34:59 nineties $
+; $Id: vm-prim-util.rlc 2014-04-17 02:49:03 nineties $
 ;
 
 (import "stdlib")
@@ -39,6 +39,21 @@
 (fun prim_cmd_argv () ((return cmd_argv)))
 (export prim_environ)
 (fun prim_environ () ((return environ)))
+
+(export prim_getenv)
+(fun prim_getenv (name) (
+    (void* p environ)
+    (int i 0)
+    (while ([] p i) (
+        (void* str ([] p i))
+        (int len (prim_strlen name))
+        (if (prim_strneq name str len) (
+            (return (prim_string (+ str (+ len 1))))
+            ))
+        (incr i)
+        ))
+    (return 0)
+    ))
 
 (export prim_memset)
 (fun prim_memset (ptr val bytes) (

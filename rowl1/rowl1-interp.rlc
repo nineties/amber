@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-04-17 01:30:18 nineties $
+; $Id: rowl1-interp.rlc 2014-04-17 03:29:16 nineties $
 ;
 
 (import "rlvm-compile")
@@ -57,6 +57,25 @@
     (return ret)
     ))
 
+(extern fun str_split)
+(fun setup_load_paths (cwd) (
+    (var load_path (ary_new)) 
+    (ary_push load_path cwd)
+    (var str (getenv "LD_LIBRARY_PATH"))
+    (if str (do
+        (var list (str_split str (string ":")))
+        (while list (do
+            (var dir (realpath (car list)))
+            (if (! dir) break) ; this directory doesn't exists
+            (ary_push load_path (strcat dir "/amber"))
+            (= list (cdr list))
+            ))
+        ))
+    (ary_push load_path (string "/usr/lib/amber"))
+    (ary_push load_path (string "/lib/amber"))
+    (return load_path)
+    ))
+
 (fun eval_main_ (argc argv) (
     (if opt_preparse
         (output_string stdout "Generating pre-parsed libs...\n")
@@ -93,15 +112,10 @@
     (var cwd (getcwd))
     (if (! cwd) (throw (os_error (string "Failed to get current working directory"))))
     (set_var amber (to_sym "INVOKE_PATH") cwd)
-
-    (var load_path (ary_new)) 
-    (set_var amber (to_sym "AMBER_PATH") load_path)
+    (var load_path (setup_load_paths cwd))
+    (set_var amber (to_sym "LOAD_PATH") load_path)
     (set_var amber (to_sym "ALREADY_LOADED") (ary_new))
     (set_var amber (to_sym "VERSION") (version_string))
-    (ary_push load_path (tuple2 (string "/usr/lib/amber") amber))
-    (var cwdir (realpath (string ".")))
-    (if (! cwdir) (throw (os_error (string "Failed to get absolute path of current working directory"))))
-    (ary_push load_path (tuple2 cwdir amber))
     (setup_minimal_interpreter prim)
     (if (== opt_compile @C_TRUE)
         (load_file "compile.ab")
@@ -245,24 +259,13 @@
         ))
     ))
 
-(fun new_dir (dirs path) (
-    (for i 0 (array_size dirs) (do
-        (if (streq (tuple_at (array_at dirs i) 0) path)
-            (return @FALSE)
-            )
-        ))
-    (return @TRUE)
-    ))
-
 (fun load_file (path) (
-    (var dirs (get_var amber (to_sym "AMBER_PATH")))
+    (var dirs (get_var amber (to_sym "LOAD_PATH")))
     (var loaded (get_var amber (to_sym "ALREADY_LOADED")))
     (if (!= (node_type dirs) @ArrayE) (goto load_error))
     (if (!= (node_type loaded) @ArrayE) (goto load_error))
     (rfor i 0 (array_size dirs) (do
-        (var t (ary_at dirs (box i)))
-        (var dir (tuple_at t 0))
-        (var mod (tuple_at t 1))
+        (var dir (ary_at dirs (box i)))
         (if (!= (node_type dir) @StringE) (goto load_error))
         (var fullpath (strcat (strcat dir "/") path))
         (if (file_exists fullpath) (do
@@ -291,10 +294,6 @@
             (var ichan (open_in rpath @FALSE))
             (if (! ichan) (throw (io_error1 (string "Open failed") fullpath)))
             (var dir (get_directory rpath))
-            (var new_dir_p (new_dir dirs dir))
-            (if new_dir_p (ary_push dirs
-                (tuple2 (string dir) (get_slot global Parent))
-                ))
             (if (< (chdir dir) 0)
                 (throw (os_error (string
                     (strcat "Failed to change directory to " dir)))))
@@ -306,7 +305,6 @@
                 (interpret_preparsed p)
                 (interpret p fullpath)
                 )
-            (if new_dir_p (ary_pop dirs))
             (if (< (fchdir fd) 0)
                 (throw (os_error (string "Failed to change directory to '.'"))))
             (if (< (close fd) 0)
@@ -318,7 +316,7 @@
         ))
     (throw (not_found (string path)))
     (label load_error)
-    (throw (logic_error1 (string "AMBER_PATH must be an array of strings") dirs))
+    (throw (logic_error1 (string "LOAD_PATH must be an array of strings") dirs))
     ))
 
 (fun exec_file (path) (
@@ -346,38 +344,19 @@
     ))
 
 (fun loadable (path) (
-    (var dirs (get_var amber (to_sym "AMBER_PATH")))
+    (var dirs (get_var amber (to_sym "LOAD_PATH")))
     (var loaded (get_var amber (to_sym "ALREADY_LOADED")))
     (if (!= (node_type dirs) @ArrayE) (goto load_error))
     (if (!= (node_type loaded) @ArrayE) (goto load_error))
     (rfor i 0 (array_size dirs) (do
-        (var t (ary_at dirs (box i)))
-        (var dir (tuple_at t 0))
-        (var mod (tuple_at t 1))
+        (var dir (ary_at dirs (box i)))
         (if (!= (node_type dir) @StringE) (goto load_error))
         (var fullpath (strcat (strcat dir "/") path))
         (if (file_exists fullpath) (return @C_TRUE))
         ))
     (return @C_FALSE)
     (label load_error)
-    (throw (logic_error1 (string "AMBER_PATH must be an array of strings") dirs))
-    ))
-
-(fun find_parent (sym) (
-    (var dirs (get_var amber (to_sym "AMBER_PATH")))
-    (if (!= (node_type dirs) @ArrayE) (goto load_error))
-    (rfor i 0 (array_size dirs) (do
-        (var t (ary_at dirs (box i)))
-        (var dir (tuple_at t 0))
-        (var mod (tuple_at t 1))
-        (if (!= (node_type dir) @StringE) (goto load_error))
-        (var fullpath (strcat (strcat dir "/") 
-            (strcat (symbol_name sym) ".ab")))
-        (if (file_exists fullpath) (return mod))
-        ))
-    (return 0)
-    (label load_error)
-    (throw (logic_error1 (string "AMBER_PATH must be an array of strings") dirs))
+    (throw (logic_error1 (string "LOAD_PATH must be an array of strings") dirs))
     ))
 
 (export fun create_module (parent sym) (
@@ -398,15 +377,26 @@
     (if (!= (symtable_depth variables) 0)
         (throw (logic_error (string "enter_module() can be called only in top-scope"))))
     (var mod @C_NIL)
-    (if (!= rec @C_FALSE)
-        (= mod (get_var_nocheck global sym))
-        (= mod (get_var_norec_nocheck global sym))
+    (var parent @C_NIL)
+    (if (== rec @C_FALSE)
+        (do
+            (= mod (get_var_norec_nocheck global sym))
+            (= parent global)
         )
+        (do
+            (= parent global)
+            (while @TRUE (do
+                (= mod (get_var_norec_nocheck parent sym))
+                (if (&& (!= mod @C_NIL) (== (node_head mod) Module))
+                    break
+                    )
+                (if (== parent amber) break)
+                (= parent (get_parent parent))
+                ))
+        ))
     (if (|| (== mod @C_NIL) (!= (node_head mod) Module)) (do
-        (var p (find_parent sym))
-        (if (! p) (= p global))
-        (= mod (create_module p sym))
-        (set_var p sym mod)
+        (= mod (create_module parent sym))
+        (set_var parent sym mod)
         ))
     (= module_stack (cons global module_stack))
     (= global mod)
