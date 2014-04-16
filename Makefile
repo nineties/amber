@@ -3,9 +3,9 @@
 # Copyright (C) 2009 nineties
 #
 
-# $Id: Makefile 2014-04-17 02:27:54 nineties $
+# $Id: Makefile 2014-04-17 03:34:13 nineties $
 
-LIBDIR = /usr/lib/amber
+LIBDIR = /usr/lib
 
 all: 
 	cd rowl0; $(MAKE)
@@ -13,8 +13,8 @@ all:
 
 install:
 	cd rowl1; $(MAKE) install_binaries install_libraries
-	mkdir -p $(LIBDIR)
-	cp -ur lib/* $(LIBDIR)/
+	mkdir -p $(LIBDIR)/amber
+	cp -ur lib/* $(LIBDIR)/amber
 	@echo "Generating pre-parsed libs..."
 	@echo exit | amber --preparse > /dev/null
 	@echo "Installation finished."
