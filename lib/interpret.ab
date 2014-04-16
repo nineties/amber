@@ -1,0 +1,56 @@
+" Copyright (C) 2014 nineties "
+" $Id: interpret.ab 2014-04-16 16:01:26 nineties $ "
+
+" Entry-point of Amber intepreter "
+
+" NB: We write comments as string literals until we define comment syntax. "
+
+Apply{Slot{prim, load}, List{"boot.ab"}}
+
+if (ARGV.empty?) {
+    # Start shell
+
+    # Change directory to the ditectory where amber is invoked.
+    prim.chdir(amber::INVOKE_PATH)
+
+    # Add `exit` command.
+    amber::eval('exit) := exit(0)
+
+    # Enable syntax for shell.
+    amber::enable_shell_syntax()
+    amber::shell_outputs := Array.new()
+    amber::shell_outputs.push(nil)
+
+    PROMPT = "amber"
+    p := Parser.new(stdin, amber)
+
+    while true {
+        try {
+            p.line = amber::shell_outputs.size
+            if (p.parse('shell)) {
+                tree := p.tree
+                v := evalfull(tree)
+                puts(pretty(v))
+                amber::shell_outputs[0] = v
+                amber::shell_outputs.push(v)
+            } else {
+                stderr.printf("%s Syntax error: %s\n",
+                        pretty(LOCATION), p.error_string)
+                p.reset!()
+            }
+        } catch e -> {
+            stderr.printf("%s Exception: %s\n",
+                    pretty(LOCATION), pretty(e))
+            p.reset!()
+        }
+    }
+} else {
+    try {
+        load(ARGV[0])
+    } catch e -> {
+        stderr.printf("%s Exception: %s\n",
+                pretty(LOCATION), pretty(e))
+        exit(1)
+    }
+    exit(0)
+}
