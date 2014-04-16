@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-04-14 11:42:39 nineties $
+; $Id: rowl1-interp.rlc 2014-04-16 15:39:43 nineties $
 ;
 
 (import "rlvm-compile")
@@ -21,7 +21,8 @@
 (import "rowl1-tuple")
 (import "rowl1-array")
 
-(extern object preparse_p)
+(extern object opt_preparse)
+(extern object op_compile)
 
 (export var amber null)
 (export var global null)
@@ -57,7 +58,7 @@
     ))
 
 (fun eval_main_ (argc argv) (
-    (if preparse_p
+    (if opt_preparse
         (output_string stdout "Generating pre-parsed libs...\n")
         )
 
@@ -102,7 +103,10 @@
     (if (! cwdir) (throw (io_error (string "Failed to get absolute path of current working directory"))))
     (ary_push load_path (tuple2 cwdir amber))
     (setup_minimal_interpreter prim)
-    (load_file "boot.ab")
+    (if (== opt_preparse @C_TRUE)
+        (load_file "compile.ab")
+        (load_file "boot.ab")
+        )
     (eval_exit @C_NIL)
     (return 0)
     ))
@@ -134,7 +138,7 @@
     ))
 
 (fun preparse_ochan (path) (
-    (if (|| (! preparse_p) (! path)) (return 0))
+    (if (|| (! opt_preparse) (! path)) (return 0))
     ; change .ab to .abc
     (var abc_path (strcat path "c"))
     (if (<= (mtime path) (mtime abc_path)) (return 0))
@@ -283,7 +287,7 @@
             ; Check whether there is pre-parsed lib.
             (var pcpath (strcat rpath "c"))
             (var pre @FALSE)
-            (if (&& (! preparse_p) (file_exists pcpath)) (do
+            (if (&& (! opt_preparse) (file_exists pcpath)) (do
                 (= rpath pcpath)
                 (= pre @TRUE)
                 ))

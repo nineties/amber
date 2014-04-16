@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-main.rlc 2014-04-08 16:15:46 nineties $
+; $Id: rowl1-main.rlc 2014-04-16 15:38:16 nineties $
 ;
 
 (import "rlvm-compile")
@@ -12,7 +12,8 @@
 
 (import "rowl1-interp")
 
-(export var preparse_p null)
+(export var opt_preparse null)
+(export var opt_compile null)
 (fun parse_options (argcp argvp) (
     (var argc (car argcp))
     (var argv (car argvp))
@@ -22,7 +23,12 @@
         (var arg (array_get string argv i))
         (if (== (load char arg 0) '-') (do
             (if (streq arg "--preparse") (do
-                (= preparse_p @C_TRUE)
+                (= opt_preparse @C_TRUE)
+                (+= i 1)
+                continue
+                ))
+            (if (streq arg "--compile") (do
+                (= opt_compile @C_TRUE)
                 (+= i 1)
                 continue
                 ))
