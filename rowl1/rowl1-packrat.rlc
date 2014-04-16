@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-04-14 11:42:50 nineties $
+; $Id: rowl1-packrat.rlc 2014-04-16 17:52:03 nineties $
 ;
 
 (import "rlvm-compile")
@@ -212,6 +212,7 @@
 (extern fun tuple_at)
 (extern fun compile_matching)
 (extern fun get_var_nocheck)
+(extern fun get_var)
 
 (fun apply_util (name args) (do
     (return (apply (quote (get_slot utilities (to_sym name))) args))
@@ -239,19 +240,19 @@
     ))
 
 (fun syntax_func (name) (
-    (return (slot (slot PVar Syntax) (to_sym name)))
+    (return (make_node2 Var (slot PVar Syntax) (to_sym name)))
     ))
 
 (fun lookup_parser (name p) (
     (var sym (to_sym name))
-    (var func (get_slot_nocheck (get_slot p Syntax) sym))
+    (var func (get_var_nocheck (get_slot p Syntax) sym))
     (if (== func @C_NIL) (return 0))
     (return (compile_matching sym func))
     ))
 
 (export fun parse (name p) (
     (var sym (to_sym name))
-    (var func (get_slot_nocheck (get_slot p Syntax) sym))
+    (var func (get_var_nocheck (get_slot p Syntax) sym))
     (if (== func @C_NIL) (do
         (throw (undefined_fun sym))
         ))
@@ -1450,7 +1451,7 @@
         ))
     (if (== hd Symbol) (do
         (return (parse_with_check
-            (apply (slot (slot PVar Syntax) pat) (list1 PVar)) ws))
+            (apply (make_node2 Var (slot PVar Syntax) pat) (list1 PVar)) ws))
         ))
     (if (== hd Slot) (do
         (return (parse_with_check (apply pat (list1 PVar)) ws))
@@ -1919,7 +1920,7 @@
     (= body (cons (assign (slot PVar Syntax) stx) body))
     (= body (cons (defvar v @C_NIL) body))
     (= body (cons (make_node2 Try
-        (assign v (apply (apply_util "%get_slot" (list2 stx expr1)) (list1 PVar)))
+        (assign v (apply (apply_util "%get_var" (list2 stx expr1)) (list1 PVar)))
         (lambda (list1 e) (block (list2
             (assign (slot PVar Syntax) save_stx)
             (make_node1 Throw e)
@@ -2131,8 +2132,8 @@
     (var parser (apply_util "%call_parser"
             (list4 PVar (quote lhs) (quote key) parser_body)))
     (+= key_idx 1)
-    (if (!= (node_head lhs) Slot)
-        (= lhs (slot Syntax lhs))
+    (if (== (node_head lhs) Symbol)
+        (= lhs (make_node2 Var Syntax lhs))
         )
     (return (make_node3 Define lhs (lambda_nocheck (make_node2 When (list1 (make_node2 Domain PVar Parser)) parser) @C_TRUE) (to_sym "fusion")))
     ))
@@ -2175,6 +2176,7 @@
     (add_function2 utilities (to_sym "%parse_text") (domainP Parser) stringT parse_text 0)
     (add_function2 utilities (to_sym "%parse_word") (domainP Parser) symT parse_word 0)
     (add_function2 utilities (to_sym "%get_slot") DontCare symT get_slot 0)
+    (add_function2 utilities (to_sym "%get_var") DontCare symT get_var 0)
 
     (add_parser mod (to_sym "parse_char") parse_char)
     (add_parser mod (to_sym "parse_char") parse_char)

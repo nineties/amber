@@ -1,10 +1,10 @@
 " Copyright (C) 2010 nineties "
-" $Id: syntax/parse.ab 2014-04-14 09:06:29 nineties $ "
+" $Id: syntax/parse.ab 2014-04-16 17:53:06 nineties $ "
 
 " Syntax definition of the Amber language. "
 
 " Enable comments. "
-Assign{Slot{syntax, comment}, Slot{prim, parse_shell_style_comment}}
+Assign{Var{syntax, comment}, Slot{prim, parse_shell_style_comment}}
 
 ### syntax definition
 # Amber's parser uses Parsing Expression Grammer (PEG)
@@ -216,7 +216,7 @@ pattern ::= quote_expr
 term    ::= postfix_expr
 
 ## enable use of quoation expressions for following definitions.
-Assign{Slot{syntax, expr}, Slot{syntax, quote_expr}}
+Assign{Var{syntax, expr}, Var{syntax, quote_expr}}
 
 prefix_expr
     ::= "+"          quote_expr { `UPlus{!node1} }
@@ -337,7 +337,7 @@ assign_expr
         { Node{Quote{WithSlots}, List{node0, node2}} }
       | caseof_expr
 
-Assign{syntax.expr, syntax.assign_expr}
+Assign{syntax::expr, syntax::assign_expr}
 
 ### Statements
 
@@ -410,8 +410,8 @@ syntax_declaration ::= pattern "::=" delimited1(parser_entry, "|")
     { `DefineSyntax{!node0, !node2} }
 
 # Entry point of parsers
-syntax.toplevel = prim.parse_toplevel
-syntax.shell    = prim.parse_shell
+syntax::toplevel = prim.parse_toplevel
+syntax::shell    = prim.parse_shell
 
 # Extend primary_expr to enable dollar sign ($) in parser action.
 primary_expr_act
@@ -423,15 +423,15 @@ primary_expr_act
         }
       | "$input"    { 'prim.input_text(parser, begin, end) }
 
-syntax.primary_expr_act =
-    fusion(syntax.primary_expr_act, syntax.primary_expr)
+syntax::primary_expr_act =
+    fusion(syntax::primary_expr_act, syntax::primary_expr)
 
-syntax.parser_action_old := syntax.parser_action
-syntax.parser_action = parser -> {
-    save_primary_expr := syntax.primary_expr
-    syntax.primary_expr = syntax.primary_expr_act
-    r := syntax.parser_action_old(parser)
-    syntax.primary_expr = save_primary_expr
+syntax::parser_action_old := syntax::parser_action
+syntax::parser_action = parser -> {
+    save_primary_expr := syntax::primary_expr
+    syntax::primary_expr = syntax::primary_expr_act
+    r := syntax::parser_action_old(parser)
+    syntax::primary_expr = save_primary_expr
     r
 }
 
@@ -448,8 +448,8 @@ primary_expr_shell
       | "$" { `prim.array_at(shell_outputs, 0) }
 
 enable_shell_syntax := () -> {
-    syntax.primary_expr =
-        fusion(syntax.primary_expr, syntax.primary_expr_shell)
+    syntax::primary_expr =
+        fusion(syntax::primary_expr, syntax::primary_expr_shell)
 }
 
 ### Macro

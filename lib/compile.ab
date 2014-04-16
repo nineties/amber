@@ -1,5 +1,5 @@
 " Copyright (C) 2014 nineties "
-" $Id: compile.ab 2014-04-16 16:15:32 nineties $ "
+" $Id: compile.ab 2014-04-16 17:30:24 nineties $ "
 
 " Entry-point of Amber compiler "
 
@@ -7,4 +7,27 @@
 
 Apply{Slot{prim, load}, List{"boot.ab"}}
 
-throw "not implemented"
+# Now, we a in the directory where this file is installed.
+# Change working directory to the original path.
+import sys
+sys::chdir(INVOKE_PATH)
+
+if ARGV.empty? {
+    stderr.puts("Usage: amber --compile <file>")
+    exit(1)
+}
+
+tree := {
+    tree := nil
+    fp   := io::open_in(ARGV[0])
+    try {
+        tree = parser::parse(amber, fp)
+    } catch e -> {
+        fp.close()
+        throw e
+    }
+    fp.close()
+    tree
+}
+
+puts(pretty(tree))
