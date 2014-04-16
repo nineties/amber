@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-04-16 17:39:42 nineties $
+; $Id: rowl1-compile.rlc 2014-04-17 03:54:52 nineties $
 ;
 
 (import "rlvm-compile")
@@ -36,7 +36,7 @@
 (extern fun set_loc)
 
 (extern fun set_slot)
-(extern fun set_slot_fusion)
+(extern fun set_slot_union)
 (extern fun set_slot_overwrite)
 (extern fun get_slot)
 (extern fun get_slot_nocheck)
@@ -256,7 +256,7 @@
     (return (alloc_builtin_function args func guard))
     ))
 
-(export fun fusion_function (fun1 fun2) (
+(export fun union_function (fun1 fun2) (
     (if (! (is_function fun1)) (throw (type_error (string "function") fun1)))
     (if (! (is_function fun2)) (throw (type_error (string "function") fun2)))
     (return (variant @BoundFunctionE 3 0 fun1 fun2))
@@ -972,7 +972,7 @@
     (var func (get_slot_nocheck vtbl sym))
     (if (!= func @C_NIL)
         (if (&& (is_function func) (is_function newfunc))
-            (return (set_slot vtbl sym (fusion_function newfunc func)))
+            (return (set_slot vtbl sym (union_function newfunc func)))
             (throw (redefined_slot mod sym))
             )
         (return (set_slot vtbl sym newfunc))
@@ -1001,7 +1001,7 @@
     (var lhs (node_arg expr 0))
     (var rhs (node_arg expr 1))
     (var ty (node_head lhs))
-    (if (&& (== (node_size expr) 3) (== (node_arg expr 2) (to_sym "fusion")))
+    (if (&& (== (node_size expr) 3) (== (node_arg expr 2) (to_sym "union")))
         (return (compile_define_global_function asm lhs rhs))
         )
     (if (!= (node_size expr) 2)
@@ -1027,7 +1027,7 @@
 (fun compile_define_local (asm expr) (
     (var lhs (node_arg expr 0))
     (var rhs (node_arg expr 1))
-    (if (&& (== (node_size expr) 3) (== (node_arg expr 2) (to_sym "fusion")))
+    (if (&& (== (node_size expr) 3) (== (node_arg expr 2) (to_sym "union")))
         (return (compile_define_local_function asm lhs rhs))
         )
     (if (!= (node_size expr) 2)
@@ -1107,7 +1107,7 @@
         (compile asm lam)
         (put_push asm sym)
         (compile asm obj)
-        (compile_simple_call asm 3 set_slot_fusion)
+        (compile_simple_call asm 3 set_slot_union)
         return
         ))
 
@@ -1117,7 +1117,7 @@
         (compile asm lam)
         (put_push asm sym)
         (compile asm (slot obj Variables))
-        (compile_simple_call asm 3 set_slot_fusion)
+        (compile_simple_call asm 3 set_slot_union)
         return
         ))
 
@@ -1164,7 +1164,7 @@
         (compile asm lam)
         (put_push asm sym)
         (compile asm obj)
-        (compile_simple_call asm 3 set_slot_fusion)
+        (compile_simple_call asm 3 set_slot_union)
         return
         ))
 
@@ -1174,7 +1174,7 @@
         (compile asm lam)
         (put_push asm sym)
         (compile asm (slot obj Variables))
-        (compile_simple_call asm 3 set_slot_fusion)
+        (compile_simple_call asm 3 set_slot_union)
         return
         ))
 
@@ -1184,7 +1184,7 @@
 
     (if (symtable_find_local variables (variable_name lhs))
         (return (compile_assign asm (assign lhs
-            (apply (to_sym "fusion") (list2 lam lhs)))))
+            (apply (to_sym "union") (list2 lam lhs)))))
         (return (compile_define_local_variable asm lhs lam))
         )
     ))
@@ -1893,10 +1893,10 @@
     (var lty (node_head lhs))
 
     ; f(x) = e is equivarent to f = x -> e | f
-    (if (list_member (to_sym "fusion") options) (do
+    (if (list_member (to_sym "union") options) (do
         (if (== lty Slot)
             (return (compile_define asm expr))
-            (return (compile asm (assign lhs (apply (to_sym "fusion") (list2 rhs lhs)))))
+            (return (compile asm (assign lhs (apply (to_sym "union") (list2 rhs lhs)))))
             )
         ))
 
@@ -2105,7 +2105,7 @@
     (set_label asm hdlr_lbl)
 
     ; here, the thrown exception is on the top of stack.
-    (compile asm (apply (to_sym "fusion") (list2 hdlr default_hdler)))
+    (compile asm (apply (to_sym "union") (list2 hdlr default_hdler)))
     (put_push asm hdlr)
     (compile_simple_call asm 2 compile_matching)
     (put_jcall asm 1 0)
@@ -2284,31 +2284,31 @@
     ))
 
 (export fun add_function0 (obj sym func guard) (
-    (set_slot_fusion obj sym (make_builtin_function 0 func guard @FALSE))
+    (set_slot_union obj sym (make_builtin_function 0 func guard @FALSE))
     ))
 
 (export fun add_function1 (obj sym pat func guard) (
-    (set_slot_fusion obj sym (make_builtin_function (list1 pat) func guard @FALSE))
+    (set_slot_union obj sym (make_builtin_function (list1 pat) func guard @FALSE))
     ))
 
 (export fun add_function2 (obj sym pat1 pat2 func guard) (
-    (set_slot_fusion obj sym (make_builtin_function (list2 pat1 pat2) func guard @FALSE))
+    (set_slot_union obj sym (make_builtin_function (list2 pat1 pat2) func guard @FALSE))
     ))
 
 (export fun add_function3 (obj sym pat1 pat2 pat3 func guard) (
-    (set_slot_fusion obj sym (make_builtin_function (list3 pat1 pat2 pat3) func guard @FALSE))
+    (set_slot_union obj sym (make_builtin_function (list3 pat1 pat2 pat3) func guard @FALSE))
     ))
 
 (export fun add_function4 (obj sym pat1 pat2 pat3 pat4 func guard) (
-    (set_slot_fusion obj sym (make_builtin_function (list4 pat1 pat2 pat3 pat4) func guard @FALSE))
+    (set_slot_union obj sym (make_builtin_function (list4 pat1 pat2 pat3 pat4) func guard @FALSE))
     ))
 
 (export fun add_function5 (obj sym pat1 pat2 pat3 pat4 pat5 func guard) (
-    (set_slot_fusion obj sym (make_builtin_function (list5 pat1 pat2 pat3 pat4 pat5) func guard @FALSE))
+    (set_slot_union obj sym (make_builtin_function (list5 pat1 pat2 pat3 pat4 pat5) func guard @FALSE))
     ))
 
 (export fun add_function6 (obj sym pat1 pat2 pat3 pat4 pat5 pat6 func guard) (
-    (set_slot_fusion obj sym (make_builtin_function (list6 pat1 pat2 pat3 pat4 pat5 pat6) func guard @FALSE))
+    (set_slot_union obj sym (make_builtin_function (list6 pat1 pat2 pat3 pat4 pat5 pat6) func guard @FALSE))
     ))
 
 ; g * f == (x -> g(f(x)))
@@ -2398,12 +2398,6 @@
     (add_compiler mod (make_node2 Closure DontCare DontCare) compile_closure)
     (add_compiler mod (make_node3 Ref DontCare intT symT) compile_clsref)
     (add_compiler mod (quote Decons) compile_decons)
-
-    ; vertical composition
-    (add_function2 mod (to_sym "compose_function") funT funT compose_function 0)
-
-    ; horizontal composition
-    (add_function2 mod (to_sym "fusion_function") funT funT fusion_function 0)
     ))
 
 (export fun add_compiler (mod pat func) (

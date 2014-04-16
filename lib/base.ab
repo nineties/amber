@@ -58,8 +58,8 @@ nil with {
     # Options:
     #   * overwrite: Lookup the slot recursively, and overwrite it with
     #     the value if the slot is found. It not throw UndefinedSlot exception. (default:false)
-    #   * fusion: When `self.s` is a function and `v` is also a function,
-    #     set `fusion(v, self.s)` as the new value. When one of `self.s` or `v` is not a function
+    #   * union: When `self.s` is a function and `v` is also a function,
+    #     set `union(v, self.s)` as the new value. When one of `self.s` or `v` is not a function
     #     simply put `v` to the slot. (default=true)
     #   * alias: Resolve Alias objects. (default=true)
     # Examples:
@@ -84,12 +84,12 @@ nil with {
     # > A.set_slot('f, (x @ String) -> "string")
     # > A.f(0)                                       # => "integer"
     # > A.f("Hello")                                 # => "string"
-    # > A.set_slot('f, (x @ String) -> "string", fusion=false)
+    # > A.set_slot('f, (x @ String) -> "string", union=false)
     # > A.f("Hello")                                 # => "string"
     # > A.f(0)                                       # => Error MatchingFailed
     # ----
-    .set_slot(s @ Symbol, v, overwrite=false, fusion=true, alias=true)
-        := prim.set_slot(self, s, v, overwrite, fusion, alias)
+    .set_slot(s @ Symbol, v, overwrite=false, union=true, alias=true)
+        := prim.set_slot(self, s, v, overwrite, union, alias)
 
     # Remove a slot named `s` from `self`.
     #
@@ -142,12 +142,12 @@ equal? := prim.equal?
 identical? := prim.identical?
 
 # Fusion two functions.
-# If `args` is in the domain of `f`, then `fusion(f,g)(args) == f(args)`.
-# Otherwise `fusion(f,g)(args) == g(args)`.
+# If `args` is in the domain of `f`, then `union(f,g)(args) == f(args)`.
+# Otherwise `union(f,g)(args) == g(args)`.
 #
-# `fusion!` is for `f |= g`.
-fusion  := prim.fusion_function
-fusion! := prim.fusion_function
+# `union!` is for `f |= g`.
+union  := prim.union_function
+union! := prim.union_function
 
 # Compose two functions.
 # `compose(f,g)` is logically equal to `x -> f(g(x))`.
@@ -216,8 +216,8 @@ hash := prim.hash
 # Default implementations for `<`, `<=`, `>`, `>=` using `compare` are
 # provided. For example, `a < b` is equivalent to `compare(a, b) < 0`.
 #
-#=== Function fusion ===
-# * 'f | g': Equivalent to `fusion(f, g)`.
+#=== Function union ===
+# * 'f | g': Equivalent to `union(f, g)`.
 #
 #=== Assignment operators ===
 # * 'a += b'  : Equivalent to `a = a.add!(b)`
@@ -229,7 +229,7 @@ hash := prim.hash
 # * 'a /= b'  : Equivalent to `a = a.div!(b)`
 # * 'a //= b' : Equivalent to `a = a.quo!(b)`
 # * 'a %= b'  : Equivalent to `a = a.rem!(b)`
-# * 'a |= b'  : Equivalent to `a = a.fusion!(b)`
+# * 'a |= b'  : Equivalent to `a = a.union!(b)`
 #
 # Amber uses different functions for `a op b` and `a op= b`.
 # Our intention is to enable giving efficient implementations to assignment
@@ -305,7 +305,7 @@ nil with {
     .quo!(b)    := quo(self, b)
     .rem!(b)    := rem(self, b)
     .div!(b)    := div(self, b)
-    .fusion!(b) := fusion(self, b)
+    .union!(b) := union(self, b)
 }
 
 compare(a, b)         := perform_binary_operation(a, b, compare, 'compare)

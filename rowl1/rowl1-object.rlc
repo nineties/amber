@@ -73,7 +73,7 @@
     (return (set_slot_ obj sym val @C_FALSE @C_FALSE @C_TRUE))
     ))
 
-(export fun set_slot_fusion (obj sym val) (
+(export fun set_slot_union (obj sym val) (
     (return (set_slot_ obj sym val @C_FALSE @C_TRUE @C_TRUE))
     ))
 
@@ -81,7 +81,7 @@
     (return (set_slot_ obj sym val @C_TRUE @C_FALSE @C_TRUE))
     ))
 
-(fun set_slot_ (obj sym val overwrite fusion alias) (
+(fun set_slot_ (obj sym val overwrite union alias) (
     (if (== sym Parent) (return (set_parent obj val)))
     (var ref (get_slot_ref obj sym @C_TRUE))
     (if (&& (!= overwrite @C_FALSE) (== ref @C_UNDEF))
@@ -96,8 +96,8 @@
         (return val)
         ))
     (var v (field_get ref 3))
-    (if (&& (!= fusion @C_FALSE) (&& (is_function v) (is_function val))) (do
-        (var f (fusion_function val v))
+    (if (&& (!= union @C_FALSE) (&& (is_function v) (is_function val))) (do
+        (var f (union_function val v))
         (if (!= overwrite @C_FALSE)
             (field_set ref 3 f)
             (wrtable_add tbl obj f)

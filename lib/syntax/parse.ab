@@ -432,7 +432,7 @@ primary_expr_act
       | "$input"    { 'prim.input_text(parser, begin, end) }
 
 syntax::primary_expr_act =
-    fusion(syntax::primary_expr_act, syntax::primary_expr)
+    union(syntax::primary_expr_act, syntax::primary_expr)
 
 syntax::parser_action_old := syntax::parser_action
 syntax::parser_action = parser -> {
@@ -457,7 +457,7 @@ primary_expr_shell
 
 enable_shell_syntax := () -> {
     syntax::primary_expr =
-        fusion(syntax::primary_expr, syntax::primary_expr_shell)
+        union(syntax::primary_expr, syntax::primary_expr_shell)
 }
 
 ### Macro
@@ -469,49 +469,49 @@ Define{expand_macro_sub, (obj, lvl) -> {
             prim.head(obj),
             prim.list_map(e -> expand_macro(e, lvl), args)
         }
-    }, fusion}
-Define{expand_macro_sub, (obj, _) when prim.atom?(obj) -> obj, fusion}
+    }, union}
+Define{expand_macro_sub, (obj, _) when prim.atom?(obj) -> obj, union}
 Define{expand_macro_sub,
     (obj, lvl) when prim.int_less_than?(lvl, 0) ->
     { throw `LogicError{"Unquotetation outside quasi-quotation"} },
-    fusion}
+    union}
 Define{expand_macro_sub,
     (obj, lvl) when Equal{prim.head(obj), 'Unquote} -> {
         prim.set_arg(obj, 0,
             expand_macro(prim.get_arg(obj, 0), prim.int_sub(lvl, 1)))
         obj
     },
-    fusion}
+    union}
 Define{expand_macro_sub,
     (obj, lvl) when Equal{prim.head(obj), 'Quasiquote} -> {
         prim.set_arg(obj, 0,
             expand_macro(prim.get_arg(obj, 0), prim.int_add(lvl, 1)))
         obj
     },
-    fusion}
+    union}
 Define{expand_macro_sub,
     (obj, 0) when Equal{prim.head(obj), 'Quote} -> obj,
-    fusion}
+    union}
 Define{expand_macro_sub,
     (Lambda{args, body, options...}, 0) ->
         `Lambda{!args, !expand_macro(body), !options...},
-    fusion}
+    union}
 Define{expand_macro_sub,
     (Lambda{When{args, guard}, body, options...}, 0) ->
         `Lambda{When{!args, !expand_macro(guard)},
             !expand_macro(body), !options...},
-    fusion}
+    union}
 Define{expand_macro_sub,
     (Assign{lhs, rhs, options...}, 0) ->
         `Assign{!lhs, !expand_macro(rhs), !options...},
-    fusion}
+    union}
 Define{expand_macro_sub,
     (Define{lhs, rhs, options...}, 0) ->
         `Define{!lhs, !expand_macro(rhs), !options...},
-    fusion}
+    union}
 Define{expand_macro_sub,
     (Match{pat, expr}, 0) -> `Match{!pat, !expand_macro(expr)},
-    fusion}
+    union}
 
 # Translate
 #
@@ -550,7 +550,7 @@ Define{expand_macro_sub, (CaseOf{es, pats}, 0) -> {
         p  := prim.list_foldr1((p, q) -> `(!p or !q),
                 prim.list_map(Case{p, _} -> p, pats))
         ex := `Throw{'MatchingFailed{DomainList{!p}, !es}}
-        body := prim.list_foldr(fusion(f, g), pats, ex)
+        body := prim.list_foldr(union(f, g), pats, ex)
 
         defs1 := prim.list_map_with_index(
             (v, i) -> `Define{!v, !expand_macro(prim.list_at(es, i))},
@@ -562,15 +562,15 @@ Define{expand_macro_sub, (CaseOf{es, pats}, 0) -> {
             Seq{!defs2},
             !body
             ]}
-    }, fusion}
+    }, union}
 Define{expand_macro_sub,
     (Case{args, body}, 0) -> `Case{!args, !expand_macro(body)},
-    fusion}
+    union}
 Define{expand_macro_sub,
     (Case{When{args, guard}, body}, 0) ->
         `Case{When{!args, !expand_macro(guard)}, !expand_macro(body)},
-    fusion}
-Define{expand_macro, (obj, lvl) -> expand_macro_sub(obj, lvl), fusion}
+    union}
+Define{expand_macro, (obj, lvl) -> expand_macro_sub(obj, lvl), union}
 Define{expand_macro, (obj, 0) -> {
         original := obj
         new_obj  := macro(obj)
@@ -582,20 +582,20 @@ Define{expand_macro, (obj, 0) -> {
         new_obj._original_ = original   # Preserve original node.
         new_obj
     },
-    fusion}
-Define{expand_macro, obj -> expand_macro(obj, 0), fusion}
+    union}
+Define{expand_macro, obj -> expand_macro(obj, 0), union}
 
 # Expand macros only once before eval.
 before_eval := expand_macro
 
-macro = fusion((Assign{Apply{f, args}, e}) -> `Assign{!f, Lambda{!args, !e}, fusion}, macro)
-macro(Define{Apply{f, args}, e})     = `Define{!f, Lambda{!args, !e}, fusion}
-macro(Define{Send{obj, f, args}, e}) = `Define{Slot{!obj, !f}, Lambda{!args, !e}, fusion}
-macro(Assign{Send{obj, f, args}, e}) = `Assign{Slot{!obj, !f}, Lambda{!args, !e}, fusion}
-macro(Define{Apply{f, args}, e, g})     = `Define{!f, Lambda{When{!args, !g}, !e}, fusion}
-macro(Assign{Apply{f, args}, e, g})     = `Assign{!f, Lambda{When{!args, !g}, !e}, fusion}
-macro(Define{Send{obj, f, args}, e, g}) = `Define{Slot{!obj, !f}, Lambda{When{!args, !g}, !e}, fusion}
-macro(Assign{Send{obj, f, args}, e, g}) = `Assign{Slot{!obj, !f}, Lambda{When{!args, !g}, !e}, fusion}
+macro = union((Assign{Apply{f, args}, e}) -> `Assign{!f, Lambda{!args, !e}, union}, macro)
+macro(Define{Apply{f, args}, e})     = `Define{!f, Lambda{!args, !e}, union}
+macro(Define{Send{obj, f, args}, e}) = `Define{Slot{!obj, !f}, Lambda{!args, !e}, union}
+macro(Assign{Send{obj, f, args}, e}) = `Assign{Slot{!obj, !f}, Lambda{!args, !e}, union}
+macro(Define{Apply{f, args}, e, g})     = `Define{!f, Lambda{When{!args, !g}, !e}, union}
+macro(Assign{Apply{f, args}, e, g})     = `Assign{!f, Lambda{When{!args, !g}, !e}, union}
+macro(Define{Send{obj, f, args}, e, g}) = `Define{Slot{!obj, !f}, Lambda{When{!args, !g}, !e}, union}
+macro(Assign{Send{obj, f, args}, e, g}) = `Assign{Slot{!obj, !f}, Lambda{When{!args, !g}, !e}, union}
 
 macro(|x|)     = `abs(!x)
 macro(+x)      = `uplus(!x)
@@ -609,7 +609,7 @@ macro(x ^ y)   = `pow(!x, !y)
 macro(x / y)   = `div(!x, !y)
 macro(x // y)  = `quo(!x, !y)
 macro(x % y)   = `rem(!x, !y)
-macro(x | y)   = `fusion(!x, !y)
+macro(x | y)   = `union(!x, !y)
 macro(x < y)   = `less_than?(!x, !y)
 macro(x > y)   = `greater_than?(!x, !y)
 macro(x <= y)  = `less_equal?(!x, !y)
@@ -626,7 +626,7 @@ macro(x ^= y)  = `ArithAssign{!x, !y, pow!}
 macro(x /= y)  = `ArithAssign{!x, !y, div!}
 macro(x //= y) = `ArithAssign{!x, !y, quo!}
 macro(x %= y)  = `ArithAssign{!x, !y, rem!}
-macro(x |= y)  = `ArithAssign{!x, !y, fusion!}
+macro(x |= y)  = `ArithAssign{!x, !y, union!}
 
 # Subscript syntax is not built-in. We need macros.
 macro(x[idxs...]) = `Send{!x, get, !idxs}
