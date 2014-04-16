@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-04-16 16:21:44 nineties $
+; $Id: rowl1-interp.rlc 2014-04-16 17:18:59 nineties $
 ;
 
 (import "rlvm-compile")
@@ -91,7 +91,7 @@
     ; Boot Amber
     (set_loc no_loc)
     (var cwd (getcwd))
-    (if (! cwd) (throw (io_error (string "Failed to get current working directory"))))
+    (if (! cwd) (throw (os_error (string "Failed to get current working directory"))))
     (set_var amber (to_sym "INVOKE_PATH") cwd)
 
     (var load_path (ary_new)) 
@@ -100,7 +100,7 @@
     (set_var amber (to_sym "VERSION") (version_string))
     (ary_push load_path (tuple2 (string "/usr/lib/amber") amber))
     (var cwdir (realpath (string ".")))
-    (if (! cwdir) (throw (io_error (string "Failed to get absolute path of current working directory"))))
+    (if (! cwdir) (throw (os_error (string "Failed to get absolute path of current working directory"))))
     (ary_push load_path (tuple2 cwdir amber))
     (setup_minimal_interpreter prim)
     (if (== opt_compile @C_TRUE)
@@ -272,7 +272,7 @@
             ; multiple load check.
             (var rpath (realpath fullpath))
             (if (! rpath)
-                (throw (io_error1 (string "Failed to get absolute path") fullpath)))
+                (throw (os_error1 (string "Failed to get absolute path") fullpath)))
 
             (for i 0 (array_size loaded) (do
                 (if (streq (ary_at loaded (box i)) rpath)
@@ -299,7 +299,7 @@
                 (tuple2 (string dir) (get_slot global Parent))
                 ))
             (if (< (chdir dir) 0)
-                (throw (io_error (string
+                (throw (os_error (string
                     (strcat "Failed to change directory to " dir)))))
 
             (var p (make_parser path ichan))
@@ -311,7 +311,7 @@
                 )
             (if new_dir_p (ary_pop dirs))
             (if (< (fchdir fd) 0)
-                (throw (io_error (string "Failed to change directory to '.'"))))
+                (throw (os_error (string "Failed to change directory to '.'"))))
             (if (< (close fd) 0)
                 (throw (io_error (string "Failed to close '.'")))
                 )
@@ -332,7 +332,7 @@
     (if (! ichan) (throw (io_error1 (string "Open failed") path)))
     (var dir (get_directory path))
     (if (< (chdir dir) 0)
-        (throw (io_error (string
+        (throw (os_error (string
             (strcat "Failed to change directory to " dir)))))
 
     (var p (make_parser path ichan))
@@ -340,7 +340,7 @@
     (set_loc (get_loc p))
     (interpret p 0)
     (if (< (fchdir fd) 0)
-        (throw (io_error (string "Failed to change directory to '.'"))))
+        (throw (os_error (string "Failed to change directory to '.'"))))
     (if (< (close fd) 0)
         (throw (io_error (string "Failed to close '.'")))
         )
@@ -436,7 +436,7 @@
 
 (fun change_dir (path) (
     (if (< (chdir path) 0)
-        (throw (io_error1 (string "Failed to change directory to") path))
+        (throw (os_error1 (string "Failed to change directory to") path))
         )
     (return @C_NIL)
     ))
@@ -542,6 +542,7 @@
 (extern fun setup_tuple)
 (extern fun setup_array)
 (extern fun setup_table)
+(extern fun setup_sys)
 ;(extern fun setup_gc)
 
 (fun init_lib (mod) (
@@ -561,6 +562,7 @@
     (setup_tuple mod)
     (setup_array mod)
     (setup_table mod)
+    (setup_sys mod)
 ;    (setup_gc)
     ))
 

@@ -1,0 +1,38 @@
+;
+; rowl - 1st generation
+; Copyright (C) 2010 nineties
+;
+; $Id: rowl1-sys.rlc 2014-04-16 17:19:59 nineties $
+;
+
+(import "rlvm-compile")
+(import "rowl1-types")
+
+(compile `object `(
+
+(import "rowl1-util")
+(import "rowl1-node")
+(import "rowl1-object")
+(import "rowl1-compile")
+(import "rowl1-error")
+
+(fun sys_chdir (path) (
+    (if (< (chdir path) 0)
+        (throw (os_error (string
+            (strcat "Failed to change directory to " path)))))
+    (return @C_TRUE)
+    ))
+
+(fun sys_getcwd () (
+    (var cwd (getcwd))
+    (if (! cwd) (throw
+        (os_error (string "Failed to get current working directory"))))
+    (return cwd)
+    ))
+
+(export fun setup_sys (mod) (
+    (add_function1 mod (to_sym "chdir") stringT sys_chdir 0)
+    (add_function0 mod (to_sym "getcwd") sys_getcwd 0)
+    ))
+
+    ))
