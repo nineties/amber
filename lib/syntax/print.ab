@@ -27,8 +27,9 @@ expression?(p) when p.head == 'Quasiquote and p.arity == 1 := true
 expression?(p) when p.head == 'Unquote and p.arity == 1    := true
 
 expression?(_ @ Int or _ @ Float or _ @ String or _ @ Symbol or _ @ List or
-            _ @ Tuple or Abs{_} or Slot{_, _ @ Symbol} or 'Rest{} or
-            'Rest{_} or Apply{_, _ @ List} or Subscript{_, _ @ List} or
+            _ @ Tuple or Abs{_} or Slot{_, _ @ Symbol} or
+            Var{_, _ @ Symbol} or 'Rest{} or 'Rest{_} or
+            Apply{_, _ @ List} or Subscript{_, _ @ List} or
             Send{_, _ @ Symbol, _ @ List} or Pow{_, _} or UPlus{_} or
             UMinus{_} or Not{_} or Mul{_} or NcMul{_} or Div{_} or
             Quo{_} or Rem{_} or Add{_, _} or NcAdd{_, _} or Sub{_, _} or
@@ -125,6 +126,7 @@ postfix(`Domain{!arg, !dom}) := [primary(arg), " @ ", primary(dom)]
 postfix(Send{obj, f @ Symbol, args @ List})
     := [postfix(obj), ".", str(f), sequence(args, argument, "(", ",", ")")]
 postfix(Slot{obj, m @ Symbol}) := [postfix(obj), ".", str(m)]
+postfix(Var{obj, m @ Symbol})  := [postfix(obj), "::", str(m)]
 postfix(Pow{x, e}) := [primary(x), "^", postfix(e)]
 
 quote(e) := postfix(e)

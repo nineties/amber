@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-04-16 18:11:21 nineties $
+; $Id: rowl1-interp.rlc 2014-04-17 01:30:18 nineties $
 ;
 
 (import "rlvm-compile")
@@ -120,21 +120,8 @@
     (return v)
     ))
 
-(fun evalfull_with_self (self expr) (
-    (var f (lookup_func_nocheck global (to_sym "before_eval")))
-    (if f (= expr (runcode f expr)))
-    (var v (runcode_with_self self (lookup_func global Eval) expr))
-    (var g (lookup_func_nocheck global (to_sym "after_eval")))
-    (if g (= v (runcode g v)))
-    (return v)
-    ))
-
 (fun eval (expr) (
     (return (runcode_with_self global (lookup_func global Eval) expr))
-    ))
-
-(fun eval_with_self (self expr) (
-    (return (runcode_with_self self (lookup_func global Eval) expr))
     ))
 
 (fun preparse_ochan (path) (
@@ -182,6 +169,10 @@
         ))
     ))
 
+(fun eval (expr) (
+    (return (runcode (lookup_func global Eval) expr))
+    ))
+
 (fun builtin_eval (expr) (
     (var hd (node_head expr))
     (if (== hd Located) (do
@@ -190,12 +181,18 @@
         )
     (if (== hd Block) (do
         (var list (node_arg_list expr 0))
-        (enter_block)
         (var v @C_NIL)
-        (while list (do
-            (= v (eval (car list)))
-            (= list (cdr list))
-            ))
+        (enter_block)
+        (try (do
+            (while list (do
+                (= v (eval (car list)))
+                (= list (cdr list))
+                ))
+            )
+        (catch e (do
+            (exit_module)
+            (throw e)
+            )))
         (exit_module)
         (return v)
         )
@@ -494,9 +491,7 @@
 
     ; evaluator
     (add_function1 prim Eval DontCare builtin_eval 0)
-    (add_function2 prim (to_sym "eval_with_self") DontCare DontCare eval_with_self 0)
     (add_function1 prim (to_sym "evalfull") DontCare evalfull 0)
-    (add_function2 prim (to_sym "eval_with_self_full") DontCare DontCare evalfull_with_self 0)
 
     (add_function1 prim (to_sym "exit") intT exit_ 0)
     (add_function1 prim (to_sym "atexit") funT at_exit 0)
@@ -513,7 +508,7 @@
 
     ; important functions
     (define_variable (to_sym "compile")  (get_slot prim (to_sym "compile")))
-    (define_variable (to_sym "eval")     (get_slot prim (to_sym "eval")))
+    (define_variable Eval (get_slot prim Eval))
     (define_variable (to_sym "evalfull") (get_slot prim (to_sym "evalfull")))
     (define_variable (to_sym "PROMPT") (string "amber"))
     ))

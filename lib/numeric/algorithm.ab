@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: numeric/algorithm.ab 2014-04-13 15:56:06 nineties $
+# $Id: numeric/algorithm.ab 2014-04-17 01:15:38 nineties $
 
 #= Numerical algorithm =
 
@@ -41,9 +41,10 @@ REDUCTION_OPERATIONS := [
 ]
 
 for (fname, o, v) in REDUCTION_OPERATIONS {
-    amber::evalfull `(
-        Var{algorithm, !fname}(f @ Function, a @ Int, b @ Int)
-        := prim.numeric_reduce(f, a, b, !o, !v)
-        )
+    code := `seq {
+        algorithm::reduce(f @ Function, a @ Int, b @ Int)
+            := prim.numeric_reduce(f, a, b, op, init)
+    }
+    evalfull code['reduce -> fname | 'op -> o | 'init -> v]
 }
 

@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: algebra/linalg.ab 2014-04-14 13:52:33 nineties $
+# $Id: algebra/linalg.ab 2014-04-17 01:15:17 nineties $
 
 import math
 
@@ -29,7 +29,7 @@ abs(Vector{a, b, c, d}) := math::sqrt(a^2 + b^2 + c^2)
 # Vector arithmetic
 SCALER_VECTOR_ARITHMETIC := ['mul]
 for op in SCALER_VECTOR_ARITHMETIC {
-    template := 'seq {
+    code := 'seq {
         linalg::op(s, v @ Vector) := {
             n := v.arity
             c := zeros(n)
@@ -44,12 +44,12 @@ for op in SCALER_VECTOR_ARITHMETIC {
         linalg::op(s, Vector{v0, v1, v2, v3})
             := `Vector{!op(s, v0), !op(s, v1), !op(s, v2), !op(s, v3)}
     }
-    evalfull template['op -> op]
+    evalfull code['op -> op]
 }
 
 VECTOR_SCALAR_ARITHMETIC := ['mul, 'div, 'pow]
 for op in VECTOR_SCALAR_ARITHMETIC {
-    template := 'seq {
+    code := 'seq {
         linalg::op(v @ Vector, s) := {
             n := v.arity
             c := zeros(n)
@@ -64,12 +64,12 @@ for op in VECTOR_SCALAR_ARITHMETIC {
         linalg::op(Vector{v0, v1, v2, v3}, s)
             := `Vector{!op(v0, s), !op(v1, s), !op(v2, s), !op(v3, s)}
     }
-    evalfull template['op -> op]
+    evalfull code['op -> op]
 }
 
 VECTOR_VECTOR_ARITHMETIC := ['add, 'sub, 'mul, 'div]
 for op in VECTOR_VECTOR_ARITHMETIC {
-    template := 'seq {
+    code := 'seq {
         linalg::op(a @ Vector, b @ Vector) :=
             throw `DomainError{"dimension mismatch", !a, !b}
         linalg::op(a @ Vector, b @ Vector) when a.arity == b.arity := {
@@ -87,7 +87,7 @@ for op in VECTOR_VECTOR_ARITHMETIC {
         linalg::op(Vector{a0, a1, a2, a3}, Vector{b0, b1, b2, b3})
             := `Vector{!op(a0, b0), !op(a1, b1), !op(a2, b2), !op(a3, b3)}
     }
-    evalfull template['op -> op]
+    evalfull code['op -> op]
 }
 
 # Return normalized vector.
