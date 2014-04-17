@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-04-17 20:02:41 nineties $
+; $Id: rowl1-interp.rlc 2014-04-17 23:17:50 nineties $
 ;
 
 (import "rlvm-compile")
@@ -99,6 +99,7 @@
 
     ; Collection of primitive functions
     (var prim (make_node0 VarTable))
+    (set_slot prim (to_sym "__owner__") global)
     (set_var global Prim prim)
 
     ; Setup built-in objects and functions.
@@ -365,6 +366,7 @@
         )
     (set_slot mod Parent parent)
     (set_slot mod Variables vtbl)
+    (set_slot vtbl (to_sym "__owner__") mod)
     (return mod)
     ))
 
@@ -373,21 +375,19 @@
         (throw (logic_error (string "enter_module() can be called only in top-scope"))))
     (var mod @C_NIL)
     (var parent @C_NIL)
-    (if (== rec @C_FALSE)
-        (do
-            (= mod (get_var_norec_nocheck global sym))
-            (= parent global)
-        )
-        (do
-            (= parent global)
-            (while @TRUE (do
-                (= mod (get_var_norec_nocheck parent sym))
-                (if (&& (!= mod @C_NIL) (== (node_head mod) Module))
-                    break
-                    )
-                (if (== parent amber) break)
-                (= parent (get_parent parent))
-                ))
+    (var tbl (get_slot global Variables))
+    (while @TRUE (do
+        (= mod (get_slot_norec_nocheck tbl sym))
+        (if (== (node_head mod) Module) (do
+            (= parent (get_slot tbl (to_sym "__owner__")))
+            break
+            ))
+        (= tbl (get_parent tbl))
+        (if (== tbl @C_UNDEF) (do
+            (= parent amber)
+            break
+            ))
+        (= parent (get_parent parent))
         ))
     (if (|| (== mod @C_NIL) (!= (node_head mod) Module)) (do
         (= mod (create_module parent sym))

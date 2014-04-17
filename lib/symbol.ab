@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: symbol.ab 2014-04-17 21:26:49 nineties $
+# $Id: symbol.ab 2014-04-17 22:45:25 nineties $
 
 import numeric (compare)
 
@@ -30,12 +30,20 @@ trait Symbol with {
 
 prim.set_builtin_parent('Symbol, Symbol)
 
+# Create a symbol, which is not internalized, with given name.
+unique := {
+    i := 0
+
+    () -> {
+          name := "abcdefghijklmnopqrstuvwxyz"[i]
+          i = (i + 1) % 26
+          prim.unique_symbol(prim.string_add("%", name).to_sym())
+    } | (name) -> prim.unique_symbol(name.to_sym())
+}
+
 # Extend the comparison operator.
 # NB: This function compares id-numbers of symbols, not lexicographic.
 compare := prim.symbol_compare | compare
 
 # Convert to a string.
 str(s @ Symbol) := prim.symbol_to_string(s)
-
-# Create a symbol, which is not internalized, with given name.
-unique := prim.unique_symbol
