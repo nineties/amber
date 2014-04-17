@@ -1,5 +1,5 @@
 # Copyright (C) 2010 nineties
-# $Id: module.ab 2014-04-17 02:53:18 nineties $
+# $Id: module.ab 2014-04-17 16:45:42 nineties $
 
 #= Module system =
 #== Basics ==
@@ -78,12 +78,12 @@ expand_import([M,rest...], path, rec) := {
           [] -> `load(!file)
         | _  -> `( if prim.loadable?(!file) load(!file) )
 
-    `Seq{[
-        enter_module('!M, !rec),
-        !loadstmt,
-        !expand_import(rest, path, false),
+    `seq {
+        enter_module('!M, !rec)
+        !loadstmt
+        !expand_import(rest, path, false)
         exit_module()
-    ]}
+    }
 }
 
 buildpath(mods) := prim.string_add(
@@ -117,13 +117,16 @@ macro(e @ Import{mods, asname, option}) := {
     mod := prim.list_foldl1((l, r) -> `Var{!l, !r}, mods)
     import_stmt := case option of
           Some{option}
-            -> `Seq{[
-                    !module::expand_import(mods, "", true),
-                    module::copy_variables(!mod, '!option),
+            -> `seq {
+                    !module::expand_import(mods, "", true)
+                    module::copy_variables(!mod, '!option)
                     !mod
-                ]}
+                }
         | nil
-            -> `Seq{[!module::expand_import(mods, "", true), !mod]}
+            -> `seq {
+                    !module::expand_import(mods, "", true)
+                    !mod
+                }
         | _
             -> { throw `UnknownExpression{!e} }
 

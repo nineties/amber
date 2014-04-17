@@ -47,7 +47,7 @@ expression?(_ @ Int or _ @ Float or _ @ String or _ @ Symbol or _ @ List or
 
 # Return `true` when given node is a standard statement.
 statement? := expression?
-statement?(Seq{_ @ List} or If{_, _} or While{_, _} or For{_, _, _} or
+statement?(_ @ Seq or If{_, _} or While{_, _} or For{_, _, _} or
            Continue{} or Break{} or Return{_} or Throw{_} or Try{_, _} or
            Define{_, _} or Assign{_, _} or Import{_ @ List, _, _}) := true
 
@@ -82,8 +82,8 @@ block(Block{stmts...}, cont=false) := {
     cont ? [doc, " "] : doc
 }
 
-block(stmt @ Seq, cont=false) := {
-    doc := P::nest(INDENT_WIDTH, [P::nl(" "), P::compress(stmt(stmt))])
+block(s @ Seq, cont=false) := {
+    doc := P::nest(INDENT_WIDTH, [P::nl(" "), P::compress(stmt(s))])
     cont ? [doc, P::nl()] : doc
 }
 
@@ -210,7 +210,7 @@ assign(WithSlots{x, stmts @ List})
 expr(e) := assign(e)
 
 stmt(e) := expr(e)
-stmt(Seq{stmts @ List}) := [stmts.map(stmt).weave(P::nl("; "))]
+stmt(Seq{stmts...}) := [stmts.map(stmt).weave(P::nl("; "))]
 stmt(Block{stmts...})
     := ["{", P::nest(INDENT_WIDTH, stmts.map(s -> [P::nl(), stmt(s)])),
         P::nl(), "}"]

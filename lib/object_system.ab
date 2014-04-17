@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: object_system.ab 2014-04-14 08:41:12 nineties $
+# $Id: object_system.ab 2014-04-17 16:48:04 nineties $
 
 #= Object System =
 # This library introduces prototype-based object-oriented programming
@@ -72,20 +72,20 @@ postfix_expr ::= 'class symbol "{" delimited(pattern, ",") "}"
                | 'trait symbol
                   { `DefTrait{!$1} }
 
-macro(DefClass{head, fields}) = `Seq{[
-        Define{!head, 'Class{!head} with .parent = Trait},
+macro(DefClass{head, fields}) = `seq {
+        Define{!head, 'Class{!head} with .parent = Trait}
 
         Define{Slot{!head, make}, Lambda{!fields,
-            Node{'!head, !fields} with .parent = !head}},
+            Node{'!head, !fields} with .parent = !head}}
 
         Define{Slot{!head, make}, Lambda{!prim.list_map(f -> `Keyword{!f, nil}, fields),
-            Node{'!head, !fields} with .parent = !head}, union},
+            Node{'!head, !fields} with .parent = !head}, union}
 
-        Define{Slot{!head, new}, Slot{!head, make}},
+        Define{Slot{!head, new}, Slot{!head, make}}
 
         WithSlots{!head, !prim.list_map_with_index((f, i) ->
             `(Slot{Self{}, !f} = alias(!i)), fields)}
-    ]}
+    }
 
 macro(DefTrait{head}) = `Define{!head, Trait.new('!head)}
 
@@ -104,8 +104,8 @@ Trait := `Class{Trait} with {
         }
     }
 
-    .extend_trait(...)
-        := throw `LogicError{"Traits can extend Trait{...} objects"}
+    .extend_trait(from)
+        := throw `LogicError{"not a trait", !from}
     .extend_trait(from @ Trait{name}) := {
         to := self
 

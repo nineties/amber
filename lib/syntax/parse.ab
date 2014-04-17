@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: syntax/parse.ab 2014-04-17 15:52:49 nineties $ "
+" $Id: syntax/parse.ab 2014-04-17 16:52:16 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -183,7 +183,7 @@ postfix_expr
         { Node{Quote{Subscript}, List{node0, node2}} }
         # sequence of statements
       | <<multiline>> 'seq "{" aligned(stmt) "}"
-        { Node{Quote{Seq}, List{node2}} }
+        { Node{Quote{Seq}, node2} }
       | # RestOf Pattern
         postfix_expr "..."
         { Node{Quote{Rest}, List{node0}} }
@@ -356,9 +356,9 @@ import_option
 
 stmt
     ::= stmt ";" stmt
-        { `Seq{[!node0, !node2]} }
+        { `Seq{!node0, !node2} }
       | stmt ";"
-        { `Seq{[!node0, nil]} }
+        { `Seq{!node0, nil} }
       | stmt 'if expr
         { `If{!node2, !node0} }
       | stmt 'unless expr
@@ -557,11 +557,7 @@ Define{expand_macro_sub, (CaseOf{es, pats}, 0) -> {
             ts)
 
         defs2 := prim.list_map(x -> `Define{!x, nil}, vars)
-        `Seq{[
-            Seq{!defs1},
-            Seq{!defs2},
-            !body
-            ]}
+        Node{'Seq, prim.list_append(defs1, prim.list_append(defs2, [body]))}
     }, union}
 Define{expand_macro_sub,
     (Case{args, body}, 0) -> `Case{!args, !expand_macro(body)},
@@ -786,7 +782,7 @@ desugar_pattern(args, guard) := {
         else
             guard = checkexpr
         if inits != []
-            guard = `Seq{!prim.list_append(inits, [guard])}
+            guard = Node{'Seq, prim.list_append(inits, [guard])}
         return (`When{!args, !guard}, vars)
     }
 }
@@ -808,4 +804,4 @@ macro(Lambda{When{args, guard}, body}) := {
 #
 # { t := obj; t.a = p; t.b = q; t.c = r; t }
 #
-macro(WithSlots{obj, init}) := `Apply{!obj, () -> { Seq{!init}; self }, []}
+macro(WithSlots{obj, init}) := `Apply{!obj, () -> { !Node{'Seq, init}; self }, []}

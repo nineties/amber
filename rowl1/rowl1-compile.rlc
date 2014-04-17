@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-04-17 16:30:13 nineties $
+; $Id: rowl1-compile.rlc 2014-04-17 16:43:24 nineties $
 ;
 
 (import "rlvm-compile")
@@ -109,12 +109,6 @@
         (return (iter_args add_var (node_arg args 0) 0 0))
         (return (iter_args add_var args 0 0))
         )
-    ))
-
-(fun fv_iter_block_ (stmts fv) (
-    (if (! stmts) (return fv))
-    (= fv (fv_iter_block_ (cdr stmts) fv))
-    (return (fv_iter (car stmts) 0 fv))
     ))
 
 (fun fv_iter_block (block fv) (
@@ -1619,18 +1613,6 @@
         ))
     ))
 
-(fun compile_block_body_ (asm exprs) (
-    (if (! exprs) (do
-        (put_nil asm)
-        return
-        ))
-    (while exprs (do
-        (compile asm (car exprs))
-        (= exprs (cdr exprs))
-        (if exprs (put_drop asm)) ; drop values except the last one
-        ))
-    ))
-
 (fun compile_block_body (asm block) (
     (var n (node_size block))
     (if (== n 0) (do
@@ -1682,7 +1664,7 @@
     ))
 
 (fun compile_seq (asm expr) (
-    (compile_block_body_ asm (node_arg_list expr 0))
+    (compile_block_body asm expr)
     ))
 
 (fun compile_if (asm expr) (
@@ -2363,7 +2345,7 @@
     (add_compiler mod (domainP Range) compile_range)
 
     (add_compiler mod (domainP Block) compile_block)
-    (add_compiler mod (make_node1 Seq listT) compile_seq)
+    (add_compiler mod (domainP Seq) compile_seq)
     (add_compiler mod (domainP Breakable) compile_breakable)
 
     (add_compiler mod (mkif DontCare DontCare) compile_if)
