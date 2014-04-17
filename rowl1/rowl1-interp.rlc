@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-04-18 01:02:55 nineties $
+; $Id: rowl1-interp.rlc 2014-04-18 08:24:46 nineties $
 ;
 
 (import "rlvm-compile")
@@ -395,6 +395,10 @@
             ))
         (= parent (get_parent parent))
         ))
+    (if (&& (== rec @C_FALSE) (!= parent global)) (do
+        (= mod @C_NIL)
+        (= parent global)
+        ))
     (if (|| (== mod @C_NIL) (!= (node_head mod) Module)) (do
         (= mod (create_module parent sym))
         (set_var parent sym mod)
@@ -456,6 +460,28 @@
     ))
 
 (fun setup_minimal_interpreter (prim) (
+    ; evaluator
+    (add_function1 prim Eval DontCare builtin_eval 0)
+    (add_function1 prim (to_sym "evalfull") DontCare evalfull 0)
+
+    (add_function1 prim (to_sym "exit") intT exit_ 0)
+    (add_function1 prim (to_sym "atexit") funT at_exit 0)
+    (add_function1 prim (to_sym "load") stringT load_file 0)
+    (add_function1 prim (to_sym "execfile") stringT exec_file 0)
+    (add_function1 prim (to_sym "loadable?") stringT loadable 0)
+    (add_function2 prim (to_sym "create_module") DontCare symT create_module 0)
+    (add_function2 prim (to_sym "enter_module") symT boolT enter_module 0)
+    (add_function0 prim (to_sym "exit_module") exit_module 0)
+    (add_function2 prim (to_sym "define_variable") symT DontCare define_variable 0)
+    ;(add_function0 prim (to_sym "gettimeofday") gettimeofday_ 0)
+    ;(add_function2 prim (to_sym "timeval_sub") DontCare DontCare timeval_sub_ 0)
+    (add_function1 prim (to_sym "debugpf") DontCare debugpf 0)
+
+    ; important functions
+    (define_variable (to_sym "compile")  (get_slot prim (to_sym "compile")))
+    (define_variable Eval (get_slot prim Eval))
+    (define_variable (to_sym "evalfull") (get_slot prim (to_sym "evalfull")))
+    (define_variable (to_sym "PROMPT") (string "amber"))
     ; parser
     (var syntax (create_module amber Syntax))
     (set_var amber Syntax syntax)
@@ -480,28 +506,6 @@
     (set_var syntax (to_sym "stmt") (get_slot prim (to_sym "parse_stmt")))
     (set_var syntax (to_sym "toplevel_stmt") (get_slot prim (to_sym "parse_toplevel_stmt")))
 
-    ; evaluator
-    (add_function1 prim Eval DontCare builtin_eval 0)
-    (add_function1 prim (to_sym "evalfull") DontCare evalfull 0)
-
-    (add_function1 prim (to_sym "exit") intT exit_ 0)
-    (add_function1 prim (to_sym "atexit") funT at_exit 0)
-    (add_function1 prim (to_sym "load") stringT load_file 0)
-    (add_function1 prim (to_sym "execfile") stringT exec_file 0)
-    (add_function1 prim (to_sym "loadable?") stringT loadable 0)
-    (add_function2 prim (to_sym "create_module") DontCare symT create_module 0)
-    (add_function2 prim (to_sym "enter_module") symT boolT enter_module 0)
-    (add_function0 prim (to_sym "exit_module") exit_module 0)
-    (add_function2 prim (to_sym "define_variable") symT DontCare define_variable 0)
-    (add_function0 prim (to_sym "gettimeofday") gettimeofday_ 0)
-    (add_function2 prim (to_sym "timeval_sub") DontCare DontCare timeval_sub_ 0)
-    (add_function1 prim (to_sym "debugpf") DontCare debugpf 0)
-
-    ; important functions
-    (define_variable (to_sym "compile")  (get_slot prim (to_sym "compile")))
-    (define_variable Eval (get_slot prim Eval))
-    (define_variable (to_sym "evalfull") (get_slot prim (to_sym "evalfull")))
-    (define_variable (to_sym "PROMPT") (string "amber"))
     ))
 
 (extern fun setup_pprint)

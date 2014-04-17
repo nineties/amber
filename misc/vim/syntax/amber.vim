@@ -1,6 +1,6 @@
 " Language:	Amber
 " Maintainer:	nineties <nineties48@gmail.com>
-" $Id: amber.vim 2014-04-14 04:08:05 nineties $
+" $Id: amber.vim 2014-04-18 01:10:29 nineties $
 
 if exists("b:current_syntax")
     finish
@@ -31,7 +31,7 @@ syn match amberParenError       /)/
 syn region amberParen   start=/(/ end=/)/ contains=ALLBUT,amberParenError fold
 syn match amberListError        /\]/
 syn region amberList    start=/\[/ end=/\]/ contains=ALLBUT,amberListError fold
-syn match amberInfix            /<[a-zA-Z_]\w*[!?]\=>/
+syn match amberInfix            /<[a-zA-Z_]\(\w\|::\)*[!?]\=>/
 
 syn match amberSpaceError       display excludenl "\s\+$"
 syn match amberSpaceError       display " \+\t"
