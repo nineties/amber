@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-04-16 17:52:03 nineties $
+; $Id: rowl1-packrat.rlc 2014-04-17 17:55:47 nineties $
 ;
 
 (import "rlvm-compile")
@@ -282,12 +282,59 @@
     (return @C_TRUE)
     ))
 
+(fun error_location (p) (
+    (var buf (field_get p 4))
+    (var vec (field_get buf 0))
+    (var pos (field_get p 6))
+    (var size (cvector_size vec))
+    (var n 10)
+    (var line (field_get p 8))
+    (var clmn (field_get p 9))
+
+    (while (< pos size) (do
+        (var c (cvector_at vec pos))
+        (if (! (is_spaces c)) break)
+        (if (== c '\n')
+            (do
+                (+= line 1)
+                (= clmn 1)
+            )
+            (+= clmn 1)
+            )
+        (+= pos 1)
+        ))
+    (if (< pos size)
+        (do
+            (var loc (strndup (+ (cvector_raw vec) pos) n))
+            (var len (strlen loc))
+            (var str (allocate_string (+ 5 len)))
+            (memcpy str "near " 5)
+            (memcpy (+ str 5) loc len)
+            (return str)
+        )
+        (do
+            (= line (itos10 line))
+            (= clmn (itos10 clmn))
+            (var len1 (strlen line))
+            (var len2 (strlen clmn))
+            (var str (allocate_string (+ 18 (+ len1 len2))))
+            (memcpy str "near line " 10)
+            (memcpy (+ str 10) line len1)
+            (memcpy (+ str (+ 10 len1)) " column " 8)
+            (memcpy (+ str (+ 18 len1)) clmn len2)
+            (return str)
+        ))
+    ))
+
 (fun noparse_sub (p msg may) (
     (field_set p 1 @C_FALSE)
 
     ; if current position >= error position, update error message
     (if (> (field_get p 6) (field_get p 11)) (do
-        (field_set p 3 (string msg))
+        (if msg
+            (field_set p 3 (string msg))
+            (field_set p 3 (error_location p))
+            )
         ; update the error position
         (field_set p 11 (field_get p 6))
         ))
@@ -295,6 +342,7 @@
     ))
 
 (fun noparse (p msg) (
+    (if (== msg @C_NIL) (= msg 0))
     (return (noparse_sub p msg @FALSE))
     ))
 
@@ -307,7 +355,7 @@
     (if @(PARSED p)
         (do
             (field_set p 1 @C_FALSE)
-            (field_set p 3 (string "unexpected token"))
+            (field_set p 3 (error_location p))
             (return @C_FALSE)
         )
         (do
@@ -499,9 +547,7 @@
     (if (< c 0) (return c))
     ; update source location
     (if (== c '\n') (do
-        (if (! shell_mode_p)
-            (field_set p 8 (+ (field_get p 8) 1))
-            )
+        (field_set p 8 (+ (field_get p 8) 1))
         (field_set p 9 0)
         ))
     (field_set p 6 (+ (field_get p 6) 1))
@@ -683,20 +729,17 @@
 (fun parse_char (p c) (
     (var v (lookahead p))
     (if (< v 0) (do
-        (return (mayparse p (strcat "expect token: " (escape_char c))))
+        (return (mayparse p 0))
         ))
     (if (== v c) (do
         (getc p)
         (return (parsed p (ctos c)))
         ))
-    (return (noparse p 
-        (strcat "expect " 
-        (strcat (escape_char c)
-        (strcat " but got " (escape_char v))))))
+    (return (noparse p 0))
     ))
  
 (fun parse_fail (p) (
-    (return (noparse p "Invalid comment syntax"))
+    (return (noparse p 0))
     ))
 
 (fun parse_any_char (p) (
@@ -726,7 +769,7 @@
             (return (parsed p (string str)))
             ))
         (if (!= d c)
-            (return (noparse p (strcat "expect token: '" (strcat str "'"))))
+            (return (noparse p 0))
             )
         (+= clmn 1)
         (if (== c '\n') (do
@@ -736,21 +779,20 @@
         (+= idx 1)
         (+= i 1)
         ))
-    (return (mayparse p (strcat "expect token: '" (strcat str "'"))))
+    (return (mayparse p 0))
     ))
 
 (fun parse_word (p sym) (
     (if (is_identchar (lookbehind p))
-        (return (noparse p "not beggining of a word"))
+        (return (noparse p 0))
         )
     (parse_text p (symbol_name sym))
     (if (! (is_end_of_token p))
-        (return (noparse p "not end of a word"))
+        (return (noparse p 0))
         )
     (if @(PARSED p)
         (return (parsed p sym))
-        (return (noparse p
-            (strcat "expect token: '" (strcat (symbol_name sym) "'"))))
+        (return (noparse p 0))
         )
     ))
 
@@ -766,7 +808,7 @@
     (var begin (field_get p 6))
     (var v (lookahead p))
 
-    (if (< v 0) (return (mayparse p "expect token: a number")))
+    (if (< v 0) (return (mayparse p 0)))
 
     (var state (copy_parser_state p))
 
@@ -780,7 +822,7 @@
         (return (parsed p (box 0)))
         )
     (if (! (is_1_9 v)) (do
-        (noparse p "expect 1-9")
+        (noparse p 0)
         (reset_parser_position p state)
         (return @C_FALSE)
         ))
@@ -958,13 +1000,13 @@
     (var state (copy_parser_state p))
     (if (== (parse_decimal p) @C_FALSE) (return @C_FALSE))
     (if (!= (lookahead p) '.') (do
-        (noparse p "expect '.'")
+        (noparse p 0)
         (reset_parser_position p state)
         (return @C_FALSE)
         ))
     (getc p)
     (if (! (is_0_9 (lookahead p))) (do
-        (noparse p "expect digits after the decimal point")
+        (noparse p 0)
         (reset_parser_position p state)
         (return @C_FALSE)
         ))
@@ -1003,7 +1045,7 @@
         break
         ))
     (if (== (get_pos p) pos)
-        (return (noparse p "no space"))
+        (return (noparse p 0))
         (return (parsed p @C_NIL))
         )
     ))
@@ -1026,7 +1068,7 @@
         break
         ))
     (if (== (get_pos p) pos)
-        (return (noparse p "no space"))
+        (return (noparse p 0))
         (return (parsed p @C_NIL))
         )
     ))
@@ -1034,7 +1076,7 @@
 
 (fun parse_shell_style_comment_ (p) (
     (var v (lookahead p))
-    (if (!= v '#') (return (noparse p "no space")))
+    (if (!= v '#') (return (noparse p 0)))
     (while @TRUE (do
         (var c (lookahead p))
         (if (|| (== c '\n') (< c 0)) break)
@@ -1058,11 +1100,11 @@
 
 (fun parse_symbol_impl_ (p) (
     (if (is_identchar (lookbehind p))
-        (return (noparse p "not beggining of a symbol"))
+        (return (noparse p 0))
         )
     (var c (lookahead p))
-    (if (< c 0) (return (mayparse p "expect a symbol")))
-    (if (! (is_letter c)) (return (noparse p "expect a symbol")))
+    (if (< c 0) (return (mayparse p 0)))
+    (if (! (is_letter c)) (return (noparse p 0)))
     (while (is_identchar (lookahead p)) (do
         (getc p)
         ))
@@ -1118,21 +1160,21 @@
 ; double-quoted string literal
 (fun parse_string_d_ (p) (
     (var v (lookahead p))
-    (if (< v 0) (return (mayparse p "expect token: \" (double quote)")))
-    (if (!= v '"') (return (noparse p "expect token: \" (double quote)")))
+    (if (< v 0) (return (mayparse p 0)))
+    (if (!= v '"') (return (noparse p 0)))
     (getc p)
     (var state (copy_parser_state p))
     (var begin (field_get p 6))
     (while (!= (lookahead p) '"') (do
         (var c (getc p))
         (if (< c 0) (do
-            (mayparse p "expect character")
+            (mayparse p "non-terminated string")
             (reset_parser_position p state)
             (return @C_FALSE)
             ))
 
         (if (== c '\n')
-            (return (noparse p "missing terminate character"))
+            (return (noparse p "non-terminated string"))
             )
         (if (== c '\\') (do
             (if (! (is_escape_char (getc p))) (do
@@ -1145,12 +1187,12 @@
     (var end (field_get p 6))
     (= v (getc p))
     (if (< v 0) (do
-        (mayparse p "expect token: \" (double quote)")
+        (mayparse p "non-terminated string")
         (reset_parser_position p state)
         (return @C_FALSE)
         ))
     (if (!= v '"') (do
-        (noparse p "expect token: \" (double quote)")
+        (noparse p "non-terminated string")
         (reset_parser_position p state)
         (return @C_FALSE)
         ))
@@ -1162,8 +1204,8 @@
 
 (fun parse_fullform_ (p) (
     (var c (lookahead p))
-    (if (< c 0) (return (mayparse p "expect token: a symbol")))
-    (if (! (is_letter c)) (return (noparse p "expect token: a symbol")))
+    (if (< c 0) (return (mayparse p 0)))
+    (if (! (is_letter c)) (return (noparse p 0)))
 
     (var state (copy_parser_state p))
 
@@ -1309,15 +1351,15 @@
         break
         ))
     (if (== (get_pos p) pos)
-        (return (noparse p "no space"))
+        (return (noparse p 0))
         (return (parsed p @C_NIL))
         )
     ))
 
 (fun parse_fullform_preparse (p) (
     (var c (lookahead p))
-    (if (< c 0) (return (mayparse p "expect token: a symbol")))
-    (if (! (is_letter c)) (return (noparse p "expect token: a symbol")))
+    (if (< c 0) (return (mayparse p 0)))
+    (if (! (is_letter c)) (return (noparse p 0)))
 
     (var state (copy_parser_state p))
 
@@ -1414,7 +1456,7 @@
     (if (! multiline_p)
         (= p (ifelse (apply_util "%check_indent" (list1 PVar))
                 p
-                (gen_noparse (string "Invalid indentation"))))
+                (gen_noparse @C_NIL)))
         )
 
     (if (&& ws (! nospace_p))
