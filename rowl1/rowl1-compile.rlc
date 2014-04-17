@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-04-17 16:23:27 nineties $
+; $Id: rowl1-compile.rlc 2014-04-17 16:30:13 nineties $
 ;
 
 (import "rlvm-compile")
@@ -161,10 +161,7 @@
         (if (== hd Ref)
             (return (fv_iter (node_arg expr 0) 0 fv))
             )
-        (if (== hd Breakable)
-            (return (fv_iter_block_ (node_arg_list expr 0) fv))
-            )
-        (if (== hd Block)
+        (if (|| (== hd Block) (== hd Breakable))
             (return (fv_iter_block expr fv))
             )
         ))
@@ -288,14 +285,6 @@
         (node_arg_set expr 1 (scan_clsvars (node_arg expr 1) tbl))
         (return expr)
         ))
-    (if (== hd Breakable) (do
-        (var exprs (node_arg_list expr 0))
-        (while exprs (do
-            (setcar exprs (scan_clsvars (car exprs) tbl))
-            (= exprs (cdr exprs))
-            ))
-        (return expr)
-        ))
     (if (== hd Define) (do
         (var syms (collect_args (node_arg expr 0)))
         (while syms (do
@@ -400,14 +389,6 @@
     (if (== hd Define) (do
         (node_arg_set expr 1 (subst_clsvars tbl cls (node_arg expr 1)))
         (node_arg_set expr 0 (subst_clsvars tbl cls (node_arg expr 0)))
-        (return expr)
-        ))
-    (if (== hd Breakable) (do
-        (var exprs (node_arg_list expr 0))
-        (while exprs (do
-            (setcar exprs (subst_clsvars tbl cls (car exprs)))
-            (= exprs (cdr exprs))
-            ))
         (return expr)
         ))
     (if (== hd Lambda) (do
@@ -1685,22 +1666,6 @@
         )))
     ))
 
-(fun compile_block_ (asm expr) (
-    (if (== (symtable_depth variables) 0)
-        (return (compile_toplevel_block asm expr))
-        )
-    (var exprs (node_arg expr 0))
-    (symtable_push variables)
-    (try (do
-        (compile_block_body_ asm exprs)
-        (symtable_pop variables)
-        )
-    (catch e (do
-        (symtable_pop variables)
-        (throw e)
-        )))
-    ))
-
 (fun compile_breakable (asm expr) (
     (if (== (symtable_depth variables) 0)
         (return (compile_toplevel_block asm expr))
@@ -1708,7 +1673,7 @@
     (var break_lbl (fresh_label asm))
     (var exit_lbl  (fresh_label asm))
     (= break_labels (cons (box break_lbl) break_labels))
-    (compile_block_ asm expr)
+    (compile_block asm expr)
     (put_goto asm exit_lbl)
     (set_label asm break_lbl)
     (put_nil asm)
@@ -2399,7 +2364,7 @@
 
     (add_compiler mod (domainP Block) compile_block)
     (add_compiler mod (make_node1 Seq listT) compile_seq)
-    (add_compiler mod (make_node1 Breakable listT) compile_breakable)
+    (add_compiler mod (domainP Breakable) compile_breakable)
 
     (add_compiler mod (mkif DontCare DontCare) compile_if)
 	(add_compiler mod (ifelse DontCare DontCare DontCare) compile_ifelse)
