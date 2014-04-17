@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-04-17 03:54:52 nineties $
+; $Id: rowl1-compile.rlc 2014-04-17 16:23:27 nineties $
 ;
 
 (import "rlvm-compile")
@@ -111,10 +111,17 @@
         )
     ))
 
-(fun fv_iter_block (stmts fv) (
+(fun fv_iter_block_ (stmts fv) (
     (if (! stmts) (return fv))
-    (= fv (fv_iter_block (cdr stmts) fv))
+    (= fv (fv_iter_block_ (cdr stmts) fv))
     (return (fv_iter (car stmts) 0 fv))
+    ))
+
+(fun fv_iter_block (block fv) (
+    (rfor i 0 (node_size block) (do
+        (= fv (fv_iter (node_arg block i) 0 fv))
+        ))
+    (return fv)
     ))
 
 (fun fv_iter (expr level fv) (
@@ -154,8 +161,11 @@
         (if (== hd Ref)
             (return (fv_iter (node_arg expr 0) 0 fv))
             )
-        (if (|| (== hd Block) (== hd Breakable))
-            (return (fv_iter_block (node_arg_list expr 0) fv))
+        (if (== hd Breakable)
+            (return (fv_iter_block_ (node_arg_list expr 0) fv))
+            )
+        (if (== hd Block)
+            (return (fv_iter_block expr fv))
             )
         ))
     (if (== hd Quote) (return fv))
@@ -278,7 +288,7 @@
         (node_arg_set expr 1 (scan_clsvars (node_arg expr 1) tbl))
         (return expr)
         ))
-    (if (|| (== hd Block) (== hd Breakable)) (do
+    (if (== hd Breakable) (do
         (var exprs (node_arg_list expr 0))
         (while exprs (do
             (setcar exprs (scan_clsvars (car exprs) tbl))
@@ -392,7 +402,7 @@
         (node_arg_set expr 0 (subst_clsvars tbl cls (node_arg expr 0)))
         (return expr)
         ))
-    (if (|| (== hd Block) (== hd Breakable)) (do
+    (if (== hd Breakable) (do
         (var exprs (node_arg_list expr 0))
         (while exprs (do
             (setcar exprs (subst_clsvars tbl cls (car exprs)))
@@ -652,7 +662,7 @@
             (= stmts (store_args tbl (cons cls args) stmts))
             )
         (= stmts (cons body stmts))
-        (= body (make_node1 Block (list_reverse stmts)))
+        (= body (make_node Block (list_reverse stmts)))
         ))
 
     (symtable_push variables)
@@ -1628,7 +1638,7 @@
         ))
     ))
 
-(fun compile_block_body (asm exprs) (
+(fun compile_block_body_ (asm exprs) (
     (if (! exprs) (do
         (put_nil asm)
         return
@@ -1640,6 +1650,18 @@
         ))
     ))
 
+(fun compile_block_body (asm block) (
+    (var n (node_size block))
+    (if (== n 0) (do
+        (put_nil asm)
+        return
+        ))
+    (for i 0 n (do
+        (compile asm (node_arg block i))
+        (if (< i (- n 1)) (put_drop asm)) ; drop values except the last one
+        ))
+    ))
+
 (fun compile_toplevel_block (asm expr) (
     (var addr (get_address asm))
     (put_allocate asm 0)
@@ -1648,14 +1670,29 @@
     (put_operand_byte asm (+ addr 1) nlocal)
     ))
 
-(fun compile_block (asm expr) (
+(fun compile_block (asm block) (
+    (if (== (symtable_depth variables) 0)
+        (return (compile_toplevel_block asm block))
+        )
+    (symtable_push variables)
+    (try (do
+        (compile_block_body asm block)
+        (symtable_pop variables)
+        )
+    (catch e (do
+        (symtable_pop variables)
+        (throw e)
+        )))
+    ))
+
+(fun compile_block_ (asm expr) (
     (if (== (symtable_depth variables) 0)
         (return (compile_toplevel_block asm expr))
         )
     (var exprs (node_arg expr 0))
     (symtable_push variables)
     (try (do
-        (compile_block_body asm exprs)
+        (compile_block_body_ asm exprs)
         (symtable_pop variables)
         )
     (catch e (do
@@ -1671,7 +1708,7 @@
     (var break_lbl (fresh_label asm))
     (var exit_lbl  (fresh_label asm))
     (= break_labels (cons (box break_lbl) break_labels))
-    (compile_block asm expr)
+    (compile_block_ asm expr)
     (put_goto asm exit_lbl)
     (set_label asm break_lbl)
     (put_nil asm)
@@ -1680,7 +1717,7 @@
     ))
 
 (fun compile_seq (asm expr) (
-    (compile_block_body asm (node_arg expr 0))
+    (compile_block_body_ asm (node_arg_list expr 0))
     ))
 
 (fun compile_if (asm expr) (
@@ -2360,7 +2397,7 @@
     (add_compiler mod (domainP Table) compile_table)
     (add_compiler mod (domainP Range) compile_range)
 
-    (add_compiler mod (make_node1 Block listT) compile_block)
+    (add_compiler mod (domainP Block) compile_block)
     (add_compiler mod (make_node1 Seq listT) compile_seq)
     (add_compiler mod (make_node1 Breakable listT) compile_breakable)
 

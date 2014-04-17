@@ -42,7 +42,7 @@ expression?(_ @ Int or _ @ Float or _ @ String or _ @ Symbol or _ @ List or
             SubAssign{_, _} or MulAssign{_, _} or NcMulAssign{_, _} or
             PowAssign{_, _} or DivAssign{_, _} or QuoAssign{_, _} or
             RemAssign{_, _} or FusionAssign{_, _} or
-            WithSlots{_, _ @ List} or Block{_ @ List}
+            WithSlots{_, _ @ List} or _ @ Block
         ) := true
 
 # Return `true` when given node is a standard statement.
@@ -76,7 +76,7 @@ block(s, cont=false) := {
     cont ? [doc, P::nl()] : doc
 }
 
-block(Block{stmts @ List}, cont=false) := {
+block(Block{stmts...}, cont=false) := {
     doc := [" {", P::nest(INDENT_WIDTH, stmts.map(s -> [P::nl(), stmt(s)])),
            P::nl(), "}"]
     cont ? [doc, " "] : doc
@@ -107,7 +107,7 @@ primary(var @ Symbol)  := str(var)
 primary(list @ List)   := sequence(list, expr, "[", ",", "]")
 primary(tuple @ Tuple) := sequence(tuple, expr, "(", ",", ")")
 primary(ary @ Array)   := sequence(ary, expr, "Array{", ",", "}")
-primary(Block{stmts})  := P::group(block(stmts))
+primary(Block{stmts...})  := P::group(block(stmts))
 primary(Abs{e})        := ["|", expr(e), "|"]
 primary(Slot{Self{}, m @ Symbol}) := "." ++ str(m)
 primary('Rest{}) := "..."
@@ -205,13 +205,13 @@ assign(QuoAssign{x, v})    := [pattern(x), " //= ", assign(v)]
 assign(RemAssign{x, v})    := [pattern(x), " %= ", assign(v)]
 assign(FusionAssign{x, v}) := [pattern(x), " |= ", assign(v)]
 assign(WithSlots{x, stmts @ List})
-    := [pattern(x), " with ", block(`Block{!stmts})]
+    := [pattern(x), " with ", block(node('Block, stmts))]
 
 expr(e) := assign(e)
 
 stmt(e) := expr(e)
 stmt(Seq{stmts @ List}) := [stmts.map(stmt).weave(P::nl("; "))]
-stmt(Block{stmts @ List})
+stmt(Block{stmts...})
     := ["{", P::nest(INDENT_WIDTH, stmts.map(s -> [P::nl(), stmt(s)])),
         P::nl(), "}"]
 stmt(If{cond, body}) := ["if ", expr(cond), block(body)]

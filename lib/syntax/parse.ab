@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: syntax/parse.ab 2014-04-16 18:21:46 nineties $ "
+" $Id: syntax/parse.ab 2014-04-17 15:52:49 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -96,7 +96,7 @@ DefineSyntax{
 DefineSyntax{
     parser_action,
     List{Tuple{List{"{", Aligned{stmt}, "}"},
-        Quasiquote{Block{Unquote{node1}}}, multiline}
+        Node{Quote{Block}, node1}, multiline}
         }
 }
 
@@ -143,7 +143,7 @@ Define{Var{syntax, reserved_words}, Array{
 }}
 
 ### Expressions
-block_body ::= aligned(stmt) { Quasiquote{Block{Unquote{node0}}} }
+block_body ::= aligned(stmt) { Node{Quote{Block}, node0} }
 
 primary_block ::= <<multiline>> "{" block_body "}" { node1 }
 
@@ -641,8 +641,8 @@ macro(ArithAssign{x[idxs...], e, op}) = {
     y     := prim.get_arg(stmt1, 0)
     ts    := prim.list_map(e -> prim.get_arg(e, 0), stmt2)
 
-    `Block{
-        !prim.list_append(
+    Node{'Block,
+        prim.list_append(
             prim.list_cons(stmt1, stmt2),
             [`Assign{Subscript{!y, !ts}, Send{Subscript{!y, !ts}, !op, [!e]}}]
         )

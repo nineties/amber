@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-04-17 03:29:16 nineties $
+; $Id: rowl1-interp.rlc 2014-04-17 16:11:52 nineties $
 ;
 
 (import "rlvm-compile")
@@ -194,15 +194,12 @@
         (return (eval (node_arg expr 1)))
         )
     (if (== hd Block) (do
-        (var list (node_arg_list expr 0))
         (var v @C_NIL)
         (enter_block)
-        (try (do
-            (while list (do
-                (= v (eval (car list)))
-                (= list (cdr list))
-                ))
-            )
+        (try
+            (for i 0 (node_size expr)
+                (= v (eval (node_arg expr i)))
+                )
         (catch e (do
             (exit_module)
             (throw e)
