@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-04-18 00:42:56 nineties $
+; $Id: rowl1-interp.rlc 2014-04-18 01:02:55 nineties $
 ;
 
 (import "rlvm-compile")
@@ -290,13 +290,23 @@
                 (throw (os_error (string
                     (strcat "Failed to change directory to " dir)))))
 
-            (var p (make_parser path ichan))
-            (set_slot p Syntax (get_var amber Syntax))
-            (set_loc (get_loc p))
-            (if pre
-                (interpret_preparsed p)
-                (interpret p fullpath)
+            (try (do
+                (var p (make_parser path ichan))
+                (set_slot p Syntax (get_var amber Syntax))
+                (set_loc (get_loc p))
+                (if pre
+                    (interpret_preparsed p)
+                    (interpret p fullpath)
+                    )
                 )
+            (catch e (do
+                (fchdir fd)
+                (close fd)
+                (close_in ichan)
+                (ary_pop loaded)
+                (throw e)
+                )))
+
             (if (< (fchdir fd) 0)
                 (throw (os_error (string "Failed to change directory to '.'"))))
             (if (< (close fd) 0)
