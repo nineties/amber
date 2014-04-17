@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-04-17 16:46:38 nineties $
+; $Id: rowl1-interp.rlc 2014-04-17 20:02:41 nineties $
 ;
 
 (import "rlvm-compile")
@@ -127,10 +127,10 @@
 
 (fun evalfull (expr) (
     (var f (lookup_func_nocheck global (to_sym "before_eval")))
-    (if f (= expr (runcode f expr)))
-    (var v (runcode (lookup_func global Eval) expr))
+    (if f (= expr (runcode_with_self global f expr)))
+    (var v (runcode_with_self global (lookup_func global Eval) expr))
     (var g (lookup_func_nocheck global (to_sym "after_eval")))
-    (if g (= v (runcode g v)))
+    (if g (= v (runcode_with_self global g v)))
     (return v)
     ))
 
@@ -184,7 +184,7 @@
     ))
 
 (fun eval (expr) (
-    (return (runcode (lookup_func global Eval) expr))
+    (return (runcode_with_self global (lookup_func global Eval) expr))
     ))
 
 (fun builtin_eval (expr) (
@@ -214,7 +214,7 @@
             )
         (return v)
         ))))
-    (return (runcode (compile_main expr)))
+    (return (runcode_with_self global (compile_main expr)))
     ))
 
 (var atexit_list null)
@@ -222,7 +222,7 @@
 (fun eval_exit (expr) (
     (= atexit_list (list_reverse atexit_list))
     (while atexit_list (do
-        (runcode (get_bytecode (car atexit_list)))
+        (runcode_with_self global (get_bytecode (car atexit_list)))
         (= atexit_list (cdr atexit_list))
         ))
     (exit 0)
