@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: CAST/syntax.ab 2014-04-18 08:14:45 nineties $
+# $Id: CAST/syntax.ab 2014-04-18 08:58:10 nineties $
 
 import pretty_print as P
 import numeric::bit as B
@@ -132,6 +132,7 @@ class Cast{type, expr}
 class Cond{test, ifthen, ifelse}
 
 class Sizeof{arg}
+class SizeofType{arg}
 
 EXPRESSIONS := [BoolL, CharL, IntL, FloatL, StringL, Var, Call, Subscript,
     Select, Uplus, Uminus, Deref, Addr, LNot, BNot, PreInc, PreDec,
@@ -205,204 +206,220 @@ reserved_words := Array{"true", "false", "void", "char", "wchar", "dchar",
     "continue", "typedef", "static", "extern", "const", "volatile"
 }
 
+# Copy Amber's parser
+# XXX: add some util to write following lines more easily.
+spaces     := amber::syntax::spaces
+identifier := amber::syntax::identifier
+integer    := amber::syntax::integer
+decimal    := amber::syntax::decimal
+binary     := amber::syntax::binary
+octal      := amber::syntax::octal
+hex        := amber::syntax::hex
+float      := amber::syntax::float
+string     := amber::syntax::string
+
 # Expressions
 
 constant ::= "true"  { BoolL.new(true) }
-#           | "false" { BoolL.new(false) }
-#           | integer { IntL.new($0) }
-#           | float   { FloatL.new($0) }
-#           | "'" nospace(.) nospace("'")  { CharL.new($input) }
-#
-#primary_expr ::= identifier      { Var.new($0) }
-#               | constant
-#               | string          { StringL.new($0) }
-#               | "(" expr ")"    { $1 }
-#
-#postfix_expr ::= postfix_expr "[" expr "]"
-#                 { Subscript.new($0, $2) }
-#               | postfix_expr "(" delimited(assign_expr, ",") ")"
-#                 { Call.new($0, $2) }
-#               | postfix_expr "." identifier
-#                 { Select.new($0, $2) }
-#               | postfix_expr "->" identifier
-#                 { Select.new(Deref.new($0), $2) }
-#               | postfix_expr "++"
-#                 { PostInc.new($0) }
-#               | postfix_expr "--"
-#                 { PostDec.new($0) }
-#               | primary_expr
-#
-#unary_expr ::= "++" unary_expr      { PreInc.new($1) }
-#             | "--" unary_expr      { PreDec.new($1) }
-#             | "&"  cast_expr       { Addr.new($1) }
-#             | "*"  cast_expr       { Deref.new($1) }
-#             | "+"  cast_expr       { Uplus.new($1) }
-#             | "-"  cast_expr       { Uminus.new($1) }
-#             | 'sizeof unary_expr   { Sizeof.new($1) }
-#             | 'sizeof "(" type ")" { SizeofType.new($2) }
-#             | postfix_expr
-#
-#cast_expr ::= "(" type ")" cast_expr  { Cast.new($1, $3) }
-#            | unary_expr
-#
-#multiplicative_expr
-#    ::= multiplicative_expr "*" cast_expr   { Mul.new($0, $2) }
-#      | multiplicative_expr "/" cast_expr   { Div.new($0, $2) }
-#      | multiplicative_expr "%" cast_expr   { Mod.new($0, $2) }
-#      | cast_expr
-#
-#additive_expr
-#    ::= additive_expr "+" multiplicative_expr   { Add.new($0, $2) }
-#      | additive_expr "-" multiplicative_expr   { Sub.new($0, $2) }
-#      | multiplicative_expr
-#
-#shift_expr
-#    ::= shift_expr "<<" additive_expr   { Shl.new($0, $2) }
-#      | shift_expr ">>" additive_expr   { Shr.new($0, $2) }
-#      | additive_expr
-#
-#relational_expr
-#    ::= relational_expr "<" shift_expr  { Lt.new($0, $2) }
-#      | relational_expr ">" shift_expr  { Gt.new($0, $2) }
-#      | relational_expr "<=" shift_expr { Le.new($0, $2) }
-#      | relational_expr ">=" shift_expr { Ge.new($0, $2) }
-#      | shift_expr
-#
-#equality_expr
-#    ::= equality_expr "==" relational_expr  { Eq.new($0, $2) }
-#      | equality_expr "!=" relational_expr  { Ne.new($0, $2) }
-#      | relational_expr
-#
-#and_expr
-#    ::= and_expr "&" equality_expr  { BAnd.new($0, $2) }
-#      | equality_expr
-#
-#xor_expr
-#    ::= xor_expr "^" and_expr   { BXor.new($0, $2) }
-#      | and_expr
-#
-#or_expr
-#    ::= or_expr "|" xor_expr    { BOr.new($0, $2) }
-#      | xor_expr
-#
-#logical_and_expr
-#    ::= logical_and_expr "&&" or_expr   { LAnd.new($0, $2) }
-#      | or_expr
-#
-#logical_or_expr
-#    ::= logical_or_expr "||" logical_and_expr   { LOr.new($0, $2) }
-#      | logical_and_expr
-#
-#conditional_expr
-#    ::= logical_or_expr "?" expr ":" conditional_expr
-#        { Cond.new($0, $2, $4) }
-#      | logical_or_expr
-#
-#assign_expr
-#    ::= unary_expr "="  assign_expr  { Assign.new($0, $2) }
-#      | unary_expr "+=" assign_expr  { OpAssign.new($0, $2, 'Add) }
-#      | unary_expr "-=" assign_expr  { OpAssign.new($0, $2, 'Sub) }
-#      | unary_expr "*=" assign_expr  { OpAssign.new($0, $2, 'Mul) }
-#      | unary_expr "/=" assign_expr  { OpAssign.new($0, $2, 'Div) }
-#      | unary_expr "%=" assign_expr  { OpAssign.new($0, $2, 'Mod) }
-#      | unary_expr "<<=" assign_expr { OpAssign.new($0, $2, 'Shl) }
-#      | unary_expr ">>=" assign_expr { OpAssign.new($0, $2, 'Shr) }
-#      | unary_expr "&=" assign_expr  { OpAssign.new($0, $2, 'BAnd) }
-#      | unary_expr "^=" assign_expr  { OpAssign.new($0, $2, 'BXor) }
-#      | unary_expr "|=" assign_expr  { OpAssign.new($0, $2, 'BOr) }
-#      | conditional_expr
-#
-#expr ::= expr "," assign_expr    { Comma.new($0, $2) }
-#       | assign_expr
-#
-#constant_expr ::= conditional_expr
-#
-## Types
-#base_type ::= 'void | 'char | 'wchar | 'dchar | 'bool | 'byte |
-#              'ubyte | 'short | 'ushort | 'int | 'uint | 'long |
-#              'ulong | 'float | 'double | 'real
-#            | 'auto
-#            | 'struct identifier   { StructT.new($1) }
-#            | 'union identifier    { UnionT.new($1) }
-#            | 'enum identifier     { EnumT.new($1) }
-#            | identifier
-#
-#primary_type ::= "(" type ")"    { $1 }
-#               | base_type
-#
-#postfix_type ::= postfix_type  "[" constant_expr "]"
-#                 { ArrayT.new($0, $2) }
-#               | postfix_type "*"
-#                 { PointerT.new($0) }
-#               | postfix_type "(" delimited(type, ",") ")"
-#                 { FunctionT.new($0, $2, 0) }
-#               | primary_type
-#
-#type ::= 'const type    { QualifiedT.new($1, QUALIFIER.const) }
-#       | 'volatile type { QualifiedT.new($1, QUALIFIER.volatile) }
-#       | postfix_type
-#
-# # Statements
-#storage ::= 'auto
-#          | 'static
-#          | 'extern
-#          | 'register
-#          |            { 'none }
-#
-#initializer ::= "{" delimited(initializer, ",") "}"
-#                { InitializerList.new($1) }
-#              | assign_expr
-#
-#struct_union_field ::= type identifier ";"  { ($0, $1) }
-#enum_field ::= identifier "=" constant_expr { ($0, $2) }
-#              | identifier                  { ($0, nil) }
-#
-#block_item ::= decl | stmt
-#block ::= <<multiline>> "{" block_item* "}"  { Block.new($1) }
-#
-#decl ::= storage type identifier "=" initializer ";"
-#         { DefVar.new($0, $1, $2, $4) }
-#       | 'typedef type identifier ";"
-#         { DefType.new($1, $2) }
-#       | <<multiline>> storage 'struct identifier "{" struct_union_field* "}"
-#         { DefAggregates.new($0, StructT.new($2), $2, $4) }
-#       | <<multiline>> storage 'union identifier "{" struct_union_field* "}"
-#         { DefAggregates.new($0, Union.new($2), $2, $4) }
-#       | <<multiline>> 'enum identifier "{" delimited(enum_field, ",") "}"
-#         { DefEnum.new($1, $3) }
-#
-#stmt ::= identifier ":" stmt           { Label.new($0, $2) }
-#       | 'case constant_expr ":" stmt  { Case.new($1, $3) }
-#       | 'default ":" stmt             { Case.new('default, $2) }
-#       | "{" block_item* "}"           { Block.new($1) }
-#       | expr ";"                      { $0 }
-#       | 'if "(" expr ")" stmt 'else stmt
-#         { If.new($2, $4, $6) }
-#       | 'if "(" expr ")" stmt
-#         { If.new($2, $4, nil) }
-#       | 'switch "(" expr ")" stmt
-#         { Switch.new($2, $4) }
-#       | 'while "(" expr ")" stmt
-#         { While.new($2, $4) }
-#       | 'do stmt 'while "(" expr ")" ";"
-#         { DoWhile.new($4, $1) }
-#       | 'upto "(" identifier "," expr "," expr ")" stmt
-#         { Upto.new($2, $4, $6, $8) }
-#       | 'downto "(" identifier "," expr "," expr ")" stmt
-#         { Downto.new($2, $4, $6, $8) }
-#       | 'goto identifier ";"
-#         { Goto.new($1) }
-#       | 'continue ";"
-#         { 'Continue{} }
-#       | 'break ";"
-#         { 'Break{} }
-#       | 'return expr? ";"
-#         { Return.new($1) }
-#
-#parameter ::= type identifier  { ($0, $1) }
-#
-#function_decl
-#    ::= storage type identifier "(" delimited(parameter, ",") ")" block
-#        { DefFunc.new($0, $1, $2, $4, $6) }
-#
-#toplevel_stmt ::= function_decl|decl
+           | "false" { BoolL.new(false) }
+           | float   { FloatL.new($0) }
+           | integer { IntL.new($0) }
+           | "'" nospace(.) nospace("'")  { CharL.new($input) }
+
+primary_expr ::= identifier      { Var.new($0) }
+               | constant
+               | string          { StringL.new($0) }
+               | "(" expr ")"    { $1 }
+
+postfix_expr ::= postfix_expr "[" expr "]"
+                 { Subscript.new($0, $2) }
+               | postfix_expr "(" delimited(assign_expr, ",") ")"
+                 { Call.new($0, $2) }
+               | postfix_expr "." identifier
+                 { Select.new($0, $2) }
+               | postfix_expr "->" identifier
+                 { Select.new(Deref.new($0), $2) }
+               | postfix_expr "++"
+                 { PostInc.new($0) }
+               | postfix_expr "--"
+                 { PostDec.new($0) }
+               | primary_expr
+
+unary_expr ::= "++" unary_expr      { PreInc.new($1) }
+             | "--" unary_expr      { PreDec.new($1) }
+             | "&"  cast_expr       { Addr.new($1) }
+             | "*"  cast_expr       { Deref.new($1) }
+             | "+"  cast_expr       { Uplus.new($1) }
+             | "-"  cast_expr       { Uminus.new($1) }
+             | 'sizeof unary_expr   { Sizeof.new($1) }
+             | 'sizeof "(" type ")" { SizeofType.new($2) }
+             | postfix_expr
+
+cast_expr ::= "(" type ")" cast_expr  { Cast.new($1, $3) }
+            | unary_expr
+
+multiplicative_expr
+    ::= multiplicative_expr "*" cast_expr   { Mul.new($0, $2) }
+      | multiplicative_expr "/" cast_expr   { Div.new($0, $2) }
+      | multiplicative_expr "%" cast_expr   { Mod.new($0, $2) }
+      | cast_expr
+
+additive_expr
+    ::= additive_expr "+" multiplicative_expr   { Add.new($0, $2) }
+      | additive_expr "-" multiplicative_expr   { Sub.new($0, $2) }
+      | multiplicative_expr
+
+shift_expr
+    ::= shift_expr "<<" additive_expr   { Shl.new($0, $2) }
+      | shift_expr ">>" additive_expr   { Shr.new($0, $2) }
+      | additive_expr
+
+relational_expr
+    ::= relational_expr "<" shift_expr  { Lt.new($0, $2) }
+      | relational_expr ">" shift_expr  { Gt.new($0, $2) }
+      | relational_expr "<=" shift_expr { Le.new($0, $2) }
+      | relational_expr ">=" shift_expr { Ge.new($0, $2) }
+      | shift_expr
+
+equality_expr
+    ::= equality_expr "==" relational_expr  { Eq.new($0, $2) }
+      | equality_expr "!=" relational_expr  { Ne.new($0, $2) }
+      | relational_expr
+
+and_expr
+    ::= and_expr "&" equality_expr  { BAnd.new($0, $2) }
+      | equality_expr
+
+xor_expr
+    ::= xor_expr "^" and_expr   { BXor.new($0, $2) }
+      | and_expr
+
+or_expr
+    ::= or_expr "|" xor_expr    { BOr.new($0, $2) }
+      | xor_expr
+
+logical_and_expr
+    ::= logical_and_expr "&&" or_expr   { LAnd.new($0, $2) }
+      | or_expr
+
+logical_or_expr
+    ::= logical_or_expr "||" logical_and_expr   { LOr.new($0, $2) }
+      | logical_and_expr
+
+conditional_expr
+    ::= logical_or_expr "?" expr ":" conditional_expr
+        { Cond.new($0, $2, $4) }
+      | logical_or_expr
+
+assign_expr
+    ::= unary_expr "="  assign_expr  { Assign.new($0, $2) }
+      | unary_expr "+=" assign_expr  { OpAssign.new($0, $2, 'Add) }
+      | unary_expr "-=" assign_expr  { OpAssign.new($0, $2, 'Sub) }
+      | unary_expr "*=" assign_expr  { OpAssign.new($0, $2, 'Mul) }
+      | unary_expr "/=" assign_expr  { OpAssign.new($0, $2, 'Div) }
+      | unary_expr "%=" assign_expr  { OpAssign.new($0, $2, 'Mod) }
+      | unary_expr "<<=" assign_expr { OpAssign.new($0, $2, 'Shl) }
+      | unary_expr ">>=" assign_expr { OpAssign.new($0, $2, 'Shr) }
+      | unary_expr "&=" assign_expr  { OpAssign.new($0, $2, 'BAnd) }
+      | unary_expr "^=" assign_expr  { OpAssign.new($0, $2, 'BXor) }
+      | unary_expr "|=" assign_expr  { OpAssign.new($0, $2, 'BOr) }
+      | conditional_expr
+
+expr ::= expr "," assign_expr    { Comma.new($0, $2) }
+       | assign_expr
+
+constant_expr ::= conditional_expr
+
+# Types
+base_type ::= 'void | 'char | 'wchar | 'dchar | 'bool | 'byte |
+              'ubyte | 'short | 'ushort | 'int | 'uint | 'long |
+              'ulong | 'float | 'double | 'real
+            | 'auto
+            | 'struct identifier   { StructT.new($1) }
+            | 'union identifier    { UnionT.new($1) }
+            | 'enum identifier     { EnumT.new($1) }
+            | identifier
+
+primary_type ::= "(" type ")"    { $1 }
+               | base_type
+
+postfix_type ::= postfix_type  "[" constant_expr "]"
+                 { ArrayT.new($0, $2) }
+               | postfix_type "*"
+                 { PointerT.new($0) }
+               | postfix_type "(" delimited(type, ",") ")"
+                 { FunctionT.new($0, $2, 0) }
+               | primary_type
+
+type ::= 'const type    { QualifiedT.new($1, QUALIFIER.const) }
+       | 'volatile type { QualifiedT.new($1, QUALIFIER.volatile) }
+       | postfix_type
+
+ # Statements
+storage ::= 'auto
+          | 'static
+          | 'extern
+          | 'register
+          |            { 'none }
+
+initializer ::= "{" delimited(initializer, ",") "}"
+                { InitializerList.new($1) }
+              | assign_expr
+
+struct_union_field ::= type identifier ";"  { ($0, $1) }
+enum_field ::= identifier "=" constant_expr { ($0, $2) }
+              | identifier                  { ($0, nil) }
+
+block_item ::= decl | stmt
+block ::= <<multiline>> "{" block_item* "}"  { Block.new($1) }
+
+decl ::= storage type identifier "=" initializer ";"
+         { DefVar.new($0, $1, $2, $4) }
+       | 'typedef type identifier ";"
+         { DefType.new($1, $2) }
+       | <<multiline>> storage 'struct identifier "{" struct_union_field* "}" ";"
+         { DefAggregates.new($0, StructT.new($2), $2, $4) }
+       | <<multiline>> storage 'union identifier "{" struct_union_field* "}" ";"
+         { DefAggregates.new($0, Union.new($2), $2, $4) }
+       | <<multiline>> 'enum identifier "{" delimited(enum_field, ",") "}" ";"
+         { DefEnum.new($1, $3) }
+
+stmt ::= identifier ":" stmt           { Label.new($0, $2) }
+       | 'case constant_expr ":" stmt  { Case.new($1, $3) }
+       | 'default ":" stmt             { Case.new('default, $2) }
+       | "{" block_item* "}"           { Block.new($1) }
+       | expr ";"                      { $0 }
+       | 'if "(" expr ")" stmt 'else stmt
+         { If.new($2, $4, $6) }
+       | 'if "(" expr ")" stmt
+         { If.new($2, $4, nil) }
+       | 'switch "(" expr ")" stmt
+         { Switch.new($2, $4) }
+       | 'while "(" expr ")" stmt
+         { While.new($2, $4) }
+       | 'do stmt 'while "(" expr ")" ";"
+         { DoWhile.new($4, $1) }
+       | 'upto "(" identifier "," expr "," expr ")" stmt
+         { Upto.new($2, $4, $6, $8) }
+       | 'downto "(" identifier "," expr "," expr ")" stmt
+         { Downto.new($2, $4, $6, $8) }
+       | 'goto identifier ";"
+         { Goto.new($1) }
+       | 'continue ";"
+         { 'Continue{} }
+       | 'break ";"
+         { 'Break{} }
+       | 'return expr? ";"
+         { Return.new($1) }
+
+parameter ::= type identifier  { ($0, $1) }
+
+function_decl
+    ::= storage type identifier "(" delimited(parameter, ",") ")" block
+        { DefFunc.new($0, $1, $2, $4, $6) }
+
+toplevel_stmt ::= function_decl|decl
+
+program ::= toplevel_stmt*   { `CASTProgram{!$0} }
+
+default := program

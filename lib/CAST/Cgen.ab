@@ -1,129 +1,130 @@
 # Copyright (C) 2014 nineties
-# $Id: CAST/Cgen.ab 2014-03-26 23:42:23 nineties $
+# $Id: CAST/Cgen.ab 2014-04-18 09:04:00 nineties $
 
-import PrettyPrint as PP
+import pretty_printer as P
 
 #= CAST to C converter =
 # Functions prefixed by `pp_` convert CAST trees to inputs of
 # `PrettyPrint.pretty`.
 
-INDENT_WIDTH: 4
+INDENT_WIDTH := 4
 
 #== Expressions ==
-pp_primary(e):  ["(", pp_expr(e), ")"]
-pp_primary(BoolL{true}):  "TRUE"
-pp_primary(BoolL{false}): "FALSE"
-pp_primary(IntL{n}):      n.to_s()
-pp_primary(FloatL{f}):    f.to_s()
-pp_primary(CharL{s}):     "'" + s + "'"   # FIXME: consider escape sequence
-pp_primary(StringL{s}):   "\"" + s + "\"" # FIXME: consider escape sequence
-pp_primary(Var{s}):       s.to_s()
+pp_primary(e) :=  ["(", pp_expr(e), ")"]
+pp_primary(BoolL{true})  := "TRUE"
+pp_primary(BoolL{false}) := "FALSE"
+pp_primary(IntL{n})      := n.to_s()
+pp_primary(FloatL{f})    := f.to_s()
+pp_primary(CharL{s})     := "'" + s.escape() + "'"
+pp_primary(StringL{s})   := "\"" + s.escape() + "\""
+pp_primary(Var{s})       := s.to_s()
 
-pp_postfix: pp_primary
-pp_postfix(Subscript{e,i}): [pp_postfix(e), "[", pp_expr(i), "]"]
-pp_postfix(Call{f, args}): [pp_postfix(f), pp_arglist(args)]
-pp_postfix(Select{f, id}): [pp_postfix(f), ".", id.to_s()]
-pp_postfix(Select{Deref{p}, id}): [pp_postfix(p), "->", id.to_s()]
-pp_postfix(PostInc{e}): [pp_postfix(e), "++"]
-pp_postfix(PostDec{e}): [pp_postfix(e), "--"]
+pp_postfix := pp_primary
+pp_postfix(Subscript{e,i})       := [pp_postfix(e), "[", pp_expr(i), "]"]
+pp_postfix(Call{f, args})        := [pp_postfix(f), pp_arglist(args)]
+pp_postfix(Select{f, id})        := [pp_postfix(f), ".", id.to_s()]
+pp_postfix(Select{Deref{p}, id}) := [pp_postfix(p), "->", id.to_s()]
+pp_postfix(PostInc{e})           := [pp_postfix(e), "++"]
+pp_postfix(PostDec{e})           := [pp_postfix(e), "--"]
 
-pp_unary: pp_postfix
-pp_unary(PreInc{e}):    ["++", pp_unary(e)]
-pp_unary(PreDec{e}):    ["--", pp_unary(e)]
-pp_unary(Addr{e}):      ["&", pp_cast(e)]
-pp_unary(Deref{e}):     ["*", pp_cast(e)]
-pp_unary(Uplus{e}):     ["+", pp_cast(e)]
-pp_unary(Uminus{e}):    ["-", pp_cast(e)]
-pp_unary(Sizeof{e}):    ["sizeof", pp_unary(e)]
-pp_unary(SizeofType{t}):["sizeof", "(", pp_type(t), ")"]
+pp_unary := pp_postfix
+pp_unary(PreInc{e})     := ["++", pp_unary(e)]
+pp_unary(PreDec{e})     := ["--", pp_unary(e)]
+pp_unary(Addr{e})       := ["&", pp_cast(e)]
+pp_unary(Deref{e})      := ["*", pp_cast(e)]
+pp_unary(Uplus{e})      := ["+", pp_cast(e)]
+pp_unary(Uminus{e})     := ["-", pp_cast(e)]
+pp_unary(Sizeof{e})     := ["sizeof", pp_unary(e)]
+pp_unary(SizeofType{t}) := ["sizeof", "(", pp_type(t), ")"]
 
-pp_cast: pp_unary
-pp_cast(Case{t, e}):    ["(", pp_type(t), ")", pp_cast(e)]
+pp_cast := pp_unary
+pp_cast(Case{t, e}) := ["(", pp_type(t), ")", pp_cast(e)]
 
-pp_multiplicative: pp_cast
-pp_multiplicative(Mul{a, b}): [pp_multiplicative(a), "*", pp_cast(b)]
-pp_multiplicative(Div{a, b}): [pp_multiplicative(a), "/", pp_cast(b)]
-pp_multiplicative(Mod{a, b}): [pp_multiplicative(a), "%", pp_cast(b)]
+pp_multiplicative := pp_cast
+pp_multiplicative(Mul{a, b}) := [pp_multiplicative(a), "*", pp_cast(b)]
+pp_multiplicative(Div{a, b}) := [pp_multiplicative(a), "/", pp_cast(b)]
+pp_multiplicative(Mod{a, b}) := [pp_multiplicative(a), "%", pp_cast(b)]
 
-pp_additive: pp_multiplicative
-pp_additive(Add{a, b}): [pp_additive(a), "+", pp_cast(b)]
-pp_additive(Sub{a, b}): [pp_additive(a), "-", pp_cast(b)]
+pp_additive := pp_multiplicative
+pp_additive(Add{a, b}) := [pp_additive(a), "+", pp_cast(b)]
+pp_additive(Sub{a, b}) := [pp_additive(a), "-", pp_cast(b)]
 
-pp_shift: pp_additive
-pp_shift(Shl{a, b}):    [pp_shift(a), "<<", pp_additive(b)]
-pp_shift(Shr{a, b}):    [pp_shift(a), ">>", pp_additive(b)]
+pp_shift := pp_additive
+pp_shift(Shl{a, b}) := [pp_shift(a), "<<", pp_additive(b)]
+pp_shift(Shr{a, b}) := [pp_shift(a), ">>", pp_additive(b)]
 
-pp_relational: pp_shift
-pp_relational(Lt{a, b}): [pp_relational(a), "<", pp_shift(b)]
-pp_relational(Gt{a, b}): [pp_relational(a), ">", pp_shift(b)]
-pp_relational(Le{a, b}): [pp_relational(a), "<=", pp_shift(b)]
-pp_relational(Ge{a, b}): [pp_relational(a), ">=", pp_shift(b)]
+pp_relational := pp_shift
+pp_relational(Lt{a, b}) := [pp_relational(a), "<", pp_shift(b)]
+pp_relational(Gt{a, b}) := [pp_relational(a), ">", pp_shift(b)]
+pp_relational(Le{a, b}) := [pp_relational(a), "<=", pp_shift(b)]
+pp_relational(Ge{a, b}) := [pp_relational(a), ">=", pp_shift(b)]
 
-pp_equality: pp_relational
-pp_equality(Eq{a, b}): [pp_equality(a), "==", pp_relational(b)]
-pp_equality(Ne{a, b}): [pp_equality(a), "!=", pp_relational(b)]
+pp_equality := pp_relational
+pp_equality(Eq{a, b}) := [pp_equality(a), "==", pp_relational(b)]
+pp_equality(Ne{a, b}) := [pp_equality(a), "!=", pp_relational(b)]
 
-pp_and: pp_equality
-pp_and(BAnd{a, b}): [pp_and(a), "&", pp_equality(b)]
+pp_and := pp_equality
+pp_and(BAnd{a, b}) := [pp_and(a), "&", pp_equality(b)]
 
-pp_xor: pp_and
-pp_xor(BXor{a, b}): [pp_xor(a), "^", pp_and(b)]
+pp_xor := pp_and
+pp_xor(BXor{a, b}) := [pp_xor(a), "^", pp_and(b)]
 
-pp_or: pp_xor
-pp_or(BOr{a, b}):   [pp_or(a), "|", pp_xor(b)]
+pp_or := pp_xor
+pp_or(BOr{a, b}) :=   [pp_or(a), "|", pp_xor(b)]
 
-pp_logical_and: pp_or
-pp_logical_and(LAnd{a, b}): [pp_logical_and(a), "&&", pp_or(b)]
+pp_logical_and := pp_or
+pp_logical_and(LAnd{a, b}) := [pp_logical_and(a), "&&", pp_or(b)]
 
-pp_logical_or: pp_logical_and
-pp_logical_or(LOr{a, b}):   [pp_logical_or(a), "||", pp_logical_and(b)]
+pp_logical_or := pp_logical_and
+pp_logical_or(LOr{a, b}) :=   [pp_logical_or(a), "||", pp_logical_and(b)]
 
-pp_conditional: pp_logical_or
+pp_conditional := pp_logical_or
 pp_conditional(Cond{cond,a,b}):
     [pp_logical_or(cond), "?", pp_expr(a), ":", pp_conditional(b)]
 
-pp_assign: pp_conditional
-pp_assign(Assign{a, b}): [pp_unary(a), "=", pp_assign(b)]
-pp_assign(OpAssign{a, b, 'Add}):  [pp_unary(a), "+=", pp_assign(b)]
-pp_assign(OpAssign{a, b, 'Sub}):  [pp_unary(a), "-=", pp_assign(b)]
-pp_assign(OpAssign{a, b, 'Mul}):  [pp_unary(a), "*=", pp_assign(b)]
-pp_assign(OpAssign{a, b, 'Div}):  [pp_unary(a), "/=", pp_assign(b)]
-pp_assign(OpAssign{a, b, 'Mod}):  [pp_unary(a), "%=", pp_assign(b)]
-pp_assign(OpAssign{a, b, 'Shl}):  [pp_unary(a), "<<=", pp_assign(b)]
-pp_assign(OpAssign{a, b, 'Shr}):  [pp_unary(a), ">>=", pp_assign(b)]
-pp_assign(OpAssign{a, b, 'BAnd}): [pp_unary(a), "&=", pp_assign(b)]
-pp_assign(OpAssign{a, b, 'BXor}): [pp_unary(a), "^=", pp_assign(b)]
-pp_assign(OpAssign{a, b, 'BOr}):  [pp_unary(a), "|=", pp_assign(b)]
+pp_assign := pp_conditional
+pp_assign(Assign{a, b}) := [pp_unary(a), "=", pp_assign(b)]
+pp_assign(OpAssign{a, b, 'Add})  := [pp_unary(a), "+=", pp_assign(b)]
+pp_assign(OpAssign{a, b, 'Sub})  := [pp_unary(a), "-=", pp_assign(b)]
+pp_assign(OpAssign{a, b, 'Mul})  := [pp_unary(a), "*=", pp_assign(b)]
+pp_assign(OpAssign{a, b, 'Div})  := [pp_unary(a), "/=", pp_assign(b)]
+pp_assign(OpAssign{a, b, 'Mod})  := [pp_unary(a), "%=", pp_assign(b)]
+pp_assign(OpAssign{a, b, 'Shl})  := [pp_unary(a), "<<=", pp_assign(b)]
+pp_assign(OpAssign{a, b, 'Shr})  := [pp_unary(a), ">>=", pp_assign(b)]
+pp_assign(OpAssign{a, b, 'BAnd}) := [pp_unary(a), "&=", pp_assign(b)]
+pp_assign(OpAssign{a, b, 'BXor}) := [pp_unary(a), "^=", pp_assign(b)]
+pp_assign(OpAssign{a, b, 'BOr})  := [pp_unary(a), "|=", pp_assign(b)]
 
-pp_expr: pp_assign
-pp_expr(Comma{a, b}): [pp_expr(a), ",", pp_assign(b)]
+pp_expr := pp_assign
+pp_expr(Comma{a, b}) := [pp_expr(a), ",", pp_assign(b)]
 
-pp_constant: pp_conditional
+pp_constant := pp_conditional
 
-pp_arglist(args): ["(", args.map(pp_assign).intersperse(","), ")"]
+pp_arglist(args) := ["(", args.map(pp_assign).weave(","), ")"]
 
 #== Types ==
 
-pp_primary_type(t): ["(", pp_type(t), ")"]
-pp_primary_type(EnumT{name}):   "enum " + name
-pp_primary_type(UnionT{name}):  "union " + name
-pp_primary_type(StructT{name}): "struct " + name
-pp_primary_type(t @ Symbol): t.to_s()
+pp_primary_type(t) := ["(", pp_type(t), ")"]
+pp_primary_type(EnumT{name})   := "enum " + name
+pp_primary_type(UnionT{name})  := "union " + name
+pp_primary_type(StructT{name}) := "struct " + name
+pp_primary_type(t @ Symbol)    := t.to_s()
 
-pp_postfix_type: pp_primary_type
-pp_postfix_type(ArrayT{t,n}): [pp_postfix_type(t), "[", pp_constant(n), "]"]
-pp_postfix_type(PointerT{t}): [pp_postfix_type(t), "*"]
+pp_postfix_type := pp_primary_type
+pp_postfix_type(ArrayT{t,n})
+    := [pp_postfix_type(t), "[", pp_constant(n), "]"]
+pp_postfix_type(PointerT{t}) := [pp_postfix_type(t), "*"]
 pp_postfix_type(FunctionT{ret, params, _}):
     [pp_postfix_type(ret), pp_paramlist(params)]
 
-pp_type: pp_postfix_type
-pp_type(QualifiedT{t, qual}): [type_qual_string(qual), pp_type(t)]
+pp_type := pp_postfix_type
+pp_type(QualifiedT{t, qual}) := [type_qual_string(qual), pp_type(t)]
 
 pp_paramlist(params):
-    ["(", params.map(pp_type).intersperse(","), ")"]
+    ["(", params.map(pp_type).weave(","), ")"]
 
-type_qual_string(qual): {
-    str: ""
+type_qual_string(qual) := {
+    str := ""
     if qual <land> QUALIFIER.const
         str += "const "
     if qual <land> QUALIFIER.volatile
@@ -132,12 +133,12 @@ type_qual_string(qual): {
 }
 
 #== Statements ==
-pp_stmt(e): [pp_expr(e), ";"]
-pp_stmt(Label{l, s}): [l.to_s(), ":", PP.nl_or_space, pp_stmt(s)]
-pp_stmt(Case{l, s}): ["case ", l.to_s(), ":", PP.nl_or_space, pp_stmt(s)]
-pp_stmt(Block{stmts}): ["{",
-    PP.nest(INDENT_WIDTH, stmts.map(s -> [PP.nl_or_null, pp_stmt(s)])),
-    PP.nl_or_null, "}"]
+pp_stmt(e) := [pp_expr(e), ";"]
+pp_stmt(Label{l, s}) := [l.to_s(), ":", P::nl_or_space, pp_stmt(s)]
+pp_stmt(Case{l, s}) := ["case ", l.to_s(), ":", P::nl_or_space, pp_stmt(s)]
+pp_stmt(Block{stmts}) := ["{",
+    P::nest(INDENT_WIDTH, stmts.map(s -> [P::nl_or_null, pp_stmt(s)])),
+    P::nl_or_null, "}"]
 pp_stmt(If{cond, ifthen, ifelse}):
     ["if (", pp_expr(cond), ")", pp_stmt(ifthen), "else", pp_stmt(ifelse)]
 pp_stmt(If{cond, ifthen, nil}):
@@ -148,40 +149,40 @@ pp_stmt(While{e, body}):
     ["while (", pp_expr(e), ")", pp_stmt(body)]
 pp_stmt(DoWhile{e, body}):
     ["do", pp_stmt(body), "while (", pp_expr(e), ")"]
-pp_stmt(Upto{i, low, high, body}): {
+pp_stmt(Upto{i, low, high, body}) := {
     i = i.to_s()
     ["for (int ", i, "=", pp_assign(low), ";", i, "<", pp_shift(high), ";", i, "++)", pp_stmt(body)]
 }
-pp_stmt(Downto{i, low, high, body}): {
+pp_stmt(Downto{i, low, high, body}) := {
     i = i.to_s()
     ["for (int ", i, "=", pp_additive(high), "-1", ";", i, ">=", pp_shift(low), ";", i, "--)", pp_stmt(body)]
 }
-pp_stmt(Goto{l}): ["goto ", l.to_s(), ";"]
-pp_stmt(Continue{}): "continue;"
-pp_stmt(Break{}): "break;"
-pp_stmt(Return{e}): ["return ", pp_expr(e), ";"]
-pp_stmt(Return{nil}): "return;"
+pp_stmt(Goto{l})     := ["goto ", l.to_s(), ";"]
+pp_stmt(Continue{})  := "continue;"
+pp_stmt(Break{})     := "break;"
+pp_stmt(Return{e})   := ["return ", pp_expr(e), ";"]
+pp_stmt(Return{nil}) := "return;"
 
-pp_storage(s): s.to_s() + " "
-pp_storage('none): ""
+pp_storage(s)     := s.to_s() + " "
+pp_storage('none) := ""
 
-pp_fundecl(DefFunc{storage, type, name, params, body}):
-    [pp_storage(storage), pp_type(type), PP.nl_or_space, name.to_s(), "(",
-    params.map(((t,n)) -> [pp_type(t), " ", n.to_s()]).intersperse(","),
-    ")", pp_stmt(body)]
+pp_fundecl(DefFunc{storage, type, name, params, body})
+    := [pp_storage(storage), pp_type(type), P::nl(" "), name.to_s(),
+        "(", params.map(((t,n)) -> [pp_type(t), " ", n.to_s()]).weave(","),
+        ")", pp_stmt(body)]
 
-generate_line(output, stmt): {
-    PrettyPrint.pretty(output, pp_fundecl(stmt))
+generate_line(output, stmt) := {
+    P::pretty(output, pp_fundecl(stmt))
     output.print("\n\n")
 }
 
-generate_line(output, Located{loc, stmt}): {
+generate_line(output, Located{loc, stmt}) := {
     output.printf("# %d \"%s\"\n", prim.loc_line(loc), prim.loc_file(loc))
     generate_line(output, stmt)
 }
 
-generate(file, "C", lines): {
-    output: File.open_out(file)
+generate(file, "C", lines) := {
+    output := io.open_out(file)
     for line in lines {
         generate_line(output, line)
     }
