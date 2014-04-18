@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-packrat.rlc 2014-04-18 08:15:57 nineties $
+; $Id: rowl1-packrat.rlc 2014-04-18 09:51:59 nineties $
 ;
 
 (import "rlvm-compile")
@@ -2177,7 +2177,12 @@
     (if (== (node_head lhs) Symbol)
         (= lhs (make_node2 Var Syntax lhs))
         )
-    (return (make_node3 Define lhs (lambda_nocheck (make_node2 When (list1 (make_node2 Domain PVar Parser)) parser) @C_TRUE) (to_sym "union")))
+
+    (var lam (lambda_nocheck (make_node2 When (list1 (make_node2 Domain PVar Parser)) parser) @C_TRUE))
+    (set_slot lam (to_sym "_original_")
+        (lambda (make_node2 When (list1 (make_node2 Domain PVar Parser))
+            (to_sym "__hidden__")) @C_TRUE))
+    (return (make_node3 Define lhs lam (to_sym "union")))
     ))
 
 (export fun enable_shell_syntax () (

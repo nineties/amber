@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: CAST/syntax.ab 2014-04-18 08:58:10 nineties $
+# $Id: CAST/syntax.ab 2014-04-18 09:22:54 nineties $
 
 import pretty_print as P
 import numeric::bit as B
@@ -353,6 +353,9 @@ postfix_type ::= postfix_type  "[" constant_expr "]"
 
 type ::= 'const type    { QualifiedT.new($1, QUALIFIER.const) }
        | 'volatile type { QualifiedT.new($1, QUALIFIER.volatile) }
+       | 'struct identifier { StructT.new($1) }
+       | 'union identifier  { UnionT.new($1) }
+       | 'enum identifier   { EnumT.new($1) }
        | postfix_type
 
  # Statements
@@ -375,13 +378,15 @@ block ::= <<multiline>> "{" block_item* "}"  { Block.new($1) }
 
 decl ::= storage type identifier "=" initializer ";"
          { DefVar.new($0, $1, $2, $4) }
+       | storage type identifier";"
+         { DefVar.new($0, $1, $2, nil) }
        | 'typedef type identifier ";"
          { DefType.new($1, $2) }
-       | <<multiline>> storage 'struct identifier "{" struct_union_field* "}" ";"
+       | <<multiline>> storage 'struct identifier "{" struct_union_field* "}"
          { DefAggregates.new($0, StructT.new($2), $2, $4) }
-       | <<multiline>> storage 'union identifier "{" struct_union_field* "}" ";"
+       | <<multiline>> storage 'union identifier "{" struct_union_field* "}"
          { DefAggregates.new($0, Union.new($2), $2, $4) }
-       | <<multiline>> 'enum identifier "{" delimited(enum_field, ",") "}" ";"
+       | <<multiline>> 'enum identifier "{" delimited(enum_field, ",") "}"
          { DefEnum.new($1, $3) }
 
 stmt ::= identifier ":" stmt           { Label.new($0, $2) }
