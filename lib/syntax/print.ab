@@ -231,13 +231,22 @@ smtt(Define{f, Lambda{args, body}})
 stmt(Assign{x, e}) := [pattern(x), " = ", expr(e)]
 stmt(Assign{f, Lambda{args, body}})
     := [pattern(f), lambda_arg(args), " = ", stmt(body)]
-stmt(Import{mods, name, option})
-    := ["import ", mods.map(str).weave("::"),
-        (name == nil)          ? [] : [" as ", str(name)],
-        (option == nil)        ? [] :
-        (option == 'All)       ? " (*)" :
-        (option.head == 'List) ? [" (", option.map(str).weave(","), ")"] :
-        ["hiding", "(", option[0].map(str).weave(","), ")"]]
+stmt(s @ Import{mods, name, option}) := {
+    doc := ["import ", mods.map(str).weave("::")]
+    case name of
+        Some{name} -> { doc ++= [" as ", str(name)] }
+      | nil        -> nil
+      | _          -> { return fullform(s) }
+    case option of
+        Some{All}
+            -> { doc ++= [" (*)"] }
+      | Some{Hiding{vars}}
+            -> { doc ++= [" hiding (", vars.map(str).weave(", "), ")"] }
+      | Some{vars @ List}
+            -> { doc ++= [" (", vars.map(str).weave(", "), ")"] }
+      | _   -> { return fullform(s) }
+    doc
+}
 
 # Convert `obj` to prettified string.
 pretty(obj, indent=0, compress=false) := {
