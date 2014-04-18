@@ -1,6 +1,8 @@
 # Copyright (C) 2014 nineties
 # $Id := Numeric/Random.ab 2014-03-04 23:11:25 nineties $
 
+import math
+
 # Initialize random seed.
 srand() := prim.srand()
 
@@ -15,3 +17,24 @@ rand(v @ Float) := prim.rand_float(v)
 
 # Return random integer in range [0,n).
 rand(n @ Int) := prim.rand_int(n)
+
+# Return random integer in range [a,b)
+rand(a @ Int, b @ Int) := a + rand(b-a)
+
+# Choice one element from `seq` randomlly.
+choice(seq) := seq[rand(seq.length)]
+
+# Sampling from uniform distribution over range [a, b)
+uniform(a, b) := a + rand() * (b-a)
+uniform()     := rand()
+
+# Sampling from standard normal distribution N(0, 1)
+# by Box-Muller's method.
+normal() := {
+    x := rand()
+    y := rand()
+    math::sqrt(-2*math::log(x))*math::cos(2*math::pi*y)
+}
+
+# Sampling from normal distribution N(mu, sigma^2)
+normal(mu, sigma) := mu + sigma * normal()
