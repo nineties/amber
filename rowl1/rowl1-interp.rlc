@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-04-18 08:24:46 nineties $
+; $Id: rowl1-interp.rlc 2014-04-19 17:27:03 nineties $
 ;
 
 (import "rlvm-compile")
@@ -99,7 +99,7 @@
 
     ; Collection of primitive functions
     (var prim (make_node0 VarTable))
-    (set_slot prim (to_sym "__owner__") global)
+    (set_slot prim (to_sym "_owner_") global)
     (set_var global Prim prim)
 
     ; Setup built-in objects and functions.
@@ -372,7 +372,13 @@
         )
     (set_slot mod Parent parent)
     (set_slot mod Variables vtbl)
-    (set_slot vtbl (to_sym "__owner__") mod)
+    (set_slot vtbl (to_sym "_owner_") mod)
+
+    ; This module is visible inside the module itself and the parent.
+    (set_var mod sym mod)
+    (if (!= parent @C_NIL)
+        (set_var parent sym mod)
+        )
     (return mod)
     ))
 
@@ -380,29 +386,26 @@
     (if (!= (symtable_depth variables) 0)
         (throw (logic_error (string "enter_module() can be called only in top-scope"))))
     (var mod @C_NIL)
-    (var parent @C_NIL)
-    (var tbl (get_slot global Variables))
+    (var parent global)
     (while @TRUE (do
+        (var tbl (get_slot parent Variables))
         (= mod (get_slot_norec_nocheck tbl sym))
-        (if (== (node_head mod) Module) (do
-            (= parent (get_slot tbl (to_sym "__owner__")))
+        (if (== (node_head mod) Module)
             break
-            ))
-        (= tbl (get_parent tbl))
-        (if (== tbl @C_UNDEF) (do
+            )
+        (= parent (get_parent parent))
+        (if (!= (node_head parent) Module) (do
             (= parent amber)
             break
             ))
-        (= parent (get_parent parent))
         ))
     (if (&& (== rec @C_FALSE) (!= parent global)) (do
         (= mod @C_NIL)
         (= parent global)
         ))
-    (if (|| (== mod @C_NIL) (!= (node_head mod) Module)) (do
+    (if (|| (== mod @C_NIL) (!= (node_head mod) Module))
         (= mod (create_module parent sym))
-        (set_var parent sym mod)
-        ))
+        )
     (= module_stack (cons global module_stack))
     (= global mod)
     (return mod)

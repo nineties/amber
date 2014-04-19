@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-object.rlc 2014-04-17 03:09:44 nineties $
+; $Id: rowl1-object.rlc 2014-04-19 16:45:35 nineties $
 ;
 
 (import "rlvm-compile")
@@ -66,6 +66,55 @@
     (if (|| (!= rec @C_FALSE) (== obj @C_NIL)) (return @C_NIL))
     (= obj (get_parent obj))
     (if (!= obj @C_UNDEF) (goto loop))
+    (return @C_NIL)
+    ))
+
+(fun remove_slots (obj rec) (
+    (var ent_ (wrtable_entries slots))
+    (var list 0)
+    (label loop)
+    (var ent ent_)
+    (while ent (do
+        (var sym (field_get ent 2))
+        (if (!= sym Parent) (do
+            (var tbl (field_get ent 3))
+            (wrtable_del tbl obj)
+            ))
+        (= ent (field_get ent 1))
+        ))
+    (if (== obj @C_NIL) (return @C_NIL))
+    (var p (get_parent obj))
+    (if (&& (!= rec @C_FALSE) (!= p @C_UNDEF)) (do
+        (= obj p)
+        (goto loop)
+        ))
+    (return @C_NIL)
+    ))
+
+(fun copy_slots (dst src rec) (
+    (var ent_ (wrtable_entries slots))
+    (var dupcheck (table_new))
+    (label loop)
+    (var ent ent_)
+    (while ent (do
+        (var sym (field_get ent 2))
+        (if (&& (!= sym Parent) (!= (table_at dupcheck sym) @C_TRUE)) (do
+            (var tbl (field_get ent 3))
+            (var v (wrtable_find tbl src))
+            (if (!= v @C_UNDEF) (do
+                (set_slot dst sym v)
+                (table_store dupcheck sym @C_TRUE)
+                ))
+            ))
+        (= ent (field_get ent 1))
+        ))
+    (if (== src @C_NIL) (return @C_NIL))
+    (var p (get_parent src))
+    (if (!= p @C_UNDEF) (set_slot dst Parent p))
+    (if (&& (!= rec @C_FALSE) (!= p @C_UNDEF)) (do
+        (= src p)
+        (goto loop)
+        ))
     (return @C_NIL)
     ))
 
@@ -204,6 +253,34 @@
     (return @C_NIL)
     ))
 
+(fun slot_list (obj rec) (
+    (var ent_ (wrtable_entries slots))
+    (var dupcheck (table_new))
+    (var list 0)
+    (label loop)
+    (var ent ent_)
+    (while ent (do
+        (var sym (field_get ent 2))
+        (if (&& (!= sym Parent) (!= (table_at dupcheck sym) @C_TRUE)) (do
+            (var tbl (field_get ent 3))
+            (var v (wrtable_find tbl obj))
+            (if (!= v @C_UNDEF) (do
+                (= list (cons (tuple2 sym v) list))
+                (table_store dupcheck sym @C_TRUE)
+                ))
+            ))
+        (= ent (field_get ent 1))
+        ))
+    (if (== obj @C_NIL) (return @C_NIL))
+    (var p (get_parent obj))
+    (if (!= p @C_UNDEF) (= list (cons (tuple2 Parent p) list)))
+    (if (&& (!= rec @C_FALSE) (!= p @C_UNDEF)) (do
+        (= obj p)
+        (goto loop)
+        ))
+    (return (list_reverse list))
+    ))
+
 (fun alias_rw (reader writer) (
     (if (&& (!= reader @C_NIL) (! (is_function reader))) (do
         (throw (invalid_argument
@@ -267,9 +344,12 @@
     (add_function5 mod (to_sym "get_slot") DontCare symT DontCare DontCare DontCare get_slot_ 0)
     (add_function6 mod (to_sym "set_slot") DontCare symT DontCare DontCare DontCare DontCare set_slot_ 0)
     (add_function3 mod (to_sym "remove_slot") DontCare symT DontCare remove_slot 0)
+    (add_function2 mod (to_sym "remove_slots") DontCare DontCare remove_slots 0)
+    (add_function3 mod (to_sym "copy_slots") DontCare DontCare DontCare copy_slots 0)
     (add_function3 mod (to_sym "has_slot?") DontCare symT DontCare has_slot_p 0)
 
     (add_function3 mod (to_sym "each_slots") DontCare funT DontCare each_slots 0)
+    (add_function2 mod (to_sym "slot_list") DontCare DontCare slot_list 0)
 
     (add_function2 mod (to_sym "alias") DontCare DontCare alias_rw 0)
 

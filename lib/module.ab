@@ -1,5 +1,5 @@
 # Copyright (C) 2010 nineties
-# $Id: module.ab 2014-04-18 12:57:35 nineties $
+# $Id: module.ab 2014-04-19 17:26:47 nineties $
 
 #= Module system =
 #== Basics ==
@@ -45,10 +45,22 @@
 
 module := enter_module('module, true)
 
+copy_table(dst, src) := {
+    prim.copy_slots(dst, src, false)
+    dst
+}
+
+clear_table(tbl) := {
+    o := tbl._owner_
+    prim.remove_slots(tbl, false)
+    tbl._owner_ = o
+    nil
+}
+
 copy_variables(mod, 'All)
     := prim.each_slots(mod.variables,
         (_, x, v) -> {
-            if (x != 'parent)
+            if (x != 'parent and x != '_owner_)
                 prim.define_variable(x, v)
         },
         false
@@ -57,7 +69,8 @@ copy_variables(mod, 'All)
 copy_variables(mod, Hiding{vars})
     := prim.each_slots(mod.variables,
         (_, x, v) -> {
-            if (x != 'parent and not prim.list_include?(x, vars))
+            if (x != 'parent and x != '_owner_ and
+                    not prim.list_include?(x, vars))
                 prim.define_variable(x, v)
         },
         false
@@ -105,29 +118,23 @@ class Module{name} with {
     }
 
     .push() := {
-        tbl := 'VariableTable{}
-        tbl.__owner__ = self
-        tbl.parent = self.variables
-        self.variables = tbl
-        nil
-    }
-
-    .push(m @ Module) := {
-        m.variables.parent = self.variables
-        self.variables = m.variables
+        tbl := node('VariableTable)
+        module::copy_table(tbl, self.variables)
+        module::clear_table(self.variables)
+        self.variables.parent = tbl
         nil
     }
 
     .pop() := {
+        tbl := self.variables.parent
+        if tbl._owner_ != self
+            throw 'Error{"mismatch of push and pop"}
         self.variables = self.variables.parent
         nil
     }
 
     .clear() := {
-        tbl := 'VariableTable{}
-        tbl.__owner__ = self
-        tbl.parent = self.variables.parent
-        self.variables = tbl
+        module::clear_table(self.variables)
         nil
     }
 }
