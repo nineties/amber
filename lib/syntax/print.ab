@@ -71,20 +71,28 @@ sequence(list, f, left, delim, right) := {
         ))
 }
 
-block(s, cont=false) := {
-    doc := P::nest(INDENT_WIDTH, [P::nl(" "), stmt(s)])
-    cont ? [doc, P::nl()] : doc
+block(s, pre=false, post=false) := {
+    doc := ["{", P::nest(INDENT_WIDTH, [P::nl(" "), stmt(s)]),
+            P::nl(" "), "}"]
+    doc = [" ", doc] if pre
+    doc = [doc, " "] if post
+    doc
 }
 
-block(Block{stmts...}, cont=false) := {
-    doc := [" {", P::nest(INDENT_WIDTH, stmts.map(s -> [P::nl(), stmt(s)])),
-           P::nl(), "}"]
-    cont ? [doc, " "] : doc
+block(Block{stmts...}, pre=false, post=false) := {
+    doc := ["{", P::nest(INDENT_WIDTH, [P::nl(" "),
+            stmts.map(stmt).weave(P::nl("; "))]), P::nl(" "), "}"]
+    doc = [" ", doc] if pre
+    doc = [doc, " "] if post
+    doc
 }
 
-block(s @ Seq, cont=false) := {
-    doc := P::nest(INDENT_WIDTH, [P::nl(" "), P::compress(stmt(s))])
-    cont ? [doc, P::nl()] : doc
+block(Seq{stmts...}, pre=false, post=false) := {
+    doc := ["seq {", P::nest(INDENT_WIDTH, [P::nl(" "),
+            stmts.map(stmt).weave(P::nl("; "))]), P::nl(" "), "}"]
+    doc = [" ", doc] if pre
+    doc = [doc, " "] if post
+    doc
 }
 
 #== Formatters ==
@@ -105,7 +113,7 @@ primary(var @ Symbol)  := str(var)
 primary(list @ List)   := sequence(list, expr, "[", ",", "]")
 primary(tuple @ Tuple) := sequence(tuple, expr, "(", ",", ")")
 primary(ary @ Array)   := sequence(ary, expr, "Array{", ",", "}")
-primary(Block{stmts...})  := P::group(block(stmts))
+primary(s @ Block)  := P::group(block(s))
 primary(Abs{e})        := ["|", expr(e), "|"]
 primary(Slot{Self{}, m @ Symbol}) := "." ++ str(m)
 primary('Rest{}) := "..."
@@ -214,17 +222,17 @@ stmt(Block{stmts...})
         P::nl(), "}"]
 stmt(If{cond, body}) := ["if ", expr(cond), block(body)]
 stmt(IfElse{cond, ifthen, ifelse})
-    := ["if ", expr(cond), " ", block(ifthen, cont=true),
+    := ["if ", expr(cond), " ", block(ifthen, post=true),
         "else ", block(ifelse)]
-stmt(While{cond, body}) := ["while ", expr(cond), block(body)]
-stmt(For{x, v, body}) := ["for ", pattern(x), " in ", expr(v), block(body)]
+stmt(While{cond, body}) := ["while ", expr(cond), block(body, pre=true)]
+stmt(For{x, v, body}) := ["for ", pattern(x), " in ", expr(v), block(body, pre=true)]
 stmt(Continue{})  := "continue"
 stmt(Break{})     := "break"
 stmt(Return{nil}) := "return"
 stmt(Return{e})   := ["return ", expr(e)]
 stmt(Throw{e})    := ["throw ", expr(e)]
 stmt(Try{body, hdlr})
-    := ["try ", block(body, cont=true), "catch ", multi_lambda(hdlr)]
+    := ["try ", block(body, pre=true, post=true), "catch ", multi_lambda(hdlr)]
 stmt(Define{x, s}) := [pattern(x), " := ", stmt(s)]
 smtt(Define{f, Lambda{args, body}})
     := [pattern(f), lambda_arg(args), " := ", stmt(body)]
