@@ -37,11 +37,11 @@ expression?(_ @ Int or _ @ Float or _ @ String or _ @ Symbol or _ @ List or
             GreaterThan{_, _} or GreaterEqual{_, _} or Equal{_, _} or
             NotEqual{_, _} or Compare{_, _} or SeqAnd{_, _} or
             IfElse{_, _, _} or Lambda{_ @ List, _} or
-            Lambda{When{_, _}, _} or Fusion{_, _} or Reset{_} or Shift{_}
+            Lambda{When{_, _}, _} or Union{_, _} or Reset{_} or Shift{_}
             or Assign{_, _} or AddAssign{_, _} or NcAddAssign{_, _} or
             SubAssign{_, _} or MulAssign{_, _} or NcMulAssign{_, _} or
             PowAssign{_, _} or DivAssign{_, _} or QuoAssign{_, _} or
-            RemAssign{_, _} or FusionAssign{_, _} or
+            RemAssign{_, _} or UnionAssign{_, _} or
             WithSlots{_, _ @ List} or _ @ Block
         ) := true
 
@@ -192,7 +192,7 @@ lambda(e)                  := ternary(e)
 lambda(Lambda{args, body}) := [lambda_arg(args), " -> ", ternary(body)]
 
 multi_lambda(e)            := lambda(e)
-multi_lambda(Fusion{f, g}) := [lambda(f), P::nl(" "), "| ", multi_lambda(g)]
+multi_lambda(Union{f, g}) := [lambda(f), P::nl(" "), "| ", multi_lambda(g)]
 
 continuation(e)        := multi_lambda(e)
 continuation(Reset{e}) := ["reset ", multi_lambda(e)]
@@ -209,7 +209,7 @@ assign(PowAssign{x, v})    := [pattern(x), " ^" , assign(v)]
 assign(DivAssign{x, v})    := [pattern(x), " /= ", assign(v)]
 assign(QuoAssign{x, v})    := [pattern(x), " //= ", assign(v)]
 assign(RemAssign{x, v})    := [pattern(x), " %= ", assign(v)]
-assign(FusionAssign{x, v}) := [pattern(x), " |= ", assign(v)]
+assign(UnionAssign{x, v}) := [pattern(x), " |= ", assign(v)]
 assign(WithSlots{x, stmts @ List})
     := [pattern(x), " with ", block(node('Block, stmts))]
 
