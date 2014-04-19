@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-base.rlc 2014-04-09 03:12:38 nineties $
+; $Id: rowl1-base.rlc 2014-04-19 17:37:06 nineties $
 ;
 
 (import "rlvm-compile")
@@ -137,6 +137,18 @@
     (var copy (allocate_expr n))
     (memcpy copy obj (* 4 (+ n 1)))
     (return copy)
+    ))
+
+(export fun copy_node (obj) (
+    (if (is_atom obj) (return obj))
+    (var h (node_head obj))
+    (var args (node_args obj))
+    (var args_ args)
+    (while args_ (do
+        (setcar args_ (copy_node (car args_)))
+        (= args_ (cdr args_))
+        ))
+    (return (make_node h args))
     ))
 
 (fun _is_atom (obj) (
