@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-04-20 13:20:19 nineties $
+; $Id: rowl1-interp.rlc 2014-04-20 20:33:26 nineties $
 ;
 
 (import "rlvm-compile")
@@ -76,6 +76,22 @@
     (return load_path)
     ))
 
+(fun construct_env () (
+    (var env (ary_new))
+    (var ptr (environ))
+    (var i 0)
+    (while (array_get string ptr i) (do
+        (var str (array_get string ptr i)) 
+        (var pos 0)
+        (while (!= (array_get char str pos) '=') (incr pos))
+        (var name  (strndup str pos))
+        (var value (strdup (+ str (+ pos 1))))
+        (ary_push env (tuple2 name value))
+        (+= i 1)
+        ))
+    (return env)
+    ))
+
 (fun eval_main_ (argc argv) (
     (if opt_preparse
         (output_string stdout "Generating pre-parsed libs...\n")
@@ -117,6 +133,7 @@
     (set_var amber (to_sym "LOAD_PATH") load_path)
     (set_var amber (to_sym "ALREADY_LOADED") (ary_new))
     (set_var amber (to_sym "VERSION") (version_string))
+    (set_var amber (to_sym "ENV") (construct_env))
     (setup_minimal_interpreter prim)
     (if (== opt_compile @C_TRUE)
         (load_file "compile.ab")
