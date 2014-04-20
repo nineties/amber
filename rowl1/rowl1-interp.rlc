@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-04-20 20:33:26 nineties $
+; $Id: rowl1-interp.rlc 2014-04-20 21:44:32 nineties $
 ;
 
 (import "rlvm-compile")
@@ -131,7 +131,7 @@
     (set_var amber (to_sym "INVOKE_PATH") cwd)
     (var load_path (setup_load_paths cwd))
     (set_var amber (to_sym "LOAD_PATH") load_path)
-    (set_var amber (to_sym "ALREADY_LOADED") (ary_new))
+    (set_var amber (to_sym "ALREADY_LOADED") 0)
     (set_var amber (to_sym "VERSION") (version_string))
     (set_var amber (to_sym "ENV") (construct_env))
     (setup_minimal_interpreter prim)
@@ -270,9 +270,8 @@
 
 (fun load_file (path) (
     (var dirs (get_var amber (to_sym "LOAD_PATH")))
-    (var loaded (get_var amber (to_sym "ALREADY_LOADED")))
+    (var loaded (get_var_list amber (to_sym "ALREADY_LOADED")))
     (if (!= (node_type dirs) @ArrayE) (goto load_error))
-    (if (!= (node_type loaded) @ArrayE) (goto load_error))
     (rfor i 0 (array_size dirs) (do
         (var dir (array_at dirs i))
         (if (!= (node_type dir) @StringE) (goto load_error))
@@ -283,15 +282,18 @@
             (if (! rpath)
                 (throw (os_error1 (string "Failed to get absolute path") fullpath)))
 
-            (for i 0 (array_size loaded) (do
-                (if (streq (array_at loaded i) rpath)
-                    (return @C_FALSE)
-                    )
+            (var loaded_ loaded) 
+            (while loaded_ (do
+                (var path (car loaded_))
+                (check_type path @StringE)
+                (if (streq path rpath) (return @C_FALSE))
+                (= loaded_ (cdr loaded_))
                 ))
+
+            (set_var amber (to_sym "ALREADY_LOADED") (cons rpath loaded))
+
             (var fd (open "."))
             (if (< fd 0) (throw (io_error (string "Can not open '.'"))))
-
-            (ary_push loaded rpath)
 
             ; Check whether there is pre-parsed lib.
             (var pcpath (strcat rpath "c"))
@@ -320,7 +322,6 @@
                 (fchdir fd)
                 (close fd)
                 (close_in ichan)
-                (ary_pop loaded)
                 (throw e)
                 )))
 
@@ -364,9 +365,7 @@
 
 (fun loadable (path) (
     (var dirs (get_var amber (to_sym "LOAD_PATH")))
-    (var loaded (get_var amber (to_sym "ALREADY_LOADED")))
     (if (!= (node_type dirs) @ArrayE) (goto load_error))
-    (if (!= (node_type loaded) @ArrayE) (goto load_error))
     (rfor i 0 (array_size dirs) (do
         (var dir (array_at dirs i))
         (if (!= (node_type dir) @StringE) (goto load_error))
@@ -456,6 +455,14 @@
 
 (export fun get_var (mod sym) (
     (return (get_slot (get_slot mod Variables) sym))
+    ))
+
+(export fun get_var_list (mod sym) (
+    (var v (get_var mod sym))
+    (if (!= (node_type v) @ListE)
+        (throw (type_error2 (string "must be a list") sym v))
+        )
+    (return v)
     ))
 
 (export fun get_var_nocheck (mod sym) (
