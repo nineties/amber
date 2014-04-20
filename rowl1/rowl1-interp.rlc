@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-04-20 21:44:32 nineties $
+; $Id: rowl1-interp.rlc 2014-04-20 22:06:55 nineties $
 ;
 
 (import "rlvm-compile")
@@ -59,20 +59,20 @@
 
 (extern fun str_split)
 (fun setup_load_paths (cwd) (
-    (var load_path (ary_new)) 
-    (ary_push load_path cwd)
+    (var load_path 0)
+    (= load_path (cons cwd load_path))
     (var str (getenv "LD_LIBRARY_PATH"))
     (if str (do
         (var list (str_split str (string ":")))
         (while list (do
             (var dir (realpath (car list)))
             (if (! dir) break) ; this directory doesn't exists
-            (ary_push load_path (strcat dir "/amber"))
+            (= load_path (cons (strcat dir "/amber") load_path))
             (= list (cdr list))
             ))
         ))
-    (ary_push load_path (string "/usr/lib/amber"))
-    (ary_push load_path (string "/lib/amber"))
+    (= load_path (cons (string "/usr/lib/amber") load_path))
+    (= load_path (cons (string "/lib/amber") load_path))
     (return load_path)
     ))
 
@@ -269,12 +269,13 @@
     ))
 
 (fun load_file (path) (
-    (var dirs (get_var amber (to_sym "LOAD_PATH")))
+    (var dirs (get_var_list amber (to_sym "LOAD_PATH")))
     (var loaded (get_var_list amber (to_sym "ALREADY_LOADED")))
-    (if (!= (node_type dirs) @ArrayE) (goto load_error))
-    (rfor i 0 (array_size dirs) (do
-        (var dir (array_at dirs i))
-        (if (!= (node_type dir) @StringE) (goto load_error))
+    (while dirs (do
+        (var dir (car dirs))
+        (if (!= (node_type dir) @StringE) 
+            (throw (type_error (string "invalid path") dir))
+            )
         (var fullpath (strcat (strcat dir "/") path))
         (if (file_exists fullpath) (do
             ; multiple load check.
@@ -333,10 +334,9 @@
             (close_in ichan)
             (return @C_TRUE)
             ))
+            (= dirs (cdr dirs))
         ))
     (throw (not_found (string path)))
-    (label load_error)
-    (throw (logic_error1 (string "LOAD_PATH must be an array of strings") dirs))
     ))
 
 (fun exec_file (path) (
@@ -364,17 +364,17 @@
     ))
 
 (fun loadable (path) (
-    (var dirs (get_var amber (to_sym "LOAD_PATH")))
-    (if (!= (node_type dirs) @ArrayE) (goto load_error))
-    (rfor i 0 (array_size dirs) (do
-        (var dir (array_at dirs i))
-        (if (!= (node_type dir) @StringE) (goto load_error))
+    (var dirs (get_var_list amber (to_sym "LOAD_PATH")))
+    (while dirs (do
+        (var dir (car dirs))
+        (if (!= (node_type dir) @StringE)
+            (throw (type_error (string "invalid path") dir))
+            )
         (var fullpath (strcat (strcat dir "/") path))
         (if (file_exists fullpath) (return @C_TRUE))
+        (= dirs (cdr dirs))
         ))
     (return @C_FALSE)
-    (label load_error)
-    (throw (logic_error1 (string "LOAD_PATH must be an array of strings") dirs))
     ))
 
 (export fun create_module (parent sym) (
