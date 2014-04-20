@@ -1,7 +1,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-04-20 21:26:16 nineties $
+; $Id: rowl1-compile.rlc 2014-04-21 08:46:30 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1324,6 +1324,9 @@
         (= args (cdr args))
         (incr arity)
         ))
+    (if (> arity @MAX_ARITY)
+        (throw (exception1 (string "too many arguments") args_))
+        )
     (return (tuple2 (box arity) keywords))
     ))
 
@@ -1354,6 +1357,10 @@
     (compile_simple_call asm 3 keyword_arg_array)
     ))
 
+(fun too_many_arguments (args) (
+    (throw (exception1 (string "too many arguments") args))
+    ))
+
 (fun compile_apply (asm expr) (
     (var func (node_arg expr 0))
     (var args (node_arg expr 1))
@@ -1379,11 +1386,18 @@
                 (compile_keyword_arg_array asm keys)
                 (+= rot 1)
                 ))
+            (var call_label (fresh_label asm))
 
             (compile asm func)
             (put_push asm func)
             (compile_simple_call asm 2 compile_matching)
             (put_rot asm rot 1)
+            (put_dup asm)
+            (put_imm_int asm @MAX_ARITY)
+            (put_if_le asm call_label)
+            (put_push asm args)
+            (compile_simple_call asm 1 too_many_arguments)
+            (set_label asm call_label)
             (put_vcall asm flag)
         ))
     ))
@@ -1409,6 +1423,7 @@
             (put_jcall asm arity flag)
         )
         (do
+            (var call_label (fresh_label asm))
             (var rot 3)
             (if keys (do
                 (compile_keyword_arg_array asm keys)
@@ -1418,6 +1433,12 @@
             (put_push asm func)
             (compile_simple_call asm 2 compile_matching)
             (put_rot asm rot 1)
+            (put_dup asm)
+            (put_imm_int asm @MAX_ARITY)
+            (put_if_le asm call_label)
+            (put_push asm args)
+            (compile_simple_call asm 1 too_many_arguments)
+            (set_label asm call_label)
             (put_vcall asm asm flag)
         ))
     ))
@@ -1456,6 +1477,7 @@
             (put_jcall asm arity flag)
         )
         (do
+            (var call_label (fresh_label asm))
             (compile asm obj)   ; self;arity;arg1;arg2;...
             (put_dup asm)       ; self;self;arity;arg1;arg2;..
             (if keys (do
@@ -1470,6 +1492,12 @@
                 (put_rot asm 4 1)
                 (put_rot asm 3 1)
                 )
+            (put_dup asm)
+            (put_imm_int asm @MAX_ARITY)
+            (put_if_le asm call_label)
+            (put_push asm args)
+            (compile_simple_call asm 1 too_many_arguments)
+            (set_label asm call_label)
             (put_vcall asm flag)
         ))
     ))
