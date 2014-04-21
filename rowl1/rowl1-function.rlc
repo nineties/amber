@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-function.rlc 2014-04-17 13:35:40 nineties $
+; $Id: rowl1-function.rlc 2014-04-21 18:53:06 nineties $
 ;
 
 (import "rlvm-compile")
@@ -64,9 +64,13 @@
     (return (list1 (construct_arg (list2 (box 1) DontCare) 0 @C_UNDEF)))
     ))
 
-(fun all_symbol (list) (
+; Return true when `list` is a list of different symbols.
+(fun is_saturated (list) (
     (while list (do
         (if (!= (node_type (car list)) @SymbolE)
+            (return @FALSE)
+            )
+        (if (list_member (car list) (cdr list))
             (return @FALSE)
             )
         (= list (cdr list))
@@ -86,7 +90,7 @@
         (if (! (list_member (box arity) saturated))
             (= new_domains (cons dom new_domains))
             )
-        (if (&& (!= (node_type dom) @TupleE) (all_symbol args))
+        (if (&& (!= (node_type dom) @TupleE) (is_saturated args))
             (= saturated (cons (box arity) saturated))
             )
         (= domains (cdr domains))
