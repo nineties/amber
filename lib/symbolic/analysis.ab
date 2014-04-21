@@ -1,0 +1,80 @@
+# Copyright (C) 2014 nineties
+# $Id: symbolic/analysis.ab 2014-04-21 23:17:40 nineties $
+
+import template (*)
+import symbolic::basic (depend?)
+
+#= Symbolic differentiation =
+
+# Module local macros.
+macro( ('diff_rule1)(from, to) )
+    := instantiate(
+        (from, x) -> {
+            df := diff(f, x)
+            instantiate(to, f, df)
+        }, from, to)
+
+macro( ('diff_rule2)(from, to) )
+    := instantiate(
+        (from, x) -> {
+            df := diff(f, x)
+            dg := diff(g, x)
+            instantiate(to, f, df, g, dg)
+        }, from, to)
+
+diff := (x, x)          -> 1
+      | (_ @ Symbol, _) -> 0
+      | (_ @ Int, _)    -> 0
+      | (_ @ Float, _)  -> 0
+      | (f ^ g, x) when depend?(f, x) and depend?(g, x) -> {
+          # let h(x) = f(x)^g(x), then
+          # { log h(x) }' = h'(x)/h(x)
+          # and
+          # { log f(x)^g(x) }' = g'(x)log f(x) + g(x)f'(x)/f(x).
+          # Therefore,
+          # h'(x) = f(x)^g(x){g'(x)log f(x) + g(x)f'(x)/f(x)}
+          #       = f(x)^{g(x)-1}{g(x)f'(x) + f(x)g'(x)log f(x)} .
+          df := diff(f, x)
+          dg := diff(g, x)
+          instantiate(f^(g-1)*(g*df + f*dg*log(f)), f, g, df, dg)
+      }
+      | (f ^ a, x) when depend?(f, x) -> {
+          df := diff(f, x)
+          instantiate(a*f^(a-1)*df, f, a, df)
+      }
+      | (a ^ f, x) -> {
+          # (a^f(x))' = a^f(x) * log(a)*f'(x)
+          df := diff(f, x)
+          instantiate(a^f*log(a)*df, f, a, df)
+      }
+      | diff_rule2( f + g , df + dg )
+      | diff_rule2( f - g , df - dg )
+      | diff_rule2( f * g , df * g + f * dg )
+      | diff_rule2( f / g , (df * g - f * dg) / g^2 )
+      | diff_rule1( ('sqrt)(f) , df / sqrt(f) )
+      | diff_rule1( ('sin)(f)  , cos(f) * df )
+      | diff_rule1( ('asin)(f) , df / sqrt(1-f^2) )
+      | diff_rule1( ('cos)(f)  , -sin(f) * df )
+      | diff_rule1( ('acos)(f) , -df / sqrt(1-f^2) )
+      | diff_rule1( ('tan)(f)  , df / (cos(f))^2 )
+      | diff_rule1( ('atan)(f) , df / (1+f^2) )
+      | diff_rule1( ('cot)(f)  , -(csc(f))^2 * df )
+      | diff_rule1( ('acot)(f) , -df / (1+f^2) )
+      | diff_rule1( ('sec)(f)  , tan(f) * sec(f) * df )
+      | diff_rule1( ('asec)(f) , df / (f^2 * sqrt(1 - 1/f^2)) )
+      | diff_rule1( ('csc)(f)  , -csc(f) * cot(f) * df )
+      | diff_rule1( ('acsc)(f) , -df / (f^2 * sqrt(1 - 1/f^2)) )
+      | diff_rule1( ('exp)(f)  , exp(f) * df )
+      | diff_rule1( ('log)(f)  , df / f )
+      | diff_rule1( ('log2)(f) , df / (f * log(2)) )
+      | diff_rule1( ('log10)(f), df / (f * log(10)) )
+      | ( ('log)(f, g), x ) when depend?(g, x)
+            -> diff(`( log(!f) / log(!g) ), x)
+      | ( ('log)(f, a), x )
+            -> diff(`( log(!f) / log(!a) ), x)
+
+.delete('macro)
+
+# External macros.
+macro( ('diff)(expr, x) ) := node('Quote, analysis::diff(expr, x))
+
