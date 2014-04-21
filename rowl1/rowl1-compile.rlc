@@ -1,7 +1,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-04-21 08:46:30 nineties $
+; $Id: rowl1-compile.rlc 2014-04-21 22:34:15 nineties $
 ;
 
 (import "rlvm-compile")
@@ -1361,6 +1361,20 @@
     (throw (exception1 (string "too many arguments") args))
     ))
 
+(fun is_global_var (node) (
+    (if (! (is_symbol node)) (return @FALSE))
+    (var v (lookup_symbol node))
+    (var vty (node_head v))
+    (if (== vty GlobalVariable)
+        (return @TRUE)
+        (return @FALSE)
+        )
+    ))
+
+(fun get_global () (
+    (return global)
+    ))
+
 (fun compile_apply (asm expr) (
     (var func (node_arg expr 0))
     (var args (node_arg expr 1))
@@ -1374,6 +1388,10 @@
 
     (if (>= arity 0)
         (do
+            (if (is_global_var func) (do
+                (compile_simple_call asm 0 get_global)
+                (= flag (| flag 1))
+                ))
             (if keys (compile_keyword_arg_array asm keys))
             (compile asm func)
             (put_push asm func)
@@ -1382,6 +1400,11 @@
             )
         (do
             (var rot 2)
+            (if (is_global_var func) (do
+                (compile_simple_call asm 0 get_global)
+                (= flag (| flag 1))
+                (+= rot 1)
+                ))
             (if keys (do
                 (compile_keyword_arg_array asm keys)
                 (+= rot 1)
