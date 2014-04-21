@@ -105,6 +105,7 @@ primary(e) when expression?(e) := ["(", expr(e), ")"]
 primary(nil)   := "nil"
 primary(true)  := "true"
 primary(false) := "false"
+primary(Self{}) := "self"
 primary(e) when e.atom? := prim.fullform(e)
 primary(n @ Int)       := str(n)
 primary(f @ Float)     := str(f)
@@ -220,10 +221,10 @@ stmt(Seq{stmts...}) := [stmts.map(stmt).weave(P::nl("; "))]
 stmt(Block{stmts...})
     := ["{", P::nest(INDENT_WIDTH, stmts.map(s -> [P::nl(), stmt(s)])),
         P::nl(), "}"]
-stmt(If{cond, body}) := ["if ", expr(cond), block(body)]
+stmt(If{cond, body}) := ["if ", expr(cond), block(body, pre=true)]
 stmt(IfElse{cond, ifthen, ifelse})
-    := ["if ", expr(cond), " ", block(ifthen, post=true),
-        "else ", block(ifelse)]
+    := ["if ", expr(cond), block(ifthen, pre=true, post=true),
+        "else", block(ifelse, pre=true)]
 stmt(While{cond, body}) := ["while ", expr(cond), block(body, pre=true)]
 stmt(For{x, v, body}) := ["for ", pattern(x), " in ", expr(v), block(body, pre=true)]
 stmt(Continue{})  := "continue"
