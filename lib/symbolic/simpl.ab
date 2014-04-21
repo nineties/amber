@@ -1,0 +1,113 @@
+# Copyright (C) 2014 nineties
+# $Id: symbolic/simplification.ab 2014-04-22 00:30:35 nineties $
+
+#= Algebraic simplification =
+
+import math
+
+simplify(e) := {
+    new_e := simpl(e)
+    while new_e != e {
+        e = new_e
+        new_e = simpl(e)
+    }
+    e
+}
+
+simpl := (e @ Int)    -> e
+       | (e @ Float)  -> e
+       | (e @ Symbol) -> e
+
+       # Trigonometric functions
+       | ( ('sin)(a @ Float) )            -> math::sin(a)
+       | ( ('sin)(a) )                    -> `( sin(!simpl(a)) )
+       | ( ('asin)(a @ Float) )           -> math::asin(a)
+       | ( ('asin)(a) )                   -> `( asin(!simpl(a)) )
+       | ( ('cos)(a @ Float) )            -> math::cos(a)
+       | ( ('cos)(a) )                    -> `( cos(!simpl(a)) )
+       | ( ('acos)(a @ Float) )           -> math::acos(a)
+       | ( ('acos)(a) )                   -> `( acos(!simpl(a)) )
+       | ( ('tan)(a @ Float) )            -> math::tan(a)
+       | ( ('tan)(a) )                    -> `( tan(!simpl(a)) )
+       | ( ('atan)(a @ Float) )           -> math::atan(a)
+       | ( ('atan)(a) )                   -> `( atan(!simpl(a)) )
+       | ( ('cot)(a @ Float) )            -> math::cot(a)
+       | ( ('cot)(a) )                    -> `( cot(!simpl(a)) )
+       | ( ('acot)(a @ Float) )           -> math::acot(a)
+       | ( ('acot)(a) )                   -> `( acot(!simpl(a)) )
+       | ( ('sec)(a @ Float) )            -> math::sec(a)
+       | ( ('sec)(a) )                    -> `( sec(!simpl(a)) )
+       | ( ('asec)(a @ Float) )           -> math::asec(a)
+       | ( ('asec)(a) )                   -> `( asec(!simpl(a)) )
+       | ( ('csc)(a @ Float) )            -> math::csc(a)
+       | ( ('csc)(a) )                    -> `( csc(!simpl(a)) )
+       | ( ('acsc)(a @ Float) )           -> math::acsc(a)
+       | ( ('acsc)(a) )                   -> `( acsc(!simpl(a)) )
+
+       # Exponential and logarithmic
+       | ( ('exp)(a @ Float) )            -> math::exp(a)
+       | ( ('exp)(a) )                    -> `( exp(!simpl(a)) )
+       | ( ('log)(a @ Float) )            -> math::log(a)
+       | ( ('log)(a) )                    -> `( log(!simpl(a)) )
+       | ( ('log2)(a @ Float) )           -> math::log2(a)
+       | ( ('log2)(a) )                   -> `( log2(!simpl(a)) )
+       | ( ('log10)(a @ Float) )          -> math::log10(a)
+       | ( ('log10)(a) )                  -> `( log10(!simpl(a)) )
+       | ( ('log)(a @ Float, b @ Float) ) -> math::log(a, b)
+       | ( ('log)(a, b) )                 -> `( log(!simpl(a), !simpl(b)) )
+
+       # Unary operators
+       | (+ a)                -> simpl(a)
+       | (- a) when a.Number? -> -a
+       | (- a)                -> `( - !simpl(a) )
+
+       # Addition
+       | (a + b) when a.Number? and b.Number? -> a + b
+       | (a + 0)                -> simpl(a)
+       | (0 + a)                -> simpl(a)
+       | (a + a)                -> `( 2 * !simpl(a) )
+       | (a + b) when b.Number? -> `( !b + !a )
+       | (a + (b + c))          -> `( (!a + !b) + !c )
+       | (a + b)                -> `( !simpl(a) + !simpl(b) )
+
+       # Subtraction
+       | (a - b) when a.Number? and b.Number? -> a - b
+       | (a - a)                -> 0
+       | (a - b) when b.Number? -> `( !(-b) + !a )
+       | (a - b)                -> `( !a + -!b )
+
+       # Multiplication
+       | (a * b) when a.Number? and b.Number? -> a * b
+       | (a * 0)                -> 0
+       | (0 * a)                -> 0
+       | (a * 1)                -> simpl(a)
+       | (1 * a)                -> simpl(a)
+       | (a * b) when b.Number? -> `( !b * !a )
+       | (a * a)                -> `( 2 * !simpl(a) )
+       | ((-a) * (-b))          -> `( !simpl(a) * !simpl(b) )
+       | ((-a) * b)             -> `( - (!simpl(a) * !simpl(b)) )
+       | (a * (-b))             -> `( - (!simpl(a) * !simpl(b)) )
+       | (a * (b * c))          -> `((!a * !b) * !c)
+       | (a * (b + c)) when a.Number? and b.Number?
+         -> `( !(a*b) + !a * !c )
+       | (a * b) -> `( !simpl(a) * !simpl(b) )
+
+       # Division
+       | (a / b) when a.Number? and b.Number? -> a / b
+       | (0 / a) -> 0
+       | (a / 1) -> simpl(a)
+       | (a / a) -> 1
+       | (a / b) -> `( !simpl(a) / !simpl(b) )
+
+       # Exponential
+       | (a ^ b) when a.Number? and b.Number? -> a ^ b
+       | (a ^ 0) -> 1
+       | (a ^ 1) -> simpl(a)
+       | (a ^ b) -> `( (!simpl(a)) ^ (!simpl(b)) )
+
+       # Square-root
+       | ( ('sqrt)(a @ Float) ) -> math::sqrt(a)
+       | ( ('sqrt)(a ^ 2) )     -> `( | !simpl(a) | )
+       | ( ('sqrt)(a) ^ n ) when n.Int? and n % 2 == 0
+         -> `( (!simpl(a))^(!(n/2)) )
+       | ( ('sqrt)(a) ) -> `( sqrt(!simpl(a)) )
