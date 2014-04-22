@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: compile.ab 2014-04-22 15:27:43 nineties $
+# $Id: compile.ab 2014-04-22 16:22:11 nineties $
 
 #= Ahead-of-time compilation =
 
@@ -27,15 +27,11 @@ languages := Table{
 }
 
 detect_lang(f, type) := {
-    if f {
-        idx := f.last_index(".")
-        if idx {
-            lang := languages[f[idx+1 .. -1]]
-            if lang
-                return lang
-        }
-    }
-    asi("What is the %s language? %p", type, languages.values)
+    idx := nil
+    lang := nil
+    f and (idx = f.last_index(".")) and (lang = languages[f[idx+1 .. -1]])
+    return lang if lang
+    ask("What is the %s language? %p", type, languages.values)
 }
 
 load_lang(f, type) := {
@@ -51,7 +47,7 @@ CompileState.tree := {
     tree := nil
     fp   := io::open_in(ARGV[0])
     try {
-        tree = parser::parse(input_lang, fp)
+        tree = parser::parse(CompileState.input_language, fp)
     } catch e -> {
         fp.close()
         throw e
@@ -60,5 +56,6 @@ CompileState.tree := {
     tree
 }
 
-evalfull(`(Import{[!CompileState.output_language, compiler]}))
+
+evalfull(`(Import{[!CompileState.output_language.name, compiler]}))
 exit(0)
