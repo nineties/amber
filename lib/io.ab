@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: io.ab 2014-04-22 12:54:19 nineties $
+# $Id: io.ab 2014-04-22 16:15:37 nineties $
 
 #= IO =
 # Input and output stream.
@@ -264,7 +264,7 @@ parse_flag(iss) := {
     flag := 0
     while true {
         f := FLAG_MAP[prim.iss_lookahead(iss, false)]
-        if (f == nil) return flag
+        if (not f) return flag
         flag = lor(flag, f)
         prim.iss_read_char(iss, false)
     }
@@ -299,7 +299,7 @@ parse_prec(fmt, iss) := {
 
 # Justify given string by given flags `f` and width `w`.
 justify(oss, s, f, w) := {
-    if w == nil
+    if not w
         oss.print(s)
     else {
         if ltest(f, FMT_MINUS)
@@ -323,7 +323,7 @@ print_element(oss,"c",f,w,p,arg) := {
 # string.
 print_element(oss,"s",f,w,p,arg) := {
     s := str(arg)
-    if p != nil and p < s.length
+    if p and p < s.length
         s = s[0,p]
     justify(oss, s, f, w)
 }
@@ -342,7 +342,7 @@ print_element(oss,"d" or "i",f,w,p,arg) := {
         else if ltest(f, FMT_SPACE)
             prefix = " "
     }
-    if w == nil
+    if not w
         return oss.print(prefix ++ s)
     else {
         if ltest(f, FMT_MINUS)
@@ -365,7 +365,7 @@ print_element(oss,t@("b" or "B"),f,w,p,arg) := {
     if ltest(f, FMT_SHARP)
         prefix = "0" ++ t ++ prefix
 
-    if w == nil
+    if not w
         return oss.print(prefix ++ s)
     else {
         if ltest(f, FMT_MINUS)
@@ -390,7 +390,7 @@ print_element(oss,t@("x" or "X"),f,w,p,arg) := {
     if ltest(f, FMT_SHARP)
         prefix = "0" ++ t ++ prefix
 
-    if w == nil
+    if not w
         return oss.print(prefix ++ s)
     else {
         if ltest(f, FMT_MINUS)
@@ -416,7 +416,7 @@ print_element(oss,"f",f,w,p,arg) := {
         else if ltest(f, FMT_SPACE)
             prefix = " "
     }
-    if w == nil
+    if not w
         return oss.print(prefix ++ s)
     else {
         # FMT_ZERO is ignored
@@ -432,7 +432,7 @@ printf(oss, fmt @ String, args...) when oss.OutputStream? := {
     iss := prim.iss_new(fmt, false)
     while true {
         c := prim.iss_read_char(iss, false)
-        if (c == nil) break
+        if (not c) break
         if (c != "%")
             oss.write(c)
         else {

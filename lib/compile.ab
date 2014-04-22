@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: compile.ab 2014-04-22 15:05:20 nineties $
+# $Id: compile.ab 2014-04-22 15:27:43 nineties $
 
 #= Ahead-of-time compilation =
 
@@ -16,38 +16,38 @@ if ARGV.empty? {
     exit(1)
 }
 
+# Construct a state object for compilation.
+CompileState := `CompileState{}
+
+
 # Detect input and output languages.
 languages := Table{
     ("ab", "amber"),
     ("c",  "CAST")
 }
 
-filename_to_lang(f) := {
-    idx := f.last_index(".")
-    if idx == nil
-        return ask("What is the input language? %p", languages.values)
-    lang := languages[f[idx+1 .. -1]]
-    if lang == nil
-        throw `UnsupportedLanguage{!f}
-    lang
+detect_lang(f, type) := {
+    if f {
+        idx := f.last_index(".")
+        if idx {
+            lang := languages[f[idx+1 .. -1]]
+            if lang
+                return lang
+        }
+    }
+    asi("What is the %s language? %p", type, languages.values)
 }
 
+load_lang(f, type) := {
+    l := detect_lang(f, type).to_sym()
+    evalfull(`(Import{[!l]}))
+}
 
-input_lang  := filename_to_lang(ARGV[0])
-output_lang := amber.output_file != nil ?
-                filename_to_lang(amber.output_file) :
-                ask("What is the output language? %p", languages.values)
-
-input_lang  = input_lang.to_sym()
-output_lang = output_lang.to_sym()
-
-if input_lang == 'amber
-    input_lang = amber
-else
-    evalfull(`(Import{[!input_lang]}))
+CompileState.input_language  := load_lang(ARGV[0], "input")
+CompileState.output_language := load_lang(amber.output_file, "output")
 
 # Parse the inputfile as a program of given language.
-tree := {
+CompileState.tree := {
     tree := nil
     fp   := io::open_in(ARGV[0])
     try {
@@ -60,13 +60,5 @@ tree := {
     tree
 }
 
-# Construct a state object for compilation.
-CompileState := `CompileState{} with {
-    .tree     := tree
-    .language := input_lang
-    .infile   := ARGV[0]
-    .outfile  := amber.output_file
-}
-
-evalfull(`(Import{[!output_lang, compiler]}))
+evalfull(`(Import{[!CompileState.output_language, compiler]}))
 exit(0)

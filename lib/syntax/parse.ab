@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: syntax/parse.ab 2014-04-22 14:52:03 nineties $ "
+" $Id: syntax/parse.ab 2014-04-22 16:10:06 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -774,15 +774,15 @@ desugar_pattern(args, guard) := {
     checks := prim.array_new_empty() # Expressoins needs checked.
     args = desugar_iter(args, vars, checks, 0)
     if prim.array_size(checks) == 0 {
-        if guard == nil
-            return (args, vars)
-        else
+        if guard
             return (`When{!args, !guard}, vars)
+        else
+            return (args, vars)
     } else {
         inits := prim.array_foldr(((a, _), b) -> prim.list_append(a, b), checks, [])
         checkexpr := prim.array_foldl1((a, b) -> `(!a and !b),
                 prim.array_map(((_, b)) -> b, checks))
-        if guard != nil
+        if guard
             guard = `(!checkexpr and !guard)
         else
             guard = checkexpr
