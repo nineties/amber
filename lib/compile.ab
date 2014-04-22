@@ -1,5 +1,9 @@
 # Copyright (C) 2014 nineties
-# $Id: interpret.ab 2014-04-22 09:59:20 nineties $
+# $Id: compile.ab 2014-04-22 12:57:10 nineties $
+
+#= Ahead-of-time compilation =
+
+import interactive (ask)
 
 # Now, we a in the directory where this file is installed.
 # Change working directory to the original path.
@@ -11,6 +15,31 @@ if ARGV.empty? {
     stderr.puts("Usage: amber --compile <file>")
     exit(1)
 }
+
+languages := Table{
+    ("ab", 'amber),
+    ("c",  'CAST)
+}
+
+filename_to_lang(f) := {
+    idx := f.last_index(".")
+    if idx == nil
+        return ask("What is the input language? %p", languages.values)
+    lang := languages[f[idx+1 .. -1]]
+    if lang == nil
+        throw `UnsupportedLanguage{!f}
+    lang
+}
+
+
+input_lang  := filename_to_lang(ARGV[0])
+output_lang := amber.output_file != nil ?
+                filename_to_lang(amber.output_file) :
+                ask("What is the output language? %p", languages.values)
+
+throw (input_lang, output_lang)
+puts(amber.output_file)
+puts(amber.do_compile)
 
 tree := {
     tree := nil

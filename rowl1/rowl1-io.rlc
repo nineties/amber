@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-io.rlc 2014-04-11 10:05:24 nineties $
+; $Id: rowl1-io.rlc 2014-04-22 12:54:02 nineties $
 ;
 
 (import "rlvm-compile")
@@ -37,6 +37,7 @@
     (if (! (close_in (field_get st 2)))
         (throw (io_error (string "Closed stream.")))
         )
+    (return @C_NIL)
     ))
 
 (export fun make_ofstream (path out) (
@@ -60,6 +61,12 @@
     (if (! (close_out (field_get st 2)))
         (throw (io_error (string "Closed stream.")))
         )
+    (return @C_NIL)
+    ))
+
+(fun io_flush_out (st) (
+    (flush (field_get st 2))
+    (return @C_NIL)
     ))
 
 (fun io_eos (st) (
@@ -456,6 +463,7 @@
     (add_function3 mod (to_sym "open_out") stringT DontCare DontCare io_open_out 0)
     (add_function1 mod (to_sym "close_in") ifT io_close_in 0)
     (add_function1 mod (to_sym "close_out") ofT io_close_out 0)
+    (add_function1 mod (to_sym "flush_out") ofT io_flush_out 0)
     (add_function1 mod (to_sym "eos?") ifT io_eos 0)
     (add_function2 mod (to_sym "print_string") ofT stringT io_print_str 0)
 

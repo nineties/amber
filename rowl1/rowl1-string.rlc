@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-string.rlc 2014-04-22 08:52:41 nineties $
+; $Id: rowl1-string.rlc 2014-04-22 12:39:21 nineties $
 ;
 
 (import "rlvm-compile")
@@ -260,16 +260,21 @@
     (return (ctos (array_get char s i)))
     ))
 
-(fun str_substr (s i len) (
-    (if (! @(FIX i))
-        (throw (invalid_argument (string "invalid index") i)))
-    (if (! @(UFIX len))
-        (throw (invalid_argument (string "invalid length") len)))
+(fun str_substr (s range) (
+    (var i (node_arg range 0))
+    (var j (node_arg range 1))
+    (if (|| (! @(FIX i)) (! @(FIX j)))
+        (throw (invalid_argument (string "invalid range") range)))
     (= i (unbox i))
-    (= len (unbox len))
+    (= j (unbox j))
     (var size (str_size s))
     (if (< i 0) (+= i size))
-    (if (< i 0) (throw (out_of_range s (box (- i size)))))
+    (if (< j 0) (+= j size))
+
+    (if (|| (< i 0) (> i j))
+        (throw (invalid_argument (string "invalid range") range)))
+
+    (var len (+ (- j i) 1))
     (if (> (+ i len) size)
         (= len (- size i))
         )
@@ -365,7 +370,7 @@
     (add_function1 mod (to_sym "char_to_code") stringT str_code 0) 
 
     (add_function2 mod (to_sym "string_at") stringT intT str_at 0)
-    (add_function3 mod (to_sym "string_substr") stringT intT intT str_substr 0)
+    (add_function2 mod (to_sym "string_substr") stringT irangeT str_substr 0)
     (add_function1 mod (to_sym "string_escape") stringT str_escape 0)
     (add_function1 mod (to_sym "string_unescape") stringT str_unescape 0)
     (add_function2 mod (to_sym "string_contain?") stringT stringT str_contain 0)

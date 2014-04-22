@@ -1,5 +1,5 @@
 " Copyright (C) 2014 nineties "
-" $Id: boot.ab 2014-04-22 09:43:56 nineties $ "
+" $Id: boot.ab 2014-04-22 12:46:12 nineties $ "
 
 " NB: We write comments as string literals until we define comment syntax. "
 
@@ -53,6 +53,18 @@ ENV = Table.new(ENV)
     amber.do_compile  = false
     amber.output_file = nil
 
+    required_arg(arg) := {
+        list := arg.split("=")
+        if list.length < 2
+            throw `ArgumentIsMissing{!arg}
+        return list[1]
+    }
+
+    optional_arg(arg) := {
+        list := arg.split("=")
+        (list.length < 2) ? nil : list[1]
+    }
+
     r := 0  # read position
     w := 0  # write position
     while r < ARGV.size {
@@ -61,12 +73,9 @@ ENV = Table.new(ENV)
             amber.do_preparse = true
             r += 1
             continue
-        } else if arg == "--compile" {
+        } else if arg[0..8] == "--compile" {
             amber.do_compile = true
-            r += 1
-            continue
-        } else if arg[0,9] == "--output=" {
-            amber.output_file = arg[9,-1]
+            amber.output_file = optional_arg(arg)
             r += 1
             continue
         } else if arg[0] == "-"
