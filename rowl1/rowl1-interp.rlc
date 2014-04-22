@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-interp.rlc 2014-04-20 22:06:55 nineties $
+; $Id: rowl1-interp.rlc 2014-04-22 10:01:43 nineties $
 ;
 
 (import "rlvm-compile")
@@ -21,8 +21,6 @@
 (import "rowl1-tuple")
 (import "rowl1-array")
 
-(extern object opt_preparse)
-(extern object opt_compile)
 
 (export var amber null)
 (export var global null)
@@ -93,9 +91,6 @@
     ))
 
 (fun eval_main_ (argc argv) (
-    (if opt_preparse
-        (output_string stdout "Generating pre-parsed libs...\n")
-        )
 
     (= current_loc no_loc)
 
@@ -135,10 +130,7 @@
     (set_var amber (to_sym "VERSION") (version_string))
     (set_var amber (to_sym "ENV") (construct_env))
     (setup_minimal_interpreter prim)
-    (if (== opt_compile @C_TRUE)
-        (load_file "compile.ab")
-        (load_file "interpret.ab")
-        )
+    (load_file "boot.ab")
     (eval_exit @C_NIL)
     (return 0)
     ))
@@ -152,23 +144,8 @@
     (return v)
     ))
 
-(fun preparse_ochan (path) (
-    (if (|| (! opt_preparse) (! path)) (return 0))
-    ; change .ab to .abc
-    (var abc_path (strcat path "c"))
-    (if (<= (mtime path) (mtime abc_path)) (return 0))
-    (output_string stdout path)
-    (output_string stdout " => ")
-    (output_string stdout abc_path)
-    (output_string stdout "\n")
-    (var ochan (open_out abc_path @(| O_WRONLY O_CREAT O_TRUNC)))
-    (if (! ochan) (throw (io_error1 (string "Open failed") abc_path)))
-    (return ochan)
-    ))
-
 (extern fun fullform)
-(fun interpret (p path) (
-    (var ochan (preparse_ochan path))
+(fun interpret (p) (
     (while 1 (do
         (set_loc (get_loc p))
         (parse_toplevel p)
@@ -176,13 +153,8 @@
             (if (end_of_file p) break)
             (throw (syntax_error (parser_error p)))
             ))
-        (if ochan (do
-            (output_string ochan (fullform (parsed_token p)))
-            (output_string ochan "\n")
-            ))
         (evalfull (parsed_token p))
         ))
-    (if ochan (close_out ochan))
     ))
 
 (fun interpret_preparsed (p) (
@@ -299,10 +271,6 @@
             ; Check whether there is pre-parsed lib.
             (var pcpath (strcat rpath "c"))
             (var pre @FALSE)
-            (if (&& (! opt_preparse) (file_exists pcpath)) (do
-                (= rpath pcpath)
-                (= pre @TRUE)
-                ))
             (var ichan (open_in rpath @FALSE))
             (if (! ichan) (throw (io_error1 (string "Open failed") fullpath)))
             (var dir (get_directory rpath))
@@ -316,7 +284,7 @@
                 (set_loc (get_loc p))
                 (if pre
                     (interpret_preparsed p)
-                    (interpret p fullpath)
+                    (interpret p)
                     )
                 )
             (catch e (do
@@ -353,7 +321,7 @@
     (var p (make_parser path ichan))
     (set_slot p Syntax (get_var amber Syntax))
     (set_loc (get_loc p))
-    (interpret p 0)
+    (interpret p)
     (if (< (fchdir fd) 0)
         (throw (os_error (string "Failed to change directory to '.'"))))
     (if (< (close fd) 0)

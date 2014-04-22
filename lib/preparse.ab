@@ -1,0 +1,38 @@
+# Copyright (C) 2014 nineties
+# $Id: preparse.ab 2014-04-22 09:57:30 nineties $
+
+if ARGV.empty? {
+    # Pre-parse standard libraries.
+    stderr.puts("Generating pre-parsed standard libraries...")
+
+    FILES := ["boot.ab", "preparse.ab", "compile.ab", "interpret.ab",
+              "base.ab", "object_system.ab", "module.ab", "symbol.ab",
+              "parser.ab", "numeric.ab", "numeric/algorithm.ab",
+              "numeric/bit.ab", "numeric/random.ab", "string.ab",
+              "string/ascii.ab", "iterable.ab", "tuple.ab", "list.ab",
+              "stack.ab", "math.ab", "table.ab", "array.ab", "io.ab",
+              "sys.ab", "function.ab", "template.ab", "pretty_print.ab",
+              "syntax/parse.ab", "syntax/print.ab", "symbolic/analysis.ab",
+              "symbolic/basic.ab", "symbolic/simpl.ab", "algebra.ab",
+              "algebra/data.ab", "algebra/euclid.ab",
+              "algebra/rational.ab", "algebra/linalg.ab",
+              "algebra/syntax.ab", "CAST.ab", "CAST/syntax.ab"]
+
+    for f in FILES {
+        inp  := io::open_in(f)
+        outp := io::open_out(f ++ "c")
+        try {
+            stderr.puts(f ++ " => " ++ f ++ "c")
+            p := Parser.new(inp, amber::syntax)
+            while syntax::toplevel(p)
+                outp.puts(fullform(p.tree))
+            tree := parser::parse(amber, inp)
+        } catch e -> {
+            inp.close()
+            outp.close()
+            throw e
+        }
+        inp.close()
+        outp.close()
+    }
+}
