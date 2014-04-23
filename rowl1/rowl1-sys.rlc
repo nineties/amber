@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-sys.rlc 2014-04-16 17:19:59 nineties $
+; $Id: rowl1-sys.rlc 2014-04-23 23:55:23 nineties $
 ;
 
 (import "rlvm-compile")
@@ -15,6 +15,7 @@
 (import "rowl1-object")
 (import "rowl1-compile")
 (import "rowl1-error")
+(import "rowl1-numeric")
 
 (fun sys_chdir (path) (
     (if (< (chdir path) 0)
@@ -30,9 +31,19 @@
     (return cwd)
     ))
 
+(fun sys_exist (path) (
+    (if (file_exists path) (return @C_TRUE) (return @C_FALSE))
+    ))
+
+(fun sys_mtime (path) (
+    (return (norm (uint_to_bint (mtime path))))
+    ))
+
 (export fun setup_sys (mod) (
     (add_function1 mod (to_sym "chdir") stringT sys_chdir 0)
     (add_function0 mod (to_sym "getcwd") sys_getcwd 0)
+    (add_function1 mod (to_sym "file_exist?") stringT sys_exist 0)
+    (add_function1 mod (to_sym "mtime") stringT sys_mtime 0)
     ))
 
     ))
