@@ -1,27 +1,31 @@
 # Copyright (C) 2014 nineties
-# $Id: preparse.ab 2014-04-22 14:25:55 nineties $
+# $Id: preparse.ab 2014-04-23 23:57:35 nineties $
+
+import sys
 
 if ARGV.empty? {
     # Pre-parse standard libraries.
     stderr.puts("Generating pre-parsed standard libraries...")
 
-    FILES := ["boot.ab", "preparse.ab", "compile.ab", "interpret.ab",
-              "base.ab", "object_system.ab", "module.ab", "symbol.ab",
-              "parser.ab", "numeric.ab", "numeric/algorithm.ab",
-              "numeric/bit.ab", "numeric/random.ab", "string.ab",
-              "string/ascii.ab", "iterable.ab", "tuple.ab", "list.ab",
-              "math.ab", "table.ab", "array.ab", "io.ab", "sys.ab",
-              "function.ab", "template.ab", "pretty_print.ab",
-              "interactive.ab", "syntax/parse.ab", "syntax/print.ab",
-              "symbolic/analysis.ab", "symbolic/basic.ab",
-              "symbolic/simpl.ab", "algebra.ab", "algebra/data.ab",
-              "algebra/euclid.ab", "algebra/rational.ab",
-              "algebra/linalg.ab", "algebra/syntax.ab", "CAST.ab",
-              "CAST/syntax.ab"]
+    FILES := ["boot.ab", "compile.ab", "interpret.ab", "base.ab",
+              "object_system.ab", "module.ab", "symbol.ab", "parser.ab",
+              "numeric.ab", "numeric/algorithm.ab", "numeric/bit.ab",
+              "numeric/random.ab", "string.ab", "string/ascii.ab",
+              "iterable.ab", "tuple.ab", "list.ab", "math.ab", "table.ab",
+              "array.ab", "io.ab", "sys.ab", "function.ab", "template.ab",
+              "pretty_print.ab", "interactive.ab", "syntax/parse.ab",
+              "syntax/print.ab", "symbolic/analysis.ab",
+              "symbolic/basic.ab", "symbolic/simpl.ab", "algebra.ab",
+              "algebra/data.ab", "algebra/euclid.ab",
+              "algebra/rational.ab", "algebra/linalg.ab",
+              "algebra/syntax.ab", "CAST.ab", "CAST/syntax.ab"]
 
     for f in FILES {
+        new_f := f ++ "c"
+        if sys::exist?(new_f) and sys::mtime(new_f) > sys::mtime(f)
+            continue
         inp  := io::open_in(f)
-        outp := io::open_out(f ++ "c")
+        outp := io::open_out(new_f)
         try {
             stderr.puts(f ++ " => " ++ f ++ "c")
             p := Parser.new(inp, amber::syntax)
