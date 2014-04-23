@@ -1,0 +1,32 @@
+# Copyright (C) 2014 nineties
+# $Id: algebra/linalg/syntax.ab 2014-04-23 17:01:29 nineties $
+
+#= language for linear algebra =
+
+# XXX: add some util to write following lines more easily.
+
+spaces     := amber::syntax::spaces
+identifier := amber::syntax::identifier
+integer    := amber::syntax::integer
+decimal    := amber::syntax::decimal
+binary     := amber::syntax::binary
+octal      := amber::syntax::octal
+hex        := amber::syntax::hex
+float      := amber::syntax::float
+string     := amber::syntax::string
+
+# Expressions
+
+primary ::= float
+          | integer
+          | identifier
+          | "(" expr ")"    { $1 }
+          | "(" delimited2(expr, ",") ")"  { `Vector{!$1...} }
+
+postfix ::= postfix "^" "-1"    { `Inverse{!$0} }
+          | postfix "^" "T"     { `Transpose{!$0} }
+          | postfix "^" decimal { `Power{!$0, !$3} }
+          | primary
+
+
+default := postfix

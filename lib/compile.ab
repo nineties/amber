@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: compile.ab 2014-04-22 17:44:52 nineties $
+# $Id: compile.ab 2014-04-23 17:32:11 nineties $
 
 #= Ahead-of-time compilation =
 
@@ -16,8 +16,7 @@ if ARGV.empty? {
 }
 
 # Construct a state object for compilation.
-CompileState := `CompileState{}
-
+Compiler := `Compiler{}
 
 # Detect input and output languages.
 languages := Table{
@@ -38,26 +37,35 @@ load_lang(f, type) := {
     evalfull(`(Import{[!l]}))
 }
 
-CompileState.input_file      := ARGV[0]
+Compiler.input_file      := ARGV[0]
 if not amber.output_file
     amber.output_file := ask("What is the name of the output file?")
-CompileState.output_file     := amber.output_file
-CompileState.input_language  := load_lang(ARGV[0], "input")
-CompileState.output_language := load_lang(amber.output_file, "output")
+Compiler.output_file     := amber.output_file
+Compiler.input_language  := load_lang(ARGV[0], "input")
+Compiler.output_language := load_lang(amber.output_file, "output")
+
+# Logging
+Compiler.log(level @ Int, fmt @ String, args...) := {
+    if level <= amber.verbose_level {
+        printf(fmt, args...)
+        stdout.flush()
+    }
+}
+Compiler.log(fmt @ String, args...) := self.log(0, fmt, args...)
 
 # Parse the inputfile as a program of given language.
-CompileState.tree := {
-    tree := nil
+Compiler.program := {
+    prog := nil
     fp   := io::open_in(ARGV[0])
     try {
-        tree = parser::parse(CompileState.input_language, fp)
+        prog = parser::parse(Compiler.input_language, fp)
     } catch e -> {
         fp.close()
         throw e
     }
     fp.close()
-    tree
+    prog
 }
 
-evalfull(`(Import{[!CompileState.output_language.name, compiler]}))
+evalfull(`(Import{[!Compiler.output_language.name, compiler]}))
 exit(0)
