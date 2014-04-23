@@ -1,5 +1,5 @@
 # Copyright (C) 2010 nineties
-# $Id: base.ab 2014-04-23 21:30:37 nineties $
+# $Id: base.ab 2014-04-23 21:53:53 nineties $
 
 #== The most basic functions and methods. ==
 
@@ -336,6 +336,19 @@ str(f @ Float, precision=0) := prim.float_to_string(f, precision)
 str(s @ String) := s
 
 #== Patter-based tree operations ==
+# Pre-order and post-order traversing of a tree.
+preorder(tree, f) := {
+    iter(obj) := { f(obj); obj.arguments.map(iter) }
+    iter(tree)
+    nil
+}
+
+postorder(tree, f) := {
+    iter(obj) := { obj.arguments.map(iter); f(obj) }
+    iter(tree)
+    nil
+}
+
 # Substitute nodes of `obj` by `f`
 # Example:
 # ----
@@ -360,16 +373,17 @@ subst(obj, f) := {
 nil.get(f @ Function) := subst(self, f)
 
 # Collect nodes of `obj` that satisfy the predicate `f`.
-collect(obj, f) := {
+collect(obj, f, traverse=preorder) := {
     list := []
+
     f = f | _ -> false
-    g(node) when f(node) := {
-        list = cons(node, list)
-        node
-    }
-    subst(obj, g)
-    list
+    g(node) when f(node) := { list = cons(node, list) }
+
+    traverse(obj, g)
+    list.reverse()
 }
 
 # Enable pattern-collection by `obj.collect(f)`.
-nil.collect(f @ Function) := collect(self, f)
+nil.collect(f @ Function, traverse=preorder)
+    := collect(self, f, traverse=traverse)
+
