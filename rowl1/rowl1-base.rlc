@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-base.rlc 2014-04-22 07:26:12 nineties $
+; $Id: rowl1-base.rlc 2014-04-23 21:29:51 nineties $
 ;
 
 (import "rlvm-compile")
@@ -124,21 +124,6 @@
     (return v)
     ))
 
-(extern fun array_copy)
-(extern fun tuple_copy)
-(extern fun table_copy)
-(fun _copy (obj) (
-    (if (is_atom obj) (throw (exception1 (string "can not copy atomic object") obj)))
-    (if (is_list obj) (return (list_copy obj)))
-    (if (is_tuple obj) (return (tuple_copy obj)))
-    (if (is_array obj) (return (array_copy obj)))
-    (if (is_table obj) (return (table_copy obj)))
-    (var n (expr_size obj))
-    (var copy (allocate_expr n))
-    (memcpy copy obj (* 4 (+ n 1)))
-    (return copy)
-    ))
-
 (export fun copy_node (obj) (
     (if (is_atom obj) (return obj))
     (var p (get_parent obj))
@@ -173,6 +158,7 @@
     (add_function2 mod (to_sym "get_arg") DontCare intT get_arg 0)
     (add_function3 mod (to_sym "set_arg") DontCare intT DontCare _set_arg 0)
     (add_function1 mod (to_sym "hash") DontCare _hash 0)
+    (add_function1 mod (to_sym "copy") DontCare copy_node 0)
     ))
 
     ))
