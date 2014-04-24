@@ -1,12 +1,23 @@
 # Copyright (C) 2014 nineties
-# $Id: algebra/linalg.ab 2014-04-17 23:56:25 nineties $
+# $Id: algebra/linalg.ab 2014-04-24 23:25:59 nineties $
 
 import math
 
 #= Linear algebra =
 #== Vector ==
+
+class Vector
+
 # Creation of a vector
-vector(values...) := node('Vector, values...)
+vector(values...) := node('Vector, values...) with .parent = Vector
+
+# Zero vector.
+zeros(n @ Int) := throw `DomainError{"vector length must be positive", n}
+zeros(n @ Int) when n > 0 := vector(List.new(_ -> 0, n)...)
+zeros(1) := vector(0)
+zeros(2) := vector(0, 0)
+zeros(3) := vector(0, 0, 0)
+zeros(4) := vector(0, 0, 0, 0)
 
 # The dimention of the vector.
 dim(v @ Vector) := v.arity
@@ -37,12 +48,12 @@ for op in ['mul] {
                 c[i] = op(s, v[i])
             c
         }
-        linalg::op(s, Vector{v0})     := `Vector{!op(s, v0)}
-        linalg::op(s, Vector{v0, v1}) := `Vector{!op(s, v0), !op(s, v1)}
+        linalg::op(s, Vector{v0})     := vector(op(s, v0))
+        linalg::op(s, Vector{v0, v1}) := vector(op(s, v0), op(s, v1))
         linalg::op(s, Vector{v0, v1, v2})
-            := `Vector{!op(s, v0), !op(s, v1), !op(s, v2)}
+            := vector(op(s, v0), op(s, v1), op(s, v2))
         linalg::op(s, Vector{v0, v1, v2, v3})
-            := `Vector{!op(s, v0), !op(s, v1), !op(s, v2), !op(s, v3)}
+            := vector(op(s, v0), op(s, v1), op(s, v2), op(s, v3))
     }
     evalfull code['op -> op]
 }
@@ -57,12 +68,12 @@ for op in ['mul, 'div, 'pow] {
                 c[i] = op(v[i], s)
             c
         }
-        linalg::op(Vector{v0}, s)     := `Vector{!op(v0, s)}
-        linalg::op(Vector{v0, v1}, s) := `Vector{!op(v0, s), !op(v1, s)}
+        linalg::op(Vector{v0}, s)     := vector(op(v0, s))
+        linalg::op(Vector{v0, v1}, s) := vector(op(v0, s), op(v1, s))
         linalg::op(Vector{v0, v1, v2}, s)
-            := `Vector{!op(v0, s), !op(v1, s), !op(v2, s)}
+            := vector(op(v0, s), op(v1, s), op(v2, s))
         linalg::op(Vector{v0, v1, v2, v3}, s)
-            := `Vector{!op(v0, s), !op(v1, s), !op(v2, s), !op(v3, s)}
+            := vector(op(v0, s), op(v1, s), op(v2, s), op(v3, s))
     }
     evalfull code['op -> op]
 }
@@ -79,13 +90,85 @@ for op in ['add, 'sub, 'mul, 'div] {
                 c[i] = op(a[i], b[i])
             c
         }
-        linalg::op(Vector{a0}, Vector{b0}) := `Vector{!op(a0, b0)}
+        linalg::op(Vector{a0}, Vector{b0}) := vector(op(a0, b0))
         linalg::op(Vector{a0, a1}, Vector{b0, b1})
-            := `Vector{!op(a0, b0), !op(a1, b1)}
+            := vector(op(a0, b0), op(a1, b1))
         linalg::op(Vector{a0, a1, a2}, Vector{b0, b1, b2})
-            := `Vector{!op(a0, b0), !op(a1, b1), !op(a2, b2)}
+            := vector(op(a0, b0), op(a1, b1), op(a2, b2))
         linalg::op(Vector{a0, a1, a2, a3}, Vector{b0, b1, b2, b3})
-            := `Vector{!op(a0, b0), !op(a1, b1), !op(a2, b2), !op(a3, b3)}
+            := vector(op(a0, b0), op(a1, b1), op(a2, b2), op(a3, b3))
+    }
+    evalfull code['op -> op]
+}
+
+# destructive vector-scalar arithmetic
+for op in ['mul!, 'div!] {
+    code := 'seq {
+        Vector.op(s) := {
+            n := self.arity
+            for i in 0..n-1
+                self[i] = self[i].op(s)
+            self
+        }
+        Vector.op(s) when self.arity == 1 := {
+            self[0] = self[0].op(s)
+            self
+        }
+        Vector.op(s) when self.arity == 2 := {
+            self[0] = self[0].op(s)
+            self[1] = self[1].op(s)
+            self
+        }
+        Vector.op(s) when self.arity == 3 := {
+            self[0] = self[0].op(s)
+            self[1] = self[1].op(s)
+            self[2] = self[2].op(s)
+            self
+        }
+        Vector.op(s) when self.arity == 4 := {
+            self[0] = self[0].op(s)
+            self[1] = self[1].op(s)
+            self[2] = self[2].op(s)
+            self[3] = self[3].op(s)
+            self
+        }
+    }
+    evalfull code['op -> op]
+}
+
+# destructive vector-vector arithmetic
+for op in ['add!, 'sub!, 'mul!, 'div!] {
+    code := 'seq {
+        Vector.op(other @ Vector) :=
+            throw `DomainError{"dimension mismatch", !self, !other}
+        Vector.op(other @ Vector) when self.arity == other.arity := {
+            n := self.arity
+            for i in 0..n-1
+                self[i] = self[i].op(other[i])
+            self
+        }
+        Vector.op(Vector{a0}) when self.arity == 1 := {
+            self[0] = self[0].op(a0)
+            self
+        }
+        Vector.op(Vector{a0, a1}) when self.arity == 2 := {
+            self[0] = self[0].op(a0)
+            self[1] = self[1].op(a1)
+            self
+        }
+        Vector.op(Vector{a0, a1, a2}) when self.arity == 3 := {
+            self[0] = self[0].op(a0)
+            self[1] = self[1].op(a1)
+            self[2] = self[2].op(a2)
+            self
+        }
+        Vector.op(Vector{a0, a1, a2, a3}) when self.arity == 4 := {
+            self[0] = self[0].op(a0)
+            self[1] = self[1].op(a1)
+            self[2] = self[2].op(a2)
+            self[3] = self[3].op(a3)
+            self
+        }
     }
     evalfull code['op -> op]
 }
@@ -110,14 +193,6 @@ dot(Vector{a0,a1,a2,a3}, Vector{b0,b1,b2,b3}) := a0*b0+a1*b1+a2*b2+a3*b3
 
 cross(Vector{a0,a1,a2}, Vector{b0,b1,b2})
     := vector(a1*b2-a2*b1, a2*b0-a0*b2, a0*b1-a1*b0)
-
-# Zero vector.
-zeros(n @ Int) := throw `DomainError{"vector length must be positive", n}
-zeros(n @ Int) when n > 0 := vector(List.new(_ -> 0, n)...)
-zeros(1) := vector(0)
-zeros(2) := vector(0, 0)
-zeros(3) := vector(0, 0, 0)
-zeros(4) := vector(0, 0, 0, 0)
 
 #== Matrix ==
 # An (n,m) matrix is represented by `Matrix{v1, v2, ..., vm}` where
