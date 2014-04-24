@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: syntax/parse.ab 2014-04-22 16:10:06 nineties $ "
+" $Id: syntax/parse.ab 2014-04-24 22:31:58 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -729,6 +729,12 @@ desugar_iter(a @ Quasiquote, vars, checks, level) := {
 desugar_iter(a @ Unquote, vars, checks, level) := {
     arg := desugar_iter(prim.get_arg(a, 0), vars, checks, level - 1)
     node('Unquote, arg)
+}
+desugar_iter(a @ Keyword, vars, checks, 0) := {
+    v := prim.get_arg(a, 0)
+    if prim.array_include?(vars, v)
+        throw `Error{"parameter name conflict", !v}
+    a
 }
 desugar_iter(a @ Domain, vars, checks, 0) := {
     v   := prim.get_arg(a, 0)
