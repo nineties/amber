@@ -1,7 +1,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-04-26 17:52:32 nineties $
+; $Id: rowl1-compile.rlc 2014-04-26 21:18:46 nineties $
 ;
 
 (import "rlvm-compile")
@@ -103,7 +103,7 @@
     (return (cons sym (list_delete sym list)))
     ))
 
-(fun collect_args (args) (
+(fun collect_params (args) (
     (if (== (node_head args) When)
         (return (iter_args add_var (node_arg args 0) 0 0))
         (return (iter_args add_var args 0 0))
@@ -278,7 +278,7 @@
         (return expr)
         ))
     (if (== hd Define) (do
-        (var syms (collect_args (node_arg expr 0)))
+        (var syms (collect_params (node_arg expr 0)))
         (while syms (do
             (var sym (car syms))
             (if (! (symtable_find tbl sym)) (do
@@ -565,7 +565,7 @@
     ))
 
 (fun store_args (tbl args stmts) (
-    (var vars (collect_args args))
+    (var vars (collect_params args))
     (while vars (do
         (var s (symtable_find tbl (car vars)))
         (if (&& s (!= s maybe)) (do 
@@ -607,7 +607,7 @@
     ;; closure conversion
     (var tbl (make_symtable 10))
     (symtable_push tbl)
-    (var vars (collect_args args))
+    (var vars (collect_params args))
     (while vars (do
         (symtable_add tbl (car vars) maybe)
         (= vars (cdr vars))
@@ -2425,6 +2425,8 @@
     (add_compiler mod (make_node2 Closure DontCare DontCare) compile_closure)
     (add_compiler mod (make_node3 Ref DontCare intT symT) compile_clsref)
     (add_compiler mod (quote Decons) compile_decons)
+
+    (add_function1 mod (to_sym "collect_parameters") DontCare collect_params 0)
     ))
 
 (export fun add_compiler (mod pat func) (
