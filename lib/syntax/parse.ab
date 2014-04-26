@@ -1,5 +1,5 @@
 " Copyright (C) 2010 nineties "
-" $Id: syntax/parse.ab 2014-04-26 07:54:06 nineties $ "
+" $Id: syntax/parse.ab 2014-04-26 18:58:59 nineties $ "
 
 " Syntax definition of the Amber language. "
 
@@ -325,7 +325,8 @@ caseof_expr
       | continuation_expr
 
 assign_expr
-    ::= pattern "=" assign_expr   { `Assign{!node0, !node2} }
+    ::= pattern "=" assign_expr
+        { syntax::normalize(`Assign{!node0, !node2}) }
       | pattern "+=" assign_expr  { `AddAssign{!node0, !node2} }
       | pattern "++=" assign_expr { `NcAddAssign{!node0, !node2} }
       | pattern "-=" assign_expr  { `SubAssign{!node0, !node2} }
@@ -343,6 +344,26 @@ assign_expr
 Assign{syntax::expr, syntax::assign_expr}
 
 ### Statements
+
+## Normalization of define and assign statements.
+Define{syntax::normalize, e -> e}
+Define{syntax::normalize, (Assign{Apply{f, args}, e})
+    -> `Assign{!f, Lambda{!args, !e}, union}, union}
+Define{syntax::normalize, (Assign{Apply{f, args}, e, g})
+    -> `Assign{!f, Lambda{When{!args, !g}, !e}, union}, union}
+Define{syntax::normalize, (Assign{Send{obj, f, args}, e})
+    -> `Assign{Slot{!obj, !f}, Lambda{!args, !e}, union}, union}
+Define{syntax::normalize, (Assign{Send{obj, f, args}, e, g})
+    -> `Assign{Slot{!obj, !f}, Lambda{When{!args, !g}, !e}, union}, union}
+Define{syntax::normalize, (Define{Apply{f, args}, e})
+    -> `Define{!f, Lambda{!args, !e}, union}, union}
+Define{syntax::normalize, (Define{Apply{f, args}, e, g})
+    -> `Define{!f, Lambda{When{!args, !g}, !e}, union}, union}
+Define{syntax::normalize, (Define{Send{obj, f, args}, e})
+    -> `Define{Slot{!obj, !f}, Lambda{!args, !e}, union}, union}
+Define{syntax::normalize, (Define{Send{obj, f, args}, e, g})
+    -> `Define{Slot{!obj, !f}, Lambda{When{!args, !g}, !e}, union}, union}
+
 
 # parenthleses-less tuple pattern and expression
 tuple_pattern ::= delimited2(pattern, ",")  { Node{'Tuple, node0} }
@@ -393,13 +414,13 @@ stmt
       | <<multiline>> 'try block 'catch multi_lambda_expr
         { `Try{!node1, !node3} }
       | <<multiline>> pattern guard_clause ":=" stmt
-        { `Define{!node0, !node3, !node1} }
+        { syntax::normalize(`Define{!node0, !node3, !node1}) }
       | <<multiline>> pattern ":=" stmt
-        { `Define{!node0, !node2} }
+        { syntax::normalize(`Define{!node0, !node2}) }
       | tuple_pattern ":=" tuple_expr
-        { `Define{!node0, !node2} }
+        { syntax::normalize(`Define{!node0, !node2}) }
       | tuple_pattern "=" tuple_expr
-        { `Assign{!node0, !node2} }
+        { syntax::normalize(`Assign{!node0, !node2}) }
       | 'import delimited1(symbol, "::") import_as? import_option?
         { `Import{!node1, !node2, !node3} }
       | postfix_expr ![+-.{] delimited1(argument, ",")
@@ -588,15 +609,6 @@ Define{expand_macro, obj -> expand_macro(obj, 0), union}
 
 # Expand macros only once before eval.
 before_eval := expand_macro
-
-macro = union((Assign{Apply{f, args}, e}) -> `Assign{!f, Lambda{!args, !e}, union}, macro)
-macro(Define{Apply{f, args}, e})     = `Define{!f, Lambda{!args, !e}, union}
-macro(Define{Send{obj, f, args}, e}) = `Define{Slot{!obj, !f}, Lambda{!args, !e}, union}
-macro(Assign{Send{obj, f, args}, e}) = `Assign{Slot{!obj, !f}, Lambda{!args, !e}, union}
-macro(Define{Apply{f, args}, e, g})     = `Define{!f, Lambda{When{!args, !g}, !e}, union}
-macro(Assign{Apply{f, args}, e, g})     = `Assign{!f, Lambda{When{!args, !g}, !e}, union}
-macro(Define{Send{obj, f, args}, e, g}) = `Define{Slot{!obj, !f}, Lambda{When{!args, !g}, !e}, union}
-macro(Assign{Send{obj, f, args}, e, g}) = `Assign{Slot{!obj, !f}, Lambda{When{!args, !g}, !e}, union}
 
 macro(|x|)     = `abs(!x)
 macro(+x)      = `uplus(!x)
