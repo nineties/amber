@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-node.rlc 2014-04-20 23:22:21 nineties $
+; $Id: rowl1-node.rlc 2014-04-26 09:01:19 nineties $
 ;
 
 (import "rlvm-compile")
@@ -181,10 +181,6 @@
     ))
 
 (export fun symbol_name (sym) (
-    (if (is_special sym) (do
-        (if (== sym @C_NIL) (return (string "nil")))
-        (return (string "undef"))
-        ))
     (return (field_get sym @SymbolName))
     ))
 
@@ -194,7 +190,7 @@
     (if (|| (== obj @C_TRUE) (== obj @C_FALSE)) (return @BoolE)
     (if (== obj @C_NIL) (return @NilE)
     (if (== obj @C_UNDEF) (return @UndefE)
-    (if (is_special obj) (return @SymbolE)))))))
+        )))))
     (var tag (get_tag obj))
     (if (== tag @TAG_PSTRUCT) (return (+ (get_pstruct_tag obj) @PLAIN_TYPE_OFFSET))
     (if (== tag @TAG_VARIANT) (return (field_get obj 0))
@@ -310,7 +306,7 @@
 (extern fun table_to_list)
 (export fun node_args (expr) (
     (if (is_atom expr) (return 0))
-    (if (is_list expr) (return expr))
+    (if (is_list expr) (return (list_copy expr)))
     (if (is_tuple expr) (return (tuple_to_list expr)))
     (if (is_array expr) (return (ary_to_list expr)))
     (if (is_table expr) (return (table_to_list expr)))
@@ -449,7 +445,7 @@
         )
 
     ; following three objects uses special data structure
-    (if (== head List)  (return args))
+    (if (== head List)  (return (list_copy args)))
     (if (== head Tuple) (return (list_to_tuple args)))
     (if (== head Array) (return (list_to_ary args)))
     (if (== head Table) (return (list_to_table args)))
@@ -534,11 +530,12 @@
     ))
 
 (export fun output_symbol (ochan sym) (
-    (if (is_special sym) (do
-        (if (== sym @C_FALSE) (return (output_string ochan "false")))
-        (return (output_string ochan "undef"))
+    (var name (field_get sym @SymbolName))
+    (output_string ochan name)
+    (if (== (array_get char name 0) '%') (do
+        (output_int ochan (field_get sym @SymbolIndex))
         ))
-    (output_string ochan (field_get sym @SymbolName))
+    ;(output_string ochan (field_get sym @SymbolName))
     ))
 
 ; types

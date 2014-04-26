@@ -1,7 +1,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-04-21 22:34:15 nineties $
+; $Id: rowl1-compile.rlc 2014-04-26 09:19:53 nineties $
 ;
 
 (import "rlvm-compile")
@@ -33,7 +33,7 @@
 (extern object global)
 (extern object variables)
 (extern fun set_loc)
-(extern fun copy_node)
+(extern fun deep_copy)
 (extern fun set_slot)
 (extern fun set_slot_union)
 (extern fun set_slot_overwrite)
@@ -120,7 +120,6 @@
 (fun fv_iter (expr level fv) (
     (if (is_symbol expr) (do
         (if (== level 0) (do
-            (if (is_special expr) (return fv))
             (if (== expr DontCare) (return fv))
             (= fv (list_delete expr fv))
             (return (cons expr fv))
@@ -1527,7 +1526,7 @@
 
 (fun compile_quote (asm expr) (
     (put_push asm (node_arg expr 0))
-    (compile_simple_call asm 1 copy_node)
+    (compile_simple_call asm 1 deep_copy)
     ))
 
 (extern fun tuple2)

@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-base.rlc 2014-04-23 21:29:51 nineties $
+; $Id: rowl1-base.rlc 2014-04-25 21:14:31 nineties $
 ;
 
 (import "rlvm-compile")
@@ -124,16 +124,28 @@
     (return v)
     ))
 
-(export fun copy_node (obj) (
+(export fun deep_copy (obj) (
     (if (is_atom obj) (return obj))
     (var p (get_parent obj))
     (var h (node_head obj))
     (var args (node_args obj))
     (var args_ args)
     (while args_ (do
-        (setcar args_ (copy_node (car args_)))
+        (setcar args_ (deep_copy (car args_)))
         (= args_ (cdr args_))
         ))
+    (= obj (make_node h args))
+    (if (!= p @C_NIL)
+        (set_parent obj p)
+        )
+    (return obj)
+    ))
+
+(export fun shallow_copy (obj) (
+    (if (is_atom obj) (return obj))
+    (var p (get_parent obj))
+    (var h (node_head obj))
+    (var args (node_args obj))
     (= obj (make_node h args))
     (if (!= p @C_NIL)
         (set_parent obj p)
@@ -158,7 +170,8 @@
     (add_function2 mod (to_sym "get_arg") DontCare intT get_arg 0)
     (add_function3 mod (to_sym "set_arg") DontCare intT DontCare _set_arg 0)
     (add_function1 mod (to_sym "hash") DontCare _hash 0)
-    (add_function1 mod (to_sym "copy") DontCare copy_node 0)
+    (add_function1 mod (to_sym "deep_copy") DontCare deep_copy 0)
+    (add_function1 mod (to_sym "shallow_copy") DontCare shallow_copy 0)
     ))
 
     ))
