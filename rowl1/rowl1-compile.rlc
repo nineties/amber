@@ -1,7 +1,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-04-26 09:19:53 nineties $
+; $Id: rowl1-compile.rlc 2014-04-26 17:52:32 nineties $
 ;
 
 (import "rlvm-compile")
@@ -171,7 +171,7 @@
     (return (fv_iter expr 0 0))
     ))
 
-(fun unqualified_args_iter (expr ret level) (
+(fun cleanup_pattern_iter (expr ret level) (
     (if (== expr DontCare)
         (return expr)
         )
@@ -190,7 +190,7 @@
     (if (is_list expr) (do
         (var ls expr)
         (while ls (do
-            (setcar ls (unqualified_args_iter (car ls) ret level))
+            (setcar ls (cleanup_pattern_iter (car ls) ret level))
             (= ls (cdr ls))
             ))
         (return expr)
@@ -200,10 +200,10 @@
     (if (== hd Domain)
         (if (== level 0) (do
             (node_arg_set expr 0
-                (unqualified_args_iter (node_arg expr 0) ret 0))
+                (cleanup_pattern_iter (node_arg expr 0) ret 0))
             (var dom (node_arg expr 1))
             (if (! (is_symbol dom))
-                (node_arg_set expr 1 (unqualified_args_iter dom ret 0))
+                (node_arg_set expr 1 (cleanup_pattern_iter dom ret 0))
                 )
             (return expr)
             ))
@@ -212,14 +212,14 @@
 
     (for i 0 (node_size expr)
         (node_arg_set expr i
-            (unqualified_args_iter (node_arg expr i) ret level))
+            (cleanup_pattern_iter (node_arg expr i) ret level))
         )
     (return expr)
     ))
 
-(fun unqualified_args (args) (
+(fun cleanup_pattern (args) (
     (var ret (struct 3 0 0 0))
-    (field_set ret 0 (unqualified_args_iter args ret 0))
+    (field_set ret 0 (cleanup_pattern_iter args ret 0))
     (return ret)
     ))
 
@@ -1059,7 +1059,7 @@
         (compile asm vars)
         return
         ))
-    (var tup (unqualified_args vars))
+    (var tup (cleanup_pattern vars))
     (var pattern (field_get tup 0))
     (var tvars   (field_get tup 1))
     (var rvars   (field_get tup 2))
@@ -1994,7 +1994,7 @@
 (fun compile_match (asm expr) (
     (var lhs (node_arg_list expr 0))
     (var rhs (node_arg_list expr 1))
-    (var tup (unqualified_args lhs))
+    (var tup (cleanup_pattern lhs))
     (var pattern (field_get tup 0))
     (var tvars   (field_get tup 1))
     (var rvars   (field_get tup 2))
@@ -2071,7 +2071,7 @@
         (compile asm lhs)
         return
         ))
-    (var tup (unqualified_args lhs))
+    (var tup (cleanup_pattern lhs))
     (var pattern (field_get tup 0))
     (var tvars   (field_get tup 1))
     (var rvars   (field_get tup 2))
