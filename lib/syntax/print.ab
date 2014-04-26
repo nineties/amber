@@ -49,7 +49,7 @@ expression?(_ @ Int or _ @ Float or _ @ String or _ @ Symbol or _ @ List or
 statement? := expression?
 statement?(_ @ Seq or If{_, _} or While{_, _} or For{_, _, _} or
            Continue{} or Break{} or Return{_} or Throw{_} or Try{_, _} or
-           Define{_, _} or Assign{_, _} or Import{_ @ List, _, _}) := true
+           _ @ Define or _ @ Assign or Import{_ @ List, _, _}) := true
 
 #== Utility formatters ==
 # Sequences with parentheses are printed as the following rule.
@@ -235,10 +235,14 @@ stmt(Throw{e})    := ["throw ", expr(e)]
 stmt(Try{body, hdlr})
     := ["try ", block(body, pre=true, post=true), "catch ", multi_lambda(hdlr)]
 stmt(Define{x, s}) := [pattern(x), " := ", stmt(s)]
-smtt(Define{f, Lambda{args, body}})
+stmt(Define{f, Lambda{args, body}})
+    := [pattern(f), " := ", lambda_arg(args), " -> ", stmt(body)]
+stmt(Define{f, Lambda{args, body}, 'union})
     := [pattern(f), lambda_arg(args), " := ", stmt(body)]
 stmt(Assign{x, e}) := [pattern(x), " = ", expr(e)]
 stmt(Assign{f, Lambda{args, body}})
+    := [pattern(f), " = ", lambda_arg(args), " -> ", stmt(body)]
+stmt(Assign{f, Lambda{args, body}, 'union})
     := [pattern(f), lambda_arg(args), " = ", stmt(body)]
 stmt(s @ Import{mods, name, option}) := {
     doc := ["import ", mods.map(str).weave("::")]
