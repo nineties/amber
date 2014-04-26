@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-list.rlc 2014-04-07 05:37:24 nineties $
+; $Id: rowl1-list.rlc 2014-04-26 23:05:22 nineties $
 ;
 
 (import "rlvm-compile")
@@ -180,9 +180,23 @@
     (return (assoc_set eql ls x v))
     ))
 
-(fun ls_insert_uniq (v ls) (
+(fun ls_insert (ls v) (
     (if (!= (ls_include v ls) @C_FALSE) (return ls))
     (return (cons v ls))
+    ))
+
+(fun ls_delete (ls v) (
+    (var eql (lookup_func global (to_sym "equal?")))
+    (var ls_ ls)
+    (var new 0)
+    (while ls (do
+        (if (!= (runcode eql (car ls) v) @C_FALSE) (do
+            (return (list_append (list_reverse new) (cdr ls)))
+            ))
+        (= new (cons (car ls) new))
+        (= ls (cdr ls))
+        ))
+    (return ls_)
     ))
 
 (fun ls_flatten (ls) (
@@ -196,7 +210,7 @@
 
 (fun ls_join (ls1 ls2) (
     (while ls1 (do
-        (= ls2 (ls_insert_uniq (car ls1) ls2))
+        (= ls2 (ls_insert (car ls1) ls2))
         (= ls1 (cdr ls1))
         ))
     (return ls2)
@@ -363,7 +377,6 @@
     (add_function2 mod (to_sym "list_include?") DontCare listT ls_include 0)
     (add_function2 mod (to_sym "list_assoc") listT DontCare ls_assoc 0)
     (add_function3 mod (to_sym "list_assoc_set") listT DontCare DontCare ls_assoc_set 0)
-    (add_function2 mod (to_sym "list_insert_unique") DontCare listT ls_insert_uniq 0)
     (add_function1 mod (to_sym "list_flatten") listT ls_flatten 0)
     (add_function2 mod (to_sym "list_join") listT listT ls_join 0)
     (add_function3 mod (to_sym "list_foldl") funT DontCare listT ls_foldl 0)
@@ -373,6 +386,10 @@
     (add_function2 mod (to_sym "list_subtract") listT listT ls_sub 0)
     (add_function2 mod (to_sym "list_weave") DontCare listT ls_weave 0)
     (add_function2 mod (to_sym "list_sort") listT funT ls_sort 0)
+
+    ; Set operations
+    (add_function2 mod (to_sym "list_insert") listT DontCare ls_insert 0)
+    (add_function2 mod (to_sym "list_delete") listT DontCare ls_delete 0)
     ))
 
     ))
