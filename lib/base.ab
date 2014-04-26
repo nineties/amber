@@ -1,5 +1,5 @@
 # Copyright (C) 2010 nineties
-# $Id: base.ab 2014-04-26 13:48:47 nineties $
+# $Id: base.ab 2014-04-26 21:25:11 nineties $
 
 #== The most basic functions and methods. ==
 
@@ -340,16 +340,16 @@ str(n @ Int, base=10, precision=0, prefix=false, upper=false, unsigned=false) :=
 str(f @ Float, precision=0) := prim.float_to_string(f, precision)
 str(s @ String) := s
 
-#== Patter-based tree operations ==
+#== Iteration of syntax tree ==
 # Pre-order and post-order traversing of a tree.
-preorder(tree, f) := {
-    iter(obj) := { f(obj); obj.arguments.map(iter) }
+preorder(tree, f, succ = obj -> obj.arguments) := {
+    iter(obj) := { f(obj); succ(obj).map(iter) }
     iter(tree)
     nil
 }
 
-postorder(tree, f) := {
-    iter(obj) := { obj.arguments.map(iter); f(obj) }
+postorder(tree, f, succ = obj -> obj.arguments) := {
+    iter(obj) := { succ(obj).map(iter); f(obj) }
     iter(tree)
     nil
 }
