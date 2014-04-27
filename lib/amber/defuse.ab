@@ -1,0 +1,35 @@
+# Copyright (C) 2014 nineties
+# $Id: amber/defuse.ab 2014-04-27 09:09:17 nineties $
+
+import amber::basic (collect_variables, collect_parameters)
+
+#= Construction of use-def chain =
+defuse_analysis(compiler) := {
+    compiler.log(1, "Use-definition analysis")
+    AmberProgram{lines} := compiler.program
+    for line in lines
+        global(line)
+}
+
+# Analyze global statements
+#global(_) := nil
+global(Define{_, Lambda{args @ List, body}, ...}) := {
+    livein := []
+    for p in collect_parameters(args)
+        livein = livein.assoc_set(p, [args])
+    local(body, livein)
+}
+global(Located{loc, stmt}) := global(stmt)
+
+# Analyze local statements.
+# `livein` is an assoc-list of reaching definitions and returns assoc-list
+# of live-out definitions.
+local(stmt, livein) := {
+    use      := collect_variables(stmt)
+    stmt.use := []
+    for v in use {
+        defs := livein.assoc(v)
+        stmt.use = stmt.use.assoc_set(v, defs) if defs
+    }
+    livein
+}

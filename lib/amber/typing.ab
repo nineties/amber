@@ -1,10 +1,107 @@
 # Copyright (C) 2014 nineties
-# $Id: amber/typing.ab 2014-04-23 17:32:05 nineties $
+# $Id: amber/typing.ab 2014-04-26 20:20:40 nineties $
 
 #= Type-analysis of the amber program =
 
+import algebra::linalg (*)
+import amber::ast as AST
+import amber::defuse (defuse_analysis)
+import amber::SSA as SSA
+import amber::CPT::default as CPT
+import random (discrete)
+
+macro( ('assume)(check) ) := {
+    template := '{
+        unless check
+            throw `AssertionFailure{check}
+    }
+    template['check -> check]
+}
+
 analyze(compiler) := {
-    compiler.log("Typing ...\n")
+    defuse_analysis(compiler)
+    #SSA::to_SSA(compiler)
+
+    ## XXX: alpha-conversion.
+    ## XXX: Convertion to SSA form.
+    #compiler.log("Typing %s...\n", compiler.input_file)
+    #inference(compiler)
+    #type_check(compiler)
+}
+
+inference(compiler) := {
     compiler.log(1, "Probabilistic type inference\n")
-    compiler.log(1, "Type check\n")
+
+    compiler.type_table := Table.new()
+    assign_prior_probabilties(compiler)
+    # Collect assignment to a variable.
+    #defs := compiler.program.collect(
+    #        (_ @ Define or _ @ Assign or _ @ For) -> true
+    #    )
+    #calls := compiler.program.collect(
+    #        (_ @ Apply or _ @ Send) -> true
+    #    )
+
+    prim.debugpf compiler.type_table
+    throw (compiler.program, defs, calls)
+}
+
+# Setup prior probability tables.
+assign_prior_probabilties(compiler) := {
+    f(_ @ Nil)    := CPT::mustbe('Nil)
+    f(_ @ Bool)   := CPT::mustbe('Bool)
+    f(_ @ Undef)  := CPT::mustbe('Undef)
+    f(_ @ Int)    := CPT::mustbe('Int)
+    f(_ @ Float)  := CPT::mustbe('Float)
+    f(_ @ String) := CPT::mustbe('String)
+    f(_ @ Range)  := CPT::mustbe('Range)
+    f(_ @ Tuple)  := CPT::mustbe('Tuple)
+    f(_ @ List)   := CPT::mustbe('List)
+    f(_ @ Array)  := CPT::mustbe('Array)
+
+    f(x @ Symbol) := {
+        p := compiler.type_table[x]
+        p ? p : CPT::NON_INFORMATIVE_LOCAL
+    }
+    f(Add{a, b}) := {
+        p1 := f(a)
+        p2 := f(b)
+
+        p := zeros(CPT::BASIC_TYPES.size)
+        prim.debugpf p
+        for j in 1..10 {
+            x := discrete(p1)
+            y := discrete(p2)
+            prim.debugpf (x,y)
+            p += CPT::add(CPT::BASIC_TYPES[x], CPT::BASIC_TYPES[y])
+        }
+        prim.debugpf p
+        p /= 10
+        p
+    }
+
+    g(Located{_, stmt}) := g(stmt)
+    g(s @ Define{x @ Symbol, body}) :=
+        compiler.type_table[(s, x)] = f(body)
+    g(s @ Assign{x @ Symbol, body}) :=
+        compiler.type_table[(s, x)] = f(body)
+    g(If{cond, body}) := g(body)
+
+    g(Define{Apply{f, args}, body}) := {
+        throw f
+        assume(args == [])
+        #prim.debugpf f
+        #prim.debugpf args
+        #prim.debugpf body
+        throw (f, args, body)
+    }
+
+    AmberProgram{lines} := compiler.program
+
+    for line in lines
+        g(line)
+}
+
+type_check(compiler) := {
+    compiler.log(1, "Checking infered types\n")
 }

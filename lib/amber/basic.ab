@@ -1,0 +1,24 @@
+# Copyright (C) 2014 nineties
+# $Id: amber/basic.ab 2014-04-27 09:26:43 nineties $
+
+subexpression(e)              := e.arguments
+subexpression(Slot{obj, x})   := [obj]
+subexpression(e @ Quote)      := []
+subexpression(e @ Quasiquote) := {
+    throw "Not implemented"
+}
+subexpression(For{_, expr, body}) := [expr, body]
+
+iterate_subexpr(tree, f) := preorder(tree, f, succ=subexpression)
+
+# Collect parameter variables.
+collect_parameters := prim.collect_parameters
+
+# Collect variables.
+collect_variables(tree) := {
+    set := []
+    collect(_) := nil
+    collect(x @ Symbol) := { set = set.insert(x) }
+    iterate_subexpr(tree, collect)
+    set
+}
