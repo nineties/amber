@@ -1,7 +1,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: rowl1-compile.rlc 2014-04-26 21:18:46 nineties $
+; $Id: rowl1-compile.rlc 2014-04-28 01:30:56 nineties $
 ;
 
 (import "rlvm-compile")
@@ -273,10 +273,6 @@
         (return expr)
         ))
     (var hd (node_head expr))
-    (if (== hd Located) (do
-        (node_arg_set expr 1 (scan_clsvars (node_arg expr 1) tbl))
-        (return expr)
-        ))
     (if (== hd Define) (do
         (var syms (collect_params (node_arg expr 0)))
         (while syms (do
@@ -370,10 +366,6 @@
         (return expr)
         ))
     (var hd (node_head expr))
-    (if (== hd Located) (do
-        (node_arg_set expr 1 (subst_clsvars tbl cls (node_arg expr 1)))
-        (return expr)
-        ))
     (if (== hd Slot) (do
         (node_arg_set expr 0 (subst_clsvars tbl cls (node_arg expr 0)))
         (return expr)
@@ -537,10 +529,6 @@
     (put_push asm sym)
     (compile asm obj)
     (compile_simple_call asm 3 define_slot)
-    ))
-
-(fun compile_located (asm expr) (
-    (compile asm (node_arg expr 1))
     ))
 
 (fun compile_special (asm expr) (
@@ -2360,7 +2348,6 @@
 
 (export fun setup_builtin_compilers (mod) (
     (add_compiler mod DontCare compile_error)
-    (add_compiler mod (make_node2 Located tupleT DontCare) compile_located)
 
     ; These commands have been evaluated in parsing phase.
     (add_compiler mod (make_node2 Node DontCare DontCare) compile_make_node)
