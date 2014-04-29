@@ -1,0 +1,102 @@
+# Copyright (C) 2014 nineties
+# $Id: amber/typing/types.ab 2014-04-29 18:28:01 nineties $
+
+#= Representation of types =
+
+# Atomic types. It is just symbols.
+ATOMIC_TYPES := ['NilT, 'BoolT, 'UndefT, 'SymbolT, 'IntT, 'StringT,
+    'FloatT]
+
+# Universal type.
+# For example, TupleT{_any_} represents a tuple of length one, and
+# TupleT{_anylist_} represents a tuple of any length.
+any     := '_any_
+anylist := '_anylist_
+
+# Empty type (type error).
+error := '_type_error_
+
+# Basic composite types.
+
+listT(elt)         := `ListT{!elt}
+arrayT(elt)        := `ArrayT{!elt}
+tupleT(elts...)    := `TupleT{!elts...}
+rangeT(elt)        := `RangeT{!elt}
+tableT(keyT, valT) := `TableT{!keyT, !valT}
+
+# The representation of probabilistic type of functions are a conditional
+# probability table. It maps types of arguments to the type of result.
+# For example, the arithmetic addition "a + b" corresponds to a table
+# +-------+-------+---------+
+# |   a   |    b  |  a + b  |
+# +-------+-------+---------+
+# | Int   | Int   | Int:1   |
+# | Int   | Float | Float:1 |
+# | Float | Int   | Float:1 |
+# | Float | Float | Float:1 |
+# | other | other | error:1 |
+# +-------+-------+---------+
+class FunctionT{table} with {
+    # Add new row to the table.
+    .add(args, prob) := {
+        .list = cons((args, prob), .list)
+        self
+    }
+}
+
+# Probabilistic types is use for type-inference.
+# It's representation is (countably infinite) discrete probability
+# distribution over types. Precisely it is a list of pairs,
+# [(t1, p1), (t2, p2), (t3, p3), ..., (tn, pn)],
+# where ti is a type and pi is the corresponding probability.
+class Ptype{table} with {
+    .new(table=[]) := .make(table)
+    # Singleton type
+    .new(t) := .make([(t, 1)])
+
+    .empty? := alias(() -> .table == [])
+
+    .add!(nil) := self
+    .add!(Ptype{tbl}) := {
+        for (t, p) in tbl {
+            q := .table.assoc(t)
+            p += q if q
+            .table = .table.assoc_set(t, p)
+        }
+        self
+    }
+
+    # Number of categories
+    .categories := alias(() -> .table.map(((t,_)) -> t))
+
+    # Summation of probabilities.
+    .sum() := {
+        s := 0
+        for (_, p) in self.table
+            s += p
+        s
+    }
+    .normalize!() := {
+        s := .sum()
+        for ent in self.table
+            ent[1] /= s
+        self
+    }
+    .normalize() := {
+        t := copy(self, deep=true)
+        t.normalize!()
+    }
+}
+
+mul(r, Ptype{table}) := {
+    table = table.map(((t, p)) -> (t, r*p))
+    Ptype.new(table = table)
+}
+
+defined?(_ @ Int, 'IntT) := true
+defined?(_ @ Symbol, _)  := true
+defined?(pats @ List, args @ List) := {
+    return false if pats.size != args.size
+    iterable::zip(pats, args).all?(((p, a)) -> defined?(p, a))
+}
+

@@ -1,35 +1,60 @@
 # Copyright (C) 2014 nineties
-# $Id: amber/defuse.ab 2014-04-27 09:09:17 nineties $
+# $Id: amber/defuse.ab 2014-04-28 18:39:54 nineties $
 
 import amber::basic (collect_variables, collect_parameters)
 
-#= Construction of use-def chain =
-defuse_analysis(compiler) := {
-    compiler.log(1, "Use-definition analysis")
-    AmberProgram{lines} := compiler.program
-    for line in lines
-        global(line)
-}
+class DefUseAnalyzer{} with {
+    .new() := .make() with .global_defs = []
 
-# Analyze global statements
-#global(_) := nil
-global(Define{_, Lambda{args @ List, body}, ...}) := {
-    livein := []
-    for p in collect_parameters(args)
-        livein = livein.assoc_set(p, [args])
-    local(body, livein)
-}
-global(Located{loc, stmt}) := global(stmt)
+    #= Construction of use-def chain =
+    .analyze(AmberProgram{lines}) := {
+        # Scan global variable assignments.
+        for line in lines
+            self.scan(line)
 
-# Analyze local statements.
-# `livein` is an assoc-list of reaching definitions and returns assoc-list
-# of live-out definitions.
-local(stmt, livein) := {
-    use      := collect_variables(stmt)
-    stmt.use := []
-    for v in use {
-        defs := livein.assoc(v)
-        stmt.use = stmt.use.assoc_set(v, defs) if defs
+        # Use-def analysis.
+        for line in lines
+            self.global(line)
     }
-    livein
+
+    # Scan global definitions and assignments.
+    .scan(_) := nil
+    .scan(s @ Define{x, ...}) :=
+        .global_defs = .global_defs.assoc_set(x, [s])
+    .scan(s @ Define{x, Lambda{...}, ...}):= {
+        set := .global_defs.assoc(x)
+        set  = set ? cons(s, set) : [s]
+        .global_defs = .global_defs.assoc_set(x, set)
+    }
+    .scan(s @ Assign{x, ...}) :=
+        .global_defs = .global_defs.assoc_set(x, [s])
+    .scan(s @ Assign{x, Lambda{...}, ...}) := {
+        set := .global_defs.assoc(x)
+        set  = set ? cons(s, set) : [s]
+        .global_defs = .global_defs.assoc_set(x, set)
+    }
+
+    # Analyze global statements
+    .global(e @ Apply)           := .local(e, .global_defs)
+    .global(stmt @ Define{_, v}) := .local(stmt, .global_defs)
+    .global(stmt @ Define{_, Lambda{args @ List, body}, ...}) := {
+        livein   := .global_defs
+        stmt.def := livein
+        for p in collect_parameters(args)
+            livein = livein.assoc_set(p, [args])
+        .local(body, livein)
+    }
+
+    # Analyze local statements.
+    # `livein` is an assoc-list of reaching definitions and returns
+    # assoc-list of live-out definitions.
+    .local(stmt, livein) := {
+        use      := collect_variables(stmt)
+        stmt.def := []
+        for v in use {
+            defs := livein.assoc(v)
+            stmt.def = stmt.def.assoc_set(v, defs) if defs
+        }
+        livein
+    }
 }
