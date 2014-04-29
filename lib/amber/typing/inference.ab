@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: amber/inference.ab 2014-04-29 20:58:01 nineties $
+# $Id: amber/inference.ab 2014-04-29 23:28:07 nineties $
 
 import amber::typing::CPT as CPT
 import amber::typing::types as T
@@ -10,18 +10,36 @@ import random (choice)
 class TypeInferencer{} with {
     .new(defuse) := .make() with {
         .defuse = defuse
-        .ftypes = []
+        .ftypes = CPT::builtin_functions
     }
 
     .analyze(AmberProgram{lines}) := {
-        # Inference types probabilistically
+        # First inference.
         for line in lines
             self.global(line)
+        # Revision.
+        for i in 1..100 {
+            for (name, cpt) in self.ftypes {
+                for (args, result_type) in cpt.table {
+                    type := T::Ptype.new()
+                    count := 0
+                    defs := self.defuse.global_defs.assoc(name)
+                    continue unless defs
+                    for def in defs {
+                        ty := .infer_lambda(def[1], args, def.def)
+                        if ty {
+                            count += 1
+                            type += ty
+                        }
+                    }
+                    result_type.table = T::mul(1/count, type).table
+                }
+            }
+        }
+
         # Annotate types.
         puts(pretty(self.ftypes))
-    }
-
-    .revise(expr) := {
+        puts(pretty(self.defuse.global_defs))
     }
 
     # Type inference of global variable.
@@ -71,29 +89,32 @@ class TypeInferencer{} with {
     }
 
     .infer_apply(name @ Symbol, args, defs) := {
-        prim.debugpf (name, args, defs)
-        ftype := .ftypes.assoc(name)
+        # XXX: consider local functions.
+        ftype := .ftypes[name]
         unless ftype {
             ftype = T::FunctionT.new(table=[])
-            .ftypes = .ftypes.assoc_set(name, ftype)
+            .ftypes[name] = ftype
         }
         ret := ftype.table.assoc(args)
-        prim.debugpf ret
         return ret if ret
+        unless defs {
+            # Unknown function
+            return T::Ptype.new('_unknown_)
+        }
+
+
         return_type := T::Ptype.new('_unknown_)
         ftype.table = ftype.table.assoc_set(args, return_type)
-        for i in 1..100 {
-            type := T::Ptype.new()
-            count    := 0
-            for def in defs {
-                ty := .infer_lambda(def[1], args, def.def)
-                if ty {
-                    count += 1
-                    type += ty
-                }
+        type := T::Ptype.new()
+        count    := 0
+        for def in defs {
+            ty := .infer_lambda(def[1], args, def.def)
+            if ty {
+                count += 1
+                type += ty
             }
-            return_type.table = T::mul(1/count, type).table
         }
+        return_type.table = T::mul(1/count, type).table
         return_type
     }
 

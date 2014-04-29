@@ -1,54 +1,16 @@
 # Copyright (C) 2014 nineties
-# $Id: amber/typing/CPT.ab 2014-04-29 13:08:43 nineties $
+# $Id: amber/typing/CPT.ab 2014-04-29 23:25:15 nineties $
 
 import amber::typing::types as T
 
-#import random (discrete)
+#= Conditional probability tables for builtin functions =
+builtin_functions := Table.new()
 
-#= Conditional probability table =
-# Prior conditional probability tables for builtin objects and functions.
-# i-th entry of tables correspond to BASIC_TYPES[i].
+builtin_functions['puts] = T::FunctionT.new(table = [
+    ([T::any], T::Ptype.new('NilT))
+    ])
 
-#BASIC_TYPES := 'Array{Nil, Bool, Undef, Symbol, Int, String, Float, Range,
-#    Tuple, List, Array, Table, Function, Module, Class, Trait,
-#    InputFileStream, OutputFileStream, _unknown_, _type_error_}
-#
-## Select a type randomly based on given discrete distribution `p`.
-#sampling_type(p) := BASIC_TYPES[discrete(p)]
-#
-#mustbe(ty) := {
-#    i := BASIC_TYPES.index(ty)
-#    unless i
-#        return mustbe('_unknown_)
-#    p := zeros(BASIC_TYPES.size)
-#    p[i] = 1
-#    p
-#}
-#
-#NON_INFORMATIVE_GLOBAL := vector(0.010277417, 0.000996909, 9.96909e-5, 0.000996909, 0.082219337, 0.012846771, 0.020554834, 0.000996909, 0.030832251, 0.025693543, 0.005138709, 0.002569354, 0.416235392, 0.051387085, 0.24665801, 0.05395644, 0.005138709, 0.010277417, 0.023124312, 0)
-#
-#NON_INFORMATIVE_LOCAL := vector(0.03909369,0.017382965,0.003596476,0.006515615,0.470538889,0.128873708,0.065156149,0.016783553,0.054546546,0.065156149,0.047953008,0.04615477,0.006593539,0.001798238,0.000599413,0.001198825,0.000998004,0.000998004,0.02606246, 0)
-#
-#
-
-NON_INFORMATIVE := T::Ptype.new(table = [('NilT, 0.0560196555324881),
-    ('BoolT, 0.01425061380806839), ('SymbolT, 0.1547911546257907),
-    ('IntT, 0.3857493864055926), ('StringT, 0.1056511055382381),
-    ('FloatT, 0.03439803436128682),
-    (T::rangeT(T::any), 0.01375921395817566),
-    (T::tupleT(T::anylist), 0.04471744509699474),
-    (T::listT(T::any), 0.1135135138195684),
-    (T::arrayT(T::any), 0.03931203927004208),
-    (T::tableT(T::any, T::any), 0.03783783758375456)])
-
-#scale(r, type) := {
-#    type = copy(type, deep=true)
-#    for ent in type
-#        ent[1] *= r
-#    type
-#}
-#
-##== Type inference for binary operations ==
+#== Type inference for binary operations ==
 binary := Table.new()
 binary['Add] = binary['Sub] = T::FunctionT.new(table = [
     (['IntT,   'IntT],   T::Ptype.new('IntT)),
