@@ -1,9 +1,8 @@
 # Copyright (C) 2014 nineties
-# $Id: amber/inference.ab 2014-04-29 23:28:07 nineties $
+# $Id: amber/inference.ab 2014-04-29 23:33:40 nineties $
 
 import amber::typing::CPT as CPT
 import amber::typing::types as T
-import random (choice)
 
 #= Type inference =
 
@@ -125,24 +124,6 @@ class TypeInferencer{} with {
         return .infer(body, body.def)
     }
 
-    #.infer_lambda(args, body, defs) := {
-    #    inf    := self
-    #    list   := []
-    #    params := args.map(a -> {
-    #            t := inf.infer_param(a)
-    #            if a.head == 'Symbol
-    #                list = cons((a, T::Ptype.new(t)), list)
-    #        })
-    #    args.types = list
-    #    ret := .infer(body, body.def)
-    #    prim.debugpf ret
-    #    type := FunctionT.new()
-    #    type.add(params, ret)
-    #    type
-    #}
-
-    #.infer_param(_ @ Symbol) := T::any
-
     # compute P(T) = sum(P(T|a1,...an)p(a1)...p(an)).
     .propagate(FunctionT{cpt}, ps) := {
         prob := T::Ptype.new()
@@ -165,53 +146,4 @@ class TypeInferencer{} with {
             prob.table = prob.table.assoc_set('_type_error_, 1-p)
         prob
     }
-
-    #.global(Lambda{_, _})       := nil
-    #.global(Define{_, body, _}) := .global(body)
-    #.global(a @ Apply)          := .statement(a)
-
-    #.statement(e) := .expr(e, e.def)
-
-    #.statement(_ @ Int) := CPT::mustbe('Int)
-    #.statement(x @ Symbol) := {
-    #    throw x
-    #}
-    #.statement(e @ Apply{f, args}) := {
-    #    inferencer := self
-    #    type := .apply(f,
-    #            args.map(a -> inferencer.expr(a, e.def)), e.def)
-    #    e.type = type
-    #    type
-    #}
-    #.statement(e @ Add{x, y}) := {
-    #    self.expr(x, e.def)
-    #    self.expr(y, e.def)
-    #}
-    #.statement(e @ Sub{x, y}) := {
-    #    prim.debugpf self.expr(x, def)
-    #    prim.debugpf self.expr(y, def)
-    #}
-
-    #.expr(_ @ Int, _) := CPT::mustbe('Int)
-    #.expr(Add{x, y}, def) := {
-    #    .expr(x, def)
-    #    .expr(y, def)
-    #}
-    #.expr(Apply{f @ Symbol, args}, def) := {
-    #    inf := self
-    #    funcs := def.assoc(f)
-    #    args   = args.map(a -> inf.expr(a, def))
-    #    if not funcs
-    #        return CPT::NON_INFORMATIVE_LOCAL
-    #    n := 0
-    #    for i in 1..10 {
-    #        params := args.map(p -> CPT::sampling_type(p))
-    #        prim.debugpf (.analyze_apply(choice(funcs), params))
-    #    }
-    #}
-
-    #.analyze_apply(Lambda{args, body}, params) := {
-    #    prim.debugpf "ANALYZE_TYPE"
-    #    .statement(body)
-    #}
 }
