@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: rowl1-array.rlc 2014-04-03 03:50:13 nineties $
+; $Id: rowl1-array.rlc 2014-04-30 18:25:11 nineties $
 ;
 
 (import "rlvm-compile")
@@ -16,6 +16,7 @@
 (import "rowl1-compile")
 (import "rowl1-assemble")
 (import "rowl1-error")
+(import "rowl1-tuple")
 (import "rowl1-table")
 
 (extern object global)
@@ -439,6 +440,42 @@
     (intro_sort buf (+ i 1) end cmp (- limit 1))
     ))
 
+(fun ary_assoc (ary k) (
+    (var ls 0)
+    (var size (array_size ary))
+    (var buf (array_buf ary))
+    (var eql (lookup_func global (to_sym "equal?")))
+    (for i 0 size (do
+        (var t (array_get object buf i))
+        (if (|| (!= (node_type t) @TupleE) (!= (node_size t) 2))
+            (throw (exception1 (string "not a pair") t))
+            )
+        (if (!= (runcode eql k (node_arg t 0)) @C_FALSE)
+            (return (node_arg t 1))
+            )
+        ))
+    (return ary)
+    ))
+
+(fun ary_assoc_set (ary k v) (
+    (var ls 0)
+    (var size (array_size ary))
+    (var buf (array_buf ary))
+    (var eql (lookup_func global (to_sym "equal?")))
+    (for i 0 size (do
+        (var t (array_get object buf i))
+        (if (|| (!= (node_type t) @TupleE) (!= (node_size t) 2))
+            (throw (exception1 (string "not a pair") t))
+            )
+        (if (!= (runcode eql k (node_arg t 0)) @C_FALSE) (do
+            (node_arg_set t 1 v)
+            (return ary)
+            ))
+        ))
+    (ary_push ary (tuple2 k v))
+    (return ary)
+    ))
+
 (export fun setup_array (mod) (
     (add_function0 mod (to_sym "array_new_empty") ary_new 0)
     (add_function2 mod (to_sym "array_new") funT intT ary_new2 0)
@@ -469,6 +506,9 @@
     (add_function2 mod (to_sym "array_foldr1") funT arrayT ary_foldr1 0)
 
     (add_function2 mod (to_sym "array_sort!") arrayT funT ary_sort_bang 0)
+
+    (add_function2 mod (to_sym "array_assoc") arrayT DontCare ary_assoc 0)
+    (add_function3 mod (to_sym "array_assoc_set!") arrayT DontCare DontCare ary_assoc_set 0)
 
     ))
 
