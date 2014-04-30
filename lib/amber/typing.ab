@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: amber/typing.ab 2014-04-28 09:53:19 nineties $
+# $Id: amber/typing.ab 2014-04-30 18:06:42 nineties $
 
 #= Type-analysis of amber programs =
 
@@ -24,89 +24,4 @@ analyze(compiler) := {
     compiler.log(1, "Probabilistic type inference\n")
     inferencer := TypeInferencer.new(defuse)
     inferencer.analyze(compiler.program)
-    #type_check(compiler)
 }
-
-## Setup prior probability tables.
-#assign_prior_probabilties(compiler) := {
-#    f(_ @ Nil)    := CPT::mustbe('Nil)
-#    f(_ @ Bool)   := CPT::mustbe('Bool)
-#    f(_ @ Undef)  := CPT::mustbe('Undef)
-#    f(_ @ Int)    := CPT::mustbe('Int)
-#    f(_ @ Float)  := CPT::mustbe('Float)
-#    f(_ @ String) := CPT::mustbe('String)
-#    f(_ @ Range)  := CPT::mustbe('Range)
-#    f(_ @ Tuple)  := CPT::mustbe('Tuple)
-#    f(_ @ List)   := CPT::mustbe('List)
-#    f(_ @ Array)  := CPT::mustbe('Array)
-#
-#    f(x @ Symbol) := {
-#        p := compiler.type_table[x]
-#        p ? p : CPT::NON_INFORMATIVE_LOCAL
-#    }
-#    f(Add{a, b}) := {
-#        p1 := f(a)
-#        p2 := f(b)
-#
-#        p := zeros(CPT::BASIC_TYPES.size)
-#        prim.debugpf p
-#        for j in 1..10 {
-#            x := discrete(p1)
-#            y := discrete(p2)
-#            prim.debugpf (x,y)
-#            p += CPT::add(CPT::BASIC_TYPES[x], CPT::BASIC_TYPES[y])
-#        }
-#        prim.debugpf p
-#        p /= 10
-#        p
-#    }
-#
-#    g(s @ Define{x @ Symbol, body}) :=
-#        compiler.type_table[(s, x)] = f(body)
-#    g(s @ Assign{x @ Symbol, body}) :=
-#        compiler.type_table[(s, x)] = f(body)
-#    g(If{cond, body}) := g(body)
-#
-#    g(Define{Apply{f, args}, body}) := {
-#        throw f
-#        assume(args == [])
-#        #prim.debugpf f
-#        #prim.debugpf args
-#        #prim.debugpf body
-#        throw (f, args, body)
-#    }
-#
-#    AmberProgram{lines} := compiler.program
-#
-#    for line in lines
-#        g(line)
-#}
-#
-#type_check(compiler) := {
-#    compiler.log(1, "Checking infered types\n")
-#}
-#
-##= Conditional probability table =
-## Prior conditional probability tables for builtin objects and functions.
-## i-th entry of tables correspond to BASIC_TYPES[i].
-#
-#
-#mustbe(ty) := {
-#    i := BASIC_TYPES.index(ty)
-#    i  = BASIC_TYPES.size-1 unless i
-#    p := zeros(BASIC_TYPES.size)
-#    p[i] = 1
-#    p
-#}
-#
-## Non-informative prior probabilities for global variables and local
-## variables.
-#NON_INFORMATIVE_GLOBAL := vector(0.010277417, 0.000996909, 9.96909e-5, 0.000996909, 0.082219337, 0.012846771, 0.020554834, 0.000996909, 0.030832251, 0.025693543, 0.005138709, 0.002569354, 0.416235392, 0.051387085, 0.24665801, 0.05395644, 0.005138709, 0.010277417, 0.023124312)
-#
-#NON_INFORMATIVE_LOCAL := vector(0.03909369,0.017382965,0.003596476,0.006515615,0.470538889,0.128873708,0.065156149,0.016783553,0.054546546,0.065156149,0.047953008,0.04615477,0.006593539,0.001798238,0.000599413,0.001198825,0.000998004,0.000998004,0.02606246)
-#
-#add(_, _)           := NON_INFORMATIVE_LOCAL
-#add('Int, 'Int)     := mustbe('Int)
-#add('Int, 'Float)   := mustbe('Float)
-#add('Float, 'Int)   := mustbe('Float)
-#add('Float, 'Float) := mustbe('Float)
