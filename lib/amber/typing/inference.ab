@@ -1,149 +1,227 @@
 # Copyright (C) 2014 nineties
-# $Id: amber/inference.ab 2014-04-29 23:33:40 nineties $
+# $Id: amber/inference.ab 2014-05-02 20:32:24 nineties $
 
 import amber::typing::CPT as CPT
 import amber::typing::types as T
 
 #= Type inference =
 
-class TypeInferencer{} with {
-    .new(defuse) := .make() with {
-        .defuse = defuse
-        .ftypes = CPT::builtin_functions
-    }
+type_inference(compiler) := {
+    compiler.function_types = CPT::builtin_functions
 
-    .analyze(AmberProgram{lines}) := {
-        # First inference.
-        for line in lines
-            self.global(line)
-        # Revision.
-        for i in 1..100 {
-            for (name, cpt) in self.ftypes {
-                for (args, result_type) in cpt.table {
-                    type := T::Ptype.new()
-                    count := 0
-                    defs := self.defuse.global_defs.assoc(name)
-                    continue unless defs
-                    for def in defs {
-                        ty := .infer_lambda(def[1], args, def.def)
-                        if ty {
-                            count += 1
-                            type += ty
-                        }
-                    }
-                    result_type.table = T::mul(1/count, type).table
-                }
-            }
-        }
+    AmberProgram{lines} := compiler.program
 
-        # Annotate types.
-        puts(pretty(self.ftypes))
-        puts(pretty(self.defuse.global_defs))
-    }
-
-    # Type inference of global variable.
-    .global(stmt @ Define) := nil
-    .global(stmt @ Apply)  := .infer(stmt, stmt.def)
-
-    #.global(stmt @ Define{x, v}) := {
-    #    t := .infer(v, stmt.def)
-    #    stmt.types = [(x, t)]
-    #}
-    #.global(stmt @ Define{f, Lambda{args, body}, ...}) := {
-    #    t := .infer_lambda(args, body, stmt.def)
-    #    stmt.types = [(f, t)]
-    #}
-    #.global(stmt @ Apply) := .infer(stmt, stmt.def)
-
-    .infer(_ @ Int, _)    := T::Ptype.new('IntT)
-    .infer(_ @ Float, _)  := T::Ptype.new('FloatT)
-    .infer(_ @ String, _) := T::Ptype.new('StringT)
-    .infer(x @ Symbol, defs) := {
-        ds := defs.assoc(x)
-        return CPT::NON_INFORMATIVE unless ds
-        t := T::Ptype.new()
-        for d in ds
-            t += d.types.assoc(x)
-        return CP::NON_INFORMATIVE if t.empty?
-        t.normalize!()
-    }
-    .infer(Add{x, y}, defs) := {
-        xt := .infer(x, defs)
-        yt := .infer(y, defs)
-        .propagate(CPT::binary['Add], [xt, yt])
-    }
-    .infer(Sub{x, y}, defs) := {
-        xt := .infer(x, defs)
-        yt := .infer(y, defs)
-        .propagate(CPT::binary['Sub], [xt, yt])
-    }
-    .infer(Apply{f @ Symbol, args}, defs) := {
-        inf   := self
-        argst := args.map(a -> inf.infer(a, defs))
-        ret   := T::Ptype.new()
-        for c in iterable::product(argst.map(a -> a.categories)...) {
-            ret += .infer_apply(f, c.to_list(), defs.assoc(f))
-        }
-        ret.normalize()
-    }
-
-    .infer_apply(name @ Symbol, args, defs) := {
-        # XXX: consider local functions.
-        ftype := .ftypes[name]
-        unless ftype {
-            ftype = T::FunctionT.new(table=[])
-            .ftypes[name] = ftype
-        }
-        ret := ftype.table.assoc(args)
-        return ret if ret
-        unless defs {
-            # Unknown function
-            return T::Ptype.new('_unknown_)
-        }
-
-
-        return_type := T::Ptype.new('_unknown_)
-        ftype.table = ftype.table.assoc_set(args, return_type)
-        type := T::Ptype.new()
-        count    := 0
-        for def in defs {
-            ty := .infer_lambda(def[1], args, def.def)
-            if ty {
-                count += 1
-                type += ty
-            }
-        }
-        return_type.table = T::mul(1/count, type).table
-        return_type
-    }
-
-    .infer_lambda(Lambda{params, body}, args, def) := {
-        return nil unless T::defined?(params, args)
-        params.types := iterable::zip(params, args).map(((p, a))
-                -> (p, T::Ptype.new(a))).to_list()
-        return .infer(body, body.def)
-    }
-
-    # compute P(T) = sum(P(T|a1,...an)p(a1)...p(an)).
-    .propagate(FunctionT{cpt}, ps) := {
-        prob := T::Ptype.new()
-        for (cond, p) in cpt {
-            r    := 1
-            skip := false
-            for (c, q) in iterable::zip(cond, ps) {
-                t := q.table.assoc(c)
-                unless t {
-                    skip = true
-                    break
-                }
-                r *= t
-            }
-            continue if skip
-            prob += T::mul(r, p)
-        }
-        p := prob.sum()
-        unless p == 1
-            prob.table = prob.table.assoc_set('_type_error_, 1-p)
-        prob
-    }
+    # Assign initial probabilities
+    for line in lines
+        global(compiler, line)
 }
+
+#== Type inference of global statements. ==
+global(c, s @ Define) := nil
+global(c, s @ Apply)  := infer(c, s, s.livein)
+
+#== Type inference of local statements. ==
+
+# literals
+infer(_, _ @ Nil, _)    := T::nilT
+infer(_, _ @ Bool, _)   := T::boolT
+infer(_, _ @ Int, _)    := T::intT
+infer(_, _ @ Float, _)  := T::floatT
+infer(_, _ @ String, _) := T::stringT
+
+# variable
+infer(c, x @ Symbol, livein) := {
+    definitions := livein.assoc(x)
+
+    # When no definitions found, returns non-informative prior
+    # probability.
+    return CPT::NON_INFORMATIVE unless definitions
+
+    # Compute mean of reaching types.
+    # XXX: Here is a possibility to use some weighted mean instead.
+    t := T::Ptype.new()
+    for def in definitions
+        t += def.types.assoc(x)
+    if t.empty?
+        throw 'Error{"inference::infer() Not reachable"}
+    t.normalize!()
+}
+
+BINARY_OPERATORS := '[(Add, add), (NcAdd, ncadd), (Sub, sub), (Mul, mul),
+    (NcMul, ncmull), (Pow, pow), (Quo, quo), (Div, div), (Rem, rem)]
+
+for (op, fun) in BINARY_OPERATORS {
+    code := 'seq {
+        inference::infer(c, Op{x, y}, livein) := {
+            x_type := infer(x, livein)
+            y_type := infer(y, livein)
+            cpt    := infer_function(c, 'fun)
+            propagate(cpt, [x_type, y_type])
+        }
+    }
+    evalfull code['Op{x, y} -> node(op, 'x, 'y) | 'fun -> fun]
+}
+
+infer(c, Apply{f, args}, livein) := {
+    arg_types := args.map(a -> infer(c, a, livein))
+    fun_type   := infer_function(c, f)
+    prim.debugpf "INFER APPLY"
+    prim.debugpf (f, args, livein)
+    prim.debugpf (fun_type, arg_types)
+    ret_type := propagate(fun_type, arg_types)
+    prim.debugpf ret_type
+    ret_type
+}
+
+# Type inference of functions
+# XXX: consider local functions
+infer_function(c, name @ Symbol) := {
+    fun_type := c.function_types[name]
+    unless fun_type {
+        fun_type = T::FunctionT.new(table=[])
+        c.function_types[name] = fun_type
+    }
+    fun_type
+}
+
+# compute P(T) = sum(P(T|a1,...an)p(a1)...p(an)).
+propagate(fun_type @ FunctionT{cpt}, arg_types) := {
+    if arg_types == []
+        throw "propagate: not implemented"
+    ret_type := T::Ptype.new()
+
+    # XXX: Consider computational complexity of this loop.
+    arg_tables := arg_types.map(Ptype{tbl} -> tbl)
+    for arg_case in iterable::product(arg_tables...) {
+        arg_case = arg_case.to_list()
+        pattern := arg_case.map(t -> t[0]).to_list()
+        prob    := arg_case.foldl((p, t) -> p*t[1], 1)
+        type    := cpt.assoc(pattern)
+        unless type {
+            type = T::unknownT
+            fun_type.table = cpt.assoc_set(pattern, type)
+        }
+        ret_type += T::mul(prob, type)
+    }
+    ret_type
+}
+
+#
+#    .infer_apply(name @ Symbol, args, defs) := {
+#        # XXX: consider local functions.
+#        ftype := .ftypes[name]
+#        unless ftype {
+#            ftype = T::FunctionT.new(table=[])
+#            .ftypes[name] = ftype
+#        }
+#        ret := ftype.table.assoc(args)
+#        return ret if ret
+#        unless defs {
+#            # Unknown function
+#            return T::Ptype.new('_unknown_)
+#        }
+#
+#
+#        return_type := T::Ptype.new('_unknown_)
+#        ftype.table = ftype.table.assoc_set(args, return_type)
+#        type := T::Ptype.new()
+#        count    := 0
+#        for def in defs {
+#            ty := .infer_lambda(def[1], args, def.def)
+#            if ty {
+#                count += 1
+#                type += ty
+#            }
+#        }
+#        return_type.table = T::mul(1/count, type).table
+#        return_type
+#    }
+
+#    .analyze(AmberProgram{lines}) := {
+#        # First inference.
+#        for line in lines
+#            self.global(line)
+#        # Revision.
+#        for i in 1..100 {
+#            for (name, cpt) in self.ftypes {
+#                for (args, result_type) in cpt.table {
+#                    type := T::Ptype.new()
+#                    count := 0
+#                    defs := self.defuse.global_defs.assoc(name)
+#                    continue unless defs
+#                    for def in defs {
+#                        ty := .infer_lambda(def[1], args, def.def)
+#                        if ty {
+#                            count += 1
+#                            type += ty
+#                        }
+#                    }
+#                    result_type.table = T::mul(1/count, type).table
+#                }
+#            }
+#        }
+#
+#        # Annotate types.
+#        puts(pretty(self.ftypes))
+#        puts(pretty(self.defuse.global_defs))
+#    }
+#    .infer_apply(name @ Symbol, args, defs) := {
+#        # XXX: consider local functions.
+#        ftype := .ftypes[name]
+#        unless ftype {
+#            ftype = T::FunctionT.new(table=[])
+#            .ftypes[name] = ftype
+#        }
+#        ret := ftype.table.assoc(args)
+#        return ret if ret
+#        unless defs {
+#            # Unknown function
+#            return T::Ptype.new('_unknown_)
+#        }
+#
+#
+#        return_type := T::Ptype.new('_unknown_)
+#        ftype.table = ftype.table.assoc_set(args, return_type)
+#        type := T::Ptype.new()
+#        count    := 0
+#        for def in defs {
+#            ty := .infer_lambda(def[1], args, def.def)
+#            if ty {
+#                count += 1
+#                type += ty
+#            }
+#        }
+#        return_type.table = T::mul(1/count, type).table
+#        return_type
+#    }
+#
+#    .infer_lambda(Lambda{params, body}, args, def) := {
+#        return nil unless T::defined?(params, args)
+#        params.types := iterable::zip(params, args).map(((p, a))
+#                -> (p, T::Ptype.new(a))).to_list()
+#        return .infer(body, body.def)
+#    }
+#
+#    # compute P(T) = sum(P(T|a1,...an)p(a1)...p(an)).
+#    .propagate(FunctionT{cpt}, ps) := {
+#        prob := T::Ptype.new()
+#        for (cond, p) in cpt {
+#            r    := 1
+#            skip := false
+#            for (c, q) in iterable::zip(cond, ps) {
+#                t := q.table.assoc(c)
+#                unless t {
+#                    skip = true
+#                    break
+#                }
+#                r *= t
+#            }
+#            continue if skip
+#            prob += T::mul(r, p)
+#        }
+#        p := prob.sum()
+#        unless p == 1
+#            prob.table = prob.table.assoc_set('_type_error_, 1-p)
+#        prob
+#    }
+#}

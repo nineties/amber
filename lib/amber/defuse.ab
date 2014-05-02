@@ -1,60 +1,70 @@
 # Copyright (C) 2014 nineties
-# $Id: amber/defuse.ab 2014-04-28 18:39:54 nineties $
+# $Id: amber/defuse.ab 2014-04-30 18:54:20 nineties $
 
 import amber::basic (collect_variables, collect_parameters)
 
-class DefUseAnalyzer{} with {
-    .new() := .make() with .global_defs = []
+#= Construction of use-def chain =
+defuse_analysis(compiler) := {
+    compiler.global_definitions = []
+    AmberProgram{lines} := compiler.program
 
-    #= Construction of use-def chain =
-    .analyze(AmberProgram{lines}) := {
-        # Scan global variable assignments.
-        for line in lines
-            self.scan(line)
+    # Scan global variable assignments.
+    for line in lines
+        scan(compiler, line)
 
-        # Use-def analysis.
-        for line in lines
-            self.global(line)
+    # Use-def analysis.
+    for line in lines {
+        line.livein = compiler.global_definitions
+        global(compiler, line)
     }
+}
 
-    # Scan global definitions and assignments.
-    .scan(_) := nil
-    .scan(s @ Define{x, ...}) :=
-        .global_defs = .global_defs.assoc_set(x, [s])
-    .scan(s @ Define{x, Lambda{...}, ...}):= {
-        set := .global_defs.assoc(x)
-        set  = set ? cons(s, set) : [s]
-        .global_defs = .global_defs.assoc_set(x, set)
-    }
-    .scan(s @ Assign{x, ...}) :=
-        .global_defs = .global_defs.assoc_set(x, [s])
-    .scan(s @ Assign{x, Lambda{...}, ...}) := {
-        set := .global_defs.assoc(x)
-        set  = set ? cons(s, set) : [s]
-        .global_defs = .global_defs.assoc_set(x, set)
-    }
+# Setup compiler.globla_definitions.
+scan(c, _) := nil
+scan(c, s @ Define{x, _}) := {
+    c.global_definitions = cons((x, [s]), c.global_definitions)
+}
+scan(c, s @ Define{x, _, union}):= {
+    set := c.global_definitions.assoc(x)
+    set  = set ? cons(s, set) : [s]
+    c.global_definitions = cons((x, set), c.global_definitions)
+}
+scan(c, s @ Assign{x, _}) := {
+    c.global_definitions = cons((x, [s]), c.global_definitions)
+}
+scan(c, s @ Assign{x, _, union}) := {
+    set := c.global_definitions.assoc(x)
+    set  = set ? cons(s, set) : [s]
+    c.global_definitions = cons((x, set), c.global_definitions)
+}
 
-    # Analyze global statements
-    .global(e @ Apply)           := .local(e, .global_defs)
-    .global(stmt @ Define{_, v}) := .local(stmt, .global_defs)
-    .global(stmt @ Define{_, Lambda{args @ List, body}, ...}) := {
-        livein   := .global_defs
-        stmt.def := livein
-        for p in collect_parameters(args)
-            livein = livein.assoc_set(p, [args])
-        .local(body, livein)
-    }
+# Analyze global statements
+# c: Compiler object.
+global(c, e @ Apply)        := local(e, c.global_definitions)
+global(c, s @ Define{_, v}) := local(s, c.global_definitions)
+global(c, s @ Define{_, Lambda{args @ List, body}, ...}) := {
+    livein   := s.livein
+    for p in collect_parameters(args)
+        livein = livein.assoc_set(p, [args])
+    local(body, livein)
+}
 
-    # Analyze local statements.
-    # `livein` is an assoc-list of reaching definitions and returns
-    # assoc-list of live-out definitions.
-    .local(stmt, livein) := {
-        use      := collect_variables(stmt)
-        stmt.def := []
-        for v in use {
-            defs := livein.assoc(v)
-            stmt.def = stmt.def.assoc_set(v, defs) if defs
-        }
-        livein
+# Analyze local statements.
+# `livein` is an assoc-list of reaching definitions and returns
+# assoc-list of live-out definitions.
+local(stmt, livein) := {
+    # Collect variables used in the statement
+    use      := collect_variables(stmt)
+    stmt.def := []
+    for v in use {
+        defs := livein.assoc(v)
+        stmt.def = stmt.def.assoc_set(v, defs) if defs
     }
+    livein
+}
+local(s @ Define, _) := {
+    throw "defuse::local Not implemented"
+}
+local(s @ Assign, _) := {
+    throw "defuse::local Not implemented"
 }

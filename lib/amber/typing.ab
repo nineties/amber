@@ -1,27 +1,15 @@
 # Copyright (C) 2014 nineties
-# $Id: amber/typing.ab 2014-04-30 18:06:42 nineties $
+# $Id: amber/typing.ab 2014-04-30 18:54:59 nineties $
 
 #= Type-analysis of amber programs =
 
-import algebra::linalg (*)
-import amber::defuse (*)
-import amber::typing::inference (*)
-import random (discrete)
-
-macro( ('assume)(check) ) := {
-    template := '{
-        unless check
-            throw `AssertionFailure{check}
-    }
-    template['check -> check]
-}
+import amber::defuse (defuse_analysis)
+import amber::typing::inference (type_inference)
 
 analyze(compiler) := {
     compiler.log("Typing %s...\n", compiler.input_file)
     compiler.log(1, "Use-definition analysis")
-    defuse     := DefUseAnalyzer.new()
-    defuse.analyze(compiler.program)
+    defuse_analysis(compiler)
     compiler.log(1, "Probabilistic type inference\n")
-    inferencer := TypeInferencer.new(defuse)
-    inferencer.analyze(compiler.program)
+    type_inference(compiler)
 }
