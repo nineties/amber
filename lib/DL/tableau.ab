@@ -1,0 +1,16 @@
+# Copyright (C) 2014 nineties
+# $Id: DL/tableau.ab 2014-07-20 20:32:03 nineties $
+
+#= Tableau method for SHOQ(D)
+
+#== NNF Normalization
+# Translates given concept to negation normal form (NNF).
+normalize(form) := {
+    f(form) := form
+    f(Not{Exists{R, C}})     := `Forall{!R, Not{!C}}
+    f(Not{Forall{R, C}})     := `Exists{!R, Not{!C}}
+    f(Not{AtMost{n, R, C}})  := `AtLeast{!(n + 1), !R, !C}
+    f(Not{AtLeast{n, R, C}}) := `AtMost{!(n - 1), !R, !C}
+    f(Not{AtLeast{0, R, C}}) := `And{!C, Not{!C}}
+    return subst(form, f)
+}
