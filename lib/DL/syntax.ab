@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: DL/syntax.ab 2014-07-20 18:24:20 nineties $
+# $Id: DL/syntax.ab 2014-07-20 18:33:08 nineties $
 
 #= Abstract syntax tree of Ontology Description Language =
 
@@ -10,7 +10,7 @@
 # `bottom` is the empty concept.
 reserved_words := Array{"top", "bottom", "forall", "exists"}
 
-#== Definition of ALC language ==
+#== ALC language ==
 concept_name ::= identifier
 role_name    ::= identifier
 
@@ -38,3 +38,16 @@ quantified_concept ::= 'forall role_name "." concept
                      | union_concept
 
 concept ::= quantified_concept
+
+#== TBox statement ==
+concept_equality   ::= concept "=" concept  { `Equal{!$0, !$2} }
+concept_inclusion  ::= concept "<=" concept { `Include{!$2, !$0} }
+                     | concept ">=" concept { `Include{!$0, !$2} }
+concept_definition ::= concept_name ":=" concept { `Define{!$0, !$2} }
+primitive_concept_definition
+    ::= concept_name ":<=" concept { `PrimDefine{!$0, !$2} }
+
+tbox_statement ::= concept_equality
+                 | concept_inclusion
+                 | concept_definition
+                 | primitive_concept_definition
