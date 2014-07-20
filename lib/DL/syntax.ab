@@ -1,0 +1,40 @@
+# Copyright (C) 2014 nineties
+# $Id: DL/syntax.ab 2014-07-20 18:24:20 nineties $
+
+#= Abstract syntax tree of Ontology Description Language =
+
+# Copy Amber's builtin parsers
+.import_vars(amber::syntax, 'spaces, 'identifier)
+
+# `top` is a special constant which contains every individual.
+# `bottom` is the empty concept.
+reserved_words := Array{"top", "bottom", "forall", "exists"}
+
+#== Definition of ALC language ==
+concept_name ::= identifier
+role_name    ::= identifier
+
+primary_concept ::= 'top
+                  | 'bottom
+                  | concept_name
+                  | "(" concept ")"  { $1 }
+
+negation_concept ::= "!" negation_concept
+                     { `Not{!$1} }
+                   | primary_concept
+
+intersection_conccept ::= intersection_conccept "&" negation_concept
+                          { `And{!$0, !$2} }
+                        | negation_concept
+
+union_concept ::= union_concept "|" intersection_conccept
+                  { `Or{!$0, !$2} }
+                | intersection_conccept
+
+quantified_concept ::= 'forall role_name "." concept
+                       { `Forall{!$1, !$3} }
+                     | 'exists role_name "." concept
+                       { `Exists{!$1, !$3} }
+                     | union_concept
+
+concept ::= quantified_concept
