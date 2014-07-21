@@ -1,12 +1,13 @@
 # Copyright (C) 2014 nineties
-# $Id: DL/syntax.ab 2014-07-20 20:17:00 nineties $
+# $Id: DL/syntax.ab 2014-07-21 09:04:06 nineties $
 
 #= Abstract syntax tree of SHOQ(D) Ontology Description Logic =
 
 # Copy Amber's builtin parsers
 .import_vars(amber::syntax, 'spaces, 'identifier, 'decimal)
 
-reserved_words := Array{"forall", "exists", "trans", "role_box"}
+reserved_words := Array{"forall", "exists", "transitivie",
+    "ABox", "TBox", "knowledge"}
 
 # Concepts
 concept_name ::= identifier
@@ -39,31 +40,29 @@ quantified_concept ::= 'forall role_name "." concept
 
 concept ::= quantified_concept
 
-# Role box
+# Knowledge base
+individual_name ::= individual_name "::" identifier
+                    { `Var{!$0, !$2} }
+                  | identifier
+
+instance_declaration
+    ::= individual_name ":" concept
+        { `InstanceDecl{!$0, !$2} }
+      | individual_name role_name individual_name
+        { `RoleInstanceDecl{!$1, !$0, !$2} }
+
+# ABox (Assertion component)
+abox_declaration
+    ::= <<multiline>> 'ABox "{" aligned(instance_declaration) "}"
+        { `ABoxDecl{!$2} }
+
+
 role_axiom ::= role_name "<=" role_name { `Included{!$0, !$2} }
-             | 'trans role_name         { `Trans{!$1} }
+             | 'transitivie role_name   { `Trans{!$1} }
 
-role_box ::= 'role_box "{" aligned(role_axiom) "}"
-             { `RoleBox{!$2} }
+# TBox (Terminological component)
+tbox_declaration
+    ::= <<multiline>> 'TBox "{" aligned(role_axiom) "}"
+        { `TBoxDecl{!$2} }
 
-##== TBox statement ==
-#concept_equality   ::= concept "=" concept  { `Equal{!$0, !$2} }
-#concept_inclusion  ::= concept "<=" concept { `Include{!$2, !$0} }
-#                     | concept ">=" concept { `Include{!$0, !$2} }
-#concept_definition ::= concept_name ":=" concept { `Define{!$0, !$2} }
-#primitive_concept_definition
-#    ::= concept_name ":<=" concept { `PrimDefine{!$0, !$2} }
-#
-#tbox_statement ::= concept_equality
-#                 | concept_inclusion
-#                 | concept_definition
-#                 | primitive_concept_definition
-#
-#tbox_definition
-#    ::= <<multiline>> 'TBox concept_name "{" aligned(tbox_statement) "}"
-#        { `DeineTBox{!$1, !$3} }
-#
-##== ABox statement ==
-#abox_definition
-#    ::= <<multiline>> 'ABox concept_name "{" aligned(concept) "}"
-#        { `DefineABox{!$1, !$3} }
+default ::= (abox_declaration/tbox_declaration)* { `KBDecl{!$0} }
