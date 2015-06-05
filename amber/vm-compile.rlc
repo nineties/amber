@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-compile.rlc 2014-03-27 01:52:42 nineties $
+; $Id: vm-compile.rlc 2015-06-06 00:14:25 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -20,11 +20,11 @@
     (eprintln "not implemented '" (car args) "' : "  . msgs)
     ))
 
-(define dispatch (dispatcher default args) (do
+(define dispatch (callbacks default args) (do
     (if (cons? (car args))
         (do
             (var head (caar args))
-            (var fun (assoc head dispatcher))
+            (var fun (assoc head callbacks))
             (if fun
                 (fun . args)
                 (default . args)
@@ -647,7 +647,7 @@
     (if ret (emit_return `(return) nil nil))
     ))
 
-(var expr_dispatcher `(
+(var expr_callbacks `(
     (nop     . @emit_nop)
     (syscall . @emit_syscall)
     (call    . @emit_call)
@@ -717,7 +717,7 @@
     (asm     . @emit_asm)
     ))
 
-(define emit_expr args (dispatch expr_dispatcher emit_expr_default args))
+(define emit_expr args (dispatch expr_callbacks emit_expr_default args))
 
 (define emit_block (block ret)
     (if (nil? block)
@@ -725,7 +725,7 @@
         (foreach e block (emit_expr e nil (and ret last?)))
         ))
 
-(define add_new_expr (sym func) (set expr_dispatcher (cons `(@sym . @func) expr_dispatcher)))
+(define add_new_expr (sym func) (set expr_callbacks (cons `(@sym . @func) expr_callbacks)))
 
 ; === compilation of external declarations ===
 
@@ -797,14 +797,14 @@
 (define scan_while ((_ _ body)) (foreach e body (scan_expr `(@e))))
 
 (define ignore (code) ())
-(define scan_expr (e) (dispatch scan_function_dispatcher ignore e))
+(define scan_expr (e) (dispatch scan_function_callbacks ignore e))
 
 (define scan_function (body) (do
     (set var_pos 0)
     (foreach e body (scan_expr `(@e)))
     ))
 
-(var scan_function_dispatcher `(
+(var scan_function_callbacks `(
     (int   . @scan_defvar)
     (char  . @scan_defvar)
     (byte  . @scan_defvar)
@@ -842,7 +842,7 @@
 
     ))
 
-(var extdecl_dispatcher `(
+(var extdecl_callbacks `(
     (export  . @emit_export)
     (extern  . @emit_extern)
     (int     . @emit_static_scalar)
@@ -858,5 +858,5 @@
     ))
 
 (define compile (prog) (do
-    (foreach decl prog (dispatch extdecl_dispatcher not_reachable `(@decl)))
+    (foreach decl prog (dispatch extdecl_callbacks not_reachable `(@decl)))
     ))
