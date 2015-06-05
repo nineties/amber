@@ -1,0 +1,192 @@
+;
+; rowl - 1st generation
+; Copyright (C) 2012 nineties
+;
+; $Id: amber-array.rlc 2014-04-17 20:32:08 nineties $
+;
+
+(import "rlvm-compile")
+(import "amber-types")
+
+(compile `object `(
+
+(import "amber-util")
+(import "amber-node")
+(import "amber-compile")
+(import "amber-string")
+
+; default pretty printer corresponding to lib/amber/syntax.ab
+
+(extern fun make_ofstream)
+
+(extern fun pp_table)
+(extern fun pp_bint)
+(extern fun pp_float)
+
+(export fun pprint_debug (ochan obj) (
+    (output_string ochan "0x")
+    (output_hex ochan obj 8)
+    (output_string ochan " = ")
+    (return (pprint_main ochan obj))
+    ))
+
+(export fun pprint (ochan obj) (
+    (pprint_main ochan obj)
+    (return @C_NIL)
+    ))
+
+(fun pprint_ (io obj) (
+    (return (pprint_main (field_get io 2) obj))
+    ))
+
+(fun pprint_main (ochan obj) (
+    (= obj (unwrap_internal obj))
+    (tswitch (node_type obj) (
+        (@ExprE               . (return (pp_expr ochan obj)))
+        (@ListE               . (return (pp_list ochan obj)))
+        (@TupleE              . (return (pp_tuple ochan obj)))
+        (@ArrayE              . (return (pp_array ochan obj)))
+        (@TableE              . (return (pp_table ochan obj)))
+        (@NilE                . (return (output_string ochan "nil")))
+        (@UndefE              . (return (output_string ochan "undef")))
+        (@BoolE               . (do
+            (if (== obj @C_TRUE)
+                (output_string ochan "true")
+                (output_string ochan "false")
+                )
+            return
+            ))
+        (@SymbolE             . (return (output_symbol ochan obj)))
+        (@AssemblerE          . (return (pp_node ochan "Assembler" obj)))
+        (@BytecodeE           . (return (pp_node ochan "Bytecode" obj)))
+        (@FunctionE           . (return (pp_node ochan "Function" obj)))
+        (@BuiltinFunctionE    . (return (pp_node ochan "Function" obj)))
+        (@BoundFunctionE      . (return (pp_node ochan "Function" obj)))
+        (@ContinuationE       . (return (pp_node ochan "Function" obj)))
+        (@AliasE              . (return (pp_node ochan "Alias" obj)))
+        (@InputFileStreamE    . (return (pp_node ochan "InputFileStream" obj)))
+        (@OutputFileStreamE   . (return (pp_node ochan "OutputFileStream" obj)))
+        (@InputStringStreamE  . (return (pp_node ochan "InputStringStream" obj)))
+        (@OutputStringStreamE . (return (pp_node ochan "OutputStringStream" obj)))
+        (@ParserE             . (return (pp_node ochan "Parser" obj)))
+        (@BigIntE             . (return (pp_bint ochan obj)))
+        (@IntE                . (return (pp_int ochan obj)))
+        (@StringE             . (return (pp_string ochan obj)))
+        (@FloatE              . (return (pp_float ochan obj)))
+        (@BuiltinTypeE        . (return (pp_node ochan "BuiltinType" obj)))
+        (default              . (return (not_reachable "fullform")))
+        ))
+    ))
+
+(fun pp_list (ochan args) (
+    (output_char ochan '[')
+    (while args (do
+        (pprint ochan (car args))
+        (= args (cdr args))
+        (if args (output_string ochan ", "))
+        ))
+    (output_char ochan ']')
+    (return @C_NIL)
+    ))
+
+(fun pp_array (ochan ary) (
+    (output_string ochan "Array{")
+    (var buf (field_get ary 1))
+    (var size (field_get ary 2))
+    (for i 0 size (do
+        (pprint ochan (array_get object buf i))
+        (if (< i (- size 1)) (output_string ochan ", "))
+        ))
+    (output_char ochan '}')
+    (return @C_NIL)
+    ))
+
+(fun pp_tuple (ochan obj) (
+    (var size (seq_size obj))
+    (output_char ochan '(')
+    (for i 0 size (do
+        (pprint ochan (array_get object obj i))
+        (if (!= i (- size 1)) (output_string ochan ", "))
+        ))
+    (output_char ochan ')')
+    (return @C_NIL)
+    ))
+
+(fun pp_node (ochan name obj) (
+    (output_string ochan "<#")
+    (output_string ochan name)
+    (output_char ochan '>')
+    ;(output_string ochan ":0x")
+    ;(output_hex ochan obj 8)
+    (return @C_NIL)
+    ))
+
+(fun pp_int (ochan node) (
+    (output_int ochan (unbox node))
+    (return @C_NIL)
+    ))
+
+(fun pp_string (ochan node) (
+    (var size (str_size node))
+    (output_char ochan '"')
+    (output_bytes_escape ochan node size)
+    (output_char ochan '"')
+    (return @C_NIL)
+    ))
+
+(extern fun unwrap_internal)
+(fun pp_expr (ochan node) (
+    (output_symbol ochan (node_head node))
+    (output_char ochan '{')
+    (var n (node_size node))
+    (for i 0 n (do
+        (pprint ochan (node_arg node i))
+        (if (!= i (- n 1)) (output_string ochan ", "))
+        ))
+    (output_char ochan '}')
+    (return @C_NIL)
+    ))
+
+(extern fun oss_new)
+(extern fun oss_raw)
+(extern fun oss_to_s)
+(export fun fullform (obj) (
+    (var io (oss_new))
+    (var ochan (oss_raw io))
+    (fullform_iter ochan obj)
+    (return (oss_to_s io))
+    ))
+
+(fun fullform_iter (ochan obj) (
+    (if (is_atom obj) (do
+        (pprint_main ochan obj)
+        return
+        ))
+
+    (var h (node_head obj))
+
+    (if (is_builtin_sym h) (do
+        (output_symbol ochan h)
+        (output_string ochan "{...}")
+        return
+        ))
+
+    (var args (node_args obj))
+    
+    (output_symbol ochan h)
+    (output_char ochan '{')
+    (while args (do
+        (fullform_iter ochan (car args))
+        (= args (cdr args))
+        (if args (output_string ochan ", "))
+        ))
+    (output_char ochan '}')
+    ))
+
+(export fun setup_pprint (mod) (
+    (add_function2 mod (to_sym "pretty_print") (domainP OutputFileStream) DontCare pprint_ 0)
+    (add_function2 mod (to_sym "pretty_print") (domainP OutputStringStream) DontCare pprint_ 0)
+    (add_function1 mod (to_sym "fullform") DontCare fullform 0)
+    ))
+
+    ))

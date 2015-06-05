@@ -1,0 +1,499 @@
+;
+; rowl - 1st generation
+; Copyright (C) 2010 nineties
+;
+; $Id: amber-io.rlc 2014-04-22 12:54:02 nineties $
+;
+
+(import "rlvm-compile")
+(import "amber-types")
+
+(var BUFSIZE 512)
+
+(compile `object `(
+
+(import "amber-util")
+(import "amber-node")
+(import "amber-object")
+(import "amber-compile")
+(import "amber-error")
+(import "amber-pprint")
+(import "amber-numeric")
+(import "amber-string")
+
+(export fun make_ifstream (path in) (
+    (return (variant @InputFileStreamE 2 path in))
+    ))
+
+(fun io_open_in (path bin) (
+    (var binary_mode @FALSE)
+    (if (!= bin @C_FALSE) (= binary_mode @TRUE))
+    (var ichan (open_in path binary_mode))
+    (if (! ichan) (throw (io_error1 (string "Open failed") path)))
+    (return (make_ifstream path ichan))
+    ))
+
+(fun io_close_in (st) (
+    (if (! (close_in (field_get st 2)))
+        (throw (io_error (string "Closed stream.")))
+        )
+    (return @C_NIL)
+    ))
+
+(export fun make_ofstream (path out) (
+    (return (variant @OutputFileStreamE 2 path out))
+    ))
+
+(fun io_open_out (path append bin) (
+    (var binary_mode @FALSE)
+    (if (!= bin @C_FALSE) (= binary_mode @TRUE))
+    (var mode @(| O_WRONLY O_CREAT))
+    (if (!= append @C_FALSE)
+        (|= mode @O_APPEND)
+        (|= mode @O_TRUNC)
+        )
+    (var ochan (open_out path mode binary_mode))
+    (if (! ochan) (throw (io_error1 (string "Open failed") path)))
+    (return (make_ofstream path ochan))
+    ))
+
+(fun io_close_out (st) (
+    (if (! (close_out (field_get st 2)))
+        (throw (io_error (string "Closed stream.")))
+        )
+    (return @C_NIL)
+    ))
+
+(fun io_flush_out (st) (
+    (flush (field_get st 2))
+    (return @C_NIL)
+    ))
+
+(fun io_eos (st) (
+    (var c)
+    (if (< (lookahead (address c) (field_get st 2)) 0)
+        (return @C_TRUE)
+        (return @C_FALSE)
+        )
+    ))
+
+(fun io_print_str (f s) (
+    (output_bytes (field_get f 2) s (str_size s))
+    (return @C_NIL)
+    ))
+
+; single character is represented as a string of one character
+(fun io_lookahead (io eoserror) (
+    (var c)
+    (if (< (lookahead (address c) (field_get io 2)) 0)
+        (if (!= eoserror @C_FALSE)
+            (throw (io_error (string "End of stream.")))
+            (return @C_NIL)
+            )
+        )
+    (var s (allocate_string 1))
+    (strncpy s (address c) 1)
+    (return s)
+    ))
+
+; single character is represented as a string of one character
+(fun io_read_char (io eoserr) (
+    (var c)
+    (if (< (input_char (address c) (field_get io 2)) 0)
+        (if (== eoserr @C_FALSE)
+            (return @C_NIL)
+            (throw (io_error (string "End of stream.")))
+            )
+        )
+    (var s (allocate_string 1))
+    (strncpy s (address c) 1)
+    (return s)
+    ))
+
+(fun io_read_bytes (io size eoserr) (
+    (if (! @(UFIX size))
+        (throw (invalid_argument (string "invalid byte size") size))
+        )
+    (= size (unbox size))
+    (if (<= size 0)
+        (throw (invalid_argument
+            (string "Read size must be positive.")
+            (box size)
+            )))
+    (var s (allocate_string size))
+    (var r (input_bytes (field_get io 2) s size))
+    (if (== r size) (return s))
+    (if (!= eoserr @C_FALSE)
+        (throw (io_error (string "End of stream.")))
+        )
+    (var new_s (allocate_string r))
+    (memcpy new_s s r)
+    (return new_s)
+    ))
+
+(fun io_read (io) (
+    (var oss (oss_new @C_TRUE))
+    (var buf (allocate_string @BUFSIZE))
+    (while @TRUE (do
+        (var r (input_bytes (field_get io 2) buf @BUFSIZE))
+        (oss_print_str oss buf)
+        (if (< r @BUFSIZE) break)
+        ))
+    (return (oss_to_s oss))
+    ))
+
+(fun io_read_line (io eoserr) (
+    (var s)
+    (if (< (input_line (address s) (field_get io 2)) 0)
+        (if (!= eoserr @C_FALSE)
+            (throw (io_error (string "End of stream.")))
+            (return @C_NIL)
+            )
+        )
+    (return s)
+    ))
+
+(fun io_read_str (io) (
+    (var s 0)
+    (input_string (address s) (field_get io 2))
+    (return s)
+    ))
+
+(fun io_read_int8 (io eoserr) (
+    (var n)
+    (if (< (input_char (address n) (field_get io 2)) 0)
+        (if (!= eoserr @C_FALSE)
+            (throw (io_error (string "End of stream.")))
+            (return @C_NIL)
+            )
+        )
+    (return (box n))
+    ))
+
+(fun io_read_uint8 (io eoserr) (
+    (var n)
+    (if (< (input_uchar (address n) (field_get io 2)) 0)
+        (if (!= eoserr @C_FALSE)
+            (throw (io_error (string "End of stream.")))
+            (return @C_NIL)
+            )
+        )
+    (return (box n))
+    ))
+
+(fun io_read_int16 (io eoserr) (
+    (var n)
+    (if (< (input_short (address n) (field_get io 2)) 0)
+        (if (!= eoserr @C_FALSE)
+            (throw (io_error (string "End of stream.")))
+            (return @C_NIL)
+            )
+        )
+    (return (box n))
+    ))
+
+(fun io_read_uint16 (io eoserr) (
+    (var n)
+    (if (< (input_ushort (address n) (field_get io 2)) 0)
+        (if (!= eoserr @C_FALSE)
+            (throw (io_error (string "End of stream.")))
+            (return @C_NIL)
+            )
+        )
+    (return (box n))
+    ))
+
+(fun io_read_int32 (io eoserr) (
+    (var n)
+    (if (< (input_int (address n) (field_get io 2)) 0)
+        (if (!= eoserr @C_FALSE)
+            (throw (io_error (string "End of stream.")))
+            (return @C_NIL)
+            )
+        )
+    (if (&& (<= n @FIXNUM_MAX) (>= n @FIXNUM_MIN))
+        (return (box n))
+        (return (int_to_bint n))
+        )
+    ))
+
+(fun io_read_uint32 (io eoserr) (
+    (var n)
+    (if (< (input_int (address n) (field_get io 2)) 0)
+        (if (!= eoserr @C_FALSE)
+            (throw (io_error (string "End of stream.")))
+            (return @C_NIL)
+            )
+        )
+    (if (&& (<= n @FIXNUM_MAX) (>= n 0))
+        (return (box n))
+        (return (uint_to_bint n))
+        )
+    ))
+
+(fun io_read_int64 (io eoserr) (
+    (var n1)
+    (var n2)
+    (if (< (input_int (address n1) (field_get io 2)) 0)
+        (if (!= eoserr @C_FALSE)
+            (throw (io_error (string "End of stream.")))
+            (return @C_NIL)
+            )
+        )
+    (if (< (input_int (address n2) (field_get io 2)) 0)
+        (return @C_NIL)
+        )
+
+    (var b (allocate_bint 2))
+    (if (< n2 0)
+        (do
+            (= n1 (~ n1))
+            (= n2 (~ n2))
+            (+= n2 1)
+            (if (== n2 0) (+= n1 1))
+        ))
+    (bint_set_digit b 0 n1)
+    (bint_set_digit b 1 n2)
+    (bint_set_ndigit b 2)
+    (return (norm b))
+    ))
+
+(fun io_read_uint64 (io eoserr) (
+    (var n1)
+    (var n2)
+    (if (< (input_int (address n1) (field_get io 2)) 0)
+        (if (!= eoserr @C_FALSE)
+            (throw (io_error (string "End of stream.")))
+            (return @C_NIL)
+            )
+        )
+    (if (< (input_int (address n2) (field_get io 2)) 0)
+        (if (!= eoserr @C_FALSE)
+            (throw (io_error (string "End of stream.")))
+            (return @C_NIL)
+            )
+        )
+    (var b (allocate_bint 2))
+    (bint_set_digit b 0 n1)
+    (bint_set_digit b 1 n2)
+    (bint_set_ndigit b 2)
+    (return (norm b))
+    ))
+
+(fun io_read_float (io eoserr) (
+    (var f (allocate_float))
+    (if (< (input_int f (field_get io 2)) 0)
+        (if (!= eoserr @C_FALSE)
+            (throw (io_error (string "End of stream.")))
+            (return @C_NIL)
+            )
+        )
+    (if (< (input_int (+ f 4) (field_get io 2)) 0)
+        (if (!= eoserr @C_FALSE)
+            (throw (io_error (string "End of stream.")))
+            (return @C_NIL)
+            )
+        )
+    (return f)
+    ))
+
+(fun io_write_int8 (io n) (
+    (var n_ n)
+    (if (! (& n 1)) (goto invalid_arg))
+    (= n (unbox n))
+    (if (|| (< n -128) (> n 127)) (goto invalid_arg))
+    (output_bytes (field_get io 2) (address n) 1)
+    (return @C_NIL)
+
+    (label invalid_arg)
+    (throw (invalid_argument
+        (string "8-bit integer is required") n_))
+    ))
+
+(fun io_write_uint8 (io n) (
+    (var n_ n)
+    (if (! (& n 1)) (goto invalid_arg))
+    (= n (unbox n))
+    (if (|| (< n 0) (> n 255)) (goto invalid_arg))
+    (output_bytes (field_get io 2) (address n) 1)
+    (return @C_NIL)
+
+    (label invalid_arg)
+    (throw (invalid_argument
+        (string "8-bit non-negative integer is required") n_))
+    ))
+
+(fun io_write_int16 (io n) (
+    (var n_ n)
+    (if (! (& n 1)) (goto invalid_arg))
+    (= n (unbox n))
+    (if (|| (< n -32768) (> n 32767)) (goto invalid_arg))
+    (output_bytes (field_get io 2) (address n) 2)
+    (return @C_NIL)
+
+    (label invalid_arg)
+    (throw (invalid_argument
+        (string "16-bit integer is required") n_))
+    ))
+
+(fun io_write_uint16 (io n) (
+    (var n_ n)
+    (if (! (& n 1)) (goto invalid_arg))
+    (= n (unbox n))
+    (if (|| (< n 0) (> n 65535)) (goto invalid_arg))
+    (output_bytes (field_get io 2) (address n) 2)
+    (return @C_NIL)
+
+    (label invalid_arg)
+    (throw (invalid_argument
+        (string "8-bit non-negative integer is required") n_))
+    ))
+
+(fun io_write_int32 (io n) (
+    (var n_ n)
+    (if (& n 1)
+        (do
+            (= n (unbox n))
+            (output_bytes (field_get io 2) (address n) 4)
+            (return @C_NIL)
+        ))
+    (if (bint_is_negative n) (= n (abs_twoscomplement (copy_bint n))))
+    (if (!= (bint_ndigit n) 1) (goto invalid_arg))
+
+    (= n (bint_digit n 0))
+    (output_bytes (field_get io 2) (address n) 4)
+    (return @C_NIL)
+
+    (label invalid_arg)
+    (throw (invalid_argument
+        (string "32-bit integer is required") n_))
+    ))
+
+(fun io_write_uint32 (io n) (
+    (var n_ n)
+    (if (& n 1)
+        (do
+            (if (< n 0) (goto invalid_arg))
+            (= n (unbox n))
+            (output_bytes (field_get io 2) (address n) 4)
+            (return @C_NIL)
+        ))
+    (if (|| (!= (bint_ndigit n) 1) (bint_is_negative n))
+        (goto invalid_arg))
+
+    (= n (bint_digit n 0))
+    (output_bytes (field_get io 2) (address n) 4)
+    (return @C_NIL)
+
+    (label invalid_arg)
+    (throw (invalid_argument
+        (string "32-bit non-negative integer is required") n_))
+    ))
+
+(fun io_write_int64 (io n) (
+    (var n_ n)
+    (if (& n 1)
+        (do
+            (= n (unbox n))
+            (output_bytes (field_get io 2) (address n) 4)
+            (if (>= n 0)
+                (= n 0)
+                (= n 0xffffffff)
+                )
+            (output_bytes (field_get io 2) (address n) 4)
+            (return @C_NIL)
+        ))
+    (if (bint_is_negative n) (= n (abs_twoscomplement (copy_bint n))))
+    (if (!= (bint_ndigit n) 2) (goto invalid_arg))
+
+    (= n (bint_digit n 0))
+    (output_bytes (field_get io 2) (address n) 4)
+    (= n (bint_digit n 1))
+    (output_bytes (field_get io 2) (address n) 4)
+    (return @C_NIL)
+
+    (label invalid_arg)
+    (throw (invalid_argument
+        (string "64-bit integer is required") n_))
+    ))
+
+(fun io_write_uint64 (io n) (
+    (var n_ n)
+    (if (& n 1)
+        (do
+            (if (< n 0) (goto invalid_arg))
+            (= n (unbox n))
+            (output_bytes (field_get io 2) (address n) 4)
+            (= n 0)
+            (output_bytes (field_get io 2) (address n) 4)
+            (return @C_NIL)
+        ))
+    (if (|| (!= (bint_ndigit n) 2) (bint_is_negative n))
+        (goto invalid_arg))
+
+    (= n (bint_digit n 0))
+    (output_bytes (field_get io 2) (address n) 4)
+    (= n (bint_digit n 1))
+    (output_bytes (field_get io 2) (address n) 4)
+    (return @C_NIL)
+
+    (label invalid_arg)
+    (throw (invalid_argument
+        (string "64-bit non-negative integer is required") n_))
+    ))
+
+(fun io_write_float (io f) (
+    (var ochan (field_get io 2))
+    (output_bytes ochan f 4)
+    (output_bytes ochan (+ f 4) 4)
+    (return @C_NIL)
+    ))
+
+(export fun setup_io (mod) (
+    (set_slot mod (to_sym "stdin")  (make_ifstream (string "stdin") stdin))
+    (set_slot mod (to_sym "stdout") (make_ofstream (string "stdout") stdout))
+    (set_slot mod (to_sym "stderr") (make_ofstream (string "stderr") stderr))
+
+    ; file mod
+
+    (var ifT (domainP InputFileStream))
+    (var ofT (domainP OutputFileStream))
+
+    (add_function2 mod (to_sym "open_in") stringT DontCare io_open_in 0)
+    (add_function3 mod (to_sym "open_out") stringT DontCare DontCare io_open_out 0)
+    (add_function1 mod (to_sym "close_in") ifT io_close_in 0)
+    (add_function1 mod (to_sym "close_out") ofT io_close_out 0)
+    (add_function1 mod (to_sym "flush_out") ofT io_flush_out 0)
+    (add_function1 mod (to_sym "eos?") ifT io_eos 0)
+    (add_function2 mod (to_sym "print_string") ofT stringT io_print_str 0)
+
+    (add_function2 mod (to_sym "lookahead") ifT DontCare io_lookahead 0)
+    (add_function2 mod (to_sym "read_char") ifT DontCare io_read_char 0)
+    (add_function2 mod (to_sym "read_line") ifT DontCare io_read_line 0)
+    (add_function3 mod (to_sym "read_bytes") ifT intT DontCare io_read_bytes 0)
+    (add_function1 mod (to_sym "read") ifT io_read 0)
+
+    ; Binary mode
+    (add_function1 mod (to_sym "read_string") ifT io_read_str 0)
+    (add_function2 mod (to_sym "read_int8") ifT DontCare io_read_int8 0)
+    (add_function2 mod (to_sym "read_uint8") ifT DontCare io_read_uint8 0)
+    (add_function2 mod (to_sym "read_int16") ifT DontCare io_read_int16 0)
+    (add_function2 mod (to_sym "read_uint16") ifT DontCare io_read_uint16 0)
+    (add_function2 mod (to_sym "read_int32") ifT DontCare io_read_int32 0)
+    (add_function2 mod (to_sym "read_uint32") ifT DontCare io_read_uint32 0)
+    (add_function2 mod (to_sym "read_int64") ifT DontCare io_read_int64 0)
+    (add_function2 mod (to_sym "read_uint64") ifT DontCare io_read_uint64 0)
+    (add_function2 mod (to_sym "read_float") ifT DontCare io_read_float 0)
+
+    (add_function2 mod (to_sym "write_int8") ofT intT io_write_int8 0)
+    (add_function2 mod (to_sym "write_uint8") ofT intT io_write_uint8 0)
+    (add_function2 mod (to_sym "write_int16") ofT intT io_write_int16 0)
+    (add_function2 mod (to_sym "write_uint16") ofT intT io_write_uint16 0)
+    (add_function2 mod (to_sym "write_int32") ofT intT io_write_int32 0)
+    (add_function2 mod (to_sym "write_uint32") ofT intT io_write_uint32 0)
+    (add_function2 mod (to_sym "write_int64") ofT intT io_write_int64 0)
+    (add_function2 mod (to_sym "write_uint64") ofT intT io_write_uint64 0)
+    (add_function2 mod (to_sym "write_float") ofT floatT io_write_float 0)
+    ))
+
+    ))

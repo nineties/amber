@@ -1,0 +1,267 @@
+;
+; rowl - 1st generation
+; Copyright (C) 2010 nineties
+;
+; $Id: amber-util.rlc 2014-04-13 04:07:31 nineties $
+;
+
+(import "rlvm-compile")
+(import "amber-types")
+
+(define PRINTABLE (c) `(&& (<= 0x20 @c) (<= @c 0x7e)))
+
+(compile `object `(
+
+(export fun max (a b) (
+    (if (>= a b)
+        (return a)
+        (return b)
+        )
+    ))
+
+(export fun min (a b) (
+    (if (>= a b)
+        (return b)
+        (return a)
+        )
+    ))
+
+; XXX: Fix bugs of following functions and move them to amber-encoding.rlc.
+
+(export fun output_char_escape (ochan t) (
+    (if (== t '"')  (output_string ochan "\\\"")
+    (if (== t '\\') (do (output_char ochan '\\') (output_char ochan '\\'))
+    (if (== t '\a') (output_string ochan "\\a")
+    (if (== t '\b') (output_string ochan "\\b")
+    (if (== t '\f') (output_string ochan "\\f")
+    (if (== t '\n') (output_string ochan "\\n")
+    (if (== t '\r') (output_string ochan "\\r")
+    (if (== t '\t') (output_string ochan "\\t")
+    (if (== t '\v') (output_string ochan "\\v")
+    (if (== t '\0') (output_string ochan "\\0")
+    (if @(PRINTABLE t) (output_char ochan t)
+        (do
+            (output_string ochan "\\x")
+            (output_hex ochan t 2)
+        )
+        )))))))))))
+    ))
+
+(export fun output_bytes_escape (ochan str size) (
+    (for i 0 size
+        (output_char_escape ochan (array_get uchar str i))
+        )
+    ))
+
+(export fun escape_char (c) (
+    (if (== c '\\') (return "\\"))
+    (if (== c '\a') (return "\\a"))
+    (if (== c '\b') (return "\\b"))
+    (if (== c '\f') (return "\\f"))
+    (if (== c '\n') (return "\\n"))
+    (if (== c '\r') (return "\\r"))
+    (if (== c '\t') (return "\\t"))
+    (if (== c '\v') (return "\\v"))
+    (if (== c '\0') (return "\\0"))
+    (if (== c '"')  (return "\\\""))
+    (return (ctos c))
+    ))
+
+(extern fun value_error)
+(fun unescape_char (c) (
+    (if (== c '\\') (return '\\'))
+    (if (== c 'a') (return '\a'))
+    (if (== c 'b') (return '\b'))
+    (if (== c 'f') (return '\f'))
+    (if (== c 'n') (return '\n'))
+    (if (== c 'r') (return '\r'))
+    (if (== c 't') (return '\t'))
+    (if (== c 'v') (return '\v'))
+    (if (== c '0') (return '\0'))
+    (if (== c '"') (return '"'))
+    (throw (value_error (string "Invalid escape sequence.")
+        (string (ctos '\\') (ctos c))))
+    ))
+
+(export fun escape_string (str) (
+    (var len (strlen str))
+    (var size (+ len 5))
+    (var buf (allocate_string size))
+    (var i 0)
+    (var j 0)
+    (while (< i len) (do
+        (var s (escape_char (array_get char str i)))
+        (var l (strlen s))
+        (if (> (+ j l) size) (do
+            (var new_buf (allocate_string (+ (+ j (- len i)) 5)))
+            (strcpy new_buf buf)
+            (= buf new_buf)
+            ))
+        (strcpy (+ buf j) s)
+        (+= j l)
+        (+= i 1)
+        ))
+    (return (string buf))
+    ))
+
+; unescape double-quoted string.
+; NB: given argument will be overriden
+(export fun unescape_string (str) (
+    (var len (strlen str))
+    (var i 0)
+    (var j 0)
+    (while (< i len) (do
+        (var c (array_get char str i))
+        (if (== c '\\') (do
+            (incr i)
+            (= c (unescape_char (array_get char str i)))
+            ))
+        (array_set char str j c)
+        (incr i)
+        (incr j)
+        ))
+    (array_set char str j 0)
+    (if (!= i j)
+        (return (string str))
+        (return str)
+        )
+    ))
+
+(export fun list1 (v) (
+    (return (cons v 0))
+    ))
+
+(export fun list2 (v1 v2) (
+    (return (cons v1 (cons v2 0)))
+    ))
+
+(export fun list3 (v1 v2 v3) (
+    (return (cons v1 (cons v2 (cons v3 0))))
+    ))
+
+(export fun list4 (v1 v2 v3 v4) (
+    (return (cons v1 (cons v2 (cons v3 (cons v4 0)))))
+    ))
+
+(export fun list5 (v1 v2 v3 v4 v5) (
+    (return (cons v1 (cons v2 (cons v3 (cons v4 (cons v5 0))))))
+    ))
+
+(export fun list6 (v1 v2 v3 v4 v5 v6) (
+    (return (cons v1 (cons v2 (cons v3 (cons v4 (cons v5 (cons v6 0)))))))
+    ))
+
+(export fun diag_list (len v) (
+    (if (== len 0) (return 0))
+    (return (cons v (diag_list (- len 1) v)))
+    ))
+
+(export fun list_reverse (ls) (
+    (var new_ls 0)
+    (while ls (do
+        (= new_ls (cons (car ls) new_ls))
+        (= ls (cdr ls))
+        ))
+    (return new_ls)
+    ))
+
+(export fun list_append (ls1 ls2) (
+    (if (! ls1) (return ls2))
+    (return (cons (car ls1) (list_append (cdr ls1) ls2)))
+    ))
+
+(export fun list_delete (val ls) (
+    (var p 0)
+    (var ret ls)
+    (while ls (do
+        (if (== (car ls) val) (do
+            (if (! p)
+                (= ret (cdr ls))
+                (setcdr p (cdr ls))
+                )
+            break
+            ))
+        (= p ls)
+        (= ls (cdr ls))
+        ))
+    (return ret)
+    ))
+
+(export fun list_insert_uniq (val ls) (
+    (if (! ls) (return (list1 val)))
+    (if (== (car ls) val) (return ls))
+    (return (cons (car ls) (list_insert_uniq val (cdr ls))))
+    ))
+
+(export fun list_member (val ls) (
+    (while ls (do
+        (if (== val (car ls)) (return @TRUE))
+        (= ls (cdr ls))
+        ))
+    (return @FALSE)
+    ))
+
+(export fun list_copy (ls) (
+    (if (! ls) (return 0))
+    (return (cons (car ls) (list_copy (cdr ls))))
+    ))
+
+(export fun list_split (ls n) (
+    (if (== n 0) (return (cons 0 ls)))
+    (var hd ls)
+    (while (> n 1) (do
+        (= ls (cdr ls))
+        (decr n)
+        ))
+    (var tl (cdr ls))
+    (setcdr ls 0)
+    (return (cons hd tl))
+    ))
+
+(export fun get_directory (path) (
+    (var len (- (strlen path) 1))
+    (var dir (strdup path))
+    (while (> len 0) (do
+        (if (== (array_get char dir len) '/') (do
+            (array_set char dir len 0)
+            break
+            ))
+        (-= len 1)
+        ))
+    (if (== len 0) (do
+        (return (string "."))
+        ))
+    (return dir)
+    ))
+
+(export fun not_reachable (name) (
+    (flush stdout)
+    (output_string stderr "INTERNAL ERROR: ")
+    (output_string stderr name)
+    (output_string stderr " : not reachable here")
+    (exit 1)
+    ))
+
+(export fun not_implemented (name) (
+    (flush stdout)
+    (output_string stderr "INTERNAL ERROR: ")
+    (output_string stderr name)
+    (output_string stderr " : not implemented here")
+    (exit 1)
+    ))
+
+(extern fun pprint)
+(extern fun pprint_debug)
+
+(export fun debugc (c) ((output_char stderr c)))
+(export fun debugs (s) ((output_string stderr s)))
+(export fun debugi (i) ((output_int stderr i)))
+(export fun debugx (x) ((output_hex stderr x 8)))
+(export fun debugp (o) ((pprint stderr o) (debugc '\n')))
+(export fun debugpf (o) (
+    (pprint_debug stderr o)
+    (debugc '\n')
+    (return @C_NIL)
+    ))
+
+    ))

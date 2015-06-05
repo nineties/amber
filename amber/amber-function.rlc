@@ -1,0 +1,113 @@
+;
+; rowl - 1st generation
+; Copyright (C) 2010 nineties
+;
+; $Id: amber-function.rlc 2014-04-21 18:53:06 nineties $
+;
+
+(import "rlvm-compile")
+(import "amber-types")
+
+(compile `object `(
+
+(import "amber-util")
+(import "amber-node")
+(import "amber-object")
+(import "amber-compile")
+(import "amber-assemble")
+(import "amber-error")
+
+(extern fun tuple2)
+(extern fun tuple_at)
+
+(fun construct_arg (args keys guard) (
+    (= args (cdr args)) ; remove arity
+    (if keys (do
+        (var list 0)
+        (for i 0 (seq_size keys) (do
+            (= list (cons (make_node2 Keyword
+                            (array_get object keys i) 
+                            (make_node0 Rest)) list))
+            ))
+        (= args (list_append args (list_reverse list)))
+        ))
+    (if (== guard @C_UNDEF)
+        (return args)
+        (return (tuple2 args guard))
+        )
+    ))
+
+(fun domain_list (f) (
+    (var ty (node_type f))
+    (if (== ty @FunctionE)
+        (do
+            (var orig (field_get f 8))
+            (if (!= orig @C_NIL) (return (list1 orig)))
+            (var args (field_get f 2))
+            (var keys (field_get f 3))
+            (var guard (field_get f 4))
+            (return (list1 (construct_arg args keys guard)))
+        )
+    (if (== ty @BuiltinFunctionE)
+        (do
+            (var args (field_get f 2))
+            (return (list1 (construct_arg args 0 @C_UNDEF)))
+        )
+    (if (== ty @BoundFunctionE)
+        (return (list_append
+            (domain_list (field_get f 2))
+            (domain_list (field_get f 3))
+            ))
+        )))
+    ; ContinuationE
+    ;(args, keyword, guard)
+    (return (list1 (construct_arg (list2 (box 1) DontCare) 0 @C_UNDEF)))
+    ))
+
+; Return true when `list` is a list of different symbols.
+(fun is_saturated (list) (
+    (while list (do
+        (if (!= (node_type (car list)) @SymbolE)
+            (return @FALSE)
+            )
+        (if (list_member (car list) (cdr list))
+            (return @FALSE)
+            )
+        (= list (cdr list))
+        ))
+    (return @TRUE)
+    ))
+
+(export fun fun_domain (f) (
+    (var domains (domain_list f))
+    (var new_domains 0)
+    (var saturated 0)
+    (while domains (do
+        (var dom (car domains))
+        (var args dom)
+        (if (is_tuple args) (= args (tuple_at args 0)))
+        (var arity (list_len args))
+        (if (! (list_member (box arity) saturated))
+            (= new_domains (cons dom new_domains))
+            )
+        (if (&& (!= (node_type dom) @TupleE) (is_saturated args))
+            (= saturated (cons (box arity) saturated))
+            )
+        (= domains (cdr domains))
+        ))
+    (= new_domains (list_reverse new_domains))
+    (return (make_node (to_sym "DomainList") new_domains))
+    ))
+
+(export fun setup_function (mod) (
+    ; domain of function
+    (add_function1 mod (to_sym "domain") funT fun_domain 0)
+
+    ; vertical composition
+    (add_function2 mod (to_sym "compose_function") funT funT compose_function 0)
+
+    ; horizontal composition
+    (add_function2 mod (to_sym "union_function") funT funT union_function 0)
+    ))
+
+    ))

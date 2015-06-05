@@ -1,0 +1,404 @@
+;
+; rowl - 1st generation
+; Copyright (C) 2010 nineties
+;
+; $Id: amber-string.rlc 2014-04-22 12:39:21 nineties $
+;
+
+(import "rlvm-compile")
+(import "amber-types")
+
+(compile `object `(
+
+(import "amber-util")
+(import "amber-node")
+(import "amber-object")
+(import "amber-compile")
+(import "amber-error")
+
+(extern fun ary_new)
+(extern fun ary_push)
+
+(export fun str_size (s) (
+    (return (- (get_pstruct_size s) 1))
+    ))
+
+(fun str_size_ (s) (
+    (return (box (str_size s)))
+    ))
+
+(export fun str_equal (a b) (
+    (if (streq a b)
+        (return @C_TRUE)
+        (return @C_FALSE)
+        )
+    ))
+
+(export fun str_hash (s) (
+    (var len (str_size s))
+    (var h 0)
+    (for i 0 len (do
+        (= h (hashnext h (array_get char s i)))
+        ))
+    (return (box h))
+    ))
+
+(fun str_add (a b) (
+    (return (strcat a b))
+    ))
+
+(fun str_join (list d) (
+    (if (! list) (return (string "")))
+    (var len 0)
+    (var dlen (str_size d))
+    (var n 0)
+    (var list_ list)
+    (while list_ (do
+        (var s (car list_))
+        (if (!= (node_type s) @StringE)
+            (throw (invalid_argument (string "join requires list of strings") list)))
+        (+= len (str_size s))
+        (+= n 1)
+        (= list_ (cdr list_))
+        ))
+    (+= len (* (- n 1) dlen))
+    (var str (allocate_string len))
+    (var p 0)
+    (while list (do
+        (+= p (strcpy (+ str p) (car list)))
+        (if (cdr list)
+            (+= p (strcpy (+ str p) d))
+            )
+        (= list (cdr list))
+        ))
+    (return str)
+    ))
+
+(fun str_escape (s) (
+    (return (escape_string s))
+    ))
+
+(fun str_unescape (s) (
+    (= s (strdup s))
+    (= s (unescape_string s))
+    (return s)
+    ))
+
+
+; returns true if s1 contains s2 as a sub-string.
+(fun str_contain (s1 s2) (
+    ; simple method
+    (var l1 (str_size s1))
+    (var l2 (str_size s2))
+    (if (< l1 l2) (return @C_FALSE))
+    (for i 0 (- l1 l2) (do
+        (if (strneq (+ s1 i) s2 l2) (return @C_TRUE))
+        ))
+    (return @C_FALSE)
+    ))
+
+; Split `str` by delimiter string `d`
+(fun str_split_ (str d slen dlen) (
+    (if (< slen dlen)
+        (return (list1 (strdup str)))
+        )
+    (if (strneq str d dlen)
+        (return (cons (string "") (str_split_ (+ str dlen) d (- slen dlen) dlen)))
+        )
+    (for i 0 (- slen dlen) (do
+        (if (strneq (+ str i) d dlen)
+            (return (cons (strndup str i) (str_split_ (+ str (+ i dlen)) d
+                (- slen (+ i dlen)) dlen)))
+            )
+        ))
+    (return (list1 (strdup str)))
+    ))
+
+(export fun str_split (str d) (
+    (var slen (str_size str))
+    (var dlen (str_size d))
+    (if (== dlen 0) (do
+        (var ls 0)
+        (rfor i 0 slen (do
+            (= ls (cons (ctos (array_get char str i)) ls))
+            ))
+        (return ls)
+        ))
+    (return (str_split_ str d slen dlen))
+    ))
+
+(extern fun lowercase)
+(extern fun upcase)
+(fun str_downcase (str) (
+    (var len (str_size str))
+    (if (== len 0) (return str))
+    (var new (allocate_string len))
+    (for i 0 len
+        (array_set char new i (lowercase (array_get char str i)))
+        )
+    (return new)
+    ))
+
+(fun str_upcase (str) (
+    (var len (str_size str))
+    (if (== len 0) (return str))
+    (var new (allocate_string len))
+    (for i 0 len
+        (array_set char new i (upcase (array_get char str i)))
+        )
+    (return new)
+    ))
+
+(fun str_capitalize (str) (
+    (var len (str_size str))
+    (if (== len 0) (return str))
+    (var new (allocate_string len))
+    (array_set char new 0 (upcase (array_get char str 0)))
+    (for i 1 len
+        (array_set char new i (lowercase (array_get char str i)))
+        )
+    (return new)
+    ))
+
+(fun str_repeat (str n) (
+    (if (! @(UFIX n))
+        (throw (invalid_argument (string "invalid repeat count") n))
+        )
+    (= n (unbox n))
+    (if (< n 0)
+        (throw (invalid_argument (string "Repeat count is negative") (box n)))
+        )
+    (var len (str_size str))
+    (var new (allocate_string (* len n)))
+    (for i 0 n (do
+        (memcpy (+ new (* i len)) str len)
+        ))
+    (return new)
+    ))
+
+(fun str_ljust (str w punct) (
+    (if (! @(UFIX w))
+        (throw (invalid_argument (string "invalid string width") w))
+        )
+    (= w (unbox w))
+    (var sz (str_size str))
+    (var psz (str_size punct))
+    (if (== psz 0) (do (= punct (string " ")) (= psz 1)))
+    (if (< w sz) (= w sz))
+    (var ret (allocate_string w))
+    (memcpy ret str sz)
+    (for i sz w
+        (array_set char ret i (array_get char punct (% i psz)))
+        )
+    (return ret)
+    )) 
+
+(fun str_rjust (str w punct) (
+    (if (! @(UFIX w))
+        (throw (invalid_argument (string "invalid string width") w))
+        )
+    (= w (unbox w))
+    (var sz (str_size str))
+    (var psz (str_size punct))
+    (if (== psz 0) (do (= punct (string " ")) (= psz 1)))
+    (if (< w sz) (= w sz))
+    (var ret (allocate_string w))
+    (memcpy (+ ret (- w sz)) str sz)
+    (for i 0 (- w sz)
+        (array_set char ret i (array_get char punct (% i psz)))
+        )
+    (return ret)
+    ))
+
+(fun str_center (str w punct) (
+    (if (! @(UFIX w))
+        (throw (invalid_argument (string "invalid string width") w))
+        )
+    (= w (unbox w))
+    (var sz (str_size str))
+    (var psz (str_size punct))
+    (if (== psz 0) (do (= punct (string " ")) (= psz 1)))
+    (if (< w sz) (= w sz))
+    (var ret (allocate_string w))
+
+    (var left (/ (- w sz) 2))
+    (memcpy (+ ret left) str sz)
+    (for i 0 left
+        (array_set char ret i (array_get char punct (% i psz)))
+        )
+    (for i (+ left sz) w
+        (array_set char ret i (array_get char punct (% i psz)))
+        )
+    (return ret)
+    ))
+
+(fun str_code (s) (
+    (var len (str_size s))
+    (if (!= len 1) (throw (invalid_argument
+        (string "invalid character")
+        s)))
+    (return (box (array_get char s 0)))
+    ))
+
+(fun str_char (i) (
+    (if (&& @(UFIX i) (< i (box 256)))
+        (return (ctos (unbox i)))
+        )
+    (throw (invalid_argument (string "invalid ascii code") i))
+    ))
+
+(fun str_at (s i) (
+    (if (! @(FIX i))
+        (throw (invalid_argument (string "invalid index") i))
+        )
+    (var i_ i)
+    (= i (unbox i))
+    (var len (str_size s))
+    (if (< i 0) (+= i len))
+    (if (|| (>= i len) (< i 0))
+        (throw (out_of_range s i_)))
+    (return (ctos (array_get char s i)))
+    ))
+
+(fun str_substr (s range) (
+    (var i (node_arg range 0))
+    (var j (node_arg range 1))
+    (if (|| (! @(FIX i)) (! @(FIX j)))
+        (throw (invalid_argument (string "invalid range") range)))
+    (= i (unbox i))
+    (= j (unbox j))
+    (var size (str_size s))
+    (if (< i 0) (+= i size))
+    (if (< j 0) (+= j size))
+
+    (if (|| (< i 0) (> i j))
+        (throw (invalid_argument (string "invalid range") range)))
+
+    (var len (+ (- j i) 1))
+    (if (> (+ i len) size)
+        (= len (- size i))
+        )
+    (var ret (allocate_string len))
+    (memcpy ret (+ s i) len)
+    (return ret)
+    ))
+
+;; StringStream
+(export fun iss_new (str bin) (
+    (var binmode @FALSE)
+    (if (!= bin @C_FALSE) (= binmode @TRUE))
+    (return (variant @InputStringStreamE 1 (make_iss str binmode)))
+    ))
+
+(export fun oss_new (bin) (
+    (var binmode @FALSE)
+    (if (!= bin @C_FALSE) (= binmode @TRUE))
+    (return (variant @OutputStringStreamE 1 (make_oss binmode)))
+    ))
+
+(export fun oss_raw (oss) (
+    (return (field_get oss 1))
+    ))
+
+(export fun oss_to_s (io) (
+    (return (string (oss_get (field_get io 1))))
+    ))
+
+(export fun oss_print_str (io str) (
+    (output_string (field_get io 1) str)
+    (return @C_NIL)
+    ))
+
+; single character is represented as a string of one character
+(fun iss_lookahead (io eoserr) (
+    (var c)
+    (if (< (lookahead (address c) (field_get io 1)) 0)
+        (if (!= eoserr @C_FALSE)
+            (throw (io_error (string "End of stream")))
+            (return @C_NIL)
+            )
+        )
+    (var s (allocate_string 1))
+    (strncpy s (address c) 1)
+    (return s)
+    ))
+
+(fun iss_eos (io) (
+    (var c)
+    (if (< (lookahead (address c) (field_get io 1)) 0)
+        (return @C_TRUE)
+        (return @C_FALSE)
+        )
+    ))
+
+; single character is represented as a string of one character
+(fun iss_read_char (io eoserr) (
+    (var c)
+    (if (< (input_char (address c) (field_get io 1)) 0)
+        (if (!= eoserr @C_FALSE)
+            (throw (io_error (string "End of stream")))
+            (return @C_NIL)
+            )
+        )
+    (var s (allocate_string 1))
+    (strncpy s (address c) 1)
+    (return s)
+    ))
+
+(fun iss_read_bytes (io size eoserr) (
+    (if (! @(UFIX size))
+        (throw (invalid_argument (string "invalid read size") size))
+        )
+    (= size (unbox size))
+    (var s (allocate_string size))
+    (var r (input_bytes (field_get io 1) s size))
+    (if (== r size) (return s))
+    (if (!= eoserr @C_FALSE)
+        (throw (io_error (string "End of stream.")))
+        )
+    (var new_s (allocate_string r))
+    (memcpy new_s s r)
+    (return new_s)
+    ))
+
+(export fun setup_string (mod) (
+    (add_function1 mod (to_sym "string_length") stringT str_size_ 0)
+    (add_function2 mod (to_sym "string_add") stringT stringT str_add 0)
+    (add_function2 mod (to_sym "string_join") listT stringT str_join 0)
+
+    (add_function1 mod (to_sym "code_to_char") intT str_char 0)
+    (add_function1 mod (to_sym "char_to_code") stringT str_code 0) 
+
+    (add_function2 mod (to_sym "string_at") stringT intT str_at 0)
+    (add_function2 mod (to_sym "string_substr") stringT irangeT str_substr 0)
+    (add_function1 mod (to_sym "string_escape") stringT str_escape 0)
+    (add_function1 mod (to_sym "string_unescape") stringT str_unescape 0)
+    (add_function2 mod (to_sym "string_contain?") stringT stringT str_contain 0)
+    (add_function2 mod (to_sym "string_split") stringT stringT str_split 0)
+
+    (add_function1 mod (to_sym "string_downcase") stringT str_downcase 0)
+    (add_function1 mod (to_sym "string_upcase") stringT str_upcase 0)
+    (add_function1 mod (to_sym "string_capitalize") stringT str_capitalize 0)
+
+    (add_function2 mod (to_sym "string_repeat") stringT intT str_repeat 0)
+    (add_function3 mod (to_sym "string_ljust") stringT intT stringT str_ljust 0)
+    (add_function3 mod (to_sym "string_rjust") stringT intT stringT str_rjust 0)
+    (add_function3 mod (to_sym "string_center") stringT intT stringT str_center 0)
+
+    ; StringStream module
+    (var issT (domainP InputStringStream))
+    (add_function2 mod (to_sym "iss_new") stringT DontCare iss_new 0)
+
+    (add_function1 mod (to_sym "iss_eos?") issT iss_eos 0)
+    (add_function2 mod (to_sym "iss_lookahead") issT DontCare iss_lookahead 0)
+    (add_function2 mod (to_sym "iss_read_char") issT DontCare iss_read_char 0)
+    (add_function3 mod (to_sym "iss_read_bytes") issT intT DontCare iss_read_bytes 0)
+
+    (var ossT (domainP OutputStringStream))
+
+    (add_function1 mod (to_sym "oss_new") DontCare oss_new 0)
+    (add_function1 mod (to_sym "oss_to_string") ossT oss_to_s 0)
+    (add_function2 mod (to_sym "oss_print_string") ossT stringT oss_print_str 0)
+    ))
+
+    ))

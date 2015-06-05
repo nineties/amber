@@ -1,0 +1,317 @@
+;
+; rowl - 1st generation
+; Copyright (C) 2010 nineties
+;
+; $Id: amber-symtable.rlc 2014-04-07 05:31:24 nineties $
+;
+
+(import "rlvm-compile")
+(import "amber-types")
+
+(compile `object `(
+
+(import "amber-util")
+
+; structur of table
+;
+; symtable
+;   0 : bucket (vector)
+;   1 : entries (vector)
+;   2 : display (ivector)
+;
+; table entry
+;   0 : symbol
+;   1 : object
+;   2 : pointer to the next entry
+;   3 : hash
+;   4 : name space id
+;   5 : index for the entries
+
+(array int prime_numbers (
+    5 11 17 37 67 131 257 521 1031 2053 4099 8209 16411 32771 65537 131101
+    0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+    ))
+
+(export fun make_symtable (hint) (
+    (var size (array_get int prime_numbers (bsr hint)))
+    (var table (struct 3 (make_vector size) (make_vector 0) (make_ivector 0)))
+    (return table)
+    ))
+
+(export fun symtable_depth (table) (
+    (var display (field_get table 2))
+    (return (ivector_size display))
+    ))
+
+(export fun symtable_entries (table) (
+    (return (field_get table 1))
+    ))
+
+(export fun symtable_size (table) (
+    (var entries (field_get table 1))
+    (var count 0)
+    (for i 0 (vector_size entries) (do
+        (var entry (vector_at entries i))
+        (if entry (+= count 1))
+        ))
+    (return count)
+    ))
+
+(export fun symtable_push (table) (
+    (var display (field_get table 2))
+    (ivector_pushback display 0)
+    ))
+
+(export fun symtable_pop (table) (
+    (var display (field_get table 2))
+    (var entries (field_get table 1))
+    (var bucket (field_get table 0))
+    (var size (vector_size bucket))
+
+    (var depth (ivector_size display))
+    (var npop  (ivector_at display (- depth 1)))
+    (ivector_resize display (- depth 1))
+
+    (var end (vector_size entries))
+    (var begin (- end npop))
+    (while (< begin end) (do
+        (var entry (vector_at entries begin))
+        (if entry (do
+            (var h (umod (field_get entry 3) size))
+            (var e (vector_at bucket h))
+            (if (== e entry)
+                (vector_put bucket h (field_get e 2))
+                (while e (do
+                    (var next (field_get e 2))
+                    (if (== entry next) (do
+                        (field_set e 2 (field_get next 2))
+                        break
+                        ))
+                    (= e next)
+                    ))
+                )
+            ))
+        (incr begin)
+        ))
+    (vector_resize entries (- end npop))
+    ))
+
+(fun hash (sym) (
+    (if (is_special sym) (return sym))
+    (return (field_get sym @SymbolIndex))
+    ))
+
+(fun rehash (table) (
+    (var old_size (vector_size (field_get table 0)))
+    (var num_ent  (vector_size (field_get table 1)))
+    (if (>= num_ent old_size) (do
+        (var new_size (array_get int prime_numbers (bsr num_ent)))
+        (if (! new_size) (error "rehash: too many entries"))
+        (var bucket (make_vector new_size))
+        (var entries (field_get table 1))
+        (for i 0 (vector_size entries) (do
+            (var entry (vector_at entries i))
+            (if (! entry) continue)
+            (var h (umod (field_get entry 3) new_size))
+            (field_set entry 2 (vector_at bucket h))
+            (vector_put bucket h entry)
+            ))
+        (field_set table 0 bucket)
+        ))
+    ))
+
+(export fun symtable_add (table sym obj) (
+    (rehash table)
+
+    (var bucket (field_get table 0))
+    (var entries (field_get table 1))
+    (var display (field_get table 2))
+    (var size (vector_size bucket))
+    (var h (hash sym))
+    (var depth (ivector_size display))
+
+    (if (== depth 0) (error "symtable_add: no namespace"))
+
+    (var ent (struct 3 sym obj 0 h depth (vector_size entries)))
+    (= h (umod h size))
+
+    (vector_pushback entries ent)
+
+    (field_set ent 2 (vector_at bucket h))
+    (vector_put bucket h ent)
+
+    ; increment a counter in display
+    (var n (ivector_at display (- depth 1)))
+    (ivector_put display (- depth 1) (+ n 1))
+    ))
+
+(export fun symtable_add_to_global (table sym obj) (
+    (rehash table)
+
+    (var bucket (field_get table 0))
+    (var entries (field_get table 1))
+    (var display (field_get table 2))
+    (var size (vector_size bucket))
+    (var h (hash sym))
+    (var depth (ivector_size display))
+
+    (if (== depth 0) (error "symtable_add_to_global: no namespace"))
+
+    (var ngvar (ivector_at display 0))
+    (var ent (struct 3 sym obj 0 h 1 ngvar))
+    (= h (umod h size))
+
+    ; increment indices of entries
+    (for i 0 (vector_size entries) (do
+        (var entry (vector_at entries i))
+        (if entry (field_set entry 5 (+ (field_get entry 5) 1)))
+        ))
+
+    (vector_pushfront entries ent)
+
+    ; insert `ent' to front of link
+    (= entries (vector_at bucket h))
+    (var prev 0)
+    (while entries (do
+        (var e_sym (field_get entries 0))
+        (var e_depth (field_get entries 4))
+        (if (!= e_sym sym) break)
+        (if (== e_depth 1) break)
+        (= prev entries)
+        (= entries (field_get entries 2))
+        ))
+    (if prev
+        (do
+            (field_set ent 2 (field_get prev 2))
+            (field_set prev 2 ent)
+        )
+        (do
+            (field_set ent 2 (vector_at bucket h))
+            (vector_put bucket h ent)
+        ))
+
+    ; increment a counter in display
+    (var n (ivector_at display 0))
+    (ivector_put display 0 (+ n 1))
+    ))
+
+; delete the most recent entry
+(export fun symtable_delete (table sym) (
+    (var bucket (field_get table 0))
+    (var entries (field_get table 1))
+    (var size (vector_size bucket))
+    (var h (hash sym))
+    (= h (umod h size))
+    (var entry (vector_at bucket h))
+    (var prev 0)
+    (while entry (do
+        (var e_sym (field_get entry 0))
+        (if (== e_sym sym) (do
+            (if (! prev)
+                (vector_put bucket h (field_get entry 2))
+                (field_set prev 2 (field_get entry 2))
+                )
+            (vector_put entries (field_get entry 5) 0)
+            (return (field_get entry 1))
+            ))
+        (= prev entry)
+        (= entry (field_get entry 2))
+        ))
+    (return 0)
+    ))
+
+; replace the most recent entry
+(export fun symtable_replace (table sym val) (
+    (var bucket (field_get table 0))
+    (var entries (field_get table 1))
+    (var size (vector_size bucket))
+    (var h (hash sym))
+    (= h (umod h size))
+    (var entry (vector_at bucket h))
+    (while entry (do
+        (var e_sym (field_get entry 0))
+        (if (== e_sym sym) (do
+            (field_set entry 1 val)
+            return
+            ))
+        (= entry (field_get entry 2))
+        ))
+    (return 0)
+    ))
+
+; lookup symbol from local scope
+(export fun symtable_find_local (table sym) (
+    (var bucket (field_get table 0))
+    (var display (field_get table 2))
+    (var size (vector_size bucket))
+    (var depth (ivector_size display))
+    (var h (hash sym))
+    (= h (umod h size))
+    (var entry (vector_at bucket h))
+    (while entry (do
+        (var e_sym (field_get entry 0))
+        (var e_depth (field_get entry 4))
+        (if (< e_depth depth) (return 0))
+        (if (== e_sym sym)
+            (return (field_get entry 1))
+            )
+        (= entry (field_get entry 2))
+        ))
+    (return 0)
+    ))
+
+; lookup symbol from global scope
+(export fun symtable_find_global (table sym) (
+    (var bucket (field_get table 0))
+    (var size (vector_size bucket))
+    (var h (hash sym))
+    (= h (umod h size))
+    (var entry (vector_at bucket h))
+    (while entry (do
+        (var e_sym (field_get entry 0))
+        (var e_depth (field_get entry 4))
+        (if (!= e_depth 1) (return 0))
+        (if (== e_sym sym)
+            (return (field_get entry 1))
+            )
+        (= entry (field_get entry 2))
+        ))
+    (return 0)
+    ))
+
+(export fun symtable_find (table sym) (
+    (var bucket (field_get table 0))
+    (var size (vector_size bucket))
+    (var h (hash sym))
+    (= h (umod h size))
+    (var entry (vector_at bucket h))
+    (while entry (do
+        (var e_sym (field_get entry 0))
+        (if (== e_sym sym) (return (field_get entry 1)))
+        (= entry (field_get entry 2))
+        ))
+    (return 0)
+    ))
+
+(export fun symtable_count (table) (
+    (return (vector_size (field_get table 1)))
+    ))
+
+(extern fun pprint)
+(export fun symtable_dump (ochan table) (
+    (output_string ochan ">>>>>\n")
+    (var entries (field_get table 1))
+    (for i 0 (vector_size entries) (do
+        (var entry (vector_at entries i))
+        (if (! entry) continue)
+        (pprint ochan (field_get entry 0))
+        (output_char ochan '(')
+        (output_int ochan (field_get entry 4))
+        (output_string ochan ") => ")
+        (pprint ochan (field_get entry 1))
+        (output_char ochan '\n')
+        ))
+    (output_string ochan "<<<<<\n")
+    ))
+
+    ))

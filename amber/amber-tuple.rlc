@@ -1,0 +1,153 @@
+;
+; rowl - 1st generation
+; Copyright (C) 2010 nineties
+;
+; $Id: amber-list.rlc 2014-04-07 05:24:16 nineties $
+;
+
+(import "rlvm-compile")
+(import "amber-types")
+
+(compile `object `(
+
+(import "amber-util")
+(import "amber-node")
+(import "amber-object")
+(import "amber-compile")
+(import "amber-assemble")
+(import "amber-error")
+
+(extern object global)
+
+(export fun tuple2 (a b) (
+    (var t (allocate_tuple 2))
+    (array_set object t 0 a)
+    (array_set object t 1 b)
+    (return t)
+    ))
+
+(export fun tuple3 (a b c) (
+    (var t (allocate_tuple 3))
+    (array_set object t 0 a)
+    (array_set object t 1 b)
+    (array_set object t 2 c)
+    (return t)
+    ))
+ 
+(export fun tuple4 (a b c d) (
+    (var t (allocate_tuple 4))
+    (array_set object t 0 a)
+    (array_set object t 1 b)
+    (array_set object t 2 c)
+    (array_set object t 3 d)
+    (return t)
+    ))
+
+(export fun tuple5 (a b c d e) (
+    (var t (allocate_tuple 5))
+    (array_set object t 0 a)
+    (array_set object t 1 b)
+    (array_set object t 2 c)
+    (array_set object t 3 d)
+    (array_set object t 4 e)
+    (return t)
+    ))
+
+(fun tuple_new (v size) (
+    (= size (unbox size))
+    (if (< size 0)
+        (throw (invalid_argument (string "Negative length is specified.") (box size)))
+        )
+    (var t (allocate_tuple size))
+    (for i 0 size
+        (array_set object t i v))
+    (return t)
+    ))
+
+(export fun tuple_at (t i) (
+    (var n (seq_size t))
+    (if (>= i n) (throw (out_of_range t (box i))))
+    (return (array_get object t i))
+    ))
+
+(export fun tuple_store (t i v) (
+    (var n (seq_size t))
+    (if (>= i n) (throw (out_of_range t (box i))))
+    (array_set object t i v)
+    (return v)
+    ))
+
+(export fun tuple_restof (tup i) (
+    (var ls 0)
+    (var size (seq_size tup))
+    (rfor j i size (do
+        (= ls (cons (array_get object tup j) ls))
+        ))
+    (return ls)
+    ))
+
+(export fun tuple_copy (tup) (
+    (var n (seq_size tup))
+    (var t (allocate_tuple n))
+    (for i 0 n (do
+        (array_set object t i (array_get object tup i))
+        ))
+    (return t)
+    ))
+
+(export fun tuple_to_list (tup) (
+    (var ls 0)
+    (var size (seq_size tup))
+    (rfor i 0 size (do
+        (= ls (cons (array_get object tup i) ls))
+        ))
+    (return ls)
+    ))
+
+(export fun list_to_tuple (list) (
+    (var n (list_len list))
+    (var t (allocate_tuple n))
+    (for i 0 n (do
+        (array_set object t i (car list))
+        (= list (cdr list))
+        ))
+    (return t)
+    ))
+
+(export fun tuple_map (f tup) (
+    (var size (seq_size tup))
+    (var t (allocate_tuple size))
+    (var code (get_bytecode f))
+    (for i 0 size (do
+        (array_set object t i (runcode code (array_get object tup i)))
+        ))
+    (return t)
+    ))
+
+(export fun tuple_map_bang (f tup) (
+    (var size (seq_size tup))
+    (var code (get_bytecode f))
+    (for i 0 size (do
+        (array_set object tup i (runcode code (array_get object tup i)))
+        ))
+    (return tup)
+    ))
+
+(export fun tuple_hash (tup) (
+    (var hash (lookup_func global (to_sym "hash")))
+    (var h (hashnext 0 (field_get Tuple @SymbolIndex)))
+    (var size (seq_size tup))
+    (for i 0 size (do
+        (= h (hashnext h (unbox (runcode hash (array_get object tup i)))))
+        ))
+    (return (box h))
+    ))
+
+(export fun setup_tuple (mod) (
+    (add_function2 mod (to_sym "tuple_new") DontCare intT tuple_new 0)
+    (add_function1 mod (to_sym "list_to_tuple") listT list_to_tuple 0)
+    (add_function2 mod (to_sym "tuple_map") funT tupleT tuple_map 0)
+    (add_function2 mod (to_sym "tuple_map!") funT tupleT tuple_map_bang 0)
+    ))
+
+    ))

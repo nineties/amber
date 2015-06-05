@@ -1,0 +1,2423 @@
+; rowl - 1st generation
+; Copyright (C) 2010 nineties
+;
+; $Id: amber-compile.rlc 2014-04-28 01:30:56 nineties $
+;
+
+(import "rlvm-compile")
+(import "amber-types")
+
+(compile `object `(
+
+(import "amber-util")
+(import "amber-node")
+(import "amber-error")
+(import "amber-symtable")
+(import "amber-assemble")
+
+(var AllocClsEnv   (to_unique_sym "%AllocClosureEnv"))
+(var Ref           (to_unique_sym "%Ref"))
+(var Decons        (to_unique_sym "%Decons"))
+(var noguard       (to_unique_sym "%noguard"))
+(var closed        (to_unique_sym "%closed"))
+(var expand        (to_unique_sym "%expand"))
+
+(export fun unwrap_internal (node) (
+    ;(if (== (node_head node) Ref)
+    ;    (return (unwrap_internal (node_arg node 2))))
+    (return node)
+    ))
+
+; compilers
+
+(extern object global)
+(extern object variables)
+(extern fun set_loc)
+(extern fun deep_copy)
+(extern fun set_slot)
+(extern fun set_slot_union)
+(extern fun set_slot_overwrite)
+(extern fun get_slot)
+(extern fun get_slot_nocheck)
+(extern fun get_slot_unalias)
+(extern fun get_slot_norec_nocheck)
+(extern fun tuple2)
+(extern fun tuple3)
+(extern fun tuple_at)
+
+(fun trace_func (msg val) (
+    (debugs msg)
+    (debugpf val)
+    (return val)
+    ))
+
+(fun trace (asm msg) (
+    (put_push asm (string msg))
+    (compile_simple_call asm 2 trace_func)
+    ))
+
+
+; variable table
+(fun lookup_symbol (sym) (
+    (var v (symtable_find variables sym))
+    (if v (return v))
+    (return (make_gvar sym))
+    ))
+
+(fun iter_args (f node arg level) (
+    (if (is_special node) (return arg))
+    (if (is_symbol node)
+        (if (== level 0) (return (f node arg)) (return arg))
+        )
+    (if (is_atom node) (return arg))
+    (if (is_list node) (do
+        (lfor v node (= arg (iter_args f v arg level)))
+        (return arg)
+        ))
+    (var hd (node_head node))
+    (if (== hd Slot)
+        (return (iter_args f (node_arg node 0) arg level))
+    (if (== hd Ref)
+        (if (== level 0)
+            (return (f (node_arg_symbol node 2) arg))
+            (return arg)
+        )
+    (if (== hd Quote) (return arg)
+    (if (== hd Quasiquote) (+= level 1)
+    (if (== hd Unquote)    (-= level 1)
+        )))))
+    (for i 0 (node_size node)
+        (= arg (iter_args f (node_arg node i) arg level))
+        )
+    (return arg)
+    ))
+
+(fun delete_args (node fv) (
+    (if (== (node_head node) When)
+        (return (iter_args list_delete (node_arg node 0) fv 0))
+        (return (iter_args list_delete node fv 0))
+        )
+    ))
+
+(fun add_var (sym list) (
+    (return (cons sym (list_delete sym list)))
+    ))
+
+(fun collect_params (args) (
+    (if (== (node_head args) When)
+        (return (iter_args add_var (node_arg args 0) 0 0))
+        (return (iter_args add_var args 0 0))
+        )
+    ))
+
+(fun fv_iter_block (block fv) (
+    (rfor i 0 (node_size block) (do
+        (= fv (fv_iter (node_arg block i) 0 fv))
+        ))
+    (return fv)
+    ))
+
+(fun fv_iter (expr level fv) (
+    (if (is_symbol expr) (do
+        (if (== level 0) (do
+            (if (== expr DontCare) (return fv))
+            (= fv (list_delete expr fv))
+            (return (cons expr fv))
+            ))
+        (return fv)
+        ))
+    (if (is_atom expr) (return fv))
+    (if (is_list expr) (do
+        (lfor v expr (= fv (fv_iter v level fv)))
+        (return fv)
+        ))
+    (var hd (node_head expr))
+    (if (== level 0) (do
+        (if (== hd Define) (do
+            (= fv (fv_iter (node_arg expr 1) 0 fv))
+            (return (delete_args (node_arg expr 0) fv))
+            ))
+        (if (== hd Lambda) (do
+            (= fv (fv_iter (node_arg expr 1) 0 fv))
+            (var arg (node_arg expr 0))
+            (if (== (node_head arg) When)
+                (= fv (fv_iter (node_arg arg 1) 0 fv))
+                )
+            (return (delete_args (node_arg expr 0) fv))
+            ))
+        (if (== hd Send) (do
+            (= fv (fv_iter (node_arg expr 0) 0 fv))
+            (= fv (fv_iter (node_arg expr 2) 0 fv))
+            (return fv)
+            ))
+        (if (== hd Ref)
+            (return (fv_iter (node_arg expr 0) 0 fv))
+            )
+        (if (|| (== hd Block) (== hd Breakable))
+            (return (fv_iter_block expr fv))
+            )
+        ))
+    (if (== hd Quote) (return fv))
+    (if (== hd Quasiquote) (+= level 1)
+    (if (== hd Unquote) (-= level 1)))
+
+    (for i 0 (node_size expr)
+        (= fv (fv_iter (node_arg expr i) level fv))
+        )
+    (return fv)
+    ))
+
+(fun free_variables (expr) (
+    (return (fv_iter expr 0 0))
+    ))
+
+(fun cleanup_pattern_iter (expr ret level) (
+    (if (== expr DontCare)
+        (return expr)
+        )
+    (if (is_symbol expr) (do
+        (field_set ret 1 (cons expr (field_get ret 1)))
+        (field_set ret 2 (cons expr (field_get ret 2)))
+        (return expr)
+        ))
+    (if (== (node_head expr) Ref) (do
+        (var t (to_unique_sym (symbol_name (variable_name expr))))
+        (field_set ret 1 (cons t (field_get ret 1)))
+        (field_set ret 2 (cons expr (field_get ret 2)))
+        (return t)
+        ))
+    (if (is_atom expr) (return expr))
+    (if (is_list expr) (do
+        (var ls expr)
+        (while ls (do
+            (setcar ls (cleanup_pattern_iter (car ls) ret level))
+            (= ls (cdr ls))
+            ))
+        (return expr)
+        ))
+    (var hd (node_head expr))
+    (if (== hd Quote) (return expr))
+    (if (== hd Domain)
+        (if (== level 0) (do
+            (node_arg_set expr 0
+                (cleanup_pattern_iter (node_arg expr 0) ret 0))
+            (var dom (node_arg expr 1))
+            (if (! (is_symbol dom))
+                (node_arg_set expr 1 (cleanup_pattern_iter dom ret 0))
+                )
+            (return expr)
+            ))
+    (if (== hd Quasiquote) (+= level 1)
+    (if (== hd Unquote) (-= level 1))))
+
+    (for i 0 (node_size expr)
+        (node_arg_set expr i
+            (cleanup_pattern_iter (node_arg expr i) ret level))
+        )
+    (return expr)
+    ))
+
+(fun cleanup_pattern (args) (
+    (var ret (struct 3 0 0 0))
+    (field_set ret 0 (cleanup_pattern_iter args ret 0))
+    (return ret)
+    ))
+
+(fun alloc_function (args keys guard code guard_code clos nlocal nocheck orig) (
+    (return (variant @FunctionE 8 0 args keys guard code guard_code clos orig nlocal nocheck))
+    ))
+
+(fun args_len (args) (
+    (var len 0)
+    (while args (do
+        (if (== (node_head (car args)) Rest) (do
+            (return (make_node1 VariableLength (box len)))
+            ))
+        (+= len 1)
+        (= args (cdr args))
+        ))
+    (return (box len))
+    ))
+
+(fun make_function (args keys guard code guard_code nlocal nocheck orig) (
+    (var arity (args_len args))
+    (= args (cons arity args))
+    (return (alloc_function args keys guard code guard_code 0 nlocal nocheck orig))
+    ))
+
+(fun alloc_builtin_function (args func guard) (
+    (return (variant @BuiltinFunctionE 3 0 args guard func))
+    ))
+
+(fun make_builtin_function (args func guard) (
+    (var arity (args_len args))
+    (= args (cons arity args))
+    (return (alloc_builtin_function args func guard))
+    ))
+
+(export fun union_function (fun1 fun2) (
+    (if (! (is_function fun1)) (throw (type_error (string "function") fun1)))
+    (if (! (is_function fun2)) (throw (type_error (string "function") fun2)))
+    (return (variant @BoundFunctionE 3 0 fun1 fun2))
+    ))
+
+(var maybe (to_sym "maybe"))
+(fun scan_clsvars (expr tbl) (
+    (if (is_atom expr) (return expr))
+    (if (is_list expr) (do
+        (var ls expr)
+        (while ls (do
+            (setcar ls (scan_clsvars (car ls) tbl))
+            (= ls (cdr ls))
+            ))
+        (return expr)
+        ))
+    (var hd (node_head expr))
+    (if (== hd Define) (do
+        (var syms (collect_params (node_arg expr 0)))
+        (while syms (do
+            (var sym (car syms))
+            (if (! (symtable_find tbl sym)) (do
+                (symtable_add tbl sym maybe)
+                ))
+            (= syms (cdr syms))
+            ))
+        (node_arg_set expr 1 (scan_clsvars (node_arg expr 1) tbl))
+        (return expr)
+        ))
+    (if (== hd Lambda) (do
+        ; free variables of lambdas will be closure variables.
+        (var fv (free_variables expr))
+        (if (! fv) (return expr))
+        (var mkcls @FALSE)
+        (while fv (do
+            (var info (symtable_find tbl (car fv)))
+            (if info (= mkcls @TRUE))
+            (if (== info maybe) (do
+                (symtable_replace tbl (car fv) @C_TRUE)
+                ))
+            (= fv (cdr fv))
+            ))
+        (if (! mkcls) (return expr))
+        (return (make_node2 Closure @C_NIL expr))
+        ))
+    ; Closure has no closure variables since it is already closed.
+    (if (== hd Closure) (return expr))
+    (if (== hd Send) (do
+        (node_arg_set expr 0 (scan_clsvars (node_arg expr 0) tbl))
+        (node_arg_set expr 2 (scan_clsvars (node_arg expr 2) tbl))
+        (return expr)
+        ))
+    (if (== hd Ref) (return expr))
+    (if (== hd Quote) (return expr))
+    (if (== hd Quasiquote) (do
+        (node_arg_set expr 0
+            (scan_clsvars_qquote (node_arg expr 0) tbl 0))
+        (return expr)
+        ))
+    (for i 0 (node_size expr)
+        (node_arg_set expr i (scan_clsvars (node_arg expr i) tbl))
+        )
+    (return expr)
+    ))
+
+(fun scan_clsvars_qquote (expr tbl level) (
+    (if (is_atom expr) (return expr))
+    (if (is_list expr) (do
+        (var ls expr)
+        (while ls (do
+            (setcar ls (scan_clsvars_qquote (car ls) tbl level))
+            (= ls (cdr ls))
+            ))
+        (return expr)
+        ))
+    (var hd (node_head expr))
+    (if (== hd Unquote) (do
+        (if (== level 0) (do
+            (node_arg_set expr 0 (scan_clsvars (node_arg expr 0) tbl))
+            (return expr)
+            ))
+        (-= level 1)
+        )
+    (if (== hd Quasiquote) 
+        (+= level 1)
+        ))
+    (for i 0 (node_size expr)
+        (node_arg_set expr i
+            (scan_clsvars_qquote (node_arg expr i) tbl level))
+        )
+    (return expr)
+    ))
+
+(fun subst_clsvars (tbl cls expr) (
+    (if (is_special expr) (return expr))
+    (if (is_symbol expr) (do
+        (var v (symtable_find tbl expr))
+        (if (&& v (!= v maybe)) (return (copy v)))
+        (return expr)
+        ))
+    (if (is_atom expr) (return expr))
+    (if (is_list expr) (do
+        (var ls expr)
+        (while ls (do
+            (setcar ls (subst_clsvars tbl cls (car ls)))
+            (= ls (cdr ls))
+            ))
+        (return expr)
+        ))
+    (var hd (node_head expr))
+    (if (== hd Slot) (do
+        (node_arg_set expr 0 (subst_clsvars tbl cls (node_arg expr 0)))
+        (return expr)
+        ))
+    (if (== hd Define) (do
+        (node_arg_set expr 1 (subst_clsvars tbl cls (node_arg expr 1)))
+        (node_arg_set expr 0 (subst_clsvars tbl cls (node_arg expr 0)))
+        (return expr)
+        ))
+    (if (== hd Lambda) (do
+        (var lhs (node_arg expr 0))
+        (if (== (node_head lhs) When)
+            (node_arg_set lhs 1 (subst_clsvars tbl cls (node_arg lhs 1)))
+            )
+        (node_arg_set expr 1 (subst_clsvars tbl cls (node_arg expr 1)))
+        (return expr)
+        ))
+    (if (== hd Send) (do
+        (node_arg_set expr 0 (subst_clsvars tbl cls (node_arg expr 0)))
+        (node_arg_set expr 2 (subst_clsvars tbl cls (node_arg expr 2)))
+        (return expr)
+        ))
+    (if (== hd Closure) (do
+        (if (== (node_arg expr 0) @C_NIL)
+            (node_arg_set expr 0 cls)
+            )
+        (node_arg_set expr 1 (subst_clsvars tbl cls (node_arg expr 1)))
+        (return expr)
+        ))
+    (if (== hd Ref) (do
+        (return (make_node3 Ref
+            (subst_clsvars tbl cls (node_arg expr 0))
+            (node_arg expr 1)
+            (node_arg expr 2)
+            ))
+        ))
+    (if (== hd Quote) (return expr))
+    (if (== hd Quasiquote) (do
+        (node_arg_set expr 0 (subst_clsvars_qquote tbl cls (node_arg expr 0) 0))
+        (return expr)
+        ))
+    (for i 0 (node_size expr)
+        (node_arg_set expr i (subst_clsvars tbl cls (node_arg expr i)))
+        )
+    (return expr)
+    ))
+
+(fun subst_clsvars_qquote (tbl cls expr level) (
+    (if (is_atom expr) (return expr))
+    (var hd (node_head expr))
+    (if (== hd Unquote) (do
+        (if (== level 0) (do
+            (node_arg_set expr 0 (subst_clsvars tbl cls (node_arg expr 0)))
+            (return expr)
+            ))
+        (-= level 1)
+        )
+    (if (== hd Quasiquote) 
+        (+= level 1)
+        ))
+    (for i 0 (node_size expr)
+        (node_arg_set expr i
+            (subst_clsvars_qquote tbl cls (node_arg expr i) level))
+        )
+    (return expr)
+    ))
+
+(fun get_global_variable (mod sym) (
+    (return (get_slot_unalias (get_slot mod Variables) sym))
+    ))
+
+(fun define_global_variable (mod sym val) (
+    (return (set_slot (get_slot mod Variables) sym val))
+    ))
+
+(fun assign_global_variable (mod sym val) (
+    (return (set_slot_overwrite (get_slot mod Variables) sym val))
+    ))
+
+(extern fun compile_matching)
+(export fun lookup_func (mod sym) (
+    (var func (get_slot_nocheck (get_slot mod Variables) sym))
+    (if (== func @C_NIL) (do
+        (throw (undefined_fun sym))
+        ))
+    (return (compile_matching sym func))
+    ))
+
+(export fun lookup_func_nocheck (mod sym) (
+    (var func (get_slot_nocheck (get_slot mod Variables) sym))
+    (if (== func @C_NIL) (return 0))
+    (return (compile_matching sym func))
+    ))
+
+(export fun get_bytecode (func) (
+    (return (compile_matching func func))
+    ))
+
+(var closure_frame null)
+(var compiling_lambda @FALSE)
+
+(export fun compile_main (expr) (
+    (var asm (make_assembler))
+    (compile asm expr)
+    (put_ireturn asm)
+    (return (get_code asm))
+    ))
+
+(fun compile (asm expr) (
+    (runcode (lookup_func global Compile) asm expr)
+    ))
+
+(export fun call0 (sym) (
+    (return (runcode (lookup_func global sym)))
+    ))
+
+(export fun call1 (sym arg0) (
+    (return (runcode (lookup_func global sym) arg0))
+    ))
+
+(fun compile_error (asm expr) (
+    (throw (unknown_expression expr))
+    ))
+
+(var SET_SLOT (to_sym "set_slot"))
+(fun define_slot (obj sym val) (
+    (var f (get_slot_nocheck obj SET_SLOT))
+    (if (!= f @C_NIL)
+        (return (runcode_with_self obj (get_bytecode f) sym val))
+        )
+    (return (set_slot obj sym val))
+    ))
+
+; obj.f
+(fun compile_slot (asm expr) (
+    (var obj (node_arg expr 0))
+    (var sym (node_arg_symbol expr 1))
+    (var not_found (fresh_label asm))
+    (var exit (fresh_label asm))
+
+    (put_push asm sym)
+    (compile asm obj)
+    (compile_simple_call asm 2 get_slot)
+    ))
+
+; obj.f = v
+(fun compile_assign_slot (asm lhs rhs) (
+    (var obj (node_arg lhs 0))
+    (var sym (node_arg_symbol lhs 1))
+    (compile asm rhs)
+    (put_push asm sym)
+    (compile asm obj)
+    (compile_simple_call asm 3 set_slot)
+    ))
+
+; obj.f: v
+(fun compile_define_slot (asm lhs rhs) (
+    (var obj (node_arg lhs 0))
+    (var sym (node_arg_symbol lhs 1))
+    (compile asm rhs)
+    (put_push asm sym)
+    (compile asm obj)
+    (compile_simple_call asm 3 define_slot)
+    ))
+
+(fun compile_special (asm expr) (
+    (put_imm_int16 asm expr)
+    ))
+
+(fun compile_const_int (asm expr) (
+    (if (& expr 1)
+        (put_imm_int asm expr)
+        (put_push asm expr)
+        )
+    ))
+
+(fun compile_const (asm expr) (
+    (put_push asm expr)
+    ))
+
+(fun compile_make_node (asm expr) (
+    (compile asm (node_arg expr 1))
+    (compile asm (node_arg expr 0))
+    (compile_simple_call asm 2 make_node)
+    ))
+
+(fun store_args (tbl args stmts) (
+    (var vars (collect_params args))
+    (while vars (do
+        (var s (symtable_find tbl (car vars)))
+        (if (&& s (!= s maybe)) (do 
+            ; this argument is a closure-variable.
+            (= stmts (cons (make_node2 Assign (copy s) (car vars)) stmts))
+            ))
+        (= vars (cdr vars))
+        ))
+    (return stmts)
+    ))
+
+(fun setup_closure_env (subst cls) (
+    (var entries (symtable_entries subst))
+    (var count 0)
+    (for i 0 (vector_size entries) (do
+        (var entry (vector_at entries i))
+        (if (!= (field_get entry 1) maybe) (do
+            (field_set entry 1
+                (make_node3 Ref cls (box count) (field_get entry 0)))
+            (+= count 1)
+            ))
+        ))
+    (return count)
+    ))
+
+(var max_lvar_idx 0)
+(var lvar_idx_offset 0)
+(var break_labels null)
+(var continue_labels null)
+(var try_nest 0)
+
+(fun get_lvar_idx () (
+    (var idx (- (symtable_count variables) lvar_idx_offset))
+    (if (>= idx max_lvar_idx) (= max_lvar_idx (+ idx 1)))
+    (return idx)
+    ))
+
+(fun compile_function (asm_body asm_guard args body guard cls) (
+    ;; closure conversion
+    (var tbl (make_symtable 10))
+    (symtable_push tbl)
+    (var vars (collect_params args))
+    (while vars (do
+        (symtable_add tbl (car vars) maybe)
+        (= vars (cdr vars))
+        ))
+    (if (!= cls @C_NIL)
+        (symtable_add tbl cls maybe)
+        )
+    (= body (scan_clsvars body tbl))
+
+    ; this function needs to allocate an environment for closures.
+    (var newcls (to_unique_sym "closure")) ; closures' environment.
+    (var clssize (setup_closure_env tbl newcls))
+    (if (> clssize 0) (do
+        (= body (subst_clsvars tbl newcls body))
+
+        ; allocate closures' environment.
+        (var stmts 0)
+        (= stmts (cons (defvar newcls
+            (make_node1 AllocClsEnv (box clssize))) stmts))
+        (if (== cls @C_NIL)
+            (= stmts (store_args tbl args stmts))
+            (= stmts (store_args tbl (cons cls args) stmts))
+            )
+        (= stmts (cons body stmts))
+        (= body (make_node Block (list_reverse stmts)))
+        ))
+
+    (symtable_push variables)
+    (var save_max_lvar_idx max_lvar_idx)
+    (var save_lvar_idx_offset lvar_idx_offset)
+    (var save_break_labels break_labels)
+    (var save_continue_labels continue_labels)
+    (var save_try_nest try_nest)
+    (var ret 0)
+
+    (try (do
+        (= lvar_idx_offset (symtable_count variables))
+        (= max_lvar_idx 0)
+        (= break_labels 0)
+        (= continue_labels 0)
+        (= try_nest 0)
+
+        (var cnt_addr 0)
+        (var t (setup_args variables args 0))
+        (var alias    (tuple_at t 0))
+        (= args       (tuple_at t 1))
+        (var keywords (tuple_at t 2))
+        (var keyarray (setup_keyword_array keywords))
+
+        (if alias (do
+            (var list 0)
+            (if (== guard noguard)
+                (= list (cons body list))
+                (= list (cons guard list))
+                )
+            (while alias (do
+                (var e (car alias))
+                (= list (cons (defvar (field_get e 0) (field_get e 1)) list))
+                (= alias (cdr alias))
+                ))
+            (if (== guard noguard)
+                (= body (seq list))
+                (= guard (seq list))
+                )
+            ))
+
+        (if keywords (do
+            (var list 0)
+            (if (== guard noguard)
+                (= list (cons body list))
+                (= list (cons guard list))
+                )
+            (var drop @C_TRUE)
+            (while keywords (do
+                (var v (node_arg_symbol (car keywords) 0))
+                (var e (node_arg (car keywords) 1))
+                (= list (cons (keyword_init v e keyarray drop) list))
+                (= drop @C_FALSE)
+                (= keywords (cdr keywords))
+                ))
+            (if (== guard noguard)
+                (= body (seq list))
+                (= guard (seq list))
+                )
+            ))
+
+        (if (!= guard noguard) (compile asm_guard guard))
+        (compile asm_body body)
+
+        (var num_lvar max_lvar_idx)
+        (= lvar_idx_offset save_lvar_idx_offset)
+        (= max_lvar_idx save_max_lvar_idx)
+        (= break_labels save_break_labels)
+        (= continue_labels save_continue_labels)
+        (= try_nest save_try_nest)
+        (symtable_pop variables)
+        (= ret (tuple3 args keyarray (box num_lvar)))
+        )
+    (catch e (do
+        (= lvar_idx_offset save_lvar_idx_offset)
+        (= max_lvar_idx save_max_lvar_idx)
+        (= break_labels save_break_labels)
+        (= continue_labels save_continue_labels)
+        (= try_nest save_try_nest)
+        (symtable_pop variables)
+        (throw e)
+        )))
+    (return ret)
+    ))
+
+(fun add_arg (tbl sym obj alias) (
+    (if (!= (node_head obj) Argument) (do
+        (var tmp (to_unique_sym (symbol_name sym)))
+        (symtable_add tbl tmp obj)
+        (return (cons (tuple2 sym tmp) alias))
+        ))
+    (symtable_add tbl sym obj)
+    (return alias)
+    ))
+
+(fun setup_args (tbl args alias) (
+    (var args_ args)
+    (if (!= (node_head args) @List)
+        (throw (type_error (string "a list") args)
+        ))
+    (var idx 0)
+    (var usual 0)
+    (var keyargs 0)
+    ; Setup usual arguments and keyword arguments
+    (while args (do
+        (var arg (car args))
+        (var hd (node_head arg))
+        (if (|| (== hd Rest) (== hd Keyword)) break)
+        (= usual (cons arg usual))
+        (= alias (setup_arg tbl (make_arg idx) arg 0 alias))
+        (+= idx 1)
+        (= args (cdr args))
+        ))
+    (if (! args) (goto setup_args_finish))
+    (if (== (node_head (car args)) Rest) (do
+        (= usual (cons (car args) usual))
+        (if (> (node_size (car args)) 0) (do
+            (var v (node_arg_symbol (car args) 0))
+            (= alias (add_arg tbl v (make_args_from idx) alias))
+            ))
+        (= args (cdr args))
+        ))
+    (if (! args) (goto setup_args_finish))
+    (while (&& args (== (node_head (car args)) Keyword)) (do
+        (= keyargs (cons (car args) keyargs))
+        (= args (cdr args))
+        ))
+    (if args (throw (logic_error1
+            (string "The order of arguments is invalid")
+            args_)))
+    (label setup_args_finish)
+    (return (tuple3 alias (list_reverse usual) (list_reverse keyargs)))
+    ))
+
+(fun setup_arg (tbl obj arg level alias) (
+    (if (is_special arg) (return alias))
+    (if (is_symbol arg) (do
+        (if (&& (!= arg DontCare) (== level 0))
+            (= alias (add_arg tbl arg obj alias))
+            )
+        (return alias)
+        ))
+    (if (is_atom arg) (return alias))
+    (var argty (node_head arg))
+    (if (== argty Domain)
+        (if (== level 0) (do
+            (var v (node_arg_symbol arg 0))
+            (if (!= v DontCare)
+                (= alias (add_arg tbl v obj alias))
+                )
+            (var dom (node_arg arg 1))
+            (if (! (is_symbol dom))
+                (= alias (setup_arg tbl obj dom 0 alias))
+                )
+            (return alias)
+            ))
+        )
+    (if (== argty Keyword)
+        (if (== level 0) (do
+            (var v (node_arg_symbol arg 0))
+            (return (add_arg tbl v obj alias))
+            ))
+        )
+    (if (== argty List) (do
+        (var idx 0)
+        (while arg (do
+            (var a (car arg))
+            (if (== (node_head a) Rest) (do
+                (if (cdr arg)
+                    (throw (exception (string "\"...\" must be the last argument")))
+                    )
+                (if (== (node_size a) 0) (return alias))
+                (var v (node_arg_symbol a 0))
+                (return (add_arg tbl v (make_list_from obj idx) alias))
+                ))
+            (= alias (setup_arg tbl (make_list_at obj idx) a level alias))
+            (= arg (cdr arg))
+            (incr idx)
+            ))
+        (return alias)
+        ))
+    (if (== argty Quote) (return alias))
+    (if (== argty Unquote) 
+        (return (setup_arg tbl obj (node_arg arg 0) (- level 1) alias))
+        )
+    (if (== argty Quasiquote)
+        (return (setup_arg tbl obj (node_arg arg 0) (+ level 1) alias))
+        )
+
+    (for i 0 (node_size arg) (do
+        (var a (node_arg arg i))
+        (if (== (node_head a) Rest) (do
+            (if (!= (+ i 1) (node_size arg))
+                (throw (exception (string "\"...\" must be the last argument")))
+                )
+            (if (== (node_size a) 0) (return alias))
+            (var v (node_arg_symbol a 0))
+            (return (add_arg tbl v (make_restof obj i) alias))
+            ))
+        (= alias (setup_arg tbl (make_node_at arg obj i)
+                (node_arg arg i) level alias))
+        ))
+    (return alias)
+    ))
+
+(fun insert_keyword (k sorted) (
+    (if (! sorted) (return (list1 k)))
+    (var a (node_arg_symbol k 0))
+    (var b (node_arg_symbol (car sorted) 0))
+    (if (< (field_get a @SymbolIndex) (field_get b @SymbolIndex))
+        (return (cons k sorted))
+        (return (cons (car sorted) (insert_keyword k (cdr sorted))))
+        )
+    ))
+
+(fun sort_keywords (list) (
+    (var sorted 0)
+    (while list (do
+        (= sorted (insert_keyword (car list) sorted))
+        (= list (cdr list))
+        ))
+    (return sorted)
+    ))
+
+(fun setup_keyword_array (keywords) (
+    (var len (list_len keywords))
+    (if (== len 0) (return 0))
+    (var sorted (sort_keywords keywords))
+    (var ary (array object len))
+    (var i 0)
+    (while sorted (do
+        (array_set object ary i (node_arg_symbol (car sorted) 0))
+        (= sorted (cdr sorted))
+        (+= i 1)
+        ))
+    (return ary)
+    ))
+
+; f(..., k = e...): ...
+;
+; k: keyword[i]
+; if (k == undef)
+;   k = e
+(fun keyword_init (v e tbl drop) (
+    (return (defvar v (make_node3 KeywordArg
+        (box (keyword_index v tbl)) e drop))
+        )
+    ))
+
+(fun keyword_index (v tbl) (
+    (for i 0 (seq_size tbl) (do
+        (if (== v (array_get object tbl i)) (return i))
+        ))
+    (throw (not_reachable "keyword_index"))
+    ))
+
+(fun compile_keyword_arg (asm expr) (
+    (var idx  (node_arg_int expr 0))
+    (var e    (node_arg expr 1))
+    (var drop (node_arg expr 2))
+    (var lbl (fresh_label asm))
+    (var exit (fresh_label asm))
+    ; Here, stack top is array of keyword values.
+    (if (== drop @C_FALSE)
+        (put_dup asm)           ; array;array
+        )
+    (put_fieldget asm idx)  ; value;array
+    (put_dup asm)           ; value;value;array
+    (put_if_undef asm lbl)  ; value;array
+    (put_goto asm exit)
+    (set_label asm lbl)
+    (put_drop asm)          ; array
+    (compile asm e)         ; value;array
+    (set_label asm exit)    ; value;array
+    ))
+
+(fun make_gvar (sym) (
+    (return (make_node1 GlobalVariable sym))
+    ))
+
+(fun make_lvar (idx) (
+    (return (make_node1 LocalVariable (box idx)))
+    ))
+
+(export fun get_arity () (
+    (return (make_node0 GetArity))
+    ))
+
+(export fun make_arg (idx) (
+    (return (make_node1 Argument (box idx)))
+    ))
+
+(export fun make_args_from (idx) (
+    (return (make_node1 ArgumentsFrom (box idx)))
+    ))
+
+(export fun make_list_at (obj idx) (
+    (return (make_node2 ListAt obj (box idx)))
+    ))
+
+(export fun make_list_from (obj idx) (
+    (return (make_node2 ListFrom obj (box idx)))
+    ))
+
+(export fun make_node_at (arg obj idx) (
+    (if (is_tuple arg) (return (make_node2 TupleAt obj (box idx))))
+    (if (is_array arg) (return (make_node2 ArrayAt obj (box idx))))
+    (return (make_node2 FieldRef obj (box idx)))
+    ))
+
+(export fun make_restof (obj idx) (
+    (return (make_node2 RestOf obj (box idx)))
+    ))
+
+(fun append_function (mod sym newfunc) (
+    (var vtbl (get_slot mod Variables))
+    (var func (get_slot_nocheck vtbl sym))
+    (if (!= func @C_NIL)
+        (if (&& (is_function func) (is_function newfunc))
+            (return (set_slot vtbl sym (union_function newfunc func)))
+            (throw (redefined_slot mod sym))
+            )
+        (return (set_slot vtbl sym newfunc))
+        )
+    ))
+
+; v: e  (in global scope)
+; v: e  (in local scope)
+;
+; (x,y,z): e     (in global scope)
+; (x,y,z): e     (in local scope)
+;
+; f(x,y,z): e   (in global scope)
+; f(x,y,z): e   (in local scope)
+(fun compile_define (asm expr) (
+    (if (== (symtable_depth variables) 0)
+        (compile_define_global asm expr)
+        (compile_define_local asm expr)
+        )
+    ))
+
+; v: e              (in global scope)
+; (x,y,z): e        (in global scope)
+; f(x,y,z): e       (in global scope)
+(fun compile_define_global (asm expr) (
+    (var lhs (node_arg expr 0))
+    (var rhs (node_arg expr 1))
+    (var ty (node_head lhs))
+    (if (&& (== (node_size expr) 3) (== (node_arg expr 2) (to_sym "union")))
+        (return (compile_define_global_function asm lhs rhs))
+        )
+    (if (!= (node_size expr) 2)
+        (throw (unknown_expression expr))
+        )
+    (if (== ty Apply)
+        (throw (unknown_expression expr))
+    (if (== ty Symbol)
+        (return (compile_define_global_variable asm lhs rhs))
+    (if (== ty Slot)
+        (return (compile_define_slot asm lhs rhs))
+    (if (== ty Var)
+        (return (compile_define_slot asm
+            (slot (slot (node_arg lhs 0) Variables) (node_arg lhs 1))
+            rhs))
+        (return (compile_define_multi_variable asm lhs rhs))
+        ))))
+    ))
+
+; v: e              (in local scope)
+; (x,y,z): e        (in local scope)
+; f(x,y,z): e       (in local scope)
+(fun compile_define_local (asm expr) (
+    (var lhs (node_arg expr 0))
+    (var rhs (node_arg expr 1))
+    (if (&& (== (node_size expr) 3) (== (node_arg expr 2) (to_sym "union")))
+        (return (compile_define_local_function asm lhs rhs))
+        )
+    (if (!= (node_size expr) 2)
+        (throw (unknown_expression expr))
+        )
+    (var ty (node_head lhs))
+    (if (== ty Apply)
+        (return (unknown_expression expr))
+    (if (|| (== ty Symbol) (== ty Ref))
+        (return (compile_define_local_variable asm lhs rhs))
+    (if (== ty Slot)
+        (return (compile_define_slot asm lhs rhs))
+    (if (== ty Var)
+        (return (compile_define_slot asm
+            (slot (slot (node_arg lhs 0) Variables) (node_arg lhs 1))
+            rhs))
+        (return (compile_define_multi_variable asm lhs rhs))
+        ))))
+    ))
+
+(fun compile_define_global_variable (asm sym val) (
+    (compile asm val)
+    (put_push asm sym)
+    (put_push asm global)
+    (compile_simple_call asm 3 define_global_variable)
+    ))
+
+; translate
+;
+; (x, y, z): e
+;
+; to
+;
+; tmp: ((t@(x, y, z)) -> [x, y, z, t])(e)
+; x: decons(tmp)
+; y: decons(tmp)
+; z: decons(tmp)
+; car(tmp)
+(fun compile_define_multi_variable (asm vars val) (
+    (if (&& (== (node_type vars) @TupleE) (== (node_type val) @TupleE)) (do
+        (if (!= (node_size vars) (node_size val))
+            (throw (exception2
+                (string "numbers of variables and values are different")
+                 vars val)))
+        (for i 0 (node_size vars) (do
+            (compile_define asm (defvar (node_arg vars i) (node_arg val i)))
+            (put_drop asm)
+            ))
+        (compile asm vars)
+        return
+        ))
+    (var tup (cleanup_pattern vars))
+    (var pattern (field_get tup 0))
+    (var tvars   (field_get tup 1))
+    (var rvars   (field_get tup 2))
+    (var t (to_unique_sym "t"))
+    (var lam (lambda (list1 (make_node2 Domain t pattern))
+        (list_append tvars (list1 t))))
+
+    ; for error message.
+    (set_slot lam (to_sym "_original_") (lambda (list1 vars) @C_NIL))
+
+    (compile asm (apply lam (list1 val)))
+    (while rvars (do
+        (compile_define asm (make_node2 Define (car rvars) Decons))
+        (put_drop asm)
+        (= rvars (cdr rvars))
+        ))
+    (put_car asm)
+    ))
+
+(fun compile_define_global_function (asm lhs lam) (
+    (var ty (node_head lhs))
+    (if (== ty Slot) (do
+        (var obj (node_arg lhs 0))
+        (var sym (node_arg_symbol lhs 1))
+        (compile asm lam)
+        (put_push asm sym)
+        (compile asm obj)
+        (compile_simple_call asm 3 set_slot_union)
+        return
+        ))
+
+    (if (== ty Var) (do
+        (var obj (node_arg lhs 0))
+        (var sym (node_arg_symbol lhs 1))
+        (compile asm lam)
+        (put_push asm sym)
+        (compile asm (slot obj Variables))
+        (compile_simple_call asm 3 set_slot_union)
+        return
+        ))
+
+    (compile asm lam)
+    (put_push asm lhs)
+    (put_push asm global)
+    (compile_simple_call asm 3 append_function)
+    ))
+
+(fun compile_define_local_variable (asm lhs val) (
+    (check_variable (variable_name lhs))
+    (if (== (node_head lhs) Ref) (do
+        (compile asm val)
+        (put_dup asm)
+        (compile asm (node_arg lhs 0))
+        (put_fieldset asm (node_arg_int lhs 1))
+
+        (symtable_add variables (variable_name lhs) lhs)
+        return
+        ))
+
+    ; We need compile `val` before registering `lhs` because
+    ; `lhs` is not accessible in `val`.
+    (compile asm val)
+
+    (var info (symtable_find_local variables lhs))
+    (var idx 0)
+    (if info
+        (= idx (node_arg_int info 0))
+        (do
+            (= idx (get_lvar_idx))
+            (symtable_add variables lhs (make_lvar idx))
+        ))
+
+    (put_dup asm)
+    (put_store_lvar asm idx)
+    ))
+
+(fun compile_define_local_function (asm lhs lam) (
+    (var ty (node_head lhs))
+    (if (== ty Slot) (do
+        (var obj (node_arg lhs 0))
+        (var sym (node_arg_symbol lhs 1))
+        (compile asm lam)
+        (put_push asm sym)
+        (compile asm obj)
+        (compile_simple_call asm 3 set_slot_union)
+        return
+        ))
+
+    (if (== ty Var) (do
+        (var obj (node_arg lhs 0))
+        (var sym (node_arg_symbol lhs 1))
+        (compile asm lam)
+        (put_push asm sym)
+        (compile asm (slot obj Variables))
+        (compile_simple_call asm 3 set_slot_union)
+        return
+        ))
+
+    (if (&& (!= ty Symbol) (!= ty Ref))
+        (throw (unknown_expression (make_node2 Define lhs lam))) 
+        )
+
+    (if (symtable_find_local variables (variable_name lhs))
+        (return (compile_assign asm (assign lhs
+            (apply (to_sym "union") (list2 lam lhs)))))
+        (return (compile_define_local_variable asm lhs lam))
+        )
+    ))
+
+(fun compile_decons (asm expr) (
+    (put_decons asm)
+    ))
+
+(fun check_variable (sym) (
+    (if (|| (!= (node_type sym) @SymbolE) (is_special sym))
+        (throw (invalid_varname sym))
+        )
+    (if (== (symtable_depth variables) 0)
+        (if (== (get_slot_nocheck global sym) @C_NIL) return)
+        (if (! (symtable_find_local variables sym)) return)
+        )
+    (throw (redefined_var sym))
+    ))
+
+(export fun compile_operand (asm opd sym) (
+    (if (== sym closure_frame) (do
+        (put_load_closure asm)
+        return
+        ))
+
+    (var ty (node_head opd))
+    (if (== ty GlobalVariable) (do
+        (put_push asm sym)
+        (put_push asm global)
+        (compile_simple_call asm 2 get_global_variable)
+        return
+        ))
+    (if (== ty LocalVariable) (do
+        (put_load_lvar asm (node_arg_int opd 0))
+        return
+        ))
+    (if (== ty GetArity) (do
+        (put_arity asm)
+        return
+        ))
+    (if (== ty Argument) (do
+        (put_arg asm (node_arg_int opd 0))
+        return
+        ))
+    (if (== ty ArgumentsFrom) (do
+        (put_args asm (node_arg_int opd 0))
+        return
+        ))
+    (if (== ty ListAt) (do
+        (compile_operand asm (node_arg opd 0) sym)
+        (put_imm_int asm (node_arg_int opd 1))
+        (put_list_at asm)
+        return
+        ))
+    (if (== ty ListFrom) (do
+        (compile_operand asm (node_arg opd 0) sym)
+        (put_imm_int asm (node_arg_int opd 1))
+        (put_list_from asm)
+        return
+        ))
+    (if (== ty TupleAt) (do
+        (compile_operand asm (node_arg opd 0) sym)
+        (put_imm_int asm (node_arg_int opd 1))
+        (put_array_get32 asm)
+        return
+        ))
+    (if (== ty ArrayAt) (do
+        (compile_operand asm (node_arg opd 0) sym)
+        (put_field_get1 asm)
+        (put_imm_int asm (node_arg_int opd 1))
+        (put_array_get32 asm)
+        return
+        ))
+    (if (== ty FieldRef) (do
+        (compile_operand asm (node_arg opd 0) sym)
+        (put_imm_int asm (+ (node_arg_int opd 1) 1))
+        (put_array_get32 asm)
+        return
+        ))
+    (if (== ty RestOf) (do
+        (put_imm_int asm (node_arg_int opd 1))
+        (compile_operand asm (node_arg opd 0) sym)
+        (compile_simple_call asm 2 node_restof)
+        return
+        ))
+    (not_reachable "compile_operand")
+    ))
+
+(fun compile_self (asm expr) (
+    (put_self asm)
+    ))
+
+(fun compile_var (asm sym) (
+    (compile_operand asm (lookup_symbol sym) sym)
+    ))
+
+(fun compile_qualvar (asm expr) (
+    (var mod (node_arg expr 0))
+    (var sym (node_arg_symbol expr 1))
+    (compile asm (slot (slot mod Variables) sym))
+    ))
+
+(fun variable_length_args_error (args) (
+    (throw (logic_error1 
+        (string "non-list object is passed as variable-length arguments")
+        args))
+    ))
+
+; Push arguments (except keyword arguments) in reversed order.
+(fun compile_args (asm args) (
+    (var args_ args)
+    (= args (list_reverse args))
+    (var keywords 0)
+    (while (&& args (== (node_head (car args)) Keyword)) (do
+        (= keywords (cons (car args) keywords))
+        (= args (cdr args))
+        ))
+    (if (&& args (== (node_head (car args)) Rest)) (do
+        (var failed (fresh_label asm))
+        (var reverse (fresh_label asm))
+        (var arg (car args))
+        (= args (cdr args))
+
+        (compile asm (node_arg arg 0))
+        (put_dup asm)
+        (put_check_list2 asm failed 0) ; check whether the argument is list.
+        (put_goto asm reverse)
+        (set_label asm failed)
+        (compile_simple_call asm 1 variable_length_args_error)
+        (set_label asm reverse)
+        (compile_simple_call asm 1 list_reverse)
+        (put_expand asm)    ; len;le0;le1;...
+        (var len (list_len args))
+        (if (> len 0) (do
+            (put_imm_int asm len)
+            (put_iadd asm)
+            ))
+
+        (while args (do
+            (if (|| (== (node_head (car args)) Rest)
+                    (== (node_head (car args)) Keyword))
+                (throw (logic_error1
+                    (string "The order of arguments is invalid")
+                    args_))
+                    )
+            (compile asm (car args))
+            (= args (cdr args))
+            ))
+        (if (> len 0) (put_rot asm (+ len 1) 1))
+        (return (tuple2 (box -1) keywords))
+        ))
+
+    (var arity 0)
+    (while args (do
+        (compile asm (car args))
+        (= args (cdr args))
+        (incr arity)
+        ))
+    (if (> arity @MAX_ARITY)
+        (throw (exception1 (string "too many arguments") args_))
+        )
+    (return (tuple2 (box arity) keywords))
+    ))
+
+(fun keyword_arg_array (len vars values) (
+    (var ary1 (array object len))
+    (var ary2 (array object len))
+    (for i 0 len (do
+        (array_set object ary1 i (car vars))
+        (array_set object ary2 i (car values))
+        (= vars (cdr vars))
+        (= values (cdr values))
+        ))
+    (return (tuple2 ary1 ary2))
+    ))
+
+(fun compile_keyword_arg_array (asm keys) (
+    (= keys (list_reverse (sort_keywords keys)))
+    (var list 0)
+    (var vars 0)
+    (while keys (do
+        (= list (cons (node_arg (car keys) 1) list))
+        (= vars (cons (node_arg_symbol (car keys) 0) vars))
+        (= keys (cdr keys))
+        ))
+    (compile asm list)
+    (put_push asm vars)
+    (put_imm_int asm (list_len vars))
+    (compile_simple_call asm 3 keyword_arg_array)
+    ))
+
+(fun too_many_arguments (args) (
+    (throw (exception1 (string "too many arguments") args))
+    ))
+
+(fun is_global_var (node) (
+    (if (! (is_symbol node)) (return @FALSE))
+    (var v (lookup_symbol node))
+    (var vty (node_head v))
+    (if (== vty GlobalVariable)
+        (return @TRUE)
+        (return @FALSE)
+        )
+    ))
+
+(fun get_global () (
+    (return global)
+    ))
+
+(fun compile_apply (asm expr) (
+    (var func (node_arg expr 0))
+    (var args (node_arg expr 1))
+    
+    (var t (compile_args asm args))
+    (var arity (unbox (tuple_at t 0)))
+    (var keys  (tuple_at t 1))
+
+    (var flag 0)
+    (if keys (= flag 2))
+
+    (if (>= arity 0)
+        (do
+            (if (is_global_var func) (do
+                (compile_simple_call asm 0 get_global)
+                (= flag (| flag 1))
+                ))
+            (if keys (compile_keyword_arg_array asm keys))
+            (compile asm func)
+            (put_push asm func)
+            (compile_simple_call asm 2 compile_matching)
+            (put_jcall asm arity flag)
+            )
+        (do
+            (var rot 2)
+            (if (is_global_var func) (do
+                (compile_simple_call asm 0 get_global)
+                (= flag (| flag 1))
+                (+= rot 1)
+                ))
+            (if keys (do
+                (compile_keyword_arg_array asm keys)
+                (+= rot 1)
+                ))
+            (var call_label (fresh_label asm))
+
+            (compile asm func)
+            (put_push asm func)
+            (compile_simple_call asm 2 compile_matching)
+            (put_rot asm rot 1)
+            (put_dup asm)
+            (put_imm_int asm @MAX_ARITY)
+            (put_if_le asm call_label)
+            (put_push asm args)
+            (compile_simple_call asm 1 too_many_arguments)
+            (set_label asm call_label)
+            (put_vcall asm flag)
+        ))
+    ))
+
+(fun compile_apply_with_self (asm expr) (
+    (var self (node_arg expr 0))
+    (var func (node_arg expr 1))
+    (var args (node_arg expr 2))
+    
+    (var t (compile_args asm args))
+    (var arity (unbox (tuple_at t 0)))
+    (var keys  (tuple_at t 1))
+    (var flag 1)
+    (if keys (|= flag 2))
+    
+    (compile asm self)
+    (if (>= arity 0)
+        (do
+            (if keys (compile_keyword_arg_array asm keys))
+            (compile asm func)
+            (put_push asm func)
+            (compile_simple_call asm 2 compile_matching)
+            (put_jcall asm arity flag)
+        )
+        (do
+            (var call_label (fresh_label asm))
+            (var rot 3)
+            (if keys (do
+                (compile_keyword_arg_array asm keys)
+                (+= rot 1)
+                ))
+            (compile asm func)
+            (put_push asm func)
+            (compile_simple_call asm 2 compile_matching)
+            (put_rot asm rot 1)
+            (put_dup asm)
+            (put_imm_int asm @MAX_ARITY)
+            (put_if_le asm call_label)
+            (put_push asm args)
+            (compile_simple_call asm 1 too_many_arguments)
+            (set_label asm call_label)
+            (put_vcall asm asm flag)
+        ))
+    ))
+
+(fun get_slot_swap (sym obj) (
+    (var f (get_slot_nocheck obj sym))
+    (if (== f @C_NIL)
+        (throw (undefined_slot obj sym))
+        )
+    (return f)
+    ))
+
+(fun compile_send (asm expr) (
+    (var obj  (node_arg expr 0))
+    (var sym  (node_arg expr 1))
+    (var args (node_arg expr 2))
+    
+    (var t (compile_args asm args))
+    (var arity (unbox (tuple_at t 0)))
+    (var keys  (tuple_at t 1))
+    (var flag 1)
+    (if keys (|= flag 2))
+
+    (if (>= arity 0)
+        (do
+            (compile asm obj)   ; self;arg1;arg2;...
+            (put_dup asm)       ; self;self;arg1;arg2;..
+            (if keys (do
+                (compile_keyword_arg_array asm keys)
+                (put_swap asm) ; self;kwarg;self;arg1;arg2;..
+                ))
+            (put_push asm sym)
+            (compile_simple_call asm 2 get_slot_swap)   ; fun;self;arg1;arg2;..
+            (put_push asm (slot obj sym))
+            (compile_simple_call asm 2 compile_matching)
+            (put_jcall asm arity flag)
+        )
+        (do
+            (var call_label (fresh_label asm))
+            (compile asm obj)   ; self;arity;arg1;arg2;...
+            (put_dup asm)       ; self;self;arity;arg1;arg2;..
+            (if keys (do
+                (compile_keyword_arg_array asm keys)
+                (put_swap asm) ; self;kwarg;self;arity;arg1;arg2;..
+                ))
+            (put_push asm sym)
+            (compile_simple_call asm 2 get_slot_swap)   ; fun;self;[kwarg];arity;arg1;arg2;..
+            (put_push asm (slot obj sym))
+            (compile_simple_call asm 2 compile_matching) ; code;self;[kwarg];arity;arg1;arg2;..
+            (if keys
+                (put_rot asm 4 1)
+                (put_rot asm 3 1)
+                )
+            (put_dup asm)
+            (put_imm_int asm @MAX_ARITY)
+            (put_if_le asm call_label)
+            (put_push asm args)
+            (compile_simple_call asm 1 too_many_arguments)
+            (set_label asm call_label)
+            (put_vcall asm flag)
+        ))
+    ))
+
+(fun compile_quote (asm expr) (
+    (put_push asm (node_arg expr 0))
+    (compile_simple_call asm 1 deep_copy)
+    ))
+
+(extern fun tuple2)
+(extern fun tuple3)
+(extern fun tuple4)
+(extern fun tuple5)
+
+(fun rest_check (expr val) (
+    (if (!= (node_type val) @ListE)
+        (throw (exception1 (string "This expression must be evaluated to a list") expr)))
+    (return val)
+    ))
+
+(export fun compile_qquote_main (asm expr level) (
+    (var hd (node_head expr))
+    (if (== hd Symbol)
+        (return (put_push asm expr)))
+    (if (== hd Int)
+        (return (put_imm_int asm expr)))
+    (if (== hd String)
+        (return (put_push asm expr)))
+    (if (is_atom expr)
+        (return (put_push asm expr)))
+    (if (== hd Unquote)
+        (if (== level 0)
+            (return (compile asm (node_arg expr 0)))
+            (return (compile_qquote_main asm (node_arg expr 0) (- level 1))) 
+            )
+    (if (== hd Quasiquote)
+        (+= level 1)
+        ))
+
+    (var sz (node_size expr))
+    (if (== sz 0)
+        (put_zero asm)
+        (do
+            (var last (node_arg expr (- sz 1)))
+            (if (&& (== level 0)
+                (&& (== (node_head last) Unquote)
+                    (== (node_head (node_arg last 0)) Rest)))
+                (do
+                    (var arg (node_arg (node_arg last 0) 0))
+                    (compile asm arg)
+                    (put_push asm arg)
+                    (compile_simple_call asm 2 rest_check)
+                    (-= sz 1)
+                )
+                (do
+                    (put_zero asm)
+                ))
+        ))
+    (rfor i 0 sz (do
+        (compile_qquote_main asm (node_arg expr i) level)
+        (put_cons asm)
+        ))
+    (put_push asm (node_head expr))
+    (compile_simple_call asm 2 make_node)
+    ))
+
+(fun compile_qquote (asm expr) (
+    (compile_qquote_main asm (node_arg expr 0) 0)
+    ))
+
+(fun compile_list (asm expr) (
+    (if (== expr 0)
+        (put_zero asm)
+        (do
+            (compile asm (cdr expr))
+            (compile asm (car expr))
+            (put_cons asm)
+        ))
+    ))
+
+(extern fun tuple_at)
+(fun compile_tuple (asm expr) (
+    (var n (seq_size expr))
+    (put_zero asm)
+    (rfor i 0 n (do
+        (compile asm (tuple_at expr i))
+        (put_cons asm)
+        ))
+    (put_push asm Tuple)
+    (compile_simple_call asm 2 make_node)
+    ))
+
+(extern fun array_size)
+(extern fun array_at)
+(fun compile_array (asm expr) (
+    (var n (array_size expr))
+    (put_zero asm)
+    (rfor i 0 n (do
+        (compile asm (array_at expr i))
+        (put_cons asm)
+        ))
+    (put_push asm Array)
+    (compile_simple_call asm 2 make_node)
+    ))
+
+(extern fun table_to_list)
+(fun compile_table (asm expr) (
+    (var list (table_to_list expr))
+    (put_zero asm)
+    (while list (do
+        (var t (car list))
+        (compile_tuple asm t)
+        (put_cons asm)
+        (= list (cdr list))
+        ))
+    (put_push asm Table)
+    (compile_simple_call asm 2 make_node)
+    ))
+
+(fun compile_range (asm expr) (
+    (var size (node_size expr))
+    (if (== size 2)
+        (do
+            (compile asm (node_arg expr 1))
+            (compile asm (node_arg expr 0))
+            (put_push asm Range)
+            (compile_simple_call asm 3 make_node2)
+        )
+    (if (== size 3)
+        (do
+            (compile asm (node_arg expr 2))
+            (compile asm (node_arg expr 1))
+            (compile asm (node_arg expr 0))
+            (put_push asm Range)
+            (compile_simple_call asm 4 make_node3)
+        )
+        (throw (unknown_expression expr))
+        ))
+    ))
+
+(fun compile_block_body (asm block) (
+    (var n (node_size block))
+    (if (== n 0) (do
+        (put_nil asm)
+        return
+        ))
+    (for i 0 n (do
+        (compile asm (node_arg block i))
+        (if (< i (- n 1)) (put_drop asm)) ; drop values except the last one
+        ))
+    ))
+
+(fun compile_toplevel_block (asm expr) (
+    (compile asm (apply (lambda 0 expr) 0))
+    ))
+
+(fun compile_block (asm block) (
+    (if (== (symtable_depth variables) 0)
+        (return (compile_toplevel_block asm block))
+        )
+    (symtable_push variables)
+    (try (do
+        (compile_block_body asm block)
+        (symtable_pop variables)
+        )
+    (catch e (do
+        (symtable_pop variables)
+        (throw e)
+        )))
+    ))
+
+(fun compile_breakable (asm expr) (
+    (if (== (symtable_depth variables) 0)
+        (return (compile_toplevel_block asm expr))
+        )
+    (var break_lbl (fresh_label asm))
+    (var exit_lbl  (fresh_label asm))
+    (= break_labels (cons (box break_lbl) break_labels))
+    (compile_block asm expr)
+    (put_goto asm exit_lbl)
+    (set_label asm break_lbl)
+    (put_nil asm)
+    (set_label asm exit_lbl)
+    (= break_labels (cdr break_labels))
+    ))
+
+(fun compile_seq (asm expr) (
+    (compile_block_body asm expr)
+    ))
+
+(fun compile_if (asm expr) (
+    (if (== (symtable_depth variables) 0)
+        (return (compile_toplevel_block asm expr))
+        )
+    (compile_ifelse_main asm (node_arg expr 0) (node_arg expr 1) @C_NIL)
+    ))
+
+(fun compile_ifelse (asm expr) (
+    (if (== (symtable_depth variables) 0)
+        (return (compile_toplevel_block asm expr))
+        )
+    (compile_ifelse_main asm (node_arg expr 0) (node_arg expr 1) (node_arg expr 2))
+    ))
+
+(fun compile_ifelse_main (asm cnd ifthen ifelse) (
+    (var cnd_hd (node_head cnd))
+    (var size (node_size cnd))
+    (if (&& (== cnd_hd Not) (== size 1))
+        (return (compile_ifelse_main asm (node_arg cnd 0) ifelse ifthen))
+        )
+    (if (&& (== cnd_hd SeqAnd) (== size 2))
+        (return (compile_ifelse_and asm cnd ifthen ifelse))
+        )
+    (if (&& (== cnd_hd SeqOr) (== size 2))
+        (return (compile_ifelse_or asm cnd ifthen ifelse))
+        )
+    (if (== ifthen @C_NIL)
+        (if (== ifelse @C_NIL)
+            (do
+                (compile asm cnd)
+                (put_drop asm)
+                (put_nil asm)
+            )
+            (do
+                (var exit_lbl (fresh_label asm))
+                (var cont_lbl (fresh_label asm))
+                (compile asm cnd)
+                (put_if_true asm exit_lbl)
+                (compile asm ifelse)
+                (put_goto asm cont_lbl)
+                (set_label asm exit_lbl)
+                (put_nil asm)
+                (set_label asm cont_lbl)
+            ))
+        (if (== ifelse @C_NIL)
+            (do
+                (var exit_lbl (fresh_label asm))
+                (var cont_lbl (fresh_label asm))
+                (compile asm cnd)
+                (put_if_false asm exit_lbl)
+                (compile asm ifthen)
+                (put_goto asm cont_lbl)
+                (set_label asm exit_lbl)
+                (put_nil asm)
+                (set_label asm cont_lbl)
+            )
+            (do
+                (var else_lbl (fresh_label asm))
+                (var exit_lbl (fresh_label asm))
+                (compile asm cnd)
+                (put_if_false asm else_lbl)
+                (compile asm ifthen)
+                (put_goto asm exit_lbl)
+                (set_label asm else_lbl)
+                (compile asm ifelse)
+                (set_label asm exit_lbl)
+            ))
+        )
+    ))
+
+(fun compile_ifelse_and (asm cnd ifthen ifelse) (
+    (var ifelse_lbl (fresh_label asm))
+    (var exit_lbl   (fresh_label asm))
+    (exit_if_false asm (node_arg cnd 0) ifelse_lbl)
+    (exit_if_false asm (node_arg cnd 1) ifelse_lbl)
+    (compile asm ifthen)
+    (put_goto asm exit_lbl)
+    (set_label asm ifelse_lbl)
+    (compile asm ifelse)
+    (set_label asm exit_lbl)
+    ))
+
+(fun compile_ifelse_or (asm cnd ifthen ifelse) (
+    (var ifthen_lbl (fresh_label asm))
+    (var exit_lbl   (fresh_label asm))
+    (exit_if_true asm (node_arg cnd 0) ifthen_lbl)
+    (exit_if_true asm (node_arg cnd 1) ifthen_lbl)
+    (compile asm ifelse)
+    (put_goto asm exit_lbl)
+    (set_label asm ifthen_lbl)
+    (compile asm ifthen)
+    (set_label asm exit_lbl)
+    ))
+
+(fun exit_if_true (asm expr exit) (
+    (var hd (node_head expr))
+    (var size (node_size expr))
+    (if (&& (== hd Not) (== size 1))
+        (return (exit_if_false asm (node_arg expr 0) exit))
+        )
+    (if (&& (== hd SeqOr) (== size 2)) (do
+        (exit_if_true asm (node_arg expr 0) exit)
+        (exit_if_true asm (node_arg expr 1) exit)
+        return
+        ))
+    (if (&& (== hd SeqAnd) (== size 2)) (do
+        (var fail (fresh_label asm))
+        (exit_if_false asm (node_arg expr 0) fail)
+        (exit_if_true asm (node_arg expr 1) exit)
+        (set_label asm fail)
+        return
+        ))
+    (compile asm expr)
+    (put_if_true asm exit)
+    ))
+
+(fun exit_if_false (asm expr exit) (
+    (var hd (node_head expr))
+    (var size (node_size expr))
+    (if (&& (== hd Not) (== size 1))
+        (return (exit_if_true asm (node_arg expr 0) exit))
+        )
+    (if (&& (== hd SeqOr) (== size 2)) (do
+        (var fail (fresh_label asm))
+        (exit_if_true asm (node_arg expr 0) fail)
+        (exit_if_false asm (node_arg expr 1) exit)
+        (set_label asm fail)
+        return
+        ))
+    (if (&& (== hd SeqAnd) (== size 2)) (do
+        (exit_if_false asm (node_arg expr 0) exit)
+        (exit_if_false asm (node_arg expr 1) exit)
+        return
+        ))
+    (compile asm expr)
+    (put_if_false asm exit)
+    ))
+
+; translate
+;
+;   While{cnd, body}
+;
+; to
+;
+;   if (not c) goto exit
+; head:
+;   body
+;   if (c) goto head
+; exit:
+;
+(fun compile_while (asm expr) (
+    (if (== (symtable_depth variables) 0)
+        (return (compile_toplevel_block asm expr))
+        )
+
+    (var cnd (node_arg expr 0))
+    (var body (node_arg expr 1))
+    (var next @C_NIL)
+    (if (== (node_size expr) 3)
+        (= next (node_arg expr 2))
+        )
+    (var exit_lbl (fresh_label asm))
+    (var cont_lbl (fresh_label asm))
+    (var head_lbl (fresh_label asm))
+
+    (= break_labels (cons (box exit_lbl) break_labels))
+    (= continue_labels (cons (box cont_lbl) continue_labels))
+
+    (compile asm cnd)
+
+    (put_if_false asm exit_lbl)
+    (set_label asm head_lbl)
+    
+    (compile asm body)
+    (put_drop asm)
+    (set_label asm cont_lbl)
+    (if (!= next @C_NIL) (do
+        (compile asm next)
+        (put_drop asm)
+        ))
+    (compile asm cnd)
+    (put_if_true asm head_lbl)
+    (set_label asm exit_lbl)
+    (put_nil asm)
+
+    (= break_labels (cdr break_labels))
+    (= continue_labels (cdr continue_labels))
+    ))
+
+(fun compile_break (asm expr) (
+    (if (! break_labels)
+        (throw (exception (string "`break' statement outside loop")))
+        )
+    (put_goto asm (unbox (car break_labels)))
+    ))
+
+(fun compile_continue (asm expr) (
+    (if (! continue_labels)
+        (throw (exception (string "`continue' statement outside loop")))
+        )
+    (put_goto asm (unbox (car continue_labels)))
+    ))
+
+(fun compile_assign (asm expr) (
+    (var lhs (node_arg expr 0))
+    (var rhs (node_arg expr 1))
+    (var options (node_restof expr 2))
+    (var lty (node_head lhs))
+
+    ; f(x) = e is equivarent to f = x -> e | f
+    (if (list_member (to_sym "union") options) (do
+        (if (== lty Slot)
+            (return (compile_define asm expr))
+            (return (compile asm (assign lhs (apply (to_sym "union") (list2 rhs lhs)))))
+            )
+        ))
+
+    (if (== lty Apply)
+        (throw (unknown_expression expr))
+        )
+    (if (== lty Slot)
+        (return (compile_assign_slot asm lhs rhs))
+        )
+    (if (== lty FieldRef)
+        (return (compile_fieldref_assign asm lhs rhs))
+        )
+    (if (== lty Ref)
+        (return (compile_clsref_assign asm lhs rhs))
+        )
+    (if (== lty Var)
+        (return (compile_assign_slot asm
+            (slot (slot (node_arg lhs 0) Variables) (node_arg lhs 1))
+            rhs))
+        )
+
+    (if (! (is_symbol lhs))
+        (return (compile_multi_assign asm lhs rhs))
+        )
+
+    (var v (lookup_symbol lhs))
+    (var vty (node_head v))
+    (if (== vty GlobalVariable) (do
+        (compile asm rhs)
+        (put_push asm (node_arg_symbol v 0))
+        (put_push asm global)
+        (compile_simple_call asm 3 assign_global_variable)
+        return
+        ))
+
+    (compile asm rhs)
+    (put_dup asm)
+    (if (== vty LocalVariable) (do
+        (put_store_lvar asm (node_arg_int v 0))
+        return
+        )
+    (if (== vty Argument) (do
+        (put_store_arg asm (node_arg_int v 0))
+        return
+        )))
+    (throw (logic_error1 (string "Can not modify a field of an argument") lhs))
+    ))
+
+(fun compile_arithmetic_assign (asm expr) (
+    (var lhs (node_arg expr 0))
+    (var rhs (node_arg expr 1))
+    (var fun (node_arg expr 2))
+
+    (var lty (node_head lhs))
+    (if (== lty Apply)
+        (throw (unknown_expression expr))
+        )
+    (if (== lty Slot)
+        (return (compile_arithmetic_assign_slot asm lhs rhs fun))
+        )
+    (if (|| (is_symbol lhs) (|| (== lty FieldRef) (== lty Ref))) (do
+        (return (compile_assign asm (assign lhs (send lhs fun (list1 rhs)))))
+        ))
+
+    (throw (unknown_expression expr))
+    ))
+
+(fun compile_match (asm expr) (
+    (var lhs (node_arg_list expr 0))
+    (var rhs (node_arg_list expr 1))
+    (var tup (cleanup_pattern lhs))
+    (var pattern (field_get tup 0))
+    (var tvars   (field_get tup 1))
+    (var rvars   (field_get tup 2))
+    (var failed (fresh_label asm))
+    (var exit   (fresh_label asm))
+
+    (compile asm (apply
+        (make_node3 Lambda pattern tvars NoMatchingError) rhs))
+    (put_dup asm)
+    (put_if_undef asm failed)
+    (while rvars (do
+        (compile asm (assign (car rvars) Decons))
+        (put_drop asm)
+        (= rvars (cdr rvars))
+        ))
+    (put_drop asm)
+    (put_true asm)
+    (put_goto asm exit)
+    (set_label asm failed)
+    (put_drop asm)
+    (put_false asm)
+    (set_label asm exit)
+    ))
+
+(fun set_slot_roll (sym val obj) (
+    (return (set_slot obj sym val))
+    ))
+
+; obj.x op= e => {t = obj; t.x = op(t, e)}
+(fun compile_arithmetic_assign_slot (asm lhs rhs fun) (
+    (var obj (node_arg lhs 0))
+    (var sym (node_arg_symbol lhs 1))
+    (compile asm obj)   ; obj
+    (put_dup asm)       ; obj; obj
+    (compile asm rhs)   ; rhs; obj; obj
+    (put_swap asm)      ; obj; rhs; obj
+    (compile asm fun)   ; fun; obj; rhs; obj
+    (put_push asm fun)
+    (compile_simple_call asm 2 compile_matching)
+    (put_jcall asm 1 1)  ; val; obj
+    (put_push asm sym)  ; sym; val; obj
+    (compile_simple_call asm 3 set_slot_roll)
+    ))
+
+; translate
+;
+; Foo{x, y, Bar{z}} = e
+;
+; to
+;
+; tmp: (t@Foo{x, y, Bar{z}} -> [x,y,z,t])(e)
+; x = decons(tmp)
+; y = decons(tmp)
+; z = decons(tmp)
+; car(tmp)
+(fun compile_multi_assign (asm lhs rhs) (
+    (if (&& (== (node_type lhs) @TupleE) (== (node_type rhs) @TupleE)) (do
+        (if (!= (node_size lhs) (node_size rhs))
+            (throw (exception2
+                (string "numbers of variables and values are different")
+                 lhs rhs)))
+        (var n (node_size lhs))
+        (var tmp (allocate_tuple n))
+        (for i 0 n (do
+            (var t (to_unique_sym "t"))
+            (compile_define asm (defvar t (node_arg rhs i)))
+            (put_drop asm)
+            (node_arg_set tmp i t)
+            ))
+        (for i 0 n (do
+            (compile_assign asm (assign (node_arg lhs i) (node_arg tmp i)))
+            (put_drop asm)
+            ))
+        (compile asm lhs)
+        return
+        ))
+    (var tup (cleanup_pattern lhs))
+    (var pattern (field_get tup 0))
+    (var tvars   (field_get tup 1))
+    (var rvars   (field_get tup 2))
+
+    (var t (to_unique_sym "t"))
+
+    (var lam (lambda (list1 (make_node2 Domain t pattern))
+        (list_append tvars (list1 t)))) 
+
+    ; for error message.
+    (set_slot lam (to_sym "_original_") (lambda (list1 lhs) @C_NIL))
+
+    (compile asm (apply lam (list1 rhs)))
+    (while rvars (do
+        (compile_assign asm (assign (car rvars) Decons))
+        (put_drop asm)
+        (= rvars (cdr rvars))
+        ))
+    (put_car asm)
+    ))
+
+(fun compile_return (asm expr) (
+    (compile asm (node_arg expr 0))
+    (for i 0 try_nest (put_unwind_pop asm))
+    (put_ireturn asm)
+    ))
+
+(fun compile_reset (asm expr) (
+    (var func (node_arg expr 0))
+    (compile asm func)
+    (put_push asm func)
+    (compile_simple_call asm 2 compile_matching)
+    (put_rcall asm)
+    ))
+
+(fun compile_shift (asm expr) (
+    (var func (node_arg expr 0))
+    (compile asm func)
+    (put_push asm func)
+    (compile_simple_call asm 2 compile_matching)
+    (put_shift asm) ; create partial continuation and call given function.
+    ))
+
+; handler must be a lambda
+(var default_hdler (lambda (to_sym "x") (make_node1 Throw (to_sym "x"))))
+(fun compile_try (asm expr) (
+    (var stmt (node_arg expr 0))
+    (var hdlr (node_arg expr 1))
+    (var hdlr_lbl (fresh_label asm))
+    (var cont_lbl (fresh_label asm)) 
+
+    (put_unwind_push asm hdlr_lbl)
+    (+= try_nest 1)
+    (compile asm stmt)
+    (-= try_nest 1)
+    (put_unwind_pop asm)
+    (put_goto asm cont_lbl)
+    (set_label asm hdlr_lbl)
+
+    ; here, the thrown exception is on the top of stack.
+    (compile asm (apply (to_sym "union") (list2 hdlr default_hdler)))
+    (put_push asm hdlr)
+    (compile_simple_call asm 2 compile_matching)
+    (put_jcall asm 1 0)
+    (set_label asm cont_lbl)
+    ))
+
+(fun compile_throw (asm expr) (
+    (compile asm (node_arg expr 0))
+    (put_throw asm)
+    ))
+
+(fun compile_eq (asm expr) (
+    (compile asm (make_node2 Apply (to_sym "equal?") (node_args expr)))
+    ))
+
+(fun compile_ne (asm expr) (
+    (compile_eq asm expr)
+    (var else_lbl (fresh_label asm))
+    (var exit_lbl (fresh_label asm))
+    (put_if_false asm else_lbl)
+    (put_false asm)
+    (put_goto asm exit_lbl)
+    (set_label asm else_lbl)
+    (put_true asm)
+    (set_label asm exit_lbl)
+    ))
+
+(fun compile_logical (asm expr) (
+	(compile asm (ifelse expr @C_TRUE @C_FALSE))
+	))
+
+(fun compile_lambda_main (asm args body guard cls nocheck orig) (
+    (var save_compiling_lambda compiling_lambda)
+    (try (do
+        (= compiling_lambda @TRUE)
+        (var asm_body (make_assembler))
+        (if (!= guard noguard)
+            (do
+                (var asm_guard (make_assembler))
+                (var t (compile_function asm_body asm_guard args body guard cls))
+                (= args (tuple_at t 0))
+                (var keys (tuple_at t 1))
+                (var nlocal (unbox (tuple_at t 2)))
+                (put_ireturn asm_body)
+                (put_push asm (make_function args keys guard (get_code asm_body) (get_code asm_guard) nlocal nocheck orig))
+            )
+            (do
+                (var t (compile_function asm_body 0 args body noguard cls))
+                (= args (tuple_at t 0))
+                (var keys (tuple_at t 1))
+                (var nlocal (unbox (tuple_at t 2)))
+                (put_ireturn asm_body)
+                (put_push asm (make_function args keys @C_UNDEF (get_code asm_body) 0 nlocal nocheck orig))
+            ))
+        (= compiling_lambda save_compiling_lambda)
+        )
+    (catch e (do
+        (= compiling_lambda save_compiling_lambda)
+        (throw e)
+        )))
+    ))
+
+(fun compile_lambda_ (asm expr cls orig) (
+    (var lhs (node_arg expr 0))
+    (var body (node_arg expr 1))
+    (var nocheck @FALSE)
+    (if (&& (>= (node_size expr) 3)
+            (== (node_arg expr 2) NoMatchingError))
+        (= nocheck @TRUE)
+        )
+    (var hd (node_head lhs))
+    (if (== hd List)
+        (compile_lambda_main asm lhs body noguard cls nocheck orig)
+    (if (== hd When)
+        (do
+            (var guard (node_arg lhs 1))
+            (var args (node_arg lhs 0))
+            (= hd (node_head lhs))
+            (compile_lambda_main asm args body guard cls nocheck orig)
+        )
+        (compile_lambda_main asm (list1 lhs) body noguard cls nocheck orig)
+        ))
+    ))
+
+(fun compile_lambda (asm expr) (
+    (var original_arg @C_NIL)
+    (var orig (get_slot_nocheck expr (to_sym "_original_")))
+    (if (!= orig @C_NIL) (do
+        (= original_arg (node_arg orig 0))
+        (if (== (node_head original_arg) When)
+            (= original_arg (tuple2
+                (node_arg original_arg 0)
+                (node_arg original_arg 1)
+                )))
+        ))
+    (return (compile_lambda_ asm expr @C_NIL original_arg))
+    ))
+
+(fun build_closure (lam clos) (
+    (var args (field_get lam 2))
+    (var keys (field_get lam 3))
+    (var guard (field_get lam 4))
+    (var body (field_get lam 5))
+    (var guard_code (field_get lam 6))
+    (var orig (field_get lam 8))
+    (var nlocal (field_get lam 9))
+    (return (alloc_function args keys guard body guard_code clos nlocal @FALSE @FALSE orig))
+    ))
+
+(fun compile_closure (asm expr) (
+    (compile asm (node_arg expr 0))
+
+    (var save_closure_frame closure_frame)
+    (try (do
+        (= closure_frame (node_arg expr 0))
+        (compile_lambda_ asm (node_arg expr 1) (node_arg expr 0) @C_NIL)
+        (compile_simple_call asm 2 build_closure)
+        (= closure_frame save_closure_frame)
+        )
+    (catch e (do
+        (= closure_frame save_closure_frame)
+        (throw e)
+        )))
+    ))
+
+(fun compile_alloc_clsenv (asm expr) (
+    (var size (node_arg_int expr 0))
+    (var t size)
+    (while (> t 0) (do
+        (put_zero asm)
+        (-= t 1)
+        ))
+    (put_struct asm size size)
+    ))
+
+(fun compile_clsref (asm expr) (
+    (compile asm (node_arg expr 0))
+    (put_fieldget asm (node_arg_int expr 1))
+    ))
+
+(fun compile_clsref_assign (asm lhs rhs) (
+    (compile asm rhs)
+    (put_dup asm)
+    (compile asm (node_arg lhs 0))
+    (put_fieldset asm (node_arg_int lhs 1))
+    ))
+
+(fun compile_fieldref (asm expr) (
+    (compile asm (node_arg expr 0))
+    (put_fieldget asm (node_arg_int expr 1))
+    ))
+
+(fun compile_fieldref_assign (asm lhs rhs) (
+    (compile asm rhs)
+    (put_dup asm)
+    (compile asm (node_arg lhs 0))
+    (put_fieldset asm (node_arg_int lhs 1))
+    ))
+
+(export fun compile_simple_call (asm arity func) (
+    (put_imm_int32 asm func)
+    (put_acall asm arity)
+    ))
+
+(fun variable_name (lhs) (
+    (if (== (node_head lhs) Ref)
+        (return (node_arg_symbol lhs 2))
+        )
+    (if (is_symbol lhs) (return lhs))
+    (throw (type_error (string "a symbol") lhs))
+    ))
+
+(extern fun transl_define_syntax)
+(fun compile_define_syntax (asm expr) (
+    (compile asm (transl_define_syntax expr))
+    ))
+
+(export fun add_function0 (obj sym func guard) (
+    (set_slot_union obj sym (make_builtin_function 0 func guard @FALSE))
+    ))
+
+(export fun add_function1 (obj sym pat func guard) (
+    (set_slot_union obj sym (make_builtin_function (list1 pat) func guard @FALSE))
+    ))
+
+(export fun add_function2 (obj sym pat1 pat2 func guard) (
+    (set_slot_union obj sym (make_builtin_function (list2 pat1 pat2) func guard @FALSE))
+    ))
+
+(export fun add_function3 (obj sym pat1 pat2 pat3 func guard) (
+    (set_slot_union obj sym (make_builtin_function (list3 pat1 pat2 pat3) func guard @FALSE))
+    ))
+
+(export fun add_function4 (obj sym pat1 pat2 pat3 pat4 func guard) (
+    (set_slot_union obj sym (make_builtin_function (list4 pat1 pat2 pat3 pat4) func guard @FALSE))
+    ))
+
+(export fun add_function5 (obj sym pat1 pat2 pat3 pat4 pat5 func guard) (
+    (set_slot_union obj sym (make_builtin_function (list5 pat1 pat2 pat3 pat4 pat5) func guard @FALSE))
+    ))
+
+(export fun add_function6 (obj sym pat1 pat2 pat3 pat4 pat5 pat6 func guard) (
+    (set_slot_union obj sym (make_builtin_function (list6 pat1 pat2 pat3 pat4 pat5 pat6) func guard @FALSE))
+    ))
+
+; g * f == (x -> g(f(x)))
+(export fun compose_function (g f) (
+    (var x (to_unique_sym "x"))
+    (var asm (make_assembler))
+    (var lbl1 (fresh_label asm))
+    (var lbl2 (fresh_label asm))
+
+    (put_arg0 asm)
+    (put_push asm f)
+    (put_dup asm)
+    (compile_simple_call asm 2 compile_matching)
+    (put_jcall asm 1 0)
+    (put_push asm g)
+    (put_dup asm)
+    (compile_simple_call asm 2 compile_matching)
+    (put_jcall asm 1 0)
+    (put_ireturn asm)
+    (return (make_function (list1 x) 0 @C_UNDEF (get_code asm) 0 @FALSE 0 @FALSE @FALSE @C_NIL))
+    ))
+
+(export fun setup_builtin_compilers (mod) (
+    (add_compiler mod DontCare compile_error)
+
+    ; These commands have been evaluated in parsing phase.
+    (add_compiler mod (make_node2 Node DontCare DontCare) compile_make_node)
+    (add_compiler mod (make_node0 Self) compile_self)
+    (add_compiler mod symT compile_var)
+    (add_compiler mod (quote @C_TRUE) compile_special)
+    (add_compiler mod (quote @C_FALSE) compile_special)
+    (add_compiler mod (quote @C_NIL) compile_special)
+    (add_compiler mod (quote @C_UNDEF) compile_special)
+    (add_compiler mod intT compile_const_int)
+    (add_compiler mod stringT compile_const)
+    (add_compiler mod (domainP Float) compile_const)
+
+    (add_compiler mod (make_node2 Apply DontCare listT) compile_apply)
+    (add_compiler mod (make_node3 Apply DontCare DontCare listT) compile_apply_with_self)
+    (add_compiler mod (make_node3 Send DontCare symT listT) compile_send)
+
+    (add_compiler mod (qquote (quote (unquote DontCare))) compile_quote)
+    (add_compiler mod (qquote (qquote (unquote (unquote DontCare)))) compile_qquote)
+
+    (add_compiler mod (domainP List)  compile_list)
+    (add_compiler mod (domainP Tuple) compile_tuple)
+    (add_compiler mod (domainP Array) compile_array)
+    (add_compiler mod (domainP Table) compile_table)
+    (add_compiler mod (domainP Range) compile_range)
+
+    (add_compiler mod (domainP Block) compile_block)
+    (add_compiler mod (domainP Seq) compile_seq)
+    (add_compiler mod (domainP Breakable) compile_breakable)
+
+    (add_compiler mod (mkif DontCare DontCare) compile_if)
+	(add_compiler mod (ifelse DontCare DontCare DontCare) compile_ifelse)
+    (add_compiler mod (make_node2 While DontCare DontCare) compile_while)
+    (add_compiler mod (make_node3 While DontCare DontCare DontCare) compile_while)
+    (add_compiler mod (make_node0 Break) compile_break) 
+    (add_compiler mod (make_node0 Continue) compile_continue)
+    (add_compiler mod (make_node1 Return DontCare) compile_return)
+    (add_compiler mod (make_node2 Try DontCare DontCare) compile_try)
+    (add_compiler mod (make_node1 Throw DontCare) compile_throw)
+    (add_compiler mod (make_node2 Equal DontCare DontCare) compile_eq)
+    (add_compiler mod (make_node2 NotEqual DontCare DontCare) compile_ne)
+    (add_compiler mod (make_node1 Not DontCare) compile_logical)
+	(add_compiler mod (make_node2 SeqAnd DontCare DontCare) compile_logical)
+	(add_compiler mod (make_node2 SeqOr DontCare DontCare) compile_logical)
+    (add_compiler mod (domainP Lambda) compile_lambda)
+    (add_compiler mod (domainP Define) compile_define)
+    (add_compiler mod (domainP Assign) compile_assign)
+    (add_compiler mod (make_node2 Match DontCare DontCare) compile_match)
+    (add_compiler mod (make_node3 ArithAssign DontCare DontCare DontCare) compile_arithmetic_assign)
+
+    (add_compiler mod (make_node2 Slot DontCare symT) compile_slot)
+    (add_compiler mod (make_node2 Var DontCare symT) compile_qualvar)
+    (add_compiler mod (make_node1 Reset DontCare) compile_reset)
+    (add_compiler mod (make_node1 Shift DontCare) compile_shift)
+
+    (add_compiler mod (make_node2 DefSyntax DontCare DontCare) compile_define_syntax)
+
+    ; internal expressions
+    (add_compiler mod (make_node3 KeywordArg intT DontCare DontCare) compile_keyword_arg)
+    (add_compiler mod (make_node2 FieldRef DontCare intT) compile_fieldref)
+    (add_compiler mod (make_node1 AllocClsEnv intT) compile_alloc_clsenv)
+    (add_compiler mod (make_node2 Closure DontCare DontCare) compile_closure)
+    (add_compiler mod (make_node3 Ref DontCare intT symT) compile_clsref)
+    (add_compiler mod (quote Decons) compile_decons)
+
+    (add_function1 mod (to_sym "collect_parameters") DontCare collect_params 0)
+    ))
+
+(export fun add_compiler (mod pat func) (
+    (add_function2 mod Compile (domainP Assembler) pat func 0)
+    ))
+
+    ))

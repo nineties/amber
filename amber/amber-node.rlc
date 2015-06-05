@@ -1,0 +1,583 @@
+;
+; rowl - 1st generation
+; Copyright (C) 2010 nineties
+;
+; $Id: amber-node.rlc 2014-04-28 01:30:15 nineties $
+;
+
+(import "rlvm-compile")
+(import "amber-types")
+
+(compile `object `(
+
+(import "amber-util")
+
+; symbol table
+(var symbol_table (init_symbol_table (make_idtable)))
+(var symbol_index_gen 0)
+(var builtin_symbol_index_gen -1)
+
+; builtin expression headers and types
+(export var DontCare    (to_sym "_"))
+
+(export var List       (to_sym "List"))
+(export var Array      (to_sym "Array"))
+(export var Tuple      (to_sym "Tuple"))
+(export var Table      (to_sym "Table"))
+(export var Range      (to_sym "Range"))
+(export var Module     (to_sym "Module"))
+(export var Slot       (to_sym "Slot"))
+(export var Block      (to_sym "Block"))
+(export var Breakable  (to_sym "BreakableBlock"))
+(export var Apply      (to_sym "Apply"))
+(export var Send       (to_sym "Send"))
+(export var Self       (to_sym "Self"))
+(export var Subscript  (to_sym "Subscript"))
+(export var Domain     (to_sym "Domain"))
+(export var When       (to_sym "When"))
+(export var Keyword    (to_sym "Keyword"))
+(export var Rest       (to_sym "Rest"))
+(export var Quote      (to_sym "Quote"))
+(export var Quasiquote (to_sym "Quasiquote"))
+(export var Unquote    (to_sym "Unquote"))
+(export var If         (to_sym "If"))
+(export var IfElse     (to_sym "IfElse"))
+(export var While      (to_sym "While"))
+(export var For        (to_sym "For"))
+(export var Break      (to_sym "Break"))
+(export var Continue   (to_sym "Continue"))
+(export var Not        (to_sym "Not"))
+(export var SeqAnd     (to_sym "SeqAnd"))
+(export var SeqOr      (to_sym "SeqOr"))
+(export var Equal      (to_sym "Equal"))
+(export var NotEqual   (to_sym "NotEqual"))
+(export var Node       (to_sym "Node"))
+(export var Define        (to_sym "Define"))
+(export var DefSyntax     (to_sym "DefineSyntax"))
+(export var ReserveSymbol (to_sym "ReserveSymbol"))
+
+(export var Assign      (to_sym "Assign"))
+(export var Match       (to_sym "Match"))
+(export var ArithAssign (to_sym "ArithAssign"))
+(export var Lambda      (to_sym "Lambda"))
+(export var Return      (to_sym "Return"))
+(export var Try         (to_sym "Try"))
+(export var Throw       (to_sym "Throw"))
+(export var Reset       (to_sym "Reset"))
+(export var Shift       (to_sym "Shift"))
+(export var Seq         (to_sym "Seq"))
+(export var Exception   (to_sym "Exception"))
+(export var Eval        (to_sym "eval"))
+(export var Compile     (to_sym "compile"))
+(export var Rewrite     (to_sym "rewrite"))
+(export var Parent      (to_sym "parent"))
+(export var Var         (to_sym "Var"))
+(export var Variables   (to_sym "variables"))
+(export var VarTable    (to_sym "VariableTable"))
+(export var NoMatchingError (to_sym "NoMatchingError"))
+
+; for parser
+(export var OneOf      (to_sym "OneOf"))
+(export var NoneOf     (to_sym "NoneOf"))
+(export var Option     (to_sym "Option"))
+(export var Choice     (to_sym "Choice"))
+(export var Many       (to_sym "Many"))
+(export var Many1      (to_sym "Many1"))
+(export var And        (to_sym "And"))
+; Amber's original syntax elements
+(export var ParseWith  (to_sym "ParseWith"))
+(export var Aligned    (to_sym "Aligned"))
+(export var Delimited  (to_sym "Delimited"))
+(export var Delimited1 (to_sym "Delimited1"))
+(export var Delimited2 (to_sym "Delimited2"))
+(export var NoSpace    (to_sym "NoSpace"))
+
+(export var Some   (to_sym "Some"))
+
+; internal nodes
+(export var GlobalVariable (to_unique_sym "%GlobalVariable")) ; GlobalVariable{sym}
+(export var LocalVariable  (to_unique_sym "%LocalVariable")) ; LocalVariable{idx}
+(export var Argument       (to_unique_sym "%Argument")) ; Argument{idx}
+(export var ArgumentsFrom  (to_unique_sym "%ArgumentsFrom")) ; ArgumentsFrom{idx}
+(export var ListAt         (to_unique_sym "%ListAt"))   ; ListAt{var, idx}
+(export var ListFrom       (to_unique_sym "%ListFrom")) ; ListFrom{var, idx}
+(export var TupleAt        (to_unique_sym "%TupleAt"))  ; TupleAt{var, idx}
+(export var ArrayAt        (to_unique_sym "%ArrayAt"))  ; ArrayAt{var, idx}
+(export var RestOf         (to_unique_sym "%RestOf"))   ; RestOf{var, idx}
+(export var FieldRef       (to_unique_sym "%FieldRef")) ; FieldRef{var, idx}
+(export var GetArity       (to_unique_sym "%GetArity"))
+(export var VariableLength (to_unique_sym "%VariableLength"))
+(export var KeywordArg     (to_unique_sym "%KeywordArg"))
+
+(export var Amber  (to_sym "amber"))
+(export var Prim   (to_sym "prim"))
+(export var Syntax (to_sym "syntax"))
+
+; BuiltinType headers
+(export var Bool   (to_builtin_sym "Bool"))
+(export var Nil    (to_builtin_sym "Nil"))
+(export var Undef  (to_builtin_sym "Undef"))
+(export var Symbol (to_builtin_sym "Symbol"))
+(export var Int    (to_builtin_sym "Int"))
+(export var String (to_builtin_sym "String"))
+(export var Float  (to_builtin_sym "Float"))
+(export var Assembler        (to_builtin_sym "Assembler"))
+(export var BuiltinType      (to_builtin_sym "BuiltinType"))
+(export var Bytecode         (to_builtin_sym "Bytecode"))
+(export var Function         (to_builtin_sym "Function"))
+(export var Alias            (to_builtin_sym "Alias"))
+(export var Closure          (to_builtin_sym "Closure"))
+(export var InputFileStream  (to_builtin_sym "InputFileStream"))
+(export var OutputFileStream (to_builtin_sym "OutputFileStream"))
+(export var InputStringStream (to_builtin_sym "InputStringStream"))
+(export var OutputStringStream (to_builtin_sym "OutputStringStream"))
+(export var Parser (to_builtin_sym "Parser"))
+
+(extern fun exception)
+(extern fun exception1)
+(extern fun out_of_range)
+(extern fun type_error)
+
+(fun init_symbol_table (tbl) (
+    (idtable_add tbl (strdup "undef") @C_UNDEF)
+    (idtable_add tbl (strdup "nil") @C_NIL)
+    (idtable_add tbl (strdup "true") @C_TRUE)
+    (idtable_add tbl (strdup "false") @C_FALSE)
+    (return tbl)
+    ))
+
+(export fun to_builtin_sym (name) (
+    (var sym (idtable_find symbol_table name))
+    (if sym (return sym))
+    (= name (strdup name))
+    (var sym (variant @SymbolE 1 name builtin_symbol_index_gen))
+    (-= builtin_symbol_index_gen 1)
+    (idtable_add symbol_table name sym)
+    (return sym)
+    ))
+
+(export fun to_sym (name) (
+    (var sym (idtable_find symbol_table name))
+    (if sym (return sym))
+    (= name (strdup name))
+    (= sym (variant @SymbolE 1 name symbol_index_gen))
+    (+= symbol_index_gen 1)
+    (idtable_add symbol_table name sym)
+    (return sym)
+    ))
+
+(export fun to_unique_sym (name) (
+    (var sym (variant @SymbolE 1 (strdup name) symbol_index_gen))
+    (+= symbol_index_gen 1)
+    (return sym)
+    ))
+
+(export fun is_builtin_sym (sym) (
+    (if (< (field_get sym 2) 0)
+        (return @TRUE)
+        (return @FALSE)
+        )
+    ))
+
+(export fun symbol_name (sym) (
+    (return (field_get sym @SymbolName))
+    ))
+
+(export fun node_type (obj) (
+    (if (! obj) (return @ListE)
+    (if (& obj 1) (return @IntE)
+    (if (|| (== obj @C_TRUE) (== obj @C_FALSE)) (return @BoolE)
+    (if (== obj @C_NIL) (return @NilE)
+    (if (== obj @C_UNDEF) (return @UndefE)
+        )))))
+    (var tag (get_tag obj))
+    (if (== tag @TAG_PSTRUCT) (return (+ (get_pstruct_tag obj) @PLAIN_TYPE_OFFSET))
+    (if (== tag @TAG_VARIANT) (return (field_get obj 0))
+    (if (== tag @TAG_CONS) (return @ListE)
+    (if (== tag @TAG_EXPR) (return @ExprE)
+    (if (== tag @TAG_BYTECODE) (return @BytecodeE)
+    (if (== tag @TAG_CONT) (return @ContinuationE)
+    (if (== tag @TAG_BIGINT) (return @BigIntE)
+    (if (== tag @TAG_SEQUENCE) (do
+        (if (== (get_sequence_tag obj) @SEQ_TUPLE) (return @TupleE))
+        )))))))))
+    (return @BuiltinTypeE)
+    ))
+
+(export fun is_symbol (obj) (
+    (if (== (node_type obj) @SymbolE) (return @TRUE) (return @FALSE))
+    ))
+(export fun is_int (obj) (
+    (if (& obj 1) (return @TRUE) (return @FALSE))
+    ))
+(export fun is_bigint (obj) (
+    (if (== (node_type obj) @BigIntE) (return @TRUE) (return @FALSE))
+    ))
+(export fun is_string (obj) (
+    (if (== (node_type obj) @StringE) (return @TRUE) (return @FALSE))
+    ))
+(export fun is_float (obj) (
+    (if (== (node_type obj) @FloatE) (return @TRUE) (return @FALSE))
+    ))
+(export fun is_list (obj) (
+    (if (== (node_type obj) @ListE) (return @TRUE) (return @FALSE))
+    ))
+(export fun is_tuple (obj) (
+    (if (== (node_type obj) @TupleE) (return @TRUE) (return @FALSE))
+    ))
+(export fun is_array (obj) (
+    (if (== (node_type obj) @ArrayE) (return @TRUE) (return @FALSE))
+    ))
+(export fun is_table (obj) (
+    (if (== (node_type obj) @TableE) (return @TRUE) (return @FALSE))
+    ))
+(export fun is_expr (obj) (
+    (if (== (node_type obj) @ExprE) (return @TRUE) (return @FALSE))
+    ))
+(export fun is_function (obj) (
+    (var ty (node_type obj))
+    (if (|| (== ty @FunctionE)
+        (|| (== ty @BuiltinFunctionE)
+        (|| (== ty @BoundFunctionE)
+            (== ty @ContinuationE))))
+        (return @TRUE)
+        (return @FALSE)
+        )
+    ))
+
+(fun is_atom_type (ty) (
+    (if (>= ty @ATOM_TYPE_OFFSET)
+        (return @TRUE)
+        (return @FALSE)
+        )
+    ))
+
+(export fun is_atom (obj) (
+    (return (is_atom_type (node_type obj)))
+    ))
+
+(export fun node_head (node) (
+    (tswitch (node_type node) (
+        (@ExprE               . (return (field_get node 0)))
+        (@ListE               . (return List))
+        (@TupleE              . (return Tuple))
+        (@ArrayE              . (return Array))
+        (@TableE              . (return Table))
+        (@NilE                . (return Nil))
+        (@UndefE              . (return Undef))
+        (@BoolE               . (return Bool))
+        (@SymbolE             . (return Symbol))
+        (@AssemblerE          . (return Assembler))
+        (@BytecodeE           . (return Bytecode))
+        (@FunctionE           . (return Function))
+        (@BuiltinFunctionE    . (return Function))
+        (@BoundFunctionE      . (return Function))
+        (@ContinuationE       . (return Function))
+        (@AliasE              . (return Alias))
+        (@InputFileStreamE    . (return InputFileStream))
+        (@OutputFileStreamE   . (return OutputFileStream))
+        (@InputStringStreamE  . (return InputStringStream))
+        (@OutputStringStreamE . (return OutputStringStream))
+        (@ParserE             . (return Parser))
+        (@BigIntE             . (return Int))
+        (@IntE                . (return Int))
+        (@StringE             . (return String))
+        (@FloatE              . (return Float))
+        (@BuiltinTypeE        . (return BuiltinType))
+        (default              . (not_reachable "node_head"))
+        ))
+    ))
+
+; number of arguments
+(extern fun array_size)
+(extern fun table_size)
+(export fun node_size (expr) (
+    (if (is_atom expr) (return 0))
+    (if (is_list expr) (return (list_len expr)))
+    (if (is_tuple expr) (return (seq_size expr)))
+    (if (is_array expr) (return (array_size expr)))
+    (if (is_table expr) (return (table_size expr)))
+    (return (expr_size expr))
+    ))
+
+(extern fun tuple_to_list)
+(extern fun ary_to_list)
+(extern fun table_to_list)
+(export fun node_args (expr) (
+    (if (is_atom expr) (return 0))
+    (if (is_list expr) (return (list_copy expr)))
+    (if (is_tuple expr) (return (tuple_to_list expr)))
+    (if (is_array expr) (return (ary_to_list expr)))
+    (if (is_table expr) (return (table_to_list expr)))
+    (var args 0)
+    (rfor i 0 (node_size expr)
+        (= args (cons (node_arg expr i) args))
+        )
+    (return args)
+    ))
+
+(extern fun tuple_restof)
+(extern fun array_restof)
+(extern fun table_restof)
+(export fun node_restof (expr i) (
+    (if (is_atom expr)
+        (throw (out_of_range expr (box i)))
+        )
+    (if (is_list expr) (do
+        (for j 0 i (= expr (cdr expr)))
+        (return expr)
+        ))
+    (if (is_tuple expr) (return (tuple_restof expr i)))
+    (if (is_array expr) (return (array_restof expr i)))
+    (if (is_table expr) (return (table_restof expr i)))
+    (var args 0)
+    (rfor j i (node_size expr)
+        (= args (cons (node_arg expr j) args))
+        )
+    (return args)
+    ))
+
+(extern fun list_at_check)
+(extern fun tuple_at)
+(extern fun array_at)
+(extern fun table_at_by_idx)
+(export fun node_arg (expr idx) (
+    (if (is_atom expr) 
+        (throw (out_of_range expr (box idx)))
+        )
+    (if (is_list expr)  (return (list_at_check expr idx)))
+    (if (is_tuple expr) (return (tuple_at expr idx)))
+    (if (is_array expr) (return (array_at expr idx)))
+    (if (is_table expr) (return (table_at_by_idx expr idx)))
+
+    (if (>= idx (expr_size expr))
+        (throw (out_of_range expr (box idx))))
+    (return (array_get object expr (+ idx 1)))
+    ))
+
+(export fun check_type (arg type) (
+    (if (!= (node_type arg) type)
+        (throw (type_error (type_string type) arg))
+        )
+    ))
+
+(fun node_arg_check (expr type idx) (
+    (var arg (node_arg expr idx))
+    (check_type arg type)
+    (return arg)
+    ))
+
+(export fun node_arg_int (expr idx) (
+    (var v (node_arg_check expr @IntE idx))
+    (return (unbox v))
+    ))
+
+(export fun node_arg_symbol (expr idx) (
+    (return (node_arg_check expr @SymbolE idx))
+    ))
+
+(export fun node_arg_list (expr idx) (
+    (return (node_arg_check expr @ListE idx))
+    ))
+
+(extern fun list_store_check)
+(extern fun tuple_store)
+(extern fun array_store)
+(extern fun invalid_argument)
+(export fun node_arg_set (expr idx val) (
+    (if (is_atom expr)
+        (throw (invalid_argument
+        (string "Can't modify fields of builtin object") expr)))
+    (if (is_list expr)  (return (list_store_check expr idx val)))
+    (if (is_tuple expr) (return (tuple_store expr idx val)))
+    (if (is_array expr) (return (array_store expr idx val)))
+    (var n (expr_size expr))
+    (if (>= idx n) (throw (out_of_range expr (box idx))))
+    (array_set object expr (+ idx 1) val)
+    ))
+
+(export fun make_node0 (head) (
+    (var obj (allocate_expr 0))
+    (field_set obj 0 head)
+    (return obj)
+    ))
+
+(export fun make_node1 (head a) (
+    (var obj (allocate_expr 1))
+    (field_set obj 0 head)
+    (field_set obj 1 a)
+    (return obj)
+    ))
+
+(export fun make_node2 (head a b) (
+    (var obj (allocate_expr 2))
+    (field_set obj 0 head)
+    (field_set obj 1 a)
+    (field_set obj 2 b)
+    (return obj)
+    ))
+
+(export fun make_node3 (head a b c) (
+    (var obj (allocate_expr 3))
+    (field_set obj 0 head)
+    (field_set obj 1 a)
+    (field_set obj 2 b)
+    (field_set obj 3 c)
+    (return obj)
+    ))
+
+(extern fun list_to_tuple)
+(extern fun list_to_ary)
+(extern fun list_to_table)
+(export fun make_node (head args) (
+    (if (!= (node_type head) @SymbolE)
+        (throw (exception (string "the 1st argument of Node must be a Symbol")))
+        )
+    (if (!= (node_type args) @ListE)
+        (throw (exception (string "the 2nd argument of Node must be a List")))
+        )
+
+    (if (is_builtin_sym head)
+        (throw (make_node Exception (list2
+            (string "Can not create builtin object")
+            head)))
+        )
+
+    ; following three objects uses special data structure
+    (if (== head List)  (return (list_copy args)))
+    (if (== head Tuple) (return (list_to_tuple args)))
+    (if (== head Array) (return (list_to_ary args)))
+    (if (== head Table) (return (list_to_table args)))
+
+    (var size (list_len args))
+    (var expr (allocate_expr size))
+    (field_set expr 0 head)
+    (for i 1 (+ size 1) (do
+        (array_set object expr i (car args))
+        (= args (cdr args))
+        ))
+    (return expr)
+    ))
+
+(export fun slot (lhs rhs) (
+    (return (make_node2 Slot lhs rhs))
+    ))
+
+(export fun quote (expr) (
+    (return (make_node1 Quote expr))
+    ))
+
+(export fun qquote (expr) (
+    (return (make_node1 Quasiquote expr))
+    ))
+
+(export fun unquote (expr) (
+    (return (make_node1 Unquote expr))
+    ))
+
+(export fun ifelse (cnd then else) (
+    (return (make_node3 IfElse cnd then else))
+	))
+
+(export fun mkif (cnd then) (
+    (return (make_node2 If cnd then))
+	))
+
+(export fun apply (fun args) (
+    (return (make_node2 Apply fun args))
+    ))
+
+(export fun send (self fun args) (
+    (return (make_node3 Send self fun args))
+    ))
+
+(export fun block (stmts) (
+    (return (make_node Block stmts))
+    ))
+
+(export fun seq (stmts) (
+    (return (make_node Seq stmts))
+    ))
+
+(export fun breakable (stmts) (
+    (return (make_node Breakable stmts))
+    ))
+
+(export fun lambda (args body) (
+    (return (make_node2 Lambda args body))
+    ))
+
+(export fun lambda_nocheck (args body) (
+    (return (make_node3 Lambda args body NoMatchingError))
+    ))
+
+(export fun assign (v arg) (
+    (return (make_node2 Assign v arg))
+    ))
+
+(export fun defvar (v arg) (
+    (return (make_node2 Define v arg))
+    ))
+
+; patterns
+(export fun domainP (sym) (
+    (return (make_node2 Domain DontCare sym))
+    ))
+
+(export fun output_symbol (ochan sym) (
+    (var name (field_get sym @SymbolName))
+    (output_string ochan name)
+    (if (== (array_get char name 0) '%') (do
+        (output_int ochan (field_get sym @SymbolIndex))
+        ))
+    ;(output_string ochan (field_get sym @SymbolName))
+    ))
+
+; types
+(export var symT       (domainP Symbol))
+(export var boolT      (domainP Bool))
+(export var stringT    (domainP String))
+(export var intT       (domainP Int))
+(export var floatT     (domainP Float))
+(export var tableT     (domainP Table))
+
+(export var listT      (domainP List))
+(export var arrayT     (domainP Array))
+(export var tupleT     (domainP Tuple))
+(export var funT       (domainP Function))
+(export var irangeT    (make_node2 Range intT intT))
+
+; printing functions
+(fun type_string (type) (
+    (tswitch type (
+        (@ExprE               . (return (string "composite expression")))
+        (@ListE               . (return (string "List")))
+        (@TupleE              . (return (string "Tuple")))
+        (@ArrayE              . (return (string "Array")))
+        (@TableE              . (return (string "Table")))
+        (@NilE                . (return (string "Nil")))
+        (@UndefE              . (return (string "Undef")))
+        (@BoolE               . (return (string "Bool")))
+        (@SymbolE             . (return (string "Symbol")))
+        (@AssemblerE          . (return (string "Assembler")))
+        (@BytecodeE           . (return (string "Bytecode")))
+        (@FunctionE           . (return (string "Function")))
+        (@BuiltinFunctionE    . (return (string "Function")))
+        (@BoundFunctionE      . (return (string "Function")))
+        (@ContinuationE       . (return (string "Function")))
+        (@AliasE              . (return (string "Alias")))
+        (@InputFileStreamE    . (return (string "InputFileStream")))
+        (@OutputFileStreamE   . (return (string "OutputFileStream")))
+        (@InputStringStreamE  . (return (string "InputStringStream")))
+        (@OutputStringStreamE . (return (string "OutputStringStream")))
+        (@ParserE             . (return (string "Parser")))
+        (@BigIntE             . (return (string "Int")))
+        (@IntE                . (return (string "Int")))
+        (@StringE             . (return (string "String")))
+        (@FloatE              . (return (string "Float")))
+        (@BuiltinTypeE        . (return (string "BuiltinType")))
+        (default              . (not_reachable "output_type"))
+        ))
+    ))
+
+    ))

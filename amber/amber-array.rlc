@@ -1,0 +1,515 @@
+;
+; rowl - 1st generation
+; Copyright (C) 2012 nineties
+;
+; $Id: amber-array.rlc 2014-04-30 18:25:11 nineties $
+;
+
+(import "rlvm-compile")
+(import "amber-types")
+
+(compile `object `(
+
+(import "amber-util")
+(import "amber-node")
+(import "amber-object")
+(import "amber-compile")
+(import "amber-assemble")
+(import "amber-error")
+(import "amber-tuple")
+(import "amber-table")
+
+(extern object global)
+
+(fun index_out_of_range (ary idx) (
+    (throw (out_of_range ary (box idx)))
+    ))
+
+(export fun ary_new () (
+    (var capa 10)
+    (var buf (allocate_array capa))
+    (for i 0 capa (do
+        (array_set object buf i @C_NIL)
+        ))
+    (return (variant @ArrayE 1 buf 0 capa))
+    ))
+
+(export fun ary_new2 (f len) (
+    (if (! @(UFIX len))
+        (throw (invalid_argument (string "invalid length") len)))
+    (= len (unbox len))
+    (var buf (allocate_array len))
+    (var code (get_bytecode f))
+    (for i 0 len (do
+        (array_set object buf i (runcode code (box i)))
+        ))
+    (return (variant @ArrayE 1 buf len len))
+    ))
+
+(export fun array_buf (ary) (
+    (return (field_get ary 1))
+    ))
+
+(export fun array_size (ary) (
+    (return (field_get ary 2))
+    ))
+
+(export fun array_capa (ary) (
+    (return (field_get ary 3))
+    ))
+
+(export fun array_copy (ary) (
+    (var len (array_size ary))
+    (var buffrom (array_buf ary))
+    (var bufto (allocate_array len))
+    (for i 0 len (do
+        (array_set object bufto i (array_get object buffrom i))
+        ))
+    (return (variant @ArrayE 1 bufto len len))
+    ))
+
+(export fun ary_size (ary) (
+    (return (box (array_size ary)))
+    ))
+
+(fun ary_resize (ary new_size) (
+    (if (! @(UFIX new_size))
+        (throw (invalid_argument (string "invalid length") new_size)))
+    (return (array_resize ary (unbox new_size)))
+    ))
+
+(fun array_resize (ary new_size) (
+    (if (< new_size 0)
+        (throw (invalid_argument (string "size of array must not be negative") (box new_size)))
+        )
+    (var buf (array_buf ary))
+    (var size (array_size ary))
+    (var capa (array_capa ary))
+    (if (<= new_size size) (do
+        (for i new_size size (array_set object buf i @C_NIL))
+        (field_set ary 2 new_size)
+        (return ary)
+        ))
+    (if (<= new_size capa) (do
+        (field_set ary 2 new_size)
+        (return ary)
+        ))
+    (var new_buf (allocate_array new_size))
+    (memcpy new_buf buf (* 4 size))
+    (for i size new_size (array_set object new_buf i @C_NIL))
+    (field_set ary 1 new_buf)
+    (field_set ary 2 new_size)
+    (field_set ary 3 new_size)
+    (return ary)
+    ))
+
+(export fun array_at (ary i) (
+    (var size (array_size ary))
+    (var i_ i)
+    (if (< i 0) (+= i size))
+    (if (&& (>= i 0) (< i size))
+        (return (array_get object (array_buf ary) i)))
+    (index_out_of_range ary i_)
+    ))
+
+(export fun ary_at (ary i) (
+    (if (! @(FIX i))
+        (throw (invalid_argument (string "invalid index") i)))
+    (return (array_at ary (unbox i)))
+    ))
+
+(fun ary_sub (ary i len) (
+    (if (! @(FIX i))
+        (throw (invalid_argument (string "invalid index") i)))
+    (if (! @(UFIX len))
+        (throw (invalid_argument (string "invalid length") len)))
+    (= i (unbox i))
+    (= len (unbox len))
+    (var size (array_size ary))
+    (if (< i 0) (+= i size))
+    (if (< i 0) (throw (out_of_range ary (box (- i size)))))
+    (if (> (+ i len) size)
+        (= len (- size i))
+        )
+    (var buf (allocate_array len))
+    (memcpy buf (+ (array_buf ary) (* @WORD_SIZE i)) (* @WORD_SIZE len))
+    (return (variant @ArrayE 1 buf len len))
+    ))
+
+(export fun array_store (ary i v) (
+    (var size (array_size ary))
+    (var i_ i)
+    (if (< i 0) (+= i size))
+    (if (&& (>= i 0) (< i size)) (do
+        (array_set object (array_buf ary) i v)
+        (return v)
+        ))
+    (if (< i 0)
+        (throw (invalid_argument (string "invalid index") (box i_)))
+        )
+    (array_resize ary (+ i 1))
+    (array_set object (array_buf ary) i v)
+    (return v)
+    ))
+
+(export fun ary_store (ary i v) (
+    (if (! @(FIX i))
+        (throw (invalid_argument (string "invalid index") i)))
+    (return (array_store ary (unbox i) v))
+    ))
+
+(export fun ary_push (ary v) (
+    (ary_store ary (ary_size ary) v)
+    (return ary)
+    ))
+
+(export fun ary_pop (ary) (
+    (var n (array_size ary))
+    (if (== n 0)
+        (throw (logic_error1 (string "Can not pop element from empty array") ary)))
+    (var v (array_at ary (- n 1)))
+    (array_resize ary (- n 1))
+    (return v)
+    ))
+
+(export fun array_restof (ary i) (
+    (var ls 0)
+    (var size (array_size ary))
+    (var buf (array_buf ary))
+    (rfor j i size (do
+        (= ls (cons (array_get object buf j) ls))
+        ))
+    (return ls)
+    ))
+
+(export fun ary_to_list (ary) (
+    (var ls 0)
+    (var size (array_size ary))
+    (var buf (array_buf ary))
+    (rfor i 0 size (do
+        (= ls (cons (array_get object buf i) ls))
+        ))
+    (return ls)
+    ))
+
+(export fun list_to_ary (ls) (
+    (var size (list_len ls))
+    (var buf (allocate_array size))
+    (for i 0 size (do
+        (array_set object buf i (car ls))
+        (= ls (cdr ls))
+        ))
+    (return (variant @ArrayE 1 buf size size))
+    ))
+
+(export fun ary_include (ary v) (
+    (var eql (lookup_func global (to_sym "equal?")))
+    (for i 0 (array_size ary) (do
+        (if (!= (runcode eql v (array_at ary i)) @C_FALSE)
+            (return @C_TRUE)
+            )
+        ))
+    (return @C_FALSE)
+    ))
+
+(fun ary_reverse (ary) (
+    (var size (array_size ary))
+    (var newbuf (allocate_array size))
+    (var buf (array_buf ary))
+    (for i 0 size (do
+        (array_set object newbuf i
+            (array_get object buf (- (- size i) 1)))
+        ))
+    (return (variant @ArrayE 1 newbuf size size))
+    ))
+    
+(fun ary_reverse_bang (ary) (
+    (var size (array_size ary))
+    (var buf (array_buf ary))
+    (for i 0 (/ size 2) (do
+        (var j (- (- size 1) i))
+        (var a (array_get object buf i))
+        (var b (array_get object buf j))
+        (array_set object buf i b)
+        (array_set object buf j a)
+        ))
+    (return ary)
+    ))
+
+(fun ary_append (ary1 ary2) (
+    (var size1 (field_get ary1 2))
+    (var buf1  (field_get ary1 1))
+    (var size2 (field_get ary2 2))
+    (var buf2  (field_get ary2 1))
+    (var new_size (+ size1 size2))
+    (var new (allocate_array new_size))
+    (for i 0 size1 (do
+        (array_set object new i (array_get object buf1 i))
+        ))
+    (for i 0 size2 (do
+        (array_set object new (+ i size1) (array_get object buf2 i))
+        ))
+    (return (variant @ArrayE 1 new new_size new_size))
+    ))
+
+(fun ary_append_bang (ary1 ary2) (
+    (var size1 (field_get ary1 2))
+    (var size2 (field_get ary2 2))
+    (var new_size (+ size1 size2))
+    (array_resize ary1 new_size)
+    (var buf1  (field_get ary1 1))
+    (var buf2  (field_get ary2 1))
+    (for i 0 size2 
+        (array_set object buf1 (+ i size1) (array_get object buf2 i))
+        )
+    (return ary1)
+    ))
+
+(fun ary_diff (ary1 ary2) (
+    (var tbl (table_new))
+    (for i 0 (array_size ary2) (do
+        (table_store tbl (array_at ary2 i) @C_TRUE)
+        ))
+    (var new (ary_new))
+    (for i 0 (array_size ary1) (do
+        (var v (array_at ary1 i))
+        (if (!= (table_at tbl v) @C_FALSE) continue)
+        (ary_push new v)
+        ))
+    (return new)
+    ))
+
+(fun ary_diff_bang (ary1 ary2) (
+    (var tbl (table_new))
+    (for i 0 (array_size ary2) (do
+        (table_store tbl (array_at ary2 i) @C_TRUE)
+        ))
+    (var j 0)
+    (for i 0 (array_size ary1) (do
+        (var v (array_at ary1 i))
+        (if (!= (table_at tbl v) @C_FALSE) continue)
+        (array_store ary1 j v)
+        (+= j 1)
+        ))
+    (array_resize ary1 j)
+    (return ary1)
+    ))
+
+(fun ary_map (f ary) (
+    (var size (array_size ary))
+    (var buf  (array_buf ary))
+    (var newbuf (allocate_array size))
+    (var code (get_bytecode f))
+    (for i 0 size (do
+        (array_set object newbuf i (runcode code (array_get object buf i)))
+        ))
+    (return (variant @ArrayE 1 newbuf size size))
+    ))
+
+(fun ary_map_bang (f ary) (
+    (var size (array_size ary))
+    (var buf  (array_buf ary))
+    (var code (get_bytecode f))
+    (for i 0 size (do
+        (array_set object buf i (runcode code (array_get object buf i)))
+        ))
+    (return ary)
+    ))
+
+(fun ary_foldl (f v ary) (
+    (var buf (array_buf ary))
+    (var size (array_size ary))
+    (var code (get_bytecode f))
+    (for i 0 size (do
+        (= v (runcode code v (array_get object buf i)))
+        ))
+    (return v)
+    ))
+
+(fun ary_foldl1 (f ary) (
+    (var buf (array_buf ary))
+    (var size (array_size ary))
+    (var code (get_bytecode f))
+    (if (== size 0)
+        (throw (invalid_argument (string "foldl1 requires non-empty array") ary))
+        )
+    (var v (array_get object buf 0))
+    (for i 1 size (do
+        (= v (runcode code v (array_get object buf i)))
+        ))
+    (return v)
+    ))
+
+(fun ary_foldr (f ary v) (
+    (var buf (array_buf ary))
+    (var size (array_size ary))
+    (var code (get_bytecode f))
+    (rfor i 0 size (do
+        (= v (runcode code (array_get object buf i) v))
+        ))
+    (return v)
+    ))
+
+(fun ary_foldr1 (f ary) (
+    (var buf (array_buf ary))
+    (var size (array_size ary))
+    (var code (get_bytecode f))
+    (if (== size 0)
+        (throw (invalid_argument (string "foldr1 requires non-empty array") ary))
+        )
+    (var v (array_get object buf (- size 1)))
+    (rfor i 0 (- size 1) (do
+        (= v (runcode code (array_get object buf i) v))
+        ))
+    (return v)
+    ))
+
+(export fun ary_hash (ary) (
+    (var hash (lookup_func global (to_sym "hash")))
+    (var buf (array_buf ary))
+    (var size (array_size ary))
+    (var h (hashnext 0 (field_get Array @SymbolIndex)))
+    (for i 0 size (do
+        (= h (hashnext h (unbox (runcode hash (array_get object buf i)))))
+        ))
+    (return (box h))
+    ))
+
+; Inplace intro sort.
+(fun ary_sort_bang (ary cmp) (
+    (= cmp (get_bytecode cmp))
+    (var limit (* 2 (bsr (array_size ary))))
+    (intro_sort (array_buf ary) 0 (- (array_size ary) 1) cmp limit)
+    (return @C_NIL)
+    ))
+
+(fun compare (cmp a b) (
+    (var r (runcode cmp a b))
+    (if (! (& r 1))
+        (throw (logic_error (string "Comparison function must returns an integer.")))
+        )
+    (return (unbox r))
+    ))
+
+(fun select_pivot (buf beg end cmp) (
+    (var mid (/ (+ beg end) 2))
+    (var a (array_get object buf beg))
+    (var b (array_get object buf end))
+    (var c (array_get object buf mid))
+    (if (< (compare cmp a b) 0)
+        (if (< (compare cmp b c) 0)
+            (return end)
+            (if (< (compare cmp a c) 0)
+                (return mid)
+                (return beg)
+                )
+            )
+        (if (> (compare cmp b c) 0)
+            (return end)
+            (if (< (compare cmp a c) 0)
+                (return beg)
+                (return mid)
+                )
+            )
+        )
+    ))
+
+(fun intro_sort (buf beg end cmp limit) (
+    (if (>= beg end) return)
+
+    (var pivot_index (select_pivot buf beg end cmp))
+    (var pivot (array_get object buf pivot_index))
+
+    ; move pivot to the right most end.
+    (array_set object buf pivot_index (array_get object buf end))
+    (array_set object buf end pivot)
+    (var i beg)
+    (for j beg end (do
+        (var a (array_get object buf j))
+        (if (<= (compare cmp a pivot) 0)
+            (do
+                (var t a)
+                (array_set object buf j (array_get object buf i))
+                (array_set object buf i a)
+                (+= i 1)
+            ))
+        ))
+    (array_set object buf end (array_get object buf i))
+    (array_set object buf i pivot)
+    (intro_sort buf beg (- i 1) cmp (- limit 1))
+    (intro_sort buf (+ i 1) end cmp (- limit 1))
+    ))
+
+(fun ary_assoc (ary k) (
+    (var ls 0)
+    (var size (array_size ary))
+    (var buf (array_buf ary))
+    (var eql (lookup_func global (to_sym "equal?")))
+    (for i 0 size (do
+        (var t (array_get object buf i))
+        (if (|| (!= (node_type t) @TupleE) (!= (node_size t) 2))
+            (throw (exception1 (string "not a pair") t))
+            )
+        (if (!= (runcode eql k (node_arg t 0)) @C_FALSE)
+            (return (node_arg t 1))
+            )
+        ))
+    (return ary)
+    ))
+
+(fun ary_assoc_set (ary k v) (
+    (var ls 0)
+    (var size (array_size ary))
+    (var buf (array_buf ary))
+    (var eql (lookup_func global (to_sym "equal?")))
+    (for i 0 size (do
+        (var t (array_get object buf i))
+        (if (|| (!= (node_type t) @TupleE) (!= (node_size t) 2))
+            (throw (exception1 (string "not a pair") t))
+            )
+        (if (!= (runcode eql k (node_arg t 0)) @C_FALSE) (do
+            (node_arg_set t 1 v)
+            (return ary)
+            ))
+        ))
+    (ary_push ary (tuple2 k v))
+    (return ary)
+    ))
+
+(export fun setup_array (mod) (
+    (add_function0 mod (to_sym "array_new_empty") ary_new 0)
+    (add_function2 mod (to_sym "array_new") funT intT ary_new2 0)
+    (add_function1 mod (to_sym "list_to_array") listT list_to_ary 0)
+    (add_function1 mod (to_sym "array_to_list") arrayT ary_to_list 0)
+
+    (add_function1 mod (to_sym "array_length") arrayT ary_size 0)
+    (add_function1 mod (to_sym "array_size") arrayT ary_size 0)
+    (add_function2 mod (to_sym "array_resize") arrayT intT ary_resize 0)
+    (add_function2 mod (to_sym "array_at") arrayT intT ary_at 0)
+    (add_function3 mod (to_sym "array_sub") arrayT intT intT ary_sub 0)
+    (add_function3 mod (to_sym "array_store") arrayT intT DontCare ary_store 0)
+    (add_function2 mod (to_sym "array_push") arrayT DontCare ary_push 0)
+    (add_function1 mod (to_sym "array_pop") arrayT ary_pop 0)
+
+    (add_function2 mod (to_sym "array_include?") arrayT DontCare ary_include 0)
+    (add_function1 mod (to_sym "array_reverse") arrayT ary_reverse 0)
+    (add_function1 mod (to_sym "array_reverse!") arrayT ary_reverse_bang 0)
+    (add_function2 mod (to_sym "array_append") arrayT arrayT ary_append 0)
+    (add_function2 mod (to_sym "array_append!") arrayT arrayT ary_append_bang 0)
+    (add_function2 mod (to_sym "array_diff") arrayT arrayT ary_diff 0)
+    (add_function2 mod (to_sym "array_diff!") arrayT arrayT ary_diff_bang 0)
+    (add_function2 mod (to_sym "array_map") funT arrayT ary_map 0)
+    (add_function2 mod (to_sym "array_map!") funT arrayT ary_map_bang 0)
+    (add_function3 mod (to_sym "array_foldl") funT DontCare arrayT ary_foldl 0)
+    (add_function2 mod (to_sym "array_foldl1") funT arrayT ary_foldl1 0)
+    (add_function3 mod (to_sym "array_foldr") funT arrayT DontCare ary_foldr 0)
+    (add_function2 mod (to_sym "array_foldr1") funT arrayT ary_foldr1 0)
+
+    (add_function2 mod (to_sym "array_sort!") arrayT funT ary_sort_bang 0)
+
+    (add_function2 mod (to_sym "array_assoc") arrayT DontCare ary_assoc 0)
+    (add_function3 mod (to_sym "array_assoc_set!") arrayT DontCare DontCare ary_assoc_set 0)
+
+    ))
+
+    ))

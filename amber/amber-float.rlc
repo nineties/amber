@@ -1,0 +1,726 @@
+;
+; rowl - 1st generation
+; Copyright (C) 2012 nineties
+;
+; $Id: amber-float.rlc 2014-04-12 12:47:40 nineties $
+;
+
+; Since Amber has no 64-bit integer, this source code uses bignums instead.
+; It will be refined in newer version of Amber.
+
+(import "rlvm-compile")
+(import "amber-types")
+
+(var FORMAT_KMIN -4)
+
+(compile `object `(
+
+(import "amber-util")
+(import "amber-node")
+(import "amber-object")
+(import "amber-compile")
+(import "amber-assemble")
+(import "amber-error")
+(import "amber-base")
+(import "amber-numeric")
+
+(export fun pp_float (ochan f) (
+    (output_string ochan (float_to_s f (box 0)))
+    ))
+
+(export fun float_sign (f) (
+    (if (< (field_get f 1) 0)
+        (return @TRUE)
+        (return @FALSE)
+        )
+    ))
+
+(export fun float_is_zero (f) (
+    (if (&& (== (& (field_get f 1) 0x7fffffff) 0)
+            (== (field_get f 0) 0))
+        (return @TRUE)
+        (return @FALSE)
+        )
+    ))
+
+(export fun float_positive (f) (
+    (if (&& (! (float_sign f)) (! (float_is_zero f)))
+        (return @TRUE)
+        (return @FALSE)
+        )
+    ))
+
+; ==== translate ascii-string to floating-point number ====
+; Bellorphon-method
+; (cf. William D Clinger, "How to Read Floating Point Numbers Accurately")
+
+(var ten^9 (uint_to_bint 1000000000))
+
+(export fun float_from_s (str) (
+    ; "XXXX.YYYYeZZZZ" => f*10^e
+    (var p 0)
+    (var slen (strlen str))
+    (var sign 0)
+    (if (== (array_get char str 0) '-') (do
+        (= sign 1)
+        (+= p 1)
+        ))
+    (var f (box 0))
+    (var e 0)
+
+    (var mlen 0)
+    (var ndigit 0)
+    (while (< mlen slen) (do
+        (var c (array_get char str mlen))
+        (if (== c 'e') break)
+        (if (&& (!= c '.') (|| (> ndigit 0) (&& (<= '1' c) (<= c '9')))) (+= ndigit 1))
+        (+= mlen 1)
+        ))
+
+    (var mlen slen)
+    (while (&& (> mlen 0) (!= (array_get char str (- mlen 1)) 'e')) (-= mlen 1))
+    (if (== mlen 0)
+        (= mlen slen)
+        (-= mlen 1)
+        )
+
+    (var r (umod (- (- mlen p) 1) 9))
+    (while (< p mlen) (do
+        (var w 0)
+        (while (> r 0) (do
+            (var c (array_get char str p))
+            (if (== c '.') (do
+                (= e 0)
+                (+= p 1)
+                continue
+                ))
+            (if (|| (< c '0') (< '9' c))
+                (throw (value_error
+                    (string "Invalid floating-point format")
+                    (string str)))
+                )
+            (= w (+ (* 10 w) (- c '0')))
+            (-= r 1)
+            (+= p 1)
+            (-= e 1)
+            ))
+        (if (!= f 1)
+            (= f (mul f ten^9))
+            )
+        (= f (add f (box w)))
+        (= r 9)
+        ))
+    (if (== (array_get char str p) 'e') (do
+        (+= p 1)
+        (var neg @FALSE)
+        (if (== (array_get char str p) '-') (do (+= p 1) (= neg @TRUE)))
+        (var d 0) 
+        (while (< p slen) (do
+            (var c (array_get char str p))
+            (if (|| (< c '0') (< '9' c))
+                (throw (value_error
+                    (string "Invalid floating-point format")
+                    (string str)))
+                )
+            (= d (+ (* 10 d) (- c '0')))
+            (+= p 1)
+            ))
+        (if neg (= d (- d)))
+        (+= e d)
+        ))
+
+    (if (== f 1) (do (= ndigit 0) (= e 0)))
+    
+    (return (encode_float sign f ndigit e))
+    ))
+
+;; translate f*10^e to IEEE754 floating point
+(var two^10 (bigshl (uint_to_bint 1) 10))
+(var two^11 (bigshl (uint_to_bint 1) 11))
+(var two^52 (bigshl (uint_to_bint 1) 52))
+(var two^53 (bigshl (uint_to_bint 1) 53))
+(var two^63 (bigshl (uint_to_bint 1) 63))
+(var two^64 (bigshl (uint_to_bint 1) 64))
+
+; This implementation is not efficient.
+(fun encode_float (sign f n e) (
+    (if (bint_is_zero f) (return (float_zero sign)))
+
+    (= f (to_bint f))
+    (if (>= e 0)
+        (do
+            (while (>= e 9) (do
+                (= f (mul f ten^9))
+                (-= e 9)
+                ))
+            (while (> e 0) (do
+                (= f (mul f (box 10)))
+                (-= e 1)
+                ))
+            (= f (to_bint f))
+            (var nbits (bint_ndigits2 f))
+            (var exp (- nbits 1))
+            (var Rbit 0)
+            (var Gbit 0)
+            (if (> exp 1024) (if sign (return (float_uminus (float_infinity))) (return (float_infinity))))
+            (if (> nbits 53)
+                (do
+                    ; check R and G bit
+                    (var w (- nbits 54))
+                    (var i 0)
+                    (while (>= w 32) (do
+                        (if (!= (bint_digit f i) 0) (= Rbit 1))
+                        (+= i 1)
+                        (-= w 32)
+                        ))
+                    (if (& (bint_digit f i) (- (<< 1 w) 1)) (= Rbit 1))
+                    (if (& (bint_digit f i) (<< 1 w)) (= Gbit 1))
+
+                    (bigshr f (- nbits 53))
+                )
+            (if (< nbits 53) (bigshr f (- nbits 53))))
+            (var lo (bint_digit f 0))
+            (var ulp (& lo 1))
+            (if (&& Gbit (|| ulp Rbit))
+                (= f (to_bint (add f (box 1))))
+                )
+            (= nbits (bint_ndigits2 f))
+            (if (!= nbits 53) (bigshr f (- nbits 53)))
+            (= lo (bint_digit f 0))
+            (var hi (bint_digit f 1))
+            (= hi (| (& hi 0xfffff) (<< (& (+ exp 1023) 0x7ff) 20)))
+            (if sign (= hi (| hi 0x80000000)))
+            (var float (allocate_float))
+            (field_set float 0 lo)
+            (field_set float 1 hi)
+            (return float)
+        )
+        (do
+            (= e (- e))
+            (var n (bint_ndigits2 f))
+            (var p (+ (- 55 (- n 1)) (* e 4)))
+            (var Rbit 0)
+            (var Gbit 0)
+            (bigshl f p)
+
+            ; create 10^e
+            (var b (box 1))
+            (while (>= e 9) (do
+                (= b (mul b ten^9))
+                (-= e 9)
+                ))
+            (while (> e 0) (do
+                (= b (mul b (box 10)))
+                (-= e 1)
+                ))
+            (if (! (bint_is_zero (bigdiv f (to_bint b)))) (= Rbit 1))
+            (var nbits (bint_ndigits2 f))
+            (if (> nbits 53) (do
+                ; check R and G bit
+                (var w (- nbits 54))
+                (var i 0)
+                (while (>= w 32) (do
+                    (if (!= (bint_digit f i) 0) (= Rbit 1))
+                    (+= i 1)
+                    (-= w 32)
+                    ))
+                (if (& (bint_digit f i) (- (<< 1 w) 1)) (= Rbit 1))
+                (if (& (bint_digit f i) (<< 1 w)) (= Gbit 1))
+
+                (bigshr f (- nbits 53))
+                (-= p (- nbits 53))
+                ))
+            (var lo (bint_digit f 0))
+            (var ulp (& lo 1))
+            (if (&& Gbit (|| ulp Rbit)) (do
+                (= f (to_bint (add f (box 1))))
+                ))
+            (= nbits (bint_ndigits2 f))
+            (if (!= nbits 53) (bigshr f (- nbits 53)))
+            (var exp (- (- nbits  p) 1))
+            (if (< exp -1022) (do
+                ; denormal number
+                (if (<= exp -1075) (return (float_zero sign)))
+                (var w (- (+ exp 1022)))
+                (= Rbit 0)
+                (= Gbit 0)
+                (= ulp 0)
+                (if (& (- (<< 1 (- w 1)) 1) (bint_digit f 0)) (= Rbit 1))
+                (if (& (<< 1 (- w 1)) (bint_digit f 0)) (= Gbit 1))
+                (if (& (<< 1 w) (bint_digit f 0)) (= ulp 1))
+                (bigshr f w)
+                (if (&& Gbit (|| ulp Rbit)) (= f (to_bint (add f (box 1)))))
+                (= exp -1023)
+                ))
+            (= lo (bint_digit f 0))
+            (var hi (bint_digit f 1))
+            (= hi (| (& hi 0xfffff) (<< (& (+ exp 1023) 0x7ff) 20)))
+            (if sign (= hi (| hi 0x80000000)))
+            (var float (allocate_float))
+            (field_set float 0 lo)
+            (field_set float 1 hi)
+            (return float)
+        ))
+    ))
+
+; ==== translate floating-point number to ascii-string ====
+
+(fun float_to_s (v prec) (
+    (if (|| (! (& prec 1)) (< prec 0))
+
+        (throw (invalid_argument (string "Invalid precision") prec))
+        )
+    (= prec (unbox prec))
+
+    (var s 0)
+    (var f0 (field_get v 0))
+    (var f1 (field_get v 1))
+    (if (& f1 0x80000000) (do
+        (= s 1)
+        (= f1 (& f1 0x7fffffff))
+        ))
+    (if (&& (! f0) (! f1)) (do
+        (if s
+            (return (string "-0.0"))
+            (return (string "0.0"))
+        )))
+    (var e (- (& (>> f1 20) 0x7ff) 1023))
+    (= f1 (& f1 0xfffff))
+    
+    (if (== e 1024)
+        (if (&& (== f1 0) (== f0 0))
+            (if s
+                (return (string "-infinity"))
+                (return (string "infinity"))
+                )
+            (return (string "NaN"))
+            )
+        )
+
+    (var f (allocate_bint 2))
+    (field_set f 1 2)
+    (bint_set_digit f 0 f0)
+
+    (if (== e -1023)
+        (do
+            (bint_set_digit f 1 f1)
+            (= e -1022)
+        )
+        (bint_set_digit f 1 (| f1 (<< 1 20)))
+        )
+    (return (decode_float s f e prec))
+    ))
+
+; v: abs of input floating-point number.
+; f: mantissa (bigint)
+; e: exponent
+(var ten (int_to_bint 10))
+(fun decode_float (sign f e prec) (
+    (-= e 52)
+
+    ; find k s.t. 10^k <= f*2^e < 10^(k+1) by linear search.
+    ; It is not efficient.
+    (var f_save (copy_bint f))
+    (var k 0)
+    (if (>= e 0)
+        (do
+            (bigshl f e)
+            (var b (int_to_bint 1))
+            (while (>= (bigcmp f b) 0) (do
+                (bigmul b ten)
+                (+= k 1)
+                ))
+            (-= k 1)
+        )
+        (do
+            (var b (int_to_bint 1))
+            (bigshl b (- e))
+            (if (>= (bigcmp f b) 0)
+                (do
+                    (while (>= (bigcmp f b) 0) (do
+                        (bigmul b ten)
+                        (+= k 1)
+                        ))
+                    (-= k 1)
+                )
+                (do
+                    (while (< (bigcmp f b) 0) (do
+                        (bigmul f ten)
+                        (-= k 1)
+                        ))
+                ))
+        ))
+    (= f f_save)
+
+    ; modify precision
+    (var p 0)
+    (if (== prec 0) (= p 15)
+    (if (>= k 0)    (= p (+ k prec))
+                    (= p (- prec 1))
+                    ))
+
+    ; find integer m (10^p <= m < 10^(p+1)) s.t. 
+    ; m * 10^(k-p) <= f*2^e < (m+1) * 10^(k-p)
+    ; by binary search
+    ; I want to find the closest 
+
+    (var left (uint_to_bint 1))
+    (var right (uint_to_bint 10))
+    (for i 0 p (do
+        (bigmul left ten)
+        (bigmul right ten)
+        ))
+    (var b (int_to_bint 1))
+    (var kk (- k p))
+    (if (< kk 0) (= kk (- kk)))
+    (while (> kk 0) (do (bigmul b ten) (-= kk 1)))
+    (var m 0)
+    (var m2 0)
+    (var f2 (copy_bint f))
+    (if (>= e 0) (bigshl f2 e))
+    (if (< k p) (bigmul f2 b))
+    (while @TRUE (do
+        (= m (copy_bint left))
+        (bigadd m right)
+        (= m2 (copy_bint m))
+        (if (< e 0) (bigshl m2 (- e)))
+        (if (>= k p) (bigmul m2 b))
+        (bigshr m 1)
+        (bigshr m2 1)
+        (if (<= (bigcmp m2 f2) 0)
+            (do
+                (if (== (bigcmp left m) 0) (do
+                    (= m right)
+                    break
+                    ))
+                (= left m)
+            )
+            (do
+                (if (== (bigcmp right m) 0) (do
+                    (= m left)
+                    break
+                    ))
+                (= right m)
+            )
+            )
+        ))
+    (var digits (bint_to_s m (box 10) (box 0) @C_FALSE @C_FALSE @C_FALSE))
+    (var exp (- k p))
+    (if (== prec 0) (do
+        (rfor i 0 (strlen digits) (do
+            (if (== (array_get char digits i) '0')
+                (do
+                    (array_set char digits i '\0')
+                    (+= exp 1)
+                )
+                break
+                )
+            ))
+        ))
+    (var n (strlen digits))
+    (= k (+ exp n))
+    (return (format_float sign k digits n))
+    ))
+
+; Format  0.d1 d2 ... dn 10^k to
+; d1 d2 ..... dn . 0           (when n = k)
+; d1 d2 ... dk . d(k+1) ... dn (when k > 0 and n > k)
+; d1 . d2 ... dn e(k-1)        (when k > 0 and n < k) 
+; 0.0 0 0 0 d1 ... dn          (when kmin < k <= 0)
+; d1 . d2 ... dn e(k-1)        (when k <= kmin)
+(fun format_float (sign k ds n) (
+    (var len n)
+    (if sign (+= len 1))
+    (if (== n k) (do
+        (var s (allocate_string (+ len 2)))
+        (var i 0)
+        (if sign (do (array_set char s 0 '-') (+= i 1)))
+        (for j 0 n (do
+            (array_set char s i (array_get char ds j))
+            (+= i 1)
+            ))
+        (array_set char s i '.')
+        (array_set char s (+ i 1) '0')
+        (return s)
+        ))
+    (if (&& (> k 0) (> n k))
+        (do
+            (var s (allocate_string (+ len 1)))
+            (var i 0)
+            (if sign (do (array_set char s 0 '-') (+= i 1)))
+            (for j 0 n (do
+                (if (== j k) (do
+                    (array_set char s i '.')
+                    (+= i 1)
+                    ))
+                (array_set char s i (array_get char ds j))
+                (+= i 1)
+                ))
+            (return s)
+        )
+    (if (|| (&& (> k 0) (< n k)) (<= k @FORMAT_KMIN))
+        (do
+            (var s (allocate_string (+ len 8)))
+            (var i 0)
+            (if sign (do (array_set char s 0 '-') (+= i 1)))
+            (array_set char s i (array_get char ds 0))
+            (array_set char s (+ i 1) '.')
+            (+= i 2)
+            (if (== n 1)
+                (do (array_set char s i '0') (+= i 1))
+                (for j 1 n (do
+                    (array_set char s i (array_get char ds j))
+                    (+= i 1)
+                    ))
+                )
+            (array_set char s i 'e')
+            (+= i 1)
+            
+            (-= k 1)
+            (if (< k 0) (do
+                (array_set char s i '-')
+                (+= i 1)
+                (= k (- k))))
+            (var d 1000)
+            (while (== (/ k d) 0) (/= d 10))
+            (while (> d 0) (do
+                (array_set char s i (+ (/ k d) '0'))
+                (%= k d)
+                (/= d 10)
+                (+= i 1)
+                ))
+            (return s)
+        )))
+    (var s (allocate_string (+ (+ len (- k)) 2)))
+    (var i 0)
+    (if sign (do (array_set char s 0 '-') (+= i 1)))
+    (array_set char s i '0')
+    (array_set char s (+ i 1) '.')
+    (+= i 2)
+    (= k (- k))
+    (while (> k 0) (do
+        (array_set char s i '0')
+        (+= i 1)
+        (-= k 1)
+        ))
+    (for j 0 n (do
+        (array_set char s i (array_get char ds j))
+        (+= i 1)
+        ))
+    (return s)
+    ))
+
+;(fun generate (ds i r s mp mm B low_ok high_ok) (
+;    (var d (bigmul (copy_bint r) B))
+;    (= r (bigdiv d s))
+;    (= mp (bigmul mp B))
+;    (= mm (bigmul mm B))
+;    (var rmp (bigadd (copy_bint r) mp))
+;    (var tc1 (|| (&& low_ok (<= (bigcmp r mm) 0))
+;                 (&& (! low_ok) (< (bigcmp r mm) 0))))
+;    (var tc2 (|| (&& high_ok (>= (bigcmp rmp s) 0))
+;                 (&& (! high_ok) (> (bigcmp rmp s) 0))))
+;    (if (! tc1)
+;        (if (! tc2)
+;            (do
+;                (array_set char ds i (+ (bint_digit d 0) '0'))
+;                (return (generate ds (+ i 1) r s mp mm B low_ok high_ok))
+;            )
+;            (do
+;                (array_set char ds i (+ (bint_digit d 0) '1'))
+;                (return (+ i 1))
+;            ))
+;        (if (! tc2)
+;            (do
+;                (array_set char ds i (+ (bint_digit d 0) '0'))
+;                (return (+ i 1))
+;            )
+;            (if (< (bigcmp (bigshl r 1) s) 0)
+;                (do
+;                    (array_set char ds i (+ (bint_digit d 0) '0'))
+;                    (return (+ i 1))
+;                )
+;                (do
+;                    (array_set char ds i (+ (bint_digit d 0) '1'))
+;                    (return (+ i 1))
+;                ))
+;            ))
+;    ))
+
+(fun float_zero (sign) (
+    (var float (allocate_float))
+    (field_set float 0 0)
+    (if sign
+        (field_set float 1 0x80000000)
+        (field_set float 1 0)
+        )
+    (return float)
+    ))
+
+(export fun float_infinity () (
+    (return (fdiv (itof 1) (itof 0)))
+    ))
+
+(fun float_uplus (f) (
+    (return f)
+    ))
+
+(export fun float_uminus (f) (
+    (return (f- (copy_float f)))
+    ))
+
+(export fun float_hash (f) (
+    (var w0 (field_get f 0))
+    (var w1 (field_get f 1))
+    (return (box (hashnext (hashnext 0 w0) w1)))
+    ))
+
+(fun float_to_i (f) (
+    (var w0 (field_get f 0))
+    (var w1 (field_get f 1))
+    (var sign 0)
+    (if (& w1 0x80000000) (= sign 1))
+    (var e (- (& (>> w1 20) 0x7ff) 1023))
+    (= w1 (| (& w1 0xfffff) 0x100000))
+    (if (< e 0) (return (box 0)))
+    (var shift (- 52 e))
+    (var b (allocate_bint 2))
+    (bint_set_digit b 0 w0)
+    (bint_set_digit b 1 w1)
+    (field_set b 1 2)
+    (if sign (bigneg b))
+    (return (norm (bint_rshift b (box shift))))
+    ))
+
+(export fun uitof (n) (
+    (if (>= n 0) (return (itof n)))
+    (var f (allocate_float))
+    (&= n 0x7fffffff)
+    ; exp = 31 because n >= 2^31
+    (field_set f 1 (| @(<< (+ 31 1023) 20) (>> n 11)))
+    (field_set f 0 (<< n 21))
+    (return f)
+    ))
+
+(fun str_to_f (s) (
+    (return (float_from_s s))
+    ))
+
+(fun float_add (a b) (
+    (= a (copy_float a))
+    (return (fadd a b))
+    ))
+(fun float_sub (a b) (
+    (= a (copy_float a))
+    (return (fsub a b))
+    ))
+(fun float_mul (a b) (
+    (= a (copy_float a))
+    (return (fmul a b))
+    ))
+(fun float_div (a b) (
+    ; normalization
+    (if (< (field_get b 1) 0)
+        (do
+            (= a (f- (copy_float a)))
+            (= b (f- (copy_float b)))
+        )
+        (= a (copy_float a))
+        )
+    (return (fdiv a b))
+    ))
+
+(fun float_compare (a b) (
+    (if (f< a b) (return (box -1))
+    (if (f== a b) (return (box 0))
+        (return (box 1))
+        ))
+    ))
+(export fun float_equal (a b) ((if (f== a b) (return @C_TRUE) (return @C_FALSE))))
+
+(fun float_abs (n) (
+    (return (fabs n))
+    ))
+
+(fun float_ipow (f n) (
+    (var v (itof 1))
+    (= n (unbox n))
+    (var m 0x40000000)
+    (while (! (& n m)) (>>= m 1))
+    (while (> m 0) (do
+        (fmul v v)
+        (if (& n m) (fmul v f))
+        (>>= m 1)
+        ))
+    (return v)
+    ))
+
+(fun float_fpow (f g) (
+    (= f (copy_float f))
+    (return (fpow f g))
+    ))
+
+(fun float_ceil (f) (
+    (var w0 (field_get f 0))
+    (var w1 (field_get f 1))
+    (var sign 0)
+    (if (& w1 0x80000000) (= sign 1))
+    (var e (- (& (>> w1 20) 0x7ff) 1023))
+    (= w1 (| (& w1 0xfffff) 0x100000))
+    (if (< e 0)
+        (if sign (return (box 0)) (return (box 1)))
+        )
+    (var shift (- 52 e))
+    (var b (allocate_bint 2))
+    (bint_set_digit b 0 w0)
+    (bint_set_digit b 1 w1)
+    (field_set b 1 2)
+    (if (<= shift 0)
+        ; The result is an integer.
+        (return (norm (bigshr b shift)))
+        )
+    (if sign (do
+        (bigshr b shift)
+        (return (norm (bigneg b)))
+        ))
+    (var round @FALSE)
+    (var x (bint_sub_bang (bint_lshift (box 1) (box shift)) (box 1)))
+    (var u (bint_land_bang x b))
+    (if (!= u (box 0))
+        (= round @TRUE)
+        )
+    (bigshr b shift)
+    (if round
+        (return (norm (bigadd b (uint_to_bint 1))))
+        (return (norm b))
+        )
+    ))
+
+(fun float_floor (f) (
+    (return (bint_uminus (float_ceil (float_uminus f))))
+    ))
+
+(export fun setup_float (mod) (
+    (set_slot mod (to_sym "infinity") (float_infinity))
+
+    (add_function1 mod (to_sym "float_uplus") floatT float_uplus 0)
+    (add_function1 mod (to_sym "float_uminus") floatT float_uminus 0)
+    (add_function2 mod (to_sym "float_to_string") floatT intT float_to_s 0)
+    (add_function1 mod (to_sym "float_to_int") floatT float_to_i 0)
+    (add_function1 mod (to_sym "string_to_float") stringT str_to_f 0)
+    
+    (add_function2 mod (to_sym "float_add") floatT floatT float_add 0)
+    (add_function2 mod (to_sym "float_sub") floatT floatT float_sub 0)
+    (add_function2 mod (to_sym "float_mul") floatT floatT float_mul 0)
+    (add_function2 mod (to_sym "float_div") floatT floatT float_div 0)
+    (add_function2 mod (to_sym "float_pow") floatT intT float_ipow 0)
+    (add_function2 mod (to_sym "float_pow") floatT floatT float_fpow 0)
+    (add_function2 mod (to_sym "float_compare") floatT floatT float_compare 0)
+    (add_function2 mod (to_sym "float_equalual?") floatT floatT float_equal 0)
+    (add_function1 mod (to_sym "float_floor") floatT float_floor 0)
+    (add_function1 mod (to_sym "float_ceil") floatT float_ceil 0)
+
+    (add_function1 mod (to_sym "float_abs") floatT float_abs 0)
+    ))
+
+   ))

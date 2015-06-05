@@ -1,0 +1,446 @@
+;
+; rowl - 1st generation
+; Copyright (C) 2010 nineties
+;
+; $Id: amber-assemble.rlc 2014-02-18 15:06:40 nineties $
+;
+
+; -- Just in time assembler
+; (byte code (cvector), labels (ivector), replaces (list of repl info),
+;  address of objects to be GCed (ivector), vector of the objects)
+; -- repl info
+; (pointer to the next info, index of the labels, offset of operand)
+
+(import "rlvm-compile")
+(import "amber-types")
+
+(var insn_name_values ())
+(var insn_len_values ())
+(var tswitch_entries ())
+
+(var print_func `(
+    (byte   . (do (output_opd_byte ochan ptr i) (+= i 1)))
+    (short  . (do (output_opd_short ochan ptr i) (+= i 2)))
+    (ushort . (do (output_opd_short ochan ptr i) (+= i 2)))
+    (int    . (do (output_opd_int ochan ptr i) (+= i 4)))
+    (prim   . (do (output_opd_prim ochan ptr i) (+= i 2)))
+    (addr   . (do (output_opd_short ochan ptr i) (+= i 2)))
+    (laddr  . (do (output_opd_int ochan ptr i) (+= i 4)))
+    (object . (do (output_opd_object ochan ptr i) (+= i 4)))
+    ))
+
+(var code 0)
+(foreach i vm_instructions (do
+    (var name (symbol2s (car i)))
+    (push insn_name_values name)
+    (var operands (cadr i))
+    (if operands
+        (push tswitch_entries
+            `(@code . (do (do . @(map (lambda (o) (assoc o print_func)) operands)) break)))
+        (push tswitch_entries
+            `(@code . break))
+            )
+    (incr code)
+    ))
+(set insn_name_values (reverse insn_name_values))
+
+(push tswitch_entries `(default . nop))
+(set tswitch_entries (reverse tswitch_entries))
+
+(var prim_name_values (map (lambda (ent) (symbol2s (car ent))) prim_table))
+
+(var code-base `(
+(import "amber-node")
+(import "amber-util")
+
+(export fun make_assembler () (
+    (return (variant @AssemblerE 5 (make_cvector 0) (make_ivector 0) 0 (make_ivector 0) (make_vector 0)))
+    ))
+
+(export fun get_code (c) (
+    (if (field_get c 3) (replace_labels c))
+    (var code (field_get c 1))
+    (var addrs (field_get c 4))
+    (var objs (field_get c 5))
+    (return (make_bytecode (cvector_raw code) (cvector_size code)
+        (ivector_raw addrs) (vector_raw objs) (ivector_size addrs)))
+    ))
+
+(export fun get_address (c) (
+    (return (cvector_size (field_get c 1)))
+    ))
+
+; aliases
+(export fun put_zero (c)   ((put_imm_i0 c)))
+(export fun put_undef (c)  ((put_imm_int c @C_UNDEF)))
+(export fun put_nil (c)    ((put_imm_int c @C_NIL)))
+(export fun put_true (c)   ((put_imm_int c @C_TRUE)))
+(export fun put_false (c)  ((put_imm_int c @C_FALSE)))
+(export fun put_car (c)    ((put_field_get0 c)))
+(export fun put_cdr (c)    ((put_field_get1 c)))
+(export fun put_setcar (c) ((put_field_set0 c)))
+(export fun put_setcdr (c) ((put_field_set1 c)))
+
+(export fun put_expr_head (c) ((put_fieldget c 0)))
+
+(export fun put_code (c code) (
+    ; setup object addresses
+    (var offs (cvector_size (field_get c 1)))
+    (var addrs_to (field_get c 4))
+    (var objs (field_get c 5))
+    (var addrs_from (bytecode_addrs code))
+    (var nobj (bytecode_nobj code))
+    (var seq (bytecode_ptr code))
+    (for i 0 nobj (do
+        (var addr (array_get int addrs_from i))
+        (ivector_pushback addrs_to (+ offs addr))
+        (vector_pushback objs (array_get object (+ seq addr) 0))
+        ))
+
+    ; copy bytecode
+    (var len (bytecode_size code))
+    (var cvec (field_get c 1))
+    (cvector_assign cvec (cvector_size cvec) seq len)
+    ))
+
+(export fun put_imm_int (c value) (
+    (if (== value -1) (do
+        (put_imm_im1 c)
+        return
+        ))
+    (tswitch value (
+        (0 . (do (put_imm_i0 c) return))
+        (1 . (do (put_imm_i1 c) return))
+        (2 . (do (put_imm_i2 c) return))
+        (3 . (do (put_imm_i3 c) return))
+        (4 . (do (put_imm_i4 c) return))
+        (5 . (do (put_imm_i5 c) return))
+        (default . break)
+        ))
+    (if (&& (<= -32768 value) (<= value 32767))
+        (put_imm_int16 c value)
+        (put_imm_int32 c value)
+        )
+    ))
+
+(export fun put_arg (c idx) (
+    (tswitch idx (
+        (0 . (do (put_arg0 c) return))
+        (1 . (do (put_arg1 c) return))
+        (2 . (do (put_arg2 c) return))
+        (3 . (do (put_arg3 c) return))
+        (4 . (do (put_arg4 c) return))
+        (default . (do
+            (put_loadl c (* 4 (+ 6 idx)))
+            return
+            ))
+        ))
+    ))
+
+(export fun put_store_arg (c idx) (
+    (put_storel c (* 4 (+ 6 idx)))
+    ))
+
+(export fun put_store_lvar (c idx) (
+    (tswitch idx (
+        (0 . (do (put_storel0 c) return))
+        (1 . (do (put_storel1 c) return))
+        (2 . (do (put_storel2 c) return))
+        (3 . (do (put_storel3 c) return))
+        (4 . (do (put_storel4 c) return))
+        (5 . (do (put_storel5 c) return))
+        (default . (do
+            (put_storel c (* -4 (+ 1 idx)))
+            return
+            ))
+        ))
+    ))
+
+(export fun put_load_lvar (c idx) (
+    (tswitch idx (
+        (0 . (do (put_loadl0 c) return))
+        (1 . (do (put_loadl1 c) return))
+        (2 . (do (put_loadl2 c) return))
+        (3 . (do (put_loadl3 c) return))
+        (4 . (do (put_loadl4 c) return))
+        (5 . (do (put_loadl5 c) return))
+        (default . (do
+            (put_loadl c (* -4 (+ 1 idx)))
+            return
+            ))
+        ))
+    ))
+
+(export fun put_load_closure (c) (
+    (put_loadl c 12)
+    ))
+(export fun put_store_closure (c) (
+    (put_storel c 12)
+    ))
+
+(export fun put_fieldget (c idx) (
+    (tswitch idx (
+        (0 . (do (put_field_get0 c) return))
+        (1 . (do (put_field_get1 c) return))
+        (2 . (do (put_field_get2 c) return))
+        (3 . (do (put_field_get3 c) return))
+        (4 . (do (put_field_get4 c) return))
+        (5 . (do (put_field_get5 c) return))
+        (default . (do
+            (put_field_get c idx)
+            return
+            ))
+        ))
+    ))
+
+(export fun put_fieldset (c idx) (
+    (tswitch idx (
+        (0 . (do (put_field_set0 c) return))
+        (1 . (do (put_field_set1 c) return))
+        (2 . (do (put_field_set2 c) return))
+        (3 . (do (put_field_set3 c) return))
+        (4 . (do (put_field_set4 c) return))
+        (5 . (do (put_field_set5 c) return))
+        (default . (do
+            (put_field_set c idx)
+            return
+            ))
+        ))
+    ))
+
+(fun emit_byte (c v) (
+    (cvector_pushback (field_get c 1) v)
+    ))
+
+(fun emit_short (c v) (
+    (var vec (field_get c 1))
+    (cvector_pushback vec (& v 0xff))
+    (cvector_pushback vec (>> v 8))
+    ))
+
+(export fun emit_int (c v) (
+    (var vec (field_get c 1))
+    (cvector_pushback vec (& v 0xff))
+    (cvector_pushback vec (& (>> v 8) 0xff))
+    (cvector_pushback vec (& (>> v 16) 0xff))
+    (cvector_pushback vec (& (>> v 24) 0xff))
+    ))
+
+(fun emit_prim (c v) (
+    (emit_short c (& v 0xffff))
+    ))
+
+(fun emit_object (c obj) (
+    (var offs (cvector_size (field_get c 1)))
+    (ivector_pushback (field_get c 4) offs)
+    (vector_pushback (field_get c 5) obj)
+    (emit_int c 0)
+    ))
+
+(export fun put_operand_byte (c addr v) (
+    (var vec (field_get c 1))
+    (cvector_put vec addr (& v 0xff))
+    ))
+
+(export fun put_operand_short (c addr v) (
+    (var vec (field_get c 1))
+    (cvector_put vec addr (& v 0xff))
+    (cvector_put vec (+ addr 1) (& (>> v 8) 0xff))
+    ))
+
+(export fun put_operand_int (c addr v) (
+    (var vec (field_get c 1))
+    (cvector_put vec addr (& v 0xff))
+    (cvector_put vec (+ addr 1) (& (>> v 8) 0xff))
+    (cvector_put vec (+ addr 2) (& (>> v 16) 0xff))
+    (cvector_put vec (+ addr 3) (& (>> v 24) 0xff))
+    ))
+
+(export fun fresh_label (c) (
+    (var lbls (field_get c 2))
+    (var n (ivector_size lbls))
+    (ivector_pushback lbls -1)
+    (return n)
+    ))
+
+(export fun set_label (c v) (
+    (var addr (get_address c))
+    (ivector_put (field_get c 2) v addr)
+    ))
+
+(export fun emit_addr (c v) (
+    (var offs (get_address c))
+    (var info (struct 1 (field_get c 3) v offs (- offs 1)))
+    (field_set c 3 info)
+    (emit_short c 0)
+    ))
+
+(export fun emit_laddr (c v) (
+    (var offs (get_address c))
+    (var info (struct 1 (field_get c 3) v offs (- offs 1)))
+    (field_set c 3 info)
+    (emit_int c 0)
+    ))
+
+(export fun emit_tswitch_label (c v) (
+    (var offs (get_address c))
+    (var info (struct 1 (field_get c 3) v offs offs))
+    (field_set c 3 info)
+    (emit_short c 0)
+    ))
+
+(export fun emit_lswitch_label (c v) (
+    (var offs (get_address c))
+    (var info (struct 1 (field_get c 3) v offs (- offs 4)))
+    (field_set c 3 info)
+    (emit_short c 0)
+    ))
+
+(fun replace_labels (c) (
+    (var repls (field_get c 3))
+    (var vec (field_get c 1))
+    (var labels (field_get c 2))
+    (while repls (do
+        (var label (field_get repls 1))
+        (var pos   (field_get repls 2))
+        (var offs  (field_get repls 3))
+        (if (>= label (ivector_size labels)) (error "undefined label"))
+        (var addr (ivector_at labels label))
+        (if (< addr 0) (error "undefined label"))
+        (-= addr offs)
+        (if (|| (>= addr 32767) (<= addr -32768)) (error "address overflow"))
+        (cvector_put vec pos (& addr 0xff))
+        (cvector_put vec (+ pos 1) (>> addr 8))
+        (= repls (field_get repls 0))
+        ))
+    (field_set c 3 0)
+    ))
+
+; Disassembler (for debug)
+
+(array string insn_names @insn_name_values)
+(array string prim_names @prim_name_values)
+
+(export fun print_bytecode (ochan code) (
+    (output_string ochan "bytecode<0x")
+    (output_hex ochan code 8)
+    (output_string ochan ">\n")
+    (var size (bytecode_size code))
+    (var ptr (bytecode_ptr code))
+    (var i 0)
+    (while (< i size) (do
+        (var byte (array_get uchar (+ ptr i) 0))
+        (output_string ochan "[")
+        (output_hex ochan (+ ptr i) 8)
+        (output_string ochan "] ")
+        (output_int ochan i)
+        (output_string ochan "\t: ")
+        (var name (array_get string insn_names byte))
+        (output_string ochan name)
+        (+= i 1)
+        (if (streq "tswitch" name)
+            (do
+                ; output jump table
+                (var ncases (array_get short (+ ptr i) 0))
+                (output_char ochan ' ')
+                (output_int ochan ncases)
+                (output_char ochan '\n')
+                (+= i 2)
+                (for j 0 (+ ncases 1) (do
+                    (var addr (array_get short (+ ptr i) 0))
+                    (output_string ochan "\t")
+                    (output_int ochan j)
+                    (output_string ochan " -> ")
+                    (output_int ochan (+ i addr))
+                    (output_char ochan '\n')
+                    (+= i 2)
+                    ))
+            )
+        (if (streq "lswitch" name)
+            (do
+                (var max (array_get int (+ ptr i) 0))
+                (output_char ochan ' ')
+                (output_int ochan max)
+                (output_char ochan '\n')
+                (+= i 4)
+                (while @TRUE (do
+                    (var val (array_get int (+ ptr i) 0))
+                    (+= i 4)
+                    (var addr (array_get short (+ ptr i) 0))
+                    (+= i 2)
+                    (output_string ochan "\t")
+                    (output_int ochan val)
+                    (output_string ochan " -> ")
+                    (output_int ochan (+ (- i 6) addr))
+                    (output_char ochan '\n')
+                    (if (== val max) break)
+                    ))
+            )
+            (do
+                (tswitch byte @tswitch_entries)
+                (output_char ochan '\n')
+            )
+            ))
+        ))
+    ))
+
+(fun output_opd_byte (ochan ptr i) (
+    (output_char ochan ' ')
+    (output_int ochan (array_get char (+ ptr i) 0))
+    ))
+
+(fun output_opd_short (ochan ptr i) (
+    (output_char ochan ' ')
+    (output_int ochan (array_get short (+ ptr i) 0))
+    ))
+
+(fun output_opd_int (ochan ptr i) (
+    (output_char ochan ' ')
+    (output_int ochan (array_get int (+ ptr i) 0))
+    ))
+
+(extern fun pprint)
+(fun output_opd_object (ochan ptr i) (
+    (output_char ochan ' ')
+    (pprint ochan (array_get int (+ ptr i) 0))
+    ))
+
+(fun output_opd_prim (ochan ptr i) (
+    (var id (array_get short (+ ptr i) 0))
+    (output_char ochan ' ')
+    (output_string ochan (array_get string prim_names id))
+    ))
+
+    ))
+
+(var put_func `(
+    (byte   . emit_byte)
+    (short  . emit_short)
+    (ushort . emit_short)
+    (int    . emit_int)
+    (prim   . emit_prim)
+    (object . emit_object)
+    (addr   . emit_addr)
+    (laddr  . emit_laddr)
+    ))
+
+(set code 0)
+(foreach i vm_instructions (do
+    (var args `(c))
+    (var body `((emit_byte c @code)))
+    (var name (symbol2s (car i)))
+    (var operands (cadr i))
+    (var j 0)
+    (foreach opd operands (do
+        (var arg (s++ `arg j))
+        (push body `(@(assoc opd put_func) c @arg))
+        (push args arg)
+        (incr j)
+        ))
+    (= body (reverse body))
+    (= args (reverse args))
+    (push code-base `(export fun @(s++ `put_ name) @args @body))
+    (incr code)
+    ))
+
+(compile `object code-base)

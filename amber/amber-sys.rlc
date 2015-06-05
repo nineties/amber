@@ -1,0 +1,49 @@
+;
+; rowl - 1st generation
+; Copyright (C) 2010 nineties
+;
+; $Id: amber-sys.rlc 2014-04-23 23:55:23 nineties $
+;
+
+(import "rlvm-compile")
+(import "amber-types")
+
+(compile `object `(
+
+(import "amber-util")
+(import "amber-node")
+(import "amber-object")
+(import "amber-compile")
+(import "amber-error")
+(import "amber-numeric")
+
+(fun sys_chdir (path) (
+    (if (< (chdir path) 0)
+        (throw (os_error (string
+            (strcat "Failed to change directory to " path)))))
+    (return @C_TRUE)
+    ))
+
+(fun sys_getcwd () (
+    (var cwd (getcwd))
+    (if (! cwd) (throw
+        (os_error (string "Failed to get current working directory"))))
+    (return cwd)
+    ))
+
+(fun sys_exist (path) (
+    (if (file_exists path) (return @C_TRUE) (return @C_FALSE))
+    ))
+
+(fun sys_mtime (path) (
+    (return (norm (uint_to_bint (mtime path))))
+    ))
+
+(export fun setup_sys (mod) (
+    (add_function1 mod (to_sym "chdir") stringT sys_chdir 0)
+    (add_function0 mod (to_sym "getcwd") sys_getcwd 0)
+    (add_function1 mod (to_sym "file_exist?") stringT sys_exist 0)
+    (add_function1 mod (to_sym "mtime") stringT sys_mtime 0)
+    ))
+
+    ))
