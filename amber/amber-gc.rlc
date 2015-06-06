@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2012 nineties
 ;
-; $Id: amber-gc.rlc 2014-02-17 23:46:04 nineties $
+; $Id: amber-gc.rlc 2015-06-06 17:36:20 nineties $
 ;
 
 (import "rlvm-compile")
@@ -14,15 +14,29 @@
 (import "amber-node")
 (import "amber-compile")
 (import "amber-symbol")
+(import "amber-numeric")
 
-(fun gc_start () (
+(extern fun tuple2)
+
+(fun start () (
     (garbage_collect)
     (return @C_NIL)
     ))
 
-(export fun setup_gc (std) (
-    (var GC (create_module std (to_sym "GC")))
-    (add_function0 GC (to_sym "start") gc_start 0)
+(fun used () (
+    (var used (gc_used))
+    (var alloc (gc_allocated))
+    (return (tuple2 (box used) (box alloc)))
+    ))
+
+(fun addressof (obj) (
+    (return (norm (uint_to_bint obj)))
+    ))
+
+(export fun setup_gc (mod) (
+    (add_function0 mod (to_sym "GC_start") start 0)
+    (add_function0 mod (to_sym "GC_used") used 0)
+    (add_function1 mod (to_sym "GC_addressof") DontCare addressof 0)
     ))
 
     ))

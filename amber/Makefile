@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2015-06-05 23:08:38 nineties $
+# $Id: Makefile 2015-06-06 17:18:01 nineties $
 
 TOPDIR = ..
 ROWL0DIR = $(TOPDIR)/rowl0
@@ -108,7 +108,8 @@ AMBOBJECTS = amber-main.rlo\
 			  amber-io.rlo\
 			  amber-pprint.rlo\
 			  amber-encoding.rlo\
-			  amber-sys.rlo
+			  amber-sys.rlo\
+			  amber-gc.rlo
 
 RLVMCOMPILER = rlci\
 		   stdlib.rlc\
