@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: CAST/Cgen.ab 2014-04-23 17:19:15 nineties $
+# $Id: CAST/Cgen.ab 2015-06-07 16:15:27 nineties $
 
 import pretty_print as P
 
@@ -15,8 +15,8 @@ pp_primary(BoolL{true})  := "TRUE"
 pp_primary(BoolL{false}) := "FALSE"
 pp_primary(IntL{n})      := str(n)
 pp_primary(FloatL{f})    := str(f)
-pp_primary(CharL{s})     := "'" + s.escape() + "'"
-pp_primary(StringL{s})   := "\"" + s.escape() + "\""
+pp_primary(CharL{s})     := "'" ++ s.escape() ++ "'"
+pp_primary(StringL{s})   := "\"" ++ s.escape() ++ "\""
 pp_primary(Var{s})       := str(s)
 
 pp_postfix := pp_primary
@@ -105,9 +105,9 @@ pp_arglist(args) := ["(", args.map(pp_assign).weave(","), ")"]
 #== Types ==
 
 pp_primary_type(t) := ["(", pp_type(t), ")"]
-pp_primary_type(EnumT{name})   := "enum " + name
-pp_primary_type(UnionT{name})  := "union " + name
-pp_primary_type(StructT{name}) := "struct " + name
+pp_primary_type(EnumT{name})   := "enum " ++ name
+pp_primary_type(UnionT{name})  := "union " ++ name
+pp_primary_type(StructT{name}) := "struct " ++ name
 pp_primary_type(t @ Symbol)    := str(t)
 
 pp_postfix_type := pp_primary_type
@@ -163,7 +163,7 @@ pp_stmt(Break{})     := "break;"
 pp_stmt(Return{e})   := ["return ", pp_expr(e), ";"]
 pp_stmt(Return{nil}) := "return;"
 
-pp_storage(s)     := str(s) + " "
+pp_storage(s)     := str(s) ++ " "
 pp_storage('none) := ""
 
 pp_fundecl(DefFunc{storage, type, name, params, body})
@@ -187,14 +187,22 @@ write_header(out, compiler) := {
         compiler.input_file
         )
     # XXX: Output other configurations.
+    out.print("\n")
 }
 
 generate(compiler, CASTProgram{lines}) := {
     out := io::open_out(compiler.output_file)
     write_header(out, compiler)
     for line in lines {
-        out.print("\n")
         generate_line(out, line)
+        out.print("\n")
     }
     out.close()
+}
+
+print(out, CASTProgram{lines}) := {
+    for line in lines {
+        generate_line(out, line)
+        out.print("\n")
+    }
 }
