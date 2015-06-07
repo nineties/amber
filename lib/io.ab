@@ -1,5 +1,5 @@
 # Copyright (C) 2014 nineties
-# $Id: io.ab 2014-04-22 16:15:37 nineties $
+# $Id: io.ab 2015-06-07 14:46:15 nineties $
 
 #= IO =
 # Input and output stream.
@@ -440,14 +440,25 @@ printf(oss, fmt @ String, args...) when oss.OutputStream? := {
             w := parse_number(iss)
             p := parse_prec(fmt, iss)
             t := prim.iss_read_char(iss, false)
+            if t == "%" {
+                oss.write("%")
+                continue
+            }
             if args == []
                 throw `MissingArgument{
                     !("argument for %" ++ t ++ " is missing")}
-            print_element(oss, t,f,w,p,first(args))
+            print_element(oss, t, f, w, p, first(args))
             args = rest(args)
         }
     }
     if args != []
         throw `InvalidArgument{"Number of arguments doesn't match", !args}
     nil
+}
+
+# Generate string with given format `fmt` and `args`.
+format(fmt @ String, args...) := {
+    oss := prim.oss_new(false)
+    oss.printf(fmt, args...)
+    str(oss)
 }
