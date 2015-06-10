@@ -3,7 +3,7 @@
 # Copyright (C) 2010 nineties
 #
 
-# $Id: Makefile 2015-06-06 17:18:01 nineties $
+# $Id: Makefile 2015-06-10 18:51:57 nineties $
 
 TOPDIR = ..
 ROWL0DIR = $(TOPDIR)/rowl0
@@ -122,7 +122,7 @@ RLVMCOMPILER = rlci\
 startup.rlo		: $(RLVMCOMPILER)
 amber-main.rlo	 : $(RLVMCOMPILER) amber-types.rlc amber-interp.rlo
 amber-util.rlo	 : $(RLVMCOMPILER) amber-types.rlc
-amber-interp.rlo   : $(RLVMCOMPILER) amber-types.rlc amber-util.rlo amber-node.rlo amber-error.rlo amber-object.rlo amber-symtable.rlo amber-compile.rlo amber-packrat.rlo amber-pprint.rlo amber-math.rlo amber-tuple.rlo amber-array.rlo
+amber-interp.rlo   : $(RLVMCOMPILER) amber-types.rlc amber-util.rlo amber-node.rlo amber-error.rlo amber-object.rlo amber-symtable.rlo amber-assemble.rlo amber-compile.rlo amber-packrat.rlo amber-pprint.rlo amber-math.rlo amber-tuple.rlo amber-array.rlo
 amber-node.rlo	 : $(RLVMCOMPILER) amber-types.rlc amber-util.rlo
 amber-error.rlo: $(RLVMCOMPILER) amber-types.rlc amber-util.rlo amber-node.rlo
 amber-object.rlo : $(RLVMCOMPILER) amber-types.rlc amber-util.rlo amber-node.rlo amber-compile.rlo amber-error.rlo

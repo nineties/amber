@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: amber-interp.rlc 2015-06-06 17:24:24 nineties $
+; $Id: amber-interp.rlc 2015-06-10 18:54:16 nineties $
 ;
 
 (import "rlvm-compile")
@@ -15,6 +15,7 @@
 (import "amber-error")
 (import "amber-object")
 (import "amber-symtable")
+(import "amber-assemble")
 (import "amber-compile")
 (import "amber-packrat")
 (import "amber-pprint")
@@ -130,7 +131,7 @@
     (set_var amber (to_sym "VERSION") (version_string))
     (set_var amber (to_sym "ENV") (construct_env))
     (setup_minimal_interpreter prim)
-    (load_file "boot.ab")
+    (boot)
     (eval_exit @C_NIL)
     (return 0)
     ))
@@ -411,6 +412,21 @@
     (= global mod)
     (= module_stack (cdr module_stack))
     (return mod)
+    ))
+
+(fun boot () (
+    (var asm_boot (make_assembler))
+    (put_push asm_boot (string "boot.ab"))
+    (put_imm_int32 asm_boot load_file)
+    (put_acall asm_boot 0)
+    (put_ireturn asm_boot)
+
+    (var asm_reset (make_assembler))
+    
+    (put_push asm_reset (get_code asm_boot))
+    (put_rcall asm_reset)
+    (put_ireturn asm_reset)
+    (runcode (get_code asm_reset))
     ))
 
 (export fun load_global (sym) (
