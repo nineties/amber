@@ -22,6 +22,8 @@ self-extension of Amber is easy and has high-degree of freedom.
 Installation
 ------------
 
+Amber can be compiled only in Linux environment now.
+
     % git clone https://github.com/nineties/amber.git
     % cd amber
     % make
