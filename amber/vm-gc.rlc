@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2015-06-07 14:20:01 nineties $
+; $Id: vm-gc.rlc 2015-06-19 10:20:52 nineties $
 ;
 
 (import "stdlib")
@@ -156,6 +156,13 @@
 (extern int num_gobject)
 (extern int wrtable_GC_ran)
 (extern void* exstack)
+
+; Stack for Shift/Reset delimited continuation
+; frame structure:
+;   word 0: stack top at reset
+;   word 1: base pointer
+;   word 2: size of evacuated stack
+;   word 3: pointer to the next frame
 (extern void* resetstack)
 
 (byte[] @(* BDESCR_SIZE MAX_BLOCKS) block_map)
@@ -314,7 +321,6 @@
     (while p (
         (promote_page ([] p 0))
         (promote_page ([] p 1))
-        (promote_page ([] p 2))
         (promote_page ([] p 3))
         (= p ([] p 3))
         ))
@@ -876,24 +882,37 @@
     (return ([] obj 2))
     ))
 
+(fun print_reset_stack () (
+    (void* p resetstack)
+    (while p (
+        (debug "frame")
+        (debugx ([] p 0))
+        (debugx ([] p 1))
+        (debugx ([] p 2))
+        (debugx ([] p 3))
+        (= p ([] p 3))
+        ))
+    ))
+
 ; shift-reset base partial continuation
 (export prim_make_continuation)
 (fun prim_make_continuation (pc base low high) (
+    (print_reset_stack)
     (-= high @(* 6 WORD_SIZE))  ; remove unnecessary stack words
-    ;(debug "prim_make_continuation\n")
-    ;(debug "pc  =") (debugx pc)
-    ;(debug "base=") (debugx base)
-    ;(debug "low =") (debugx low)
-    ;(debug "high=") (debugx high)
-    ;(debug "size=") (debugi (/ (- high low) @WORD_SIZE))
+    (debug "prim_make_continuation\n")
+    (debug "pc  =") (debugx pc)
+    (debug "base=") (debugx base)
+    (debug "low =") (debugx low)
+    (debug "high=") (debugx high)
+    (debug "size=") (debugi (/ (- high low) @WORD_SIZE))
     (int size (- high low))
     (void* stack (prim_allocate_iarray size))
     (prim_memcpy stack low size)
-    ;(debug "--stack--\n")
-    ;(for i 0 (/ size @WORD_SIZE) (
-    ;    (debugx ([] stack i))
-    ;    ))
-    ;(debug "---------\n")
+    (debug "--stack--\n")
+    (for i 0 (/ size @WORD_SIZE) (
+        (debugx ([] stack i))
+        ))
+    (debug "---------\n")
     (void* ptr (allocate_object 7))
     @(SET_HEADER ptr TAG_CONT 0 7)
     (+= ptr @WORD_SIZE)
