@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2015-06-21 18:57:08 nineties $
+; $Id: vm-gc.rlc 2015-06-21 21:12:08 nineties $
 ;
 
 (import "stdlib")
@@ -882,6 +882,7 @@
     (return ([] obj 2))
     ))
 
+(export print_resetstack)
 (fun print_resetstack () (
     (debug "==== reset stack ====\n")
     (void* p resetstack)
@@ -895,6 +896,20 @@
         (debugx ([] p 2))
         (= p ([] p 3))
         ))
+    ))
+
+(export print_vmstack)
+(fun print_vmstack () (
+    (debug "==== VM stack ====\n")
+    (debug "top\n")
+    (void* p)
+    (asm "movl %esi, " p)
+    (void* end (+ stack stack_size))
+    (while (< p end) (
+        (debugx ([] p 0))
+        (+= p @WORD_SIZE)
+        ))
+    (debug "bottom\n")
     ))
 
 ; shift-reset base partial continuation
