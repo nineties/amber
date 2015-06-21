@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-compile.rlc 2015-06-21 18:52:57 nineties $
+; $Id: vm-compile.rlc 2015-06-21 19:42:10 nineties $
 ;
 
 ; a compiler for compiling virtual machine code
@@ -647,21 +647,20 @@
     (if ret (emit_return `(return) nil nil))
     ))
 
-(define emit_dputs ((_ msg) _ ret) (do
+(define emit_dbgblock ((_ exprs) _ _) (do
     (println "\tpushl %eax")
     (println "\tpushl %ebx")
     (println "\tpushl %ecx")
     (println "\tpushl %edx")
     (println "\tpushl %esi")
     (println "\tpushl %edi")
-    (emit_call `(call debug @msg) nil nil)
+    (foreach e exprs (emit_expr e nil nil))
     (println "\tpopl %edi")
     (println "\tpopl %esi")
     (println "\tpopl %edx")
     (println "\tpopl %ecx")
     (println "\tpopl %ebx")
     (println "\tpopl %eax")
-    (if ret (emit_return `(return) nil nil))
     ))
 
 (var expr_callbacks `(
@@ -732,7 +731,7 @@
     (address . @emit_addressof)
     (bsr     . @emit_bsr)
     (asm     . @emit_asm)
-    (dputs   . @emit_dputs)
+    (dbgblock  . @emit_dbgblock)
     ))
 
 (define emit_expr args (dispatch expr_callbacks emit_expr_default args))
