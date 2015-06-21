@@ -2,7 +2,7 @@
 ; rowl - 1st generation
 ; Copyright (C) 2010 nineties
 ;
-; $Id: vm-gc.rlc 2015-06-19 10:20:52 nineties $
+; $Id: vm-gc.rlc 2015-06-21 15:16:17 nineties $
 ;
 
 (import "stdlib")
@@ -883,11 +883,15 @@
     ))
 
 (fun print_reset_stack () (
+    (debug "==== reset stack ====\n")
     (void* p resetstack)
     (while p (
-        (debug "frame")
+        (debug "> frame\n")
+        (debug "stack pointer:   ")
         (debugx ([] p 0))
+        (debug "base pointer:    ")
         (debugx ([] p 1))
+        (debug "program counter: ")
         (debugx ([] p 2))
         (debugx ([] p 3))
         (= p ([] p 3))
@@ -897,22 +901,22 @@
 ; shift-reset base partial continuation
 (export prim_make_continuation)
 (fun prim_make_continuation (pc base low high) (
-    (print_reset_stack)
+    ;(print_reset_stack)
     (-= high @(* 6 WORD_SIZE))  ; remove unnecessary stack words
-    (debug "prim_make_continuation\n")
-    (debug "pc  =") (debugx pc)
-    (debug "base=") (debugx base)
-    (debug "low =") (debugx low)
-    (debug "high=") (debugx high)
-    (debug "size=") (debugi (/ (- high low) @WORD_SIZE))
+    ;(debug "prim_make_continuation\n")
+    ;(debug "pc  =") (debugx pc)
+    ;(debug "base=") (debugx base)
+    ;(debug "low =") (debugx low)
+    ;(debug "high=") (debugx high)
+    ;(debug "size=") (debugi (/ (- high low) @WORD_SIZE))
     (int size (- high low))
     (void* stack (prim_allocate_iarray size))
     (prim_memcpy stack low size)
-    (debug "--stack--\n")
-    (for i 0 (/ size @WORD_SIZE) (
-        (debugx ([] stack i))
-        ))
-    (debug "---------\n")
+    ;(debug "--stack--\n")
+    ;(for i 0 (/ size @WORD_SIZE) (
+    ;    (debugx ([] stack i))
+    ;    ))
+    ;(debug "---------\n")
     (void* ptr (allocate_object 7))
     @(SET_HEADER ptr TAG_CONT 0 7)
     (+= ptr @WORD_SIZE)
@@ -920,7 +924,7 @@
     ([]= ptr 1 0)   ; cache
     ([]= ptr 2 (- base low)) ; offset of base ptr
     ([]= ptr 3 stack)
-    ([]= ptr 4 (/ size @WORD_SIZE))
+    ([]= ptr 4 size)
     ([]= ptr 5 continuation_list)
     (= continuation_list ptr)
     (return ptr)
