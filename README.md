@@ -38,6 +38,7 @@ Information
 -----------
 * [Project Page](http://nineties.github.com/amber/)
 * [GitHub](http://github.com/nineties/amber)
+* [Creating a language using only assembly language](https://speakerdeck.com/nineties/creating-a-language-using-only-assembly-language)
 
 Contact
 -------
