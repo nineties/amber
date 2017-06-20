@@ -29,6 +29,12 @@ Amber can be compiled only in Linux environment now.
     % make
     % make install
 
+Alternatively, if you would like to install it to a local prefix:
+
+* Set `PREFIX` in config.mk to the desired location
+* `export PATH=$PREFIX/usr/bin:$PREFIX/amber/usr/lib/amber/bin:$PATH`
+* `export LD_LIBRARY_PATH=$PREFIX/usr/lib/`
+
 License
 -------
 Amber is published under the MIT License. See COPYING for the details of this

@@ -5,7 +5,10 @@
 
 # $Id: Makefile 2015-06-05 22:54:18 nineties $
 
-LIBDIR = /usr/lib
+include config.mk
+
+BINDIR = ${PREFIX}/usr/bin
+LIBDIR = ${PREFIX}/usr/lib
 
 all: 
 	cd rowl0; $(MAKE)
@@ -13,6 +16,7 @@ all:
 
 install:
 	cd amber; $(MAKE) install_binaries install_libraries
+	sed -i -e "s|PREFIX|$(PREFIX)|g" $(BINDIR)/amber
 	mkdir -p $(LIBDIR)/amber
 	cp -ur lib/* $(LIBDIR)/amber
 	@echo exit | amber --preparse > /dev/null
