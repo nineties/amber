@@ -5,10 +5,12 @@
 
 # $Id: Makefile 2015-06-10 18:51:57 nineties $
 
+include ../config.mk
+
 TOPDIR = ..
 ROWL0DIR = $(TOPDIR)/rowl0
-BINDIR = /usr/bin
-LIBDIR = /usr/lib
+BINDIR = $(PREFIX)/usr/bin
+LIBDIR = $(PREFIX)/usr/lib
 
 AS = as
 ASFLAGS = --32
